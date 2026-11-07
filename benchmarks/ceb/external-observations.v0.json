@@ -4066,7 +4066,15 @@
         "unit": "USD_per_task",
         "direction": "minimize",
         "raw_display": "$17",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_cost_per_task",
+          "applies_to_task_count": 53
+        }
       },
       "notes": [
         "Paper/page pricing assumptions; not a live provider quote."
@@ -4092,7 +4100,15 @@
         "unit": "USD_per_task",
         "direction": "minimize",
         "raw_display": "$12",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_cost_per_task",
+          "applies_to_task_count": 53
+        }
       },
       "notes": [
         "Paper/page pricing assumptions; not a live provider quote."
@@ -4118,7 +4134,15 @@
         "unit": "minutes_per_task",
         "direction": "minimize",
         "raw_display": "57.5 minutes",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_wall_time",
+          "applies_to_task_count": 53
+        }
       },
       "notes": []
     },
@@ -4142,7 +4166,15 @@
         "unit": "minutes_per_task",
         "direction": "minimize",
         "raw_display": "29.5 minutes",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_wall_time",
+          "applies_to_task_count": 53
+        }
       },
       "notes": []
     },
@@ -4166,7 +4198,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "69.4%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_rate_without_live_e2e",
+          "applies_to_task_count": 19
+        }
       },
       "notes": []
     },
@@ -4190,7 +4230,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "45.9%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_rate_with_full_verifier",
+          "applies_to_task_count": 19
+        }
       },
       "notes": []
     },
@@ -4214,7 +4262,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "13.50%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "strict_fullcycle_solve_rate",
+          "applies_to_task_count": 489
+        }
       },
       "notes": []
     },
@@ -4238,7 +4294,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "96.9%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "judge_human_alignment",
+          "applies_to_task_count": 489
+        }
       },
       "notes": []
     },
@@ -4262,7 +4326,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "67.7%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 186
+        }
       },
       "notes": []
     },
@@ -4286,7 +4358,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "65.3%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 186
+        }
       },
       "notes": []
     },
@@ -4310,7 +4390,15 @@
         "unit": "percent",
         "direction": "maximize",
         "raw_display": "61.2%",
-        "uncertainty": null
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 186
+        }
       },
       "notes": []
     }
