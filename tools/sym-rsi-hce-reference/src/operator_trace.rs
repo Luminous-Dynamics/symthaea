@@ -51,8 +51,15 @@ pub struct OperatorTrace {
     pub max_tool_calls: u32,
     pub wall_clock_budget_ms: u64,
     pub max_resource_cost_units: f64,
-    pub allowed_tools: Vec<String>,
+    pub allowed_tools: Vec<ToolPermissionSpec>,
     pub actions: Vec<OperatorAction>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolPermissionSpec {
+    pub tool_id: String,
+    pub permission_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,6 +120,7 @@ pub enum OperatorTraceError {
     ToolBudgetExceeded,
     ToolCallPermissionMissing(u32),
     ToolNotAllowed { step: u32, tool_id: String },
+    ToolPermissionMismatch(u32),
     ToolPermissionUnexpected(u32),
     InvalidActionDigest { step: u32, field: &'static str },
     ToolNotAllowedForAction(u32),
@@ -164,13 +172,17 @@ impl OperatorTrace {
             return Err(OperatorTraceError::EmptyAllowedTools);
         }
 
-        let mut allowed = BTreeSet::new();
+        let mut allowed = std::collections::BTreeMap::new();
+        let mut permissions = BTreeSet::new();
         for tool in &self.allowed_tools {
-            if !non_empty(tool) {
-                return Err(OperatorTraceError::EmptyIdentifier("allowed_tool"));
+            if !non_empty(&tool.tool_id) || !non_empty(&tool.permission_id) {
+                return Err(OperatorTraceError::EmptyIdentifier("tool_permission"));
             }
-            if !allowed.insert(tool.as_str()) {
-                return Err(OperatorTraceError::DuplicateAllowedTool(tool.clone()));
+            if allowed.insert(tool.tool_id.as_str(), tool.permission_id.as_str()).is_some() {
+                return Err(OperatorTraceError::DuplicateAllowedTool(tool.tool_id.clone()));
+            }
+            if !permissions.insert(tool.permission_id.as_str()) {
+                return Err(OperatorTraceError::DuplicateAllowedTool(tool.permission_id.clone()));
             }
         }
         if self.actions.is_empty() {
@@ -253,11 +265,14 @@ impl OperatorTrace {
                     .as_deref()
                     .filter(|value| non_empty(value))
                     .ok_or(OperatorTraceError::ToolCallPermissionMissing(action.step))?;
-                if !allowed.contains(tool_id) {
-                    return Err(OperatorTraceError::ToolNotAllowed {
+                let expected_permission = allowed.get(tool_id).ok_or_else(|| {
+                    OperatorTraceError::ToolNotAllowed {
                         step: action.step,
                         tool_id: tool_id.to_owned(),
-                    });
+                    }
+                })?;
+                if permission_id != *expected_permission {
+                    return Err(OperatorTraceError::ToolPermissionMismatch(action.step));
                 }
                 if action.input_sha256.as_deref().is_none_or(|digest| !valid_digest(digest)) {
                     return Err(OperatorTraceError::InvalidActionDigest {
@@ -265,7 +280,6 @@ impl OperatorTrace {
                         field: "input_sha256",
                     });
                 }
-                let _ = permission_id;
                 if action.disposition == OperatorActionDisposition::Succeeded
                     && action.output_sha256.as_deref().is_none_or(|digest| !valid_digest(digest))
                 {
@@ -486,6 +500,16 @@ mod tests {
         assert_eq!(
             trace.validate().expect_err("permission required"),
             OperatorTraceError::ToolCallPermissionMissing(1)
+        );
+    }
+
+    #[test]
+    fn rejects_tool_call_with_wrong_permission_for_allowlisted_tool() {
+        let mut trace = valid_trace();
+        trace.actions[0].permission_id = Some("perm-exec-sandbox".to_owned());
+        assert_eq!(
+            trace.validate().expect_err("tool must use its bound permission"),
+            OperatorTraceError::ToolPermissionMismatch(1)
         );
     }
 
