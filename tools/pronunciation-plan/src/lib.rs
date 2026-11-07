@@ -1026,6 +1026,11 @@ mod tests {
         alignment.events[1].start_s = 0.5;
         let error = alignment.validate_against(&pronunciation).unwrap_err();
         assert!(error.contains("explicit Rest"), "{error}");
+
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.events[0].start_s = 0.25;
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("begin at time zero"), "{error}");
     }
 
     #[test]
