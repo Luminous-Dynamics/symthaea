@@ -252,7 +252,7 @@ def validate_contract(manifest: dict, proof: str) -> None:
         raise ContractError("generic workflow Fail incorrectly used as semantic counterevidence")
 
     evidence_closed_match = re.search(
-        r"inductive\s+EvidenceClosed\b(?P<body>.*?)(?=\n/--\nFinite first-kernel closure)",
+        r"structure\s+EvidenceClosed\b(?P<body>.*?)(?=\n/--\nFinite first-kernel closure)",
         proof,
         re.S,
     )
@@ -279,7 +279,7 @@ def validate_contract(manifest: dict, proof: str) -> None:
         if term not in closed:
             raise ContractError(f"Closed lost mandatory term: {term}")
 
-    if "rank prerequisite.evidenceId < rank e.evidenceId" not in proof:
+    if "rank prerequisite.evidenceId < rank node.evidenceId" not in proof:
         raise ContractError("recursive EvidenceClosed rank decrease missing")
     if "rank prerequisite < rank dependent" not in proof:
         raise ContractError("rank-decreasing DependencyPath edge missing")
