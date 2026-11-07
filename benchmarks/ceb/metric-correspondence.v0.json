@@ -470,12 +470,11 @@
         "reviewbench-ohmybug-grounded-precision",
         "crbench-gpt52-reflexion-usefulness",
         "codereviewbench-deepseek-v4-pro-precision",
-        "kodus-deepseek-v4-pro-precision",
         "martian-greptile-precision",
         "martian-cubic-dev-ai-precision",
         "martian-qodo-code-review-precision"
       ],
-      "rationale": "ReviewBench grounded precision, Kodus CodeReviewBench precision and CR-Bench-v2 Usefulness Rate are informative but differently labeled. Martian's adoption precision is based on LLM analysis of production bot suggestions and developer follow-up, not independent adjudication of factual defect/actionability. All are related-but-distinct contextual references, not exact CEB actionable precision.",
+      "rationale": "ReviewBench grounded precision, Kodus CodeReviewBench precision, CR-Bench-v2 Usefulness Rate and Martian production-adoption precision are informative but differently labeled. Martian's adoption precision is based on LLM analysis of production bot suggestions and developer follow-up, not independent adjudication of factual defect/actionability. All are related-but-distinct contextual references, not exact CEB actionable precision.",
       "blockers": [
         "ReviewBench's high-severity classifier/matcher and scope differ from CEB blinded actionable-precision adjudication",
         "CR-Bench-v2 Usefulness Rate includes valid suggestions and uses a one-known-defect task design; judge calibration differs",
@@ -484,7 +483,8 @@
         "ReviewBench and CR-Bench-v2 use distinct classifiers/rubrics and task definitions",
         "Kodus uses a single Claude Haiku 4.5 judge and one model run; its CI is task-sampling-only",
         "Martian adoption precision reflects developer follow-up and LLM analysis, not independent defect adjudication",
-        "Per-system sample sizes and benchmark denominators are not common across all comparators"
+        "Per-system sample sizes and benchmark denominators are not common across all comparators",
+        "Kodus CodeReviewBench uses one Claude Haiku 4.5 judge and one model run; its recall CI is task-sampling-only"
       ],
       "normalization_requirements": [
         "apply one frozen CEB actionable rubric to identical PRs and findings",
