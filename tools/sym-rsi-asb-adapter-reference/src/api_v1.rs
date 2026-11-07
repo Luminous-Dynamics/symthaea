@@ -512,6 +512,34 @@ impl DeliverableResponse {
 mod tests {
     use super::*;
 
+    const NUCLEASE_CARD: &str =
+        include_str!("../fixtures/asb_lab_v1/nuclease_campaign_card.json");
+    const PROPYLENE_CARD: &str =
+        include_str!("../fixtures/asb_lab_v1/propylene_campaign_card.json");
+
+    #[test]
+    fn parses_exact_pinned_upstream_nuclease_public_card() {
+        let card = CampaignCard::parse_public(NUCLEASE_CARD).expect("pinned nuclease card");
+        assert_eq!(card.campaign_id, "deepmind/nuclease-active-learning");
+        assert_eq!(card.design_id_field, "variant_id");
+        assert_eq!(card.budget.total, 384);
+        assert_eq!(card.stages.len(), 4);
+        assert!(card.stages.iter().all(|stage| stage.batch_size == 96));
+        assert!(card.design_space.as_ref().is_some_and(|space| space.shared_pool == Some(true)));
+    }
+
+    #[test]
+    fn parses_exact_pinned_upstream_propylene_twin_public_card() {
+        let card = CampaignCard::parse_public(PROPYLENE_CARD).expect("pinned propylene card");
+        assert_eq!(card.campaign_id, "sargent-lab/propylene-active-learning");
+        assert_eq!(card.design_id_field, "composition");
+        assert_eq!(card.budget.total, 60);
+        assert_eq!(card.stages.len(), 3);
+        assert!(card.stages.iter().all(|stage| stage.batch_size == 20));
+        assert!(card.design_space.as_ref().is_some_and(|space| space.shared_pool == Some(true)));
+        assert!(card.deliverable.description.contains("predict(composition)"));
+    }
+
     fn campaign_card() -> CampaignCard {
         CampaignCard {
             ok: true,
