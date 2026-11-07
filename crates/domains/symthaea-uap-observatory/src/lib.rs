@@ -806,6 +806,7 @@ pub use tracking_metrics::{
 pub mod trajectory_metrics;
 
 pub use trajectory_metrics::{
-    MAX_OSPA2_ASSIGNMENT_SIDE, Ospa2Breakdown, Ospa2Config, Ospa2Error, TrackSeries,
+    MAX_OSPA2_ASSIGNMENT_SIDE, MAX_OSPA2_WINDOW_LENGTH, Ospa2Breakdown, Ospa2Config,
+    Ospa2Error, TrackSeries,
     ospa2_track_distance, ospa2_track_sets,
 };
