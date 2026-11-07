@@ -55,9 +55,15 @@ Existing components:
 - The original `symthaea-fractal-time-lab::floquet_time_crystal` remains a
   classical scalar period-two surrogate with an FFT subharmonic score.
 - A new `symthaea-fractal-time-lab::exact_floquet` module now implements exact
-  complex state-vector evolution for a finite open-boundary kicked-Ising chain,
-  with nearest-neighbour ZZ interactions, longitudinal fields and a global X
-  pulse. Its example compares interacting and noninteracting traces.
+  complex state-vector evolution for finite kicked-Ising interaction graphs,
+  including 1D chains and 2D open square lattices, with ZZ couplings,
+  longitudinal fields and a global X pulse.
+- It includes finite-window subharmonic response statistics, zero-interaction
+  controls, 1D and 2D coupling/drive sweeps, and independent Python reference
+  results for finite systems up to 3x3 spins.
+- The graph oracle is exact only for its small finite Hilbert space (currently
+  capped at 20 spins); it is not a thermodynamic-limit solver or a DTC phase
+  proof.
 
 Known limitation of the original scalar surrogate:
 - It is not a quantum many-body Hamiltonian simulator.
@@ -68,6 +74,11 @@ Known limitation of the original scalar surrogate:
   to generic perturbations.
 - The new exact state-vector oracle is a small-system reference, not a
   many-body thermodynamic-limit solver or a DTC phase demonstration.
+- Independent finite-window sweeps show strong subharmonic response for a
+  symmetry-broken all-up/all-down product initial state at moderate ZZ
+  coupling, while the zero-coupling control loses phase coherence under pulse
+  errors. Mixed initial states do not show the same uniform magnetization
+  order. Stronger coupling is not monotonically better in small graphs.
 - Its current semantic-stream adapter uses a single zero null score and one
   dimension at a time; this is not a suitable inferential design.
 
@@ -283,7 +294,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals (prototype added) | Rust tests + independent volume, distribution and boost checks |
 | CTGP-04 | Chain Theory reproduction | Independent std-only record enumerator and radical-sum audit (prototype added) | Per-record CSV match + Lean 4.35.0/axiom audit |
 | CTGP-05 | Chain Theory stress tests | Alternative choices, uniqueness and sensitivity analysis | All assumptions enumerated; blind alternatives |
-| CTGP-06 | Quantum DTC simulator | Floquet Ising and anisotropic Heisenberg reference systems | Exact diagonalization agreement on small systems |
+| CTGP-06 | Quantum DTC simulator | Exact complex kicked-Ising graph oracle (1D/2D prototype added); anisotropic Heisenberg remains future work | Independent exact-diagonalization agreement on small systems |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | ADM 3+1 metric, constraints, geodesics and curvature | Minkowski, Schwarzschild and weak-field regression |
@@ -363,7 +374,7 @@ oracles, calibration provenance, falsification gates and reproducibility.
 | Area | Mature reference / current frontier | Symthaea current position | Credible path to compete |
 |---|---|---|---|
 | Causal sets | Analytic Myrheim–Meyer estimators and research codes; causal-set literature includes d'Alembertian, propagator and action work | New std-only kinematics prototypes in D=2,3,4; no dynamics | Match estimators and invariants; add higher-D efficient counting, curved embeddings, discrete wave operators and independent continuum tests |
-| Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact state-vector oracle only for small kicked-Ising chains; existing MPS/DMRG helpers are pedagogical | Match exact diagonalization; then implement and benchmark MPS/TEBD, validate against TeNPy/quimb/ITensor and published hardware observables |
+| Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact state-vector oracle for small 1D/2D kicked-Ising graphs; existing MPS/DMRG helpers remain pedagogical | Match independent exact diagonalization; then implement and benchmark MPS/TEBD, validate against TeNPy/quimb/ITensor and published hardware observables |
 | Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Classical toy detector plus new small exact Floquet oracle | Reproduce a published phase diagram, phase rigidity and lifetime scaling; only then investigate new higher-order or sensor protocols |
 | Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; 2026 Hypatia release adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings and a speculative GravCraft shift-field surrogate, not a GR solver | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
 | UAP / sensor analysis | NASA recommends purpose-built, calibrated multi-sensor data and complete metadata; existing reports are often insufficiently calibrated | New typed sensor/evidence contract only | Build a blind known-object set, calibration and trajectory reconstruction, uncertainty propagation and measured false-positive guarantees |
@@ -400,7 +411,8 @@ benchmark demonstrates it.
 3. Add coordinate-distribution and finite-size tests to the 2+1D / 3+1D
    causal-set implementation; then profile before optimizing O(N²) observables.
 4. Upgrade time-crystal phase-rigidity and lifetime metrics around the exact
-   small-system oracle; add external TeNPy/quimb reference comparison.
+   1D/2D kicked-Ising graph oracle; add independent exact-diagonalization and
+   external TeNPy/quimb reference comparisons.
 5. Extend the UAP evidence contract with synchronization, frame transforms,
    covariance propagation, track association and blind known-object tests.
 6. Build a separate GR metric kernel with analytic references before changing
