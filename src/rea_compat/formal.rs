@@ -485,6 +485,138 @@ impl<'de> Visitor<'de> for UniqueJsonVisitor {
     }
 }
 
+fn require_formal_object_keys(
+    value: &Value,
+    required: &[&str],
+    context: &str,
+) -> Result<(), FormalMappingError> {
+    let object = value.as_object().ok_or_else(|| {
+        FormalMappingError::new(
+            FormalMappingErrorKind::InvalidJson,
+            format!("{context} must be a JSON object"),
+        )
+    })?;
+    for key in required {
+        if !object.contains_key(*key) {
+            return Err(FormalMappingError::new(
+                FormalMappingErrorKind::InvalidJson,
+                format!("{context}.{key} is required, including when its value is null"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_formal_required_fields(value: &Value) -> Result<(), FormalMappingError> {
+    require_formal_object_keys(
+        value,
+        &[
+            "schema",
+            "mapping_rule",
+            "evidence_class",
+            "semantic_polarity",
+            "rea_disposition",
+            "binding",
+            "rea_evaluation",
+            "claim_ceiling",
+        ],
+        "formal envelope",
+    )?;
+    let binding = value.get("binding").unwrap_or(&Value::Null);
+    require_formal_object_keys(
+        binding,
+        &[
+            "claim_request_sha256",
+            "derivation_sha256",
+            "request_schema",
+            "result_schema",
+            "evaluator_rule_generation",
+            "evaluator_version",
+            "evaluator_rule_id",
+            "claim_id",
+            "predicate",
+            "subject_sha256",
+            "operation",
+            "platform",
+            "platform_version",
+            "environment_id",
+            "asserted_value",
+            "source_predicate_type",
+            "requested_evidence_ids",
+            "assumptions",
+            "falsification_condition",
+        ],
+        "formal envelope.binding",
+    )?;
+
+    let evaluation = value.get("rea_evaluation").unwrap_or(&Value::Null);
+    require_formal_object_keys(
+        evaluation,
+        &[
+            "schema",
+            "evaluator_version",
+            "rule_id",
+            "claim_id",
+            "claim_request_sha256",
+            "predicate",
+            "disposition",
+            "scope",
+            "asserted_value",
+            "source_predicate_type",
+            "requested_evidence_ids",
+            "assumptions",
+            "evidence_assessments",
+            "missing_evidence_ids",
+            "unmet_obligations",
+            "falsification_condition",
+            "claim_ceiling",
+            "derivation_sha256",
+        ],
+        "formal envelope.rea_evaluation",
+    )?;
+    let scope = evaluation.get("scope").unwrap_or(&Value::Null);
+    require_formal_object_keys(
+        scope,
+        &[
+            "subject_sha256",
+            "operation",
+            "platform",
+            "platform_version",
+            "environment_id",
+        ],
+        "formal envelope.rea_evaluation.scope",
+    )?;
+
+    let assessments = evaluation
+        .get("evidence_assessments")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            FormalMappingError::new(
+                FormalMappingErrorKind::InvalidJson,
+                "formal envelope.rea_evaluation.evidence_assessments must be an array",
+            )
+        })?;
+    for (index, assessment) in assessments.iter().enumerate() {
+        require_formal_object_keys(
+            assessment,
+            &[
+                "evidence_id",
+                "kind",
+                "provider_id",
+                "provider_name",
+                "provider_version",
+                "confidence",
+                "authority",
+                "reason",
+            ],
+            &format!(
+                "formal envelope.rea_evaluation.evidence_assessments[{index}]"
+            ),
+        )?;
+    }
+    Ok(())
+}
+
 /// Parse a formal envelope with a strict byte bound and closed, deny-unknown
 /// structs. Raw duplicate-key rejection remains the responsibility of the
 /// upstream REA request/result parser and replay verifier.
@@ -511,6 +643,7 @@ pub fn parse_formal_provider_observation_json(
             format!("formal provider-observation envelope has trailing data: {error}"),
         )
     })?;
+    validate_formal_required_fields(&value)?;
     let envelope: FormalProviderObservation = serde_json::from_value(value).map_err(|error| {
         FormalMappingError::new(
             FormalMappingErrorKind::InvalidJson,
