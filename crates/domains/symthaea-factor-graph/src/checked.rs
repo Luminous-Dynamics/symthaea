@@ -1149,7 +1149,7 @@ mod tests {
         *state ^= *state >> 12;
         *state ^= *state << 25;
         *state ^= *state >> 27;
-        state.wrapping_mul(0x2545_F491_4F6C_DD1D)
+        (*state).wrapping_mul(0x2545_F491_4F6C_DD1D)
     }
 
 
