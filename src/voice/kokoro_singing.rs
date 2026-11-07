@@ -706,14 +706,11 @@ mod tests {
             duration: 0.5,
             velocity: 0.7,
         };
-        let mut performance =
-            VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
         performance.syllables[0].consonant_advance_s = 0.1;
         let syllable = &performance.syllables[0];
         let source: Vec<f32> = (0..9_600)
-            .map(|index| {
-                (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin()
-            })
+            .map(|index| (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin())
             .collect();
         let rendered = render_syllable(source.as_slice(), syllable, sample_rate);
         // The output starts at 0.4s and still terminates at the 1.0s note end.
