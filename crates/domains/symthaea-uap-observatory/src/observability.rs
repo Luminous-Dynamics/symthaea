@@ -431,6 +431,28 @@ mod tests {
     }
 
     #[test]
+    fn stationary_target_cannot_identify_a_clock_offset() {
+        // With a static target and static sensors, changing the sensor clock
+        // offset does not change any predicted bearing. The fourth Jacobian
+        // column is therefore a true data-only null direction.
+        let report = analyze_jacobian(
+            &[
+                vec![2.0, 0.1, 0.0, 0.0],
+                vec![0.0, 1.5, 0.2, 0.0],
+                vec![0.1, 0.2, 1.0, 0.0],
+                vec![1.0, -0.4, 0.2, 0.0],
+            ],
+            &[1.0, 1.0, 1.0, 1.0],
+            1.0e-8,
+        )
+        .unwrap();
+
+        assert_eq!(report.numerical_rank, 3);
+        assert_eq!(report.nullity, 1);
+        assert!(report.weak_directions[0][3].abs() > 1.0 - 1.0e-10);
+    }
+
+    #[test]
     fn zero_information_jacobian_has_zero_rank() {
         let report =
             analyze_jacobian(&[vec![0.0, 0.0], vec![0.0, 0.0]], &[1.0, 1.0], 1.0e-8)
