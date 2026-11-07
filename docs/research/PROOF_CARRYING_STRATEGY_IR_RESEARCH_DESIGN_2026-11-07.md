@@ -286,3 +286,40 @@ This extension is motivated by:
 - Chede, Krishan & Shukla, *On Knowledge Compilation Languages for QBFs*, ECCC TR26-279, posted 27 October 2026. It explores tree/DAG representations, #QBF proof systems and an initial model counter that handles doubly exponential counts, compared against d4-QBF. https://eccc.weizmann.ac.il/report/2026/279/
 
 The next research objective is to compose quantifier-prefix validation, Skolem evidence, compiled representation guarantees and independently checked quantified result semantics. Keep actual quantified solving outside v1 until the proof objects and independent checker exist.
+
+
+## 16. Claim-specific proof backend capability
+
+A result status and a proof format are not interchangeable. The semantic verifier must reject evidence produced by a backend that cannot certify the exact claim, even if the producer says that verification succeeded.
+
+Model proof capability as a typed adapter contract, not another universal proof language:
+
+`ProofBackendCapability = (task kind, representation, claim kind, proof format/version, checker identity/version, input-binding rules, supported transformations, deterministic/randomized guarantee, resource profile)`
+
+Every admitted evidence object must bind:
+- immutable source problem / request identity;
+- task semantics, objective or quantifier prefix;
+- claim type (witness feasibility, UNSAT, exact count, projected count, weighted/algebraic count, quantified truth, #QBF count, optimization bound/optimality, completion);
+- proof-system and certificate format revision;
+- producer implementation/configuration identity;
+- independent checker implementation/build identity and outcome;
+- certificate digest/length and measured generation/checking resources.
+
+A theoretical simulation theorem, a checker binary, and a producer adapter are separate facts. A proof system may be theoretically stronger without being the most practical producer or checker. CPOG's simulation result over MICE and kcps does not establish universal practical speed or certificate-size dominance.
+
+Illustrative compatibility boundaries (subject to exact adapter/version review):
+- SAT UNSAT: DRAT/LRAT-family certificates checked against the exact CNF/assumptions; a SAT witness is checked directly against the source formula.
+- Exact #SAT / WMC: use a counting-specific proof system and a declared coefficient algebra; CPOG, MICE and kcps are research-relevant #SAT systems, not generic UNSAT proofs.
+- Projected counting: carry visible-scope identity and projected-compilation/Skolem evidence; an ordinary #SAT count is not a projected count certificate.
+- QBF / #QBF: preserve the quantifier prefix and Skolem dependency evidence; Q-MICE and the tree/DAG systems in TR26-279 are research targets, not currently qualified Symthaea backends.
+- MaxSAT optimality: an UNSAT proof for one bound is not a complete optimum certificate unless the lower-bound derivation is also checked. MaxSAT-specific core-guided proof logging and general pseudo-Boolean proof systems such as VeriPB are distinct candidate backends.
+- Approximate counting: validate the theorem/parameters, randomness source and confidence guarantee; arbitrary-precision or floating-point arithmetic alone is not an approximation guarantee.
+
+The capability registry should only point to existing proof/checker formats and versioned adapters. It must not introduce a second proof language or treat an unverified checker assertion as a proof.
+
+Research references:
+- CPOG / MICE / kcps / CLIP strength: https://doi.org/10.1007/s10817-026-09757-w
+- Projected knowledge compilation with Skolem assignments and HOL4-validated soundness: https://doi.org/10.4230/LIPIcs.SAT.2025.8
+- Q-MICE for #QBF: https://eccc.weizmann.ac.il/report/2026/101/
+- MaxSAT-specific proof logging for core-guided OLL: https://conf.researchr.org/details/ase-2025/ase-2025-papers/49/Efficient-and-Verifiable-Proof-Logging-for-MaxSAT-Solving
+- VeriPB's pseudo-Boolean proof format and current solver ecosystem: https://veripb.org/
