@@ -1390,7 +1390,7 @@ mod tests {
             maximum_sift_gap =
                 maximum_sift_gap.max(sifted.optimized_node_count - exact.minimum_node_count);
         }
-        assert!(maximum_sift_gap <= 1);
+        assert_eq!(maximum_sift_gap, 0, "three-variable sifting should match exact order search");
     }
 
     #[test]
@@ -1483,20 +1483,17 @@ mod tests {
 
     #[test]
     fn high_level_compiler_rejects_noncanonical_strategy_function_order() {
-        let first = function(&[0], &[false, true]);
+        let first = BooleanStrategyFunction {
+            variable: 2,
+            ..function(&[0], &[false, true])
+        };
         let second = BooleanStrategyFunction {
             variable: 1,
             ..function(&[0], &[false, true])
         };
         let strategy = WinningStrategy {
             owner: StrategyOwner::Existential,
-            functions: vec![
-                BooleanStrategyFunction {
-                    variable: 2,
-                    ..second.clone()
-                },
-                first,
-            ],
+            functions: vec![first, second],
         };
         assert!(matches!(
             compile_winning_strategy_functions(&strategy, budget()),
