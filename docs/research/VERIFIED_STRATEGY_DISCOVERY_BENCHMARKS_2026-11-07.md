@@ -315,3 +315,67 @@ Required workload measurements:
 Every reusable artifact must bind to source digest, task kind, assumptions/update revision, variable universe, objective and units, quantifier prefix/dependencies, transformation/hyperedge registry revision, solver/proof backend and checker contract. Any semantic mismatch must cause recomputation or rejection. Test stale bounds, witnesses, clauses, projected support, compiled representations and Skolem dependencies after query updates.
 
 The workload trace and per-transition evidence must use #10805's existing manifest/receipt format. Do not create a second provenance system. See [#10965](https://github.com/Luminous-Dynamics/symthaea/issues/10965) for the implementation workstream.
+
+
+## 12. Quantified Boolean formulas — strategy quality is the result
+
+Add a separate QBF evaluation lane. The central output is not only a TRUE/FALSE decision: it is a winning strategy whose dependencies and behavior can be checked against the original matrix.
+
+### External evaluation surface
+
+[QBFGallery 2026](https://qbf.pages.sai.jku.at/gallery26/) evaluates QBF and DQBF and defines these distinct tracks:
+- PCNF main track;
+- crafted instances;
+- random formulas;
+- 2QBF;
+- prenex non-CNF;
+- DQBF.
+
+It accepts QDIMACS, QCIR and DQDIMACS inputs. The gallery's 2026 event presentation took place at the QBF Workshop on 19 July 2026. The public page identifies a results presentation and benchmark collection, but this plan does not invent a numeric best-solver count where a machine-readable result table has not been pinned.
+
+### Competitive references and proof research
+
+- CAQE is described in a SAT 2026 paper as the strongest practice-wise QBF algorithmic paradigm and as clearly dominating recent QBF competitions. This is a literature characterization; it is not a complete current leaderboard or a strategy-extraction score. See *Towards Understanding the Complexity of CAQE: A Proof-Theoretic Analysis of Its Core Procedure*, SAT 2026 proceedings: https://drops.dagstuhl.de/entities/volume/LIPIcs-volume-377.
+- *Proof Systems for QBF Synthesis: Extracting Skolem and Herbrand Functions* (SAT 2026) introduces a sound and complete proof system with polynomial-time extraction of Skolem/Herbrand functions and intermediate game values: https://doi.org/10.4230/LIPIcs.SAT.2026.3.
+- *On Proof Systems for #QBF* (SAT 2026) studies proof systems for counting winning strategies and proposes Q-MICE. #QBF counts Skolem functions; it is not QBF truth evaluation: https://doi.org/10.4230/LIPIcs.SAT.2026.32.
+
+### Symthaea comparison protocol
+
+Keep four result layers separate:
+
+1. **Decision:** independently verified QBF TRUE and FALSE.
+2. **Strategy:** explicit Skolem function for TRUE or Herbrand function for FALSE.
+3. **Certificate:** proof object and independently validated proof, when a supported proof backend exists.
+4. **Counting:** #QBF count of distinct winning strategies, a separate research task and result type.
+
+Compare pinned versions of CAQE, DepQBF and Qute where their supported interfaces and configurations are available. Report decision-only solver runs separately from strategy-producing or proof-logging runs. A solver's proof may permit extraction, but do not assume it provides the same output or cost as a native strategy interface.
+
+### Required metrics
+
+- verified TRUE count and verified FALSE count separately;
+- time to solver decision, strategy candidate, and independently verified strategy;
+- strategy function/table/circuit size and dependency count;
+- proof generation time/bytes and proof checker time, where available;
+- strategy extraction overhead relative to decision-only solving;
+- fraction of solved instances for which strategy extraction succeeds;
+- checker throughput, memory and counterexample rates;
+- results by quantifier alternation depth, PCNF/crafted/random/2QBF/non-CNF family and held-out application;
+- preprocessing traceability: bind extracted functions to the original preprocessed/unpreprocessed contract and verify reconstruction where preprocessing changes variables or dependencies.
+
+### Proposed milestones
+
+| Stage | Target |
+|---|---|
+| Finite reference | All exhaustive small formulas and prefixes agree with an independent oracle; every extracted function independently validates |
+| External reproduction | Reproduce pinned QBFGallery 2026 decision results for the selected public corpus and solver builds |
+| Strategy baseline | Extract and validate strategies on every instance where the baseline solver exposes adequate proof/strategy data |
+| Initial improvement | Improve verified strategy extraction coverage without reducing decision correctness |
+| Strong result | Improve time-to-verified-strategy and/or strategy size on held-out families while retaining the same resource envelope |
+
+Do not set a numeric solved-count target until the exact QBFGallery results artifact, solver versions, benchmark splits and scoring rules are pinned in #10805.
+
+### Semantics boundary
+
+Prenex QBF dependencies are determined by quantifier order. DQBF instead supplies explicit, potentially non-prenex dependency sets and cannot be represented by the standard prefix rule alone. Keep DQBF behind a different typed task/dependency contract. Likewise, do not treat #QBF (count of winning strategies) as ordinary #SAT or as a QBF decision result.
+
+The bounded implementation in #10991 is an exhaustive reference producer/checker over CNF matrices. Its truth-table strategies are a correctness oracle, not the target representation for scalable synthesis. Production strategy discovery should explore AIG/BDD/circuit representations and proof-derived intermediate game values, and optimize verified output size plus checking cost.
