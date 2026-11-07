@@ -43,6 +43,7 @@ pub enum CheckedBPError {
     LoopyGraphUnsupported,
     MessagePassingDidNotConverge { max_passes: usize },
     InconsistentTraceback { variable: usize, existing: usize, proposed: usize },
+    BeliefShapeMismatch { context: &'static str },
 }
 
 impl fmt::Display for CheckedBPError {
@@ -67,6 +68,7 @@ impl fmt::Display for CheckedBPError {
             Self::LoopyGraphUnsupported => write!(f, "exact forest MAP inference does not accept loopy graphs"),
             Self::MessagePassingDidNotConverge { max_passes } => write!(f, "forest max-product messages did not stabilize within {max_passes} passes"),
             Self::InconsistentTraceback { variable, existing, proposed } => write!(f, "MAP traceback assigned variable {variable} both {existing} and {proposed}"),
+            Self::BeliefShapeMismatch { context } => write!(f, "belief result shape or normalization is invalid: {context}"),
         }
     }
 }
@@ -270,13 +272,24 @@ pub fn run_sum_product(
                 continue;
             }
             let config = decode_assignment(flat_index, &cards);
-            let mut score = potential.ln();
+            let mut terms = vec![potential.ln()];
+            let mut unsupported = false;
             for (position, &variable) in factor.variables.iter().enumerate() {
                 let message = messages
                     .get(&var_to_factor_key(n_variables, variable, factor.id))
                     .expect("validated message initialization");
-                score += message[config[position]];
+                let value = message[config[position]];
+                if value == f64::NEG_INFINITY {
+                    unsupported = true;
+                    break;
+                }
+                terms.push(value);
             }
+            if unsupported {
+                continue;
+            }
+            terms.sort_by(f64::total_cmp);
+            let score = compensated_sum(&terms);
             if !score.is_finite() {
                 if score == f64::NEG_INFINITY {
                     continue;
@@ -673,7 +686,10 @@ fn compensated_sum(values: &[f64]) -> f64 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BetheStatus {
     ExactForest,
-    ApproximateLoopy,
+    /// Converged damped-forest or loopy fixed-point approximation.
+    ApproximateFixedPoint,
+    /// BP stopped at a tolerance or iteration boundary without an exact or
+    /// converged fixed point.
     NonStationary,
 }
 
@@ -700,13 +716,51 @@ pub fn bethe_free_energy(
     validate_graph(graph)?;
     if inference.factor_beliefs.len() != graph.factors.len()
         || inference.log_factor_beliefs.len() != graph.factors.len()
+        || inference.beliefs.len() != graph.variables.len()
         || inference.log_beliefs.len() != graph.variables.len()
+        || inference.graph_structure != graph_structure(graph)
     {
-        return Err(CheckedBPError::InvalidPotential {
-            factor: 0,
-            table_index: 0,
-            value: f64::NAN,
-        });
+        return Err(CheckedBPError::BeliefShapeMismatch { context: "top-level result dimensions or graph structure" });
+    }
+
+    for (variable_index, variable) in graph.variables.iter().enumerate() {
+        let probabilities = &inference.beliefs[variable_index];
+        let log_probabilities = &inference.log_beliefs[variable_index];
+        if probabilities.len() != variable.cardinality
+            || log_probabilities.len() != variable.cardinality
+        {
+            return Err(CheckedBPError::BeliefShapeMismatch { context: "variable marginal cardinality" });
+        }
+        if probabilities.iter().any(|value| !value.is_finite() || *value < 0.0)
+            || log_probabilities.iter().any(|value| value.is_nan() || *value == f64::INFINITY)
+        {
+            return Err(CheckedBPError::BeliefShapeMismatch { context: "non-finite or negative variable marginal" });
+        }
+        let probability_sum = probabilities.iter().sum::<f64>();
+        let log_sum = log_sum_exp(log_probabilities);
+        if (probability_sum - 1.0).abs() > 1.0e-8 || !log_sum.is_finite() || log_sum.abs() > 1.0e-8 {
+            return Err(CheckedBPError::BeliefShapeMismatch { context: "variable marginal is not normalized" });
+        }
+    }
+
+    for (factor_index, factor) in graph.factors.iter().enumerate() {
+        let probabilities = &inference.factor_beliefs[factor_index];
+        let log_probabilities = &inference.log_factor_beliefs[factor_index];
+        if probabilities.len() != factor.table.len()
+            || log_probabilities.len() != factor.table.len()
+        {
+            return Err(CheckedBPError::BeliefShapeMismatch { context: "factor marginal table length" });
+        }
+        if probabilities.iter().any(|value| !value.is_finite() || *value < 0.0)
+            || log_probabilities.iter().any(|value| value.is_nan() || *value == f64::INFINITY)
+        {
+            return Err(CheckedBPError::BeliefShapeMismatch { context: "non-finite or negative factor marginal" });
+        }
+        let probability_sum = probabilities.iter().sum::<f64>();
+        let log_sum = log_sum_exp(log_probabilities);
+        if (probability_sum - 1.0).abs() > 1.0e-8 || !log_sum.is_finite() || log_sum.abs() > 1.0e-8 {
+            return Err(CheckedBPError::BeliefShapeMismatch { context: "factor marginal is not normalized" });
+        }
     }
 
     let mut energy_terms = Vec::new();
@@ -763,11 +817,11 @@ pub fn bethe_free_energy(
         return Err(CheckedBPError::NonFiniteMessage { context: "Bethe free energy" });
     }
 
-    let status = match (inference.inference_status, inference.graph_structure) {
-        (InferenceStatus::ExactForest, GraphStructure::Forest) => BetheStatus::ExactForest,
-        (InferenceStatus::NotConverged, _) => BetheStatus::NonStationary,
-        (_, GraphStructure::Loopy) => BetheStatus::ApproximateLoopy,
-        _ => BetheStatus::NonStationary,
+    let status = match inference.inference_status {
+        InferenceStatus::ExactForest => BetheStatus::ExactForest,
+        InferenceStatus::ApproximateDampedForest | InferenceStatus::ApproximateForest
+        | InferenceStatus::ApproximateLoopy => BetheStatus::ApproximateFixedPoint,
+        InferenceStatus::NotConverged => BetheStatus::NonStationary,
     };
 
     Ok(BetheResult {
@@ -977,6 +1031,18 @@ fn decode_assignment(mut flat_index: usize, cardinalities: &[usize]) -> Vec<usiz
         flat_index /= cardinalities[position];
     }
     result
+}
+
+fn log_sum_exp(values: &[f64]) -> f64 {
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if maximum == f64::NEG_INFINITY {
+        return f64::NEG_INFINITY;
+    }
+    if !maximum.is_finite() {
+        return f64::NAN;
+    }
+    let sum = values.iter().map(|value| (*value - maximum).exp()).sum::<f64>();
+    maximum + sum.ln()
 }
 
 fn normalize_log(values: &mut [f64], context: &'static str) -> Result<(), CheckedBPError> {
@@ -1328,7 +1394,7 @@ mod tests {
         }
         assert!((inference.factor_beliefs[0][0] - 0.25).abs() > 0.1);
         let bethe = bethe_free_energy(&graph, &inference).unwrap();
-        assert_eq!(bethe.status, BetheStatus::ApproximateLoopy);
+        assert_eq!(bethe.status, BetheStatus::ApproximateFixedPoint);
     }
 
     #[test]
