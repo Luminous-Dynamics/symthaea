@@ -130,6 +130,18 @@ This is directly relevant to Symthaea. Treat those reported improvements as resu
 
 LACE's input/output/tool/heuristic-portfolio interface and complementary evolution are a strong model for a domain-independent algorithm-discovery layer. It evaluates a broad CO benchmark and structurally new problems. Reuse its interface and evaluation ideas where licensing and engineering review permit; do not assume its results transfer unchanged to SAT or industrial workloads.
 
+### 7. From static heuristic evolution to solver–instance co-evolution
+
+Three 2026 results suggest that Symthaea should evolve more than a solver's local heuristic functions:
+
+- **ASRO — Algorithm Space Response Oracles (ICML 2026, PMLR 306):** co-evolves solver-program and instance-generator strategy pools using best-response oracles. Its motivation is that static instance distributions can overfit and generalize poorly under distribution shift. [Paper](https://proceedings.mlr.press/v306/ke26b.html).
+- **HeurEvo (September 2026 preprint):** jointly evolves high-level algorithm plans, their implementations and reusable components, while adapting runtime allocation. [Preprint](https://arxiv.org/abs/2609.36303).
+- **CP-SynC-XL (May 2026 preprint):** 100 combinatorial problems and 4,577 instances; highlights that representation/formulation choice changes correctness. Its reported search-heuristic speedups are small and bimodal (median 1.03–1.12×), and some optimizations reduce correctness. This is a caution against promoting LLM-generated search changes without separate verification. [Preprint](https://arxiv.org/abs/2605.12421).
+
+**Proposed Symthaea extension:** jointly search over (i) proof-carrying representation/reduction paths, (ii) complementary solver plans and reusable components, and (iii) adversarial instance generators. Keep the problem contract, evaluator, hidden labels and certificate checker frozen outside both evolving populations. Use a restricted empirical game / double-oracle loop, not an unsupported claim of Nash equilibrium or minimax optimality. Every generated instance must satisfy the original problem contract and pass independent validation. This is tracked in [#10848 — co-evolve proof-carrying representations, solver plans and adversarial instances](https://github.com/Luminous-Dynamics/symthaea/issues/10848).
+
+This adds an adversarial discovery curriculum to LACE-style portfolio search and HeurEvo-style plan/component co-evolution. It composes with #10811, #10835, #10807 and #10836; it must not replace the frozen benchmark runner or leak sealed confirmation instances.
+
 ## Counting-to-sampling and Max-k-SAT consequences in the ETH manuscript
 
 The October 25 manuscript also derives two useful consequences of exact #k-SAT counting. Treat both as claims within that preprint, subject to the same proof-scope and review caveats as the main theorem.
@@ -489,19 +501,20 @@ Use TSPLIB for TSP, CO-Bench for broad CO coverage, and public scheduling/VRP/gr
 
 ## Quantified targets: how to beat SOTA without benchmark theatre
 
-The 2026 Main Track winner solved 276 instances. Use this result—not the stale 2026 HTML table's 2024 figures—as the initial fixed reference. Do not set a VBS-gap target until the official 2026 per-instance data has been independently reprocessed.
+The pinned August-updated 2026 instance-wise `scores.csv` shows a best single Main Track solver at 276/400. A derived Main-only virtual-best oracle over 19 `[main]` solvers solves 324/400 (48 more); a separate Main+AI oracle over 31 solvers solves 344/400. Both are hindsight diagnostics, not deployable portfolios. The source commit, CSV blob SHA, per-instance admission method and exact PAR-2 calculations are recorded in the baseline section above.
 
 Set staged targets:
 
 | Stage | Target | Admission rule |
 |---|---|---|
 | T0: semantic trust | 100% agreement on exhaustive small formula/graph corpora; zero invalid SAT models | Any false SAT/UNSAT or invalid witness blocks promotion |
-| T1: baseline reproduction | Reproduce pinned 2026 winner/baselines and selected model-counter results within 1% PAR-2 on repeated same-machine runs, with identical per-instance outcomes | Compare exact binaries, flags, benchmark manifests and resource limits |
-| T2: selector utility | On held-out families, beat the best individual portfolio component by at least 3 additional solved instances **or** 5% PAR-2, with selector overhead <=5% | No held-out family may have a statistically/materially significant catastrophic regression hidden by aggregate score |
-| T3: first competition-grade SAT target | Reach >=280 solved on the exact 2026 Main Track corpus and resource setup, with valid SAT models and independently checked Main Track UNSAT proofs | Aspirational target (+4 vs the published winner), not a result; report per-instance receipts and SAT/UNSAT subtotals |
-| T4: strong portfolio target | Reach >=290 solved on that same corpus without hindsight oracle information | Aspirational target (+14 vs the published winner); require robust family-held-out and distribution-shift performance |
-| A1: AI SAT-subtrack target | Reach >=150 SAT instances on the same 2026 Main Track SAT AI subtrack corpus | The published Lymphosat row is 146; compare only under the same subtrack/resource rules, require valid models and disclose AI-generated/tuned components |
-| A2: strong AI SAT-subtrack target | Reach >=160 SAT instances on that same SAT-only corpus | Aspirational; report per-instance receipts and family-/generator-held-out performance; never add SAT-only and UNSAT-only subtrack totals |
+| T1: baseline reproduction | Reproduce pinned 2026 top solver and relevant specialist baselines within 1% PAR-2 on identical conditions and per-instance outcomes | Compare exact binaries, flags, benchmark manifests and resource limits |
+| T2: selector utility | On sealed held-out families, beat the best deployable component by at least 3 additional solved instances **or** 5% PAR-2, with selector overhead <=5% | No materially catastrophic held-out family regression hidden by an aggregate |
+| T3: first competition-grade SAT target | Reach >=280 solved on the exact 2026 Main Track corpus and resource setup | Aspirational +4 vs the 276 single-solver winner; valid SAT models and independently checked UNSAT proofs required |
+| T4: strong portfolio target | Reach >=290 solved on that same corpus without hindsight oracle information | Aspirational +14 vs winner; close about 29% of the 48-instance Main-only VBS gap |
+| T4-stretch | Reach >=300 solved on that same corpus | Aspirational +24; close half of the Main-only VBS gap |
+| A1: AI SAT-subtrack target | Reach >=150 SAT instances on the same 2026 Main Track SAT AI subtrack corpus | Lymphosat's SAT-only result is 146; keep this separate from total Main solves and UNSAT results |
+| A2: strong AI SAT-subtrack target | Reach >=160 SAT instances on that same SAT-only corpus | Aspirational; disclose AI-generated/tuned components and report family-/generator-held-out performance |
 | T5: theory breakthrough | Publish an improved worst-case upper bound, FPT result or approximation guarantee with a complete proof and exact assumptions | Benchmarks are supporting evidence, never a substitute for proof |
 
 For AutoModSAT reproduction, do not target its paper's reported 30% speedup as a universal expected outcome. First reproduce its 11-family setup, then use an entirely held-out family split. Report which families win and lose; its authors explicitly report a case where parameter-tuned Kissat beats AutoModSAT and note the human-in-the-loop baseline preparation.
