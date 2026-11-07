@@ -1080,7 +1080,10 @@ mod tests {
                 .all(|value| value.is_finite())
         );
         assert!(result.residual_chi_square > 0.0);
-        assert!(result.rms_angular_residual_rad < 1.0e-8);
+        assert!(result.rms_angular_residual_rad > 0.0);
+        // The injected bearing perturbations are <= 1.5e-5 rad per axis;
+        // the fitted residual must remain within a conservative noise envelope.
+        assert!(result.rms_angular_residual_rad < 5.0e-5);
         assert!(result.condition_number < 1.0e10);
     }
 
