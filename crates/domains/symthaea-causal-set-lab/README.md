@@ -22,6 +22,11 @@ finite-sample validation in 1+1D, 2+1D and 3+1D flat Minkowski spacetime.
 - The 1+1D pair counter and chain reconstruction are O(N log N); the generic
   higher-dimensional reference observables are O(N²).
 - Deterministic seeds and bounded-input validation.
+- Open-interval cardinality histogram: for each related endpoint pair,
+  count the number of events strictly between them. A successor/predecessor
+  bitset intersection computes exact finite-set abundance counts and is
+  checked for Lorentz-boost invariance. This is a reference observable for
+  future causal-set action work, not a BDG action implementation.
 
 The implementation uses (u=t+x), (v=t-x). A 1+1D Alexandrov
 interval of endpoint proper-time separation (T) is the square
