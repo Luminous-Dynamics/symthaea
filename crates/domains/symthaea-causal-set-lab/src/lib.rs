@@ -12,6 +12,8 @@
 //! or a continuum limit. See the crate README and the programme specification.
 #![forbid(unsafe_code)]
 
+pub mod causal_set_nd;
+
 use std::collections::HashSet;
 use std::error::Error;
 use std::f64::consts::PI;
