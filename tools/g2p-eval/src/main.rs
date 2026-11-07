@@ -40,6 +40,7 @@ struct CandidateCase {
     case_id: String,
     candidate_id: String,
     source_id: String,
+    language: String,
     phones: Vec<String>,
     syllable_boundaries: Option<Vec<usize>>,
     syllable_stress: Option<Vec<u8>>,
@@ -75,6 +76,7 @@ struct BoundaryCounts {
 #[derive(Debug, Serialize)]
 struct CaseScore {
     case_id: String,
+    language: String,
     selected_reference_variant: Option<String>,
     reference_phone_count: usize,
     candidate_phone_count: usize,
@@ -125,10 +127,40 @@ struct AggregateMetrics {
 }
 
 #[derive(Debug, Serialize)]
+struct LanguageMetrics {
+    language: String,
+    cases: usize,
+    in_vocabulary_cases: usize,
+    reference_phone_count: usize,
+    phone_edits: usize,
+    phone_error_rate: Option<f64>,
+    exact_pronunciation_cases: usize,
+    exact_pronunciation_rate: Option<f64>,
+    oov_true_positive: usize,
+    oov_false_positive: usize,
+    oov_false_negative: usize,
+    oov_precision: Option<f64>,
+    oov_recall: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
 struct EvaluationReport {
     schema: &'static str,
     metrics: AggregateMetrics,
+    by_language: Vec<LanguageMetrics>,
     cases: Vec<CaseScore>,
+}
+
+#[derive(Default)]
+struct LanguageTotals {
+    cases: usize,
+    in_vocabulary_cases: usize,
+    reference_phone_count: usize,
+    phone_edits: usize,
+    exact_pronunciation_cases: usize,
+    oov_true_positive: usize,
+    oov_false_positive: usize,
+    oov_false_negative: usize,
 }
 
 fn invalid(message: impl Into<String>) -> String {
@@ -349,25 +381,33 @@ struct VariantScore<'a> {
 
 fn score_variant<'a>(variant: &'a ReferenceVariant, candidate: &CandidateCase) -> VariantScore<'a> {
     let (edits, distance) = align(&variant.phones, &candidate.phones);
-    let boundaries = candidate
-        .syllable_boundaries
-        .as_ref()
+    // Boundary indices refer to phone positions. Once phone edits exist,
+    // reference and candidate indices are no longer in the same coordinate
+    // system. Report boundary/stress metrics as undefined rather than
+    // comparing unrelated offsets.
+    let boundaries = (distance == 0)
+        .then(|| candidate.syllable_boundaries.as_ref())
+        .flatten()
         .map(|observed| boundary_counts(&variant.syllable_boundaries, observed));
-    let (stress_correct, stress_compared) = candidate
-        .syllable_stress
-        .as_ref()
-        .filter(|observed| variant.syllable_stress.len() == observed.len())
-        .map(|observed| {
-            let compared = variant.syllable_stress.len();
-            let correct = variant
-                .syllable_stress
-                .iter()
-                .zip(observed)
-                .filter(|(expected, actual)| expected == actual)
-                .count();
-            (Some(correct), Some(compared))
-        })
-        .unwrap_or((None, None));
+    let (stress_correct, stress_compared) = if distance == 0 {
+        candidate
+            .syllable_stress
+            .as_ref()
+            .filter(|observed| variant.syllable_stress.len() == observed.len())
+            .map(|observed| {
+                let compared = variant.syllable_stress.len();
+                let correct = variant
+                    .syllable_stress
+                    .iter()
+                    .zip(observed)
+                    .filter(|(expected, actual)| expected == actual)
+                    .count();
+                (Some(correct), Some(compared))
+            })
+            .unwrap_or((None, None))
+    } else {
+        (None, None)
+    };
     VariantScore {
         variant,
         edits,
@@ -468,8 +508,11 @@ fn validate_inputs(
         if prediction.case_id.trim().is_empty()
             || prediction.candidate_id.trim().is_empty()
             || prediction.source_id.trim().is_empty()
+            || prediction.language.trim().is_empty()
         {
-            return Err("candidate case_id, candidate_id, and source_id are required".into());
+            return Err(
+                "candidate case_id, candidate_id, source_id, and language are required".into(),
+            );
         }
         if !prediction_ids.insert(prediction.case_id.as_str()) {
             return Err(format!(
@@ -481,6 +524,16 @@ fn validate_inputs(
             return Err(format!(
                 "prediction {} has no reference case",
                 prediction.case_id
+            ));
+        }
+        let reference = references
+            .iter()
+            .find(|reference| reference.case_id == prediction.case_id)
+            .expect("prediction ID was checked against reference IDs");
+        if prediction.language != reference.language {
+            return Err(format!(
+                "prediction {} language {:?} does not match reference language {:?}",
+                prediction.case_id, prediction.language, reference.language
             ));
         }
         if let Some((candidate_id, source_id)) = identity {
@@ -572,6 +625,7 @@ fn evaluate(
         .collect();
 
     let mut cases = Vec::with_capacity(references.len());
+    let mut language_totals: BTreeMap<String, LanguageTotals> = BTreeMap::new();
     let mut total_reference_phones = 0usize;
     let mut total_edits = 0usize;
     let mut in_vocabulary_cases = 0usize;
@@ -639,8 +693,10 @@ fn evaluate(
         }
         if let Some(exact) = exact {
             in_vocabulary_cases += 1;
+            language.in_vocabulary_cases += 1;
             if exact {
                 exact_cases += 1;
+                language.exact_pronunciation_cases += 1;
             }
         }
         if let Some(boundaries) = &boundaries {
@@ -668,6 +724,12 @@ fn evaluate(
         } else {
             0
         };
+        language.oov_true_positive +=
+            if reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
+        language.oov_false_positive +=
+            if !reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
+        language.oov_false_negative +=
+            if reference.expected_oov && !candidate.detected_oov { 1 } else { 0 };
         oov_correct += if reference.expected_oov == candidate.detected_oov {
             1
         } else {
@@ -680,6 +742,7 @@ fn evaluate(
         }
         cases.push(CaseScore {
             case_id: reference.case_id.clone(),
+            language: reference.language.clone(),
             selected_reference_variant: variant_id,
             reference_phone_count: reference_phones,
             candidate_phone_count,
@@ -710,6 +773,37 @@ fn evaluate(
             prediction.source_id.clone(),
         )
     };
+    let by_language = language_totals
+        .into_iter()
+        .map(|(language, totals)| {
+            let oov_precision = ratio(
+                totals.oov_true_positive,
+                totals.oov_true_positive + totals.oov_false_positive,
+            );
+            let oov_recall = ratio(
+                totals.oov_true_positive,
+                totals.oov_true_positive + totals.oov_false_negative,
+            );
+            LanguageMetrics {
+                language,
+                cases: totals.cases,
+                in_vocabulary_cases: totals.in_vocabulary_cases,
+                reference_phone_count: totals.reference_phone_count,
+                phone_edits: totals.phone_edits,
+                phone_error_rate: ratio(totals.phone_edits, totals.reference_phone_count),
+                exact_pronunciation_cases: totals.exact_pronunciation_cases,
+                exact_pronunciation_rate: ratio(
+                    totals.exact_pronunciation_cases,
+                    totals.in_vocabulary_cases,
+                ),
+                oov_true_positive: totals.oov_true_positive,
+                oov_false_positive: totals.oov_false_positive,
+                oov_false_negative: totals.oov_false_negative,
+                oov_precision,
+                oov_recall,
+            }
+        })
+        .collect();
     Ok(EvaluationReport {
         schema: "g2p-reference-evaluation/v1",
         metrics: AggregateMetrics {
@@ -745,6 +839,7 @@ fn evaluate(
             confidence_brier_score: (confidence_count > 0)
                 .then(|| confidence_squared_error / confidence_count as f64),
         },
+        by_language,
         cases,
     })
 }
@@ -823,6 +918,7 @@ mod tests {
             case_id: case_id.into(),
             candidate_id: "candidate-a".into(),
             source_id: "test-source".into(),
+            language: "en".into(),
             phones: phones.iter().map(|phone| (*phone).into()).collect(),
             syllable_boundaries: (!detected_oov).then(|| boundaries.to_vec()),
             syllable_stress: (!detected_oov).then(|| stress.to_vec()),
@@ -885,6 +981,52 @@ mod tests {
         assert_eq!(report.cases[0].edits.insertions, 1);
         assert_eq!(report.cases[0].edits.deletions, 0);
         assert!((report.metrics.phone_error_rate.unwrap() - 2.0 / 3.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn syllable_metrics_are_undefined_when_phone_alignment_has_edits() {
+        let refs = vec![reference(
+            "word",
+            false,
+            vec![variant("v1", &["k", "æ", "t"], &[3], &[1])],
+        )];
+        let preds = vec![candidate("word", &["k", "ɛ", "t", "s"], &[4], &[1], false)];
+        let report = evaluate(&refs, &preds).unwrap();
+        assert_eq!(report.metrics.phone_error_rate, Some(2.0 / 3.0));
+        assert_eq!(report.metrics.syllable_boundary_cases_compared, 0);
+        assert_eq!(report.metrics.syllable_boundary_f1, None);
+        assert_eq!(report.metrics.stress_compared, 0);
+        assert_eq!(report.metrics.stress_accuracy, None);
+    }
+
+    #[test]
+    fn prediction_language_must_match_reference_case_language() {
+        let refs = vec![reference(
+            "word",
+            false,
+            vec![variant("v1", &["w", "ɜ", "d"], &[3], &[1])],
+        )];
+        let mut pred = candidate("word", &["w", "ɜ", "d"], &[3], &[1], false);
+        pred.language = "zu-ZA".into();
+        let error = validate_inputs(&refs, &[pred]).unwrap_err();
+        assert!(error.contains("does not match reference language"), "{error}");
+    }
+
+    #[test]
+    fn aggregate_report_contains_language_stratified_metrics() {
+        let mut refs = vec![reference(
+            "hello",
+            false,
+            vec![variant("v1", &["h", "ə", "l", "oʊ"], &[2, 4], &[0, 1])],
+        )];
+        refs[0].language = "en-US".into();
+        let mut pred = candidate("hello", &["h", "ə", "l", "oʊ"], &[2, 4], &[0, 1], false);
+        pred.language = "en-US".into();
+        let report = evaluate(&refs, &[pred]).unwrap();
+        assert_eq!(report.by_language.len(), 1);
+        assert_eq!(report.by_language[0].language, "en-US");
+        assert_eq!(report.by_language[0].phone_error_rate, Some(0.0));
+        assert_eq!(report.by_language[0].exact_pronunciation_rate, Some(1.0));
     }
 
     #[test]
