@@ -15,7 +15,6 @@
 #![forbid(unsafe_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::f64::consts::SQRT_2;
 
 /// Four slots: (read 1, center), (read 1, far), (read 2, center),
 /// (read 2, far). Qutrit slots have eight traceless letters; qubit slots
