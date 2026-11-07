@@ -307,6 +307,44 @@ For our benchmark contracts, distinguish at least:
 
 Do not compare projected counts with full model counts, or approximate counters with exact counters, using a single solved-count metric. Compare counts, proof/precision guarantees, preprocessing, compile time, query time, memory and reuse across repeated queries.
 
+## Actual Model Counting Competition 2026 baseline: Ganak
+
+The current MC Competition 2026 comparison source includes a detailed, reproducible Ganak entry with exact/approximate result tables across the official tracks. Use it as a pinned specialist baseline, while respecting the metric/solver caveats below.
+
+| Track | Contract | Ganak reported configuration | Solved / denominator |
+|---|---|---|---:|
+| 1 | Unweighted #SAT | Exact MPZ integer arithmetic | 133 / 200 |
+| 1 | Unweighted #SAT | PAC approximate counting (MPZ output) | 143 / 200 |
+| 2B | Weighted #SAT, including negative weights | Exact MPQ rationals | 120 / 200 |
+| 2B | Weighted #SAT | MPFR high-precision floating point | 121 / 200 |
+| 3 | Projected model counting | Exact MPZ integer arithmetic | 125 / 200 |
+| 3 | Projected model counting | PAC approximate counting (MPZ output) | 167 / 200 |
+| 4 | Mixed projected weighted counting (WMC/PMC/PWMC) | Exact MPQ rational arithmetic | 135 / 200 |
+| 5B | Complex-weight algebraic model counting | Exact MPQ configuration | 49 / 100 public instances |
+| 5B | Complex-weight algebraic model counting | MPFR high-precision floating point | 53 / 100 public instances |
+
+Sources: [MC Competition 2026 track definitions and rules](https://mccompetition.org/2026/mc_description) and [Ganak's 2026 entry, run scripts and per-track results](https://github.com/meelgroup/mccomp-ganak-appmc-2026). The competition budget is 3,600 seconds and 32 GB; exact ranking requires arbitrary precision and zero relative error, while the PAC track requires its stated multiplicative error/confidence guarantee.
+
+**Critical metric caveats from the authors:**
+
+- The entry states that Ganak ran in probabilistic mode for all displayed configurations. "Exact MPZ/MPQ" here describes arithmetic/output precision, not a claim that the whole solver execution is a deterministic, formally certified computation. Record algorithmic randomization and its error guarantee separately from arithmetic exactness and independent proof/certificate status.
+- For Tracks 1 and 3, "approx" is PAC approximate counting with a multiplicative `epsilon` and success probability `1-delta`; it is not comparable to exact MPZ as if it had the same guarantee.
+- For weighted Track 2B and complex Track 5B, "approx" is MPFR high-precision floating point, **not PAC**. The authors warn that absolute error near a true zero can yield a nonzero result. It must not be treated as a valid relative-error approximation or an exact zero-preserving method.
+- Track 4's entry explicitly reports a header/semantics problem: some instances labeled PWMC were actually PMC or WMC, and Ganak selected PAC or MPFR methods based on the header. Only the exact MPQ total is reported; this is a data-contract warning, not clean evidence of homogeneous PWMC coverage.
+- Track 5B's published table lists 100 public instances and no private denominator; do not describe 49/100 as a full 200-instance total.
+
+### Symthaea's model-counting targets
+
+First reproduce the entry on the same public/private files, hardware limits and per-instance manifests. Then compare each contract independently:
+- Track 1: exact MPZ baseline 133/200 and PAC 143/200; maintain separate exact and PAC scorecards.
+- Track 2B: exact MPQ baseline 120/200. Add negative-weight and exact-zero cancellation controls; MPFR's 121/200 is a diagnostic only, not an exact/PAC target.
+- Track 3: exact MPZ baseline 125/200 and PAC 167/200; enforce projection-variable sets and existential hidden-witness semantics.
+- Track 4: do not use the reported 135/200 as a clean PWMC target until each instance's actual PMC/WMC/PWMC header and semantics are independently audited. Re-run a homogeneous PWMC subset with a typed parser.
+- Track 5B: exact Q(i) output / zero-cancellation correctness is the priority; current Ganak published result is only 49/100 public instances. Keep MPFR 53/100 separate.
+- For all tracks, record solver randomization, arithmetic domain, error/confidence guarantee, parsing/contract validation, preprocessing, exact output comparison, runtime, peak RSS, and independent checker evidence separately.
+
+A promising research advantage is not simply beating Ganak's totals. It is combining algebra-aware representation/decomposition discovery with a fail-closed contract auditor and independent replay/certification, especially for projected support, negative rational weights and complex cancellation. Only claim a performance win after a same-instance, same-budget comparison with the full end-to-end path measured.
+
 ## Proof-complexity-aware model counting: optimize the derivation, not only the answer
 
 A further paradigm shift is to make the *structure of an exact count derivation* part of the algorithm-discovery objective. A numeric #SAT answer alone hides whether the solver found reusable decomposition, whether its cache was effective, and whether its computation admits a compact independently checkable representation.
