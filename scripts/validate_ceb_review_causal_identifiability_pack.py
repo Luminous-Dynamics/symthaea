@@ -125,7 +125,7 @@ def validate(
         if required.lower() not in annotators.lower():
             errors.append(f"dual-annotator pack missing identifiability workflow field/concept {required}")
 
-    for required in ("AND/OR gates", "Temporal partial order", "Residual target paths"):
+    for required in ("AND gate", "OR gate", "happens_before", "Residual reachability"):
         if required not in topology:
             errors.append(f"causal topology protocol missing composition anchor {required}")
 
@@ -188,14 +188,13 @@ def self_test() -> list[str]:
         return ["valid minimal pack rejected"]
 
     mutants = (
-        ("challenge case removed", challenge.replace("CID-S03", "CID-SXX", 1), key, protocol, annotators),
-        ("disposition removed", protocol.replace("partially_identified", "missing_disposition"), challenge, key, protocol.replace("partially_identified", "missing_disposition"), annotators),
-        ("missing disagreement witness", challenge.replace("Two compatible models", "One model", 1), key, protocol, annotators),
-        ("missing key claim ceiling", key.replace("Claim ceiling:", "Ceiling removed:", 1), challenge, key.replace("Claim ceiling:", "Ceiling removed:", 1), protocol, annotators),
-        ("missing I2 arm", prereg.replace("I0 I1 I2", "I0 I1"), challenge, key, protocol, annotators),
+        ("challenge case removed", protocol, challenge.replace("CID-S03", "CID-SXX", 1), key, prereg, annotators),
+        ("disposition removed", protocol.replace("partially_identified", "missing_disposition"), challenge, key, prereg, annotators),
+        ("missing disagreement witness", protocol, challenge.replace("Two compatible models", "One model", 1), key, prereg, annotators),
+        ("missing key claim ceiling", protocol, challenge, key.replace("Claim ceiling:", "Ceiling removed:", 1), prereg, annotators),
+        ("missing I2 arm", protocol, challenge, key, prereg.replace("I0 I1 I2", "I0 I1"), annotators),
     )
-    for label, mutated_challenge, mutated_key, mutated_protocol, mutated_annotators in mutants:
-        mutated_prereg = prereg.replace("I0 I1 I2", "I0 I1") if label == "missing I2 arm" else prereg
+    for label, mutated_protocol, mutated_challenge, mutated_key, mutated_prereg, mutated_annotators in mutants:
         result = validate(
             mutated_protocol,
             mutated_challenge,
