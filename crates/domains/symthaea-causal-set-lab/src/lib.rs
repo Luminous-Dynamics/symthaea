@@ -584,6 +584,30 @@ impl SplitMix64 {
 mod tests {
     use super::*;
 
+    fn brute_interval_size_histogram(causet: &CausalSet2D) -> Vec<u64> {
+        let n = causet.events.len();
+        let mut histogram = vec![0_u64; n.saturating_sub(1)];
+        for first in 0..n {
+            for second in (first + 1)..n {
+                let (past, future) = if causet.events[first].causally_precedes(causet.events[second]) {
+                    (first, second)
+                } else if causet.events[second].causally_precedes(causet.events[first]) {
+                    (second, first)
+                } else {
+                    continue;
+                };
+                let interior = (0..n)
+                    .filter(|&event| {
+                        causet.events[past].causally_precedes(causet.events[event])
+                            && causet.events[event].causally_precedes(causet.events[future])
+                    })
+                    .count();
+                histogram[interior] += 1;
+            }
+        }
+        histogram
+    }
+
     fn brute_related_pair_count(causet: &CausalSet2D) -> u64 {
         let mut count = 0_u64;
         for i in 0..causet.events.len() {
@@ -698,6 +722,25 @@ mod tests {
     }
 
     #[test]
+    fn interval_histogram_handles_empty_and_antichain_controls() {
+        let empty = CausalSet2D::new(Vec::new(), 1.0, 1.0).unwrap();
+        assert!(empty.interval_size_histogram().is_empty());
+
+        let antichain = CausalSet2D::new(
+            vec![
+                Event2D { id: 0, u: 0.1, v: 0.9 },
+                Event2D { id: 1, u: 0.3, v: 0.7 },
+                Event2D { id: 2, u: 0.5, v: 0.5 },
+                Event2D { id: 3, u: 0.7, v: 0.3 },
+            ],
+            1.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(antichain.interval_size_histogram(), vec![0, 0, 0]);
+    }
+
+    #[test]
     fn longest_chain_has_expected_square_root_order_of_growth() {
         let causet = CausalSet2D::sprinkle_fixed_cardinality(2026, 1_024, 1.0).unwrap();
         let scaled = causet.longest_chain_length() as f64 / (causet.len() as f64).sqrt();
@@ -760,6 +803,11 @@ mod tests {
                 causet.related_pair_count(),
                 brute_related_pair_count(&causet),
                 "related-pair mismatch for seed={seed}"
+            );
+            assert_eq!(
+                causet.interval_size_histogram(),
+                brute_interval_size_histogram(&causet),
+                "interval-size histogram mismatch for seed={seed}"
             );
 
             let chain = causet.longest_chain_ids();
