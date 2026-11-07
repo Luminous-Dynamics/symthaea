@@ -146,7 +146,7 @@ def validate_documents(
         "no new primary metric lane",
         "#10064",
         "#10369",
-        "no task is admitted",
+        "No tasks are admitted by this preregistration",
     ):
         if required not in preregistration.lower() and required not in preregistration:
             errors.append(f"causal-diagnosis preregistration is missing required safeguard: {required}")
@@ -198,7 +198,7 @@ def self_test() -> list[str]:
         "Phase B — Evidence acquisition value",
         "Phase C — Human complementarity",
         "paired task-level analysis repository-cluster bootstrap 80% power family-wise alpha 0.05",
-        "same total inference budget no new primary metric lane #10064 #10369 no task is admitted",
+        "same total inference budget no new primary metric lane #10064 #10369 No tasks are admitted by this preregistration",
         *PRIMARY_METRICS,
     ))
 
