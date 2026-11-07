@@ -763,6 +763,72 @@ mod tests {
     }
 
     #[test]
+    fn test_streaming_hvs_match_offline_projector_raw() {
+        let sample_rate = 16_000usize;
+        let samples: Vec<f32> = (0..8_000usize)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                0.35 * (std::f32::consts::TAU * 180.0 * t).sin()
+                    + 0.15 * (std::f32::consts::TAU * 720.0 * t).sin()
+                    + 0.05 * (std::f32::consts::TAU * 1_800.0 * t).sin()
+            })
+            .collect();
+
+        let mut offline = AudioProjector::default_config();
+        let expected = offline.project_raw(&samples);
+
+        let mut streaming = StreamProcessor::new(StreamConfig::default());
+        streaming.push_audio(&samples);
+        let actual = streaming.process();
+
+        assert_eq!(actual.len(), expected.len());
+        for (frame, offline_hv) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                frame.hv, *offline_hv,
+                "stream/offline HDC mismatch at frame {}",
+                frame.frame_idx
+            );
+        }
+    }
+
+    #[test]
+    fn test_streaming_hv_is_invariant_to_input_chunk_boundaries() {
+        let sample_rate = 16_000usize;
+        let samples: Vec<f32> = (0..12_000usize)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                0.30 * (std::f32::consts::TAU * 220.0 * t).sin()
+                    + 0.12 * (std::f32::consts::TAU * 1_100.0 * t).sin()
+            })
+            .collect();
+
+        let mut offline = AudioProjector::default_config();
+        let expected = offline.project_raw(&samples);
+
+        let mut streaming = StreamProcessor::new(StreamConfig::default());
+        let mut actual = Vec::new();
+        let chunk_sizes = [73usize, 211, 49, 503, 160, 997, 37, 1_003];
+        let mut cursor = 0usize;
+        let mut chunk_index = 0usize;
+        while cursor < samples.len() {
+            let end = (cursor + chunk_sizes[chunk_index % chunk_sizes.len()]).min(samples.len());
+            streaming.push_audio(&samples[cursor..end]);
+            actual.extend(streaming.process());
+            cursor = end;
+            chunk_index += 1;
+        }
+
+        assert_eq!(actual.len(), expected.len());
+        for (frame, offline_hv) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                frame.hv, *offline_hv,
+                "chunked stream/offline HDC mismatch at frame {}",
+                frame.frame_idx
+            );
+        }
+    }
+
+    #[test]
     fn test_stream_session() {
         let config = StreamConfig::default();
         let mut session = StreamSession::new(config);
