@@ -114,6 +114,15 @@ For each eligible anchor:
 
 A missing task condition is missing data, not a zero or a failure. An agent's failure to ask a question when needed is adjudicated under the existing CEB-HUMAN question/abstention contracts; do not add a new metric.
 
+
+### 5.1 Required interpretation of paired prompt variants
+
+- A **wording-only mutation** is a paraphrase that preserves objective, facts, constraints, available evidence and output contract. If any information changes, record that separately; do not label it wording-only.
+- Each framing runs in **fresh isolated contexts**. No memory, transcript, cache or conversation state from a sibling variant may leak into another condition.
+- All variants are **clustered under the original anchor** (source tree, originating defect and repository) in sampling, bootstrap and reporting. Prompt variants are not independent tasks.
+- **Do not create a composite** across review, repair, repository discovery and clarification outcomes. Analyze each existing lane-specific measure separately.
+
+
 ## 6. Confounders and leakage controls
 
 | Threat | Required control |
