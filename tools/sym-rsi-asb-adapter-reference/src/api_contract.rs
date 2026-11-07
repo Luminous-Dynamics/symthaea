@@ -342,7 +342,7 @@ impl CampaignStatusV1 {
             .take(self.stages_completed as usize)
             .try_fold(0u64, |sum, stage| sum.checked_add(stage.batch_size))
             .ok_or(ApiContractError::InvalidBudgetAccounting)?;
-        let expected_spent = match self.active_job {
+        let expected_spent = match self.active_job.as_ref() {
             Some(_) => {
                 let next_stage = self.next_stage.ok_or(ApiContractError::InvalidActiveJob)?;
                 let next_batch = campaign.stage(next_stage)
