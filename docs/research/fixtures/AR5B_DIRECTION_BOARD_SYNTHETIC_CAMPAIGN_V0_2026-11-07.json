@@ -3,7 +3,7 @@
   "campaign_id": "ar5b-synthetic-delayed-payoff-and-new-option-v0",
   "budget": {
     "available_cost_units": 100,
-    "total_cost_units": 150
+    "total_cost_units": 200
   },
   "config": {
     "exploration_weight": 0.25,
