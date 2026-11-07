@@ -418,8 +418,10 @@ mod tests {
             "history",
             vec![action("actor-1", "yield"), action("ego", "continue")],
         )];
-        let a = SupportManifest::new("evidence-v1", "policy-v1", "context-v1", true, vec![path_a]).unwrap();
-        let b = SupportManifest::new("evidence-v1", "policy-v1", "context-v1", true, vec![path_b]).unwrap();
+        let a = SupportManifest::new("evidence-v1", "policy-v1", "context-v1", true, vec![path_a])
+            .unwrap();
+        let b = SupportManifest::new("evidence-v1", "policy-v1", "context-v1", true, vec![path_b])
+            .unwrap();
         assert_eq!(a.canonical_bytes(), b.canonical_bytes());
     }
 
@@ -428,20 +430,28 @@ mod tests {
         let first = query(
             "policy-v1",
             "context-v1",
-            vec![step(0, "history", vec![action("ego", "continue"), action("actor-1", "yield")])],
+            vec![step(
+                0,
+                "history",
+                vec![action("ego", "continue"), action("actor-1", "yield")],
+            )],
         );
         let second = query(
             "policy-v1",
             "context-v1",
-            vec![step(0, "history", vec![action("actor-1", "yield"), action("ego", "continue")])],
+            vec![step(
+                0,
+                "history",
+                vec![action("actor-1", "yield"), action("ego", "continue")],
+            )],
         );
         assert_eq!(first.canonical_bytes(), second.canonical_bytes());
 
-        let result = assess(
-            &manifest(vec![first.steps.clone()], true),
-            &first,
-        ).unwrap();
-        assert_eq!(result.canonical_bytes().len(), 8 + "sam.policy-trajectory-support.assessment.v0.1".len() + 1 + 8 + 1);
+        let result = assess(&manifest(vec![first.steps.clone()], true), &first).unwrap();
+        assert_eq!(
+            result.canonical_bytes().len(),
+            8 + "sam.policy-trajectory-support.assessment.v0.1".len() + 1 + 8 + 1
+        );
     }
 
     #[test]
@@ -477,14 +487,12 @@ mod tests {
 
     #[test]
     fn canonical_artifact_exports_match_cross_repository_golden_vectors() {
-        let support = SupportManifest::new(
-            "evidence-v1",
-            "policy-v1",
-            "context-v1",
-            false,
-            vec![],
-        ).unwrap();
-        assert_eq!(bytes_to_hex(&support.canonical_bytes()), canonical_vector("manifest"));
+        let support =
+            SupportManifest::new("evidence-v1", "policy-v1", "context-v1", false, vec![]).unwrap();
+        assert_eq!(
+            bytes_to_hex(&support.canonical_bytes()),
+            canonical_vector("manifest")
+        );
 
         let query = query(
             "policy-v1",
@@ -492,17 +500,20 @@ mod tests {
             vec![step(
                 7,
                 "history-7",
-                vec![
-                    action("ego", "continue"),
-                    action("actor-1", "yield"),
-                ],
+                vec![action("ego", "continue"), action("actor-1", "yield")],
             )],
         );
-        assert_eq!(bytes_to_hex(&query.canonical_bytes()), canonical_vector("query"));
+        assert_eq!(
+            bytes_to_hex(&query.canonical_bytes()),
+            canonical_vector("query")
+        );
 
         let assessment = assess(&support, &query).unwrap();
         assert_eq!(assessment.disposition, Disposition::SupportUnknown);
-        assert_eq!(bytes_to_hex(&assessment.canonical_bytes()), canonical_vector("assessment"));
+        assert_eq!(
+            bytes_to_hex(&assessment.canonical_bytes()),
+            canonical_vector("assessment")
+        );
     }
 
     #[test]
