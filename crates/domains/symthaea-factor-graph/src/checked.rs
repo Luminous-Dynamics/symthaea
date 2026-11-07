@@ -686,8 +686,9 @@ fn compensated_sum(values: &[f64]) -> f64 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BetheStatus {
     ExactForest,
-    /// Converged damped-forest or loopy fixed-point approximation.
-    ApproximateFixedPoint,
+    /// Converged approximation: damped forest, tolerance-only forest or loopy BP.
+    /// This does not imply an exact or globally optimal fixed point.
+    ApproximateConverged,
     /// BP stopped at a tolerance or iteration boundary without an exact or
     /// converged fixed point.
     NonStationary,
@@ -1486,6 +1487,44 @@ mod tests {
             bethe_free_energy(&graph, &wrong_values),
             Err(CheckedBPError::BeliefShapeMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn bethe_log_partition_shifts_by_log_factor_rescaling() {
+        let mut base = FactorGraph::new();
+        let a = base.add_variable("A", 2);
+        let b = base.add_variable("B", 2);
+        base.add_factor(&[a, b], vec![0.3, 0.1, 0.2, 0.4]);
+        let base_inference = run_sum_product(&base, &BPConfig::default()).unwrap();
+        let base_bethe = bethe_free_energy(&base, &base_inference).unwrap();
+
+        let mut scaled = FactorGraph::new();
+        let a = scaled.add_variable("A", 2);
+        let b = scaled.add_variable("B", 2);
+        scaled.add_factor(&[a, b], vec![0.6, 0.2, 0.4, 0.8]);
+        let scaled_inference = run_sum_product(&scaled, &BPConfig::default()).unwrap();
+        let scaled_bethe = bethe_free_energy(&scaled, &scaled_inference).unwrap();
+
+        for state in 0..4 {
+            assert!((base_inference.factor_beliefs[0][state] - scaled_inference.factor_beliefs[0][state]).abs() < 1.0e-10);
+        }
+        assert!((scaled_bethe.log_partition_estimate - base_bethe.log_partition_estimate - 2.0_f64.ln()).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn factor_beliefs_preserve_exact_zero_support() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        graph.add_factor(&[a, b], vec![1.0, 0.0, 0.0, 0.0]);
+
+        let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+        assert_eq!(inference.factor_beliefs[0], vec![1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(inference.log_factor_beliefs[0][0], 0.0);
+        assert!(inference.log_factor_beliefs[0][1..].iter().all(|&value| value == f64::NEG_INFINITY));
+        let bethe = bethe_free_energy(&graph, &inference).unwrap();
+        assert_eq!(bethe.status, BetheStatus::ExactForest);
+        assert!(bethe.log_partition_estimate.abs() < 1.0e-12);
     }
 
     #[test]
