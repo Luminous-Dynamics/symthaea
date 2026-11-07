@@ -1,70 +1,133 @@
 # symthaea-chain-theory-audit
 
-A std-only independent implementation of the combinatorial record construction
-used in A. D. Wissner-Gross, *A Parameter-Free Candidate for the Fine-Structure
-Constant from Entangled Qudits* (23 October 2026).
+A std-only independent implementation of the combinatorial record
+construction used in A. D. Wissner-Gross, A Parameter-Free Candidate for
+the Fine-Structure Constant from Entangled Qudits (23 October 2026).
 
-It reconstructs the four slot dimensions (8, 3, 8, 3), enumerates all
-two-slot product assignments, symmetrizes/antisymmetrizes under the read
-exchange, derives the three qubit commutator records from explicit integer
-2x2 basis matrices, counts both exchange signatures, and evaluates the
-resulting radical sum.
+The independent implementation reconstructs the four slot dimensions
+(8, 3, 8, 3), enumerates the two-slot product assignments, performs
+read-exchange symmetrization and antisymmetrization, derives the three qubit
+commutator records from integer 2x2 basis matrices, counts both exchange
+signatures, and evaluates the resulting radical sum.
 
 ## Reproduction
 
-```bash
-cargo test -p symthaea-chain-theory-audit
-cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit
-```
+Run:
 
-The exact symbolic result represented by the sector counts is
+    cargo test -p symthaea-chain-theory-audit
+    cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit
 
-[
-\alpha_{\mathrm{candidate}} =
-\frac{79 + 48\sqrt{2} + 42\sqrt{3} + 3\sqrt{6}}{31104}.
-]
+The sector counts reproduce the author's published table:
 
-Its inverse is approximately 137.035999189566. The denominator is reconstructed
-from one unread-link traceless operator space of dimension 24 and two read-link
-operator spaces of dimension 36 each.
+| X signature | Y signature | Record count | Weight |
+|---:|---:|---:|---:|
+| +1 | +1 | 79 | 1 |
+| +1 | -1 | 48 | sqrt(2) |
+| -1 | +1 | 42 | sqrt(3) |
+| -1 | -1 | 3 | sqrt(6) |
+| Total | | 172 | |
 
-## Independent scope
+There are 169 product records and three commutator records. The exact
+symbolic expression represented by those counts is
 
-This is an independent combinatorial/numerical reproduction of the published
-calculation under its stated slot, exchange, survival and weight definitions.
-It does not copy or import the paper's Lean file. It does not independently
-formalize the complete qutrit–qubit gauge-group derivation or the external
-quantum-information theorems motivating the read cap.
+    (79 + 48*sqrt(2) + 42*sqrt(3) + 3*sqrt(6)) / 31104
 
-The paper's Lean file itself proves that its *defined* `readableByReads`
-predicate is equivalent to (d_1 d_2 \le 6). The remaining bridge is the
-physical identification of those defined reads with all the distillation/LOCC
-operations intended by the axiom; that is not established merely by the
-arithmetic or by checking the internal definitions.
+whose inverse is approximately 137.035999189566155.
 
-This crate does **not** show that:
-- the model's definitions are the right description of nature;
-- the qutrit–qubit link is a photon;
+## Primary-source grounding
+
+The audited author source is pinned to commit
+a28db8998bce5bd5ef11195c05f13c86cd9dac5c in
+https://github.com/physical-superintelligence/chain-theory
+
+Relevant author artefacts:
+
+- papers/alpha/lean/ChainAlpha.lean
+- papers/alpha/lean/README.md
+- papers/alpha/anc/enumerate_records.py
+- papers/alpha/anc/records.csv
+- papers/alpha/anc/README.txt
+
+The author publishes both the Lean 4.35.0 formalization and a standard-library
+Python record enumerator. The Rust reproduction was written independently
+from the documented slot, exchange and weight rules. Its current tests assert
+the published record count, sector counts, denominator and scalar. A
+record-by-record comparison against the author's CSV remains a separate
+verification task.
+
+## What the formalization proves
+
+The author’s Lean file checks that its Part 1 definitions produce the
+published finite calculation: the product records, commutator records,
+exchange eigen-records, sector counts and closed-form readout. Its main
+arithmetic theorem is a theorem about those definitions.
+
+The author’s own Lean README distinguishes that computation from the
+external mathematical input used for the read-cap selection rule:
+
+- The read cap is stated as a named hypothesis in the original formalization.
+- The cited mathematical results are associated with Størmer, Woronowicz
+  and Choi; the original ChainAlpha file does not re-prove all of those
+  literature results from first principles.
+- A separate public audit formalization reduces the read-cap statement, for
+  the paper's readability predicate, to Woronowicz's theorem for positive
+  maps M2 to M3. That external theorem is not proved inside that audit file.
+
+Thus the record arithmetic can be exactly reproduced without the physical
+interpretation or every mathematical premise becoming established.
+
+## Physical interpretation remains conjectural
+
+The paper identifies the qutrit-qubit link with a photon and its readout with
+the zero-momentum electromagnetic coupling by a separate Photon Conjecture.
+The record count does not construct:
+
+- a momentum-dependent photon propagator or propagating pole;
+- a QED interaction vertex and scattering amplitudes;
+- a full renormalized QED calculation;
+- an experimental mechanism connecting the defined read operation to
+  all physically allowed distillation / LOCC operations.
+
+The Lean file itself states that it checks the model computation, not whether
+the definitions are the right physics, and that the photon identification is
+a conjecture outside the file.
+
+A separate public audit by Cody Mitchell (25 October 2026) reports a possible
+tension between the paper's own unbroken generator / charge assignments and
+the photon / electric-charge identification. That is an important objection
+to investigate, not a result this crate independently adjudicates:
+
+https://github.com/SproutSeeds/chain-theory-audit
+
+The same audit reports a census of 1,492,992 alternatives formed from the
+paper's explicitly listed choices, with the published value the only listed
+1-sigma match. That is evidence about the enumerated alternative grammar,
+not proof that every possible researcher choice or model grammar has been
+exhausted.
+
+## Measurement comparison
+
+The example compares the candidate inverse coupling with CODATA 2022:
+137.035999177(21), reporting about 0.60 of the adjusted standard uncertainty.
+CODATA expanded the uncertainties of the six alpha input determinations by
+a factor of 2.5 in that adjustment. The independent October audit reports
+about 1.40 standard deviations against an unexpanded weighted mean of a
+subset of those inputs. These comparisons are not independent validation.
+
+The next regular CODATA adjustment is scheduled after its 31 December 2026
+closing date, with publication expected in early 2027. Refresh the measurement
+comparison only from the published adjustment and identified primary inputs.
+
+## Scientific non-claims
+
+This crate does not show that:
+- the model's definitions are the correct description of nature;
+- the qutrit-qubit link is a photon;
 - the calculated number is the electromagnetic coupling;
-- the gauge-group calculation yields all of the Standard Model;
-- the model has a momentum-dependent photon propagator, QED vertex, or
-  scattering amplitudes.
+- the gauge-group calculation derives the complete Standard Model;
+- the model provides QED propagators, vertices or scattering amplitudes.
 
-The author explicitly describes the physical identification with the photon
-as a conjecture. The Lean file's header also says that it checks the model
-calculation but not whether its definitions are the right physics.
-
-## Experimental comparison
-
-The comparison in the example uses the CODATA 2022 inverse fine-structure
-constant, 137.035999177(21), as the latest regular CODATA adjustment
-available at the time of this work. It is about 0.60 of that *adjusted
-standard uncertainty* from the candidate. CODATA states that the six input
-determinations for alpha in the 2022 adjustment required an uncertainty
-expansion factor of 2.5 to bring their inconsistencies to an acceptable
-level. Thus agreement with the combined adjusted value is a comparison,
-not an independent validation of the model.
-
-The next regular CODATA 2026 adjustment has a closing date of 31 December
-2026, with results scheduled for early 2027. The benchmark should be refreshed
-when the published adjustment and accepted input data become available.
+The next milestones are per-record comparison with the author's CSV,
+independent Lean build / axiom audit, read-cap premise review, explicit
+charge-assignment consistency checks and preregistered comparison to new
+independent measurements.
