@@ -1931,6 +1931,48 @@ mod tests {
     }
 
     #[test]
+    fn model_eig_rejects_missing_unknown_and_duplicate_model_prediction_ids() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        let make_action = |predictions: Vec<(&str, f64)>| DirichletActionPrediction {
+            action_id: "malformed-model-predictive-identities".into(),
+            outcomes: vec![
+                predicted_outcome("success", 0.5, &predictions, vec![vec![1.0, 0.0]]),
+                predicted_outcome(
+                    "failure",
+                    0.5,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.8)],
+                    vec![vec![0.0, 1.0]],
+                ),
+            ],
+        };
+
+        let missing = make_action(vec![("success-favouring", 0.8)]);
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &missing),
+            Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch { .. })
+        ));
+
+        let unknown = make_action(vec![
+            ("success-favouring", 0.8),
+            ("unknown-model", 0.2),
+        ]);
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &unknown),
+            Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch { .. })
+        ));
+
+        let duplicate = make_action(vec![
+            ("success-favouring", 0.4),
+            ("success-favouring", 0.4),
+            ("failure-favouring", 0.2),
+        ]);
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &duplicate),
+            Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn model_eig_rejects_per_model_predictive_mass_that_does_not_normalize() {
         let (full_prior, models) = symmetric_beta_model_family();
         let action = DirichletActionPrediction {
