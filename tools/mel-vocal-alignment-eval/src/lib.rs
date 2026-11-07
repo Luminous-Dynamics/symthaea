@@ -215,7 +215,11 @@ pub fn score_alignment(
     })
 }
 
-fn validate_header(sample_rate_hz: u32, total_frames: u64, reference: &[PhoneEvent]) -> Result<(), String> {
+fn validate_header(
+    sample_rate_hz: u32,
+    total_frames: u64,
+    reference: &[PhoneEvent],
+) -> Result<(), String> {
     if sample_rate_hz == 0 {
         return Err("sample_rate_hz must be positive".into());
     }
@@ -236,7 +240,13 @@ fn validate_reference(total_frames: u64, events: &[PhoneEvent]) -> Result<(), St
         if event.symbol.trim().is_empty() {
             return Err(format!("reference phone {index} has an empty symbol"));
         }
-        validate_interval(total_frames, event.start_frame, event.end_frame, "reference", index)?;
+        validate_interval(
+            total_frames,
+            event.start_frame,
+            event.end_frame,
+            "reference",
+            index,
+        )?;
         if index > 0
             && (event.start_frame < previous_start
                 || event.word_index < previous_word
@@ -259,7 +269,13 @@ fn validate_predictions(total_frames: u64, events: &[PredictedPhoneEvent]) -> Re
         if event.symbol.trim().is_empty() {
             return Err(format!("predicted phone {index} has an empty symbol"));
         }
-        validate_interval(total_frames, event.start_frame, event.end_frame, "predicted", index)?;
+        validate_interval(
+            total_frames,
+            event.start_frame,
+            event.end_frame,
+            "predicted",
+            index,
+        )?;
         if index > 0
             && (event.start_frame < previous_start
                 || event.word_index < previous_word
@@ -287,7 +303,9 @@ fn validate_interval(
     index: usize,
 ) -> Result<(), String> {
     if start_frame >= end_frame || end_frame > total_frames {
-        return Err(format!("{label} phone {index} has an invalid half-open frame interval"));
+        return Err(format!(
+            "{label} phone {index} has an invalid half-open frame interval"
+        ));
     }
     Ok(())
 }
@@ -302,7 +320,9 @@ fn validate_melismas(
             || span.start_frame >= span.end_frame
             || span.end_frame > total_frames
         {
-            return Err(format!("melisma span {index} has invalid note count or frame interval"));
+            return Err(format!(
+                "melisma span {index} has invalid note count or frame interval"
+            ));
         }
         let Some(phone) = reference.get(span.reference_phone_index) else {
             return Err(format!("melisma span {index} references a missing phone"));
@@ -337,7 +357,11 @@ fn align_phone_sequences(
 
     for i in 1..=n {
         for j in 1..=m {
-            let substitution_cost = if reference[i - 1].symbol == predicted[j - 1].symbol { 0 } else { 1 };
+            let substitution_cost = if reference[i - 1].symbol == predicted[j - 1].symbol {
+                0
+            } else {
+                1
+            };
             let diagonal = costs[i - 1][j - 1] + substitution_cost;
             let deletion = costs[i - 1][j] + 1;
             let insertion = costs[i][j - 1] + 1;
@@ -350,12 +374,22 @@ fn align_phone_sequences(
     while i > 0 || j > 0 {
         // Deterministic tie-breaking: diagonal, then deletion, then insertion.
         if i > 0 && j > 0 {
-            let cost = if reference[i - 1].symbol == predicted[j - 1].symbol { 0 } else { 1 };
+            let cost = if reference[i - 1].symbol == predicted[j - 1].symbol {
+                0
+            } else {
+                1
+            };
             if costs[i][j] == costs[i - 1][j - 1] + cost {
                 if cost == 0 {
-                    reversed.push(Edit::Exact { reference: i - 1, predicted: j - 1 });
+                    reversed.push(Edit::Exact {
+                        reference: i - 1,
+                        predicted: j - 1,
+                    });
                 } else {
-                    reversed.push(Edit::Substitute { reference: i - 1, predicted: j - 1 });
+                    reversed.push(Edit::Substitute {
+                        reference: i - 1,
+                        predicted: j - 1,
+                    });
                 }
                 i -= 1;
                 j -= 1;
@@ -394,7 +428,13 @@ fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
 
-    fn reference(symbol: &str, syllable: u32, start: u64, end: u64, is_vowel: bool) -> PhoneEvent {
+    fn reference(
+        symbol: &str,
+        syllable: u32,
+        start: u64,
+        end: u64,
+        is_vowel: bool,
+    ) -> PhoneEvent {
         PhoneEvent {
             symbol: symbol.into(),
             word_index: 0,
@@ -405,7 +445,13 @@ mod tests {
         }
     }
 
-    fn prediction(symbol: &str, syllable: u32, start: u64, end: u64, is_vowel: bool) -> PredictedPhoneEvent {
+    fn prediction(
+        symbol: &str,
+        syllable: u32,
+        start: u64,
+        end: u64,
+        is_vowel: bool,
+    ) -> PredictedPhoneEvent {
         PredictedPhoneEvent {
             symbol: symbol.into(),
             word_index: 0,
@@ -469,7 +515,7 @@ mod tests {
         ];
         let result = score_alignment(44_100, 2_000, &reference, &predicted, &[]).unwrap();
         assert_eq!(result.timing.exact_phone_pairs, 1);
-        assert!((result.timing.onset_mae_ms.unwrap() - (10.0)).abs() < 1e-10);
+        assert!((result.timing.onset_mae_ms.unwrap() - 10.0).abs() < 1e-10);
         assert_eq!(result.edits.substitutions, 1);
     }
 
@@ -500,7 +546,8 @@ mod tests {
             end_frame: 2_300,
             note_count: 4,
         };
-        let result = score_alignment(24_000, 3_000, &reference, &predicted, &[melisma]).unwrap();
+        let result =
+            score_alignment(24_000, 3_000, &reference, &predicted, &[melisma]).unwrap();
         assert_eq!(result.edits.exact_matches, 2);
         assert_eq!(result.edits.insertions, 0);
         assert_eq!(result.melisma.covered_spans, 1);
@@ -543,7 +590,9 @@ mod tests {
         assert!(score_alignment(0, 1, &[reference("a", 0, 0, 1, true)], &[], &[]).is_err());
         assert!(score_alignment(16_000, 0, &[reference("a", 0, 0, 1, true)], &[], &[]).is_err());
         assert!(score_alignment(16_000, 1, &[], &[], &[]).is_err());
-        assert!(score_alignment(16_000, 100, &[reference("a", 0, 0, 200, true)], &[], &[]).is_err());
+        assert!(
+            score_alignment(16_000, 100, &[reference("a", 0, 0, 200, true)], &[], &[]).is_err()
+        );
     }
 
     #[test]
