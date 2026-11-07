@@ -1,0 +1,54 @@
+name: Strict vocal phoneme contract
+
+on:
+  pull_request:
+    paths:
+      - "src/voice/functional_singing.rs"
+      - "src/voice/mod.rs"
+      - "scripts/diffsinger_worker.py"
+      - "scripts/diffsinger_phonemes.py"
+      - "scripts/test_diffsinger_phonemes.py"
+      - ".github/workflows/strict-vocal-phoneme-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-phoneme-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_PHONEME_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test dependency-free IPA, duration, melisma and language contracts
+        run: python3 scripts/test_diffsinger_phonemes.py -v
+
+      - name: Check worker and helper syntax
+        run: python3 -m py_compile scripts/diffsinger_worker.py scripts/diffsinger_phonemes.py scripts/test_diffsinger_phonemes.py
+
+      - name: Install pinned Rust formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check only the changed Rust files
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/functional_singing.rs src/voice/mod.rs
