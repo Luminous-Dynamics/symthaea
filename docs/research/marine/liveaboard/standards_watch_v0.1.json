@@ -88,7 +88,7 @@
       "publication_date": "2025-03",
       "status": "published",
       "scope": "Selection and installation of lithium-ion batteries and battery systems above 500 Wh used on small craft for general electrical loads and/or electric propulsion, including manufacturer safety information.",
-      "applicability_note": "Directly relevant to LOS-18 battery systems above 500 Wh if the vessel and system fall within its stated small-craft scope. Obtain the licensed standard and have battery installer / marine electrical engineer review applicability and interfaces. This does not replace cell/system-specific fire, thermal-runaway, enclosure or class/flag requirements.",
+      "applicability_note": "Directly relevant to LOS-18 battery installations above 500 Wh if the craft/system falls within its stated small-craft scope. Important limit: ISO 23625 warns that boat DC systems operating at 60 V or higher have additional safety requirements not addressed by this document. Obtain the licensed standard and have a marine electrical engineer review the complete system, manufacturer requirements, voltage-specific protection, containment and applicable class/flag rules. This is not a complete high-voltage battery safety basis.",
       "source": "https://www.iso.org/standard/85220.html"
     },
     {
