@@ -994,6 +994,9 @@ mod tests {
         let ranking = rank_sensor_placements(&existing, target, &candidates).unwrap();
         assert_eq!(ranking.len(), 3);
         assert_eq!(ranking[0].sensor_id, "high");
+        assert!((ranking[0].log_determinant_information - 28.778_305_173_1).abs() < 1e-8);
+        assert!((ranking[0].a_optimal_variance_sum_m2 - 5.541_708_743_8e-4).abs() < 1e-12);
+        assert!((ranking[0].covariance_lower_bound_m2[2][2] - 4.938_144_56e-4).abs() < 1e-12);
         assert!(ranking.windows(2).all(|pair| {
             pair[0].log_determinant_information >= pair[1].log_determinant_information
         }));
