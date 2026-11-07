@@ -10,9 +10,10 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 [lib]
 path = "src/lib.rs"
 
-# Intentionally std-only. The first milestone defines immutable evidence
-# records and validation rules; it does not infer object identity, propulsion,
-# or non-human origin.
+# Keep the evidence/geometry primitives std-only so their scientific contracts
+# can be audited independently. Workspace lockfile reconciliation and
+# exact-head locked tests remain mandatory; minimal dependencies do not
+# eliminate the need for a reproducible workspace dependency graph.
 
 [[example]]
 name = "sensor_placement_design"
