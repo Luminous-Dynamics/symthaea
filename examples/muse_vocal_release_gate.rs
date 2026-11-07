@@ -12,6 +12,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use symthaea::voice::diffsinger::DiffSingerEngine;
+use symthaea::voice::formant_singing_engine::FormantSingingEngine;
 use symthaea::voice::kokoro_singing::KokoroSingingEngine;
 use symthaea::voice::singing_engine::{
     SingingBackendCapabilities, SingingVoiceEngine, VocalPerformance, VocalStem,
@@ -452,6 +453,7 @@ fn main() -> Result<()> {
     let salt = blind_salt(&args, &output)?;
 
     let mut kokoro = KokoroSingingEngine::load(&voice)?;
+    let mut formant = FormantSingingEngine::default();
     let mut diffsinger = worker.as_deref().map(DiffSingerEngine::spawn).transpose()?;
     let mut clips = Vec::new();
     let mut key = Vec::new();
@@ -504,6 +506,17 @@ fn main() -> Result<()> {
         });
         render_one(
             &mut kokoro,
+            &performance,
+            case_id,
+            case,
+            &salt,
+            &output,
+            &mut clips,
+            &mut key,
+            &mut objective,
+        )?;
+        render_one(
+            &mut formant,
             &performance,
             case_id,
             case,
