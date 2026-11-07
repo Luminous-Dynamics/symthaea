@@ -1145,6 +1145,14 @@ mod tests {
         graph
     }
 
+    fn next_fixture_value(state: &mut u64) -> u64 {
+        *state ^= *state >> 12;
+        *state ^= *state << 25;
+        *state ^= *state >> 27;
+        state.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+
+
     #[test]
     fn forest_marginals_match_direct_enumeration() {
         let graph = two_node_tree();
@@ -1607,6 +1615,170 @@ mod tests {
             run_max_product_forest(&graph),
             Err(CheckedBPError::ZeroSupport { .. })
         ));
+    }
+
+    #[test]
+    fn randomized_mixed_cardinality_forests_match_exhaustive_sum_product() {
+        let mut seed = 0x5047_4D42_5020_2607u64;
+        let mut cases = 0usize;
+        for variable_count in 2..=6 {
+            for _case in 0..8 {
+                let cardinalities = (0..variable_count)
+                    .map(|_| 2 + (next_fixture_value(&mut seed) % 2) as usize)
+                    .collect::<Vec<_>>();
+                let mut graph = FactorGraph::new();
+                for variable in 0..variable_count {
+                    graph.add_variable(&format!("X{variable}"), cardinalities[variable]);
+                }
+
+                let mut frozen_factors: Vec<(Vec<usize>, Vec<f64>)> = Vec::new();
+                for variable in 0..variable_count {
+                    let mut table = (0..cardinalities[variable])
+                        .map(|_| (next_fixture_value(&mut seed) % 9 + 1) as f64)
+                        .collect::<Vec<_>>();
+                    graph.add_factor(&[variable], table.clone());
+                    frozen_factors.push((vec![variable], std::mem::take(&mut table)));
+                }
+                for child in 1..variable_count {
+                    let parent = (next_fixture_value(&mut seed) % child as u64) as usize;
+                    let entries = cardinalities[parent] * cardinalities[child];
+                    let mut table = (0..entries)
+                        .map(|_| (next_fixture_value(&mut seed) % 10) as f64)
+                        .collect::<Vec<_>>();
+                    // Guarantees the all-zero global assignment has support.
+                    table[0] = 1.0;
+                    graph.add_factor(&[parent, child], table.clone());
+                    frozen_factors.push((vec![parent, child], table));
+                }
+
+                let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+                assert_eq!(inference.inference_status, InferenceStatus::ExactForest);
+
+                let assignment_count = cardinalities.iter().product::<usize>();
+                let mut z = 0.0;
+                let mut variable_mass = cardinalities.iter()
+                    .map(|&cardinality| vec![0.0; cardinality])
+                    .collect::<Vec<_>>();
+                let mut factor_mass = frozen_factors.iter()
+                    .map(|(_, table)| vec![0.0; table.len()])
+                    .collect::<Vec<_>>();
+
+                for flat_index in 0..assignment_count {
+                    let assignment = decode_assignment(flat_index, &cardinalities);
+                    let mut weight = 1.0;
+                    let mut table_indices = Vec::with_capacity(frozen_factors.len());
+                    for (scope, table) in &frozen_factors {
+                        let table_index = scope.iter().fold(0usize, |index, &variable| {
+                            index * cardinalities[variable] + assignment[variable]
+                        });
+                        table_indices.push(table_index);
+                        weight *= table[table_index];
+                    }
+                    if weight == 0.0 {
+                        continue;
+                    }
+                    z += weight;
+                    for variable in 0..variable_count {
+                        variable_mass[variable][assignment[variable]] += weight;
+                    }
+                    for (factor_index, table_index) in table_indices.into_iter().enumerate() {
+                        factor_mass[factor_index][table_index] += weight;
+                    }
+                }
+                assert!(z > 0.0);
+
+                for variable in 0..variable_count {
+                    for state in 0..cardinalities[variable] {
+                        let expected = variable_mass[variable][state] / z;
+                        assert!(
+                            (inference.beliefs[variable][state] - expected).abs() < 1.0e-9,
+                            "case {cases}, variable {variable}, state {state}: BP={}, exact={expected}",
+                            inference.beliefs[variable][state]
+                        );
+                    }
+                }
+                for factor_index in 0..frozen_factors.len() {
+                    for table_index in 0..factor_mass[factor_index].len() {
+                        let expected = factor_mass[factor_index][table_index] / z;
+                        assert!(
+                            (inference.factor_beliefs[factor_index][table_index] - expected).abs() < 1.0e-9,
+                            "case {cases}, factor {factor_index}, table entry {table_index}: BP={}, exact={expected}",
+                            inference.factor_beliefs[factor_index][table_index]
+                        );
+                    }
+                }
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, 40);
+    }
+
+    #[test]
+    fn randomized_mixed_cardinality_forests_match_exhaustive_joint_map() {
+        let mut seed = 0x4D41_5020_2607_0A11u64;
+        let mut cases = 0usize;
+        for variable_count in 2..=6 {
+            for _case in 0..8 {
+                let cardinalities = (0..variable_count)
+                    .map(|_| 2 + (next_fixture_value(&mut seed) % 2) as usize)
+                    .collect::<Vec<_>>();
+                let mut graph = FactorGraph::new();
+                for variable in 0..variable_count {
+                    graph.add_variable(&format!("X{variable}"), cardinalities[variable]);
+                }
+
+                let mut frozen_factors: Vec<(Vec<usize>, Vec<f64>)> = Vec::new();
+                for variable in 0..variable_count {
+                    let table = (0..cardinalities[variable])
+                        .map(|_| (next_fixture_value(&mut seed) % 9 + 1) as f64)
+                        .collect::<Vec<_>>();
+                    graph.add_factor(&[variable], table.clone());
+                    frozen_factors.push((vec![variable], table));
+                }
+                for child in 1..variable_count {
+                    let parent = (next_fixture_value(&mut seed) % child as u64) as usize;
+                    let entries = cardinalities[parent] * cardinalities[child];
+                    let mut table = (0..entries)
+                        .map(|_| (next_fixture_value(&mut seed) % 10) as f64)
+                        .collect::<Vec<_>>();
+                    table[0] = 1.0;
+                    graph.add_factor(&[parent, child], table.clone());
+                    frozen_factors.push((vec![parent, child], table));
+                }
+
+                let result = run_max_product_forest(&graph).unwrap();
+                let assignment_count = cardinalities.iter().product::<usize>();
+                let mut best_score = f64::NEG_INFINITY;
+                for flat_index in 0..assignment_count {
+                    let assignment = decode_assignment(flat_index, &cardinalities);
+                    let mut terms = Vec::with_capacity(frozen_factors.len());
+                    let mut supported = true;
+                    for (scope, table) in &frozen_factors {
+                        let table_index = scope.iter().fold(0usize, |index, &variable| {
+                            index * cardinalities[variable] + assignment[variable]
+                        });
+                        let potential = table[table_index];
+                        if potential == 0.0 {
+                            supported = false;
+                            break;
+                        }
+                        terms.push(potential.ln());
+                    }
+                    if supported {
+                        terms.sort_by(f64::total_cmp);
+                        best_score = best_score.max(compensated_sum(&terms));
+                    }
+                }
+                assert!(best_score.is_finite());
+                assert!(
+                    (result.joint_log_potential - best_score).abs() < 1.0e-10,
+                    "case {cases}: MAP={}, exhaustive={best_score}",
+                    result.joint_log_potential
+                );
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, 40);
     }
 
     #[test]
