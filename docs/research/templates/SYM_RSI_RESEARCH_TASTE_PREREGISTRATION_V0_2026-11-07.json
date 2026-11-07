@@ -341,5 +341,21 @@
     "transfer_results_reported_separately": true,
     "limitations_and_unidentified_effects_required": true
   },
-  "claim_ceiling": "Research judgment and efficiency are not themselves proof of a scientific discovery. Future-paper matching is not truth. A useful research process is not R4 until a successor improves the research procedure from the same start and matched inclusive budget, with repeatability and fresh-family transfer."
+  "claim_ceiling": "Research judgment and efficiency are not themselves proof of a scientific discovery. Future-paper matching is not truth. A useful research process is not R4 until a successor improves the research procedure from the same start and matched inclusive budget, with repeatability and fresh-family transfer.",
+  "decision_theory": {
+    "decision_options_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "hypothesis_prior_distribution_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "posterior_update_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "utility_function_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "outcome_value_scale_and_units": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "expected_value_without_experiment_definition": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "expected_value_with_experiment_definition": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evsi_estimation_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "expected_experiment_cost_and_opportunity_cost_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "downside_risk_measure_and_limit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "robustness_and_sensitivity_plan": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "utility_weights_frozen_before_outcomes": true,
+    "post_hoc_utility_reweighting_prohibited": true,
+    "note": "Expected information gain and expected value of sample information are distinct. A result is decision-relevant only if it can change the selected action or its expected utility after accounting for full cost and downside risk."
+  }
 }
