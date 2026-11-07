@@ -1018,6 +1018,14 @@ mod tests {
     }
 
     #[test]
+    fn decision_critical_outcome_mutation_is_rejected_by_known_answer() {
+        let mut value: Value = serde_json::from_str(ADAPTIVE).unwrap();
+        value["potential_outcomes"][0]["observations"][1]["outcome_id"] = json!("a-minus");
+        let raw = serde_json::to_vec(&value).unwrap();
+        assert!(run(&raw).unwrap_err().contains("known-answer mismatch"));
+    }
+
+    #[test]
     fn policy_depth_above_available_action_count_is_rejected() {
         let mut value: Value = serde_json::from_str(ADAPTIVE).unwrap();
         let action_count = value["actions"].as_array().unwrap().len();
