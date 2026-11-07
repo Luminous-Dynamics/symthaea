@@ -3736,7 +3736,7 @@
           "confidence_level": "not reported",
           "method": "not reported by source",
           "applies_to_metric_id": "implemented_adapted_rate",
-          "applies_to_task_count": null
+          "applies_to_task_count": 180739
         }
       },
       "notes": [
@@ -3770,7 +3770,7 @@
           "confidence_level": "not reported",
           "method": "not reported by source",
           "applies_to_metric_id": "bug_suggestion_implementation_rate",
-          "applies_to_task_count": null
+          "applies_to_task_count": 100014
         }
       },
       "notes": [
@@ -3804,7 +3804,7 @@
           "confidence_level": "not reported",
           "method": "not reported by source",
           "applies_to_metric_id": "security_suggestion_implementation_rate",
-          "applies_to_task_count": null
+          "applies_to_task_count": 7409
         }
       },
       "notes": [
@@ -3838,7 +3838,7 @@
           "confidence_level": "not reported",
           "method": "not reported by source",
           "applies_to_metric_id": "flagged_merged_pr_open_flag_rate",
-          "applies_to_task_count": null
+          "applies_to_task_count": 13609
         }
       },
       "notes": [
