@@ -33,7 +33,7 @@
 //! information gain and not a complete expected-free-energy policy.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const PROBABILITY_TOLERANCE: f64 = 1e-9;
 const LANCZOS_G: f64 = 7.0;
