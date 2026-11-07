@@ -1469,9 +1469,10 @@ fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|line| line.as_str().unwrap().contains(
-                "does not prove the underlying real-world proposition"
-            ))
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
     );
 
     let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
@@ -1509,7 +1510,10 @@ fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|line| line.as_str().unwrap().contains("does not prove the underlying real-world proposition"))
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
     );
 }
 
