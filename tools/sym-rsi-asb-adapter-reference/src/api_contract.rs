@@ -332,6 +332,29 @@ impl CampaignStatusV1 {
         if self.active_job.as_deref().is_some_and(|job| !non_empty(job)) {
             return Err(ApiContractError::InvalidActiveJob);
         }
+
+        // The pinned server counts accepted, non-failed jobs as spent. With no
+        // active job, spent must equal the completed-stage budget. With one
+        // active job, it must additionally include exactly the next batch.
+        let completed_budget = campaign
+            .stages
+            .iter()
+            .take(self.stages_completed as usize)
+            .try_fold(0u64, |sum, stage| sum.checked_add(stage.batch_size))
+            .ok_or(ApiContractError::InvalidBudgetAccounting)?;
+        let expected_spent = match self.active_job {
+            Some(_) => {
+                let next_stage = self.next_stage.ok_or(ApiContractError::InvalidActiveJob)?;
+                let next_batch = campaign.stage(next_stage)
+                    .ok_or(ApiContractError::InvalidActiveJob)?.batch_size;
+                completed_budget.checked_add(next_batch)
+                    .ok_or(ApiContractError::InvalidBudgetAccounting)?
+            }
+            None => completed_budget,
+        };
+        if self.budget.spent != expected_spent {
+            return Err(ApiContractError::InvalidBudgetAccounting);
+        }
         Ok(())
     }
 }
@@ -519,6 +542,45 @@ mod tests {
         let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
         assert_eq!(
             bad.validate_against(&card).expect_err("budget must reconcile"),
+            ApiContractError::InvalidBudgetAccounting
+        );
+    }
+
+    #[test]
+    fn accepts_status_with_one_accepted_pending_batch_in_spent_budget() {
+        let card = campaign();
+        let mut value: Value = serde_json::from_str(STATUS).expect("status JSON parses");
+        value["active_job"] = Value::String("job-0001".to_owned());
+        value["budget"]["spent"] = Value::from(2);
+        value["budget"]["remaining"] = Value::from(2);
+        let pending: CampaignStatusV1 = serde_json::from_value(value).expect("pending status parses");
+        assert!(pending.validate_against(&card).is_ok());
+    }
+
+    #[test]
+    fn rejects_active_job_without_next_stage() {
+        let card = campaign();
+        let mut value: Value = serde_json::from_str(STATUS).expect("status JSON parses");
+        value["stages_completed"] = Value::from(2);
+        value["next_stage"] = Value::Null;
+        value["active_job"] = Value::String("job-0003".to_owned());
+        let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
+        assert_eq!(
+            bad.validate_against(&card).expect_err("active job requires next stage"),
+            ApiContractError::InvalidActiveJob
+        );
+    }
+
+    #[test]
+    fn rejects_spent_budget_that_exceeds_completed_and_active_batches() {
+        let card = campaign();
+        let mut value: Value = serde_json::from_str(STATUS).expect("status JSON parses");
+        value["active_job"] = Value::String("job-0001".to_owned());
+        value["budget"]["spent"] = Value::from(3);
+        value["budget"]["remaining"] = Value::from(1);
+        let bad: CampaignStatusV1 = serde_json::from_value(value).expect("mutated status parses");
+        assert_eq!(
+            bad.validate_against(&card).expect_err("only one next batch may be active"),
             ApiContractError::InvalidBudgetAccounting
         );
     }
