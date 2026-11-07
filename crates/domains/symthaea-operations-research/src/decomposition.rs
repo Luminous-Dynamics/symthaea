@@ -98,6 +98,7 @@ pub enum DecompositionError {
     ClauseCrossesComponents { clause: usize },
     EmptyClauseNotSupportedByComponentWitness { clause: usize },
     CountOverflow,
+    ResourceAccountingOverflow,
     SemanticMismatch { source_count: u128, aggregate_count: u128 },
 }
 
@@ -118,7 +119,9 @@ fn validate_problem(
         });
     }
     let literal_count = problem.clauses.iter().try_fold(0usize, |total, clause| {
-        total.checked_add(clause.len()).ok_or(DecompositionError::CountOverflow)
+        total
+            .checked_add(clause.len())
+            .ok_or(DecompositionError::ResourceAccountingOverflow)
     })?;
     if literal_count > budget.max_literals {
         return Err(DecompositionError::LiteralBudgetExceeded {
