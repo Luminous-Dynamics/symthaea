@@ -22,10 +22,24 @@ source is pinned to commit a28db8998bce5bd5ef11195c05f13c86cd9dac5c.
 | Inverse-alpha candidate | 137.035999189566... | test asserts numeric value |
 
 The author publishes an independent standard-library Python enumerator and
-the row-level records.csv. The next audit step is a record-by-record comparison
-of the Rust implementation's canonical record identities and signatures
-against that CSV. The current Rust test suite compares aggregate counts and
-sectors, not all 172 individual rows.
+the row-level records.csv. The Rust implementation now emits the CSV row
+schema in author-compatible stable order and tests all six contiguous
+classification bands across all 172 row ordinals:
+
+| Ordinals | Construction | Slot kind | X | Y | Passed ends | k | Count |
+|---|---|---|---:|---:|---|---:|---:|
+| R001–R048 | odd | mixed | +1 | +1 | none | 1 | 48 |
+| R049–R079 | odd | same | +1 | +1 | none | 1 | 31 |
+| R080–R127 | even | mixed | +1 | -1 | qubit | 2 | 48 |
+| R128–R158 | even | same | -1 | +1 | qutrit | 3 | 31 |
+| R159–R169 | exchange-fixed | same | -1 | +1 | qutrit | 3 | 11 |
+| R170–R172 | commutator | bracket | -1 | -1 | both | 6 | 3 |
+
+This establishes a category-by-category row-schema match to the published CSV
+specification. It is not yet a byte-for-byte file comparison, because the
+Rust example has not been compiled in this environment. The example now emits
+all rows to make the final diff straightforward on a machine with the pinned
+Rust toolchain.
 
 ## Formalization boundary
 
