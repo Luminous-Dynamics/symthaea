@@ -19,14 +19,15 @@
 //! factorize, so their log ratios add. This is the Dirichlet BMR construction
 //! used for categorical active-inference likelihood tensors.
 //!
-//! Full-model priors and posteriors use proper Dirichlet distributions with
-//! strictly positive concentrations. A reduced model may explicitly exclude
-//! coordinates through its active-support mask: inactive coordinates must have
-//! exactly zero concentration and denote a lower-dimensional simplex face.
-//! Any observed count in an excluded coordinate makes that reduced model's
-//! evidence exactly zero. Implicit zeros, empty support, and non-integrable
-//! reduced posteriors are rejected. Small positive shrinkage concentrations
-//! (e.g. 1/32) are supported when the resulting reduced posterior remains positive.
+//! Every Dirichlet column carries an explicit support mask. Concentrations on
+//! active coordinates must be strictly positive; inactive coordinates must be
+//! exactly zero and denote a lower-dimensional simplex face. The full prior
+//! and posterior must use identical support; reduced-model support may only be
+//! a subset of the full support. Any observed count in a coordinate excluded
+//! by a reduced model makes that model's evidence exactly zero. Implicit zeros,
+//! empty support, mismatched supports, and non-integrable reduced posteriors
+//! are rejected. Small positive shrinkage concentrations (e.g. 1/32) are
+//! supported when the resulting reduced posterior remains positive.
 //!
 //! This is post-observation model evidence, not prospective expected
 //! information gain and not a complete expected-free-energy policy.
@@ -1263,6 +1264,114 @@ mod tests {
         assert!(matches!(
             invalid_prior_mass,
             Err(DirichletBayesianModelReductionError::ModelPriorMassNotNormalized { .. })
+        ));
+    }
+
+    #[test]
+    fn full_model_support_masks_allow_structural_zero_outcomes() {
+        let full_prior = tensor_with_support(
+            &[&[1.0, 0.0, 0.0], &[0.0, 1.0, 1.0]],
+            &[&[true, false, false], &[false, true, true]],
+            'a',
+        );
+        let posterior = tensor_with_support(
+            &[&[4.0, 0.0, 0.0], &[0.0, 3.0, 1.0]],
+            &[&[true, false, false], &[false, true, true]],
+            'a',
+        );
+        let reduced_prior = tensor_with_support(
+            &[&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]],
+            &[&[true, false, false], &[false, true, false]],
+            'a',
+        );
+        let result = reduce_dirichlet_models(
+            &posterior,
+            &full_prior,
+            &[ReducedDirichletModelHypothesis {
+                model_id: "no-incorrect-feedback".into(),
+                prior_probability: 1.0,
+                parameter_prior: reduced_prior,
+            }],
+        )
+        .expect("full and reduced models have valid explicit support");
+        // The second column has two observed correct outcomes and no incorrect
+        // outcomes. The reduced model fixes P(correct)=1, so BF = 3.
+        assert!((result.models[0].log_evidence_ratio - 3.0_f64.ln()).abs() < 1e-11);
+    }
+
+    #[test]
+    fn full_support_mismatch_and_reduced_support_expansion_are_rejected() {
+        let prior = tensor_with_support(
+            &[&[1.0, 0.0, 0.0]],
+            &[&[true, false, false]],
+            'a',
+        );
+        let mismatched_posterior = tensor_with_support(
+            &[&[2.0, 1.0, 0.0]],
+            &[&[true, true, false]],
+            'a',
+        );
+        assert!(matches!(
+            reduce_dirichlet_models(
+                &mismatched_posterior,
+                &prior,
+                &[ReducedDirichletModelHypothesis {
+                    model_id: "bad-full-support".into(),
+                    prior_probability: 1.0,
+                    parameter_prior: prior.clone(),
+                }]
+            ),
+            Err(DirichletBayesianModelReductionError::SupportMismatch {
+                distribution: "full prior",
+                ..
+            })
+        ));
+
+        let posterior = tensor_with_support(
+            &[&[2.0, 0.0, 0.0]],
+            &[&[true, false, false]],
+            'a',
+        );
+        let expanded_reduced_support = tensor(&[&[1.0, 1.0, 1.0]], 'a');
+        assert!(matches!(
+            reduce_dirichlet_models(
+                &posterior,
+                &prior,
+                &[ReducedDirichletModelHypothesis {
+                    model_id: "expanded-support".into(),
+                    prior_probability: 1.0,
+                    parameter_prior: expanded_reduced_support,
+                }]
+            ),
+            Err(DirichletBayesianModelReductionError::SupportMismatch {
+                distribution: "reduced prior",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn full_column_with_empty_support_is_rejected() {
+        let empty = tensor_with_support(
+            &[&[0.0, 0.0]],
+            &[&[false, false]],
+            'a',
+        );
+        let result = reduce_dirichlet_models(
+            &empty,
+            &empty,
+            &[ReducedDirichletModelHypothesis {
+                model_id: "empty-full-support".into(),
+                prior_probability: 1.0,
+                parameter_prior: empty.clone(),
+            }],
+        );
+        assert!(matches!(
+            result,
+            Err(DirichletBayesianModelReductionError::EmptySupport {
+                distribution: "full posterior",
+                column: 0
+            })
         ));
     }
 
