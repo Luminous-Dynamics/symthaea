@@ -28,7 +28,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::amplifier::combined_metric;
+use crate::amplifier::alcubierre_shaping;
 use crate::types::{GravcraftConfig, MetricCommand};
 use std::error::Error;
 use std::f64::consts::PI;
@@ -66,6 +66,8 @@ impl AmplifierAdmMetric {
             || config.bubble_radius <= 0.0
             || !config.wall_sigma.is_finite()
             || config.wall_sigma <= 0.0
+            || !config.max_metric_amplitude.is_finite()
+            || config.max_metric_amplitude <= 0.0
         {
             return Err(AdmReferenceError::InvalidConfiguration);
         }
@@ -77,7 +79,10 @@ impl AmplifierAdmMetric {
             {
                 return Err(AdmReferenceError::NonFiniteInput);
             }
-            if focal < 0.0 || elevation.abs() > 0.5 * PI {
+            if amplitude.abs() > config.max_metric_amplitude
+                || focal < 0.0
+                || elevation.abs() > 0.5 * PI
+            {
                 return Err(AdmReferenceError::InvalidConfiguration);
             }
         }
@@ -93,13 +98,44 @@ impl AmplifierAdmMetric {
         if position_m.iter().any(|value| !value.is_finite()) {
             return Err(AdmReferenceError::NonFiniteInput);
         }
-        Ok(combined_metric(
-            position_m,
-            self.craft_origin_m,
-            &self.command.amplifiers,
-            &self.config,
-        )
-        .0)
+        let mut total_shift = [0.0_f64; 3];
+        for (amplitude, focal_distance, azimuth, elevation) in self.command.amplifiers {
+            if amplitude == 0.0 {
+                continue;
+            }
+            // Alcubierre-style convention: the shift direction is fixed for
+            // each bubble; the radial shaping function controls its profile.
+            // This is smooth at the bubble centre, unlike the legacy
+            // radial-away-from-focal-point toy field.
+            let cosine_elevation = elevation.cos();
+            let direction = [
+                cosine_elevation * azimuth.cos(),
+                cosine_elevation * azimuth.sin(),
+                elevation.sin(),
+            ];
+            let focal = [
+                self.craft_origin_m[0] + focal_distance * direction[0],
+                self.craft_origin_m[1] + focal_distance * direction[1],
+                self.craft_origin_m[2] + focal_distance * direction[2],
+            ];
+            let displacement = [
+                position_m[0] - focal[0],
+                position_m[1] - focal[1],
+                position_m[2] - focal[2],
+            ];
+            let radius = displacement[0]
+                .hypot(displacement[1])
+                .hypot(displacement[2]);
+            let profile = alcubierre_shaping(
+                radius,
+                self.config.bubble_radius,
+                self.config.wall_sigma,
+            );
+            for axis in 0..3 {
+                total_shift[axis] += amplitude * profile * direction[axis];
+            }
+        }
+        Ok(total_shift)
     }
 
     /// Build the covariant metric from the ADM lapse, spatial metric and shift.
@@ -399,6 +435,68 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn fixed_axis_shift_is_continuous_at_the_bubble_centre() {
+        let field = shifted_field();
+        let focal = [10.0, 0.0, 0.0];
+        let centre = field.shift_at(focal).unwrap();
+        let epsilon = 1.0e-6;
+        let x_plus = field.shift_at([10.0 + epsilon, 0.0, 0.0]).unwrap();
+        let y_plus = field.shift_at([10.0, epsilon, 0.0]).unwrap();
+        let z_plus = field.shift_at([10.0, 0.0, epsilon]).unwrap();
+
+        assert!((centre[0] - 0.05).abs() < 1.0e-10);
+        assert!(centre[1].abs() < 1.0e-12);
+        assert!(centre[2].abs() < 1.0e-12);
+        for nearby in [x_plus, y_plus, z_plus] {
+            let difference = (0..3)
+                .map(|axis| (nearby[axis] - centre[axis]).powi(2))
+                .sum::<f64>()
+                .sqrt();
+            assert!(
+                difference < 1.0e-6,
+                "fixed-axis shift is discontinuous at focal centre: {difference:.3e}"
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_axis_shift_uses_command_direction_not_radial_position_direction() {
+        let field = AmplifierAdmMetric::new(
+            [0.0; 3],
+            MetricCommand {
+                amplifiers: [
+                    (0.05, 10.0, std::f64::consts::FRAC_PI_2, 0.0),
+                    (0.0, 0.0, 0.0, 0.0),
+                    (0.0, 0.0, 0.0, 0.0),
+                ],
+            },
+            GravcraftConfig::default(),
+        )
+        .unwrap();
+        let focal = [0.0, 10.0, 0.0];
+        let shift = field.shift_at(focal).unwrap();
+        assert!(shift[1] > 0.049);
+        assert!(shift[0].abs() < 1.0e-10);
+        assert!(shift[2].abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn amplifier_limit_is_enforced_before_metric_construction() {
+        let result = AmplifierAdmMetric::new(
+            [0.0; 3],
+            MetricCommand {
+                amplifiers: [
+                    (0.051, 10.0, 0.0, 0.0),
+                    (0.0, 0.0, 0.0, 0.0),
+                    (0.0, 0.0, 0.0, 0.0),
+                ],
+            },
+            GravcraftConfig::default(),
+        );
+        assert_eq!(result, Err(AdmReferenceError::InvalidConfiguration));
     }
 
     #[test]
