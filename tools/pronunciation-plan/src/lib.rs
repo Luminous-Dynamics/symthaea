@@ -1047,13 +1047,28 @@ mod tests {
                 SyllableNoteBinding {
                     word_index: 0,
                     syllable_index: 0,
-                    note_indices: vec![0, 1],
+                    spans: vec![
+                        ScoreEventSpan {
+                            event_index: 0,
+                            start_offset_s: 0.0,
+                            end_offset_s: 0.4,
+                        },
+                        ScoreEventSpan {
+                            event_index: 1,
+                            start_offset_s: 0.0,
+                            end_offset_s: 0.4,
+                        },
+                    ],
                     melisma_phone_index: Some(1),
                 },
                 SyllableNoteBinding {
                     word_index: 1,
                     syllable_index: 0,
-                    note_indices: vec![2],
+                    spans: vec![ScoreEventSpan {
+                        event_index: 2,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.4,
+                    }],
                     melisma_phone_index: None,
                 },
             ],
@@ -1084,18 +1099,205 @@ mod tests {
     #[test]
     fn every_sung_note_must_be_assigned_once_and_rests_must_remain_unbound() {
         let (pronunciation, mut alignment) = alignment_fixture();
-        alignment.syllable_bindings[0].note_indices = vec![0];
+        alignment.syllable_bindings[0].spans = vec![ScoreEventSpan {
+            event_index: 0,
+            start_offset_s: 0.0,
+            end_offset_s: 0.4,
+        }];
         alignment.syllable_bindings[0].melisma_phone_index = None;
         let error = alignment.validate_against(&pronunciation).unwrap_err();
-        assert!(
-            error.contains("does not match") || error.contains("unassigned"),
-            "{error}"
-        );
+        assert!(error.contains("unassigned interval"), "{error}");
 
         let (pronunciation, mut alignment) = alignment_fixture();
         alignment.events[1].kind = ScoreEventKind::Rest;
         let error = alignment.validate_against(&pronunciation).unwrap_err();
         assert!(error.contains("assigns a rest"), "{error}");
+    }
+
+    #[test]
+    fn multiple_syllables_can_share_one_long_note_without_overlap() {
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read now".into(),
+            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+        };
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![ScoreEvent {
+                start_s: 0.0,
+                duration_s: 1.0,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            }],
+            syllable_bindings: vec![
+                SyllableNoteBinding {
+                    word_index: 0,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.45,
+                    }],
+                    melisma_phone_index: None,
+                },
+                SyllableNoteBinding {
+                    word_index: 1,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.45,
+                        end_offset_s: 1.0,
+                    }],
+                    melisma_phone_index: None,
+                },
+            ],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+        };
+        assert!(alignment.validate_against(&pronunciation).is_ok());
+    }
+
+    #[test]
+    fn syllable_intervals_must_cover_each_note_without_gaps_or_overlap() {
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read now".into(),
+            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+        };
+        let mut alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![ScoreEvent {
+                start_s: 0.0,
+                duration_s: 1.0,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            }],
+            syllable_bindings: vec![
+                SyllableNoteBinding {
+                    word_index: 0,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.4,
+                    }],
+                    melisma_phone_index: None,
+                },
+                SyllableNoteBinding {
+                    word_index: 1,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.5,
+                        end_offset_s: 1.0,
+                    }],
+                    melisma_phone_index: None,
+                },
+            ],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+        };
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("unassigned interval"), "{error}");
+
+        alignment.syllable_bindings[1].spans[0].start_offset_s = 0.35;
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("overlapping syllable intervals"), "{error}");
+    }
+
+    #[test]
+    fn melisma_cannot_skip_an_explicit_rest() {
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read now".into(),
+            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+        };
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![
+                ScoreEvent {
+                    start_s: 0.0,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.4,
+                    duration_s: 0.1,
+                    kind: ScoreEventKind::Rest,
+                },
+                ScoreEvent {
+                    start_s: 0.5,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.9,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 261.63,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+            syllable_bindings: vec![
+                SyllableNoteBinding {
+                    word_index: 0,
+                    syllable_index: 0,
+                    spans: vec![
+                        ScoreEventSpan {
+                            event_index: 0,
+                            start_offset_s: 0.0,
+                            end_offset_s: 0.4,
+                        },
+                        ScoreEventSpan {
+                            event_index: 2,
+                            start_offset_s: 0.0,
+                            end_offset_s: 0.4,
+                        },
+                    ],
+                    melisma_phone_index: Some(1),
+                },
+                SyllableNoteBinding {
+                    word_index: 1,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 3,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.4,
+                    }],
+                    melisma_phone_index: None,
+                },
+            ],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+        };
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("consecutive score events"), "{error}");
     }
 
     #[test]
@@ -1122,8 +1324,15 @@ mod tests {
     #[test]
     fn note_assignments_cannot_overlap_or_reorder() {
         let (pronunciation, mut alignment) = alignment_fixture();
-        alignment.syllable_bindings[1].note_indices = vec![1];
+        alignment.syllable_bindings[1].spans = vec![ScoreEventSpan {
+            event_index: 1,
+            start_offset_s: 0.0,
+            end_offset_s: 0.4,
+        }];
         let error = alignment.validate_against(&pronunciation).unwrap_err();
-        assert!(error.contains("overlaps or reorders"), "{error}");
+        assert!(
+            error.contains("overlaps or reorders") || error.contains("overlapping"),
+            "{error}"
+        );
     }
 }
