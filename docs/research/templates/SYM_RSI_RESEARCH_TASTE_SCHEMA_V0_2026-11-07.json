@@ -267,16 +267,37 @@
           "minLength": 1
         },
         "task_count": {
-          "type": "string",
-          "minLength": 1
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "problem_family_count": {
-          "type": "string",
-          "minLength": 1
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "domain_count": {
-          "type": "string",
-          "minLength": 1
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "opportunity_fields": {
           "type": "array",
@@ -712,8 +733,15 @@
       "type": "object",
       "properties": {
         "reviewer_count": {
-          "type": "string",
-          "minLength": 1
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "reviewer_qualification_ref": {
           "type": "string",
