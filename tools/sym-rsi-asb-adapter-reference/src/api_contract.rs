@@ -517,6 +517,8 @@ mod tests {
     const STATUS: &str = include_str!("../fixtures/status-v1.json");
     const CATALOG: &str = include_str!("../fixtures/catalog-stage-1-v1.json");
     const COMPLETED_JOB: &str = include_str!("../fixtures/completed-job-v1.json");
+    const PINNED_NUCLEASE_CARD: &str = include_str!("../fixtures/asb_lab_v1/nuclease_campaign_card.json");
+    const PINNED_PROPYLENE_CARD: &str = include_str!("../fixtures/asb_lab_v1/propylene_campaign_card.json");
 
     fn campaign() -> CampaignCardV1 {
         CampaignCardV1::parse(CAMPAIGN).expect("campaign fixture parses")
@@ -528,6 +530,33 @@ mod tests {
 
     fn completed_job() -> JobResponseV1 {
         JobResponseV1::parse(COMPLETED_JOB).expect("job fixture parses")
+    }
+
+    #[test]
+    fn parses_exact_pinned_nuclease_campaign_card_from_upstream() {
+        let card = CampaignCardV1::parse(PINNED_NUCLEASE_CARD)
+            .expect("pinned public nuclease campaign card parses");
+        assert!(card.validate().is_ok());
+        assert_eq!(card.campaign_id, "deepmind/nuclease-active-learning");
+        assert_eq!(card.design_id_field, "variant_id");
+        assert_eq!(card.budget.total, 384);
+        assert_eq!(card.stages.len(), 4);
+        assert!(card.stages.iter().all(|stage| stage.batch_size == 96));
+        assert!(card.is_shared_pool_catalog());
+    }
+
+    #[test]
+    fn parses_exact_pinned_propylene_twin_campaign_card_from_upstream() {
+        let card = CampaignCardV1::parse(PINNED_PROPYLENE_CARD)
+            .expect("pinned public propylene campaign card parses");
+        assert!(card.validate().is_ok());
+        assert_eq!(card.campaign_id, "sargent-lab/propylene-active-learning");
+        assert_eq!(card.design_id_field, "composition");
+        assert_eq!(card.budget.total, 60);
+        assert_eq!(card.stages.len(), 3);
+        assert!(card.stages.iter().all(|stage| stage.batch_size == 20));
+        assert!(card.is_shared_pool_catalog());
+        assert!(card.deliverable.description.contains("predict(composition)"));
     }
 
     #[test]
