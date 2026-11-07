@@ -54,6 +54,10 @@ Recent ship-EMS work extends beyond electrical dispatch:
 - A 2026 Applied Energy review frames hybrid-ship EMS around source/storage dynamics, lifecycle degradation, transient buffers, DC-grid stability and deployment evidence: https://doi.org/10.1016/j.apenergy.2026.128503
 - A September 2026 hybrid ship prediction study uses a multi-model ensemble for propulsion/load prediction; it reports lower MAE/RMSE than its best single-network comparator on its own study dataset. It is not evidence that the same method will outperform for small-craft hotel loads: https://doi.org/10.1016/j.oceaneng.2026.127503
 
+- Bao et al., *Research on prediction and coordinated optimization for the energy management system of hybrid power ships*, Ocean Engineering 365 (1 Sep 2026), DOI https://doi.org/10.1016/j.oceaneng.2026.127503. The paper reports an EMTOA-DW multi-network forecasting approach (CNN/BiLSTM/ELM/Elman) with lower MAE/RMSE than its best single-network comparator in its study. Treat the percentages as paper-specific; LOS requires its own out-of-vessel/time/condition validation.
+- Kotsampopoulos, *Testing Ship Electric Propulsion and Shipboard Microgrids: Standards, Techniques and New Trends*, Energies 19(9), published 22 Apr 2026, DOI https://doi.org/10.3390/en19092016. Supports staged holistic CHIL/PHIL validation rather than relying only on offline simulation.
+- A 2026 field-validated shipboard microgrid paper reports 360 half-hour records across 12 event classes at 4 s sampling. Useful for supervisory diagnostics and fault-aware energy reconfiguration; its primary telemetry is operator-confidential and its sample rate is not fast-transient evidence: https://doi.org/10.3390/en19174074.
+
 The service schema now records both `input_requirements[]` and `required_output.carrier`. Examples:
 - A watermaker consumes electrical energy and seawater feed; its delivered output is potable water only after the separate quality acceptance owner has accepted it.
 - Domestic hot water consumes electricity and may consume recoverable heat from a generator/range extender or a thermal store; the useful heat must satisfy the grade/temperature/exchanger constraints.
@@ -118,7 +122,7 @@ No one score combines these. Publish the full service and energy ledger plus har
 
 ## 9. Frozen scenario corpus
 
-The companion JSON defines four synthetic profiles with critical, hotel, thermal-protection and propulsion load series. Their sum is checked against the aggregate load profile passed to the existing grid-physics harness. Each scenario also declares synthetic generator availability/ramp/start/minimum-run/fuel state, shore-power availability, battery temperature/SoH, sea state/wind/air/sea temperature, solar forecast error bound and RO feed salinity/temperature qualification. These are synthetic contract fields, not vendor- or class-qualified equipment parameters.
+The companion JSON defines four synthetic profiles with critical, hotel, thermal-protection and propulsion load series. Their sum is checked against the aggregate load profile passed to the existing grid-physics harness. Each scenario also declares synthetic generator availability/ramp/start/minimum-run/fuel state, shore-power availability, battery temperature/SoH, sea state/wind/air/sea temperature, solar forecast error bound and RO feed salinity/temperature qualification. These are synthetic contract fields, not vendor- or class-qualified equipment parameters. It also carries separate recoverable-heat and thermal-store availability, plus per-service input carrier requirements (for example, electricity + seawater feed -> qualified potable water; electricity + recoverable heat -> hot-water service). This enables multi-carrier dispatch tests without treating thermal energy as electrical energy or crediting unqualified heat.
 
 The four cases are:
 - clear solar surplus with scheduled watermaking and hot-water service;
@@ -137,6 +141,8 @@ These profiles are deliberately synthetic. Their numbers are contract-test input
 - Generator noise restrictions at anchorage may constrain operation, but cannot justify violating critical safety/electrical limits.
 - A refrigeration temperature excursion must not be hidden by a lower energy cost.
 - High solar nameplate capacity does not imply contemporaneous generation.
+- Recoverable generator heat is not available by assumption: if the source is offline, below usable temperature, exchanger state is unknown, or the measurement/energy boundary would double-count it, no thermal-service credit is permitted.
+- Thermal kWh and electrical kWh remain separate carriers; never sum or substitute them without a reviewed conversion/process model.
 - Propulsion load supplied by a route case is fixed in V0; the service scheduler may not change speed or route to improve its score.
 - A schedule with a lower energy total but missed service deadlines does not win.
 - Reordered service rows must produce equivalent deterministic output.
