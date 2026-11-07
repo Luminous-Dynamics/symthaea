@@ -1050,14 +1050,12 @@ mod tests {
     #[test]
     fn explicit_melisma_gaps_are_preserved_as_rests() {
         let mut performance = performance_with_melisma();
-        performance.syllables[0].melisma_notes[0].start_time += 0.03;
+        performance.syllables[0].melisma_notes[1].start_time += 0.03;
         performance.validate().unwrap();
+        let first_end = performance.syllables[0].melisma_notes[0].start_time
+            + performance.syllables[0].melisma_notes[0].duration;
         assert!(
-            (performance.syllables[0].melisma_notes[0].start_time
-                - performance.syllables[0].note.start_time
-                - performance.syllables[0].note.duration
-                - 0.03)
-                .abs()
+            (performance.syllables[0].melisma_notes[1].start_time - first_end - 0.03).abs()
                 < 1e-5
         );
     }
