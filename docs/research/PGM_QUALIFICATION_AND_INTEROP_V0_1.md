@@ -659,3 +659,10 @@ The checked BP PR now authors 13 tests, including stale/corrupted cached-message
 
 
 The query-aware algorithm-portfolio/compiler follow-up is tracked in https://github.com/Luminous-Dynamics/symthaea/issues/10943.
+
+### Public benchmark harness and planner follow-ups
+
+- Reproducible public discrete PGM benchmark execution is tracked by https://github.com/Luminous-Dynamics/symthaea/issues/10946 (UAI PR/MAR/MAP/MMAP tasks and pgmpy/bnlearn networks with per-case exactness, calibration, complexity and resource metrics).
+- Query-aware inference planner and algorithm contracts are tracked by https://github.com/Luminous-Dynamics/symthaea/issues/10943.
+- Checked log-domain BP implementation: https://github.com/Luminous-Dynamics/symthaea/pull/10939.
+- Remaining legacy joint MAP and Bethe defects: https://github.com/Luminous-Dynamics/symthaea/issues/10940 and https://github.com/Luminous-Dynamics/symthaea/issues/10941.
