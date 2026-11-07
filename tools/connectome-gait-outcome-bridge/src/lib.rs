@@ -258,6 +258,8 @@ pub enum SummaryState {
 pub struct MetricCoverage {
     pub metric_id: MetricId,
     pub method_sha256: String,
+    pub preprocessing_sha256: Option<String>,
+    pub phase_estimator_sha256: Option<String>,
     pub measured: usize,
     pub required: usize,
     pub state: CoverageState,
@@ -583,6 +585,10 @@ fn validate_measurement(
         EndpointKind::PerLegStepping => {
             add(measurement.leg.is_none(), ReasonCode::MissingLegIdentity);
             add(
+                measurement.preprocessing_sha256.is_none(),
+                ReasonCode::MissingPreprocessingDigest,
+            );
+            add(
                 measurement.pair.is_some(),
                 ReasonCode::UnexpectedPairIdentity,
             );
@@ -628,6 +634,10 @@ fn validate_measurement(
             add(
                 measurement.tripod_group.is_none(),
                 ReasonCode::MissingTripodIdentity,
+            );
+            add(
+                measurement.preprocessing_sha256.is_none(),
+                ReasonCode::MissingPreprocessingDigest,
             );
             add(
                 measurement.aggregation != AggregationLevel::Trial,
@@ -678,6 +688,14 @@ fn validate_measurement(
                 measurement.transfer_probe.is_none(),
                 ReasonCode::MissingTransferProbe,
             );
+            add(
+                measurement.preprocessing_sha256.is_none(),
+                ReasonCode::MissingPreprocessingDigest,
+            );
+            add(
+                measurement.phase_estimator_sha256.is_none(),
+                ReasonCode::MissingPhaseEstimatorDigest,
+            );
             add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
             add(
                 measurement.pair.is_some(),
@@ -715,6 +733,10 @@ fn validate_measurement(
         }
         EndpointKind::EmbodiedBehaviour => {
             add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
+            add(
+                measurement.preprocessing_sha256.is_none(),
+                ReasonCode::MissingPreprocessingDigest,
+            );
             add(
                 measurement.pair.is_some(),
                 ReasonCode::UnexpectedPairIdentity,
@@ -881,12 +903,17 @@ fn grouped_metric_coverage(
     endpoint: EndpointKind,
     required: usize,
 ) -> Vec<MetricCoverage> {
-    let mut groups: BTreeMap<(MetricId, String), BTreeSet<String>> = BTreeMap::new();
+    let mut groups: BTreeMap<
+        (MetricId, String, Option<String>, Option<String>),
+        BTreeSet<String>,
+    > = BTreeMap::new();
     for measurement in &packet.measurements {
         if measurement.endpoint != endpoint || !measured(measurement) {
             continue;
         }
         let method = measurement.method_sha256.clone();
+        let preprocessing = measurement.preprocessing_sha256.clone();
+        let phase_estimator = measurement.phase_estimator_sha256.clone();
         let identity = match endpoint {
             EndpointKind::PairwiseInterlegCoupling => measurement
                 .pair
@@ -898,7 +925,12 @@ fn grouped_metric_coverage(
         };
         if let Some(identity) = identity {
             groups
-                .entry((measurement.metric_id, method))
+                .entry((
+                    measurement.metric_id,
+                    method,
+                    preprocessing,
+                    phase_estimator,
+                ))
                 .or_default()
                 .insert(identity);
         }
@@ -906,16 +938,20 @@ fn grouped_metric_coverage(
 
     groups
         .into_iter()
-        .map(|((metric_id, method_sha256), identities)| {
-            let measured = identities.len();
-            MetricCoverage {
-                metric_id,
-                method_sha256,
-                measured,
+        .map(
+            |((metric_id, method_sha256, preprocessing_sha256, phase_estimator_sha256), identities)| {
+                let measured = identities.len();
+                MetricCoverage {
+                    metric_id,
+                    method_sha256,
+                    preprocessing_sha256,
+                    phase_estimator_sha256,
+                    measured,
                 required,
-                state: coverage_state(measured, required),
-            }
-        })
+                    state: coverage_state(measured, required),
+                }
+            },
+        )
         .collect()
 }
 
@@ -929,10 +965,20 @@ fn phase_reset_probe_coverage(packet: &GaitOutcomePacket) -> usize {
         if let Some(key) = measurement.transfer_probe {
             match measurement.metric_id {
                 MetricId::PhaseResetFractionalMicroturnsV1 => {
-                    fractional.insert(key);
+                    fractional.insert((
+                        key,
+                        measurement.method_sha256.clone(),
+                        measurement.preprocessing_sha256.clone(),
+                        measurement.phase_estimator_sha256.clone(),
+                    ));
                 }
                 MetricId::PhaseResetCycleSlipsV1 => {
-                    slips.insert(key);
+                    slips.insert((
+                        key,
+                        measurement.method_sha256.clone(),
+                        measurement.preprocessing_sha256.clone(),
+                        measurement.phase_estimator_sha256.clone(),
+                    ));
                 }
                 _ => {}
             }
@@ -1172,7 +1218,7 @@ mod tests {
             1.5,
         );
         velocity.channel_id = None;
-        velocity.preprocessing_sha256 = None;
+        velocity.preprocessing_sha256 = Some(digest('7'));
         velocity.phase_estimator_sha256 = None;
         velocity.sample_count = Some(4500);
         velocity.support_count = Some(4500);
@@ -1359,8 +1405,8 @@ mod tests {
             row.tripod_group = Some(group);
             row.numerator_ticks = Some(numerator);
             row.denominator_ticks = Some(denominator);
-            row.preprocessing_sha256 = None;
-            row.phase_estimator_sha256 = None;
+            row.preprocessing_sha256 = Some(digest('1'));
+            row.phase_estimator_sha256 = Some(digest('2'));
             packet.measurements.push(row);
         }
         let report = audit_packet(&packet).unwrap();
@@ -1414,8 +1460,8 @@ mod tests {
                 0.7,
             );
             row.pair = Some(LegPair::new(first, second).unwrap());
-            row.preprocessing_sha256 = None;
-            row.phase_estimator_sha256 = None;
+            row.preprocessing_sha256 = Some(digest('1'));
+            row.phase_estimator_sha256 = Some(digest('2'));
             packet.measurements.push(row);
         }
         let report = audit_packet(&packet).unwrap();
@@ -1442,8 +1488,8 @@ mod tests {
             );
             row.pair = Some(LegPair::new(pair.0, pair.1).unwrap());
             row.method_sha256 = digest(if index == 0 { 'a' } else { 'b' });
-            row.preprocessing_sha256 = None;
-            row.phase_estimator_sha256 = None;
+            row.preprocessing_sha256 = Some(digest('1'));
+            row.phase_estimator_sha256 = Some(digest('2'));
             packet.measurements.push(row);
         }
         let report = audit_packet(&packet).unwrap();
@@ -1471,8 +1517,8 @@ mod tests {
             row.tripod_group = Some(group);
             row.numerator_ticks = Some(5);
             row.denominator_ticks = Some(10);
-            row.preprocessing_sha256 = None;
-            row.phase_estimator_sha256 = None;
+            row.preprocessing_sha256 = Some(digest('1'));
+            row.phase_estimator_sha256 = Some(digest('2'));
             packet.measurements.push(row);
         }
         let report = audit_packet(&packet).unwrap();
