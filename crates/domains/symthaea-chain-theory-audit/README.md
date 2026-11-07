@@ -8,14 +8,17 @@ The independent implementation reconstructs the four slot dimensions
 (8, 3, 8, 3), enumerates the two-slot product assignments, performs
 read-exchange symmetrization and antisymmetrization, derives the three qubit
 commutator records from integer 2x2 basis matrices, counts both exchange
-signatures, and evaluates the resulting radical sum.
+signatures, emits all 172 row classifications in the author's CSV sort order,
+and evaluates the resulting radical sum.
 
 ## Reproduction
 
 Run:
 
     cargo test -p symthaea-chain-theory-audit
-    cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit
+    cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit > /tmp/chain-alpha-rust.csv
+    tail -n +2 /tmp/chain-alpha-rust.csv > /tmp/chain-alpha-rows.csv
+    diff -u /path/to/author/records.csv /tmp/chain-alpha-rows.csv
 
 The sector counts reproduce the author's published table:
 
@@ -50,10 +53,13 @@ Relevant author artefacts:
 
 The author publishes both the Lean 4.35.0 formalization and a standard-library
 Python record enumerator. The Rust reproduction was written independently
-from the documented slot, exchange and weight rules. Its current tests assert
-the published record count, sector counts, denominator and scalar. A
-record-by-record comparison against the author's CSV remains a separate
-verification task.
+from the documented slot, exchange and weight rules, including an
+author-compatible lexicographic assignment ordering and stable
+construction/slot-kind sort. Its tests assert all six contiguous CSV
+classification bands, including construction, slot kind, X/Y signs, passed
+ends and squared weight for all 172 ordinals. The example emits the complete
+CSV rows so a byte-level comparison against the pinned author file can be run
+once the Rust crate is compiled.
 
 ## What the formalization proves
 
