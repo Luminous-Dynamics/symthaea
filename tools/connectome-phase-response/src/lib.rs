@@ -102,12 +102,21 @@ pub enum ProbeClass {
     MechanicalBodyOrSubstrate,
 }
 
+/// Identity for descending command inputs. Named neurons remain distinct.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub enum DescendingNeuron {
+    DNg100,
+    DNg97,
+    DNb08,
+}
+
 /// A typed design cell in the phase-response transfer tensor.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct ProbeKey {
     pub context: Context,
     pub class: ProbeClass,
     pub source_leg: Option<LegId>,
+    pub descending_neuron: Option<DescendingNeuron>,
     pub phase_bin: u8,
     pub delay_index: u8,
 }
@@ -117,12 +126,28 @@ impl ProbeKey {
         if self.phase_bin >= DEFAULT_PHASE_BINS {
             return Err(PhaseError::InvalidPhaseBin(self.phase_bin));
         }
-        let source_required = self.class != ProbeClass::DescendingCommand;
-        if source_required && self.source_leg.is_none() {
-            return Err(PhaseError::SourceLegRequired(self.class));
-        }
-        if !source_required && self.source_leg.is_some() {
-            return Err(PhaseError::SourceLegForbidden(self.class));
+        match self.class {
+            ProbeClass::LocalPhaseKick => {
+                if self.source_leg.is_none() {
+                    return Err(PhaseError::SourceLegRequired(self.class));
+                }
+                if self.descending_neuron.is_some() {
+                    return Err(PhaseError::DescendingNeuronForbidden);
+                }
+            }
+            ProbeClass::DescendingCommand => {
+                if self.source_leg.is_some() {
+                    return Err(PhaseError::SourceLegForbidden(self.class));
+                }
+                if self.descending_neuron.is_none() {
+                    return Err(PhaseError::DescendingNeuronRequired);
+                }
+            }
+            _ => {
+                if self.descending_neuron.is_some() {
+                    return Err(PhaseError::DescendingNeuronForbidden);
+                }
+            }
         }
         Ok(())
     }
@@ -576,6 +601,8 @@ pub enum PhaseError {
     InvalidPhaseBin(u8),
     SourceLegRequired(ProbeClass),
     SourceLegForbidden(ProbeClass),
+    DescendingNeuronRequired,
+    DescendingNeuronForbidden,
     DuplicateProbeKey,
     DuplicateExpectedKey,
     MissingProbeKey,
@@ -598,6 +625,8 @@ impl fmt::Display for PhaseError {
             Self::InvalidPhaseBin(value) => write!(f, "invalid phase bin {value}; expected 0..8"),
             Self::SourceLegRequired(class) => write!(f, "probe class {class:?} requires a source leg"),
             Self::SourceLegForbidden(class) => write!(f, "probe class {class:?} is a global input and forbids a source leg"),
+            Self::DescendingNeuronRequired => write!(f, "descending command probe requires an exact DNg100/DNg97/DNb08 identity"),
+            Self::DescendingNeuronForbidden => write!(f, "non-descending probe cannot carry a descending-neuron identity"),
             Self::DuplicateProbeKey => write!(f, "duplicate phase-response probe key"),
             Self::DuplicateExpectedKey => write!(f, "duplicate key in expected phase-response grid"),
             Self::MissingProbeKey => write!(f, "phase-response probe key is absent"),
@@ -663,6 +692,7 @@ mod tests {
             context,
             class: ProbeClass::LocalPhaseKick,
             source_leg: Some(LegId::new(source).unwrap()),
+            descending_neuron: None,
             phase_bin,
             delay_index,
         }
@@ -732,6 +762,7 @@ mod tests {
             context: Context::BallContact,
             class: ProbeClass::LocalPhaseKick,
             source_leg: None,
+            descending_neuron: None,
             phase_bin: 0,
             delay_index: 0,
         };
@@ -741,10 +772,49 @@ mod tests {
             context: Context::AirStepping,
             class: ProbeClass::DescendingCommand,
             source_leg: Some(LegId::new(0).unwrap()),
+            descending_neuron: Some(DescendingNeuron::DNg100),
             phase_bin: 0,
             delay_index: 0,
         };
         assert_eq!(invalid_global.validate(), Err(PhaseError::SourceLegForbidden(ProbeClass::DescendingCommand)));
+    }
+
+    #[test]
+    fn descending_command_sources_remain_distinct() {
+        let dng100 = ProbeKey {
+            context: Context::BallContact,
+            class: ProbeClass::DescendingCommand,
+            source_leg: None,
+            descending_neuron: Some(DescendingNeuron::DNg100),
+            phase_bin: 2,
+            delay_index: 1,
+        };
+        let dng97 = ProbeKey {
+            descending_neuron: Some(DescendingNeuron::DNg97),
+            ..dng100
+        };
+        let dnb08 = ProbeKey {
+            descending_neuron: Some(DescendingNeuron::DNb08),
+            ..dng100
+        };
+        assert!(dng100.validate().is_ok());
+        assert!(dng97.validate().is_ok());
+        assert!(dnb08.validate().is_ok());
+        assert_ne!(dng100, dng97);
+        assert_ne!(dng100, dnb08);
+    }
+
+    #[test]
+    fn descending_command_without_neuron_identity_is_rejected() {
+        let invalid = ProbeKey {
+            context: Context::BallContact,
+            class: ProbeClass::DescendingCommand,
+            source_leg: None,
+            descending_neuron: None,
+            phase_bin: 0,
+            delay_index: 0,
+        };
+        assert_eq!(invalid.validate(), Err(PhaseError::DescendingNeuronRequired));
     }
 
     #[test]
