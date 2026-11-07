@@ -379,7 +379,10 @@ fn arithmetic_mean_prior(rules: &[ThreeBallRule]) -> DirichletConcentrationTenso
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dirichlet_model_reduction::reduce_dirichlet_models;
+    use crate::dirichlet_model_reduction::{
+        evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
+        DirichletActionPrediction, DirichletPredictedOutcome,
+    };
 
     #[test]
     fn reproduces_81_source_hypotheses_and_rule_65() {
@@ -545,6 +548,173 @@ mod tests {
                 "semantic class {representative_index} posterior changed under quotienting"
             );
         }
+    }
+
+    fn feedback_action_prediction(
+        space: &ThreeBallRuleSpace,
+        ball_colours: [ThreeBallColour; 3],
+        gaze: Option<ThreeBallLocation>,
+        choice: Option<ThreeBallColour>,
+    ) -> DirichletActionPrediction {
+        // Column order is choice (outer), gaze, right, centre, left (inner).
+        let choice_index = choice.map(|value| value as usize).unwrap_or(3);
+        let gaze_index = gaze.map(|value| value as usize).unwrap_or(3);
+        let [left, centre, right] = ball_colours.map(|value| value as usize);
+        let column_index =
+            choice_index * 4 * 27 + gaze_index * 27 + right * 9 + centre * 3 + left * 1;
+
+        let predictive = &space.full_model_average_prior.columns[column_index];
+        let outcomes = predictive
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, probability)| *probability > 0.0)
+            .map(|(outcome_index, probability)| {
+                let mut posterior_count_increment =
+                    vec![vec![0.0; THREE_BALL_FEEDBACK_OUTCOME_COUNT];
+                         THREE_BALL_HIDDEN_STATE_COLUMN_COUNT];
+                posterior_count_increment[column_index][outcome_index] = 1.0;
+                DirichletPredictedOutcome {
+                    outcome_id: format!("{:?}", match outcome_index {
+                        0 => ThreeBallFeedback::NoFeedback,
+                        1 => ThreeBallFeedback::Correct,
+                        2 => ThreeBallFeedback::Incorrect,
+                        _ => unreachable!("exactly three feedback outcomes"),
+                    }),
+                    full_model_predictive_probability: probability,
+                    posterior_count_increment,
+                }
+            })
+            .collect();
+
+        DirichletActionPrediction {
+            action_id: format!("gaze={gaze:?};choice={choice:?}"),
+            outcomes,
+        }
+    }
+
+    #[test]
+    fn three_ball_action_eig_and_class_posteriors_are_invariant_under_semantic_quotient() {
+        let space = build_three_ball_rule_space();
+        let labelled_models = space.reduced_model_hypotheses();
+        let quotient_models = space.semantic_unique_model_hypotheses();
+        let full_prior = &space.full_model_average_prior;
+        let ball_colours = [
+            ThreeBallColour::Red,
+            ThreeBallColour::Green,
+            ThreeBallColour::Blue,
+        ];
+        let choices = [
+            Some(ThreeBallColour::Red),
+            Some(ThreeBallColour::Green),
+            Some(ThreeBallColour::Blue),
+            None,
+        ];
+
+        let mut labelled_eig = Vec::with_capacity(choices.len());
+        let mut quotient_eig = Vec::with_capacity(choices.len());
+        for choice in choices {
+            let action = feedback_action_prediction(
+                &space,
+                ball_colours,
+                Some(ThreeBallLocation::Centre),
+                choice,
+            );
+            let source_result = evaluate_dirichlet_model_information_gain(
+                full_prior,
+                full_prior,
+                &labelled_models,
+                &action,
+            )
+            .expect("source-labelled action EIG");
+            let quotient_result = evaluate_dirichlet_model_information_gain(
+                full_prior,
+                full_prior,
+                &quotient_models,
+                &action,
+            )
+            .expect("semantic quotient action EIG");
+
+            assert!(
+                (source_result.predictive_probability_mass
+                    - quotient_result.predictive_probability_mass)
+                    .abs()
+                    < 1e-12
+            );
+            assert_eq!(
+                source_result.outcomes.len(),
+                quotient_result.outcomes.len()
+            );
+            assert!(
+                (source_result.model_information_gain_nats
+                    - quotient_result.model_information_gain_nats)
+                    .abs()
+                    < 1e-10,
+                "model EIG changed for action {}",
+                action.action_id
+            );
+
+            for (source_outcome, quotient_outcome) in source_result
+                .outcomes
+                .iter()
+                .zip(quotient_result.outcomes.iter())
+            {
+                assert_eq!(source_outcome.outcome_id, quotient_outcome.outcome_id);
+                assert!(
+                    (source_outcome.predictive_probability
+                        - quotient_outcome.predictive_probability)
+                        .abs()
+                        < 1e-12
+                );
+                for quotient_model in &quotient_outcome.posterior_model_probabilities {
+                    let representative_index: usize = quotient_model
+                        .0
+                        .rsplit('-')
+                        .next()
+                        .expect("semantic rule index")
+                        .parse()
+                        .expect("numeric rule index");
+                    let aggregated_source_posterior = source_outcome
+                        .posterior_model_probabilities
+                        .iter()
+                        .filter(|(model_id, _)| {
+                            space.rules.iter().any(|rule| {
+                                rule.model_id == *model_id
+                                    && (rule.one_based_index == representative_index
+                                        || rule.duplicate_of_one_based_index
+                                            == Some(representative_index))
+                            })
+                        })
+                        .map(|(_, probability)| *probability)
+                        .sum::<f64>();
+                    assert!(
+                        (aggregated_source_posterior - quotient_model.1).abs() < 1e-9,
+                        "posterior mass differs for semantic rule {representative_index}"
+                    );
+                }
+            }
+
+            labelled_eig.push(source_result.model_information_gain_nats);
+            quotient_eig.push(quotient_result.model_information_gain_nats);
+        }
+
+        assert!(labelled_eig
+            .iter()
+            .zip(quotient_eig.iter())
+            .all(|(source, quotient)| (source - quotient).abs() < 1e-10));
+        let source_best = labelled_eig
+            .iter()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .map(|(index, _)| index)
+            .expect("non-empty action set");
+        let quotient_best = quotient_eig
+            .iter()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .map(|(index, _)| index)
+            .expect("non-empty action set");
+        assert_eq!(source_best, quotient_best);
     }
 
     #[test]
