@@ -71,7 +71,7 @@ This distinction matters: when two methods consume the same fixed budget and com
 
 ## Claim boundary
 
-- Both checked-in fixtures are synthetic.
+- All checked-in HCE, worker, operator and regime-simulation fixtures are synthetic.
 - The HCE fixture remains `SYNTHETIC_HCE_FIXTURE_NOT_PREREGISTERED`.
 - No real split membership, sealed labels, evaluator service, model, worker, GPU, or campaign was accessed.
 - The crate has 31 authored Rust tests (12 HCE/worker-trace, 14 interactive-operator and 5 worker-simulation tests). They remain unexecuted.
