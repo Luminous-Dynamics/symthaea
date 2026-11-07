@@ -821,6 +821,65 @@ mod tests {
         }
     }
 
+    // Deliberately separate from the production evaluator: this test oracle
+    // evaluates each literal directly from a bit mask and shares no helper
+    // with count_models, cofactor, or the decomposition verifiers.
+    fn independent_model_count(problem: &CnfProblem) -> u128 {
+        let rows = 1usize << problem.variables.len();
+        (0..rows)
+            .filter(|mask| {
+                problem.clauses.iter().all(|clause| {
+                    clause.iter().any(|literal| {
+                        let value = ((mask >> literal.variable) & 1) != 0;
+                        value == literal.positive
+                    })
+                })
+            })
+            .count() as u128
+    }
+
+    fn independent_projected_support(
+        problem: &CnfProblem,
+        visible_variable: usize,
+    ) -> (u128, BTreeSet<Vec<bool>>) {
+        let rows = 1usize << problem.variables.len();
+        let mut full_models = 0u128;
+        let mut support = BTreeSet::new();
+        for mask in 0..rows {
+            let is_model = problem.clauses.iter().all(|clause| {
+                clause.iter().any(|literal| {
+                    let value = ((mask >> literal.variable) & 1) != 0;
+                    value == literal.positive
+                })
+            });
+            if is_model {
+                full_models += 1;
+                support.insert(vec![((mask >> visible_variable) & 1) != 0]);
+            }
+        }
+        (full_models, support)
+    }
+
+    fn all_two_variable_clauses() -> Vec<Vec<Literal>> {
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+        ];
+        (0..(1usize << literals.len()))
+            .map(|mask| {
+                literals
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, literal)| {
+                        (((mask >> index) & 1) != 0).then_some(*literal)
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
     fn branch_fixture() -> CnfProblem {
         // (x OR y) AND (!x OR z)
         CnfProblem {
@@ -1231,5 +1290,105 @@ mod tests {
             clauses: vec![vec![]],
         };
         assert_eq!(count_models(&problem, budget()).unwrap(), 0);
+    }
+
+    #[test]
+    fn exhaustive_two_variable_cnf_matches_independent_truth_table_oracle() {
+        let clauses = all_two_variable_clauses();
+        let mut formulas = vec![Vec::<Vec<Literal>>::new()];
+        formulas.extend(clauses.iter().cloned().map(|clause| vec![clause]));
+        for left in &clauses {
+            for right in &clauses {
+                formulas.push(vec![left.clone(), right.clone()]);
+            }
+        }
+
+        assert_eq!(formulas.len(), 273);
+        for (formula_index, formula) in formulas.into_iter().enumerate() {
+            let problem = CnfProblem {
+                variables: vec!["x".into(), "y".into()],
+                clauses: formula,
+            };
+            let expected_models = independent_model_count(&problem);
+            assert_eq!(
+                count_models(&problem, budget()).unwrap(),
+                expected_models,
+                "full model count disagreed for formula {formula_index}"
+            );
+
+            for split_variable in 0..2 {
+                let report =
+                    verify_branch_sum(&problem, split_variable, budget()).unwrap();
+                let false_count = (0..4usize)
+                    .filter(|mask| {
+                        ((mask >> split_variable) & 1) == 0
+                            && problem.clauses.iter().all(|clause| {
+                                clause.iter().any(|literal| {
+                                    let value = ((mask >> literal.variable) & 1) != 0;
+                                    value == literal.positive
+                                })
+                            })
+                    })
+                    .count() as u128;
+                let true_count = (0..4usize)
+                    .filter(|mask| {
+                        ((mask >> split_variable) & 1) != 0
+                            && problem.clauses.iter().all(|clause| {
+                                clause.iter().any(|literal| {
+                                    let value = ((mask >> literal.variable) & 1) != 0;
+                                    value == literal.positive
+                                })
+                            })
+                    })
+                    .count() as u128;
+                assert_eq!(report.direct_source_count, expected_models);
+                assert_eq!(report.false_branch_count, false_count);
+                assert_eq!(report.true_branch_count, true_count);
+                assert_eq!(report.aggregate_count, expected_models);
+            }
+
+            for visible_variable in 0..2 {
+                let (expected_full, expected_support) =
+                    independent_projected_support(&problem, visible_variable);
+                let report =
+                    verify_projected_support(&problem, &[visible_variable], budget()).unwrap();
+                assert_eq!(report.full_model_count, expected_full);
+                assert_eq!(report.support, expected_support);
+                assert_eq!(report.projected_count, expected_support.len() as u128);
+            }
+        }
+    }
+
+    #[test]
+    fn exhaustive_unary_component_products_match_independent_oracle() {
+        let unit_clauses = [
+            vec![Literal::positive(0)],
+            vec![Literal::negative(0)],
+            vec![Literal::positive(1)],
+            vec![Literal::negative(1)],
+        ];
+        for mask in 0..(1usize << unit_clauses.len()) {
+            let clauses = unit_clauses
+                .iter()
+                .enumerate()
+                .filter_map(|(index, clause)| {
+                    (((mask >> index) & 1) != 0).then_some(clause.clone())
+                })
+                .collect();
+            let problem = CnfProblem {
+                variables: vec!["x".into(), "y".into(), "free".into()],
+                clauses,
+            };
+            let expected = independent_model_count(&problem);
+            let report = verify_independent_product(
+                &problem,
+                &[vec![0], vec![1]],
+                &[2],
+                budget(),
+            )
+            .unwrap();
+            assert_eq!(report.direct_source_count, expected, "unit clause mask {mask}");
+            assert_eq!(report.aggregate_count, expected, "unit clause mask {mask}");
+        }
     }
 }
