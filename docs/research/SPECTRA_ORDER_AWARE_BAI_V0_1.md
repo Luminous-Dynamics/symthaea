@@ -77,6 +77,23 @@ for methods that are \(\delta\)-correct over the stated model class. The paper a
 
 A preference is normative input to the experiment, not a latent label to infer from reward data. When the preference is unspecified, contested, or changes during the campaign, the decision contract is unresolved; sensitivity across separately registered preferences may be reported.
 
+### Preference-known and preference-unknown are separate tasks
+
+OATS is a *known-preference* fixed-confidence identification method. SPECTRA must not claim that it also learns an unknown or hidden stakeholder preference.
+
+The 2026 literature adds useful but different comparators:
+- Cao, Shi & Shroff, *Provably Efficient Multi-Objective Bandit Algorithms Under Preference-Centric Customization* (AAAI 2026), studies both unknown and hidden preference settings and develops preference-estimation plus preference-aware regret minimization. This is a preference-learning/regret problem, not a drop-in fixed-confidence OATS baseline: https://doi.org/10.1609/aaai.v40i24.39072
+- Cao, Shi & Shroff, *Provably Efficient Personalized Multi-Objective Bandits with Proactive Conversational Queries* (UAI 2026), treats structured conversational preference signals using a Plackett–Luce subset-choice model and identifies a shift-invariance limit: query-only observations are insufficient to identify all preference parameters. This is evidence that natural-language requests can constrain preferences without uniquely specifying a utility function: https://proceedings.mlr.press/v337/cao26a.html
+- Wang, Sun & Li, *Preference Is More than Comparisons: Rethinking Dueling Bandits with Augmented Human Feedback* (AAAI 2026), studies sparse pairwise preference feedback augmented with other human feedback: https://doi.org/10.1609/aaai.v40i31.39852
+
+For SPECTRA, keep three contracts distinct:
+
+1. **Preference supplied:** freeze the preference relation, then use OATS or another matched known-preference identification method.
+2. **Preference uncertain:** represent an admissible set/distribution of preferences only where its construction is defensible. Report the union of possibly optimal actions, the intersection of robustly optimal actions, and whether the answer is invariant over the admissible set. Do not average stakeholder preferences into one hidden scalar.
+3. **Preference elicitation is actionable:** select a stakeholder query or comparison only under an explicit feedback model, query cost, response-noise model, group/identity scope and stopping rule. A preference query and a candidate-performance experiment are different information channels and must be charged separately.
+
+This can compose with [#10790](https://github.com/Luminous-Dynamics/symthaea/issues/10790) for multi-objective LLM configuration preference feedback, [#7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803) for decision-value-of-information benchmarking, and [#10320](https://github.com/Luminous-Dynamics/symthaea/issues/10320) for decision-sensitive active measurement. Those owners should remain authoritative for their specific domains. The OATS reproduction must remain a known-preference, Gaussian fixed-confidence track.
+
 ## 3. Why objective count alone is the wrong complexity proxy
 
 The paper's two-arm analysis gives concrete counterexamples to the intuition that more objectives necessarily make identification harder.
@@ -223,3 +240,6 @@ This note does not implement OATS, certify the paper's theorem independently, pr
 2. Jiang, X., Hashima, S., Hatano, K. & Takimoto, E. (2025). [Multi-thresholding Good Arm Identification with Bandit Feedback](https://proceedings.mlr.press/v304/jiang26a.html), PMLR 304.
 3. Xue, B. et al. (2026). [Few-for-Many Best-Arm Identification in Multi-Objective Bandits](https://arxiv.org/abs/2610.16840), arXiv:2610.16840.
 4. Kato, M. & Ariu, K. (2026). [The Role of Contextual Information in Best Arm Identification](https://www.jmlr.org/beta/papers/v27/22-0358.html), JMLR 27(51).
+5. Cao, L., Shi, M. & Shroff, N. (2026). [Provably Efficient Multi-Objective Bandit Algorithms Under Preference-Centric Customization](https://doi.org/10.1609/aaai.v40i24.39072), AAAI 2026.
+6. Cao, L., Shi, M. & Shroff, N. (2026). [Provably Efficient Personalized Multi-Objective Bandits with Proactive Conversational Queries](https://proceedings.mlr.press/v337/cao26a.html), UAI 2026.
+7. Wang, S., Sun, H. & Li, K. (2026). [Preference Is More than Comparisons: Rethinking Dueling Bandits with Augmented Human Feedback](https://doi.org/10.1609/aaai.v40i31.39852), AAAI 2026.
