@@ -68,7 +68,7 @@ The state machine rejects unallowlisted tools, wrong permission IDs, missing per
 
 Digest linkage is also required: inspection output → hypothesis input; hypothesis output → execution input; failed-execution observation → revision input; revision output → retry input; and successful final observation → submission input. This is artifact linkage only. It does not authenticate execution, tool identity or scientific truth.
 
-A synthetic fixture contains one failed execution, an observation, a revision, a successful retry and submission. It is not a model run or operator-performance result. The operator trace validator has 14 authored Rust tests; together with 12 HCE/worker-trace tests, the standalone crate now contains 26 authored tests. None has been executed here.
+A synthetic fixture contains one failed execution, an observation, a revision, a successful retry and submission. It is not a model run or operator-performance result. Tool permissions are exact tool-ID to permission-ID bindings, not generic non-empty permission strings. The operator validator is run as part of the same offline `--fixtures` command. The operator trace validator has 14 authored Rust tests; together with 12 HCE/worker-trace tests, the standalone crate now contains 26 authored tests. None has been executed here.
 
 ## Current implementation
 
@@ -77,7 +77,7 @@ A synthetic fixture contains one failed execution, an observation, a revision, a
 - role/visibility/family/custodian semantic validator;
 - synthetic worker trace and trace analyzer;
 - CLI mode `--fixtures`;
-- 11 authored Rust tests.
+- 26 authored Rust tests (12 HCE/worker-trace and 14 operator-trace).
 
 The fixture CLI command is:
 
