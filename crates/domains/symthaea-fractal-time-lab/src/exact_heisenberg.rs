@@ -105,11 +105,7 @@ impl KickedHeisenbergFloquet {
                     n_spins,
                 });
             }
-            for (name, value) in [
-                ("j_x", edge.j_x),
-                ("j_y", edge.j_y),
-                ("j_z", edge.j_z),
-            ] {
+            for (name, value) in [("j_x", edge.j_x), ("j_y", edge.j_y), ("j_z", edge.j_z)] {
                 if !value.is_finite() {
                     return Err(FloquetError::NonFiniteParameter {
                         name,
@@ -251,7 +247,10 @@ impl KickedHeisenbergFloquet {
 
     /// State-vector norm squared; every gate in the schedule is unitary.
     pub fn norm_squared(&self) -> f64 {
-        self.amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum()
+        self.amplitudes
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum()
     }
 
     /// Mean z magnetization normalized to [-1,1].
@@ -370,18 +369,14 @@ impl KickedHeisenbergFloquet {
                 let partner = basis | first_mask | second_mask;
                 let a = self.amplitudes[basis];
                 let b = self.amplitudes[partner];
-                self.amplitudes[basis] =
-                    even_phase * (a * even_cos + b * even_off_diagonal);
-                self.amplitudes[partner] =
-                    even_phase * (b * even_cos + a * even_off_diagonal);
+                self.amplitudes[basis] = even_phase * (a * even_cos + b * even_off_diagonal);
+                self.amplitudes[partner] = even_phase * (b * even_cos + a * even_off_diagonal);
             } else if first_is_zero && !second_is_zero {
                 let partner = (basis | first_mask) & !second_mask;
                 let a = self.amplitudes[basis];
                 let b = self.amplitudes[partner];
-                self.amplitudes[basis] =
-                    odd_phase * (a * odd_cos + b * odd_off_diagonal);
-                self.amplitudes[partner] =
-                    odd_phase * (b * odd_cos + a * odd_off_diagonal);
+                self.amplitudes[basis] = odd_phase * (a * odd_cos + b * odd_off_diagonal);
+                self.amplitudes[partner] = odd_phase * (b * odd_cos + a * odd_off_diagonal);
             }
         }
     }
@@ -393,9 +388,9 @@ fn color_edges(edges: &[HeisenbergEdge]) -> Vec<Vec<usize>> {
     let mut occupied: Vec<BTreeSet<usize>> = Vec::new();
 
     for (edge_index, edge) in edges.iter().enumerate() {
-        let selected_color = occupied.iter().position(|sites| {
-            !sites.contains(&edge.first) && !sites.contains(&edge.second)
-        });
+        let selected_color = occupied
+            .iter()
+            .position(|sites| !sites.contains(&edge.first) && !sites.contains(&edge.second));
         let color_index = selected_color.unwrap_or_else(|| {
             colors.push(Vec::new());
             occupied.push(BTreeSet::new());
@@ -463,8 +458,7 @@ mod tests {
             for basis in 0..amplitudes.len() {
                 if basis & mask == 0 {
                     let partner = basis | mask;
-                    amplitudes[basis] =
-                        previous[basis] * cosine + previous[partner] * minus_i_sine;
+                    amplitudes[basis] = previous[basis] * cosine + previous[partner] * minus_i_sine;
                     amplitudes[partner] =
                         previous[partner] * cosine + previous[basis] * minus_i_sine;
                 }
@@ -533,8 +527,7 @@ mod tests {
         model.step();
 
         let expected_00 = Complex::from_polar(1.0, -j_z) * (j_x - j_y).cos();
-        let expected_11 = Complex::from_polar(1.0, -j_z)
-            * Complex::new(0.0, -(j_x - j_y).sin());
+        let expected_11 = Complex::from_polar(1.0, -j_z) * Complex::new(0.0, -(j_x - j_y).sin());
         assert!((model.amplitudes()[0] - expected_00).norm() < 1e-12);
         assert!((model.amplitudes()[3] - expected_11).norm() < 1e-12);
         assert!(model.amplitudes()[1].norm() < 1e-12);
@@ -566,21 +559,10 @@ mod tests {
             })
             .collect();
         let fields = vec![0.13, -0.08, 0.21];
-        let mut ising = KickedIsingFloquet::new_graph(
-            3,
-            ising_edges,
-            fields.clone(),
-            PI + 0.07,
-        )
-        .unwrap();
-        let mut heisenberg = KickedHeisenbergFloquet::new_graph(
-            3,
-            heisenberg_edges,
-            fields,
-            PI + 0.07,
-            1,
-        )
-        .unwrap();
+        let mut ising =
+            KickedIsingFloquet::new_graph(3, ising_edges, fields.clone(), PI + 0.07).unwrap();
+        let mut heisenberg =
+            KickedHeisenbergFloquet::new_graph(3, heisenberg_edges, fields, PI + 0.07, 1).unwrap();
 
         for _ in 0..12 {
             ising.step();
@@ -632,8 +614,7 @@ mod tests {
         ];
         let fields = vec![0.03, -0.04, 0.02];
         let pulse_angle = 0.41;
-        let reference =
-            dense_floquet_step_reference(3, &edges, &fields, pulse_angle);
+        let reference = dense_floquet_step_reference(3, &edges, &fields, pulse_angle);
 
         let mut errors = Vec::new();
         for slices in [1, 2, 4, 8, 16] {
@@ -655,13 +636,15 @@ mod tests {
                 .sqrt();
             errors.push(error);
         }
-        assert!(errors.windows(2).all(|pair| pair[1] < pair[0]), "{errors:?}");
-        let refinement_ratios: Vec<f64> = errors
-            .windows(2)
-            .map(|pair| pair[0] / pair[1])
-            .collect();
         assert!(
-            refinement_ratios.iter().all(|ratio| (3.5..=4.5).contains(ratio)),
+            errors.windows(2).all(|pair| pair[1] < pair[0]),
+            "{errors:?}"
+        );
+        let refinement_ratios: Vec<f64> = errors.windows(2).map(|pair| pair[0] / pair[1]).collect();
+        assert!(
+            refinement_ratios
+                .iter()
+                .all(|ratio| (3.5..=4.5).contains(ratio)),
             "second-order refinement ratios={refinement_ratios:?}"
         );
     }
@@ -752,13 +735,7 @@ mod tests {
             Err(FloquetError::DuplicateEdge { .. })
         ));
         assert!(matches!(
-            KickedHeisenbergFloquet::new_graph(
-                2,
-                vec![],
-                vec![0.0; 2],
-                f64::NAN,
-                1,
-            ),
+            KickedHeisenbergFloquet::new_graph(2, vec![], vec![0.0; 2], f64::NAN, 1,),
             Err(FloquetError::NonFiniteParameter { .. })
         ));
     }
