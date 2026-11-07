@@ -194,6 +194,14 @@ Across eight direct-review model+harness configurations, target recall ranges fr
 
 **CEB implication:** require mechanism-level diagnosis rather than location overlap. Include same-file/wrong-mechanism, neighboring-cause, fixed-companion and multi-file causal-chain controls. Report the evidence authority and exact source revision. Reuse CEB-REVIEW and causal diagnosis; do not add another metric lane.
 
+### 2.23 CodeReviewBench: the human-review ceiling is visible
+
+Kodus's CodeReviewBench contains **30 merged pull requests and 95 human-authored golden bugs** from five repositories and five languages (Go, Java, Python, Ruby and TypeScript). Its current 13-configuration leaderboard uses the Kodus harness, replay execution and Claude Haiku 4.5 judge. DeepSeek V4 Pro leads at **43.9 F1 / 43.6% precision / 44.2% recall**, finding 42/95 golden bugs at an estimated $0.30 per PR / $0.21 per bug. The scorecard reports a **95% PR-bootstrap interval for recall of 32.3–56.3 points**, resampling 30 PRs 2,000 times. Three re-scores of the same findings measure judge noise; every model has only one agent pass, so model run-to-run variance is not measured. [Leaderboard](https://www.codereviewbench.com/leaderboard) · [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro) · [August 21 methodology discussion](https://www.codereviewbench.com/blog/ai-code-review-recall-2026).
+
+The authors explicitly say that the gold contains only bugs human reviewers already flagged before merge; bugs missed by all original humans are absent. The benchmark therefore measures recovery of human-found defects, not exhaustive bug discovery. Its small 30-PR sample, single Kodus harness and single judge family are additional limits. It remains useful because per-PR findings/misses and scorecards are inspectable and cost is exposed.
+
+**CEB implication:** use as a contextual replay/cost comparator, not a direct Recall@5 equivalent. Extend CEB beyond human-found gold by blind-auditing zero-finding PRs and multi-producer "clean" consensus cases. Preserve a frozen target denominator, then separately adjudicate valid novel findings. Keep the unobserved defect remainder unknown.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -292,6 +300,18 @@ Autonomy asks whether an agent can act without step-by-step direction. Proactivi
 A correct file or line is not a correct diagnosis. SecPRBench reports that most analyzed misses can locate a root-cause file while asserting the wrong mechanism. CR-Bench-v2 further separates target-defect detection from usefulness, while ReviewBench distinguishes fixed-gold findings from independently adjudicated novel discoveries.
 
 A review finding should state a concise, verifiable causal account: triggering precondition, relevant path/state transition, unsafe operation, violated requirement/invariant, exact source revision and evidence authority. The reviewer should try to falsify its own diagnosis with a neighboring mechanism, changed precondition or repaired companion. A location-only hit does not count as a mechanism hit; an independently valid non-target finding is not automatically noise. Measure these as adjudication attributes under existing CEB-REVIEW and causal-diagnosis contracts, not as new metric lanes. Reuse #10367/#10723, #9431 and #10680/#10681 for causality, human complementarity, judge-dependence and verifier qualification.
+
+### Shift 13 — From human-found gold to independently audited open-set discovery
+
+CodeReviewBench is deliberately transparent that its 95 golden bugs are the bugs human reviewers already reported; it cannot reward defects that escaped all of those reviewers. ReviewBench similarly states that a finite gold-producer union cannot reveal findings missed by every producer. A multi-source gold is better than a single-source gold, but it is not exhaustive by declaration.
+
+CEB should separate frozen target recall, independently adjudicated novel discoveries and the unknown unobserved defect remainder. Blindly audit zero-finding PRs and multi-producer "clean" consensus cases; keep candidate findings out of gold until independent review; measure how much each producer family uniquely contributes; and report gold composition sensitivity. Do not use naïve capture–recapture as an exact defect-total estimate when producers share models, prompts, corpora and context. This reuses #8311, #9431 and #10680/#10681; it does not create a new metric lane or oracle authority.
+
+### Shift 14 — From tool-using agents to sequential evidence scientists
+
+Tool use is not inherently intelligence. A reviewer should choose the next observation because it distinguishes named causal alternatives, supports a claim at a specific evidence authority, is applicable to the exact source revision, and is worth its full human/compute cost. It should stop when the decision is sufficiently supported, ask when human authority is needed, and preserve unresolved when no safe discriminating observation is available.
+
+Compare static-first, unconstrained tool selection, transparent evidence-directed heuristics, calibrated sequential value-of-information, and ask/abstain policies under matched all-in budgets. Require an action proposal that states the claim, alternatives, observation, expected discriminating outcomes, applicability, authority, safety, cost and stopping implication. Do not reward number of tools or tests. Reuse the existing selective-escalation, causal-diagnosis and evidence-authority contracts; do not create a tool-use metric lane, execution scheduler or Bayesian confidence claim without calibrated probabilities.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
@@ -415,6 +435,7 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 
 - Microsoft Research, [CRBugBench: (When) Should a Software Factory be Lights-off?](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/), October 2026; [arXiv:2610.13668](https://arxiv.org/abs/2610.13668).
 - PREreview, [review of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026 (reviewer summary of human/agent complementarity and a proposed, not tested, skeptical second-reviewer arm).
+- Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [human-found gold limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), accessed November 7, 2026.
 - GitHub, [ReviewBench: An open benchmark for AI code review](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/), October 5, 2026; [live leaderboard](https://review-bench.ai/) viewed November 7, 2026.
 - Yang et al., [Can Agentic Code Review Catch Vulnerabilities Before They Are Merged? (SecPRBench)](https://arxiv.org/abs/2610.33509), October 24, 2026.
 - Dong et al., [Towards AI as a Collaborative Partner: A Taxonomy of AI Agent Behavior in Software Engineering](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/), AIware '26 (to appear).
