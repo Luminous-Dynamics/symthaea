@@ -1405,14 +1405,13 @@ fn validate_spm_model_average_prior(
     }
     let total_mass = expected.iter().flatten().sum::<f64>();
     if !total_mass.is_finite() || total_mass <= 0.0 {
-        return Err(DirichletModelInformationGainError::InvalidModelInformationGain {
-            value: total_mass,
-        });
+        return Err(
+            DirichletModelInformationGainError::InvalidModelInformationGain { value: total_mass },
+        );
     }
     for column in 0..expected.len() {
         for coordinate in 0..expected[column].len() {
-            if expected_support[column][coordinate]
-                != full_prior.active_support[column][coordinate]
+            if expected_support[column][coordinate] != full_prior.active_support[column][coordinate]
             {
                 return Err(DirichletModelInformationGainError::ModelReduction(
                     DirichletBayesianModelReductionError::SupportMismatch {
@@ -1539,7 +1538,9 @@ mod tests {
         assert_eq!(result.most_probable_model_id, "full");
     }
 
-    fn model_average_prior(models: &[ReducedDirichletModelHypothesis]) -> DirichletConcentrationTensor {
+    fn model_average_prior(
+        models: &[ReducedDirichletModelHypothesis],
+    ) -> DirichletConcentrationTensor {
         let mut columns = models[0]
             .parameter_prior
             .columns
@@ -1557,9 +1558,8 @@ mod tests {
                 for outcome in 0..columns[column].len() {
                     columns[column][outcome] +=
                         model.prior_probability * model.parameter_prior.columns[column][outcome];
-                    active_support[column][outcome] |=
-                        model.prior_probability > 0.0
-                            && model.parameter_prior.active_support[column][outcome];
+                    active_support[column][outcome] |= model.prior_probability > 0.0
+                        && model.parameter_prior.active_support[column][outcome];
                 }
             }
         }
@@ -1611,12 +1611,8 @@ mod tests {
             &[&[true, true, false], &[false, true, true]],
             'a',
         );
-        let result = reduce_dirichlet_models_spm_compatible(
-            &posterior,
-            &full_prior,
-            &models,
-        )
-        .expect("SPM-compatible pseudocount evidence");
+        let result = reduce_dirichlet_models_spm_compatible(&posterior, &full_prior, &models)
+            .expect("SPM-compatible pseudocount evidence");
 
         // Independent reference calculated from SPM's published formula:
         // p=1/32; q'=q+p, p'=p+p, r'=r+p, s'=q'+r'-p'.
@@ -1625,7 +1621,10 @@ mod tests {
         assert!((result.models[0].posterior_probability - 0.99479331).abs() < 1e-8);
         assert!((result.models[1].posterior_probability - 0.00520669).abs() < 1e-8);
         assert!(
-            result.models.iter().all(|model| model.log_evidence_ratio.is_finite()),
+            result
+                .models
+                .iter()
+                .all(|model| model.log_evidence_ratio.is_finite()),
             "SPM's 1/32 pseudocount keeps formerly zero outcomes in the smoothed simplex"
         );
     }
@@ -1635,34 +1634,27 @@ mod tests {
         let model_a = ReducedDirichletModelHypothesis {
             model_id: "a".into(),
             prior_probability: 0.5,
-            parameter_prior: tensor_with_support(
-                &[&[1.0, 0.0]],
-                &[&[true, false]],
-                'a',
-            ),
+            parameter_prior: tensor_with_support(&[&[1.0, 0.0]], &[&[true, false]], 'a'),
         };
         let model_b = ReducedDirichletModelHypothesis {
             model_id: "b".into(),
             prior_probability: 0.5,
-            parameter_prior: tensor_with_support(
-                &[&[0.0, 1.0]],
-                &[&[false, true]],
-                'a',
-            ),
+            parameter_prior: tensor_with_support(&[&[0.0, 1.0]], &[&[false, true]], 'a'),
         };
         let models = vec![model_a, model_b];
         let full_prior = model_average_prior(&models);
         // One observation on coordinate 1 is excluded by model A but is
         // representable under the full model and model B.
-        let posterior = tensor_with_support(
-            &[&[0.5, 1.5]],
-            &[&[true, true]],
-            'a',
-        );
+        let posterior = tensor_with_support(&[&[0.5, 1.5]], &[&[true, true]], 'a');
         let strict = reduce_dirichlet_models(&posterior, &full_prior, &models)
             .expect("strict BMR assigns zero evidence only to the contradicted rule");
         assert_eq!(
-            strict.models.iter().find(|model| model.model_id == "a").unwrap().log_evidence_ratio,
+            strict
+                .models
+                .iter()
+                .find(|model| model.model_id == "a")
+                .unwrap()
+                .log_evidence_ratio,
             f64::NEG_INFINITY
         );
 
