@@ -154,5 +154,27 @@
         "https://www.imo.org/en/mediacentre/hottopics/pages/autonomous-shipping.aspx"
       ]
     }
+  ],
+  "guidance_documents": [
+    {
+      "id": "EMSA Guidance on the Safety of Battery Energy Storage Systems (BESS)",
+      "document_type": "non_mandatory_maritime_safety_guidance",
+      "published": "2023-11-14",
+      "updated": "2025-11-11",
+      "status": "published_guidance",
+      "scope": "Guidance for national administrations and industry on essential safety requirements for battery energy storage systems on ships, drawing on classification, standards and available research.",
+      "applicability_note": "Use as a supplementary shipboard BESS safety reference, not as a statutory international code or a replacement for current flag/class requirements, ISO 23625 where applicable, OEM instructions, vessel-specific fire risk assessment or the additional safety requirements for 60 V or higher DC systems.",
+      "source": "https://www.emsa.europa.eu/publications/item/5061-battery-energy-storage-systems-bess.html"
+    },
+    {
+      "id": "Testing Ship Electric Propulsion and Shipboard Microgrids: Standards, Techniques and New Trends",
+      "document_type": "open_access_testing_review",
+      "published": "2026-04-22",
+      "status": "published",
+      "scope": "Review of ship electric propulsion and microgrid testing methods including equipment tests, co-simulation, CHIL, PHIL and holistic HIL workflows.",
+      "applicability_note": "Useful for the LOS electrical test ladder and laboratory/real-time integration planning. It does not provide LOS-18 equipment limits, test settings or vessel approval.",
+      "doi": "10.3390/en19092016",
+      "source": "https://doi.org/10.3390/en19092016"
+    }
   ]
 }
