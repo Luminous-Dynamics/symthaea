@@ -37,12 +37,11 @@ impl EventNd {
         if dt <= 0.0 {
             return false;
         }
-        let spatial_distance_squared: f64 = self.coordinates[1..]
+        let spatial_distance = self.coordinates[1..]
             .iter()
             .zip(&other.coordinates[1..])
-            .map(|(a, b)| (b - a) * (b - a))
-            .sum();
-        dt * dt >= spatial_distance_squared
+            .fold(0.0_f64, |distance, (a, b)| distance.hypot(b - a));
+        dt >= spatial_distance
     }
 }
 
