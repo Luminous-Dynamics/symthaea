@@ -590,6 +590,54 @@ mod tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    fn global_ledger() -> GlobalLedger {
+        GlobalLedger {
+            campaign_id: "synthetic-phase-response-campaign".into(),
+            global_filtration_id: "connectome-global-v1".into(),
+            global_filtration_sha256: digest('e'),
+            entries: vec![
+                LedgerEntry {
+                    sequence: 1,
+                    entry_commitment_sha256: digest('9'),
+                    payload: LedgerPayload::Evidence(EvidenceEvent {
+                        event_id: "S1".into(),
+                        evidence_family_id: "structural-revision-s1".into(),
+                        source_stream: "structural-em".into(),
+                        source_artifact_sha256: digest('a'),
+                        revision: 0,
+                        supersedes_event_id: None,
+                        event_time_ms: Some(100),
+                        acquired_at_ms: Some(101),
+                        annotated_at_ms: Some(102),
+                        qc_at_ms: Some(103),
+                        availability_state: AvailabilityState::Approved,
+                        split: EvidenceSplit::Fit,
+                        confirmatory_family_id: None,
+                    }),
+                },
+                LedgerEntry {
+                    sequence: 2,
+                    entry_commitment_sha256: digest('8'),
+                    payload: LedgerPayload::Evidence(EvidenceEvent {
+                        event_id: "T7".into(),
+                        evidence_family_id: "behaviour-trial-7".into(),
+                        source_stream: "behaviour-kinematics".into(),
+                        source_artifact_sha256: digest('b'),
+                        revision: 0,
+                        supersedes_event_id: None,
+                        event_time_ms: Some(90),
+                        acquired_at_ms: Some(91),
+                        annotated_at_ms: Some(110),
+                        qc_at_ms: Some(111),
+                        availability_state: AvailabilityState::Approved,
+                        split: EvidenceSplit::Exploration,
+                        confirmatory_family_id: None,
+                    }),
+                },
+            ],
+        }
+    }
+
     fn claim(
         id: &str,
         sender: &str,
@@ -598,6 +646,8 @@ mod tests {
         weight: Rational,
         path: &[Rational],
     ) -> ClaimEvidence {
+        let e_process_values = path.to_vec();
+        let e_process_path_sha256 = canonical_e_process_path_sha256(&e_process_values);
         ClaimEvidence {
             claim_id: id.into(),
             key: PhaseResponseClaimKey {
@@ -615,11 +665,29 @@ mod tests {
             null_envelope_sha256: digest('b'),
             component_e_process_receipt_sha256: digest('c'),
             component_validity_receipt_sha256: digest('d'),
+            component_input_process_sha256: digest('1'),
+            e_process_path_sha256: e_process_path_sha256.clone(),
             global_filtration_sha256: digest('e'),
             confirmation_split_sha256: digest('f'),
-            component_status: "VALIDATED_GLOBAL_FILTRATION_EPROCESS".into(),
+            filtration_admission: FiltrationAdmission {
+                campaign_id: "synthetic-phase-response-campaign".into(),
+                process_id: id.into(),
+                null_spec_sha256: digest('b'),
+                input_process_sha256: digest('1'),
+                output_process_sha256: e_process_path_sha256,
+                source_filtration_id: "connectome-global-v1".into(),
+                source_filtration_sha256: digest('e'),
+                target_filtration_id: "connectome-global-v1".into(),
+                target_filtration_sha256: digest('e'),
+                observed_event_ids: vec!["S1".into()],
+                process_output_sequence: 2,
+                mode: AdmissionMode::DirectGlobalSupermartingale,
+                proof_receipt_sha256: Some(digest('d')),
+                assumption_sha256: Some(digest('2')),
+                adjuster: None,
+            },
             weight,
-            e_process_values: path.into(),
+            e_process_values,
         }
     }
 
@@ -634,6 +702,7 @@ mod tests {
             alpha: r(1, 10),
             global_filtration_sha256: digest('e'),
             confirmation_split_sha256: digest('f'),
+            global_ledger: global_ledger(),
             claims: vec![
                 claim(
                     "C1-local-reset",
