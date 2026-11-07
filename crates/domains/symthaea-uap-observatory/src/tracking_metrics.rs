@@ -454,7 +454,9 @@ mod tests {
         assert_eq!(result.missed_targets, 0);
         assert_eq!(result.false_targets, MAX_GOSPA_ASSIGNMENT_SIDE + 1);
         let expected_cost = (MAX_GOSPA_ASSIGNMENT_SIDE + 1) as f64
-            * GospaConfig::default().cutoff_m.powf(GospaConfig::default().order)
+            * GospaConfig::default()
+                .cutoff_m
+                .powf(GospaConfig::default().order)
             / GospaConfig::default().alpha;
         assert!((result.distance_m.powf(2.0) - expected_cost).abs() < 1.0e-8);
     }
