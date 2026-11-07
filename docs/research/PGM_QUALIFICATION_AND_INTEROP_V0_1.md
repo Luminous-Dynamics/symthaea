@@ -459,3 +459,88 @@ This sequence avoids tuning an approximate policy against an unqualified inferen
 
 
 The companion draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10907 adds bounded exhaustive posterior marginals and a log-partition reference, with a direct tree sum-product differential test. It is stacked on #10900. Both reference paths use f64 arithmetic and explicit state-space bounds; neither is a scalable inference algorithm.
+
+## 14. Exact rational probability reference and external benchmark protocol (2026-11-07)
+
+### New exact reference path
+
+Draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10934 adds a rational coefficient domain to the exact semiring engine in `symthaea-complexity-lab`:
+
+- `CheckedRational`: canonical reduced numerator / positive denominator; checked i128 arithmetic; cross-cancelled multiplication and division; explicit overflow and zero-divisor errors.
+- `rational_probability::posterior_marginals`: exact partition function and per-variable posterior marginals through conditioned bucket variable elimination.
+- Rejects negative probability potentials, treats exact zeros as impossible support, rejects zero partition/evidence mass, and verifies each returned marginal sums to exactly one.
+
+This is exact relative to the finite factor tables and representable i128 intermediates. It is not arbitrary precision. The module is a reference and qualification mechanism, not a high-throughput inference algorithm. Its current posterior method performs one partition-function elimination and one additional elimination per variable state.
+
+### Matched external baselines
+
+| Track | External baseline | Compare on | Do not claim |
+|---|---|---|---|
+| Discrete Bayesian networks | pgmpy 1.1.2; published bnlearn example networks | CPD validation, posterior marginals, MAP, variable elimination and junction-tree queries | pgmpy does not represent continuous robotics factors like GTSAM |
+| General discrete PGM inference | UAI 2014 / UAI 2022 competition problem sets | PR (partition/evidence), MAR (marginals), MPE/MAP, MMAP; preserve original problem/evidence/query files | Small synthetic tests do not establish public benchmark SOTA |
+| Continuous, hybrid and incremental robotics | GTSAM 4.3.0 stable | Gaussian/nonlinear factor graphs, incremental updates, hybrid discrete-continuous inference, trajectory/sensor tasks | Rational discrete VE is not a like-for-like replacement for GTSAM's Lie-group and nonlinear optimization |
+| Tractable exact repeated-query models | Probabilistic circuits and UAI-2025 Probabilistic Graph Circuits | Query latency, exactness, circuit size, graph-permutation invariance, model expressivity and training cost | Circuit tractability depends on structural restrictions; exact inference is not cost-free |
+| Stateful partial-observation design | Symtropy #3018; ICML-2026 nested-particle online BED | Joint latent state/parameter inference, EIG bias/variance, ESS, decision regret, cost and model shift | A static factor graph cannot substitute for transition/sensor-state dynamics |
+| Correlated observations and misspecification | Mycelix #5632/#5648; Symtropy #3189/#3171 | Joint likelihood correctness, SBC, discrepancy, calibration, worst-case decision regret | Good posterior algebra does not prove the likelihood model is adequate |
+
+Pinned external sources:
+- pgmpy v1.1.2 release (2026-04-30): https://github.com/pgmpy/pgmpy/releases
+- pgmpy example models: https://pgmpy.org/documentation and https://github.com/pgmpy/example_models
+- UAI 2014 task definitions (PR, MAR, MAP, MMAP): https://www.auai.org/uai2014/competition.shtml
+- UAI 2022 competition benchmark sets: https://uaicompetition.github.io/uci-2022/results/benchmarks/
+- GTSAM 4.3.0 stable release: https://gtsam.org/2026/09/23/gtsam-4-3-release.html
+- UAI 2025 Probabilistic Graph Circuits: https://proceedings.mlr.press/v286/papez25a.html
+- ICML 2026 online BED with nested particle filters: https://proceedings.mlr.press/v306/perez-vieites26a.html
+- AAAI 2026 weighted model-counting variance: https://ojs.aaai.org/index.php/AAAI/article/view/39007
+
+### Benchmark tiers and target gates
+
+**Tier A — mathematical oracle (tiny finite instances)**
+- Full enumeration, exact rational VE, and a separate independently coded checker.
+- 100% exact equality for partition functions and every marginal on sealed cases.
+- 100% exact normalization and nonnegative marginal support.
+- Zero fabricated posterior on inconsistent evidence or invalid negative potentials.
+- Zero unchecked overflow; every arithmetic/resource error is explicit.
+- Tree BP must match exact rational reference after conversion to f64 within a preregistered absolute tolerance (initial target 1e-10).
+
+**Tier B — public discrete networks**
+- Start with Asia, Cancer, Earthquake, Sachs, Survey, Child, Alarm, Insurance, Water, Barley, Hailfinder, Hepar2, Win95pts, Pathfinder, Andes, Diabetes, Pigs, Link and Munin variants where formats / parameter sizes permit.
+- Use small networks for exact rational references; use float/double exact algorithms and independent cross-checks on large networks if i128 rational bit growth is prohibitive.
+- Freeze evidence/query sets. Report success rate, exactness, log-evidence error, TV distance / marginal L1, MAP score/assignment, runtime, peak memory, induced width, largest intermediate table and arithmetic bit lengths.
+- Run tree, poly-tree, low-treewidth, high-treewidth, sparse/dense, deterministic, near-deterministic and zero-support families.
+
+**Tier C — approximate and learned inference**
+- Compare tree BP, loopy BP, junction tree, variable elimination, mini-bucket, importance/likelihood-weighted sampling, MCMC, particle filtering, variational inference and tractable probabilistic circuits only on matched query semantics.
+- Report error against exact references: total variation, KL when finite and meaningful, log evidence, MAP regret, convergence rate, ESS/degeneracy, calibration and decision loss.
+- Distinguish inference approximation error from model misspecification with a 2x2 factorial evaluation. Never score a method only by EIG if downstream decision quality can worsen.
+
+**Tier D — domain transfer**
+- Symtropy: joint stochastic physical state + persistent sensor state, exact finite-horizon oracle versus nested particles / SMC².
+- Mycelix: batch/instrument/temporal/spatial covariance, discrepancy and prior/posterior SBC.
+- Sol-Atlas: event composition, spatial/temporal evidence dependence, risk and resource decisions.
+- Symthaea: active model/parameter/state inference and model-adequacy diagnostics.
+
+Every published result should carry a frozen model/data/query manifest, seed(s), code SHA, compiler/toolchain, command, exactness level, timeout/memory budget, raw per-case outputs and a replayable result digest.
+
+### What would count as an actual advance over SOTA?
+
+1. **Correctness frontier:** outperform existing libraries on neither correctness nor scale by assertion; show exact parity on public semantics and zero false exact claims.
+2. **Efficiency frontier:** for each workload family, produce a Pareto curve of latency, memory, error and model width. A target is at least 2x faster or 2x lower memory at matched error on a preregistered, representative slice; report regressions elsewhere.
+3. **Calibration frontier:** improve posterior predictive / SBC calibration and robust decision regret under dependence and model-family shifts, with paired uncertainty intervals excluding zero.
+4. **Anytime frontier:** return certified bounds or a clearly approximate posterior with calibrated error/abstention at any compute budget; never silently blur exact, approximate or unsupported.
+5. **Evidence frontier:** an independent replay checker verifies exact small-instance results and each approximate method reports estimator/solver gap, convergence diagnostics and model-adequacy status.
+
+These are proposed qualification gates, not current results. A 2x speed target is meaningful only after identical models, hardware, compiler modes, query sets, precision, warm-up policy and memory accounting are frozen.
+
+### Research implications
+
+Do not build a universal solver that tries to beat every specialized library. Build a typed inference compiler that:
+- preserves probability, evidence, objective, and query semantics;
+- compiles low-treewidth exact models to exact elimination;
+- uses junction-tree / sparse elimination where structure permits;
+- selects loopy/particle/variational/circuit methods only with explicit approximation and calibration contracts;
+- routes continuous manifolds and incremental nonlinear problems to GTSAM-class backends;
+- uses active experimentation to reduce uncertainty that matters to a decision;
+- records evidence lineage, dependence, model discrepancy and abstention reasons.
+
+The moat is not another implementation of sum-product. It is end-to-end, evidence-qualified inference and decisions across changing models, observations, sources and physical processes.
