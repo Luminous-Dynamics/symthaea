@@ -1251,6 +1251,23 @@ mod tests {
         }
     }
 
+    fn predicted_outcome(
+        outcome_id: &str,
+        full_model_predictive_probability: f64,
+        model_predictive_probabilities: &[(&str, f64)],
+        posterior_count_increment: Vec<Vec<f64>>,
+    ) -> DirichletPredictedOutcome {
+        DirichletPredictedOutcome {
+            outcome_id: outcome_id.to_owned(),
+            full_model_predictive_probability,
+            model_predictive_probabilities: model_predictive_probabilities
+                .iter()
+                .map(|(model_id, probability)| ((*model_id).to_owned(), *probability))
+                .collect(),
+            posterior_count_increment,
+        }
+    }
+
     #[test]
     fn identical_reduced_and_full_priors_have_zero_log_evidence_ratio() {
         let full_prior = tensor(&[&[1.0, 1.0], &[0.5, 1.5, 2.0]], 'a');
@@ -1633,16 +1650,8 @@ mod tests {
         let action = DirichletActionPrediction {
             action_id: "inspect-outcome".into(),
             outcomes: vec![
-                DirichletPredictedOutcome {
-                    outcome_id: "success".into(),
-                    full_model_predictive_probability: 0.5,
-                    posterior_count_increment: vec![vec![1.0, 0.0]],
-                },
-                DirichletPredictedOutcome {
-                    outcome_id: "failure".into(),
-                    full_model_predictive_probability: 0.5,
-                    posterior_count_increment: vec![vec![0.0, 1.0]],
-                },
+                predicted_outcome("success", 0.5, &[("success-favouring", 0.8), ("failure-favouring", 0.2)], vec![vec![1.0, 0.0]]),
+                predicted_outcome("failure", 0.5, &[("success-favouring", 0.2), ("failure-favouring", 0.8)], vec![vec![0.0, 1.0]]),
             ],
         };
         let result =
@@ -1670,16 +1679,8 @@ mod tests {
         let action = DirichletActionPrediction {
             action_id: "uninformative-action".into(),
             outcomes: vec![
-                DirichletPredictedOutcome {
-                    outcome_id: "outcome-a".into(),
-                    full_model_predictive_probability: 0.3,
-                    posterior_count_increment: vec![vec![0.0, 0.0]],
-                },
-                DirichletPredictedOutcome {
-                    outcome_id: "outcome-b".into(),
-                    full_model_predictive_probability: 0.7,
-                    posterior_count_increment: vec![vec![0.0, 0.0]],
-                },
+                predicted_outcome("outcome-a", 0.3, &[("success-favouring", 0.3), ("failure-favouring", 0.3)], vec![vec![0.0, 0.0]]),
+                predicted_outcome("outcome-b", 0.7, &[("success-favouring", 0.7), ("failure-favouring", 0.7)], vec![vec![0.0, 0.0]]),
             ],
         };
         let result =
@@ -1722,19 +1723,38 @@ mod tests {
                 parameter_prior: tensor(&[&[1.0, 2.0]], 'a'),
             },
         ];
-        let action = DirichletActionPrediction {
-            action_id: "one-observation".into(),
+        let labelled_action = DirichletActionPrediction {
+            action_id: "one-observation-labelled".into(),
             outcomes: vec![
-                DirichletPredictedOutcome {
-                    outcome_id: "success".into(),
-                    full_model_predictive_probability: 0.5,
-                    posterior_count_increment: vec![vec![1.0, 0.0]],
-                },
-                DirichletPredictedOutcome {
-                    outcome_id: "failure".into(),
-                    full_model_predictive_probability: 0.5,
-                    posterior_count_increment: vec![vec![0.0, 1.0]],
-                },
+                predicted_outcome(
+                    "success",
+                    0.5,
+                    &[("red-labelled-a", 2.0 / 3.0), ("red-labelled-b", 2.0 / 3.0), ("blue", 1.0 / 3.0)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.5,
+                    &[("red-labelled-a", 1.0 / 3.0), ("red-labelled-b", 1.0 / 3.0), ("blue", 2.0 / 3.0)],
+                    vec![vec![0.0, 1.0]],
+                ),
+            ],
+        };
+        let quotient_action = DirichletActionPrediction {
+            action_id: "one-observation-quotient".into(),
+            outcomes: vec![
+                predicted_outcome(
+                    "success",
+                    0.5,
+                    &[("red-equivalence-class", 2.0 / 3.0), ("blue-equivalence-class", 1.0 / 3.0)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.5,
+                    &[("red-equivalence-class", 1.0 / 3.0), ("blue-equivalence-class", 2.0 / 3.0)],
+                    vec![vec![0.0, 1.0]],
+                ),
             ],
         };
 
@@ -1742,14 +1762,14 @@ mod tests {
             &full_prior,
             &full_prior,
             &duplicated_models,
-            &action,
+            &labelled_action,
         )
         .expect("labelled model EIG");
         let quotient = evaluate_dirichlet_model_information_gain(
             &full_prior,
             &full_prior,
             &quotient_models,
-            &action,
+            &quotient_action,
         )
         .expect("quotient model EIG");
 
@@ -1791,16 +1811,8 @@ mod tests {
         let action = DirichletActionPrediction {
             action_id: "bad-prediction".into(),
             outcomes: vec![
-                DirichletPredictedOutcome {
-                    outcome_id: "success".into(),
-                    full_model_predictive_probability: 0.6,
-                    posterior_count_increment: vec![vec![1.0, 0.0]],
-                },
-                DirichletPredictedOutcome {
-                    outcome_id: "failure".into(),
-                    full_model_predictive_probability: 0.3,
-                    posterior_count_increment: vec![vec![0.0, 1.0]],
-                },
+                predicted_outcome("success", 0.6, &[("success-favouring", 0.8), ("failure-favouring", 0.2)], vec![vec![1.0, 0.0]]),
+                predicted_outcome("failure", 0.3, &[("success-favouring", 0.2), ("failure-favouring", 0.8)], vec![vec![0.0, 1.0]]),
             ],
         };
         assert!(matches!(
@@ -1812,16 +1824,8 @@ mod tests {
         let coherent_action = DirichletActionPrediction {
             action_id: "coherent-shape-but-wrong-parent".into(),
             outcomes: vec![
-                DirichletPredictedOutcome {
-                    outcome_id: "success".into(),
-                    full_model_predictive_probability: 0.5,
-                    posterior_count_increment: vec![vec![1.0, 0.0]],
-                },
-                DirichletPredictedOutcome {
-                    outcome_id: "failure".into(),
-                    full_model_predictive_probability: 0.5,
-                    posterior_count_increment: vec![vec![0.0, 1.0]],
-                },
+                predicted_outcome("success", 0.5, &[("success-favouring", 0.8), ("failure-favouring", 0.2)], vec![vec![1.0, 0.0]]),
+                predicted_outcome("failure", 0.5, &[("success-favouring", 0.2), ("failure-favouring", 0.8)], vec![vec![0.0, 1.0]]),
             ],
         };
         assert!(matches!(
