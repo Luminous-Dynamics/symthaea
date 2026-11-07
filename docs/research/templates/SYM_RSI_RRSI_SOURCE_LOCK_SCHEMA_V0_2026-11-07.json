@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sym-rsi-rrsi-source-lock-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-rrsi-source-lock-v0"
+    },
+    "status": {
+      "const": "MANIFEST_TEMPLATE_UNACQUIRED"
+    },
+    "generated_on": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "issue": {
+      "const": "#10846"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "object",
+      "properties": {
+        "paper": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "arxiv_id": {
+              "const": "2609.24972v3"
+            },
+            "submitted_on": {
+              "type": "string"
+            },
+            "revision_date": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "manuscript_sha256": {
+              "type": "string"
+            },
+            "acquired": {
+              "const": false
+            }
+          },
+          "required": [
+            "title",
+            "arxiv_id",
+            "submitted_on",
+            "revision_date",
+            "url",
+            "manuscript_sha256",
+            "acquired"
+          ],
+          "additionalProperties": false
+        },
+        "implementation": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "declared_license": {
+              "const": "Apache-2.0"
+            },
+            "default_branch": {
+              "type": "string"
+            },
+            "exact_commit": {
+              "type": "string"
+            },
+            "source_archive_sha256": {
+              "type": "string"
+            },
+            "acquired": {
+              "const": false
+            }
+          },
+          "required": [
+            "repository",
+            "declared_license",
+            "default_branch",
+            "exact_commit",
+            "source_archive_sha256",
+            "acquired"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "paper",
+        "implementation"
+      ],
+      "additionalProperties": false
+    },
+    "search_method": {
+      "type": "object",
+      "properties": {
+        "proposer_edit_budget": {
+          "type": "string"
+        },
+        "history_conditioning": {
+          "type": "string"
+        },
+        "stalled_search": {
+          "type": "string"
+        },
+        "critic": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        },
+        "pruner": {
+          "type": "string"
+        },
+        "novelty": {
+          "type": "string"
+        },
+        "candidate_execution": {
+          "type": "string"
+        },
+        "candidate_count_per_round": {
+          "const": 2
+        }
+      },
+      "required": [
+        "proposer_edit_budget",
+        "history_conditioning",
+        "stalled_search",
+        "critic",
+        "selector",
+        "pruner",
+        "novelty",
+        "candidate_execution",
+        "candidate_count_per_round"
+      ],
+      "additionalProperties": false
+    },
+    "execution_domains": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "enum": [
+              "coding",
+              "workspace",
+              "engineering_design"
+            ]
+          },
+          "evolve_benchmark": {
+            "type": "string"
+          },
+          "ood_benchmarks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "base_policy_model": {
+            "const": "Claude Opus 4.8"
+          },
+          "grader_model": {
+            "type": "string"
+          },
+          "reference_harness": {
+            "type": "string"
+          },
+          "base_harness_and_environment_commit": {
+            "type": "string"
+          },
+          "base_harness_commit": {
+            "type": "string"
+          },
+          "domain_config_sha256": {
+            "type": "string"
+          },
+          "task_manifest_sha256": {
+            "type": "string"
+          },
+          "oracle_version_sha256": {
+            "type": "string"
+          },
+          "reported_scores": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "benchmark": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "baseline_h0": {
+                  "type": "number"
+                },
+                "rrsi": {
+                  "type": "number"
+                },
+                "delta": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "benchmark",
+                "role",
+                "baseline_h0",
+                "rrsi",
+                "delta"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reported_noise_band": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "domain",
+          "evolve_benchmark",
+          "ood_benchmarks",
+          "base_policy_model",
+          "domain_config_sha256",
+          "task_manifest_sha256",
+          "oracle_version_sha256",
+          "reported_scores",
+          "reported_noise_band"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "resource_and_accounting_lock": {
+      "type": "object",
+      "properties": {
+        "proposer_model_and_calls": {
+          "type": "string"
+        },
+        "critic_model_and_calls": {
+          "type": "string"
+        },
+        "analyst_and_digester_model_and_calls": {
+          "type": "string"
+        },
+        "candidate_execution_inference_cost": {
+          "type": "string"
+        },
+        "benchmark_evaluation_cost": {
+          "type": "string"
+        },
+        "tool_calls_and_api_prices": {
+          "type": "string"
+        },
+        "input_output_tokens_by_role": {
+          "type": "string"
+        },
+        "retries_invalid_and_failed_candidates": {
+          "type": "string"
+        },
+        "wall_clock_cpu_gpu_memory_energy": {
+          "type": "string"
+        },
+        "human_review_and_rework_time": {
+          "type": "string"
+        },
+        "total_budget_digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposer_model_and_calls",
+        "critic_model_and_calls",
+        "analyst_and_digester_model_and_calls",
+        "candidate_execution_inference_cost",
+        "benchmark_evaluation_cost",
+        "tool_calls_and_api_prices",
+        "input_output_tokens_by_role",
+        "retries_invalid_and_failed_candidates",
+        "wall_clock_cpu_gpu_memory_energy",
+        "human_review_and_rework_time",
+        "total_budget_digest"
+      ],
+      "additionalProperties": false
+    },
+    "reproduction_design": {
+      "type": "object",
+      "properties": {
+        "baseline_h0_repeated_runs": {
+          "const": true
+        },
+        "compare_unregularized_and_full_rrsi": {
+          "const": true
+        },
+        "isolate_each_regularizer": {
+          "const": true
+        },
+        "preserve_best_so_far_and_final_separately": {
+          "const": true
+        },
+        "fresh_family_transfer": {
+          "const": true
+        },
+        "fixed_backbone_factor": {
+          "const": true
+        },
+        "post_initialization_improvement_measured": {
+          "const": true
+        },
+        "same_start_and_matched_realized_cost_for_r4": {
+          "const": true
+        },
+        "report_capability_vector_and_worst_family_regression": {
+          "const": true
+        }
+      },
+      "required": [
+        "baseline_h0_repeated_runs",
+        "compare_unregularized_and_full_rrsi",
+        "isolate_each_regularizer",
+        "preserve_best_so_far_and_final_separately",
+        "fresh_family_transfer",
+        "fixed_backbone_factor",
+        "post_initialization_improvement_measured",
+        "same_start_and_matched_realized_cost_for_r4",
+        "report_capability_vector_and_worst_family_regression"
+      ],
+      "additionalProperties": false
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "generated_on",
+    "issue",
+    "purpose",
+    "sources",
+    "search_method",
+    "execution_domains",
+    "resource_and_accounting_lock",
+    "reproduction_design",
+    "limitations"
+  ],
+  "additionalProperties": false
+}
