@@ -79,3 +79,12 @@ Biological, after exact source reproduction and held-out validation:
 - all failed, unavailable, non-response, out-of-support and infeasible outcomes remain in denominators.
 
 No biological target is promoted to a result until source-bound replication and a blinded lockbox are available.
+
+## Additional embodied and mechanosensory comparators
+
+- Özdil et al., ICLR 2026 introduce a 3D Drosophila leg musculoskeletal model in OpenSim/MuJoCo, with Hill-type muscles estimated from high-resolution X-ray scans and muscle-actuated behavioral replay. It is a strong muscle/limb mechanics comparator, not a connectome-derived neural controller: https://proceedings.iclr.cc/paper_files/paper/2026/hash/222843b731e2c7813291586e2b39fe89-Abstract-Conference.html
+- FlyGym / NeuroMechFly 2.1.1 (released 24 October 2026) exposes joint angles, actuator forces and contact forces and includes GPU simulation state access and a split trochanter/femur model. Pin the exact release, assets, MuJoCo/Warp and solver settings: https://github.com/NeLy-EPFL/flygym/releases and https://neuromechfly.org/2.1.1/
+- Kuo et al., bioRxiv preprint (16 September 2026), reports localized leg contact, subsequent-leg-contact patterns, landing probability, and connectome/optogenetic analysis of mechanosensory pathways including ascending Moonlander neurons. This is a separate landing-transition task and remains a preprint: https://doi.org/10.64898/2026.09.14.751322
+- FlyBody (Nature 2025) supplies a 67-body / 102-DoF whole-body physics reference with learned controllers and proprioceptive feedback. It is a strong embodiment baseline, not a source-grounded neural mechanism: https://www.nature.com/articles/s41586-025-09029-4
+
+Keep walking rhythm, inter-leg coordination, mechanosensory landing transition, and embodied muscle/physics evaluation as separate strata. Do not merge them into one accuracy number.
