@@ -170,6 +170,58 @@ pub enum MeasurementStatus {
     NotAssessed,
 }
 
+/// Immutable source and evaluation-unit commitments for one response surface.
+/// These digests bind lineage strings; they are not signature verification or
+/// proof that the upstream bytes have been authenticated by a trusted party.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceBinding {
+    pub dataset_id: String,
+    pub dataset_revision_sha256: String,
+    pub phase_estimator_sha256: String,
+    pub axis_identity_receipt_sha256: String,
+    pub raw_trajectory_sha256: String,
+    pub perturbation_receipt_sha256: String,
+    pub context_definition_sha256: String,
+    pub animal_unit_token: String,
+    pub session_id: String,
+    pub trial_unit_token: String,
+}
+
+impl SourceBinding {
+    pub fn validate(&self) -> Result<(), PhaseError> {
+        for (field, value) in [
+            ("dataset_id", self.dataset_id.as_str()),
+            ("animal_unit_token", self.animal_unit_token.as_str()),
+            ("session_id", self.session_id.as_str()),
+            ("trial_unit_token", self.trial_unit_token.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(PhaseError::MissingSourceBindingField(field));
+            }
+        }
+        for (field, digest) in [
+            ("dataset_revision_sha256", self.dataset_revision_sha256.as_str()),
+            ("phase_estimator_sha256", self.phase_estimator_sha256.as_str()),
+            ("axis_identity_receipt_sha256", self.axis_identity_receipt_sha256.as_str()),
+            ("raw_trajectory_sha256", self.raw_trajectory_sha256.as_str()),
+            ("perturbation_receipt_sha256", self.perturbation_receipt_sha256.as_str()),
+            ("context_definition_sha256", self.context_definition_sha256.as_str()),
+        ] {
+            if !valid_sha256(digest) {
+                return Err(PhaseError::InvalidSourceDigest(field));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 /// One paired control/perturbed response row or an explicit unavailable state.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RowOutcome {
@@ -232,12 +284,18 @@ impl PhaseReset {
 /// Validated set of phase-response rows.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PhaseResponseSurface {
+    source_binding: SourceBinding,
     rows: BTreeMap<ProbeKey, TransferRow>,
 }
 
 impl PhaseResponseSurface {
-    /// Reject duplicate design cells and invalid axis/source declarations.
-    pub fn new(rows: Vec<TransferRow>) -> Result<Self, PhaseError> {
+    /// Require source lineage, reject duplicate design cells, and validate
+    /// every probe key before admitting the response surface.
+    pub fn new(
+        source_binding: SourceBinding,
+        rows: Vec<TransferRow>,
+    ) -> Result<Self, PhaseError> {
+        source_binding.validate()?;
         let mut indexed = BTreeMap::new();
         for row in rows {
             row.key.validate()?;
@@ -245,7 +303,14 @@ impl PhaseResponseSurface {
                 return Err(PhaseError::DuplicateProbeKey);
             }
         }
-        Ok(Self { rows: indexed })
+        Ok(Self {
+            source_binding,
+            rows: indexed,
+        })
+    }
+
+    pub fn source_binding(&self) -> &SourceBinding {
+        &self.source_binding
     }
 
     pub fn len(&self) -> usize {
@@ -633,6 +698,8 @@ pub enum PhaseError {
     ModelProbeGridMismatch { model_id: String },
     EmptyProbeGrid,
     ArithmeticOverflow,
+    MissingSourceBindingField(&'static str),
+    InvalidSourceDigest(&'static str),
 }
 
 impl fmt::Display for PhaseError {
@@ -659,6 +726,8 @@ impl fmt::Display for PhaseError {
             Self::ModelProbeGridMismatch { model_id } => write!(f, "model {model_id} does not predict the identical probe grid"),
             Self::EmptyProbeGrid => write!(f, "phase-response probe grid is empty"),
             Self::ArithmeticOverflow => write!(f, "phase-response separation overflowed its exact integer range"),
+            Self::MissingSourceBindingField(field) => write!(f, "source binding field {field} is empty"),
+            Self::InvalidSourceDigest(field) => write!(f, "source binding digest {field} is not a lowercase SHA-256 hex string"),
         }
     }
 }
@@ -722,6 +791,21 @@ mod tests {
         [Phase::from_microturns(0); LEG_COUNT]
     }
 
+    fn test_source_binding() -> SourceBinding {
+        SourceBinding {
+            dataset_id: "synthetic-six-leg-phase-response".to_string(),
+            dataset_revision_sha256: "a".repeat(64),
+            phase_estimator_sha256: "b".repeat(64),
+            axis_identity_receipt_sha256: "c".repeat(64),
+            raw_trajectory_sha256: "d".repeat(64),
+            perturbation_receipt_sha256: "e".repeat(64),
+            context_definition_sha256: "f".repeat(64),
+            animal_unit_token: "synthetic-animal-0001".to_string(),
+            session_id: "synthetic-session-0001".to_string(),
+            trial_unit_token: "synthetic-trial-0001".to_string(),
+        }
+    }
+
     fn zero_samples() -> [PhaseSample; LEG_COUNT] {
         [PhaseSample::from_unwrapped_microturns(0); LEG_COUNT]
     }
@@ -742,7 +826,7 @@ mod tests {
         let mut perturbed = zero_samples();
         perturbed[0] = PhaseSample::from_unwrapped_microturns(100_000);
         perturbed[2] = PhaseSample::from_unwrapped_microturns(25_000);
-        let surface = PhaseResponseSurface::new(vec![TransferRow {
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Measured { control, perturbed },
         }]).unwrap();
@@ -759,7 +843,7 @@ mod tests {
         let control = zero_samples();
         let mut perturbed = zero_samples();
         perturbed[3] = PhaseSample::from_unwrapped_microturns(-80_000);
-        let surface = PhaseResponseSurface::new(vec![TransferRow {
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Measured { control, perturbed },
         }]).unwrap();
@@ -767,9 +851,34 @@ mod tests {
     }
 
     #[test]
+    fn phase_response_surface_requires_valid_source_binding() {
+        let probe = key(Context::BallContact, 0, 1, 1);
+        let row = TransferRow {
+            key: probe,
+            outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed),
+        };
+        let mut bad_digest = test_source_binding();
+        bad_digest.raw_trajectory_sha256 = "not-a-digest".to_string();
+        assert_eq!(
+            PhaseResponseSurface::new(bad_digest, vec![row.clone()]),
+            Err(PhaseError::InvalidSourceDigest("raw_trajectory_sha256"))
+        );
+
+        let mut missing_trial = test_source_binding();
+        missing_trial.trial_unit_token.clear();
+        assert_eq!(
+            PhaseResponseSurface::new(missing_trial, vec![row.clone()]),
+            Err(PhaseError::MissingSourceBindingField("trial_unit_token"))
+        );
+
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![row]).unwrap();
+        assert_eq!(surface.source_binding().dataset_id, "synthetic-six-leg-phase-response");
+    }
+
+    #[test]
     fn unavailable_measurements_are_never_silently_zero_filled() {
         let probe = key(Context::BallContact, 0, 1, 1);
-        let surface = PhaseResponseSurface::new(vec![TransferRow {
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Unavailable(MeasurementStatus::NoResponse),
         }]).unwrap();
@@ -866,13 +975,13 @@ mod tests {
     fn phase_grid_rejects_duplicate_and_missing_rows() {
         let first = key(Context::BallContact, 0, 0, 1);
         let second = key(Context::BallContact, 0, 1, 1);
-        let surface = PhaseResponseSurface::new(vec![
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![
             TransferRow { key: first, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
             TransferRow { key: second, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
         ]).unwrap();
         assert_eq!(surface.validate_complete(&[first]), Err(PhaseError::GridMismatch { missing: 0, unexpected: 1 }));
         assert!(matches!(
-            PhaseResponseSurface::new(vec![
+            PhaseResponseSurface::new(test_source_binding(), vec![
                 TransferRow { key: first, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
                 TransferRow { key: first, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
             ]),
@@ -1040,7 +1149,7 @@ mod tests {
         ];
         let probe = key(Context::AirStepping, 1, 2, 1);
         for status in statuses {
-            let surface = PhaseResponseSurface::new(vec![TransferRow {
+            let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
                 key: probe,
                 outcome: RowOutcome::Unavailable(status),
             }])
@@ -1102,7 +1211,7 @@ mod tests {
         let mut perturbed = zero_samples();
         perturbed[0] = PhaseSample::from_unwrapped_microturns(1_000_000);
         perturbed[2] = PhaseSample::from_unwrapped_microturns(1_100_000);
-        let surface = PhaseResponseSurface::new(vec![TransferRow {
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Measured { control, perturbed },
         }]).unwrap();
@@ -1122,7 +1231,7 @@ mod tests {
         let mut perturbed = zero_samples();
         control[0] = PhaseSample::from_unwrapped_microturns(990_000);
         perturbed[0] = PhaseSample::from_unwrapped_microturns(1_010_000);
-        let surface = PhaseResponseSurface::new(vec![TransferRow {
+        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Measured { control, perturbed },
         }])
