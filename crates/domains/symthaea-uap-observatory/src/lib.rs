@@ -660,6 +660,30 @@ mod tests {
     }
 
     #[test]
+    fn corrected_clock_time_controls_calibration_validity() {
+        let mut calibration = calibration("eo-01", SensorModality::ElectroOptical);
+        calibration.clock_offset_ns = 12;
+        let observation = bearing("eo-01", SensorModality::ElectroOptical, 1, 10_005);
+        // The recorded timestamp is just outside the window, but the
+        // calibrated true TAI timestamp is 9,993 ns and remains valid.
+        let bundle = EvidenceBundle {
+            calibrations: vec![calibration],
+            observations: vec![observation],
+        };
+        assert!(bundle.validate().is_ok());
+    }
+
+    #[test]
+    fn clock_correction_overflow_is_rejected() {
+        let mut calibration = calibration("eo-01", SensorModality::ElectroOptical);
+        calibration.clock_offset_ns = i64::MIN;
+        assert!(matches!(
+            calibration.corrected_timestamp_tai_ns(i64::MAX),
+            Err(EvidenceError::TimestampOverflow { .. })
+        ));
+    }
+
+    #[test]
     fn malformed_uncertainties_and_frames_fail_closed() {
         let mut observation = bearing("eo-01", SensorModality::ElectroOptical, 1, 2_000);
         observation.measurement = Measurement::Bearing {
