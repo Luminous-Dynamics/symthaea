@@ -73,6 +73,33 @@ F3 and F5 must not be conflated: F3 holds one target defect in focus for paired 
 
 F1 must be human-authored or independently reviewed for realism. Do not let the candidate model generate its own user prompt, gold label or evaluation input. Preserve the mutation source, transformation procedure and human review; synthetic paraphrase is not equivalent to telemetry-derived real user distribution.
 
+### 4.1 Prompt-fidelity adjudication before pairing
+
+Every proposed prompt variant receives an independent information/fidelity review before it is paired or evaluated. The goal is not to force every framing to contain identical information; the goal is to know *exactly which information changed* and whether the underlying target/contract remained the same.
+
+Two reviewers independently complete the following dimensions:
+
+| Dimension | Question | Required record |
+|---|---|---|
+| C1 — Contract preservation | Does the variant preserve the same normative behavior, invariants, scope and constraints? | Preserved / narrowed / broadened / contradicted / unresolved; cite contract fields |
+| C2 — Target identity | Does it still concern the same source/defect anchor, or has it introduced a second issue? | Same target / target plus extra issue / different target / unresolved |
+| C3 — Information inventory | Which facts, symptoms, hints, locations, tests, environment and constraints are present, omitted or added? | Present/absent/added ledger; do not summarize this as “same prompt” |
+| C4 — Objective/output | Is the agent asked to review, repair, discover, clarify or sweep? | Exact objective and lane-specific output; objective changes are not wording-only |
+| C5 — Interaction realism | Does the human-authored request resemble a plausible developer interaction without leaking benchmark labels or artificial rubric language? | Realistic / artificial / ambiguous / unresolved, with rationale |
+| C6 — Target leakage | Does the prompt reveal the defect identity, target file, fix, gold label or answer-bearing clue beyond the intended condition? | No leakage / bounded hint / prohibited leakage / unresolved |
+
+After independent review, assign one disposition:
+
+- **W — Wording-only:** C1/C2 are preserved, C3 contains no material information delta, C4 objective is unchanged, and only natural-language expression or conversational style differs.
+- **R — Information-reduced:** the same contract and target remain, but one or more useful facts/hints are intentionally omitted. This estimates the effect of reduced information, not pure paraphrase.
+- **A — Information-added:** the same contract and target remain, but additional evidence is supplied (for example, a failing test or exact location). This estimates an additional-information effect.
+- **O — Objective-changed:** the underlying anchor is shared, but the requested engineering objective/output differs (for example, diff review versus repair). Retain as a separate lane condition, not a wording pair.
+- **X — Invalid / unresolved:** the variant changes the normative contract, target identity, target leakage boundary, or cannot be adjudicated. Reject it from the paired comparison or retain it as unresolved; never relabel it as W/R/A after seeing candidate outcomes.
+
+F0/F1 should be explicitly labelled W or R/A per anchor; do not presume all realistic user requests are semantically equivalent to formal issues. F2/F3/F4/F5 are different objectives or evidence packages and must be labelled O and/or A/R as applicable, not passed off as paraphrases.
+
+The two reviewers record their independent dispositions before reconciliation. Preserve the information ledgers and disagreements. A third reviewer resolves only with source/contract evidence; unresolved cases remain out of the confirmatory sample. Do not convert these labels into a new metric or aggregate score. Report the composition of the framing sample by W/R/A/O/X so that a result cannot be described as a prompt-style effect when it was actually caused by new evidence or a different task objective.
+
 ## 5. Paired experimental design
 
 For each eligible anchor:
