@@ -13,3 +13,7 @@ path = "src/lib.rs"
 # Intentionally std-only. The first milestone defines immutable evidence
 # records and validation rules; it does not infer object identity, propulsion,
 # or non-human origin.
+
+[[example]]
+name = "sensor_placement_design"
+path = "examples/sensor_placement_design.rs"
