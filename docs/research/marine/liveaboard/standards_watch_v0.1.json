@@ -4,13 +4,28 @@
   "status_semantics": "Published editions remain the published references until a replacement is formally published; DIS / target publication dates are not compliance evidence.",
   "standards": [
     {
-      "id": "ISO 16315:2026",
+      "id": "ISO 12215-5:2019",
       "edition": 2,
-      "publication_date": "2026-02-06",
-      "status": "published",
-      "scope": "AC/DC electrical systems used for electrical propulsion and hybrid propulsion on small craft up to 24 m LH; DC below 1500 V, single-phase AC up to 1000 V, and three-phase AC up to 1000 V.",
-      "applicability_note": "Directly relevant to LOS-18 electrical propulsion if vessel type, voltage and system scope match. Obtain the licensed standard and have applicability reviewed before compliance claims.",
-      "source": "https://www.iso.org/standard/84203.html"
+      "corrected_version": "2024-03",
+      "status": "published_confirmed_current_2026",
+      "scope": "Monohull design pressures, design stresses and scantlings up to 24 m LH or load-line length.",
+      "source": "https://www.iso.org/standard/69552.html"
+    },
+    {
+      "id": "ISO 12215-7:2020",
+      "edition": 1,
+      "status": "published_confirmed_current_2026",
+      "scope": "Multihull global loads, local design pressures and local scantlings up to 24 m LH or load-line length.",
+      "source": "https://www.iso.org/standard/73457.html"
+    },
+    {
+      "id": "ISO 12215-9:2026",
+      "edition": 2,
+      "publication_month": "2026-08",
+      "status": "under_publication_stage_60_00_as_checked_2026_11_07",
+      "scope": "Sailing-craft appendage loads and scantlings for monohull sailing craft up to 24 m.",
+      "source": "https://www.iso.org/standard/85208.html",
+      "note": "The ISO public record showed stage 60.00 under publication when checked. Verify publication and applicable edition at actual design review; do not assume the title year alone establishes current status."
     },
     {
       "id": "ISO 12217-1:2022",
@@ -49,28 +64,32 @@
       "design_note": "DIS preview includes habitable-multihull inversion susceptibility, viable means of escape and inverted flotation."
     },
     {
-      "id": "ISO 12215-5:2019",
+      "id": "ISO 16315:2026",
       "edition": 2,
-      "corrected_version": "2024-03",
-      "status": "published_confirmed_current_2026",
-      "scope": "Monohull design pressures, design stresses and scantlings up to 24 m LH or load-line length.",
-      "source": "https://www.iso.org/standard/69552.html"
+      "publication_date": "2026-02-06",
+      "status": "published",
+      "scope": "AC/DC electrical systems used for electrical propulsion and hybrid propulsion on small craft up to 24 m LH; DC below 1500 V, single-phase AC up to 1000 V, and three-phase AC up to 1000 V.",
+      "applicability_note": "Directly relevant to LOS-18 electrical propulsion if vessel type, voltage and system scope match. Obtain the licensed standard and have applicability reviewed before compliance claims.",
+      "source": "https://www.iso.org/standard/84203.html"
     },
     {
-      "id": "ISO 12215-7:2020",
+      "id": "ISO 20283-5:2016",
       "edition": 1,
-      "status": "published_confirmed_current_2026",
-      "scope": "Multihull global loads, local design pressures and local scantlings up to 24 m LH or load-line length.",
-      "source": "https://www.iso.org/standard/73457.html"
+      "publication_date": "2016-12-02",
+      "status": "published_confirmed_current_2026-10-12",
+      "scope": "Measurement, evaluation and reporting of vibration for habitability on passenger and merchant ships; frequency-weighted RMS guideline values in the 1–80 Hz range for normally occupied areas; intended voyages of 24 hours or more.",
+      "applicability_note": "Useful measurement and reporting methodology for long-duration liveaboard trials and spatial vibration mapping. Its stated scope is passenger and merchant ships on voyages of 24 hours or more; do not automatically treat it as directly applicable statutory criteria for a private recreational craft. Low-frequency motion sickness is addressed separately by ISO 2631-1. This standard alone does not qualify seakeeping comfort or task operability.",
+      "source": "https://www.iso.org/standard/68125.html",
+      "confirmed_current_source": "https://www.iso.org/standard/68125.html"
     },
     {
-      "id": "ISO 12215-9:2026",
-      "edition": 2,
-      "publication_month": "2026-08",
-      "status": "under_publication_stage_60_00_as_checked_2026_11_07",
-      "scope": "Sailing-craft appendage loads and scantlings for monohull sailing craft up to 24 m.",
-      "source": "https://www.iso.org/standard/85208.html",
-      "note": "The ISO public record showed stage 60.00 under publication when checked. Verify publication and applicable edition at actual design review; do not assume the title year alone establishes current status."
+      "id": "ISO 23625:2025",
+      "edition": 1,
+      "publication_date": "2025-03",
+      "status": "published",
+      "scope": "Selection and installation of lithium-ion batteries and battery systems above 500 Wh used on small craft for general electrical loads and/or electric propulsion, including manufacturer safety information.",
+      "applicability_note": "Directly relevant to LOS-18 battery systems above 500 Wh if the vessel and system fall within its stated small-craft scope. Obtain the licensed standard and have battery installer / marine electrical engineer review applicability and interfaces. This does not replace cell/system-specific fire, thermal-runaway, enclosure or class/flag requirements.",
+      "source": "https://www.iso.org/standard/85220.html"
     },
     {
       "id": "ISO 2631-1:1997 + Amd 1:2010",
@@ -83,8 +102,9 @@
       "scope": "Methods for measuring periodic, random and transient whole-body vibration; informative guidance on health, comfort, perception and motion sickness. Current ISO page distinguishes 0.5–80 Hz for health/comfort/perception and 0.1–0.5 Hz for motion sickness in the replacement DIS preview.",
       "next_revision": {
         "id": "ISO/FDIS 2631-1",
-        "status_as_of_2026_11_07": "under development; ISO public record says expected to replace the 1997 edition within coming months",
-        "not_published_as_of": "2026-11-07"
+        "status_as_of_2026_11_07": "Final Draft International Standard registered in approval phase (stage 50.00) on 2026-09-24; under development, not yet published as replacement",
+        "replacement_for": "ISO 2631-1:1997",
+        "source": "https://www.iso.org/standard/85768.html"
       },
       "source": "https://www.iso.org/standard/7612.html",
       "draft_preview": "https://www.iso.org/obp/ui?_escaped_fragment_=iso%3Astd%3Aiso%3A2631%3A-1%3Adis%3Aed-3%3Av1%3Aen",
