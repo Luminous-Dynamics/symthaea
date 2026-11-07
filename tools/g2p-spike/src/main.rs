@@ -26,9 +26,14 @@ fn main() {
     let phonemizer = EnglishPhonemizer::new_bundled()
         .expect("bundled Piper Plus English dictionary must initialize");
 
-    println!("case_id\ttext\tpiper_ipa_tokens\tmuse_ipa_tokens\tprosody_debug");
+    println!("case_id\ttext\tpiper_ipa_tokens\tmuse_word_ipa_tokens\tprosody_debug");
     for (case_id, text) in CASES {
-        let muse_syllable_count = symthaea_muse::singing_bridge::syllable_count(text);
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let muse_word_syllable_counts: Vec<usize> = words
+            .iter()
+            .map(|word| symthaea_muse::singing_bridge::syllable_count(word))
+            .collect();
+        let muse_syllable_count: usize = muse_word_syllable_counts.iter().sum();
         let melody: Vec<symthaea_muse::Note> = (0..muse_syllable_count)
             .map(|index| symthaea_muse::Note {
                 frequency: 220.0,
@@ -37,17 +42,26 @@ fn main() {
                 velocity: 0.7,
             })
             .collect();
-        let muse_tokens: Vec<&str> = symthaea_muse::singing_bridge::sing(text, &melody)
-            .into_iter()
-            .flat_map(|syllable| syllable.phonemes.into_iter().map(|phoneme| phoneme.ipa))
+        let muse_syllables = symthaea_muse::singing_bridge::sing(text, &melody);
+        let mut cursor = 0usize;
+        let muse_word_tokens: Vec<Vec<&str>> = muse_word_syllable_counts
+            .iter()
+            .map(|count| {
+                let word_phones = muse_syllables[cursor..cursor + count]
+                    .iter()
+                    .flat_map(|syllable| syllable.phonemes.iter().map(|phoneme| phoneme.ipa))
+                    .collect();
+                cursor += count;
+                word_phones
+            })
             .collect();
 
         match phonemizer.phonemize_with_prosody(text) {
             Ok((tokens, prosody)) => {
-                println!("{case_id}\t{text}\t{tokens:?}\t{muse_tokens:?}\t{prosody:?}");
+                println!("{case_id}\t{text}\t{tokens:?}\t{muse_word_tokens:?}\t{prosody:?}");
             }
             Err(error) => {
-                println!("{case_id}\t{text}\tERROR: {error}\t{muse_tokens:?}\t-");
+                println!("{case_id}\t{text}\tERROR: {error}\t{muse_word_tokens:?}\t-");
             }
         }
     }
