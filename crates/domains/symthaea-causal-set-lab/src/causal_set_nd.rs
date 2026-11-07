@@ -542,6 +542,13 @@ mod tests {
                     causet.interval_size_histogram(),
                     boosted.interval_size_histogram()
                 );
+                if dimension == 4 {
+                    assert_eq!(
+                        causet.bdg_action_4d_dimensionless_bracket().unwrap(),
+                        boosted.bdg_action_4d_dimensionless_bracket().unwrap(),
+                        "4D BDG action bracket changed under rapidity={rapidity}"
+                    );
+                }
                 assert_eq!(
                     causet.longest_chain_length(),
                     boosted.longest_chain_length()
