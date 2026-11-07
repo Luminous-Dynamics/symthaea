@@ -37,6 +37,8 @@ The benchmark's scoring pipeline uses a Claude Sonnet 5 classifier to label cand
 
 **CEB use:** adopt the *principle* of multi-source candidate discovery, semantic deduplication, common rubric and independent expert audit. Keep a strict known-gold comparison and a separate discovery channel for valid findings absent from the original gold set. Do not automatically add unmatched model findings to gold truth. Version the rubric, matcher, judge, dataset and expert-audit scope.
 
+**Second live capture — November 7, 2026, 20:14 SAST:** a later retrieval of the same high-severity grounded-F1 view showed 16 rows and listed intent-review-agent at **82.2 F1 / 92.0 precision / 74.4 recall** (October 20 run) as the top row. The earlier 83.0 OhMyBug entry above is retained as the earlier same-day snapshot, not silently overwritten. For comparisons made after this capture, use the live board's contemporaneous ranking and record the exact filter, capture time, dataset/judge/matcher version and model run date. A mutable leaderboard row is not a permanent SOTA constant. [Live leaderboard capture](https://review-bench.ai/).
+
 ### 2.2 SecPRBench — correct causal diagnosis matters more than pointing at the right file
 
 The October 24, 2026 preprint introduces **265 real-world vulnerability-review tasks** from nine widely deployed systems projects, including Firefox, V8 and OpenSSL, in C, C++ and Rust. For each task the paper validates the pre-introduction tree, introducing tree and repaired tree; it replays the same PoC/invocation and requires the target failure to be absent, present and absent respectively. Of 265 cases, 217 pass mechanical checks; 48 require human adjudication of source and execution evidence. [Y. Yang et al., SecPRBench (arXiv:2610.33509)](https://arxiv.org/abs/2610.33509).
@@ -106,6 +108,22 @@ Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Appro
 **CEB implication:** prompt/task framing is an experimental variable. A system may repair a formal issue but fail to clarify an ordinary developer request; a failing test adds information, not merely a different phrasing. Use paired shared-source/defect anchors across formal issue, realistic user request, diff-only review, repository-only discovery and failing-test-guided repair. Separate wording-only contrasts from information-package contrasts. Keep the outcomes in existing CEB-REVIEW, CEB-RESOLUTION, CEB-REPO and CEB-HUMAN lanes; do not average them into a composite engineering-intelligence score.
 
 The [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) defines the six framing conditions, source/defect anchors, leakage controls and paired analysis. It is a design proposal, not a task set or performance result.
+
+### 2.11 Causal software root-cause analysis — SDRCA and UniVal
+
+Causal fault-localization work is a necessary adjacent comparator: CEB should not present causal graphs and interventions as if no software-engineering literature had explored them.
+
+**SDRCA (Journal of Systems and Software, October 2026)** is a runtime defect root-cause framework. Its reported method combines information-theoretic anomaly scoring across heterogeneous monitoring signals, causal graphs, in-distribution counterfactual interventions and Shapley-style allocation of multiple-variable contributions. It is evaluated on PetShop, RE1 and RE3 and reports Recall@1 / Recall@3 improvements over correlation and causal baselines. Its domain is runtime anomaly localization with monitored signals, not source-only pre-merge review. A Shapley value allocates modeled contribution under a specified coalition game; it does not, by itself, prove causal identification or replace intervention validity. [Sun et al., SDRCA](https://doi.org/10.1016/j.jss.2026.112931).
+
+**UniVal (ICSE 2021 Distinguished Paper)** combines predicate outcomes and variable-value profiles in a causal statistical fault-localization method intended to reduce confounding in spectrum-based localization. The paper reports evaluation over 835 Defects4J program versions containing real faults. It is an execution-profile fault-localization comparator, not an agentic PR-review benchmark and not a source-counterfactual diagnosis evaluation. [Paper](https://arxiv.org/abs/2102.06292) · [ICSE distinguished paper record](https://2021.icse-conferences.org/details/icse-2021-papers/72/Improving-Fault-Localization-by-Integrating-Valueand-Predicate-Based-Causal-Inference-Techniques).
+
+**CEB implication:** evaluate source-level mechanism diagnosis separately from runtime root-cause localization. The new [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) tests AND/OR path structure, partial temporal order, interaction conditions and residual paths. Compare with SDRCA/UniVal only on an explicitly matched runtime evidence slice if their data and intervention contracts permit it; never compare their Recall@1/3 directly to CEB Recall@5.
+
+### 2.12 AACR-Bench — holistic repository context
+
+AACR-Bench reports **200 real PRs from 50 active projects across 10 languages**, with full repository context and an AI-assisted, expert-verified annotation pipeline. The authors report a 285% increase in annotated defect coverage relative to their prior comparison baseline; that is a dataset-coverage claim, not evidence that a model improved by 285%. It is especially relevant to multi-file reasoning, caller discovery, cross-file tracking and the impact of context granularity/retrieval. The benchmark does not itself establish causal intervention prediction or residual-path correctness. [Paper](https://arxiv.org/abs/2601.19494) · [benchmark repository](https://github.com/alibaba/aacr-bench).
+
+**CEB implication:** AACR-Bench motivates repository-level context and multilingual/cross-file stratification, while SecPRBench motivates mechanism correctness and the causal-topology extension tests whether reviewers can represent the missing path/interactions. Do not infer causal diagnosis from a repository-context score.
 
 ### 2.10 Kodus State of AI Code Review 2026 — suggestion implementation is not correctness
 
@@ -207,7 +225,7 @@ To establish a meaningful industry improvement, require paired, same-task compar
 - Alternatively, show **at least 20% lower total review cost** at non-inferior Recall@5 and actionable precision.
 - On a matched SecPRBench-style security subset, target **≥85% causal target diagnosis recall**, with no critical-severity false accept in the evaluated sample; this is an application-specific prospective research gate, not a new CEB primary metric.
 - On a CR-Bench-v2-style known-target subset, target **≥45% KDDR** while maintaining **≥90% comment usefulness** under the same frozen judge protocol and separately human-audited matcher; report cost/latency.
-- On ReviewBench, any matched replication must beat the contemporaneous **83.0 grounded-F1 / 92.0 precision / 75.6 recall** top row on its exact high-severity slice, or demonstrate a favorable Pareto trade-off. This external target is meaningful only under its own dataset/judge/matcher version and is not itself the CEB target.
+- On ReviewBench, any matched replication must beat the contemporaneous high-severity grounded-F1 leader captured at evaluation time. The latest 20:14 SAST capture on November 7 lists intent-review-agent at **82.2 F1 / 92.0 precision / 74.4 recall**; the earlier 83.0 OhMyBug row remains a prior same-day observation. Re-capture the board immediately before comparison and freeze the exact filter, run, dataset, judge and matcher versions. This external target is meaningful only on that benchmark's own slice and is not itself the CEB target.
 
 These are prospective aspirations, not achievements. Do not pick thresholds after inspecting a holdout. The ≥85% security-diagnosis, ≥45% KDDR and ≥5-point gains require preregistration, power analysis, paired confidence intervals and an independent evaluation sample.
 
@@ -226,11 +244,16 @@ These are prospective aspirations, not achievements. Do not pick thresholds afte
 
 Move from **“Did the model point at the bug?”** to **“Can the reviewer discover, explain, evidence, challenge and communicate the defect accurately at the right cost?”** This is a more meaningful engineering standard than optimizing comment count, lexical overlap, pass rate or a single composite leaderboard score.
 
+### Causal topology as the next research extension
+
+A five-link chain remains the minimum explanation. For multi-path, stateful and concurrent defects, compare that baseline with a typed graph that represents AND-gated interactions, OR alternative routes, temporal partial orders and residual path reachability after intervention. The graph is a falsifiable mechanism contract, not a decorative dependency map. See [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) and its six public synthetic development cases.
+
 ## 8. Reuse and integration boundaries
 
 - #10419 continues to own the CEB-REVIEW capability/task profile and primary metric contract.
 - #10723 owns disconfirm-first, human-agent complementarity, and the review comparison experiment.
 - #10367 owns the causal debugging ledger and broader causal-diagnosis integration.
+- Draft #10987 operationalizes dual-reviewer annotation; the causal-topology development tranche is stacked on that reviewer-calibration work and does not introduce a second annotation/receipt system.
 - #9431 owns dependence-aware judge ensembles/correlated error.
 - #10680/#10681 own verifier-of-verifiers qualification.
 - #10619/#10624 own statistical claim qualification.
