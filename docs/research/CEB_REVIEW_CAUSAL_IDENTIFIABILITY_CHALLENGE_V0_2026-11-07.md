@@ -221,6 +221,7 @@ Two compatible explanations:
 | Explicit assumptions and scope | |
 | Candidate causal model | |
 | Material compatible alternative(s) | |
+| Model-set completeness argument / open-world remainder | |
 | Disagreement witness (query/intervention) | |
 | Predicted outcomes under each model | |
 | Disposition | |
