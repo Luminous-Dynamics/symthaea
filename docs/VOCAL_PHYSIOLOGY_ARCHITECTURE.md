@@ -1,5 +1,7 @@
 # Symthaea Computational Vocal Physiology
 
+> **Implementation boundary (7 November 2026):** The architecture described here includes a proposed/experimental gesture and physical-waveguide path. The exact checked-in crate module graph does not currently export the full `GesturePlanner` / `PhysicalTractFrame` / `BranchedWaveguideV2` API used by the prototype adapters and example. A root feature compile exposed the mismatch, so the prototype is not enabled as a production singing backend. The current public `symthaea-vocal-tract` API exposes the HDC encoder/controller/FEP pipeline and `FormantFrame` interfaces. Reconciliation is tracked in [issue #10860](https://github.com/Luminous-Dynamics/symthaea/issues/10860). Measurements documented below are evidence from the referenced experiments, not evidence that the full physical renderer is currently selectable in the root crate.
+
 ## Stable contracts
 
 ```text
