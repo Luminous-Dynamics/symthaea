@@ -2144,7 +2144,7 @@ mod tests {
 
     #[test]
     fn end_to_end_compiler_rechecks_source_strategy_and_compiles_verified_bdd() {
-        let (problem, prefix) = equality_qbf_problem();
+        let (problem, prefix) = equality_qbf_problem_and_prefix();
         let candidate = super::super::quantified_strategy::evaluate_qbf_with_strategy(
             &problem,
             &prefix,
@@ -2182,7 +2182,7 @@ mod tests {
 
     #[test]
     fn end_to_end_compiler_rejects_tampered_source_strategy_before_bdd_compile() {
-        let (problem, prefix) = equality_qbf_problem();
+        let (problem, prefix) = equality_qbf_problem_and_prefix();
         let mut candidate = super::super::quantified_strategy::evaluate_qbf_with_strategy(
             &problem,
             &prefix,
@@ -2214,7 +2214,7 @@ mod tests {
 
     #[test]
     fn end_to_end_compiler_rejects_truth_value_owner_mismatch() {
-        let (problem, prefix) = equality_qbf_problem();
+        let (problem, prefix) = equality_qbf_problem_and_prefix();
         let mut candidate = super::super::quantified_strategy::evaluate_qbf_with_strategy(
             &problem,
             &prefix,
