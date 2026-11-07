@@ -34,7 +34,7 @@ A renderer receives a validated alignment graph. It must not silently re-run G2P
 
 ## 3. Proposed top-level v3 shape
 
-The names below are conceptual, not committed Rust types or a frozen wire schema.
+The names below remain conceptual, not a frozen production wire schema. A first research-only Rust contract now exists in `tools/pronunciation-plan/src/lib.rs`; it uses `ScoreEventSpan` intervals relative to each note/rest event rather than bare note-index ownership.
 
 ```text
 VocalPerformanceGraph
@@ -107,11 +107,13 @@ An `AlignmentEdge` links one phoneme or syllable event to one or more score even
 - hard/soft constraint class;
 - confidence/evidence and optional solver rationale.
 
-This supports both important directions:
+The research prototype now supports both important directions at the symbolic score-event interval layer:
 
-**Fast syllabic passage:** one long notated note/beat span may be divided into several non-overlapping syllable intervals. Each syllable retains its own onset, nucleus and coda, rather than having its consonants stretched across the full note.
+**Fast syllabic passage:** one long notated note/beat span may be divided into several non-overlapping syllable intervals. Each syllable receives a half-open `ScoreEventSpan` with offsets relative to the note onset. The validator sorts these spans and requires exact interval coverage of the note, rejecting overlap and gaps.
 
-**Melisma:** one syllable nucleus may align to multiple notes, ties or ornaments. Onset and coda consonants are not repeated. The held-vowel policy is explicit in the graph; it is not inferred from “notes left over”.
+**Melisma:** one syllable may span several consecutive score events. Each sub-interval must be continuous across the note boundary, and the selected pronunciation must designate an explicit vowel phone to sustain. A melisma cannot silently skip a rest event. Onset and coda consonants are not repeated by the symbolic alignment contract.
+
+The current prototype validates event-level syllable intervals; it does not yet emit separate phoneme-level onset, nucleus and coda edges. Those remain the next graph extension.
 
 Coarticulation can use overlapping transition windows, but these overlaps must be represented explicitly rather than violating the core event timing constraints.
 
@@ -202,6 +204,19 @@ A competitive advantage would be higher exact score/lyric compliance, interpreta
 6. Reconcile the physical tract API in issue #10860 before adding it as a renderer.
 7. Add v3-specific case-level provenance and artifact receipts; extend the model/voicebank tree manifest work in issue #10872.
 
-## 9. Claim boundary
+## 9. Current prototype status
+
+The dependency-isolated crate currently contains:
+- provenance-bearing pronunciation candidates with explicit selected/review/OOV/unsupported states;
+- source-text coverage and UTF-8 byte-span validation;
+- selected-candidate receipts and fail-closed renderability;
+- score note/rest events with monotonic, explicit timeline coverage;
+- syllable-to-score sub-interval spans, which permit a long note to be subdivided by multiple syllables;
+- consecutive multi-note spans that require an explicit vowel melisma phone;
+- exact coverage, non-overlap, rest, phrase-partition and breath-timing checks.
+
+Synthetic tests cover valid shared-note subdivision, uncovered note intervals, overlapping syllable intervals, and melisma that attempts to cross a rest. The prototype is still not called by production renderers and has no human phonetic or audio evaluation attached.
+
+## 10. Claim boundary
 
 This is an architecture proposal. It does not establish that v3 exists, that the current Muse path supports arbitrary lyric/score alignment, or that any alignment solver has achieved human-level performance. The v2 production path remains intentionally narrower until v3 has a tested migration path and exact-head evidence.
