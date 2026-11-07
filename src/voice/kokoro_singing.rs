@@ -75,13 +75,10 @@ fn kokoro_capability_manifest() -> SingingBackendCapabilities {
     .expect("static Kokoro capability manifest is complete")
 }
 
-
 impl SingingVoiceEngine for KokoroSingingEngine {
     fn id(&self) -> &str {
         "kokoro-v2"
     }
-
-
 
     fn capabilities(&self) -> SingingBackendCapabilities {
         kokoro_capability_manifest()
@@ -734,7 +731,6 @@ mod tests {
             assert!(output.iter().all(|x| x.is_finite()));
         }
     }
-
 }
 
 #[cfg(test)]
@@ -746,7 +742,12 @@ mod capability_manifest_tests {
         let manifest = kokoro_capability_manifest();
         manifest.validate().unwrap();
         assert_eq!(manifest.controls.len(), SingingControl::ALL.len());
-        assert!(manifest.controls.iter().any(|entry| entry.control == SingingControl::ConsonantAnticipation));
+        assert!(
+            manifest
+                .controls
+                .iter()
+                .any(|entry| entry.control == SingingControl::ConsonantAnticipation)
+        );
         super::super::singing_engine::SingingRenderPolicy::score_conditioned_comparison()
             .validate_against(&manifest)
             .unwrap();
