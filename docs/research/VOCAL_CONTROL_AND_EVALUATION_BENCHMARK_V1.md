@@ -7,7 +7,7 @@
 
 A singing system can sound impressive while ignoring supplied lyrics, changing notes, losing consonants, or changing singer identity. Conversely, a system can satisfy a score and phoneme contract but sound artificial. These are separate capabilities.
 
-VCEB evaluates Symthaea as a controllable vocal performer. It complements the existing 60-case Muse vocal release set and the MEL-VOCAL-001 phoneme-alignment scorer. The current physical-tract code is not yet an integrated renderer; physiology results remain a future track until issue #10860 is resolved. English G2P remains a known accuracy limitation: issue #10869 tracks replacing the small dictionary/letter fallback with versioned pronunciation candidates and explicit uncertainty. The target architecture now has isolated pronunciation-lattice and score-alignment contracts under `tools/pronunciation-plan`; they are not yet production adapters. Generalized medial melisma and phrase-aware note binding are tracked in issue #10903.
+VCEB evaluates Symthaea as a controllable vocal performer. It complements the existing 60-case Muse vocal release set and the MEL-VOCAL-001 phoneme-alignment scorer. The advanced physical waveguide/gesture prototype is not yet an integrated renderer; physiology results for that architecture remain a future track until issue #10860 is resolved. The existing formant-frame + FormantVocoder renderer is now exposed separately as FormantSingingEngine; it is a source-filter baseline, not a substitute for the physical model. English G2P remains a known accuracy limitation: issue #10869 tracks replacing the small dictionary/letter fallback with versioned pronunciation candidates and explicit uncertainty. The target architecture now has isolated pronunciation-lattice and score-alignment contracts under `tools/pronunciation-plan`; they are not yet production adapters. Generalized medial melisma and phrase-aware note binding are tracked in issue #10903.
 
 The central research question is:
 
@@ -81,6 +81,8 @@ Measure:
 A useful target is to preserve unaffected regions as exact cached audio where the backend supports deterministic localized rendering. Where it does not, compare aligned acoustic and perceptual deltas, not samplewise equality.
 
 ### Track E — Acoustic and physiological plausibility
+
+For the integrated FormantSingingEngine, measure formant/voicing continuity, consonant spectral cues, score-onset quantization, and artifact rate; treat it as a conventional source-filter baseline, not a physical vocal-fold/waveguide model.
 
 For a future physical tract backend—only after the API integration and compile gates in issue #10860 are closed—measure:
 - vowel F1-F4 and bandwidth error;
@@ -162,6 +164,7 @@ A public task aggregator also lists heterogeneous SVS metrics across distinct da
 | MusicJudge | Joint lyric correctness and pitch/rhythm fidelity at music-block level | Independent evaluator design reference |
 | DiffSinger | Phoneme/duration/F0-conditioned SVS baseline | Explicit control baseline |
 | Kokoro singing adaptation | Speech-to-singing adapted baseline | Measure degradation from speech-domain transformation |
+| Symthaea FormantSingingEngine | Existing Muse G2P + formant-frame renderer + source-filter FormantVocoder | Third integrated renderer; declared capabilities make fixed vibrato, English G2P, and unavailable expression controls explicit |
 | Symthaea physical vocal tract (planned; not currently integrated) | Intended interpretable articulatory and physical acoustic realization | Keep as a research track until issue #10860 is closed and exact-head examples compile |
 
 SoulX-Singer reports training on more than 42,000 hours of vocal data and support for Mandarin, English and Cantonese. That is a very different scale from Muse's current hand-tuned G2P and local worker. We should not imply that a small local prototype can beat that system on raw naturalness by changing architectures alone. The feasible path is to first reproduce it as a reference baseline, then target a better control/evidence/compute frontier with exact score compliance, local edits, provenance and a deployable hybrid design.
