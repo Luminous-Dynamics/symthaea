@@ -909,10 +909,7 @@ pub fn find_exact_minimum_robdd_order(
     })
 }
 
-fn exact_order_space_fits(
-    dependency_count: usize,
-    evaluation_budget: usize,
-) -> bool {
+fn exact_order_space_fits(dependency_count: usize, evaluation_budget: usize) -> bool {
     let mut permutations = 1usize;
     for factor in 2..=dependency_count {
         let Some(next) = permutations.checked_mul(factor) else {
@@ -1390,7 +1387,10 @@ mod tests {
             maximum_sift_gap =
                 maximum_sift_gap.max(sifted.optimized_node_count - exact.minimum_node_count);
         }
-        assert_eq!(maximum_sift_gap, 0, "three-variable sifting should match exact order search");
+        assert_eq!(
+            maximum_sift_gap, 0,
+            "three-variable sifting should match exact order search"
+        );
     }
 
     #[test]
@@ -1459,9 +1459,7 @@ mod tests {
 
     #[test]
     fn high_level_strategy_compiler_uses_sifting_when_exact_order_exceeds_budget() {
-        let values: Vec<bool> = (0..64)
-            .map(|mask| mask.count_ones() % 2 == 1)
-            .collect();
+        let values: Vec<bool> = (0..64).map(|mask| mask.count_ones() % 2 == 1).collect();
         let source = function(&[0, 1, 2, 3, 4, 5], &values);
         let strategy = WinningStrategy {
             owner: StrategyOwner::Universal,
