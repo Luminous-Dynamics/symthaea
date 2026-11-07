@@ -1,0 +1,48 @@
+{
+  "worker_count": 2,
+  "wall_clock_budget_ms": 1500,
+  "tasks": [
+    {
+      "attempt_id": "sim-01",
+      "candidate_id": "candidate-01",
+      "duration_ms": 100,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    },
+    {
+      "attempt_id": "sim-02",
+      "candidate_id": "candidate-02",
+      "duration_ms": 1000,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    },
+    {
+      "attempt_id": "sim-03",
+      "candidate_id": "candidate-03",
+      "duration_ms": 200,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    },
+    {
+      "attempt_id": "sim-04",
+      "candidate_id": "candidate-04",
+      "duration_ms": 200,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    },
+    {
+      "attempt_id": "sim-05",
+      "candidate_id": "candidate-05",
+      "duration_ms": 200,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    },
+    {
+      "attempt_id": "sim-06",
+      "candidate_id": "candidate-06",
+      "duration_ms": 200,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    }
+  ]
+}
