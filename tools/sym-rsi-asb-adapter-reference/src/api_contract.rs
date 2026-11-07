@@ -201,8 +201,13 @@ impl CampaignCardV1 {
         {
             return Err(ApiContractError::EmptyCampaign);
         }
-        if self.stages.is_empty() {
+        if self.stages.is_empty() || self.measurements.is_empty() {
             return Err(ApiContractError::EmptyCampaign);
+        }
+        if self.design_space.is_none()
+            && self.stages.iter().any(|stage| stage.catalog_size.is_none())
+        {
+            return Err(ApiContractError::InvalidDesignSpace);
         }
 
         let mut total_budget = 0u64;
@@ -373,6 +378,9 @@ impl CatalogResponseV1 {
         if !self.ok {
             return Err(ApiContractError::ResponseNotOk);
         }
+        if campaign.design_space.as_ref().is_some_and(|space| space.kind != "catalog") {
+            return Err(ApiContractError::InvalidDesignSpace);
+        }
         if self.stage != requested_stage || campaign.stage(requested_stage).is_none() {
             return Err(ApiContractError::InvalidCatalogStage);
         }
@@ -413,6 +421,9 @@ pub fn validate_catalog_submission(
     let Some(stage) = campaign.stage(stage_number) else {
         return Err(ApiContractError::WrongSubmissionStage);
     };
+    if campaign.design_space.as_ref().is_some_and(|space| space.kind != "catalog") {
+        return Err(ApiContractError::InvalidDesignSpace);
+    }
     if design_ids.len() != stage.batch_size as usize {
         return Err(ApiContractError::WrongBatchSize {
             expected: stage.batch_size as usize,
