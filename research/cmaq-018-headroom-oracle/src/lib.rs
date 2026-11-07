@@ -420,7 +420,7 @@ pub fn select_supported_candidate(
         .map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
 
     let mut qualifying = Vec::<(usize, i128)>::new();
-    for index in eligible_alternatives {
+    for index in eligible_alternatives.iter().copied() {
         let values = &design.headroom.selection.candidates[index].values;
         let candidate_sum =
             checked_sum(values).map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
