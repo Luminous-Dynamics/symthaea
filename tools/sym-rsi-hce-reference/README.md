@@ -9,7 +9,7 @@ It has four narrow functions:
 3. Validate bounded interactive operator traces, including exact tool-to-permission bindings, step/time/cost limits, failure observation, revision/recovery and digest-linked artifact lineage.
 4. Simulate matched synchronous-barrier and asynchronous steady-state worker assignments from a fixed task-duration fixture, then analyze both through the same worker-trace metrics.
 
-It does **not** run workers, schedule tasks, evaluate models, access hidden labels, authenticate a custodian, issue evidence receipts or authorize promotion.
+It does **not** run real workers, dispatch production tasks, evaluate models, access hidden labels, authenticate a custodian, issue evidence receipts or authorize promotion. The event simulator schedules only synthetic durations in memory to compare two assignment policies.
 
 ## Run
 
