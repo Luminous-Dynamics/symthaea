@@ -15,8 +15,8 @@
 pub mod cognitive_coherence;
 pub mod correlation_auditor;
 pub mod floquet_time_crystal;
-pub mod exact_floquet;
 pub mod exact_heisenberg;
+pub mod exact_floquet;
 pub mod hofstadter;
 pub mod live_audit;
 pub mod metrics;
