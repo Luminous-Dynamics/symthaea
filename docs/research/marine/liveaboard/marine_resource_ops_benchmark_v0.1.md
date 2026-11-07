@@ -172,6 +172,38 @@ These profiles are deliberately synthetic. Their numbers are contract-test input
 - Report paired results, tails and worst scenario; no universal kWh saving is predeclared.
 - Use held-out scenario families for policy confirmation; do not split time samples from one synthetic trace into train and test.
 
-## 12. Claim ceiling
+## 12. Schedule-result and service-accounting contract
+
+The companion `marine_resource_schedule_report_schema_v0.1.json` defines the scheduler's output contract. Every report binds the exact mission/profile, vessel configuration, operating case, condition digest, policy revision, forecast manifest and input snapshot. Its authority mode is fixed to `advisory_only_no_actuation`.
+
+Each requested service must receive exactly one disposition:
+- `scheduled`: explicit time interval, consumed input carriers, delivered output carriers, accepted quality and evidence reference;
+- `postponed`: deferred within a declared service window, with no output credit;
+- `blocked`: a prerequisite or qualified operating envelope prevents execution;
+- `failed`: attempted service did not meet the contract;
+- `indeterminate`: missing/stale/unknown input prevents a defensible decision.
+
+The report separately records every hard constraint as satisfied, violated or unknown, and preserves a carrier ledger. It must not turn a blocked/failed/postponed/indeterminate service into delivered potable water or thermal service. Electrical energy, thermal energy, recoverable heat, water, seawater feed and fuel remain separate carriers.
+
+The companion fixture file contains five **hand-authored expected-result reports**, not scheduler outputs:
+1. clear-solar anchorage — all three services synthetically delivered;
+2. cloudy underway — watermaking and optional hot water postponed to protect reserves;
+3. low-reserve/high-water demand — priority watermaking delivered while discretionary hot water is postponed;
+4. out-of-domain RO feed — watermaking blocked, with zero potable-water credit;
+5. stale battery telemetry — schedule indeterminate, not a guessed safe plan.
+
+Acceptance invariants for future scheduler implementations:
+- every request in the frozen input has exactly one output disposition; no missing or duplicate service rows;
+- a scheduled service has valid start/end times, accepted output quality and supporting evidence;
+- non-scheduled services have no accepted-output credit;
+- `all_required_services_delivered` is permitted only when every required service is scheduled and accepted;
+- `service_degraded` explicitly exposes postponed or failed services;
+- `not_supported` has a violated hard constraint or blocked/failed required service;
+- `indeterminate` exposes unknown hard constraints or an indeterminate required service;
+- no output status authorizes equipment control, voyage dispatch, operation, statutory compliance or seaworthiness.
+
+Static verification of the V0 fixtures includes recursive schema checks and these disposition invariants. It does not execute a scheduler or establish energy savings.
+
+## 13. Claim ceiling
 
 A PASS establishes only that the frozen scheduling contract behaves as specified on the synthetic replay corpus. It does not establish physical energy savings, generator fuel reduction, battery-life improvement, potable-water availability, food safety, habitability, seaworthiness or authority to operate equipment.
