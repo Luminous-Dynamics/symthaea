@@ -1,0 +1,188 @@
+name: SYM-FV-ASSURANCE-001A Closure Calculus
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/assurance/Closure.lean"
+      - "docs/formal/sym-fv-assurance-001a-closure-calculus-v1.json"
+      - "scripts/validate_sym_fv_assurance_001a.py"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-fv-assurance-001a.yml"
+  push:
+    branches: [main]
+    paths:
+      - "formal/lean/assurance/Closure.lean"
+      - "docs/formal/sym-fv-assurance-001a-closure-calculus-v1.json"
+      - "scripts/validate_sym_fv_assurance_001a.py"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-fv-assurance-001a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-assurance-001a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  closure-calculus:
+    name: Lean assurance closure calculus
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Record exact Git subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git status --porcelain=v1 --untracked-files=all
+
+      - name: Static contract and hostile controls
+        run: python3 scripts/validate_sym_fv_assurance_001a.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Prove the wrapper propagates Lean failure
+        run: |
+          set -euo pipefail
+          cat > /tmp/sym-fv-assurance-001a-known-bad.lean <<'LEAN'
+          example : False := by
+            trivial
+          LEAN
+          if nix develop .#formal --command sh -c 'lean /tmp/sym-fv-assurance-001a-known-bad.lean > /tmp/sym-fv-assurance-001a-known-bad-output.txt 2>&1'; then
+            cat /tmp/sym-fv-assurance-001a-known-bad-output.txt
+            echo "known-bad Lean subject incorrectly returned success" >&2
+            exit 1
+          fi
+          cat /tmp/sym-fv-assurance-001a-known-bad-output.txt
+          grep -q 'error:' /tmp/sym-fv-assurance-001a-known-bad-output.txt
+
+      - name: Typecheck assurance calculus fail-closed
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            lean --version > /tmp/sym-fv-assurance-001a-lean-version.txt
+            cat /tmp/sym-fv-assurance-001a-lean-version.txt
+            if ! lean formal/lean/assurance/Closure.lean > /tmp/sym-fv-assurance-001a-lean-output.txt 2>&1; then
+              cat /tmp/sym-fv-assurance-001a-lean-output.txt
+              exit 1
+            fi
+            cat /tmp/sym-fv-assurance-001a-lean-output.txt
+            if grep -q "sorryAx" /tmp/sym-fv-assurance-001a-lean-output.txt; then
+              echo "forbidden sorryAx in Lean axiom census" >&2
+              exit 1
+            fi
+            if grep -q "error:" /tmp/sym-fv-assurance-001a-lean-output.txt; then
+              echo "Lean output contains an error marker despite zero exit" >&2
+              exit 1
+            fi
+          '
+
+      - name: Postflight immutability and qualification receipt
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          root = Path.cwd()
+          parent_head = "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3"
+          parent_proof_path = "formal/lean/hdc/BinaryHVBind.lean"
+          expected_parent_blob = "259ba64888d8492bafc123b72d67b70da9282c36"
+          paths = {
+              "proof": root / "formal/lean/assurance/Closure.lean",
+              "manifest": root / "docs/formal/sym-fv-assurance-001a-closure-calculus-v1.json",
+              "validator": root / "scripts/validate_sym_fv_assurance_001a.py",
+              "workflow": root / ".github/workflows/sym-fv-assurance-001a.yml",
+              "flake_lock": root / "flake.lock",
+              "lean_output": Path("/tmp/sym-fv-assurance-001a-lean-output.txt"),
+              "known_bad_output": Path("/tmp/sym-fv-assurance-001a-known-bad-output.txt"),
+          }
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          parent_blob = git("rev-parse", f"{parent_head}:{parent_proof_path}")
+          if parent_blob != expected_parent_blob:
+              raise SystemExit("repaired parent proof blob drift")
+
+          receipt = {
+              "schema": "symthaea.formal.sym-fv-assurance-001a-qualification-receipt.v1",
+              "issue": 6073,
+              "parent_issue": 5801,
+              "evidence_class": "AbstractFormalTheorem",
+              "result": "LeanTypecheckedAndAxiomClean",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent_head": parent_head,
+              "parent_proof_path": parent_proof_path,
+              "parent_proof_blob": parent_blob,
+              "lean_version": Path("/tmp/sym-fv-assurance-001a-lean-version.txt").read_text().strip(),
+              "proof_blob": git("rev-parse", "HEAD:formal/lean/assurance/Closure.lean"),
+              "proof_sha256": sha256(paths["proof"]),
+              "manifest_blob": git("rev-parse", "HEAD:docs/formal/sym-fv-assurance-001a-closure-calculus-v1.json"),
+              "manifest_sha256": sha256(paths["manifest"]),
+              "validator_blob": git("rev-parse", "HEAD:scripts/validate_sym_fv_assurance_001a.py"),
+              "validator_sha256": sha256(paths["validator"]),
+              "workflow_blob": git("rev-parse", "HEAD:.github/workflows/sym-fv-assurance-001a.yml"),
+              "workflow_sha256": sha256(paths["workflow"]),
+              "flake_lock_blob": git("rev-parse", "HEAD:flake.lock"),
+              "flake_lock_sha256": sha256(paths["flake_lock"]),
+              "lean_output_sha256": sha256(paths["lean_output"]),
+              "known_bad_output_sha256": sha256(paths["known_bad_output"]),
+              "static_contract": "PASS",
+              "negative_controls": "PASS",
+              "exact_head_checkout": True,
+              "repaired_parent_ancestor": True,
+              "known_bad_lean_subject_rejected": True,
+              "lean_exit_zero": True,
+              "sorryAx_absent": True,
+              "lean_error_markers_absent": True,
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-soundness-of-imported-verifiers",
+                  "not-truth-of-imported-premises",
+                  "not-production-validator-refinement",
+                  "not-runtime-authorization",
+                  "not-legal-or-safety-certification"
+              ]
+          }
+          Path("/tmp/sym-fv-assurance-001a-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-assurance-001a-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/sym-fv-assurance-001a-lean-version.txt
+            /tmp/sym-fv-assurance-001a-lean-output.txt
+            /tmp/sym-fv-assurance-001a-known-bad-output.txt
+            /tmp/sym-fv-assurance-001a-receipt.json
+          if-no-files-found: error
+          retention-days: 30
