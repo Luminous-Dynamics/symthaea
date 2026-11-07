@@ -89,7 +89,7 @@ def validate(
             errors.append(f"protocol missing claim disposition {disposition}")
 
     for required in (
-        "M(E,A)",
+        "mathcal{M}(E,A)",
         "disagreement witness",
         "minimum discriminating evidence",
         "latent_context",
@@ -175,7 +175,7 @@ def self_test() -> list[str]:
         ))
         for i, case_id in enumerate(CASE_IDS, 1)
     ) + "\nnot a gold authority"
-    topology = "AND/OR gates Temporal partial order Residual target paths"
+    topology = "AND gate OR gate happens_before Residual reachability"
     prereg = "\n".join((
         "CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md",
         "CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md",
