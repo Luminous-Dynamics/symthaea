@@ -140,10 +140,45 @@
     "No area/energy/yield/SOTA claim."
   ],
   "expected_latent_overprovisioning": {
-    "active_channels_required": 32,
-    "nominal_failure_probability": 0.39,
-    "expected_installed_channels": 52.459016393442624,
-    "rounded_up_design_probe": 53,
-    "caveat": "Expectation only; a high-confidence design needs a binomial tail/availability target and physically measured correlated faults."
+    "expected_value_only": {
+      "active_channels_required": 32,
+      "nominal_failure_probability": 0.39,
+      "expected_installed_channels": 52.459016393442624,
+      "rounded_up_installed_channels": 53,
+      "probability_of_at_least_32_active_at_53": 0.5960826243149094,
+      "caveat": "Expectation-only; not an availability design."
+    },
+    "independent_binomial_reliability": {
+      "active_channels_required": 32,
+      "channel_survival_probability": 0.61,
+      "minimum_installed_channels_for_availability": {
+        "0.95": {
+          "n": 63,
+          "probability_at_n": 0.9620473809111428,
+          "probability_at_n_minus_1": 0.9488219334514043,
+          "raw_parameter_ratio_2n_over_32": 3.9375
+        },
+        "0.99": {
+          "n": 68,
+          "probability_at_n": 0.9928775713132509,
+          "probability_at_n_minus_1": 0.9898207317355343,
+          "raw_parameter_ratio_2n_over_32": 4.25
+        },
+        "0.999": {
+          "n": 74,
+          "probability_at_n": 0.9993221076875388,
+          "probability_at_n_minus_1": 0.998973058226003,
+          "raw_parameter_ratio_2n_over_32": 4.625
+        },
+        "0.9999": {
+          "n": 79,
+          "probability_at_n": 0.9999249981069271,
+          "probability_at_n_minus_1": 0.9998816557449044,
+          "raw_parameter_ratio_2n_over_32": 4.9375
+        }
+      },
+      "assumption": "Independent identical Bernoulli channel failures only.",
+      "caveat": "Spatially correlated defects, common-mode failures, nonuniform channel quality and aging invalidate the simple binomial model; use empirical device distributions and explicit availability requirements."
+    }
   }
 }
