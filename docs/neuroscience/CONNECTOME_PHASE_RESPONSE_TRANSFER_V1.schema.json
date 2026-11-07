@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json",
+  "title": "Connectome phase-response transfer input V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "phase_unit",
+    "leg_axis",
+    "source_binding",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "in_silico_prediction",
+        "biological_observation"
+      ]
+    },
+    "phase_unit": {
+      "const": "microturns_per_cycle_1000000"
+    },
+    "leg_axis": {
+      "const": [
+        "left_fore",
+        "left_middle",
+        "left_hind",
+        "right_fore",
+        "right_middle",
+        "right_hind"
+      ]
+    },
+    "source_binding": {
+      "$ref": "#/$defs/source_binding"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision_sha256",
+        "phase_estimator_sha256",
+        "animal_unit_token",
+        "session_id"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "phase_estimator_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "animal_unit_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "probe_key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context",
+        "probe_class",
+        "source_leg_id",
+        "phase_bin",
+        "delay_index"
+      ],
+      "properties": {
+        "context": {
+          "enum": [
+            "BALL_CONTACT",
+            "SLIPPERY_SURFACE",
+            "AIR_STEPPING",
+            "AIR_FECO_SILENCED"
+          ]
+        },
+        "probe_class": {
+          "enum": [
+            "LOCAL_PHASE_KICK",
+            "LOAD_OR_CONTACT",
+            "PROPRIOCEPTIVE_CHANNEL",
+            "DESCENDING_COMMAND",
+            "MECHANICAL_BODY_OR_SUBSTRATE"
+          ]
+        },
+        "source_leg_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "left_fore",
+            "left_middle",
+            "left_hind",
+            "right_fore",
+            "right_middle",
+            "right_hind",
+            null
+          ]
+        },
+        "phase_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "delay_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "phase_vector": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "integer",
+        "minimum": -500000,
+        "maximum": 499999
+      }
+    },
+    "measured_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "control_phase_microturns",
+        "perturbed_phase_microturns"
+      ],
+      "properties": {
+        "status": {
+          "const": "MEASURED"
+        },
+        "control_phase_microturns": {
+          "$ref": "#/$defs/phase_vector"
+        },
+        "perturbed_phase_microturns": {
+          "$ref": "#/$defs/phase_vector"
+        }
+      }
+    },
+    "unavailable_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NO_RESPONSE",
+            "FAILED_ASSAY",
+            "MISSING_TRACK",
+            "OUT_OF_SUPPORT",
+            "NOT_ASSESSED"
+          ]
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_key",
+        "outcome"
+      ],
+      "properties": {
+        "probe_key": {
+          "$ref": "#/$defs/probe_key"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/measured_outcome"
+            },
+            {
+              "$ref": "#/$defs/unavailable_outcome"
+            }
+          ]
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measured_row_index",
+        "phase_reset_microturns",
+        "local_reset_microturns",
+        "off_diagonal_l1_microturns"
+      ],
+      "properties": {
+        "measured_row_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase_reset_microturns": {
+          "$ref": "#/$defs/phase_vector"
+        },
+        "local_reset_microturns": {
+          "type": "integer",
+          "minimum": -500000,
+          "maximum": 499999
+        },
+        "off_diagonal_l1_microturns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
