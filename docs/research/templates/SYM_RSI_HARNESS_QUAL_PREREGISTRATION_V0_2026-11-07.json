@@ -1,0 +1,290 @@
+{
+  "schema_version": "sym-rsi-harness-qual-preregistration-v0",
+  "document_status": "TEMPLATE_NOT_PREREGISTERED",
+  "warning": "Unfilled protocol template. No benchmark assets or model/harness runs are claimed. Choose one Harness-Bench release per confirmatory campaign, freeze the source/rights/task/oracle identities, and complete all placeholders before looking at confirmatory outcomes.",
+  "issue": "#10846",
+  "experiment": {
+    "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "protocol_version": "v0",
+    "preregistered_at_utc": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "preregistration_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "reviewers": [
+      "__REQUIRED_BEFORE_PREREGISTRATION__"
+    ],
+    "primary_question": "Can Symthaea select model-conditioned harnesses and improve harness evolution under a fixed fully inclusive budget while preserving full-credit delivery, safety and out-of-family transfer?"
+  },
+  "source_release": {
+    "source_lock_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "harness_bench_release": {
+      "selected_snapshot": "paper_v2_or_live_site_snapshot",
+      "exact_source_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "task_catalog_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "oracle_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "rights_review_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "rrsi_source_lock_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "rrsi_implementation_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "do_not_pool_paper_and_live_counts": true
+  },
+  "frozen_system": {
+    "base_policy_model_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "proposer_model_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "critic_model_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evaluator_model_oracle_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "harness_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "tool_permission_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "sandbox_image_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "prompt_and_policy_bundle_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "frozen_starting_harness_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "code_and_configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "phase_a_configuration_selection": {
+    "enabled": true,
+    "arms": [
+      {
+        "arm_id": "shared_harness",
+        "selection_source": "development_only",
+        "selection_rule": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      },
+      {
+        "arm_id": "per_model_harness",
+        "selection_source": "development_only",
+        "selection_rule": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      },
+      {
+        "arm_id": "model_agnostic_router",
+        "selection_source": "development_only",
+        "selection_rule": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      },
+      {
+        "arm_id": "per_task_family_harness",
+        "selection_source": "development_only",
+        "selection_rule": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      },
+      {
+        "arm_id": "minimal_harness",
+        "selection_source": "development_only",
+        "selection_rule": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      }
+    ],
+    "model_backend_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "native_harness_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "pairwise_matrix_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "heldout_backend_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "phase_b_harness_evolution": {
+    "enabled": true,
+    "fixed_base_policy_for_primary_comparison": true,
+    "arms": [
+      {
+        "arm_id": "fixed_incumbent_no_evolution",
+        "regularizers": []
+      },
+      {
+        "arm_id": "unregularized_evolution",
+        "regularizers": []
+      },
+      {
+        "arm_id": "annealed_edit_budget_only",
+        "regularizers": [
+          "annealed_edit_budget"
+        ]
+      },
+      {
+        "arm_id": "evidence_history_only",
+        "regularizers": [
+          "falsified_hypothesis_memory"
+        ]
+      },
+      {
+        "arm_id": "stalled_search_exploration_only",
+        "regularizers": [
+          "untried_component_exploration"
+        ]
+      },
+      {
+        "arm_id": "critic_only",
+        "regularizers": [
+          "benchmark_specific_leakage_critic"
+        ]
+      },
+      {
+        "arm_id": "selection_pruning_only",
+        "regularizers": [
+          "noise_adjusted_acceptance",
+          "cost_complexity_rule",
+          "unproductive_component_pruning"
+        ]
+      },
+      {
+        "arm_id": "full_rrsi",
+        "regularizers": [
+          "annealed_edit_budget",
+          "falsified_hypothesis_memory",
+          "untried_component_exploration",
+          "benchmark_specific_leakage_critic",
+          "noise_adjusted_acceptance",
+          "cost_complexity_rule",
+          "unproductive_component_pruning"
+        ]
+      },
+      {
+        "arm_id": "full_rrsi_plus_direction_board",
+        "regularizers": [
+          "annealed_edit_budget",
+          "falsified_hypothesis_memory",
+          "untried_component_exploration",
+          "benchmark_specific_leakage_critic",
+          "noise_adjusted_acceptance",
+          "cost_complexity_rule",
+          "unproductive_component_pruning",
+          "verifier_grounded_direction_allocation"
+        ]
+      }
+    ],
+    "same_start_harness_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "same_backbone_and_tool_privileges": true,
+    "proposal_budget_per_arm": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "total_evaluation_budget_per_arm": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "round_count": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "maximum_candidates_per_round": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "edit_budget_schedule_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "critic_policy_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "noise_calibration_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "cost_complexity_rule_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "pruning_window_and_rule_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "direction_board_policy_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "splits": {
+    "discovery": {
+      "family_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accessible_to_proposer": true
+    },
+    "development": {
+      "family_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accessible_to_selector": true
+    },
+    "calibration": {
+      "family_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "access_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "sealed_confirmation": {
+      "family_manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_candidates": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "one_shot_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "fresh_family_transfer": {
+      "family_manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_candidates": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retuning_prohibited": true
+    },
+    "unseen_backend_transfer": {
+      "backend_manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retuning_prohibited": true
+    },
+    "family_lineage_audit": {
+      "method_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "report_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "independent_auditor": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_overlap_count": 0
+    }
+  },
+  "resources": {
+    "currency_and_price_basis": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "total_inclusive_budget_per_arm": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "shared_budget_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "includes_proposer_inference": true,
+    "includes_critic_inference": true,
+    "includes_analyst_and_digester_inference": true,
+    "includes_candidate_execution_inference": true,
+    "includes_evaluator_and_oracle_cost": true,
+    "includes_failed_invalid_and_retried_attempts": true,
+    "includes_human_review_and_rework": true,
+    "includes_tool_api_calls_and_provider_price": true,
+    "includes_wall_clock_and_compute": true,
+    "detailed_cost_ledger_schema_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "per_arm_cost_refs": {
+      "proposer_tokens_and_cost": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "critic_tokens_and_cost": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "analyst_tokens_and_cost": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "candidate_tokens_and_cost": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "evaluator_calls_and_cost": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "tool_api_cost": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retries_and_failures": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cpu_gpu_energy_wall_time": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  },
+  "outcomes": {
+    "primary": [
+      "full_credit_delivery_R1",
+      "independently_verified_improvements_per_fully_inclusive_cost",
+      "fresh_family_transfer_R1"
+    ],
+    "secondary": [
+      "mean_module_score",
+      "R0_8",
+      "module_completion_vector",
+      "safety_and_risk_gate_pass",
+      "unmet_requirement_count",
+      "best_so_far_and_final_separately",
+      "cost_per_independently_confirmed_edit",
+      "time_to_first_confirmed_improvement",
+      "accepted_rejected_invalid_and_noop_edit_counts",
+      "edit_count_and_bundle_size",
+      "policy_tokens_and_total_inference_cost",
+      "critic_false_reject_and_false_accept",
+      "unseen_backend_transfer",
+      "worst_family_regression",
+      "protected_capability_retention"
+    ],
+    "noncompensatory_gates": [
+      "zero critical safety gate violations",
+      "zero sealed family/answer leakage",
+      "no post-hoc checkpoint selection using confirmation metrics",
+      "no omitted failed/invalid denominator or cost",
+      "no protected capability regression beyond preregistered margin"
+    ],
+    "practical_effect_threshold": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "multiplicity_and_sequential_look_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "uncertainty_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "clustering_unit": "complete task-family block and complete stateful harness-evolution run"
+  },
+  "replicate_plan": {
+    "pilot_seed_count": 5,
+    "confirmatory_seed_count": "DETERMINE_AFTER_PILOT_AND_FREEZE_BEFORE_CONFIRMATION",
+    "sample_size_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "independent_complete_evolution_runs_required": 2,
+    "minimum_complete_outer_cycles_for_R4": 2,
+    "paired_seed_and_common_random_number_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "all_trajectories_and_checkpoints_retained": true
+  },
+  "analysis": {
+    "statistical_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "clustered_inference": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "missing_invalid_and_censored_run_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "stopping_rule": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "best_so_far_final_and_predeclared_selected_checkpoint_reported_separately": true,
+    "analysis_code_commit": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "claim_profile": {
+    "configuration_selection": false,
+    "product_harness_improvement": false,
+    "regularized_search_gain": false,
+    "reusable_improver_change": false,
+    "r4_ignition": false,
+    "recursive_progress": false
+  },
+  "governance": {
+    "candidate_can_change_oracle": false,
+    "candidate_can_access_sealed_confirmation": false,
+    "candidate_can_change_preregistered_outcomes": false,
+    "independent_custodian_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evaluator_epoch_owner": "#10708",
+    "promotion_authority": "#10573",
+    "canonical_receipt_and_cost_owners": "#10314/#10370/#10533",
+    "r4_improver_owner": "#10497",
+    "no_new_evaluator_or_receipt_authority": true
+  },
+  "claim_ceiling": "A better selected model–harness pair is configuration selection. A better harness is product improvement. A better harness proposer/selector/pruner is an improver change only if it is actually reused in later runs. R4 requires the same-start, equal fully inclusive realized-cost, repeated successor-improver comparison plus independent fresh-family transfer."
+}
