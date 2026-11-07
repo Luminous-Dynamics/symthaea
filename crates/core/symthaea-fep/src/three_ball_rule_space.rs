@@ -523,6 +523,11 @@ pub fn build_three_ball_feedback_action_prediction(
             .get(&model.model_id)
             .copied()
             .unwrap_or(0.0);
+        // Zero-posterior hypotheses remain in BMR receipts but do not belong
+        // to the posterior-predictive mixture or require undefined predictions.
+        if posterior_model_probability <= 0.0 {
+            continue;
+        }
         let mut concentrations = Vec::with_capacity(THREE_BALL_FEEDBACK_OUTCOME_COUNT);
         for outcome_index in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
             let active = model.parameter_prior.active_support[column_index][outcome_index];
