@@ -19,6 +19,30 @@ pub struct SimulationTask {
     pub resource_cost_units: f64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerSimulationPlan {
+    pub worker_count: u32,
+    pub wall_clock_budget_ms: u64,
+    pub tasks: Vec<SimulationTask>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct WorkerRegimeComparisonReport {
+    pub task_count: usize,
+    pub worker_count: u32,
+    pub wall_clock_budget_ms: u64,
+    pub synchronous_makespan_ms: u64,
+    pub asynchronous_makespan_ms: u64,
+    pub async_makespan_speedup: f64,
+    pub same_attempt_count: bool,
+    pub same_total_busy_ms: bool,
+    pub same_unique_valid_candidates: bool,
+    pub same_resource_cost_units: bool,
+    pub synchronous: crate::WorkerTraceReport,
+    pub asynchronous: crate::WorkerTraceReport,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SimulationError {
     InvalidWorkerCount,
@@ -161,6 +185,49 @@ pub fn simulate_worker_regime(
         worker_count,
         wall_clock_budget_ms,
         attempts,
+    })
+}
+
+/// Simulate and analyze both execution regimes over exactly the same ordered task set.
+pub fn compare_worker_regimes(
+    plan: &WorkerSimulationPlan,
+) -> Result<WorkerRegimeComparisonReport, Box<dyn std::error::Error>> {
+    let synchronous_trace = simulate_worker_regime(
+        &plan.tasks,
+        plan.worker_count,
+        plan.wall_clock_budget_ms,
+        ExecutionRegime::SynchronousBarrier,
+    )?;
+    let asynchronous_trace = simulate_worker_regime(
+        &plan.tasks,
+        plan.worker_count,
+        plan.wall_clock_budget_ms,
+        ExecutionRegime::AsynchronousSteadyState,
+    )?;
+
+    let synchronous = crate::analyze_worker_trace(&synchronous_trace)?;
+    let asynchronous = crate::analyze_worker_trace(&asynchronous_trace)?;
+    let synchronous_makespan_ms = synchronous.observed_elapsed_ms;
+    let asynchronous_makespan_ms = asynchronous.observed_elapsed_ms;
+    let async_makespan_speedup = synchronous_makespan_ms as f64
+        / asynchronous_makespan_ms as f64;
+
+    Ok(WorkerRegimeComparisonReport {
+        task_count: plan.tasks.len(),
+        worker_count: plan.worker_count,
+        wall_clock_budget_ms: plan.wall_clock_budget_ms,
+        synchronous_makespan_ms,
+        asynchronous_makespan_ms,
+        async_makespan_speedup,
+        same_attempt_count: synchronous.total_attempts == asynchronous.total_attempts,
+        same_total_busy_ms: synchronous.total_worker_busy_ms == asynchronous.total_worker_busy_ms,
+        same_unique_valid_candidates:
+            synchronous.unique_valid_candidates == asynchronous.unique_valid_candidates,
+        same_resource_cost_units:
+            (synchronous.total_resource_cost_units - asynchronous.total_resource_cost_units).abs()
+                <= 1e-12,
+        synchronous,
+        asynchronous,
     })
 }
 
