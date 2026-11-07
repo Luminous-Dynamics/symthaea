@@ -34,7 +34,9 @@ Includes monolingual, mixed-language, spontaneous, scripted and streaming speech
 
 A 1950s recording is historical audio, not ancient audio. A contemporary speaker's elicitation is direct modern audio, not a historical pronunciation witness. An archive catalogue entry is evidence of a record's existence, not permission to train on it.
 
-For Namibia, begin with source discovery and community/expert scoping for Ju|'hoan, Khoekhoegowab (with variety labels such as Nama, Damara and Haiǁom preserved), ≠Akhoe Hai//om and N|uu. Do not use "ancient Namibian" as a single language label. Any ancestral-language reconstruction must be a separate text/comparative-linguistics task.
+For Namibia, begin with source discovery and community/expert scoping for Ju|'hoan, Khoekhoegowab (with variety labels such as Nama, Damara and Haiǁom preserved) and ≠Akhoe Hai//om. Do not use "ancient Namibian" as a single language label. Any ancestral-language reconstruction must be a separate text/comparative-linguistics task.
+
+Keep N|uu / Nǀuu as an adjacent South African/Kalahari comparative cohort, not a current Namibian cohort. Its historical range includes parts of South Africa, Namibia and Botswana, but the current documented speech resources and speaker/community work identified in this research are centred in South Africa's Northern Cape. The SadiLAR catalogue describes recordings and transcripts from Upington, Askham and Witdraai (2001–2022), with a displayed CC BY-NC 3.0 ZA licence: https://hdl.handle.net/20.500.12185/567. The historical regional range and catalogue licence do not establish blanket permission for training or commercial use; re-check each source and community condition before admission.
 
 ### 2.3 Extinct-language reconstruction and synthetic realization
 
