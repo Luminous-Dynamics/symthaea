@@ -101,6 +101,59 @@ impl Form {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RecordConstruction {
+    Odd,
+    Even,
+    ExchangeFixed,
+    Commutator,
+}
+
+impl RecordConstruction {
+    fn sort_rank(self) -> u8 {
+        match self {
+            Self::Odd => 0,
+            Self::Even => 1,
+            Self::ExchangeFixed => 2,
+            Self::Commutator => 3,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Odd => "odd",
+            Self::Even => "even",
+            Self::ExchangeFixed => "exchange-fixed",
+            Self::Commutator => "commutator",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SlotKinds {
+    Mixed,
+    Same,
+    Bracket,
+}
+
+impl SlotKinds {
+    fn sort_rank(self) -> u8 {
+        match self {
+            Self::Mixed => 0,
+            Self::Same => 1,
+            Self::Bracket => 2,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Mixed => "mixed",
+            Self::Same => "same",
+            Self::Bracket => "bracket",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Record {
     form: Form,
@@ -109,6 +162,8 @@ struct Record {
     /// The exchanged-read image exists only for records with two letters
     /// at one end, or for the commutator records.
     reads: Option<Form>,
+    construction: RecordConstruction,
+    slot_kinds: SlotKinds,
 }
 
 impl Record {
@@ -152,11 +207,27 @@ fn exchange_assignment(a: Assignment) -> Assignment {
     [a[2], a[3], a[0], a[1]]
 }
 
-fn assignment_key(a: Assignment) -> u32 {
-    a.iter().fold(0_u32, |acc, letter| {
-        let digit = letter.map_or(0, |index| index as u32 + 1);
-        acc * 100 + digit
-    })
+/// Author-compatible lexicographic key: the ordered list of occupied
+/// (slot, basis-letter) pairs. This matches the reference enumerator's
+/// tuple ordering, unlike a digit-packed key that prioritizes letter values.
+fn assignment_key(a: Assignment) -> Vec<(usize, u8)> {
+    a.iter()
+        .enumerate()
+        .filter_map(|(slot, letter)| letter.map(|index| (slot, index)))
+        .collect()
+}
+
+fn product_slot_kinds(a: Assignment) -> SlotKinds {
+    let slots: Vec<usize> = a
+        .iter()
+        .enumerate()
+        .filter_map(|(slot, letter)| letter.map(|_| slot))
+        .collect();
+    if slots.len() == 2 && slots[0] % 2 == slots[1] % 2 {
+        SlotKinds::Same
+    } else {
+        SlotKinds::Mixed
+    }
 }
 
 fn occupied_qudits(a: Assignment) -> Vec<u8> {
@@ -201,6 +272,7 @@ fn product_records(products: &[Assignment]) -> Vec<Record> {
     let mut records = Vec::with_capacity(products.len());
     for &product in products {
         let exchanged = exchange_assignment(product);
+        let slot_kinds = product_slot_kinds(product);
         if product == exchanged {
             let form = Form::single(product);
             let reads = form.has_two_letters_at_same_end().then(|| form.exchange_reads());
@@ -208,6 +280,8 @@ fn product_records(products: &[Assignment]) -> Vec<Record> {
                 form,
                 sign: 1,
                 reads,
+                construction: RecordConstruction::ExchangeFixed,
+                slot_kinds,
             });
         } else if assignment_key(product) < assignment_key(exchanged) {
             let odd = Form::new(vec![(product, 1), (exchanged, -1)]);
@@ -217,11 +291,15 @@ fn product_records(products: &[Assignment]) -> Vec<Record> {
                 reads: has_reads.then(|| odd.exchange_reads()),
                 form: odd,
                 sign: 1,
+                construction: RecordConstruction::Odd,
+                slot_kinds,
             });
             records.push(Record {
                 reads: has_reads.then(|| even.exchange_reads()),
                 form: even,
                 sign: 1,
+                construction: RecordConstruction::Even,
+                slot_kinds,
             });
         }
     }
@@ -355,6 +433,8 @@ fn commutator_records() -> Vec<Record> {
                         form: candidate,
                         sign,
                         reads: Some(reverse),
+                        construction: RecordConstruction::Commutator,
+                        slot_kinds: SlotKinds::Bracket,
                     });
                 }
             }
@@ -409,6 +489,39 @@ impl ExchangeSectors {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecordRow {
+    /// One-based row position, matching the R001...R172 CSV ordinal.
+    pub ordinal: usize,
+    pub construction: &'static str,
+    pub slot_kinds: &'static str,
+    pub signature_x: i32,
+    pub signature_y: i32,
+    pub ends_passed: &'static str,
+    pub weight_squared: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RecordCategoryCounts {
+    pub odd_mixed_plus_plus: usize,
+    pub odd_same_plus_plus: usize,
+    pub even_mixed_plus_minus: usize,
+    pub even_same_minus_plus: usize,
+    pub exchange_fixed_same_minus_plus: usize,
+    pub commutator_minus_minus: usize,
+}
+
+impl RecordCategoryCounts {
+    pub fn total(self) -> usize {
+        self.odd_mixed_plus_plus
+            + self.odd_same_plus_plus
+            + self.even_mixed_plus_minus
+            + self.even_same_minus_plus
+            + self.exchange_fixed_same_minus_plus
+            + self.commutator_minus_minus
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ChainAlphaAudit {
     pub product_assignments: usize,
@@ -416,6 +529,7 @@ pub struct ChainAlphaAudit {
     pub commutator_records: usize,
     pub total_records: usize,
     pub sectors: ExchangeSectors,
+    pub categories: RecordCategoryCounts,
     pub readout_dimension: usize,
     pub alpha_candidate: f64,
     pub inverse_alpha_candidate: f64,
@@ -424,19 +538,118 @@ pub struct ChainAlphaAudit {
     pub difference_in_standard_uncertainties: f64,
 }
 
-/// Reproduce the record count, exchange sectors and weighted scalar under
-/// the published four-slot qutrit-qubit definitions.
-pub fn reproduce() -> ChainAlphaAudit {
+fn build_records() -> (usize, usize, usize, Vec<Record>) {
     let products = product_assignments();
-    let product_records = product_records(&products);
-    let commutators = commutator_records();
-    let mut all_records = product_records.clone();
-    all_records.extend(commutators.iter().cloned());
+    let product_record_list = product_records(&products);
+    let commutator_record_list = commutator_records();
+    let product_record_count = product_record_list.len();
+    let commutator_record_count = commutator_record_list.len();
+    let mut all_records = product_record_list;
+    all_records.extend(commutator_record_list);
+    // This is the stable sort used by the author's enumerate_records.py:
+    // construction order, then "mixed"/"same"/"bracket" within that class.
+    all_records.sort_by_key(|record| {
+        (
+            record.construction.sort_rank(),
+            record.slot_kinds.sort_rank(),
+        )
+    });
+    (products.len(), product_record_count, commutator_record_count, all_records)
+}
+
+fn record_weight_squared(signature_x: i32, signature_y: i32) -> usize {
+    (if signature_x == -1 { 3 } else { 1 })
+        * (if signature_y == -1 { 2 } else { 1 })
+}
+
+fn record_ends_passed(signature_x: i32, signature_y: i32) -> &'static str {
+    match (signature_x, signature_y) {
+        (1, 1) => "none",
+        (-1, 1) => "qutrit",
+        (1, -1) => "qubit",
+        (-1, -1) => "both",
+        _ => unreachable!("exchange signatures are signs"),
+    }
+}
+
+/// Emit all 172 row classifications in the author's CSV ordering. This
+/// supports direct comparison of construction, slot class, signs and weights.
+pub fn record_rows() -> Vec<RecordRow> {
+    let (_, _, _, records) = build_records();
+    records
+        .iter()
+        .enumerate()
+        .map(|(index, record)| {
+            let signature_x = record.signature_x();
+            let signature_y = record.signature_y();
+            RecordRow {
+                ordinal: index + 1,
+                construction: record.construction.as_str(),
+                slot_kinds: record.slot_kinds.as_str(),
+                signature_x,
+                signature_y,
+                ends_passed: record_ends_passed(signature_x, signature_y),
+                weight_squared: record_weight_squared(signature_x, signature_y),
+            }
+        })
+        .collect()
+}
+
+fn count_record_categories(rows: &[RecordRow]) -> RecordCategoryCounts {
+    let mut counts = RecordCategoryCounts::default();
+    for row in rows {
+        match (
+            row.construction,
+            row.slot_kinds,
+            row.signature_x,
+            row.signature_y,
+            row.ends_passed,
+            row.weight_squared,
+        ) {
+            ("odd", "mixed", 1, 1, "none", 1) => counts.odd_mixed_plus_plus += 1,
+            ("odd", "same", 1, 1, "none", 1) => counts.odd_same_plus_plus += 1,
+            ("even", "mixed", 1, -1, "qubit", 2) => counts.even_mixed_plus_minus += 1,
+            ("even", "same", -1, 1, "qutrit", 3) => counts.even_same_minus_plus += 1,
+            ("exchange-fixed", "same", -1, 1, "qutrit", 3) => {
+                counts.exchange_fixed_same_minus_plus += 1
+            }
+            ("commutator", "bracket", -1, -1, "both", 6) => {
+                counts.commutator_minus_minus += 1
+            }
+            other => panic!("unexpected Chain Theory CSV row classification: {other:?}"),
+        }
+    }
+    counts
+}
+
+/// Reproduce the record count, row classifications, exchange sectors and
+/// weighted scalar under the published four-slot qutrit-qubit definitions.
+pub fn reproduce() -> ChainAlphaAudit {
+    let (product_assignments, product_records, commutator_records, all_records) =
+        build_records();
 
     let mut sectors = ExchangeSectors::default();
     for record in &all_records {
         sectors.add(record.signature_x(), record.signature_y());
     }
+    let rows: Vec<RecordRow> = all_records
+        .iter()
+        .enumerate()
+        .map(|(index, record)| {
+            let signature_x = record.signature_x();
+            let signature_y = record.signature_y();
+            RecordRow {
+                ordinal: index + 1,
+                construction: record.construction.as_str(),
+                slot_kinds: record.slot_kinds.as_str(),
+                signature_x,
+                signature_y,
+                ends_passed: record_ends_passed(signature_x, signature_y),
+                weight_squared: record_weight_squared(signature_x, signature_y),
+            }
+        })
+        .collect();
+    let categories = count_record_categories(&rows);
 
     // Two read links each contribute (3*2)^2 operator directions.
     // The unread link contributes (3^2-1)(2^2-1) traceless directions.
@@ -453,11 +666,12 @@ pub fn reproduce() -> ChainAlphaAudit {
         (inverse_alpha_candidate - codata_2022_inverse) / codata_2022_standard_uncertainty;
 
     ChainAlphaAudit {
-        product_assignments: products.len(),
-        product_records: product_records.len(),
-        commutator_records: commutators.len(),
+        product_assignments,
+        product_records,
+        commutator_records,
         total_records: all_records.len(),
         sectors,
+        categories,
         readout_dimension,
         alpha_candidate,
         inverse_alpha_candidate,
@@ -504,6 +718,42 @@ mod tests {
             }
         );
         assert_eq!(audit.sectors.total(), audit.total_records);
+        assert_eq!(audit.categories.total(), audit.total_records);
+        assert_eq!(
+            audit.categories,
+            RecordCategoryCounts {
+                odd_mixed_plus_plus: 48,
+                odd_same_plus_plus: 31,
+                even_mixed_plus_minus: 48,
+                even_same_minus_plus: 31,
+                exchange_fixed_same_minus_plus: 11,
+                commutator_minus_minus: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn row_classification_matches_all_author_csv_bands() {
+        let rows = record_rows();
+        assert_eq!(rows.len(), 172);
+        let bands = [
+            (1, 48, "odd", "mixed", 1, 1, "none", 1),
+            (49, 79, "odd", "same", 1, 1, "none", 1),
+            (80, 127, "even", "mixed", 1, -1, "qubit", 2),
+            (128, 158, "even", "same", -1, 1, "qutrit", 3),
+            (159, 169, "exchange-fixed", "same", -1, 1, "qutrit", 3),
+            (170, 172, "commutator", "bracket", -1, -1, "both", 6),
+        ];
+        for (first, last, construction, slot_kinds, x, y, ends, k) in bands {
+            for row in &rows[(first - 1)..last] {
+                assert_eq!(row.construction, construction, "ordinal={}", row.ordinal);
+                assert_eq!(row.slot_kinds, slot_kinds, "ordinal={}", row.ordinal);
+                assert_eq!(row.signature_x, x, "ordinal={}", row.ordinal);
+                assert_eq!(row.signature_y, y, "ordinal={}", row.ordinal);
+                assert_eq!(row.ends_passed, ends, "ordinal={}", row.ordinal);
+                assert_eq!(row.weight_squared, k, "ordinal={}", row.ordinal);
+            }
+        }
     }
 
     #[test]
