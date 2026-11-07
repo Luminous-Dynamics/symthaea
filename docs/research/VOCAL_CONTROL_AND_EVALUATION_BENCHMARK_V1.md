@@ -99,6 +99,16 @@ Compare complete vocal mixes and whole songs against commercial systems using bl
 
 When candidates generate their own lyrics, use this as a separate prompt-to-song task. Do not combine those results with Track A's fixed-lyric score-conditioned task.
 
+## Backend capability qualification
+
+The renderer interface now has a fail-closed capability manifest with 18 explicit controls. Each control is classified as native, approximated, unsupported, or conditional, with a rationale. A backend that has not declared capabilities defaults to all unsupported; the release gate validates the manifest and records its digest for every scored clip.
+
+Current source-level dispositions:
+- **Kokoro:** text and absolute onset/gaps are native; exact phone sequence, syllable alignment, pitch/duration, melisma, energy, vibrato are approximated; language and voice identity are conditional on the English v2 frontend and loaded voice; continuous pitch curves, phrase expression curves, breathiness, tension, portamento, articulation enum and local editing are currently unsupported.
+- **DiffSinger:** exact supported phone sequence, per-note pitch/duration, absolute onset/gaps and explicit vowel melisma are native; syllable alignment and articulation are approximated; language and identity are conditional on the English profile and provisioned placeholder voicebank; raw lyric text, continuous pitch curve, phrase expression, explicit breathiness/energy/tension, within-note vibrato/portamento and local editing are unsupported.
+
+These are implementation declarations, not listening-quality results. The benchmark must score only controls common to candidates in the shared comparison track. Unsupported controls remain visible in the receipt and must not be counted as successfully applied. Model/voicebank byte-tree digests remain separate work tracked by issue #10872.
+
 ## Fair comparison protocol
 
 1. Freeze the exact lyrics, language, pronunciation, score, tempo, controls, voice reference, source commits, and dataset split before generating any candidate audio.
