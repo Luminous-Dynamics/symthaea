@@ -23,6 +23,7 @@ The current frontier makes a single "coding success rate" an inadequate research
 - CRBugBench (October 2026) measures human-verified bugs in incoming PRs: 1,000 tasks across 98 OSS repositories and 800 private-industry tasks. Claude Opus 5 + Copilot CLI catches 71.9% of bugs within its top five comments. Detection falls on complex changes and non-local bugs, and drops sharply on proprietary code; prompt nudging improves up to 5.8% at 10% extra cost. Add review quality as a distinct capability, not a proxy for patch success.
 - GitHub, ReviewBench: An open benchmark for AI code review, October 5, 2026: https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/; live leaderboard: https://review-bench.ai/ (viewed November 7, 2026).
 - Yang et al., SecPRBench, October 24, 2026: https://arxiv.org/abs/2610.33509.
+- Kodus, CodeReviewBench leaderboard/DeepSeek V4 Pro scorecard (30 PRs / 95 human-authored bugs; data generated 2026-09-11): https://www.codereviewbench.com/leaderboard; https://www.codereviewbench.com/model/deepseek-v4-pro.
 - Pereira et al., CR-Bench-v2, November 2, revised November 3, 2026: https://arxiv.org/abs/2611.02566.
 - Agent Security League measures both functional and security correctness on 200 tasks from 108 Python projects across 77 CWE classes, with 34 independently evaluated agent/model combinations. The live table shows Claude Code + Fable 5.1 at 86.6% Functional / 36.9% Secure, Codex + GPT-6 Astra at 82.1% / 34.6%, and Codex + GPT-6.1 Sol at 77.7% / 34.1%. Muse Code + Muse Wonder leads Functional at 91.6% but has 25.1% Secure. A task that works but is insecure must not be accepted as a successful engineering outcome.
 - Rust-SWE-bench is a dedicated Rust repository-level repair benchmark: 500 tasks from 34 repositories. Its February 2026 paper reports RUSTFORGER at 28.6% using Claude Sonnet 3.7, versus up to 21.2% for the studied ReAct baselines. The result is a valuable Rust-specific reference but predates current frontier models/harnesses and requires matched replication.
@@ -145,6 +146,27 @@ Supplementary failure labels (discovery miss, localization miss, mechanism misdi
 
 Sources and full correspondence are recorded in [CEB Review Benchmark Triangulation V0](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md). For a matched CEB superiority claim, compare the same frozen tasks, language/repository mix, issue/PR snapshots, model+harness, tool permissions, cost budget, grader and metric definition. A 0.85 CEB Recall@5 target is an ambitious CEB-specific sealed-holdout gate, not a conversion from SecPRBench or ReviewBench.
 
+## 3.11 From human-found gold to independently audited open-set discovery
+
+A multi-source gold set improves on a single-source oracle, but it is not exhaustive by declaration. CodeReviewBench measures recovery of 95 human-authored bugs on 30 merged PRs and explicitly excludes defects missed by all original human reviewers. ReviewBench likewise states that a finite producer union cannot reveal findings missed by every producer. Therefore fixed-gold recall is a necessary common comparison, but it does not measure the entire latent defect population.
+
+CEB must separate:
+1. **Frozen target set** — independently established defects used for the fixed Recall@5 denominator.
+2. **Adjudicated open-set discoveries** — candidate findings independently confirmed after blinded review; report separately and never retroactively add them to the current denominator.
+3. **Unobserved remainder** — defects not found by any producer/audit; keep unknown beyond the declared audit sample and uncertainty.
+
+Blindly audit zero-finding PRs and multi-producer "clean" consensus strata. Track producer model/provider/prompt/context dependence, and run leave-one-producer-family-out sensitivity. A candidate's unmatched claim is not gold before independent adjudication. Do not use naïve capture–recapture to estimate the total defect count when heterogeneous producers have shared information and correlated capture probabilities.
+
+This is an extension of the existing CEB-REVIEW / #8311 oracle-quality / #9431 correlated-judge / #10680–#10681 verifier-qualification contracts. It creates no new metric lane, task schema or gold-label authority. See [CEB Review Gold-Completeness and Open-Set Discovery V0](CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md).
+
+## 3.12 From tool use to sequential evidence acquisition
+
+Tool volume is not engineering intelligence. The reviewer should name its current proposition, nearest competing mechanisms, and the smallest safe observation that would discriminate them. Before an action, record applicability to the exact source revision, expected result for each hypothesis, evidence authority, safety/permissions and total expected cost. After the action, bind the result to source/configuration/environment and update the decision.
+
+Compare static-first, unconstrained model-selected tools, a transparent evidence-directed heuristic, a calibrated sequential value-of-information policy and explicit ask/abstain/escalate. Stop when evidence is sufficient, no useful safe action remains, human authority is needed or budget is exhausted. Preserve unresolved, skipped, timeout and infrastructure-error states; do not award points for tool/test count.
+
+Compare quality at matched all-in budget and cost at non-inferior quality, including model, retrieval, compiler/test, judge, human review and retry costs. This is not a new CEB metric lane or a claim that expected information gain is calibrated. See [CEB Review Sequential Evidence Acquisition V0](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md).
+ 
 ## 4. Matched industry comparison design
 
 For every CEB slice, compare:
