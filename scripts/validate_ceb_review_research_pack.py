@@ -465,6 +465,7 @@ def self_test() -> list[str]:
         "https://arxiv.org/abs/2611.02566",
         "https://arxiv.org/abs/2610.13668",
         "https://arxiv.org/abs/2510.08996",
+        "https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
         "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane",
