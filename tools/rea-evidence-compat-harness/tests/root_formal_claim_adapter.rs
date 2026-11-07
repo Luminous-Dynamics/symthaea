@@ -285,4 +285,71 @@ fn formal_rule_generation_is_a_versioned_wire_value_and_schema_contract() {
         schema["properties"]["binding"]["properties"]["evaluator_rule_generation"]["const"],
         json!(0)
     );
+#[test]
+fn formal_parser_rejects_omitted_nullable_fields_instead_of_defaulting_them() {
+    let evidence = verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let result = evaluate_claim(&claim, &[evidence]).unwrap();
+    let formal = export_formal_provider_observation(&result).unwrap();
+    let original = serde_json::to_value(&formal).unwrap();
+
+    let mut mutations: Vec<(&str, Value)> = Vec::new();
+
+    let mut missing_binding_platform = original.clone();
+    missing_binding_platform["binding"]
+        .as_object_mut()
+        .unwrap()
+        .remove("platform");
+    mutations.push(("binding.platform", missing_binding_platform));
+
+    let mut missing_binding_platform_version = original.clone();
+    missing_binding_platform_version["binding"]
+        .as_object_mut()
+        .unwrap()
+        .remove("platform_version");
+    mutations.push(("binding.platform_version", missing_binding_platform_version));
+
+    let mut missing_binding_environment = original.clone();
+    missing_binding_environment["binding"]
+        .as_object_mut()
+        .unwrap()
+        .remove("environment_id");
+    mutations.push(("binding.environment_id", missing_binding_environment));
+
+    let mut missing_scope_platform = original.clone();
+    missing_scope_platform["rea_evaluation"]["scope"]
+        .as_object_mut()
+        .unwrap()
+        .remove("platform");
+    mutations.push(("rea_evaluation.scope.platform", missing_scope_platform));
+
+    let mut missing_source_predicate_type = original.clone();
+    missing_source_predicate_type["binding"]
+        .as_object_mut()
+        .unwrap()
+        .remove("source_predicate_type");
+    mutations.push(("binding.source_predicate_type", missing_source_predicate_type));
+
+    let mut missing_assessment_provider_version = original;
+    missing_assessment_provider_version["rea_evaluation"]["evidence_assessments"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("provider_version");
+    mutations.push((
+        "rea_evaluation.evidence_assessments[0].provider_version",
+        missing_assessment_provider_version,
+    ));
+
+    for (field, value) in mutations {
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let error = parse_formal_provider_observation_json(&bytes)
+            .unwrap_err();
+        assert_eq!(
+            error.kind,
+            FormalMappingErrorKind::InvalidJson,
+            "omitted {field} must be rejected"
+        );
+    }
+}
+
 }
