@@ -87,11 +87,19 @@ pub enum InferenceStatus {
 /// Checked sum-product result.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CheckedBPResult {
+    /// Normalized state probabilities. Extremely small values may underflow
+    /// when exponentiating; use log_beliefs to retain the full f64 log range.
     pub beliefs: Vec<Vec<f64>>,
+    /// Normalized log probabilities, preserving states whose probabilities
+    /// underflow when converted into ordinary f64 probability space.
+    pub log_beliefs: Vec<Vec<f64>>,
     pub converged: bool,
     pub iterations: usize,
     /// Maximum absolute probability-message change on the final iteration.
     pub max_message_delta: f64,
+    /// Maximum absolute finite log-message change. Infinity indicates a
+    /// support change (finite log mass becoming exact zero or vice versa).
+    pub max_log_message_delta: f64,
     pub graph_structure: GraphStructure,
     pub inference_status: InferenceStatus,
 }
@@ -130,10 +138,12 @@ pub fn run_sum_product(
     let mut converged = false;
     let mut iterations = 0usize;
     let mut final_delta = f64::INFINITY;
+    let mut final_log_delta = f64::INFINITY;
 
     for iteration in 0..config.max_iterations {
         iterations = iteration + 1;
         let mut max_delta = 0.0f64;
+        let mut max_log_delta = 0.0f64;
 
         match config.schedule {
             MessageSchedule::Parallel => {
@@ -147,6 +157,7 @@ pub fn run_sum_product(
                         let old_message = messages.get(&key).expect("validated message initialization");
                         let damped = damp_message(&new_message, old_message, config.damping)?;
                         max_delta = max_delta.max(probability_delta(&damped, old_message));
+                        max_log_delta = max_log_delta.max(log_message_delta(&damped, old_message));
                         pending.push((key, damped));
                     }
                 }
@@ -176,6 +187,7 @@ pub fn run_sum_product(
                         let old_message = messages.get(&key).expect("validated message initialization");
                         let damped = damp_message(&new_message, old_message, config.damping)?;
                         max_delta = max_delta.max(probability_delta(&damped, old_message));
+                        max_log_delta = max_log_delta.max(log_message_delta(&damped, old_message));
                         messages.insert(key, damped);
                     }
                 }
@@ -194,13 +206,15 @@ pub fn run_sum_product(
         }
 
         final_delta = max_delta;
-        if max_delta < config.tolerance {
+        final_log_delta = max_log_delta;
+        if max_delta < config.tolerance && max_log_delta < config.tolerance {
             converged = true;
             break;
         }
     }
 
     let mut beliefs = Vec::with_capacity(n_variables);
+    let mut log_beliefs = Vec::with_capacity(n_variables);
     for variable in 0..n_variables {
         let cardinality = graph.variables[variable].cardinality;
         let mut log_belief = vec![0.0; cardinality];
@@ -213,7 +227,8 @@ pub fn run_sum_product(
             }
         }
         normalize_log(&mut log_belief, "variable belief")?;
-        beliefs.push(log_belief.into_iter().map(f64::exp).collect());
+        beliefs.push(log_belief.iter().map(|value| value.exp()).collect());
+        log_beliefs.push(log_belief);
     }
 
     let inference_status = if !converged {
@@ -228,9 +243,11 @@ pub fn run_sum_product(
 
     Ok(CheckedBPResult {
         beliefs,
+        log_beliefs,
         converged,
         iterations,
         max_message_delta: final_delta,
+        max_log_message_delta: final_log_delta,
         graph_structure: structure,
         inference_status,
     })
@@ -496,6 +513,20 @@ fn probability_delta(left: &[f64], right: &[f64]) -> f64 {
         .fold(0.0, f64::max)
 }
 
+fn log_message_delta(left: &[f64], right: &[f64]) -> f64 {
+    left.iter().zip(right)
+        .map(|(&a, &b)| {
+            if a == b {
+                0.0
+            } else if !a.is_finite() || !b.is_finite() {
+                f64::INFINITY
+            } else {
+                (a - b).abs()
+            }
+        })
+        .fold(0.0, f64::max)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -644,6 +675,8 @@ mod tests {
 
         let result = run_sum_product(&graph, &BPConfig::default()).unwrap();
         assert!(result.beliefs[0][0] < 1.0e-100);
+        assert!(result.log_beliefs[0][0].is_finite());
+        assert!(result.log_beliefs[0][0] < -400.0);
         assert!((result.beliefs[0][1] - 1.0).abs() < 1.0e-12);
     }
 
