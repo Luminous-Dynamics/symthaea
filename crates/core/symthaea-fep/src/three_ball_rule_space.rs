@@ -81,7 +81,7 @@ pub enum ThreeBallFeedback {
 /// The selected criterion ball's colour is the correct choice. The gaze
 /// factor is part of the likelihood tensor's state space but is not used by
 /// the feedback rule itself.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThreeBallRule {
     /// One-based source enumeration index, 1..=81.
     pub one_based_index: usize,
