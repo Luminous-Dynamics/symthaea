@@ -37,8 +37,14 @@ def parse_debug_list(raw: str, *, expected_nested: bool = False) -> list[Any]:
     return value
 
 
-def split_piper_words(raw: str) -> list[list[str]]:
-    tokens = parse_debug_list(raw)
+def split_piper_words(raw: str | list[str]) -> list[list[str]]:
+    """Split either a Rust Debug list string or an already-parsed token list."""
+    if isinstance(raw, str):
+        tokens = parse_debug_list(raw)
+    elif isinstance(raw, list) and all(isinstance(token, str) for token in raw):
+        tokens = raw
+    else:
+        raise ValueError("Piper tokens must be a Debug-list string or list[str]")
     words: list[list[str]] = []
     current: list[str] = []
     for token in tokens:
