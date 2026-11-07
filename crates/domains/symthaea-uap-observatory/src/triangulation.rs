@@ -601,11 +601,8 @@ pub fn rank_sensor_placements_over_target_region(
 
     for hypothesis in target_hypotheses {
         let weight = hypothesis.weight / total_weight;
-        let scenario_scores = rank_sensor_placements(
-            existing_observations,
-            hypothesis.target_ecef_m,
-            candidates,
-        )?;
+        let scenario_scores =
+            rank_sensor_placements(existing_observations, hypothesis.target_ecef_m, candidates)?;
 
         for aggregate_score in &mut aggregate {
             let scenario = scenario_scores
@@ -1208,25 +1205,20 @@ mod tests {
         ];
 
         let ranking =
-            rank_sensor_placements_over_target_region(&existing, &hypotheses, &candidates)
-                .unwrap();
+            rank_sensor_placements_over_target_region(&existing, &hypotheses, &candidates).unwrap();
         assert_eq!(ranking.len(), 3);
         assert_eq!(ranking[0].sensor_id, "high");
         assert!(
-            (ranking[0].expected_log_determinant_information - 28.819_964_335_2).abs()
-                < 1.0e-8
+            (ranking[0].expected_log_determinant_information - 28.819_964_335_2).abs() < 1.0e-8
         );
         assert!(
-            (ranking[0].worst_case_log_determinant_information - 27.507_265_299_7).abs()
-                < 1.0e-8
+            (ranking[0].worst_case_log_determinant_information - 27.507_265_299_7).abs() < 1.0e-8
         );
         assert!(
-            (ranking[0].expected_a_optimal_variance_sum_m2 - 5.937_469_984_0e-4).abs()
-                < 1.0e-12
+            (ranking[0].expected_a_optimal_variance_sum_m2 - 5.937_469_984_0e-4).abs() < 1.0e-12
         );
         assert!(
-            (ranking[0].worst_case_a_optimal_variance_sum_m2 - 1.134_356_489_3e-3).abs()
-                < 1.0e-12
+            (ranking[0].worst_case_a_optimal_variance_sum_m2 - 1.134_356_489_3e-3).abs() < 1.0e-12
         );
         assert!(ranking.iter().all(|score| score.target_hypotheses == 3));
         assert!(ranking.iter().all(|score| {
@@ -1290,14 +1282,12 @@ mod tests {
         )
         .unwrap();
         assert!(
-            (a[0].expected_log_determinant_information
-                - b[0].expected_log_determinant_information)
+            (a[0].expected_log_determinant_information - b[0].expected_log_determinant_information)
                 .abs()
                 < 1.0e-10
         );
         assert!(
-            (a[0].expected_a_optimal_variance_sum_m2
-                - b[0].expected_a_optimal_variance_sum_m2)
+            (a[0].expected_a_optimal_variance_sum_m2 - b[0].expected_a_optimal_variance_sum_m2)
                 .abs()
                 < 1.0e-12
         );
