@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const FIXTURE_SCHEMA_VERSION: &str = "sym-rsi-research-taste-decision-fixtures-v0";
 const FIXTURE_STATUS: &str = "SYNTHETIC_POLICY_CASES_NOT_EXPERT_GOLD_OR_BENCHMARK_RESULTS";
@@ -766,7 +766,7 @@ const TYPED_DECISION_SCHEMA_VERSION: &str = "sym-rsi-typed-research-decision-rec
 const TYPED_DECISION_STATUS: &str =
     "SYNTHETIC_DECISION_CONTRACT_CASES_NOT_DCR_REPRODUCTION_OR_AGENT_RESULTS";
 const TYPED_DECISION_COUNT: usize = 5;
-const PROBABILITY_TOLERANCE: f64 = 1e-9;
+const DECISION_PROBABILITY_TOLERANCE: f64 = 1e-9;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -960,7 +960,7 @@ pub fn validate_typed_research_decision_pack(
         if probability_actions != available {
             issues.push(format!("{}: probability options must exactly match the admissible action set", record.decision_id));
         }
-        if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
+        if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > DECISION_PROBABILITY_TOLERANCE {
             issues.push(format!("{}: action probabilities must sum to one", record.decision_id));
         }
 
@@ -981,7 +981,7 @@ pub fn validate_typed_research_decision_pack(
         }
         if prediction_actions.is_empty()
             || !prediction_mass.is_finite()
-            || prediction_mass + PROBABILITY_TOLERANCE < record.nominal_coverage
+            || prediction_mass + DECISION_PROBABILITY_TOLERANCE < record.nominal_coverage
         {
             issues.push(format!(
                 "{}: calibrated prediction set does not meet its declared probability mass",
