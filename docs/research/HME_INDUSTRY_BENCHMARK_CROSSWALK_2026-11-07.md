@@ -280,3 +280,8 @@ The semantic API owner is #10918; the read-only HME comparison is #10917. The in
 ## 12. HDC-LTC checkpoint correctness
 
 The HME architecture now has a dedicated checkpoint-completeness work package, [#10979](https://github.com/Luminous-Dynamics/symthaea/issues/10979). It distinguishes evolution-only snapshots from complete learner checkpoints and replay checkpoints. The distinction is essential because a state snapshot may restore current dynamics while omitting weights, optimizer momentum or mutable normalization statistics needed for continued learning. Checkpoint size comparisons must cover identical field sets; a smaller artifact that omits training state is not a compression win.
+
+
+The HDC-LTC checkpoint contract has a source-derived field inventory:
+[hme_dyn_checkpoint_field_matrix_v0.json](fixtures/hme_dyn_checkpoint_field_matrix_v0.json).
+It captures the distinction between an EvolutionSnapshot (dynamic state + outputs + clocks) and a LearnerCheckpoint (parameters, optimizer state, mutable statistics, config, bindings and dynamic state), plus ReplayCheckpoint and WeightsOnlyArtifact.
