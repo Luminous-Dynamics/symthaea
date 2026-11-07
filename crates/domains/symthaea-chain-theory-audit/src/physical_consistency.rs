@@ -119,8 +119,7 @@ pub fn pair_electric_charge_audit() -> PairChargeAudit {
 
 pub fn weak_angle_normalization_audit() -> WeakAngleNormalizationAudit {
     let cos_squared_theta_w = 0.5;
-    let inverse_alpha_em_per_y =
-        CANDIDATE_INVERSE_ALPHA / cos_squared_theta_w;
+    let inverse_alpha_em_per_y = CANDIDATE_INVERSE_ALPHA / cos_squared_theta_w;
     // If X=sY, alpha_Y=s^2 alpha_X and therefore
     // 1/alpha_em = 1/(s^2 alpha_candidate cos^2 theta_W).
     let inverse_alpha_em_per_two_y = inverse_alpha_em_per_y / 4.0;
