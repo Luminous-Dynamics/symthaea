@@ -112,6 +112,18 @@ impl Quaternion {
         })
     }
 
+    /// Transform an ECEF vector back into sensor-body coordinates.
+    pub fn inverse_rotate_vector(self, vector: Vector3) -> Result<Vector3, TriangulationError> {
+        let q = self.normalized()?;
+        Self {
+            w: q.w,
+            x: -q.x,
+            y: -q.y,
+            z: -q.z,
+        }
+        .rotate_vector(vector)
+    }
+
     pub fn rotate_vector(self, vector: Vector3) -> Result<Vector3, TriangulationError> {
         let q = self.normalized()?;
         let imaginary = Vector3::new(q.x, q.y, q.z);
@@ -249,11 +261,36 @@ pub struct TriangulatedPosition {
     pub iterations: usize,
 }
 
+/// Candidate sensor placement and orientation for a planned bearing observation.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SensorPlacementCandidate {
+    pub sensor_id: String,
+    pub origin_ecef_m: Vector3,
+    pub sensor_to_ecef: Quaternion,
+    pub sigma_azimuth_rad: f64,
+    pub sigma_elevation_rad: f64,
+}
+
+/// Local Fisher-information / Cramer-Rao design scores for adding one sensor.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SensorPlacementScore {
+    pub sensor_id: String,
+    /// D-optimal score: log(det(Fisher information)).
+    pub log_determinant_information: f64,
+    /// A-optimal score: trace of the local covariance lower bound.
+    pub a_optimal_variance_sum_m2: f64,
+    /// Ratio of largest to smallest Fisher-information eigenvalue.
+    pub condition_number: f64,
+    pub covariance_lower_bound_m2: [[f64; 3]; 3],
+    pub observations_after_placement: usize,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TriangulationError {
     InsufficientObservations,
     EmptySensorId,
     DuplicateSensorId(String),
+    DuplicateCandidateId(String),
     NonFiniteVector,
     NonFiniteAngle,
     InvalidAngularUncertainty,
@@ -276,6 +313,7 @@ impl fmt::Display for TriangulationError {
             }
             Self::EmptySensorId => write!(f, "sensor id must not be empty"),
             Self::DuplicateSensorId(id) => write!(f, "sensor id {id} appears more than once"),
+            Self::DuplicateCandidateId(id) => write!(f, "candidate sensor id {id} is duplicated or already observed"),
             Self::NonFiniteVector => write!(f, "sensor ECEF origin is not finite"),
             Self::NonFiniteAngle => write!(f, "bearing angle is not finite"),
             Self::InvalidAngularUncertainty => {
@@ -398,6 +436,186 @@ pub fn triangulate_bearings_with_config(
 }
 
 type Matrix3 = [[f64; 3]; 3];
+
+/// Compute the local bearing Fisher information matrix at an assumed ECEF target.
+pub fn bearing_fisher_information(
+    observations: &[RayObservation],
+    assumed_target_ecef_m: Vector3,
+) -> Result<[[f64; 3]; 3], TriangulationError> {
+    if observations.is_empty() || !assumed_target_ecef_m.is_finite() {
+        return Err(TriangulationError::InsufficientObservations);
+    }
+    let mut seen = BTreeSet::new();
+    let mut rays = Vec::with_capacity(observations.len());
+    for observation in observations {
+        if !seen.insert(observation.sensor_id.as_str()) {
+            return Err(TriangulationError::DuplicateSensorId(
+                observation.sensor_id.clone(),
+            ));
+        }
+        rays.push(observation.prepare()?);
+    }
+    angular_information_matrix(&rays, assumed_target_ecef_m)
+}
+
+/// Rank candidate placements by D-optimal information at an assumed target.
+///
+/// Each candidate's bearing is predicted from the supplied target and pose.
+/// Scores are local design calculations: target point and angular standard
+/// deviations are treated as known. Pose uncertainty, target-prior spread,
+/// visibility, occlusion, weather, cost and platform constraints are omitted.
+pub fn rank_sensor_placements(
+    existing_observations: &[RayObservation],
+    assumed_target_ecef_m: Vector3,
+    candidates: &[SensorPlacementCandidate],
+) -> Result<Vec<SensorPlacementScore>, TriangulationError> {
+    if !assumed_target_ecef_m.is_finite() {
+        return Err(TriangulationError::NonFiniteVector);
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    let mut rays = Vec::with_capacity(existing_observations.len() + 1);
+    for observation in existing_observations {
+        if !seen_ids.insert(observation.sensor_id.as_str()) {
+            return Err(TriangulationError::DuplicateSensorId(
+                observation.sensor_id.clone(),
+            ));
+        }
+        rays.push(observation.prepare()?);
+    }
+
+    let mut candidate_ids = BTreeSet::new();
+    let mut scores = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if candidate.sensor_id.trim().is_empty() {
+            return Err(TriangulationError::EmptySensorId);
+        }
+        if seen_ids.contains(candidate.sensor_id.as_str())
+            || !candidate_ids.insert(candidate.sensor_id.as_str())
+        {
+            return Err(TriangulationError::DuplicateCandidateId(
+                candidate.sensor_id.clone(),
+            ));
+        }
+
+        let observation = predicted_candidate_bearing(candidate, assumed_target_ecef_m)?;
+        let mut candidate_rays = rays.clone();
+        candidate_rays.push(observation.prepare()?);
+        let information = angular_information_matrix(&candidate_rays, assumed_target_ecef_m)?;
+        let condition_number = symmetric_condition_number(information)?;
+        let covariance_lower_bound = invert_well_conditioned(information, 1.0e14)?;
+        let determinant = determinant3(information);
+        if !determinant.is_finite() || determinant <= 0.0 {
+            return Err(TriangulationError::ParallelOrIllConditioned {
+                condition_number,
+            });
+        }
+        let log_determinant_information = determinant.ln();
+        let a_optimal_variance_sum_m2 = covariance_lower_bound[0][0]
+            + covariance_lower_bound[1][1]
+            + covariance_lower_bound[2][2];
+
+        scores.push(SensorPlacementScore {
+            sensor_id: candidate.sensor_id.clone(),
+            log_determinant_information,
+            a_optimal_variance_sum_m2,
+            condition_number,
+            covariance_lower_bound_m2: covariance_lower_bound,
+            observations_after_placement: candidate_rays.len(),
+        });
+    }
+
+    scores.sort_by(|left, right| {
+        right
+            .log_determinant_information
+            .total_cmp(&left.log_determinant_information)
+            .then_with(|| {
+                left.a_optimal_variance_sum_m2
+                    .total_cmp(&right.a_optimal_variance_sum_m2)
+            })
+            .then_with(|| left.sensor_id.cmp(&right.sensor_id))
+    });
+    Ok(scores)
+}
+
+fn predicted_candidate_bearing(
+    candidate: &SensorPlacementCandidate,
+    target: Vector3,
+) -> Result<RayObservation, TriangulationError> {
+    if !candidate.origin_ecef_m.is_finite() {
+        return Err(TriangulationError::NonFiniteVector);
+    }
+    let displacement = target.subtract(candidate.origin_ecef_m);
+    let range = displacement.norm();
+    if !range.is_finite() {
+        return Err(TriangulationError::NonFiniteIntermediate);
+    }
+    if range <= VECTOR_EPSILON {
+        return Err(TriangulationError::ZeroRange(candidate.sensor_id.clone()));
+    }
+    let direction_ecef = displacement.scale(1.0 / range);
+    let direction_body = candidate
+        .sensor_to_ecef
+        .inverse_rotate_vector(direction_ecef)?;
+    let horizontal = direction_body.x.hypot(direction_body.y);
+    Ok(RayObservation {
+        sensor_id: candidate.sensor_id.clone(),
+        origin_ecef_m: candidate.origin_ecef_m,
+        sensor_to_ecef: candidate.sensor_to_ecef,
+        azimuth_rad: direction_body.y.atan2(direction_body.x),
+        elevation_rad: direction_body.z.atan2(horizontal),
+        sigma_azimuth_rad: candidate.sigma_azimuth_rad,
+        sigma_elevation_rad: candidate.sigma_elevation_rad,
+    })
+}
+
+fn angular_information_matrix(
+    rays: &[PreparedRay],
+    position: Vector3,
+) -> Result<Matrix3, TriangulationError> {
+    if rays.is_empty() {
+        return Err(TriangulationError::InsufficientObservations);
+    }
+    let mut normal = [[0.0; 3]; 3];
+    for ray in rays {
+        let displacement = position.subtract(ray.origin);
+        let range = displacement.norm();
+        if !range.is_finite() {
+            return Err(TriangulationError::NonFiniteIntermediate);
+        }
+        if range <= VECTOR_EPSILON {
+            return Err(TriangulationError::ZeroRange(ray.sensor_id.clone()));
+        }
+        if displacement.dot(ray.direction) <= 0.0 {
+            return Err(TriangulationError::BehindSensor(ray.sensor_id.clone()));
+        }
+        let jacobian_azimuth =
+            ray.tangent_azimuth.scale(1.0 / (range * ray.cos_elevation));
+        let jacobian_elevation = ray.tangent_elevation.scale(1.0 / range);
+        matrix_add_outer(
+            &mut normal,
+            jacobian_azimuth,
+            jacobian_azimuth,
+            1.0 / ray.sigma_azimuth.powi(2),
+        );
+        matrix_add_outer(
+            &mut normal,
+            jacobian_elevation,
+            jacobian_elevation,
+            1.0 / ray.sigma_elevation.powi(2),
+        );
+    }
+    if normal.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(TriangulationError::NonFiniteIntermediate);
+    }
+    Ok(normal)
+}
+
+fn determinant3(matrix: Matrix3) -> f64 {
+    matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+        - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+        + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
+}
 
 fn line_intersection_normal_equations(rays: &[PreparedRay]) -> (Matrix3, Vector3) {
     let mut normal = [[0.0; 3]; 3];
@@ -736,6 +954,74 @@ mod tests {
         assert!(result.residual_chi_square > 0.0);
         assert!(result.rms_angular_residual_rad < 1.0e-8);
         assert!(result.condition_number < 1.0e10);
+    }
+
+    #[test]
+    fn fisher_information_and_sensor_placement_ranking_are_geometry_sensitive() {
+        let target = Vector3::new(50.0, 40.0, 200.0);
+        let existing = vec![
+            bearing_from_target("north", Vector3::new(0.0, 0.0, 0.0), target, 1.0e-4),
+            bearing_from_target("east", Vector3::new(100.0, 0.0, 0.0), target, 1.0e-4),
+        ];
+        let information = bearing_fisher_information(&existing, target).unwrap();
+        assert!(information[0][0] > 0.0);
+        assert!(information[1][1] > 0.0);
+        assert!(information[2][2] > 0.0);
+
+        let candidates = vec![
+            SensorPlacementCandidate {
+                sensor_id: "north-far".to_string(),
+                origin_ecef_m: Vector3::new(-100.0, 0.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "south".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 100.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "high".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 0.0, 100.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+        ];
+        let ranking = rank_sensor_placements(&existing, target, &candidates).unwrap();
+        assert_eq!(ranking.len(), 3);
+        assert_eq!(ranking[0].sensor_id, "high");
+        assert!(ranking.windows(2).all(|pair| {
+            pair[0].log_determinant_information >= pair[1].log_determinant_information
+        }));
+        assert!(ranking.iter().all(|score| {
+            score.condition_number.is_finite()
+                && score.a_optimal_variance_sum_m2.is_finite()
+                && score.covariance_lower_bound_m2.iter().flatten().all(|v| v.is_finite())
+        }));
+    }
+
+    #[test]
+    fn placement_ranking_rejects_duplicate_candidate_and_observed_ids() {
+        let target = Vector3::new(50.0, 40.0, 200.0);
+        let existing = vec![
+            bearing_from_target("north", Vector3::new(0.0, 0.0, 0.0), target, 1.0e-4),
+            bearing_from_target("east", Vector3::new(100.0, 0.0, 0.0), target, 1.0e-4),
+        ];
+        let candidate = SensorPlacementCandidate {
+            sensor_id: "north".to_string(),
+            origin_ecef_m: Vector3::new(0.0, 100.0, 0.0),
+            sensor_to_ecef: Quaternion::IDENTITY,
+            sigma_azimuth_rad: 1.0e-4,
+            sigma_elevation_rad: 1.0e-4,
+        };
+        assert_eq!(
+            rank_sensor_placements(&existing, target, &[candidate]),
+            Err(TriangulationError::DuplicateCandidateId("north".to_string()))
+        );
     }
 
     #[test]
