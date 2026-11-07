@@ -172,6 +172,24 @@ Kodus separately publishes platform-level analytics from its production code-rev
 
 **CEB implication:** use these data to motivate a separate uptake/outcome protocol, not as correctness evidence. The production-impact experiment must freeze truth/actionability before exposure; distinguish accepted, adapted, rejected, deferred, independently reproduced and no-response; verify repairs and regressions separately; control team composition and censoring; and never treat a later diff as causal proof. See [CEB Review Production-Impact Protocol V0](CEB_REVIEW_PRODUCTION_IMPACT_PROTOCOL_V0_2026-11-07.md). Uptake stays contextual under existing CEB-HUMAN/CEB-CONTINUITY ownership; no new metric lane or acceptance score is created.
 
+
+### 2.17 CGARF — causality-guided repair pipeline
+
+Yuan et al.'s **CGARF** (Empirical Software Engineering; published August 22, 2026) composes three components: Causal Graph-Augmented Multi-Agent Debate for location re-ranking, Self-Reflection Consistency Distillation for more stable patch generation, and Two-Stage Patch Filtering using functional tests, causal matching and group-similarity selection. It evaluates 12 configurations across three localization methods (Agentless, OrcaLoca and CoSIL) and four models on SWE-bench Lite and Verified. The paper reports **2–4 percentage-point repair-success gains** and about **3 percentage points average patch-applicability gain** across the evaluated configurations. [Paper and results](https://doi.org/10.1007/s10664-026-10940-1).
+
+**Scope and limitations:** CGARF evaluates repair, not source-only PR-review comments. The reported gains are aggregated across configurations with different localizers/models; task denominators, exact per-configuration intervals and effect heterogeneity must be retrieved from the full paper before quantitative replication. Its causal graph debate and filtering pipeline motivate a useful I1/I2 ablation, but a higher patch-success rate does not prove that the model correctly identified which cause was identifiable from the evidence or that its explanation was accurate.
+
+**CEB implication:** borrow the separation of localization, causal argument, patch generation and patch verification. Evaluate each stage with its own outcome and provenance; do not let a correct patch retroactively validate an unsupported diagnosis. The three primary CEB-REVIEW metrics remain distinct from repair pass rate and patch applicability.
+
+### 2.18 SecRepoBench — repository-level secure code completion
+
+**SecRepoBench** contains **318 code-completion tasks** from 27 C/C++ repositories covering 15 CWEs. A model or agent completes a masked region with full-repository context; correctness is checked with developer tests and security with OSS-Fuzz-derived PoCs. The visible leaderboard snapshot accessed November 7, 2026 lists an ImageCodex + GPT-5.1-Codex-Max review setup at **60.1 secure-pass@1** and **76.4 pass@1**. [Benchmark and leaderboard](https://secrepobench.github.io/) · [Google Research summary](https://research.google/pubs/secrepobench-benchmarking-code-agents-for-secure-code-completion-in-real-world-repositories/).
+
+**Scope and limitations:** this is secure code completion, not review of a vulnerability-introducing pull request, causal diagnosis, or reviewer burden. Its test/PoC contract and denominator must remain attached to each score. “Secure completion” is not automatically equivalent to CEB's joint secure-functional pass or a review agent's security finding precision.
+
+**CEB implication:** use it as a downstream secure-code generation comparator and possible cross-lane robustness context, not a direct code-review SOTA row. A future matched experiment could compare whether diagnoses from CEB produce safer repairs, but only after freezing the same source snapshot, security contract, tests/PoCs, model/harness, budget and independent oracle.
+
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
