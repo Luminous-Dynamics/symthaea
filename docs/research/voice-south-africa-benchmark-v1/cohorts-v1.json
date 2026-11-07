@@ -1,0 +1,362 @@
+{
+  "schema_version": "symthaea.voice.sa_speech_cohort_registry.v1",
+  "status": "metadata_only_no_corpus_ingestion",
+  "parent_issue": 10913,
+  "created_on": "2026-11-07",
+  "purpose": "Maintain dataset provenance, task boundaries, and licence admission status for reproducible South African and African speech evaluation.",
+  "target_profiles": [
+    {
+      "bcp47": "af-ZA",
+      "display": "Afrikaans (South Africa)",
+      "phase": "1"
+    },
+    {
+      "bcp47": "en-ZA",
+      "display": "South African English",
+      "phase": "1"
+    },
+    {
+      "bcp47": "zu-ZA",
+      "display": "isiZulu",
+      "phase": "1"
+    },
+    {
+      "bcp47": "xh-ZA",
+      "display": "isiXhosa",
+      "phase": "1"
+    },
+    {
+      "bcp47": "st-ZA",
+      "display": "Sesotho",
+      "phase": "1"
+    },
+    {
+      "bcp47": "tn-ZA",
+      "display": "Setswana",
+      "phase": "1"
+    },
+    {
+      "bcp47": "nso-ZA",
+      "display": "Sepedi / Northern Sotho",
+      "phase": "1"
+    },
+    {
+      "bcp47": "nr-ZA",
+      "display": "isiNdebele",
+      "phase": "2"
+    },
+    {
+      "bcp47": "ss-ZA",
+      "display": "siSwati",
+      "phase": "2"
+    },
+    {
+      "bcp47": "ve-ZA",
+      "display": "Tshivenda",
+      "phase": "2"
+    },
+    {
+      "bcp47": "ts-ZA",
+      "display": "itsonga",
+      "phase": "2"
+    }
+  ],
+  "cohorts": [
+    {
+      "id": "pazabench-2026",
+      "title": "PazaBench",
+      "url": "https://www.microsoft.com/en-us/research/publication/pazabench-large-scale-asr-benchmark-for-low-resource-languages-in-africa/",
+      "category": "external_benchmark",
+      "tasks": [
+        "asr",
+        "model_comparison",
+        "efficiency"
+      ],
+      "scope": {
+        "african_languages": 39,
+        "models": 52,
+        "harmonized_public_corpora": 6
+      },
+      "metrics": [
+        "WER",
+        "CER",
+        "RTFx"
+      ],
+      "south_african_language_presence": "not asserted by this manifest; inspect official language matrix and exact split before per-language comparison",
+      "license_status": "source_corpus_specific_review_required",
+      "intended_use": "external_baseline_and_protocol_reference",
+      "admission": "not_yet_pinned",
+      "notes": "The Paza model release is described separately and covers six Kenyan languages; benchmark coverage must not be confused with available model coverage."
+    },
+    {
+      "id": "afrivox-v1",
+      "title": "AfriVox v1",
+      "url": "https://huggingface.co/datasets/intronhealth/afrivox",
+      "paper_url": "https://aclanthology.org/2026.eacl-long.122/",
+      "category": "multilingual_speech_benchmark",
+      "tasks": [
+        "asr",
+        "speech_translation",
+        "domain_robustness"
+      ],
+      "scope": {
+        "languages": 18,
+        "hours": 64.26,
+        "south_african_languages": [
+          "afr",
+          "nso",
+          "sot",
+          "tsn",
+          "xho",
+          "zul"
+        ]
+      },
+      "license_status": "CC-BY-NC-SA-4.0_dataset_card_claim_verify_exact_revision",
+      "intended_use": "research_evaluation_only_until_terms_verified",
+      "admission": "review_required",
+      "notes": "Do not assume v1 terms apply to v2 or to underlying source recordings. Speaker/domain split and sample counts must be pinned."
+    },
+    {
+      "id": "afrivox-v2",
+      "title": "AfriVox-v2",
+      "url": "https://huggingface.co/datasets/intronhealth/afrivox-v2",
+      "category": "multilingual_in_the_wild_speech_benchmark",
+      "tasks": [
+        "asr",
+        "domain_robustness",
+        "named_entities",
+        "numbers",
+        "unscripted_speech"
+      ],
+      "scope": {
+        "languages": 24,
+        "south_african_languages": [
+          "afr",
+          "nso",
+          "sot",
+          "tsn",
+          "xho",
+          "zul"
+        ]
+      },
+      "license_status": "verify_exact_dataset_revision_and_source_terms",
+      "intended_use": "research_evaluation_after_admission_review",
+      "admission": "review_required",
+      "notes": "Dataset card reports domain annotation, with LLM-assisted tagging and human validation on a sample. Treat generated tags as a separate label-quality stratum; do not treat all annotations as fully human ground truth."
+    },
+    {
+      "id": "afrivox-transcribe",
+      "title": "AfriVox transcription aggregate",
+      "url": "https://huggingface.co/datasets/intronhealth/afrivox-transcribe",
+      "category": "transcription_corpus_aggregate",
+      "tasks": [
+        "asr"
+      ],
+      "scope": {
+        "languages": 20,
+        "hours": 79.47,
+        "south_african_languages": [
+          "afr",
+          "nso",
+          "sot",
+          "tsn",
+          "xho",
+          "zul"
+        ]
+      },
+      "license_status": "verify_exact_dataset_revision_and_each_source",
+      "intended_use": "benchmark_adapter_after_rights_review",
+      "admission": "review_required",
+      "notes": "Aggregate source distribution includes multiple corpora. Preserve original source attribution and source-specific split/license boundaries."
+    },
+    {
+      "id": "nchlt-aux-combined",
+      "title": "NCHLT Auxiliary Speech Corpus — combined multilingual release",
+      "url": "https://huggingface.co/datasets/dsfsi-anv/multilingual-nchlt-dataset",
+      "category": "monolingual_and_multilingual_speech_corpus",
+      "tasks": [
+        "asr",
+        "cross_lingual_transfer"
+      ],
+      "scope": {
+        "languages": 11,
+        "hours_approx": 1421.3,
+        "speakers_approx": 3400,
+        "south_african_language_codes": [
+          "afr",
+          "eng",
+          "nbl",
+          "nso",
+          "sot",
+          "ssw",
+          "tsn",
+          "tso",
+          "ven",
+          "xho",
+          "zul"
+        ]
+      },
+      "license_status": "verify_each_original_language_release_and_combined_mirror_terms",
+      "intended_use": "training_or_evaluation_only_after_source_rights_and_split_review",
+      "admission": "review_required",
+      "notes": "The combined collection is not a new blanket license for all source material. Pin original language release and split for every included file."
+    },
+    {
+      "id": "lwazi-telephone",
+      "title": "Lwazi ASR Corpus Collection",
+      "url": "https://huggingface.co/datasets/dsfsi/lwazi-asr-corpus-compressed",
+      "category": "scripted_telephonic_speech",
+      "tasks": [
+        "telephony_asr",
+        "channel_robustness"
+      ],
+      "scope": {
+        "languages": 9,
+        "south_african_language_codes": [
+          "nbl",
+          "xho",
+          "zul",
+          "nso",
+          "sot",
+          "tsn",
+          "ssw",
+          "ven",
+          "tso"
+        ]
+      },
+      "license_status": "dataset_card_claims_CC_BY_terms_conflicting_across_summary_and_rows_verify_per_source",
+      "intended_use": "evaluation_and_training_only_after_per_release_license_check",
+      "admission": "review_required",
+      "notes": "Scripted telephone speech must be reported separately from natural unscripted conversations. Do not rely on one aggregate license string."
+    },
+    {
+      "id": "african-next-voices-swivuriso",
+      "title": "African Next Voices / Swivuriso",
+      "url": "https://capstone.aims.ac.za/datasets/african-next-voices/",
+      "project_url": "https://www.dsfsi.co.za/za-african-next-voices/",
+      "category": "community_collected_scripted_and_unscripted_speech",
+      "tasks": [
+        "asr",
+        "domain_transfer",
+        "unscripted_speech"
+      ],
+      "scope": {
+        "languages": 7,
+        "hours_approx": 3000,
+        "south_african_language_codes": [
+          "zul",
+          "xho",
+          "sot",
+          "tsn",
+          "nso",
+          "nbl",
+          "ven"
+        ]
+      },
+      "license_status": "CC-BY-4.0_visible_card_gated_access_and_terms_must_be_accepted",
+      "intended_use": "asr_only_under_current_visible_terms",
+      "prohibited_uses": [
+        "tts",
+        "voice_cloning",
+        "voice_synthesis"
+      ],
+      "admission": "review_required",
+      "notes": "Do not use these recordings or associated speaker material for voice realization/identity imitation. Recheck current terms before every use."
+    },
+    {
+      "id": "soap-opera-five-language-cs",
+      "title": "South African five-language code-switched soap-opera corpus",
+      "url": "https://hdl.handle.net/20.500.12185/545",
+      "baseline_paper": "https://www.isca-archive.org/interspeech_2018/ylmaz18c_interspeech.html",
+      "category": "spontaneous_broadcast_code_switch_speech",
+      "tasks": [
+        "code_switch_asr",
+        "switch_boundary_detection",
+        "language_id"
+      ],
+      "scope": {
+        "hours": 26.9,
+        "languages": [
+          "eng",
+          "zul",
+          "xho",
+          "tsn",
+          "sot"
+        ],
+        "sources": [
+          "South African soap-opera episodes"
+        ]
+      },
+      "license_status": "research_only_repository_statement",
+      "intended_use": "research_evaluation_only_with_repository_terms_review",
+      "admission": "evaluation_only_pending_confirmation",
+      "notes": "Repository description says performers often ad-lib; speech is useful for code-switch diagnostics. Research-only does not automatically permit commercial training or redistribution."
+    },
+    {
+      "id": "afrocs-xs",
+      "title": "AfroCS-xs",
+      "url": "https://aclanthology.org/2025.acl-long.1601/",
+      "category": "text_only_human_validated_synthetic_code_switch_corpus",
+      "tasks": [
+        "text_code_switch_translation",
+        "text_representation_diagnostics"
+      ],
+      "scope": {
+        "languages": [
+          "afr",
+          "sot",
+          "yor",
+          "zul",
+          "eng"
+        ],
+        "domains": [
+          "agriculture"
+        ]
+      },
+      "license_status": "paper_and_dataset_terms_review_required",
+      "intended_use": "text_only_diagnostic_not_speech_asr",
+      "admission": "not_an_audio_cohort",
+      "notes": "Synthetic text examples are not acoustic evidence or natural speech recognition ground truth."
+    }
+  ],
+  "evaluation_axes": [
+    "strict_orthographic_WER",
+    "declared_normalized_WER",
+    "CER",
+    "PER_where_reference_is_qualified",
+    "language_identification_accuracy",
+    "switch_boundary_precision_recall_f1",
+    "within_word_or_morpheme_switch_accuracy_where_annotated",
+    "named_entity_error_rate",
+    "number_date_unit_negation_exactness",
+    "word_phone_alignment_tolerance_f1",
+    "streaming_latency_p50_p95_p99",
+    "RTFx",
+    "selective_risk_coverage",
+    "worst_language_and_worst_domain"
+  ],
+  "required_receipt_fields": [
+    "cohort_id",
+    "immutable_dataset_revision",
+    "file_or_split_manifest_digest",
+    "licence_and_terms_snapshot",
+    "language_and_variety_profile",
+    "domain_and_recording_channel",
+    "speaker_disjoint_split_id",
+    "source_disjoint_split_id",
+    "normalization_policy_version",
+    "annotation_provenance",
+    "model_and_encoder_schema_digest",
+    "inference_and_decoding_configuration",
+    "scorer_version",
+    "result_artifact_digest"
+  ],
+  "hard_invariants": [
+    "no_silent_english_fallback",
+    "no_macro_average_hiding_failed_languages",
+    "no_train_test_speaker_or_source_leakage",
+    "no_raw_speech_or_speaker_identifiers_in_public_pr_fixtures",
+    "no_unpermitted_training_or_synthesis",
+    "unsupported_language_or_dialect_remains_unknown"
+  ]
+}
