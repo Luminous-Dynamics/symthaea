@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.schema.json",
+  "title": "Drosophila coordination mechanism identifiability synthetic fixture V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_scope",
+    "evidence_tier",
+    "worlds",
+    "interventions",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "evidence_tier": {
+      "const": "SYNTHETIC_KNOWN_TRUTH_ONLY"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "int6": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "u32six": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4294967295
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase_reset_by_leg_microturns",
+        "cycle_slips_by_leg",
+        "frequency_by_leg_millihz",
+        "tripod_occupancy_milli"
+      ],
+      "properties": {
+        "phase_reset_by_leg_microturns": {
+          "$ref": "#/$defs/int6"
+        },
+        "cycle_slips_by_leg": {
+          "$ref": "#/$defs/int6"
+        },
+        "frequency_by_leg_millihz": {
+          "$ref": "#/$defs/u32six"
+        },
+        "tripod_occupancy_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "frames"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/frame"
+          }
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "mechanism_family",
+        "source_revision_sha256",
+        "world_spec_sha256",
+        "baseline_summary",
+        "baseline_trajectory",
+        "interventions"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "world_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "baseline_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mean_frequency_millihz",
+            "aggregate_phase_locking_milli",
+            "tripod_occupancy_milli"
+          ],
+          "properties": {
+            "mean_frequency_millihz": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "aggregate_phase_locking_milli": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "tripod_occupancy_milli": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            }
+          }
+        },
+        "baseline_trajectory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pairwise_phase_offsets_microturns",
+            "stance_count_histogram_milli"
+          ],
+          "properties": {
+            "pairwise_phase_offsets_microturns": {
+              "type": "array",
+              "minItems": 15,
+              "maxItems": 15,
+              "items": {
+                "type": "integer",
+                "minimum": -500000,
+                "maximum": 499999
+              }
+            },
+            "stance_count_histogram_milli": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          }
+        },
+        "interventions": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/prediction"
+          }
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "feasible",
+        "feasibility_receipt_sha256"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feasible": {
+          "type": "boolean"
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_world_pairs",
+        "summary_only_class_count",
+        "summary_unresolved_pairs",
+        "full_baseline_class_count",
+        "baseline_separated_pairs",
+        "feasible_portfolio_class_count",
+        "feasible_portfolio_separated_pairs",
+        "feasible_portfolio_unresolved_pairs",
+        "status",
+        "unresolved_world_pair",
+        "mechanism_certificate_issued"
+      ],
+      "properties": {
+        "total_world_pairs": {
+          "const": 10
+        },
+        "summary_only_class_count": {
+          "const": 1
+        },
+        "summary_unresolved_pairs": {
+          "const": 10
+        },
+        "full_baseline_class_count": {
+          "const": 2
+        },
+        "baseline_separated_pairs": {
+          "const": 4
+        },
+        "feasible_portfolio_class_count": {
+          "const": 4
+        },
+        "feasible_portfolio_separated_pairs": {
+          "const": 9
+        },
+        "feasible_portfolio_unresolved_pairs": {
+          "const": 1
+        },
+        "status": {
+          "const": "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO"
+        },
+        "unresolved_world_pair": {
+          "const": [
+            "W-central",
+            "W-shared-drive"
+          ]
+        },
+        "mechanism_certificate_issued": {
+          "const": false
+        }
+      }
+    }
+  }
+}
