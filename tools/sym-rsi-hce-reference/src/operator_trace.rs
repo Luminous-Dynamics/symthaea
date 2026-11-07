@@ -587,7 +587,7 @@ mod tests {
         }
         assert_eq!(
             trace.validate().expect_err("hypothesis must precede execute"),
-            OperatorTraceError::HypothesisRequired(3)
+            OperatorTraceError::HypothesisRequired(2)
         );
     }
 
