@@ -11,7 +11,7 @@ This standalone offline Rust crate validates the pinned AS-Bench v0.1 compatibil
 - Strict separation of agent-visible public campaign metadata from lab-private configuration. In particular, public campaign cards must not contain the private `backend` field.
 - Status consistency: completed/active stage progression, active job and budget accounting.
 - Catalog design-ID presence, uniqueness, requested stage and pool size; local fail-fast checks for duplicate, ineligible, previously measured and over-budget selections.
-- Job lifecycle: `queued` and `running` are pending; `failed` never advances a stage; only a completed job with a complete result batch and matching result-design identities advances a stage.
+- Job lifecycle: `queued` and `running` are pending; `failed` never advances a stage; only a completed job with a complete result batch, matching result-design identities, and every declared measurement present with its declared scalar/file type advances a stage.
 - A small offline end-to-end fixture path through campaign, status, catalog, batch preflight and completed-job checks.
 
 The canonical API implementation is `src/api_contract.rs`; job status and result-row lifecycle are shared with `src/job_lifecycle.rs`. There is one API contract owner, not parallel validators. The code is transport-independent and makes no HTTP requests.
@@ -35,7 +35,7 @@ cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- docs
 cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- --api-fixtures
 ```
 
-There are 33 authored Rust tests: 19 public API contract tests, nine job-lifecycle tests and five manifest tests. They have not been executed in the current environment.
+There are 38 authored Rust tests: 24 public API contract tests, nine job-lifecycle tests and five manifest tests. The public API tests include missing-measurement, non-numeric scalar, blank file-reference and duplicate result-ID negative controls. They have not been executed in the current environment.
 
 ## Authority and claim boundaries
 
