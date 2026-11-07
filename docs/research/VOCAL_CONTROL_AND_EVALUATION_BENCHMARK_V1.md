@@ -7,7 +7,7 @@
 
 A singing system can sound impressive while ignoring supplied lyrics, changing notes, losing consonants, or changing singer identity. Conversely, a system can satisfy a score and phoneme contract but sound artificial. These are separate capabilities.
 
-VCEB evaluates Symthaea as a controllable vocal performer. It complements the existing 60-case Muse vocal release set and the MEL-VOCAL-001 phoneme-alignment scorer.
+VCEB evaluates Symthaea as a controllable vocal performer. It complements the existing 60-case Muse vocal release set and the MEL-VOCAL-001 phoneme-alignment scorer. The current physical-tract code is not yet an integrated renderer; physiology results remain a future track until issue #10860 is resolved. English G2P remains a known accuracy limitation: issue #10869 tracks replacing the small dictionary/letter fallback with versioned pronunciation candidates and explicit uncertainty.
 
 The central research question is:
 
@@ -82,7 +82,7 @@ A useful target is to preserve unaffected regions as exact cached audio where th
 
 ### Track E — Acoustic and physiological plausibility
 
-For the functional tract backend, measure:
+For a future physical tract backend—only after the API integration and compile gates in issue #10860 are closed—measure:
 - vowel F1-F4 and bandwidth error;
 - consonant place/manner spectral cues;
 - harmonic spectral tilt, H1-H2/H1-H3 and periodicity;
@@ -106,10 +106,12 @@ When candidates generate their own lyrics, use this as a separate prompt-to-song
 3. Use the same dry-vocal comparison stems first. Evaluate full mixes separately.
 4. Normalize listening copies using one predeclared loudness/true-peak procedure. Preserve original dry samples and record all processing. Do not compress, EQ, denoise or repair one candidate differently from another.
 5. Keep training, tuning and evaluation splits separate by singer, session, song and phrase. Hold out complete singers and songs for zero-shot tests.
-6. Blind backend identity and randomize presentation order. Include licensed human-sung references and quality anchors.
-7. Use an initial small pilot to estimate variance and rater agreement, then power the confirmatory human study. Report confidence intervals and per-rater/per-case distributions.
-8. Publish per-case outputs, unknowns, failures and exclusions. A missing estimate is undefined, not zero.
-9. Do not promote a backend because one MOS predictor, one ASR system, or the generator's own evaluator says it is good.
+6. Emit a run manifest with exact source revision, generation inputs, performance digest, output artifact digest, voice/model identifier and all unsupported/approximated controls. The current Muse gate writes `run_manifest.json`, a per-case performance digest, and per-clip WAV digest. Its voicebank/model-weight tree digest is not yet included, so full artifact provenance remains a follow-on requirement.
+7.
+ Blind backend identity and randomize presentation order. Include licensed human-sung references and quality anchors.
+8. Use an initial small pilot to estimate variance and rater agreement, then power the confirmatory human study. Report confidence intervals and per-rater/per-case distributions.
+9. Publish per-case outputs, unknowns, failures and exclusions. A missing estimate is undefined, not zero.
+10. Do not promote a backend because one MOS predictor, one ASR system, or the generator's own evaluator says it is good.
 
 For pairwise preference, use a Bradley-Terry or equivalent rater-aware model and report uncertainty. For multi-stimulus quality ratings, use an appropriately adapted MUSHRA-style protocol with hidden reference/anchors. Singing-specific dimensions must be rated separately.
 
@@ -123,7 +125,7 @@ For pairwise preference, use a Bradley-Terry or equivalent rater-aware model and
 | MusicJudge | Joint lyric correctness and pitch/rhythm fidelity at music-block level | Independent evaluator design reference |
 | DiffSinger | Phoneme/duration/F0-conditioned SVS baseline | Explicit control baseline |
 | Kokoro singing adaptation | Speech-to-singing adapted baseline | Measure degradation from speech-domain transformation |
-| Symthaea functional vocal tract | Interpretable articulatory and physical acoustic realization | Physiology/controllability research track |
+| Symthaea physical vocal tract (planned; not currently integrated) | Intended interpretable articulatory and physical acoustic realization | Keep as a research track until issue #10860 is closed and exact-head examples compile |
 
 Sources:
 - Artificial Analysis leaderboard: https://artificialanalysis.ai/music/leaderboard/vocals
@@ -142,8 +144,9 @@ These values are initial engineering goals. Freeze final thresholds only after t
 - 100% of malformed, unsupported or out-of-range inputs rejected.
 - Zero unknown-phone-to-schwa substitutions.
 - Zero unknown-language-to-language-ID-zero substitutions.
-- 100% of generated stems accompanied by source, model, voice, language, score, configuration and output digests.
+- 100% of generated stems accompanied by source-revision, voice identifier, language, score/performance-input and exact output-artifact digests.
 - 100% of positive/negative synthetic contract fixtures produce their expected outcome.
+- Separately provisioned model/voicebank manifests must provide file-tree digests before a run can claim complete model-weight provenance.
 
 ### Linguistic and musical fidelity
 - Human-verified lyric comprehension at least 95% on the declared supported-language/register domain.
