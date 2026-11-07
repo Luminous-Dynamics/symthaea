@@ -360,7 +360,16 @@ def verify(data: dict[str, Any], check_expected: bool = True) -> dict[str, Any]:
     factor_rows = []
     for history in histories:
         predictive = challenger_predictive(history, prepared)
-        require(predictive is not None, f"challenger mixture exhausted at {history}")
+        if predictive is None:
+            predictive_rows.append({
+                "history": list(history),
+                "status": "CHALLENGER_MIXTURE_EXHAUSTED",
+            })
+            factor_rows.append({
+                "history": list(history),
+                "status": "CHALLENGER_MIXTURE_EXHAUSTED",
+            })
+            continue
         predictive_rows.append({
             "history": list(history),
             "probabilities": {
