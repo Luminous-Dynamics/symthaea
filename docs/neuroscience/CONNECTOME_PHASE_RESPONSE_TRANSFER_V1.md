@@ -54,6 +54,8 @@ A full-cycle advance can therefore have zero wrapped phase reset but a cycle sli
 
 The canonical six-leg axis is left fore, left middle, left hind, right fore, right middle, right hind. Any source matrix/annotation ordering must be independently mapped to stable leg IDs before populating this axis.
 
+Descending-command probe keys must carry an exact source identity: DNg100, DNg97 or DNb08. These are separate probe keys, not interchangeable labels for generic descending stimulation. The schema and Rust validator reject a descending-command probe without this identity.
+
 For a measured row, the crate computes one wrapped phase reset and one cycle-slip count per leg. Non-response, failed assay, missing tracking, out-of-support and unassessed rows remain typed statuses and cannot be silently turned into zero responses.
 
 ## Synthetic known-answer tranche
