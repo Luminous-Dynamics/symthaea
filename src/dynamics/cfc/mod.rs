@@ -58,11 +58,12 @@ pub use network::{
 
 // Weight-space programming
 pub use weight_program_adapter::{
-    CfCActivationSignatureSet, CfCAlignmentAcceptancePolicy, CfCFunctionalProbe,
-    CfCHiddenUnitAlignment, CfCPermutationAlignmentError, CfCWeightProgramAdapterError,
-    CfCWeightProgramCandidate, align_cfc_hidden_unit_signatures,
-    cfc_hidden_unit_activation_signatures, cfc_weight_model_snapshot,
-    materialize_cfc_weight_program, validate_cfc_alignment_for_parameter_transfer,
+    CfCActivationSignatureSet, CfCAlignmentAcceptancePolicy, CfCDisambiguatingProbeSelection,
+    CfCFunctionalProbe, CfCHiddenUnitAlignment, CfCPermutationAlignmentError,
+    CfCProbeCandidateScore, CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
+    align_cfc_hidden_unit_signatures, cfc_hidden_unit_activation_signatures,
+    cfc_weight_model_snapshot, materialize_cfc_weight_program,
+    select_cfc_disambiguating_probe, validate_cfc_alignment_for_parameter_transfer,
 };
 
 // Phi-gated attention
