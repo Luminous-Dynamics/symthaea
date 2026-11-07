@@ -6,10 +6,10 @@ use std::f64::consts::PI;
 use symthaea_metric_geometry_lab::{GeodesicState, SchwarzschildExterior, geodesic_rk4_step};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mass = 1.0;
-    let radius = 10.0;
-    let radial_tangent = -0.05;
-    let f = 1.0 - 2.0 * mass / radius;
+    let mass: f64 = 1.0;
+    let radius: f64 = 10.0;
+    let radial_tangent: f64 = -0.05;
+    let f: f64 = 1.0 - 2.0 * mass / radius;
     let time_tangent = ((1.0 + radial_tangent * radial_tangent / f) / f).sqrt();
     let field = SchwarzschildExterior::new(mass)?;
     let mut state = GeodesicState {
