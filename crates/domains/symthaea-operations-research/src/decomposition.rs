@@ -456,29 +456,15 @@ pub fn verify_independent_product(
             variable_count,
         });
     }
-    let component_entries = components.iter().try_fold(0usize, |total, component| {
-        let next = total
-            .checked_add(component.len())
-            .ok_or(DecompositionError::ResourceAccountingOverflow)?;
-        if next > variable_count {
-            return Err(DecompositionError::PartitionEntryCountMismatch {
-                expected: variable_count,
-                actual: next,
-            });
-        }
-        Ok(next)
-    })?;
-    let partition_entries = component_entries
-        .checked_add(free_variables.len())
-        .ok_or(DecompositionError::ResourceAccountingOverflow)?;
-    if partition_entries != variable_count {
+    if free_variables.len() > variable_count {
         return Err(DecompositionError::PartitionEntryCountMismatch {
             expected: variable_count,
-            actual: partition_entries,
+            actual: free_variables.len(),
         });
     }
 
     let mut seen = vec![false; variable_count];
+    let mut partition_entries = 0usize;
     let mut component_owner = vec![None; variable_count];
     let mut free = vec![false; variable_count];
 
@@ -499,6 +485,15 @@ pub fn verify_independent_product(
             if seen[variable] {
                 return Err(DecompositionError::VariableRepeatedInPartition { variable });
             }
+            partition_entries = partition_entries
+                .checked_add(1)
+                .ok_or(DecompositionError::ResourceAccountingOverflow)?;
+            if partition_entries > variable_count {
+                return Err(DecompositionError::PartitionEntryCountMismatch {
+                    expected: variable_count,
+                    actual: partition_entries,
+                });
+            }
             seen[variable] = true;
             component_owner[variable] = Some(component_index);
         }
@@ -514,6 +509,15 @@ pub fn verify_independent_product(
         }
         if seen[variable] {
             return Err(DecompositionError::VariableRepeatedInPartition { variable });
+        }
+        partition_entries = partition_entries
+            .checked_add(1)
+            .ok_or(DecompositionError::ResourceAccountingOverflow)?;
+        if partition_entries > variable_count {
+            return Err(DecompositionError::PartitionEntryCountMismatch {
+                expected: variable_count,
+                actual: partition_entries,
+            });
         }
         seen[variable] = true;
         free[variable] = true;
@@ -1163,8 +1167,13 @@ mod tests {
     #[test]
     fn independent_product_rejects_partition_entry_count_before_allocation() {
         let problem = independent_fixture();
-        let error = verify_independent_product(&problem, &[vec![0, 1, 2, 3]], &[4, 4], budget())
-            .unwrap_err();
+        let error = verify_independent_product(
+            &problem,
+            &[vec![0, 1, 2, 3]],
+            &[4, 4, 4, 4, 4, 4],
+            budget(),
+        )
+        .unwrap_err();
         assert_eq!(
             error,
             DecompositionError::PartitionEntryCountMismatch {
