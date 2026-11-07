@@ -317,6 +317,42 @@ uncertainty budget, independent predictions such as the scale dependence of
 the coupling, and tests against alternative formula selection and
 post-selection/complexity penalties.
 
+### Independent physical-consistency audit
+
+A separate public audit by Cody Mitchell, pinned to
+`SproutSeeds/chain-theory-audit@95cd02da5955450397a848c25f8287c1a037d9f2`,
+reports several checks beyond the 172-row enumeration:
+
+- Under the Letter's stated diagonal assignments, the unbroken generator
+  decomposes exactly as
+  (U=\frac13(6Y)-\frac13\operatorname{diag}(0,0;1,1,-2)).
+  It therefore has no weak-isospin component and has a nonzero colour
+  component. Under those assignments it is not (Q=T_3+Y).
+- The two terms in the proposed (2,3) link carry (+2/3) and (-1/3)
+  under the audit's stated electric-charge convention. Their superposition
+  is not an eigenstate of that charge generator. This is a consistency
+  tension if the same pair state is identified with a photon state.
+- With the compendium's conditional \(\cos^2\theta_W=1/2\) and
+  \(\alpha_{em}=\alpha_Y\cos^2\theta_W\), common Y, 2Y, 6Y and
+  GUT-normalized conventions imply very different inverse electromagnetic
+  couplings; the audit says the photon identification would require a
+  \(\sqrt2\) hypercharge rescaling.
+- The compendium's \(319^k\) running ladder is arithmetically distinct
+  from the Letter's 31,104 readout dimension.
+- The external audit reports a census of 1,492,992 combinations of the
+  alternatives explicitly listed in the Letter, with 9,275 distinct
+  values and one within its stated 1-sigma CODATA 2022 window. It explicitly
+  leaves the broader look-elsewhere question open because undocumented
+  development-time choices are not recoverable from the published list.
+
+Symthaea now has a separate exact-integer `physical_consistency` module
+covering the diagonal generator decomposition, pair-term charge values,
+weak-angle normalization arithmetic, readout/ladder mismatch and the
+candidate's CODATA offset. These are small, conditional checks under the
+published assignments; they do not rederive the complete gauge model or
+independently reproduce the 1.49-million-case census. The exact source and
+scope of the external findings are recorded in the crate README.
+
 Work package: independently reproduce the finite-dimensional construction,
 formalization and algebraic value before testing its physical interpretation.
 Do not market the number as a derivation of QED.
@@ -389,8 +425,8 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-01 | Causal-set kinematics | 1+1D sprinkling, order, chain, dimension estimator | Minkowski reference + Lorentz invariance |
 | CTGP-02 | Causal-set scaling | Multi-N, multi-seed finite-size study | Error bars, convergence and null controls |
 | CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals (prototype added) | Rust tests + independent volume, distribution and boost checks |
-| CTGP-04 | Chain Theory reproduction | Independent std-only enumerator emits all 172 rows in author CSV order; six full classification bands tested | Run Rust example and byte-diff full CSV; Lean 4.35.0 build and axiom/read-cap audit |
-| CTGP-05 | Chain Theory stress tests | Alternative choices, uniqueness and sensitivity analysis | All assumptions enumerated; blind alternatives |
+| CTGP-04 | Chain Theory arithmetic reproduction | Independent std-only enumerator and 172 row bands; exact charge/generator identities added as a separate physical-consistency module | Run full CSV byte-diff, pinned Lean build, and independent charge/normalization comparison |
+| CTGP-05 | Chain Theory physical/selection stress tests | Exact charge and weak-angle consistency checks added; external audit census documented | Reproduce full listed-alternative census, compare every convention and Ward identity, and preregister blinded independent-measurement tests |
 | CTGP-06 | Quantum DTC simulator | Exact kicked-Ising graph oracle plus second-order Trotter anisotropic-XYZ graph solver (prototype added) | Dense exact small-system agreement, second-order convergence and published-protocol comparison |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
@@ -435,6 +471,31 @@ between competing hypotheses, not simply to the most complex simulation.
     counting results. A 2026 PR Research paper gives a ~O(N²) quantum algorithm
     for BDG action evaluation; compare the correct oracle/query/hardware model
     rather than treating that quantum complexity as a classical Rust target.
+
+### Chain Theory physical interpretation and selection
+
+1. Reproduce all 172 rows and the exact radical sum from a pinned author
+   commit, then byte-diff the full CSV.
+2. Build the author's Lean file with its declared Lean/Mathlib versions;
+   record assumptions, axioms and externally imported theorems explicitly.
+3. Re-derive the unbroken generator decomposition, ray stabilizer,
+   charge assignments and Ward-identity results from the primary definitions.
+4. Compare all standard hypercharge normalizations and energy-scale
+   conventions; no rescaling may be chosen after seeing the numerical answer.
+5. Independently reproduce the 1,492,992-case census of alternatives
+   explicitly listed in the Letter; report duplicated/identical values,
+   grammar complexity and all boundaries.
+6. Keep two different null families separate: (a) enumerated alternatives
+   actually listed by the Letter and (b) broader plausible formula/model
+   grammars. A uniqueness result in (a) is not uniqueness in (b).
+7. Preregister future alpha predictions with closed form, scale, uncertainty
+   and decision rule before measurement release. Compare g-2 and atom-recoil
+   values individually as well as any later CODATA adjustment; do not rely
+   solely on an adjusted mean when inputs are in tension.
+8. A photon/QED identification requires a propagating pole, correct
+   gauge/charge representation, momentum-dependent propagator, interaction
+   vertex, Ward identities and at least one parameter-free scattering or
+   running prediction. A match to one dimensionless constant is insufficient.
 
 ### Time crystals
 
@@ -568,7 +629,7 @@ physical fidelity only count after matched benchmarks.
 | Workstream | Current Symthaea prototype | Strong external comparator | Near-term parity gate | Longer-term differentiator |
 |---|---|---|---|---|
 | Causal sets | 1+1D O(N log N), D=2..4 O(N²) kinematics | Causal-set literature/reference implementations | Multi-seed finite-size, Lorentz boosts, volume and dimension recovery | Higher-D efficient causal relations, curved embeddings and discrete wave operators |
-| Chain Theory | Independent 172-row algebraic enumerator | Author's Python/Lean source and third-party audit | Full CSV byte diff, pinned Lean build and assumption audit | Formalize alternative grammars and falsify/derive the physical bridge |
+| Chain Theory | Independent 172-row enumerator plus separate exact charge/generator arithmetic checks | Author's Lean/Python source; independent SproutSeeds consistency and alternatives audit | Full CSV byte diff, Lean axiom/read-cap audit, exact charge and weak-angle tests, reproducible census of listed alternatives | Parameter-free propagator/vertex/scattering predictions; preregistered blind comparisons and explicit look-elsewhere accounting |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
 | GR / GravCraft | Analytic Minkowski/Schwarzschild kernel plus new amplifier-derived ADM metric, full 4D geodesics and Einstein-implied source diagnostics | Einstein Toolkit Hypatia (GPU BSSNOK/Z4c), SpECTRE, Apples-with-Apples and analytic GR references | Exact Minkowski/Schwarzschild references; ADM projection consistency; curvature step-size and gauge tests | Self-consistent 3+1 evolution, matter coupling, global energy-condition and source/boundary analysis |
 | UAP | Calibration/provenance, bearing triangulation, local covariance and point/finite-region FIM placement prototypes | Calibrated multi-sensor methodology; EKF/UKF/factor-graph tracking; CRLB-based placement | Synthetic 93–97% ellipsoid coverage, exact Rust/Python agreement, increasing-region-grid stability and blind known-object calibration | Low false-positive track reconstruction on sealed data with nuisance covariance and cost-aware placement |
@@ -642,6 +703,15 @@ physical fidelity only count after matched benchmarks.
 - Adamson and Wallden (2026), Benincasa-Dowker-Glaser causal set actions by
   quantum counting, Physical Review Research 8, 023188.
   https://doi.org/10.1103/qdst-yrh6
+- Mitchell (25 October 2026), independent Chain Theory audit:
+  arithmetic reproduction, census of the Letter's listed alternatives,
+  photon/charge-assignment consistency and preregistration methodology.
+  https://github.com/SproutSeeds/chain-theory-audit/tree/95cd02da5955450397a848c25f8287c1a037d9f2
+- Wissner-Gross (23 October 2026), *A Parameter-Free Candidate for the
+  Fine-Structure Constant from Entangled Qudits*: the arithmetic result and
+  separate photon conjecture.
+  https://github.com/physical-superintelligence/chain-theory
+
 - NIST CODATA (2022 adjustment; published 2025), Recommended Values of the
   Fundamental Physical Constants.
   https://physics.nist.gov/constants
