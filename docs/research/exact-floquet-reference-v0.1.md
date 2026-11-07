@@ -99,3 +99,48 @@ coupling. The report does not claim an asymptotic DTC phase.
 
 All Rust compilation and unit-test gates remain open until run on the
 repository-pinned toolchain.
+
+
+## v0.3 anisotropic-Heisenberg extension
+
+A separate module, `symthaea-fractal-time-lab::exact_heisenberg`, now
+implements a finite-graph kicked XYZ / anisotropic-Heisenberg model:
+
+```
+U_F = exp[-i H_int] exp[-i theta/2 sum_i X_i]
+H_int = sum_(i,j) (Jx XX + Jy YY + Jz ZZ) + sum_i h_i Z_i
+```
+
+The two-site XYZ exponential is analytic because XX, YY and ZZ commute on
+the same edge. Distinct edges can overlap and therefore do not all commute.
+The implementation greedily edge-colors the graph into matchings, then uses
+a symmetric second-order Suzuki-Trotter splitting over the on-site field
+group and matching groups. The requested number of Trotter slices is
+explicit and capped.
+
+Validation includes:
+- closed-form two-spin XYZ gate amplitudes;
+- exact reduction to the existing kicked-Ising engine when Jx=Jy=0;
+- unitary norm preservation on a 2D graph;
+- edge-color matching disjointness;
+- all-up / all-down global spin-inversion symmetry;
+- Trotter convergence against an independent dense small-system exponential,
+  including the expected approximately fourfold error reduction when the
+  slice count doubles.
+
+This is a controlled small-system solver, not an exact solution of the
+overlapping-edge many-body exponential and not a reproduction of a specific
+published hardware protocol. The new example
+`heisenberg_2d_sweep` explores 2x2, 2x3 and 3x3 open lattices, includes a
+zero-coupling control, varies pulse error, checks initial-state dependence,
+and reports the final-state difference between two Trotter resolutions.
+
+The latest 2026 frontier includes an anisotropic-Heisenberg 2D DTC realized
+using quantum hardware and tensor-network methods. The new solver moves
+Symthaea toward model-family parity at small sizes, but it is not competitive
+with hardware-scale or validated tensor-network results yet. The exact
+published Floquet protocol, couplings, initialization, observables and
+phase-boundary definitions must be matched before calling this a reproduction.
+
+Rust compilation and tests remain unverified until the pinned toolchain is
+used on this branch.
