@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sym-rsi-research-taste-decision-fixtures-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-research-taste-decision-fixtures-v0"
+    },
+    "status": {
+      "const": "SYNTHETIC_POLICY_CASES_NOT_EXPERT_GOLD_OR_BENCHMARK_RESULTS"
+    },
+    "source_issue": {
+      "const": "#10877"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^RT-(D|A|E|I|T)[0-9]{2}$"
+          },
+          "stage": {
+            "enum": [
+              "direction_selection",
+              "approach_design",
+              "experiment_design",
+              "result_interpretation",
+              "transfer"
+            ]
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "facts": {
+            "type": "object"
+          },
+          "expected_action": {
+            "enum": [
+              "select_A_for_pilot",
+              "deprioritize_as_duplicate",
+              "run_low_cost_information_pilot",
+              "return_for_mechanism_and_falsifiability",
+              "accept_for_discriminating_pilot",
+              "classify_as_reproduction_not_novelty",
+              "redesign_non_discriminating_experiment",
+              "run_preregistered_paired_test",
+              "stage_low_cost_screen_before_confirmation",
+              "abstain_or_replicate",
+              "reject_current_mechanism_and_test_alternative",
+              "invalidate_result_and_requalify",
+              "run_blinded_mechanism_transfer_test",
+              "reject_transfer_claim",
+              "reject_successor_promotion",
+              "reject_research_state_continuity_claim"
+            ]
+          },
+          "required_response": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "prohibited_inference": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence_to_request": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "why": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "fixture_id",
+          "stage",
+          "scenario",
+          "facts",
+          "expected_action",
+          "required_response",
+          "prohibited_inference",
+          "evidence_to_request",
+          "why"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "properties": {
+        "adjudication": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scoring": {
+          "type": "string",
+          "minLength": 1
+        },
+        "denominator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "no_single_oracle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transfer": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "adjudication",
+        "scoring",
+        "denominator",
+        "no_single_oracle",
+        "transfer"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "source_issue",
+    "purpose",
+    "fixtures",
+    "evaluation_policy"
+  ],
+  "additionalProperties": false
+}
