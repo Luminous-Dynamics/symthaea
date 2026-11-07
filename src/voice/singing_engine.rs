@@ -586,4 +586,32 @@ mod tests {
         assert_eq!(performance.syllables[0].melisma_notes.len(), 2);
         assert!((performance.duration_s() - 0.7).abs() < 1e-4);
     }
+    #[test]
+    fn from_melody_rejects_non_english_g2p_profiles() {
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let error = VocalPerformance::from_melody("light", &[note], "zu")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("language='en' only"));
+    }
+
+    #[test]
+    fn from_melody_rejects_insufficient_notes_instead_of_dropping_lyrics() {
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let error = VocalPerformance::from_melody("light bright", &[note], "en")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("insufficient melody notes"), "{error}");
+    }
+
 }
