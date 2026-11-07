@@ -16,6 +16,7 @@ from pathlib import Path
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
 GOLD_COMPLETENESS = "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
 SEQUENTIAL_EVIDENCE = "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
+EVIDENCE_CROSSWALK = "docs/research/CEB_REVIEW_EVIDENCE_ACTION_CROSSWALK_V0_2026-11-07.md"
 PREREGISTRATION = "docs/research/CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md"
 CHALLENGE = "docs/research/CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md"
 ADJUDICATION = "docs/research/CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md"
@@ -63,6 +64,7 @@ def validate_documents(
     preregistration: str,
     gold_completeness: str,
     sequential_evidence: str,
+    evidence_crosswalk: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -202,6 +204,34 @@ def validate_documents(
         if required not in sequential_evidence:
             errors.append(f"sequential evidence protocol is missing {required}")
 
+    crosswalk_rows = [
+        line for line in evidence_crosswalk.splitlines()
+        if re.match(r"^\\| ERG-S\\d{2} \\|", line)
+    ]
+    crosswalk_ids = [
+        int(re.match(r"^\\| ERG-S(\\d{2}) \\|", line).group(1))
+        for line in crosswalk_rows
+    ]
+    if crosswalk_ids != list(range(1, 27)):
+        errors.append(
+            f"evidence-action crosswalk must map ERG-S01..ERG-S26 exactly once and in order; got {crosswalk_ids}"
+        )
+    if len(crosswalk_rows) != 26:
+        errors.append(f"evidence-action crosswalk must contain 26 rows; got {len(crosswalk_rows)}")
+    for scenario_id, row in zip(crosswalk_ids, crosswalk_rows):
+        if row.count("|") < 6:
+            errors.append(f"ERG-S{scenario_id:02d}: crosswalk row is missing a required column")
+    for required in (
+        "Competing hypotheses / claim to resolve",
+        "Minimum discriminating action",
+        "Strongest authority this action can establish",
+        "Stop / escalate condition",
+        "E3/E4 remain design-only until #10064 qualification",
+        "#10369",
+    ):
+        if required not in evidence_crosswalk:
+            errors.append(f"evidence-action crosswalk is missing {required}")
+
     return errors
 
 
@@ -278,10 +308,21 @@ def self_test() -> list[str]:
         "#10064 #10369",
     ))
 
-    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str) -> list[str]:
-        return validate_documents(t, ch, a, s, p, g, e)
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str) -> list[str]:
+        return validate_documents(t, ch, a, s, p, g, e, x)
 
-    valid = run(triangulation, challenge, adjudication, scorecard, preregistration, gold_completeness, sequential_evidence)
+    crosswalk = "\\n".join((
+        "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
+        *(
+            f"| ERG-S{i:02d} | target vs alternative | E1 smallest action | source_declared | stop or ask |"
+            for i in range(1, 27)
+        ),
+        "E3/E4 remain design-only until #10064 qualification; #10369",
+    ))
+    valid = run(
+        triangulation, challenge, adjudication, scorecard,
+        preregistration, gold_completeness, sequential_evidence, crosswalk
+    )
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
 
@@ -303,6 +344,9 @@ def self_test() -> list[str]:
         ("missing evidence action ladder", "evidence", sequential_evidence.replace("Evidence action ladder", "ladder missing")),
         ("missing stop rule", "evidence", sequential_evidence.replace("Stopping and escalation policy", "stop missing")),
         ("missing cost accounting", "evidence", sequential_evidence.replace("Matched-budget accounting", "budget missing")),
+        ("duplicate crosswalk scenario", "crosswalk", crosswalk.replace("ERG-S02", "ERG-S01", 1)),
+        ("missing crosswalk scenario", "crosswalk", crosswalk.replace("| ERG-S02 |", "| ERG-SXX |", 1)),
+        ("missing crosswalk execution gate", "crosswalk", crosswalk.replace("#10064", "gate removed")),
     )
     for label, target, mutant in mutations:
         args = {
@@ -313,6 +357,7 @@ def self_test() -> list[str]:
             "preregistration": preregistration,
             "gold": gold_completeness,
             "evidence": sequential_evidence,
+            "crosswalk": crosswalk,
         }
         args[target] = mutant
         result = run(
@@ -323,6 +368,7 @@ def self_test() -> list[str]:
             args["preregistration"],
             args["gold"],
             args["evidence"],
+            args["crosswalk"],
         )
         if not result:
             return [f"negative self-test was accepted: {label}"]
@@ -350,7 +396,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 17 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 20 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -360,11 +406,12 @@ def main() -> int:
         preregistration = read_required(args.repo_root, PREREGISTRATION)
         gold_completeness = read_required(args.repo_root, GOLD_COMPLETENESS)
         sequential_evidence = read_required(args.repo_root, SEQUENTIAL_EVIDENCE)
+        evidence_crosswalk = read_required(args.repo_root, EVIDENCE_CROSSWALK)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    failures = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration, gold_completeness, sequential_evidence)
+    failures = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration, gold_completeness, sequential_evidence, evidence_crosswalk)
     if failures:
         for failure in failures:
             print(f"ERROR: {failure}", file=sys.stderr)
@@ -375,7 +422,7 @@ def main() -> int:
         "CEB_REVIEW_RESEARCH_PACK_PASS: "
         f"scenarios={len(ids)} comparators={len(COMPARATORS)} "
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
-        "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1"
+        "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
