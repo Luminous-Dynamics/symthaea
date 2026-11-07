@@ -72,11 +72,12 @@ Each reviewer annotates all assigned variants separately. For every variant:
 1. classify the source state or select unresolved;
 2. decide whether the target mechanism is live, absent or indeterminate;
 3. assess each causal link independently;
-4. distinguish the target from the nearest alternative mechanism;
-5. assess the candidate's counterfactual prediction, where one is supplied;
-6. identify evidence authority and freshness;
-7. assign a disposition, confidence and elapsed annotation time;
-8. cite the smallest source/evidence anchors that support the decision.
+4. for CTG cases, add the topology worksheet in Section 6.1: typed nodes/edges, AND/OR gates, temporal constraints, sufficient paths and residual-path predictions;
+5. distinguish the target from the nearest alternative mechanism;
+6. assess the candidate's counterfactual prediction, where one is supplied;
+7. identify evidence authority and freshness;
+8. assign a disposition, confidence and elapsed annotation time;
+9. cite the smallest source/evidence anchors that support the decision.
 
 Reviewers must record uncertainty rather than infer missing evidence. A reviewer may use the existing evidence classes only: source_declared, syntax_derived, compiler_resolved, runtime_observed, intervention_observed, and inferred/unresolved. The first-pass exercise is source-only; it cannot create runtime or intervention observations.
 
@@ -181,6 +182,31 @@ Create one row per anonymous variant, per reviewer. Use the following columns wi
 | blinding_deviation | none / possible / confirmed, with explanation |
 
 The coordinator-only mapping is not part of the reviewer-facing export. Retain missing values as missing; do not silently convert them to a negative label.
+
+
+### 6.1 Causal-topology addendum (CTG cases only)
+
+Use this addendum only for the six cases in [Causal-Topology Development Challenge V0](CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md). It extends the annotation of the mechanism; it does not create a new task schema, receipt, evaluator or primary metric.
+
+| Field | Reviewer 1 / Reviewer 2 entry |
+|---|---|
+| Target outcome and frozen invariant | |
+| Node inventory (ID, kind, semantic statement, source anchor) | |
+| Edge inventory (from, to, type, condition, source anchor, authority class) | |
+| AND gates and jointly required conditions | |
+| OR gates and alternative sufficient paths | |
+| Temporal partial order / concurrency / unknown ordering | |
+| Minimal sufficient path or condition sets | |
+| Nearest alternative mechanism | |
+| Qualified intervention set(s) | |
+| Residual target paths after each intervention | |
+| Declared context boundary and unobserved remainder | |
+| Topology disposition | correct / wrong / incomplete / unresolved |
+| Main topology disagreement cause | missing path / wrong gate / wrong order / unsupported edge / residual path / scope / other |
+
+Do not require the same node names or an identical drawing. Reviewers must identify semantic equivalence, not reproduce a canonical diagram. A call-graph or shared-file edge is not causal evidence by itself. If the source package does not bound all relevant callers/configurations, mark the open-world remainder unknown.
+
+For CTG calibration, compare first-pass graphs before either reviewer sees the other or the key. Preserve the independent graphs and edge-level rationale; never replace them with a consensus graph. The third adjudicator records the accepted semantic path/gate set and the evidence that resolves each disagreement.
 
 ## 7. Agreement analysis and interpretation
 
