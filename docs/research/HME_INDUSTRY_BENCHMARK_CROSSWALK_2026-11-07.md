@@ -275,3 +275,8 @@ HME integration must not silently alter this legacy behavior. The first exact ba
 - deterministic score-descending / conversation-ID-ascending tie ordering.
 
 The semantic API owner is #10918; the read-only HME comparison is #10917. The intended result is an explicit migration decision, not a shadow scoring implementation.
+
+
+## 12. HDC-LTC checkpoint correctness
+
+The HME architecture now has a dedicated checkpoint-completeness work package, [#10979](https://github.com/Luminous-Dynamics/symthaea/issues/10979). It distinguishes evolution-only snapshots from complete learner checkpoints and replay checkpoints. The distinction is essential because a state snapshot may restore current dynamics while omitting weights, optimizer momentum or mutable normalization statistics needed for continued learning. Checkpoint size comparisons must cover identical field sets; a smaller artifact that omits training state is not a compression win.
