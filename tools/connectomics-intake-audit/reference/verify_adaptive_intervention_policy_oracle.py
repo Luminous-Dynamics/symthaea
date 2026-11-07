@@ -420,7 +420,7 @@ def self_test(fixtures: list[Path]) -> None:
         raise AssertionError("policy depth above the available action count was accepted")
 
     broken = json.loads(json.dumps(data))
-    broken['potential_outcomes'][0]['observations'][0]['outcome_id'] = 'invented-outcome'
+    broken['potential_outcomes'][0]['observations'][1]['outcome_id'] = 'a-minus'
     try:
         build_report(json.dumps(broken).encode(), broken)
     except ValueError:
