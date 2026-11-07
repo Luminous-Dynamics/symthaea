@@ -174,18 +174,21 @@ fn blind_id(salt: &str, backend: &str, case_id: usize) -> String {
 }
 
 fn source_revision() -> Option<String> {
-    std::env::var("GITHUB_SHA").ok().or_else(|| {
-        let output = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let revision = String::from_utf8(output.stdout).ok()?;
-        let revision = revision.trim();
-        (!revision.is_empty()).then(|| revision.to_string())
-    })
+    std::env::var("VOCAL_PHONEME_REVISION")
+        .ok()
+        .or_else(|| std::env::var("GITHUB_SHA").ok())
+        .or_else(|| {
+            let output = Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            let revision = String::from_utf8(output.stdout).ok()?;
+            let revision = revision.trim();
+            (!revision.is_empty()).then(|| revision.to_string())
+        })
 }
 
 fn performance_digest(performance: &VocalPerformance) -> Result<String> {
