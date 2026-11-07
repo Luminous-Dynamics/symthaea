@@ -537,6 +537,16 @@ pub enum CfCPermutationAlignmentError {
     ActivationErrorAboveThreshold { measured: f64, maximum: f64 },
     #[error("alignment assignment margin {measured:?} is below required minimum {minimum}")]
     AssignmentAmbiguous { measured: Option<f64>, minimum: f64 },
+    #[error("alignment receipt does not match the current {field} fingerprint")]
+    StaleAlignment { field: &'static str },
+    #[error("permutation canonicalization supports only a one-layer, non-residual, non-backbone, unidirectional CfC network")]
+    UnsupportedCanonicalizationTopology,
+    #[error("required CfC parameter group is absent from the candidate snapshot: {0}")]
+    MissingCanonicalizationGroup(String),
+    #[error("CfC parameter group has an unexpected shape for canonicalization: {group}")]
+    InvalidCanonicalizationGroupShape { group: String },
+    #[error("canonicalization would not change any parameters")]
+    NoOpCanonicalization,
 }
 
 /// Infer a one-to-one hidden-unit correspondence from frozen activation probes.
@@ -686,6 +696,327 @@ pub fn align_cfc_hidden_unit_signatures(
         mean_squared_activation_error: best_total_cost / (unit_count * probe_count) as f64,
         minimum_assignment_margin,
     })
+}
+
+/// Build a candidate-only WeightProgram that maps the candidate's hidden-unit
+/// coordinates into the source network's coordinate order.
+///
+/// The alignment maps each source unit to its candidate index. For the supported
+/// one-layer topology, the exact function-preserving reparameterization applies
+/// the same row permutation to input weights, both axes of recurrent weights,
+/// hidden bias and time constants, and the matching column permutation to the
+/// output projection. Output bias is unchanged.
+///
+/// This is coordinate canonicalization, not weight transfer: it permutes the
+/// candidate's own tensors and therefore preserves the candidate's function.
+/// The returned program is still only a proposal; callers must materialize it
+/// through the candidate-only adapter, evaluate independent held-out sequences,
+/// and keep the source network unchanged.
+pub fn build_cfc_hidden_unit_canonicalization_program(
+    source: &CfCNetwork,
+    candidate: &CfCNetwork,
+    target_specification_digest: impl Into<String>,
+    alignment: &CfCHiddenUnitAlignment,
+    policy: CfCAlignmentAcceptancePolicy,
+) -> Result<WeightProgram, CfCPermutationAlignmentError> {
+    validate_cfc_alignment_for_parameter_transfer(alignment, policy)?;
+
+    let source_fingerprint = source
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    let candidate_fingerprint = candidate
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+
+    if alignment.source_model_digest != source_fingerprint.model_digest {
+        return Err(CfCPermutationAlignmentError::StaleAlignment {
+            field: "source model",
+        });
+    }
+    if alignment.candidate_model_digest != candidate_fingerprint.model_digest {
+        return Err(CfCPermutationAlignmentError::StaleAlignment {
+            field: "candidate model",
+        });
+    }
+    if alignment.architecture_digest != candidate_fingerprint.architecture_digest
+        || source_fingerprint.architecture_digest != candidate_fingerprint.architecture_digest
+    {
+        return Err(CfCPermutationAlignmentError::ArchitectureMismatch {
+            source: alignment.architecture_digest.clone(),
+            candidate: candidate_fingerprint.architecture_digest,
+        });
+    }
+    if alignment.manifest_digest != candidate_fingerprint.manifest_digest
+        || source_fingerprint.manifest_digest != candidate_fingerprint.manifest_digest
+    {
+        return Err(CfCPermutationAlignmentError::ManifestMismatch {
+            source: alignment.manifest_digest.clone(),
+            candidate: candidate_fingerprint.manifest_digest,
+        });
+    }
+
+    let config = candidate.config();
+    if config.num_layers != 1
+        || config.residual
+        || config.bidirectional
+        || config.cell_config.use_backbone
+        || alignment.layer_index != 0
+        || alignment.source_to_candidate.len() != config.hidden_dim
+    {
+        return Err(CfCPermutationAlignmentError::UnsupportedCanonicalizationTopology);
+    }
+
+    let task_digest = target_specification_digest.into();
+    let snapshot = cfc_weight_model_snapshot(candidate, task_digest.clone()).map_err(|error| {
+        match error {
+            CfCWeightProgramAdapterError::Fingerprint(message) => {
+                CfCPermutationAlignmentError::FingerprintFailed(message)
+            }
+            _ => CfCPermutationAlignmentError::MissingCanonicalizationGroup(
+                "candidate snapshot".to_owned(),
+            ),
+        }
+    })?;
+    let hidden_dim = config.hidden_dim;
+    let mut operations = Vec::with_capacity(5);
+    let mut changed_parameter_count = 0_usize;
+    let mut squared_delta = 0.0_f64;
+    let mut max_abs_delta = 0.0_f32;
+
+    let mut add_replacement = |group_id: CfCWeightGroupId,
+                               expected_shape: &[usize],
+                               replacement: Vec<f32>|
+     -> Result<(), CfCPermutationAlignmentError> {
+        let target = WeightProgramTarget::CfC(group_id.clone());
+        let group = snapshot
+            .groups
+            .iter()
+            .find(|group| group.target == target)
+            .ok_or_else(|| {
+                CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{group_id:?}"))
+            })?;
+        if group.shape != expected_shape || group.values.len() != replacement.len() {
+            return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                group: format!("{group_id:?}"),
+            });
+        }
+        for (before, after) in group.values.iter().copied().zip(replacement.iter().copied()) {
+            let delta = after - before;
+            if delta != 0.0 {
+                changed_parameter_count += 1;
+                squared_delta += f64::from(delta).powi(2);
+                max_abs_delta = max_abs_delta.max(delta.abs());
+            }
+        }
+        operations.push(WeightProgramOperation::ReplaceGroup {
+            target,
+            values: replacement,
+        });
+        Ok(())
+    };
+
+    let input_group = CfCWeightGroupId::CellInputProjection { cell: 0 };
+    let input_snapshot = snapshot
+        .groups
+        .iter()
+        .find(|group| group.target == WeightProgramTarget::CfC(input_group.clone()))
+        .ok_or_else(|| {
+            CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{input_group:?}"))
+        })?;
+    let input_shape = input_snapshot.shape.clone();
+    if input_shape.len() != 2 || input_shape[0] != hidden_dim {
+        return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+            group: format!("{input_group:?}"),
+        });
+    }
+    let permuted_input = permute_matrix_rows_checked(
+        &input_snapshot.values,
+        input_shape[0],
+        input_shape[1],
+        &alignment.source_to_candidate,
+    )
+    .ok_or_else(|| CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+        group: format!("{input_group:?}"),
+    })?;
+    add_replacement(input_group, &input_shape, permuted_input)?;
+
+    let recurrent_group = CfCWeightGroupId::CellRecurrentProjection { cell: 0 };
+    let recurrent_snapshot = snapshot
+        .groups
+        .iter()
+        .find(|group| group.target == WeightProgramTarget::CfC(recurrent_group.clone()))
+        .ok_or_else(|| {
+            CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{recurrent_group:?}"))
+        })?;
+    let recurrent_shape = recurrent_snapshot.shape.clone();
+    if recurrent_shape != [hidden_dim, hidden_dim] {
+        return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+            group: format!("{recurrent_group:?}"),
+        });
+    }
+    let permuted_recurrent = permute_square_checked(
+        &recurrent_snapshot.values,
+        hidden_dim,
+        &alignment.source_to_candidate,
+    )
+    .ok_or_else(|| CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+        group: format!("{recurrent_group:?}"),
+    })?;
+    add_replacement(recurrent_group, &recurrent_shape, permuted_recurrent)?;
+
+    for group_id in [
+        CfCWeightGroupId::CellHiddenBias { cell: 0 },
+        CfCWeightGroupId::CellTimeConstant { cell: 0 },
+    ] {
+        let group = snapshot
+            .groups
+            .iter()
+            .find(|group| group.target == WeightProgramTarget::CfC(group_id.clone()))
+            .ok_or_else(|| {
+                CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{group_id:?}"))
+            })?;
+        if group.shape != [hidden_dim] || group.values.len() != hidden_dim {
+            return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                group: format!("{group_id:?}"),
+            });
+        }
+        let replacement = alignment
+            .source_to_candidate
+            .iter()
+            .map(|index| group.values[*index])
+            .collect::<Vec<_>>();
+        add_replacement(group_id, &[hidden_dim], replacement)?;
+    }
+
+    let output_group = CfCWeightGroupId::OutputProjection;
+    let output_snapshot = snapshot
+        .groups
+        .iter()
+        .find(|group| group.target == WeightProgramTarget::CfC(output_group.clone()))
+        .ok_or_else(|| {
+            CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{output_group:?}"))
+        })?;
+    let output_shape = output_snapshot.shape.clone();
+    if output_shape != [config.output_dim, hidden_dim] {
+        return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+            group: format!("{output_group:?}"),
+        });
+    }
+    let permuted_output = permute_matrix_columns_checked(
+        &output_snapshot.values,
+        config.output_dim,
+        hidden_dim,
+        &alignment.source_to_candidate,
+    )
+    .ok_or_else(|| CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+        group: format!("{output_group:?}"),
+    })?;
+    add_replacement(output_group, &output_shape, permuted_output)?;
+
+    if changed_parameter_count == 0 {
+        return Err(CfCPermutationAlignmentError::NoOpCanonicalization);
+    }
+
+    let total_l2_delta = squared_delta.sqrt() as f32;
+    let budget_epsilon = 1.0e-6_f32;
+    let max_total_l2_delta = total_l2_delta * (1.0 + 1.0e-6) + budget_epsilon;
+    let max_abs_delta = max_abs_delta * (1.0 + 1.0e-6) + budget_epsilon;
+    let mut evidence_hasher = blake3::Hasher::new();
+    evidence_hasher.update(b"symthaea-cfc-hidden-unit-alignment-receipt-v1\0");
+    evidence_hasher.update(alignment.source_model_digest.as_bytes());
+    evidence_hasher.update(alignment.candidate_model_digest.as_bytes());
+    evidence_hasher.update(alignment.architecture_digest.as_bytes());
+    evidence_hasher.update(alignment.manifest_digest.as_bytes());
+    evidence_hasher.update(alignment.probe_digest.as_bytes());
+    evidence_hasher.update(&(alignment.layer_index as u64).to_le_bytes());
+    for index in alignment.source_to_candidate.iter().copied() {
+        evidence_hasher.update(&(index as u64).to_le_bytes());
+    }
+    evidence_hasher.update(&alignment.mean_squared_activation_error.to_le_bytes());
+    if let Some(margin) = alignment.minimum_assignment_margin {
+        evidence_hasher.update(&margin.to_le_bytes());
+    }
+
+    Ok(WeightProgram {
+        format_version: 1,
+        architecture_digest: snapshot.architecture_digest,
+        manifest_digest: snapshot.manifest_digest,
+        base_model_digest: snapshot.model_digest,
+        target_specification_digest: task_digest,
+        fault_hypothesis_ids: vec!["symmetry:hidden-unit-permutation-canonicalization".to_owned()],
+        evidence_receipt_ids: vec![format!(
+            "alignment:{}",
+            evidence_hasher.finalize().to_hex()
+        )],
+        max_changed_parameters: changed_parameter_count,
+        max_total_l2_delta,
+        max_abs_delta,
+        operations,
+    })
+}
+
+fn permute_matrix_rows_checked(
+    values: &[f32],
+    rows: usize,
+    columns: usize,
+    permutation: &[usize],
+) -> Option<Vec<f32>> {
+    if values.len() != rows.checked_mul(columns)? || permutation.len() != rows {
+        return None;
+    }
+    let mut seen = vec![false; rows];
+    for index in permutation.iter().copied() {
+        if index >= rows || seen[index] {
+            return None;
+        }
+        seen[index] = true;
+    }
+    let mut result = vec![0.0; values.len()];
+    for new_row in 0..rows {
+        let old_row = permutation[new_row];
+        let source = old_row * columns;
+        let destination = new_row * columns;
+        result[destination..destination + columns]
+            .copy_from_slice(&values[source..source + columns]);
+    }
+    Some(result)
+}
+
+fn permute_square_checked(
+    values: &[f32],
+    dimension: usize,
+    permutation: &[usize],
+) -> Option<Vec<f32>> {
+    if values.len() != dimension.checked_mul(dimension)? {
+        return None;
+    }
+    let rows = permute_matrix_rows_checked(values, dimension, dimension, permutation)?;
+    permute_matrix_columns_checked(&rows, dimension, dimension, permutation)
+}
+
+fn permute_matrix_columns_checked(
+    values: &[f32],
+    rows: usize,
+    columns: usize,
+    permutation: &[usize],
+) -> Option<Vec<f32>> {
+    if values.len() != rows.checked_mul(columns)? || permutation.len() != columns {
+        return None;
+    }
+    let mut seen = vec![false; columns];
+    for index in permutation.iter().copied() {
+        if index >= columns || seen[index] {
+            return None;
+        }
+        seen[index] = true;
+    }
+    let mut result = vec![0.0; values.len()];
+    for row in 0..rows {
+        for new_column in 0..columns {
+            result[row * columns + new_column] = values[row * columns + permutation[new_column]];
+        }
+    }
+    Some(result)
 }
 
 /// Select the next functional probe that most increases assignment confidence.
