@@ -285,6 +285,8 @@ fn formal_rule_generation_is_a_versioned_wire_value_and_schema_contract() {
         schema["properties"]["binding"]["properties"]["evaluator_rule_generation"]["const"],
         json!(0)
     );
+}
+
 #[test]
 fn formal_parser_rejects_omitted_nullable_fields_instead_of_defaulting_them() {
     let evidence = verify_evidence_json(fixture_bytes()).unwrap();
@@ -342,8 +344,7 @@ fn formal_parser_rejects_omitted_nullable_fields_instead_of_defaulting_them() {
 
     for (field, value) in mutations {
         let bytes = serde_json::to_vec(&value).unwrap();
-        let error = parse_formal_provider_observation_json(&bytes)
-            .unwrap_err();
+        let error = parse_formal_provider_observation_json(&bytes).unwrap_err();
         assert_eq!(
             error.kind,
             FormalMappingErrorKind::InvalidJson,
