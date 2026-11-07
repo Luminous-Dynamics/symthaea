@@ -346,12 +346,28 @@ pub enum ScoreEventKind {
 /// Ordered note-index assignment for one resolved pronunciation syllable.
 /// Multiple consecutive note indices represent a melisma over one explicitly
 /// designated vowel phone from the selected pronunciation candidate.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScoreEventSpan {
+    /// Index into the ordered score event list.
+    pub event_index: usize,
+    /// Half-open interval, in seconds relative to the score event's onset.
+    /// Multiple syllables may occupy disjoint sub-intervals of one long note.
+    pub start_offset_s: f32,
+    pub end_offset_s: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SyllableNoteBinding {
     pub word_index: usize,
     pub syllable_index: usize,
-    pub note_indices: Vec<usize>,
+    /// One or more ordered intervals within sung score events. One syllable
+    /// may span multiple consecutive notes (melisma); several syllables may
+    /// occupy different intervals inside the same note.
+    pub spans: Vec<ScoreEventSpan>,
+    /// Required when this syllable spans multiple score events. It identifies
+    /// the exact vowel nucleus sustained across those events.
     pub melisma_phone_index: Option<usize>,
 }
 
@@ -376,9 +392,15 @@ pub struct VocalScoreAlignment {
 
 impl VocalScoreAlignment {
     /// Validate the score mapping against a fully resolved pronunciation plan.
-    /// Every selected syllable and every sung score event must be represented
-    /// exactly once. Rests are explicit and cannot be assigned to a syllable.
+    ///
+    /// Every selected syllable is represented once. Every sung note interval
+    /// is covered exactly once by one or more syllable intervals. This permits
+    /// both one-syllable-to-many-notes melisma and many-syllables-to-one-note
+    /// subdivision, while forbidding overlap, gaps, and silent event loss.
+    /// Rests remain explicit and unbound.
     pub fn validate_against(&self, pronunciation: &PronunciationPlan) -> Result<(), String> {
+        const TIME_EPSILON_S: f32 = 0.000_01;
+
         pronunciation.validate_renderable()?;
         if self.schema_version != 1 {
             return Err(format!(
@@ -389,7 +411,7 @@ impl VocalScoreAlignment {
         if self.events.is_empty() || self.syllable_bindings.is_empty() || self.phrases.is_empty() {
             return Err("score events, syllable bindings, and phrases are required".into());
         }
-        if self.events[0].start_s.abs() > 0.000_01 {
+        if self.events[0].start_s.abs() > TIME_EPSILON_S {
             return Err(
                 "score must begin at time zero; represent an opening gap as an explicit Rest event"
                     .into(),
@@ -409,12 +431,12 @@ impl VocalScoreAlignment {
             if !end.is_finite() || end <= event.start_s {
                 return Err(format!("score event {event_index} has invalid end time"));
             }
-            if event.start_s < previous_event_end {
+            if event.start_s < previous_event_end - TIME_EPSILON_S {
                 return Err(format!(
                     "score event {event_index} overlaps or is out of chronological order"
                 ));
             }
-            if event_index > 0 && (event.start_s - previous_event_end).abs() > 0.000_01 {
+            if event_index > 0 && (event.start_s - previous_event_end).abs() > TIME_EPSILON_S {
                 return Err(format!(
                     "score event {event_index} has an implicit gap; represent it as an explicit Rest event"
                 ));
@@ -462,8 +484,12 @@ impl VocalScoreAlignment {
             ));
         }
 
-        let mut bound_sung_events = std::collections::BTreeSet::new();
-        let mut previous_bound_event = None;
+        // Collect every sub-interval assigned within each score event. The
+        // final coverage pass proves that intervals partition each sung note.
+        let mut event_coverage: Vec<Vec<(f32, f32, usize)>> =
+            vec![Vec::new(); self.events.len()];
+        let mut previous_binding_end_s: Option<f32> = None;
+
         for (binding_index, (binding, expected)) in self
             .syllable_bindings
             .iter()
@@ -476,38 +502,73 @@ impl VocalScoreAlignment {
                     expected.0, expected.1
                 ));
             }
-            if binding.note_indices.is_empty() {
-                return Err(format!(
-                    "syllable binding {binding_index} has no score notes"
-                ));
+            if binding.spans.is_empty() {
+                return Err(format!("syllable binding {binding_index} has no score spans"));
             }
-            for (span_index, note_index) in binding.note_indices.iter().copied().enumerate() {
-                let Some(event) = self.events.get(note_index) else {
+
+            let mut previous_span: Option<&ScoreEventSpan> = None;
+            let mut seen_events = std::collections::BTreeSet::new();
+            for span in &binding.spans {
+                let Some(event) = self.events.get(span.event_index) else {
                     return Err(format!(
-                        "syllable binding {binding_index} references missing score event {note_index}"
+                        "syllable binding {binding_index} references missing score event {}",
+                        span.event_index
                     ));
                 };
                 if !matches!(event.kind, ScoreEventKind::SungNote { .. }) {
                     return Err(format!(
-                        "syllable binding {binding_index} assigns a rest event {note_index}"
+                        "syllable binding {binding_index} assigns a rest event {}",
+                        span.event_index
                     ));
                 }
-                if span_index > 0 && note_index != binding.note_indices[span_index - 1] + 1 {
+                if !span.start_offset_s.is_finite()
+                    || !span.end_offset_s.is_finite()
+                    || span.start_offset_s < 0.0
+                    || span.end_offset_s <= span.start_offset_s
+                    || span.end_offset_s > event.duration_s + TIME_EPSILON_S
+                {
                     return Err(format!(
-                        "syllable binding {binding_index} melisma note span must be contiguous"
+                        "syllable binding {binding_index} has an invalid interval in score event {}",
+                        span.event_index
                     ));
                 }
-                if previous_bound_event.is_some_and(|previous| note_index <= previous) {
+                if !seen_events.insert(span.event_index) {
                     return Err(format!(
-                        "syllable binding {binding_index} overlaps or reorders score notes"
+                        "syllable binding {binding_index} assigns the same score event more than once"
                     ));
                 }
-                if !bound_sung_events.insert(note_index) {
+                if let Some(previous) = previous_span {
+                    if span.event_index != previous.event_index + 1 {
+                        return Err(format!(
+                            "syllable binding {binding_index} multi-note span must use consecutive score events"
+                        ));
+                    }
+                    let previous_event = &self.events[previous.event_index];
+                    if previous.end_offset_s + TIME_EPSILON_S < previous_event.duration_s
+                        || span.start_offset_s > TIME_EPSILON_S
+                    {
+                        return Err(format!(
+                            "syllable binding {binding_index} has a gap between consecutive melisma notes"
+                        ));
+                    }
+                }
+
+                let event_start_s = event.start_s + span.start_offset_s;
+                let event_end_s = event.start_s + span.end_offset_s;
+                if previous_binding_end_s
+                    .is_some_and(|previous_end| event_start_s < previous_end - TIME_EPSILON_S)
+                {
                     return Err(format!(
-                        "score event {note_index} is assigned more than once"
+                        "syllable binding {binding_index} overlaps or reorders a preceding syllable"
                     ));
                 }
-                previous_bound_event = Some(note_index);
+                previous_binding_end_s = Some(event_end_s);
+                event_coverage[span.event_index].push((
+                    span.start_offset_s,
+                    span.end_offset_s.min(event.duration_s),
+                    binding_index,
+                ));
+                previous_span = Some(span);
             }
 
             let word = &pronunciation.words[binding.word_index];
@@ -532,7 +593,7 @@ impl VocalScoreAlignment {
                     "syllable binding {binding_index} references a missing pronunciation syllable"
                 ));
             };
-            if binding.note_indices.len() > 1 {
+            if binding.spans.len() > 1 {
                 let Some(phone_index) = binding.melisma_phone_index else {
                     return Err(format!(
                         "multi-note syllable binding {binding_index} requires an explicit melisma vowel"
@@ -550,20 +611,40 @@ impl VocalScoreAlignment {
                 }
             } else if binding.melisma_phone_index.is_some() {
                 return Err(format!(
-                    "single-note syllable binding {binding_index} must not declare a melisma phone"
+                    "single-event syllable binding {binding_index} must not declare a melisma phone"
                 ));
             }
         }
 
         for (event_index, event) in self.events.iter().enumerate() {
             match event.kind {
-                ScoreEventKind::SungNote { .. } if !bound_sung_events.contains(&event_index) => {
-                    return Err(format!("sung score event {event_index} is unassigned"));
-                }
-                ScoreEventKind::Rest if bound_sung_events.contains(&event_index) => {
+                ScoreEventKind::Rest if !event_coverage[event_index].is_empty() => {
                     return Err(format!("rest event {event_index} cannot be bound"));
                 }
-                _ => {}
+                ScoreEventKind::SungNote { .. } => {
+                    let mut segments = event_coverage[event_index].clone();
+                    segments.sort_by(|left, right| left.0.total_cmp(&right.0));
+                    let mut covered_until = 0.0f32;
+                    for (start_s, end_s, binding_index) in segments {
+                        if start_s > covered_until + TIME_EPSILON_S {
+                            return Err(format!(
+                                "sung score event {event_index} has an unassigned interval before syllable binding {binding_index}"
+                            ));
+                        }
+                        if start_s < covered_until - TIME_EPSILON_S {
+                            return Err(format!(
+                                "sung score event {event_index} has overlapping syllable intervals at binding {binding_index}"
+                            ));
+                        }
+                        covered_until = end_s;
+                    }
+                    if (covered_until - event.duration_s).abs() > TIME_EPSILON_S {
+                        return Err(format!(
+                            "sung score event {event_index} is not fully covered by syllable intervals"
+                        ));
+                    }
+                }
+                ScoreEventKind::Rest => {}
             }
         }
 
