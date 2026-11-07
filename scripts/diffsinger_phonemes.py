@@ -101,6 +101,44 @@ def duration_per_mapped_phone(duration_ms: float, mapped_phone_count: int) -> fl
     return duration_ms / mapped_phone_count
 
 
+def note_timing(note: object, context: str) -> tuple[float, float, float, float]:
+    """Validate a score note and return (start_s, duration_s, frequency_hz, end_s)."""
+    if not isinstance(note, Mapping):
+        raise ValueError(f"{context} must be an object")
+    values: dict[str, float] = {}
+    for field in ("start_time", "duration", "frequency"):
+        value = note.get(field)
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError(f"{context}.{field} must be a finite number")
+        values[field] = float(value)
+    start = values["start_time"]
+    duration = values["duration"]
+    frequency = values["frequency"]
+    if start < 0.0 or duration <= 0.0 or frequency <= 0.0:
+        raise ValueError(f"{context} requires non-negative start and positive duration/frequency")
+    end = start + duration
+    if not math.isfinite(end) or end <= start:
+        raise ValueError(f"{context} has an invalid end time")
+    return start, duration, frequency, end
+
+
+def timeline_gap_ms(start_s: float, previous_end_s: float, context: str) -> float:
+    """Return silence between adjacent events; reject overlaps instead of compressing them."""
+    if (
+        type(start_s) not in (int, float)
+        or type(previous_end_s) not in (int, float)
+        or not math.isfinite(start_s)
+        or not math.isfinite(previous_end_s)
+        or start_s < 0.0
+        or previous_end_s < 0.0
+    ):
+        raise ValueError(f"{context} timeline values must be finite and non-negative")
+    gap_s = float(start_s) - float(previous_end_s)
+    if gap_s < -1e-6:
+        raise ValueError(f"{context} overlaps the preceding score event by {-gap_s * 1000.0:.3f} ms")
+    return max(gap_s, 0.0) * 1000.0
+
+
 def resolve_language_id(language_ids: Mapping[str, Any], language: str) -> int:
     """Require an explicit valid language entry; never default to language zero."""
     if not isinstance(language, str) or not language.strip():
