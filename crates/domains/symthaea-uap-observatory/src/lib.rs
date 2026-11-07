@@ -793,3 +793,14 @@ pub use triangulation::{
     Vector3 as EcefVector3, bearing_fisher_information, rank_sensor_placements,
     triangulate_bearings, triangulate_bearings_with_config,
 };
+
+/// Frame-level multi-target GOSPA metrics; trajectory-level metrics remain future work.
+pub mod tracking_metrics;
+
+pub use tracking_metrics::{
+    GospaBreakdown,
+    GospaConfig,
+    GospaError,
+    MAX_GOSPA_ASSIGNMENT_SIDE,
+    gospa_frame,
+};
