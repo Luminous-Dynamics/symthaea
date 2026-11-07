@@ -19,6 +19,25 @@ pub const DEFAULT_PHASE_BINS: u8 = 8;
 /// Maximum registered perturbation magnitude levels in V1.
 pub const MAX_MAGNITUDE_BINS: u8 = 16;
 
+/// Convert finite radians to a checked, rounded unwrapped microturn count.
+/// Rust's round-half-away-from-zero rule is used. The quantization error is
+/// less than half a microturn; upstream estimator uncertainty is not included.
+fn radians_to_unwrapped_microturns(value: f64) -> Result<i64, PhaseError> {
+    if !value.is_finite() {
+        return Err(PhaseError::NonFinitePhase);
+    }
+    let microturns = value * (PHASE_SCALE as f64) / std::f64::consts::TAU;
+    if !microturns.is_finite() || microturns < i64::MIN as f64 || microturns >= i64::MAX as f64
+    {
+        return Err(PhaseError::PhaseOutOfRange);
+    }
+    let rounded = microturns.round();
+    if rounded < i64::MIN as f64 || rounded >= i64::MAX as f64 {
+        return Err(PhaseError::PhaseOutOfRange);
+    }
+    Ok(rounded as i64)
+}
+
 /// Canonical fixed-point oscillator phase.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct Phase(i32);
@@ -30,25 +49,12 @@ impl Phase {
         Self(wrap_microturns(value) as i32)
     }
 
-    /// Construct a phase sample from an unwrapped phase in radians.
-    ///
-    /// The conversion quantizes to the nearest microturn using Rust's
-    /// round-half-away-from-zero rule. The quantization error is less than
-    /// half a microturn; upstream phase-estimator uncertainty is not included.
+    /// Construct a wrapped phase from an unwrapped phase in radians.
+    /// Integer cycle winding is intentionally discarded by this type.
     pub fn from_unwrapped_radians(value: f64) -> Result<Self, PhaseError> {
-        if !value.is_finite() {
-            return Err(PhaseError::NonFinitePhase);
-        }
-        let microturns = value * (PHASE_SCALE as f64) / std::f64::consts::TAU;
-        if !microturns.is_finite() || microturns < i64::MIN as f64 || microturns >= i64::MAX as f64
-        {
-            return Err(PhaseError::PhaseOutOfRange);
-        }
-        let rounded = microturns.round();
-        if rounded < i64::MIN as f64 || rounded >= i64::MAX as f64 {
-            return Err(PhaseError::PhaseOutOfRange);
-        }
-        Ok(Self::from_unwrapped_microturns(rounded as i64))
+        Ok(Self::from_microturns(
+            radians_to_unwrapped_microturns(value)?,
+        ))
     }
 
     /// Return the canonical signed microturn count.
@@ -826,6 +832,14 @@ pub struct PhaseSample {
 }
 
 impl PhaseSample {
+    /// Construct a phase sample from unwrapped radians while preserving
+    /// integer cycle winding and canonical fractional phase.
+    pub fn from_unwrapped_radians(value: f64) -> Result<Self, PhaseError> {
+        Ok(Self::from_unwrapped_microturns(
+            radians_to_unwrapped_microturns(value)?,
+        ))
+    }
+
     /// Split an unwrapped microturn count into integer cycle winding and
     /// canonical fractional phase.
     pub fn from_unwrapped_microturns(value: i64) -> Self {
