@@ -359,7 +359,11 @@ impl VocalPerformance {
                 self.syllables.len()
             );
         }
-        let primary_notes: Vec<Note> = self.syllables.iter().map(|syllable| syllable.note).collect();
+        let primary_notes: Vec<Note> = self
+            .syllables
+            .iter()
+            .map(|syllable| syllable.note)
+            .collect();
         let expected_alignment = symthaea_muse::singing_bridge::sing(&self.lyrics, &primary_notes);
         if expected_alignment.len() != self.syllables.len() {
             bail!(
@@ -368,21 +372,17 @@ impl VocalPerformance {
                 self.syllables.len()
             );
         }
-        for (syllable_index, (expected, observed)) in expected_alignment
-            .iter()
-            .zip(&self.syllables)
-            .enumerate()
+        for (syllable_index, (expected, observed)) in
+            expected_alignment.iter().zip(&self.syllables).enumerate()
         {
             if expected.phonemes.len() != observed.phonemes.len()
-                || expected
-                    .phonemes
-                    .iter()
-                    .zip(&observed.phonemes)
-                    .any(|(expected_phone, observed_phone)| {
+                || expected.phonemes.iter().zip(&observed.phonemes).any(
+                    |(expected_phone, observed_phone)| {
                         expected_phone.ipa != observed_phone.ipa
                             || expected_phone.is_vowel != observed_phone.is_vowel
                             || expected_phone.stress != observed_phone.stress
-                    })
+                    },
+                )
             {
                 bail!(
                     "vocal syllable {syllable_index} phone sequence does not match the selected English G2P result; use a reviewed pronunciation-plan override rather than mutating v2 phones"
@@ -875,9 +875,7 @@ mod tests {
         assert!(SingingBackendCapabilities::new("fixture", controls).is_err());
     }
 
-    fn capability_fixture(
-        support: CapabilitySupport,
-    ) -> SingingBackendCapabilities {
+    fn capability_fixture(support: CapabilitySupport) -> SingingBackendCapabilities {
         SingingBackendCapabilities::new(
             "fixture",
             SingingControl::ALL
@@ -896,7 +894,10 @@ mod tests {
     fn render_policy_admits_only_declared_control_levels() {
         let native = capability_fixture(CapabilitySupport::Native);
         let policy = SingingRenderPolicy::new(
-            vec![SingingControl::ExactPhoneSequence, SingingControl::NotePitch],
+            vec![
+                SingingControl::ExactPhoneSequence,
+                SingingControl::NotePitch,
+            ],
             false,
             false,
         )
@@ -905,22 +906,15 @@ mod tests {
 
         let approximated = capability_fixture(CapabilitySupport::Approximated);
         assert!(policy.validate_against(&approximated).is_err());
-        let permissive = SingingRenderPolicy::new(
-            vec![SingingControl::ExactPhoneSequence],
-            true,
-            false,
-        )
-        .unwrap();
+        let permissive =
+            SingingRenderPolicy::new(vec![SingingControl::ExactPhoneSequence], true, false)
+                .unwrap();
         assert!(permissive.validate_against(&approximated).is_ok());
 
         let conditional = capability_fixture(CapabilitySupport::Conditional);
         assert!(permissive.validate_against(&conditional).is_err());
-        let conditional_policy = SingingRenderPolicy::new(
-            vec![SingingControl::Language],
-            false,
-            true,
-        )
-        .unwrap();
+        let conditional_policy =
+            SingingRenderPolicy::new(vec![SingingControl::Language], false, true).unwrap();
         assert!(conditional_policy.validate_against(&conditional).is_ok());
 
         let unsupported = SingingBackendCapabilities::undeclared("unverified");
@@ -930,10 +924,7 @@ mod tests {
     #[test]
     fn render_policy_rejects_duplicate_required_controls() {
         let error = SingingRenderPolicy::new(
-            vec![
-                SingingControl::NotePitch,
-                SingingControl::NotePitch,
-            ],
+            vec![SingingControl::NotePitch, SingingControl::NotePitch],
             true,
             true,
         )
