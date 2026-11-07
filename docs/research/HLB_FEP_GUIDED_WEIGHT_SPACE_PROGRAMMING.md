@@ -413,6 +413,30 @@ The categorical likelihood BMR baseline must use the Dirichlet primitive in `cra
 
 BMR is evaluated after evidence updates the full-model Dirichlet posterior. It must not be added directly to prospective expected information gain or pragmatic value. The state/parameter/model information terms remain separate and their chain rule must be checked.
 
+### G. Causal weight reading under semantic interventions
+
+A model's weights may contain recognizable statistical signatures without revealing the function it actually computes. Recent 2026 weight-reading experiments and independent audits show why familiar dataset priors, class order, and local weight statistics must be separated from causal understanding.
+
+Ahmed's 5 November 2026 exploratory study reports that a weight-only LLM can infer local batch-normalization and output-layer patterns, but often overgeneralizes familiar dataset labels; after a class-label permutation, its interpretations follow memorized label order and become incorrect. The paper uses mostly single runs and is explicitly exploratory, so this should motivate controls rather than be treated as definitive evidence that LLM weight reading cannot work.
+
+The Alan Turing Institute replication reports that a written Breakout policy could be independently decompiled to an exactly action-equivalent program over 49,189 states. However, its weight-only handwritten-digit classification performance averaged 50%, below an 82% fitted-template baseline. This reinforces a key distinction: compiling a policy, identifying a task, interpreting a trained representation, and diagnosing causal computation are different capabilities.
+
+Design a matched family of small networks with identical architecture and dimensions but distinct hidden task functions, randomized class/action names, and procedural task families absent from familiar public benchmarks. Give the reader raw weights and a fixed set of frozen functional probes. Compare weight-only interpretation against architecture-only priors, activation-probe-assisted interpretation, intervention-assisted interpretation, and a verifier-only full-function oracle.
+
+The primary question is not whether a reader can guess a task label. It is whether it can predict what happens under a controlled intervention. The evaluator should ask the reader to predict outputs after selected parameter-group ablations, hidden-unit permutations, output-label permutations, or scale-preserving weight shuffles, then execute those interventions and compare the predictions with actual outputs.
+
+Primary outcomes: task-semantic identification accuracy, held-out function prediction, label-mapping recovery, causal intervention prediction, and false semantic-claim rate. Diagnostics: calibration, selective accuracy at matched coverage, performance after output-label permutation, unseen-task generalization, probe budget, and accuracy versus parameter count.
+
+Negative controls must include architecture-only guessing, shuffled weights that preserve marginal distributions, randomized class/action names, misleading metadata, and task families generated only after the reader's method/prompt is frozen. Score task names and semantic explanations only when they imply a testable behavioural prediction. A confident explanation that fails the held-out intervention is a false claim, not a partial success.
+
+Keep four claims distinct:
+1. **Pattern reading:** recognition of local statistical structure in weights.
+2. **Task identification:** correct prediction of the training/task family.
+3. **Functional reconstruction:** prediction of outputs on unseen inputs.
+4. **Causal understanding:** correct prediction of how specific interventions change the function.
+
+Only the fourth supports a strong claim of weight-space diagnosis. This task is initially a benchmark specification; no Symthaea semantic-reading capability result is claimed.
+
 ## 6. Baselines and fairness requirements
 
 ### Temporal models
