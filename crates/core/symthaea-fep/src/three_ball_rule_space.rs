@@ -776,7 +776,7 @@ mod tests {
     use super::*;
     use crate::dirichlet_model_reduction::{
         evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
-        DirichletActionPrediction, DirichletPredictedOutcome,
+        DirichletActionPrediction,
     };
 
     #[test]
@@ -947,56 +947,22 @@ mod tests {
 
     fn feedback_action_prediction(
         space: &ThreeBallRuleSpace,
+        posterior: &DirichletConcentrationTensor,
         models: &[ReducedDirichletModelHypothesis],
         ball_colours: [ThreeBallColour; 3],
         gaze: Option<ThreeBallLocation>,
         choice: Option<ThreeBallColour>,
     ) -> DirichletActionPrediction {
-        // Column order is choice (outer), gaze, right, centre, left (inner).
-        let choice_index = choice.map(|value| value as usize).unwrap_or(3);
-        // Gaze state order in the SPM tensor is start, left, centre, right.
-        let gaze_index = gaze.map(|value| 1 + value as usize).unwrap_or(0);
-        let [left, centre, right] = ball_colours.map(|value| value as usize);
-        let column_index =
-            choice_index * 4 * 27 + gaze_index * 27 + right * 9 + centre * 3 + left * 1;
-
-        let predictive = &space.full_model_average_prior.columns[column_index];
-        let outcomes = predictive
-            .iter()
-            .copied()
-            .enumerate()
-            .filter(|(_, probability)| *probability > 0.0)
-            .map(|(outcome_index, probability)| {
-                let mut posterior_count_increment =
-                    vec![vec![0.0; THREE_BALL_FEEDBACK_OUTCOME_COUNT];
-                         THREE_BALL_HIDDEN_STATE_COLUMN_COUNT];
-                posterior_count_increment[column_index][outcome_index] = 1.0;
-                DirichletPredictedOutcome {
-                    outcome_id: format!("{:?}", match outcome_index {
-                        0 => ThreeBallFeedback::NoFeedback,
-                        1 => ThreeBallFeedback::Correct,
-                        2 => ThreeBallFeedback::Incorrect,
-                        _ => unreachable!("exactly three feedback outcomes"),
-                    }),
-                    full_model_predictive_probability: probability,
-                    model_predictive_probabilities: models
-                        .iter()
-                        .map(|model| {
-                            (
-                                model.model_id.clone(),
-                                model.parameter_prior.columns[column_index][outcome_index],
-                            )
-                        })
-                        .collect(),
-                    posterior_count_increment,
-                }
-            })
-            .collect();
-
-        DirichletActionPrediction {
-            action_id: format!("gaze={gaze:?};choice={choice:?}"),
-            outcomes,
-        }
+        build_three_ball_feedback_action_prediction(
+            space,
+            posterior,
+            models,
+            ball_colours,
+            gaze,
+            choice,
+            format!("gaze={gaze:?};choice={choice:?}"),
+        )
+        .expect("known-state feedback prediction")
     }
 
     #[test]
@@ -1022,6 +988,7 @@ mod tests {
         for choice in choices {
             let labelled_action = feedback_action_prediction(
                 &space,
+                full_prior,
                 &labelled_models,
                 ball_colours,
                 Some(ThreeBallLocation::Centre),
@@ -1029,6 +996,7 @@ mod tests {
             );
             let quotient_action = feedback_action_prediction(
                 &space,
+                full_prior,
                 &quotient_models,
                 ball_colours,
                 Some(ThreeBallLocation::Centre),
@@ -1129,6 +1097,184 @@ mod tests {
             .map(|(index, _)| index)
             .expect("non-empty action set");
         assert_eq!(source_best, quotient_best);
+    }
+
+    #[test]
+    fn known_state_feedback_action_evaluator_separates_risk_and_model_information() {
+        let space = build_three_ball_rule_space();
+        let models = space.reduced_model_hypotheses();
+        let posterior = space.full_model_average_prior.clone();
+        let ball_colours = [
+            ThreeBallColour::Red,
+            ThreeBallColour::Green,
+            ThreeBallColour::Blue,
+        ];
+        let actions = vec![
+            ThreeBallFeedbackActionSpec {
+                action_id: "choose-red".into(),
+                choice: Some(ThreeBallColour::Red),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "choose-green".into(),
+                choice: Some(ThreeBallColour::Green),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "choose-blue".into(),
+                choice: Some(ThreeBallColour::Blue),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "no-choice".into(),
+                choice: None,
+                action_cost_nats: 0.0,
+            },
+        ];
+        let decision = score_three_ball_known_state_feedback_actions(
+            &space,
+            &posterior,
+            &models,
+            ball_colours,
+            Some(ThreeBallLocation::Centre),
+            &actions,
+            ThreeBallFeedbackDecisionConfig::default(),
+        )
+        .expect("finite one-step known-state decision");
+
+        assert_eq!(decision.action_scores.len(), 4);
+        assert_eq!(decision.selected_action_id, decision.action_scores[decision.selected_action_index].action_id);
+        for score in &decision.action_scores {
+            assert!(score.pragmatic_risk_nats.is_finite());
+            assert!(score.model_information_gain_nats >= 0.0);
+            assert!(score.expected_free_energy_nats.is_finite());
+            assert!(
+                (score.expected_free_energy_nats
+                    - (score.pragmatic_risk_nats
+                        - score.epistemic_value_nats
+                        + score.action_cost_nats))
+                    .abs()
+                    < 1e-12
+            );
+            assert!((score.predictive_feedback.iter().map(|(_, p)| p).sum::<f64>() - 1.0).abs() < 1e-10);
+        }
+
+        let no_choice = decision
+            .action_scores
+            .iter()
+            .find(|score| score.action_id == "no-choice")
+            .expect("no-choice action");
+        assert_eq!(no_choice.model_information_gain_nats, 0.0);
+        assert_eq!(
+            no_choice.predictive_feedback,
+            vec![(ThreeBallFeedback::NoFeedback, 1.0)]
+        );
+    }
+
+    #[test]
+    fn pragmatic_known_state_policy_selects_planted_rule_choice_after_feedback_evidence() {
+        let space = build_three_ball_rule_space();
+        let models = space.reduced_model_hypotheses();
+        let mut posterior = space.full_model_average_prior.clone();
+        let ball_colours = [
+            ThreeBallColour::Red,
+            ThreeBallColour::Green,
+            ThreeBallColour::Blue,
+        ];
+        // Rule 65 uses the centre ball as context; green therefore makes
+        // the centre green ball the criterion and a green choice correct.
+        // One observed correct-feedback count removes hypotheses that
+        // assigned zero probability to this known-state event.
+        let feedback_column = 1 * 4 * 27 + 2 * 27 + 2 * 9 + 1 * 3;
+        posterior.columns[feedback_column][ThreeBallFeedback::Correct as usize] += 1.0;
+
+        let actions = vec![
+            ThreeBallFeedbackActionSpec {
+                action_id: "choose-red".into(),
+                choice: Some(ThreeBallColour::Red),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "choose-green".into(),
+                choice: Some(ThreeBallColour::Green),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "choose-blue".into(),
+                choice: Some(ThreeBallColour::Blue),
+                action_cost_nats: 0.0,
+            },
+        ];
+        let mut config = ThreeBallFeedbackDecisionConfig::default();
+        config.epistemic_weight = 0.0;
+        let decision = score_three_ball_known_state_feedback_actions(
+            &space,
+            &posterior,
+            &models,
+            ball_colours,
+            Some(ThreeBallLocation::Centre),
+            &actions,
+            config,
+        )
+        .expect("pragmatic posterior-predictive action selection");
+
+        assert_eq!(decision.selected_action_id, "choose-green");
+        let green = decision
+            .action_scores
+            .iter()
+            .find(|score| score.action_id == "choose-green")
+            .expect("green choice");
+        assert_eq!(
+            green.predictive_feedback,
+            vec![(ThreeBallFeedback::Correct, 1.0)]
+        );
+        assert_eq!(green.model_information_gain_nats, 0.0);
+    }
+
+    #[test]
+    fn known_state_decision_rejects_negative_cost_and_invalid_epistemic_weight() {
+        let space = build_three_ball_rule_space();
+        let models = space.reduced_model_hypotheses();
+        let posterior = space.full_model_average_prior.clone();
+        let action = [ThreeBallFeedbackActionSpec {
+            action_id: "choose-green".into(),
+            choice: Some(ThreeBallColour::Green),
+            action_cost_nats: -0.1,
+        }];
+        assert!(matches!(
+            score_three_ball_known_state_feedback_actions(
+                &space,
+                &posterior,
+                &models,
+                [ThreeBallColour::Red, ThreeBallColour::Green, ThreeBallColour::Blue],
+                Some(ThreeBallLocation::Centre),
+                &action,
+                ThreeBallFeedbackDecisionConfig::default(),
+            ),
+            Err(ThreeBallFeedbackDecisionError::InvalidActionCost { .. })
+        ));
+
+        let valid_action = [ThreeBallFeedbackActionSpec {
+            action_id: "choose-green".into(),
+            choice: Some(ThreeBallColour::Green),
+            action_cost_nats: 0.0,
+        }];
+        let invalid_config = ThreeBallFeedbackDecisionConfig {
+            epistemic_weight: f64::NAN,
+            ..Default::default()
+        };
+        assert!(matches!(
+            score_three_ball_known_state_feedback_actions(
+                &space,
+                &posterior,
+                &models,
+                [ThreeBallColour::Red, ThreeBallColour::Green, ThreeBallColour::Blue],
+                Some(ThreeBallLocation::Centre),
+                &valid_action,
+                invalid_config,
+            ),
+            Err(ThreeBallFeedbackDecisionError::InvalidEpistemicWeight(_))
+        ));
     }
 
     #[test]
