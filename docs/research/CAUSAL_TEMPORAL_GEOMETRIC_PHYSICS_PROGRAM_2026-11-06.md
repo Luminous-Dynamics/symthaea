@@ -47,17 +47,25 @@ volumes, causal order and Lorentz boosts for 2+1D and 3+1D. Independent
 Python reference sweeps over 12 seeds per dimension (N=1,500) recover the
 expected Myrheim–Meyer dimensions within about 0.02 on average. The higher-D
 reference pair-count and chain observables remain O(N²).
-A successor/predecessor bitset interval histogram now counts exact open-order
-interval cardinalities and is checked against brute-force controls and Lorentz
-boosts in D=2,3,4. Its first four abundance bins also feed a dimensionless
-4D BDG action bracket, n-N0+9N1-16N2+8N3; tests cover hand-counted chains,
-antichains and reject non-4D inputs. This is a finite-set combinatorial
-implementation only, not a discrete d'Alembertian, path integral, quantum
-counting algorithm or continuum-limit demonstration.
+Open-interval abundance histograms count exact numbers of interior
+elements for every related endpoint pair. The 1+1D path now uses persistent
+prefix segment trees over compressed null coordinates: an interval rectangle
+query is O(log N), giving O(N^2 log N) total time and O(N log N) memory. The
+2+1D/3+1D reference path retains successor/predecessor bitsets, with O(N^2)
+bits of storage and O(R ceil(N/64)) interval-intersection work. Both paths are
+differentially checked against brute-force interval enumeration and
+Lorentz-boost invariance.
 
-Pinned exact-head CI has now passed the causal-set and Chain Theory focused
-packages. The additional interval-histogram and BDG action tests added after
-that passing head are awaiting the next exact-head run.
+Two finite-set BDG action brackets are now exposed:
+- 1+1D: 2N - 4N0 + 8N1 - 4N2.
+- 3+1D: N - N0 + 9N1 - 16N2 + 8N3, with physical prefactor
+  4 sqrt(6) (ell/ell_p)^2.
+
+The action methods return integer combinatorial brackets only. Tests include
+hand-counted total chains and antichains, unsupported-dimension rejection,
+and exact interval-histogram controls. This remains a finite-set action
+prototype: no discrete d'Alembertian, path-integral measure, Einstein
+equations, or continuum-limit demonstration is implemented.
 
 ### Time-crystal foundation
 
@@ -503,6 +511,37 @@ between competing hypotheses, not simply to the most complex simulation.
    vertex, Ward identities and at least one parameter-free scattering or
    running prediction. A match to one dimensionless constant is insufficient.
 
+### Causal-set action and interval-abundance benchmarks
+
+1. Match all open-interval abundance bins against an independent brute-force
+   endpoint/interior enumerator on exact posets and seeded Poisson sprinklings.
+2. Check 1+1D and 3+1D BDG brackets against independently transcribed
+   hand-computed references; verify endpoint convention, layer indexing and
+   orientation (past versus future layers).
+3. Check Lorentz-boost invariance of the full histogram and action bracket,
+   not only the related-pair count.
+4. For Poisson sprinklings in 1+1D and 3+1D, measure abundance-bin means,
+   covariance, variance scaling and finite-size effects over many seeds.
+   Compare with analytic Poisson expectations for the declared bounded
+   Alexandrov interval, including boundary terms; do not assume a zero mean
+   for a finite region.
+5. In 3+1D, compare the classical exact bracket with the 2026 quantum-counting
+   construction's mathematical output on shared small causal sets. Compare
+   resource models separately: CPU wall time/peak memory/word operations versus
+   quantum query complexity, oracle depth, state preparation and readout
+   assumptions.
+6. Benchmark 1+1D persistent range counting against the retained
+   bitset-reference path and brute force on the same seeded event sets.
+   Report N, related-pair count R, interval-bin checksum, runtime, peak
+   memory and machine/compiler details.
+7. Extend to the 3D action only after the dimension-dependent coefficients
+   and interval-layer convention are independently derived and reviewed.
+8. Add BDG scalar-curvature and nonlocal d'Alembertian tests on scalar fields:
+   flat-space plane waves, constant fields, convergence with sprinkling
+   density, nonlocality scale sweeps and curved analytic backgrounds.
+9. Do not interpret a correct finite-set action bracket as a quantum measure,
+   a continuum GR solution or evidence that spacetime is discrete.
+
 ### Time crystals
 
 1. Small-system exact Floquet evolution as the reference oracle.
@@ -596,7 +635,7 @@ oracles, calibration provenance, falsification gates and reproducibility.
 
 | Area | Mature reference / current frontier | Symthaea current position | Credible path to compete |
 |---|---|---|---|
-| Causal sets | Analytic Myrheim–Meyer estimators and research codes; causal-set literature includes d'Alembertian, propagator and action work | New std-only kinematics prototypes in D=2,3,4; no dynamics | Match estimators and invariants; add higher-D efficient counting, curved embeddings, discrete wave operators and independent continuum tests |
+| Causal sets | BDG action/d'Alembertian literature; 2026 quantum-counting method for 4D action with ~O(n^2) quantum runtime and ~O(n) oracle depth | D=2,3,4 flat kinematics, 2D/4D BDG brackets, 1+1D persistent interval range counting; no quantum measure or dynamics | Exact abundance-bin agreement, Poisson finite-size/variance study, measured classical resource curves, then discrete wave-operator and continuum tests |
 | Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact small 1D/2D kicked-Ising oracle plus controlled second-order Trotter XYZ graph solver; existing MPS/DMRG helpers remain pedagogical | Match dense exact diagonalization for N<=9; verify second-order convergence; then validate MPS/TEBD against TeNPy/quimb/ITensor and published hardware observables |
 | Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Small exact kicked-Ising oracle and second-order Trotter anisotropic-Heisenberg prototype; arbitrary complex initial-state input added; no large-scale phase demonstration | Match exact small-system and published protocol observables; then establish initial-state-ensemble robustness, finite-size phase rigidity, heating/lifetime and tensor-network agreement |
 | Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; Hypatia adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings plus a new std-only analytic metric / geodesic reference kernel; still no Einstein evolution or constraints | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
@@ -634,7 +673,7 @@ physical fidelity only count after matched benchmarks.
 
 | Workstream | Current Symthaea prototype | Strong external comparator | Near-term parity gate | Longer-term differentiator |
 |---|---|---|---|---|
-| Causal sets | 1+1D O(N log N), D=2..4 O(N²) kinematics | Causal-set literature/reference implementations | Multi-seed finite-size, Lorentz boosts, volume and dimension recovery | Higher-D efficient causal relations, curved embeddings and discrete wave operators |
+| Causal sets | 1+1D O(N log N) pair/chain observables; 1+1D interval histogram O(N² log N); 2+1D/3+1D bitset reference O(R ceil(N/64)); 2D/4D BDG brackets | Causal-set BDG action/d'Alembertian literature; 2026 quantum-counting algorithm | Brute-force abundance-bin oracle, Poisson variance/boundary study, boost-invariant action, CPU scaling and independent 2026-formula comparison | Discrete d'Alembertian/curvature, matter propagation, curved backgrounds and continuum convergence |
 | Chain Theory | Independent 172-row enumerator plus separate exact charge/generator arithmetic checks | Author's Lean/Python source; independent SproutSeeds consistency and alternatives audit | Full CSV byte diff, Lean axiom/read-cap audit, exact charge and weak-angle tests, reproducible census of listed alternatives | Parameter-free propagator/vertex/scattering predictions; preregistered blind comparisons and explicit look-elsewhere accounting |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
 | GR / GravCraft | Analytic Minkowski/Schwarzschild kernel plus new amplifier-derived ADM metric, full 4D geodesics and Einstein-implied source diagnostics | Einstein Toolkit Hypatia (GPU BSSNOK/Z4c), SpECTRE, Apples-with-Apples and analytic GR references | Exact Minkowski/Schwarzschild references; ADM projection consistency; curvature step-size and gauge tests | Self-consistent 3+1 evolution, matter coupling, global energy-condition and source/boundary analysis |
