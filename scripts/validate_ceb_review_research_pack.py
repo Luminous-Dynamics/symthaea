@@ -143,7 +143,7 @@ def validate_documents(
         "80% power",
         "family-wise alpha 0.05",
         "same total inference budget",
-        "does not create another metric lane",
+        "no new primary metric lane",
         "#10064",
         "#10369",
         "no task is admitted",
@@ -198,7 +198,7 @@ def self_test() -> list[str]:
         "Phase B — Evidence acquisition value",
         "Phase C — Human complementarity",
         "paired task-level analysis repository-cluster bootstrap 80% power family-wise alpha 0.05",
-        "same total inference budget does not create another metric lane #10064 #10369 no task is admitted",
+        "same total inference budget no new primary metric lane #10064 #10369 no task is admitted",
         *PRIMARY_METRICS,
     ))
 
