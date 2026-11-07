@@ -68,10 +68,19 @@ impl fmt::Display for MetricError {
         match self {
             Self::NonFiniteCoordinate { axis } => write!(f, "coordinate {axis} is not finite"),
             Self::InvalidMass => write!(f, "Schwarzschild mass must be finite and positive"),
-            Self::OutsideCoordinateChart(message) => write!(f, "point lies outside metric chart: {message}"),
-            Self::NonFiniteMetricEntry { row, column } => write!(f, "metric entry g[{row}][{column}] is not finite"),
-            Self::MetricNotSymmetric { row, column } => write!(f, "metric is not symmetric at [{row}][{column}]"),
-            Self::SingularMetric => write!(f, "metric matrix is singular or numerically ill-conditioned"),
+            Self::OutsideCoordinateChart(message) => {
+                write!(f, "point lies outside metric chart: {message}")
+            }
+            Self::NonFiniteMetricEntry { row, column } => {
+                write!(f, "metric entry g[{row}][{column}] is not finite")
+            }
+            Self::MetricNotSymmetric { row, column } => {
+                write!(f, "metric is not symmetric at [{row}][{column}]")
+            }
+            Self::SingularMetric => write!(
+                f,
+                "metric matrix is singular or numerically ill-conditioned"
+            ),
             Self::InvalidStep => write!(f, "geodesic integration step must be finite and positive"),
             Self::NonFiniteTangent { axis } => write!(f, "geodesic tangent {axis} is not finite"),
         }
@@ -319,10 +328,14 @@ impl MetricField for SchwarzschildExterior {
         let radius = coordinates[1];
         let theta = coordinates[2];
         if radius <= 2.0 * self.mass {
-            return Err(MetricError::OutsideCoordinateChart("r must be greater than 2M"));
+            return Err(MetricError::OutsideCoordinateChart(
+                "r must be greater than 2M",
+            ));
         }
         if theta <= 0.0 || theta >= PI {
-            return Err(MetricError::OutsideCoordinateChart("theta must lie strictly between 0 and pi"));
+            return Err(MetricError::OutsideCoordinateChart(
+                "theta must lie strictly between 0 and pi",
+            ));
         }
 
         let f = 1.0 - 2.0 * self.mass / radius;
@@ -365,9 +378,9 @@ pub fn metric_derivatives<M: MetricField>(
         let metric_minus = field.metric(minus)?;
         for mu in 0..4 {
             for nu in 0..4 {
-                derivatives[axis][mu][nu] =
-                    (metric_plus.components[mu][nu] - metric_minus.components[mu][nu])
-                        / (2.0 * step);
+                derivatives[axis][mu][nu] = (metric_plus.components[mu][nu]
+                    - metric_minus.components[mu][nu])
+                    / (2.0 * step);
             }
         }
     }
@@ -390,8 +403,7 @@ pub fn christoffel_symbols<M: MetricField>(
                 let mut sum = 0.0;
                 for nu in 0..4 {
                     sum += inverse[mu][nu]
-                        * (derivatives[alpha][nu][beta]
-                            + derivatives[beta][nu][alpha]
+                        * (derivatives[alpha][nu][beta] + derivatives[beta][nu][alpha]
                             - derivatives[nu][alpha][beta]);
                 }
                 gamma[mu][alpha][beta] = 0.5 * sum;
@@ -433,8 +445,7 @@ pub fn riemann_tensor<M: MetricField>(
             for sigma in 0..4 {
                 for nu in 0..4 {
                     gamma_derivatives[axis][rho][nu][sigma] =
-                        (gamma_plus[rho][nu][sigma] - gamma_minus[rho][nu][sigma])
-                            / (2.0 * step);
+                        (gamma_plus[rho][nu][sigma] - gamma_minus[rho][nu][sigma]) / (2.0 * step);
                 }
             }
         }
@@ -494,8 +505,7 @@ pub fn curvature_tensors<M: MetricField>(
                 for delta in 0..4 {
                     for rho in 0..4 {
                         riemann_lower[alpha][beta][gamma][delta] +=
-                            metric.components[alpha][rho]
-                                * riemann[rho][beta][gamma][delta];
+                            metric.components[alpha][rho] * riemann[rho][beta][gamma][delta];
                     }
                 }
             }
@@ -553,7 +563,9 @@ impl GeodesicState {
     }
 
     pub fn norm_squared<M: MetricField>(&self, field: &M) -> Result<f64, MetricError> {
-        Ok(field.metric(self.coordinates)?.inner_product(self.tangent, self.tangent))
+        Ok(field
+            .metric(self.coordinates)?
+            .inner_product(self.tangent, self.tangent))
     }
 }
 
@@ -573,9 +585,7 @@ fn geodesic_derivative<M: MetricField>(
         let mut value = 0.0;
         for alpha in 0..4 {
             for beta in 0..4 {
-                value -= gamma[mu][alpha][beta]
-                    * state.tangent[alpha]
-                    * state.tangent[beta];
+                value -= gamma[mu][alpha][beta] * state.tangent[alpha] * state.tangent[beta];
             }
         }
         acceleration[mu] = value;
@@ -586,11 +596,7 @@ fn geodesic_derivative<M: MetricField>(
     })
 }
 
-fn offset_state(
-    state: GeodesicState,
-    derivative: GeodesicDerivative,
-    scale: f64,
-) -> GeodesicState {
+fn offset_state(state: GeodesicState, derivative: GeodesicDerivative, scale: f64) -> GeodesicState {
     let mut next = state;
     for axis in 0..4 {
         next.coordinates[axis] += scale * derivative.coordinates[axis];
@@ -693,7 +699,11 @@ mod tests {
         let minkowski = MinkowskiCartesian.metric([0.0; 4]).unwrap();
         assert_eq!(
             minkowski.inertia(),
-            MetricInertia { negative: 1, zero: 0, positive: 3 }
+            MetricInertia {
+                negative: 1,
+                zero: 0,
+                positive: 3
+            }
         );
         assert!(minkowski.is_lorentzian_minus_plus_plus_plus());
 
@@ -701,7 +711,11 @@ mod tests {
         let exterior = schwarzschild.metric([0.0, 10.0, PI / 2.0, 0.0]).unwrap();
         assert_eq!(
             exterior.inertia(),
-            MetricInertia { negative: 1, zero: 0, positive: 3 }
+            MetricInertia {
+                negative: 1,
+                zero: 0,
+                positive: 3
+            }
         );
 
         // A non-diagonal flat metric under a linear shear of the time
@@ -716,7 +730,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             sheared_minkowski.inertia(),
-            MetricInertia { negative: 1, zero: 0, positive: 3 }
+            MetricInertia {
+                negative: 1,
+                zero: 0,
+                positive: 3
+            }
         );
 
         let euclidean = MetricTensor4::new([
@@ -750,8 +768,7 @@ mod tests {
         let mass = 1.0;
         let radius: f64 = 10.0;
         let field = SchwarzschildExterior::new(mass).unwrap();
-        let curvature =
-            curvature_tensors(&field, [0.0, radius, PI / 2.0, 0.0]).unwrap();
+        let curvature = curvature_tensors(&field, [0.0, radius, PI / 2.0, 0.0]).unwrap();
 
         let max_ricci = curvature
             .ricci
@@ -836,8 +853,7 @@ mod tests {
         let final_radius = state.coordinates[1];
         let final_f = 1.0 - 2.0 / final_radius;
         let final_energy = final_f * state.tangent[0];
-        let final_angular_momentum =
-            final_radius * final_radius * state.tangent[3];
+        let final_angular_momentum = final_radius * final_radius * state.tangent[3];
         let final_norm = state.norm_squared(&field).unwrap();
 
         assert!((final_norm + 1.0).abs() < 1e-7);
@@ -857,6 +873,9 @@ mod tests {
             [0.0, 0.0, 0.0, 1.0],
         ])
         .unwrap();
-        assert!(matches!(singular.inverse(), Err(MetricError::SingularMetric)));
+        assert!(matches!(
+            singular.inverse(),
+            Err(MetricError::SingularMetric)
+        ));
     }
 }
