@@ -1,0 +1,79 @@
+name: Connectome gait outcome bridge contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/connectome-gait-outcome-bridge/**"
+      - "docs/neuroscience/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.md"
+      - "docs/neuroscience/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.example.json"
+      - ".github/workflows/connectome-gait-outcome-bridge.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectome-gait-outcome-bridge/**"
+      - "docs/neuroscience/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.md"
+      - "docs/neuroscience/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.example.json"
+      - ".github/workflows/connectome-gait-outcome-bridge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-gait-outcome-bridge:
+    name: Validate source-bound locomotion endpoint separation
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Validate schema and synthetic endpoint coverage oracle
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          packets = {packet["packet_id"]: packet for packet in fixture["packets"]}
+          assert len(packets) == len(fixture["packets"]) == 2
+          reports = {row["packet_id"]: row for row in fixture["oracle_expectations"]}
+          assert set(reports) == set(packets)
+          for packet_id, packet in packets.items():
+              counts = Counter(row["endpoint"] for row in packet["measurements"] if row["availability"] == "measured")
+              assert counts["local_joint_rhythmicity"] == 6
+              assert counts["per_leg_stepping"] == 6
+              assert counts.get("pairwise_interleg_coupling", 0) == 0
+              assert counts.get("tripod_coordination", 0) == 0
+              assert packet["frame_count"] == 4500
+              assert all(row["aggregation"] != "frame" for row in packet["measurements"])
+              for row in packet["measurements"]:
+                  source = row["source_binding"]
+                  for key in ("dataset_id", "dataset_revision_sha256", "raw_trajectory_sha256", "animal_id", "session_id", "trial_id", "condition", "stimulus"):
+                      assert source[key] == packet[key]
+          dng = reports["synthetic-dng100-trial-0001"]
+          dnb = reports["synthetic-dnb08-trial-0001"]
+          assert dng["summary"] == dnb["summary"] == "rhythm_only"
+          assert dng["phase_reset"] == {"measured": 1, "required": 8, "state": "partial"}
+          assert dnb["phase_reset"] == {"measured": 1, "required": 8, "state": "partial"}
+          assert dng["fictrac_velocity"] == "complete"
+          assert dnb["fictrac_velocity"] == "not_available"
+          assert dng["emits_global_gait_certification"] is False
+          assert dnb["emits_global_gait_certification"] is False
+          print("gait outcome schema/fixture oracle: PASS")
+          PY
+      - name: Format standalone Rust crate
+        run: cargo fmt --manifest-path tools/connectome-gait-outcome-bridge/Cargo.toml -- --check
+      - name: Run source-bound endpoint verifier tests
+        run: cargo test --manifest-path tools/connectome-gait-outcome-bridge/Cargo.toml --locked
