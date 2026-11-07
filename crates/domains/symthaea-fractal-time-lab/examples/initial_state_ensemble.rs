@@ -96,8 +96,12 @@ fn report_case(
     )?;
     model.set_initial_state(initial_state)?;
     let signal = model.stroboscopic_magnetization(PERIODS);
-    let response = analyze_subharmonic_response(&signal, ANALYSIS_START)
-        .ok_or("subharmonic response window was invalid")?;
+    let response = analyze_subharmonic_response(&signal, ANALYSIS_START).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "subharmonic response window was invalid",
+        )
+    })?;
 
     println!(
         "{state_class},{seed},{coupling:.6},{:.12},{:.12},{:.12},{},{}",
