@@ -78,93 +78,84 @@ where
     histogram
 }
 
-/// Build a merge-sort range tree over unique u coordinates.
-///
-/// Each segment-tree node stores the sorted v coordinates of all events whose
-/// u rank lies in that node's interval. A closed axis-aligned rectangle query
-/// is answered in O(log^2 N) using O(N log N) storage.
-fn build_sorted_range_tree(
-    node: usize,
-    left: usize,
-    right: usize,
-    leaves: &[Vec<f64>],
-    tree: &mut [Vec<f64>],
-) {
-    if right - left == 1 {
-        tree[node] = leaves[left].clone();
-        return;
-    }
-    let middle = left + (right - left) / 2;
-    build_sorted_range_tree(node * 2, left, middle, leaves, tree);
-    build_sorted_range_tree(node * 2 + 1, middle, right, leaves, tree);
-
-    let left_values = &tree[node * 2];
-    let right_values = &tree[node * 2 + 1];
-    let mut merged = Vec::with_capacity(left_values.len() + right_values.len());
-    let (mut i, mut j) = (0, 0);
-    while i < left_values.len() && j < right_values.len() {
-        if left_values[i] <= right_values[j] {
-            merged.push(left_values[i]);
-            i += 1;
-        } else {
-            merged.push(right_values[j]);
-            j += 1;
-        }
-    }
-    merged.extend_from_slice(&left_values[i..]);
-    merged.extend_from_slice(&right_values[j..]);
-    tree[node] = merged;
+/// Persistent segment-tree node for one prefix of the u-sorted event set.
+#[derive(Clone, Copy, Debug, Default)]
+struct PersistentCountNode {
+    left_child: usize,
+    right_child: usize,
+    count: usize,
 }
 
-fn count_sorted_range_tree_rectangle(
-    node: usize,
+fn persistent_count_insert(
+    previous_root: usize,
+    left: usize,
+    right: usize,
+    position: usize,
+    nodes: &mut Vec<PersistentCountNode>,
+) -> usize {
+    let mut updated = nodes[previous_root];
+    updated.count += 1;
+    let new_root = nodes.len();
+    nodes.push(updated);
+
+    if right - left > 1 {
+        let middle = left + (right - left) / 2;
+        if position < middle {
+            let previous_child = nodes[new_root].left_child;
+            let updated_child =
+                persistent_count_insert(previous_child, left, middle, position, nodes);
+            nodes[new_root].left_child = updated_child;
+        } else {
+            let previous_child = nodes[new_root].right_child;
+            let updated_child =
+                persistent_count_insert(previous_child, middle, right, position, nodes);
+            nodes[new_root].right_child = updated_child;
+        }
+    }
+    new_root
+}
+
+fn persistent_count_range(
+    root: usize,
     left: usize,
     right: usize,
     query_left: usize,
     query_right: usize,
-    v_low: f64,
-    v_high: f64,
-    tree: &[Vec<f64>],
+    nodes: &[PersistentCountNode],
 ) -> usize {
-    if query_right <= left || right <= query_left {
+    if root == 0 || query_right <= left || right <= query_left {
         return 0;
     }
     if query_left <= left && right <= query_right {
-        let values = &tree[node];
-        let first = values.partition_point(|value| *value < v_low);
-        let last = values.partition_point(|value| *value <= v_high);
-        return last - first;
+        return nodes[root].count;
     }
 
     let middle = left + (right - left) / 2;
-    count_sorted_range_tree_rectangle(
-        node * 2,
+    persistent_count_range(
+        nodes[root].left_child,
         left,
         middle,
         query_left,
         query_right,
-        v_low,
-        v_high,
-        tree,
-    ) + count_sorted_range_tree_rectangle(
-        node * 2 + 1,
+        nodes,
+    ) + persistent_count_range(
+        nodes[root].right_child,
         middle,
         right,
         query_left,
         query_right,
-        v_low,
-        v_high,
-        tree,
+        nodes,
     )
 }
 
-/// Exact 1+1D open-interval histogram using offline 2D rectangle counting.
+/// Exact 1+1D open-interval histogram via persistent 2D orthogonal range count.
 ///
-/// The closed coordinate rectangle between causally related endpoints is
-/// queried in O(log^2 N), then all events sharing either endpoint coordinate
+/// Events are sorted/grouped by u and each prefix gets a persistent segment
+/// tree over compressed v. A closed rectangle query is the difference of two
+/// prefix versions and takes O(log N), then the endpoint-coordinate groups
 /// are excluded because identical-coordinate events are incomparable.
 /// Every unordered related endpoint pair is visited once. Complexity is
-/// O(N^2 log^2 N) time and O(N log N) memory.
+/// O(N^2 log N) time and O(N log N) memory.
 fn interval_size_histogram_1p1(events: &[Event2D]) -> Vec<u64> {
     use std::collections::HashMap;
 
@@ -174,27 +165,47 @@ fn interval_size_histogram_1p1(events: &[Event2D]) -> Vec<u64> {
         return histogram;
     }
 
-    let mut ordered: Vec<(f64, f64)> =
-        events.iter().map(|event| (event.u, event.v)).collect();
-    ordered.sort_by(|left, right| {
-        left.0
-            .total_cmp(&right.0)
-            .then_with(|| left.1.total_cmp(&right.1))
+    let mut u_coordinates: Vec<f64> = events.iter().map(|event| event.u).collect();
+    u_coordinates.sort_by(f64::total_cmp);
+    u_coordinates.dedup_by(|left, right| *left == *right);
+
+    let mut v_coordinates: Vec<f64> = events.iter().map(|event| event.v).collect();
+    v_coordinates.sort_by(f64::total_cmp);
+    v_coordinates.dedup_by(|left, right| *left == *right);
+
+    let mut order: Vec<usize> = (0..event_count).collect();
+    order.sort_by(|&left, &right| {
+        events[left]
+            .u
+            .total_cmp(&events[right].u)
+            .then_with(|| events[left].v.total_cmp(&events[right].v))
+            .then_with(|| events[left].id.cmp(&events[right].id))
     });
 
-    let mut u_coordinates = Vec::new();
-    let mut leaves: Vec<Vec<f64>> = Vec::new();
-    for (u, v) in ordered {
-        if u_coordinates.last().is_none_or(|previous| *previous != u) {
-            u_coordinates.push(u);
-            leaves.push(Vec::new());
-        }
-        leaves.last_mut().expect("a u-coordinate leaf exists").push(v);
-    }
+    // Node zero is the immutable all-zero tree shared by all empty prefixes.
+    let mut nodes = vec![PersistentCountNode::default()];
+    let mut roots = Vec::with_capacity(u_coordinates.len() + 1);
+    roots.push(0_usize);
+    let mut root = 0_usize;
+    let mut order_index = 0_usize;
 
-    let unique_u_count = u_coordinates.len();
-    let mut range_tree = vec![Vec::new(); unique_u_count * 4 + 4];
-    build_sorted_range_tree(1, 0, unique_u_count, &leaves, &mut range_tree);
+    for u in &u_coordinates {
+        while order_index < order.len() && events[order[order_index]].u == *u {
+            let event = events[order[order_index]];
+            let v_position = v_coordinates
+                .binary_search_by(|candidate| candidate.total_cmp(&event.v))
+                .expect("event v coordinate is present in compression");
+            root = persistent_count_insert(
+                root,
+                0,
+                v_coordinates.len(),
+                v_position,
+                &mut nodes,
+            );
+            order_index += 1;
+        }
+        roots.push(root);
+    }
 
     let mut coordinate_multiplicity: HashMap<(u64, u64), usize> =
         HashMap::with_capacity(event_count);
@@ -216,18 +227,29 @@ fn interval_size_histogram_1p1(events: &[Event2D]) -> Vec<u64> {
                 continue;
             };
 
-            let query_left = u_coordinates.partition_point(|u| *u < past.u);
-            let query_right = u_coordinates.partition_point(|u| *u <= future.u);
-            let closed_rectangle_count = count_sorted_range_tree_rectangle(
-                1,
+            let u_before = u_coordinates.partition_point(|u| *u < past.u);
+            let u_through = u_coordinates.partition_point(|u| *u <= future.u);
+            let v_from = v_coordinates.partition_point(|v| *v < past.v);
+            let v_through = v_coordinates.partition_point(|v| *v <= future.v);
+
+            let upper_count = persistent_count_range(
+                roots[u_through],
                 0,
-                unique_u_count,
-                query_left,
-                query_right,
-                past.v,
-                future.v,
-                &range_tree,
+                v_coordinates.len(),
+                v_from,
+                v_through,
+                &nodes,
             );
+            let lower_count = persistent_count_range(
+                roots[u_before],
+                0,
+                v_coordinates.len(),
+                v_from,
+                v_through,
+                &nodes,
+            );
+            let closed_rectangle_count = upper_count - lower_count;
+
             let endpoint_duplicates = coordinate_multiplicity
                 .get(&(past.u.to_bits(), past.v.to_bits()))
                 .copied()
