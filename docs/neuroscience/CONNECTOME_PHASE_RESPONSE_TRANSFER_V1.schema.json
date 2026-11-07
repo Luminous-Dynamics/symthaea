@@ -5,13 +5,14 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version",
-    "run_id",
     "claim_scope",
-    "phase_unit",
     "leg_axis",
-    "source_binding",
-    "rows"
+    "oracle_expectations",
+    "phase_unit",
+    "rows",
+    "run_id",
+    "schema_version",
+    "source_binding"
   ],
   "properties": {
     "schema_version": {
