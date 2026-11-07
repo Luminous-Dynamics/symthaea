@@ -329,5 +329,49 @@
     "Co-locate hot state with consuming compute and measure data movement before changing memory technology.",
     "Include refresh, calibration, migration, write/erase and recovery in lifecycle energy.",
     "Require explicit conversion and verification boundaries when Symthaea spans multiple substrates."
+  ],
+  "external_benchmarks": [
+    {
+      "id": "THOR_NEUROBENCH_OPENBMI_EEG_MI_2026",
+      "family": "neuromorphic_temporal_classification",
+      "results_announcement_date": "2026-10-20",
+      "task": "continuous OpenBMI EEG motor imagery decoding",
+      "sources": [
+        "https://neuromorphiccommons.com/news/thor-x-neurobench-challenge-2026-results/",
+        "https://neuromorphiccommons.com/events/thor-neurobench-2026/",
+        "https://www.nature.com/articles/s41467-025-56739-4"
+      ],
+      "separate_tracks": {
+        "absolute_accuracy": {
+          "winner": "EdgeSynapse AI",
+          "accuracy_percent": 73.38,
+          "scoring": "highest verified test accuracy across the declared cross-validation splits"
+        },
+        "efficiency": {
+          "winner": "PHC Lab",
+          "accuracy_percent": 69.73,
+          "synops": 60540,
+          "model_and_state_footprint_bytes": 672,
+          "scoring": [
+            "NeuroEfficiency Score (NES)",
+            "Normalized Balanced Score (NBS)"
+          ]
+        }
+      },
+      "other_reference_submission": {
+        "team": "Synaptic",
+        "accuracy_percent": 68.4,
+        "synops": 23650,
+        "model_and_state_footprint_bytes": 1050
+      },
+      "evidence_class": "published_competition_results",
+      "interpretation_caveats": [
+        "Specific to OpenBMI EEG motor-imagery task and competition evaluation protocol.",
+        "SynOps plus memory footprint is an efficiency proxy and is not a direct wall-input energy measurement.",
+        "Do not compare these accuracy figures directly with Symthaea's HDC language classification or exact retrieval tasks.",
+        "Reuse NeuroBench algorithm and system tracks; add whole-system energy and latency measurement for any hardware deployment."
+      ],
+      "suggested_luminous_use": "Optional BCI/temporal-classification benchmark lane using exact official data splits and scoring where licensed; separately measure sensor/DAQ, host, memory traffic, accelerator, wall energy and p99 decision latency."
+    }
   ]
 }
