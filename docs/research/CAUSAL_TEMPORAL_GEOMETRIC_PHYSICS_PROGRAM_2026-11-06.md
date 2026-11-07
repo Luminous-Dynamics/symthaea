@@ -328,7 +328,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals (prototype added) | Rust tests + independent volume, distribution and boost checks |
 | CTGP-04 | Chain Theory reproduction | Independent std-only enumerator emits all 172 rows in author CSV order; six full classification bands tested | Run Rust example and byte-diff full CSV; Lean 4.35.0 build and axiom/read-cap audit |
 | CTGP-05 | Chain Theory stress tests | Alternative choices, uniqueness and sensitivity analysis | All assumptions enumerated; blind alternatives |
-| CTGP-06 | Quantum DTC simulator | Exact complex kicked-Ising graph oracle (1D/2D prototype added); anisotropic Heisenberg remains future work | Independent exact-diagonalization agreement on small systems |
+| CTGP-06 | Quantum DTC simulator | Exact kicked-Ising graph oracle plus second-order Trotter anisotropic-XYZ graph solver (prototype added) | Dense exact small-system agreement, second-order convergence and published-protocol comparison |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, signature, Christoffel, Riemann/Ricci and geodesic reference kernel (prototype added) | Rust tests + independent curvature, conserved quantities and weak-field regression; ADM constraints remain future work |
@@ -402,6 +402,18 @@ between competing hypotheses, not simply to the most complex simulation.
 9. Track-level false-positive rate and calibration error at fixed recall,
    with confidence intervals and a sealed test set.
 
+### New 2026 frontier comparator: anisotropic-Heisenberg DTCs
+
+A January 28, 2026 Nature Communications paper by Switzer et al. reports a
+two-dimensional DTC with anisotropic Heisenberg interactions, combining IBM
+quantum processors and tensor-network methods. That is a distinct target from
+the clean 2D kicked-Ising demonstration on the 133-qubit Heron processor.
+Symthaea now has an anisotropic-XYZ graph solver with explicit second-order
+Trotter control, but it does not yet reproduce either paper's full phase
+diagram or hardware/tensor-network scale. The next gate is exact small-system
+dense agreement, convergence versus Trotter slices, and an independent
+tensor-network comparison under the paper's precise protocol.
+
 ## State-of-the-art comparison and strategy
 
 The goal is not to claim that Symthaea already outperforms mature specialist
@@ -412,8 +424,8 @@ oracles, calibration provenance, falsification gates and reproducibility.
 | Area | Mature reference / current frontier | Symthaea current position | Credible path to compete |
 |---|---|---|---|
 | Causal sets | Analytic Myrheim–Meyer estimators and research codes; causal-set literature includes d'Alembertian, propagator and action work | New std-only kinematics prototypes in D=2,3,4; no dynamics | Match estimators and invariants; add higher-D efficient counting, curved embeddings, discrete wave operators and independent continuum tests |
-| Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact state-vector oracle for small 1D/2D kicked-Ising graphs; existing MPS/DMRG helpers remain pedagogical | Match independent exact diagonalization; then implement and benchmark MPS/TEBD, validate against TeNPy/quimb/ITensor and published hardware observables |
-| Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Classical toy detector plus new small exact Floquet oracle | Reproduce a published phase diagram, phase rigidity and lifetime scaling; only then investigate new higher-order or sensor protocols |
+| Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact small 1D/2D kicked-Ising oracle plus controlled second-order Trotter XYZ graph solver; existing MPS/DMRG helpers remain pedagogical | Match dense exact diagonalization for N<=9; verify second-order convergence; then validate MPS/TEBD against TeNPy/quimb/ITensor and published hardware observables |
+| Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Small exact kicked-Ising oracle plus second-order Trotter anisotropic-Heisenberg prototype; no large-scale phase demonstration | Match exact small-system and published protocol observables; then establish finite-size phase rigidity, heating/lifetime and tensor-network agreement |
 | Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; Hypatia adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings plus a new std-only analytic metric / geodesic reference kernel; still no Einstein evolution or constraints | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
 | UAP / sensor analysis | NASA recommends purpose-built, calibrated multi-sensor data and complete metadata; existing reports are often insufficiently calibrated | New typed sensor/evidence contract only | Build a blind known-object set, calibration and trajectory reconstruction, uncertainty propagation and measured false-positive guarantees |
 
