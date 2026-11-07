@@ -144,7 +144,7 @@ Algorithm selection must be explicit and report why a requested output is unsupp
 - Exact zeros in likelihoods and potentials are allowed.
 - Negative and non-finite probability potentials are rejected unless a distinct signed algebra explicitly permits them.
 - Products of many small probabilities require log-domain or scale-tracked arithmetic.
-- Marginal MAP (independent modes of each variable) is not joint MAP.
+- Independent per-variable max-product belief argmax is not a general joint-MAP guarantee. On a tree with tied max-marginals, local tie-breaking can select an assignment that violates a factor. A three-variable chain with A=B and B!=C has two valid MAP assignments, (0,0,1) and (1,1,0); selecting the same tied state at every variable yields (0,0,0) or (1,1,1), both with zero joint potential. Loopy BP adds approximation on top.
 - A factor belief is computed from the factor and incoming messages; it is not generally the product of its variable marginals.
 - Loopy BP convergence is not proof that its marginals are accurate.
 - Bethe free energy is an approximation under declared assumptions, not a generic exact log-partition function.
