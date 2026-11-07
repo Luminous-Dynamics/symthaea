@@ -330,7 +330,10 @@ fn formal_parser_rejects_omitted_nullable_fields_instead_of_defaulting_them() {
         .as_object_mut()
         .unwrap()
         .remove("source_predicate_type");
-    mutations.push(("binding.source_predicate_type", missing_source_predicate_type));
+    mutations.push((
+        "binding.source_predicate_type",
+        missing_source_predicate_type,
+    ));
 
     let mut missing_assessment_provider_version = original;
     missing_assessment_provider_version["rea_evaluation"]["evidence_assessments"][0]
