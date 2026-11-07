@@ -31,6 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
       - name: Validate JSON Schema and synthetic fixture
         run: |
           python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
