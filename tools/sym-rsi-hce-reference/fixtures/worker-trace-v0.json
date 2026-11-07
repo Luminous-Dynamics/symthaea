@@ -1,0 +1,44 @@
+{
+  "trace_id": "synthetic-async-trace-001",
+  "regime": "asynchronous_steady_state",
+  "worker_count": 2,
+  "wall_clock_budget_ms": 1000,
+  "attempts": [
+    {
+      "attempt_id": "attempt-001",
+      "candidate_id": "candidate-A",
+      "worker_id": 0,
+      "start_ms": 0,
+      "end_ms": 400,
+      "disposition": "valid",
+      "resource_cost_units": 1
+    },
+    {
+      "attempt_id": "attempt-002",
+      "candidate_id": "candidate-B",
+      "worker_id": 1,
+      "start_ms": 100,
+      "end_ms": 600,
+      "disposition": "valid",
+      "resource_cost_units": 1.2
+    },
+    {
+      "attempt_id": "attempt-003",
+      "candidate_id": "candidate-C",
+      "worker_id": 1,
+      "start_ms": 650,
+      "end_ms": 1000,
+      "disposition": "valid",
+      "resource_cost_units": 0.8
+    },
+    {
+      "attempt_id": "attempt-004",
+      "candidate_id": "candidate-D",
+      "worker_id": 0,
+      "start_ms": 450,
+      "end_ms": 900,
+      "disposition": "failed",
+      "resource_cost_units": 0.5
+    }
+  ]
+}
