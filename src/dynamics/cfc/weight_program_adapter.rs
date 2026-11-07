@@ -912,6 +912,7 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         group: format!("{output_group:?}"),
     })?;
     add_replacement(output_group, &output_shape, permuted_output)?;
+    drop(add_replacement);
 
     if changed_parameter_count == 0 {
         return Err(CfCPermutationAlignmentError::NoOpCanonicalization);
