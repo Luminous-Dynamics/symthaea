@@ -7,3 +7,5 @@ description = "Dependency-free, score-independent metrics for singing phoneme al
 
 [lib]
 path = "src/lib.rs"
+
+[workspace]
