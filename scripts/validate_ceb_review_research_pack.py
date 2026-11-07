@@ -249,25 +249,25 @@ def validate_documents(
         if required not in evidence_crosswalk:
             errors.append(f"evidence-action crosswalk is missing {required}")
 
-    case_ids = re.findall(r"^## \\d+\\. Case (CAL-\\d{2})", calibration_pack, re.MULTILINE)
+    case_ids = re.findall(r"^## \d+\. Case (CAL-\d{2})", calibration_pack, re.MULTILINE)
     expected_cases = ["CAL-01", "CAL-02", "CAL-03"]
     if case_ids != expected_cases:
         errors.append(f"human calibration pack must contain CAL-01..CAL-03 exactly once and in order; got {case_ids}")
     for case_id in expected_cases:
         match = re.search(
-            rf"^## \\d+\\. Case {case_id}\\b([\\s\\S]*?)(?=^## \\d+\\. Case CAL-|^## \\d+\\. Cross-case|\\Z)",
+            rf"^## \d+\. Case {case_id}\b([\s\S]*?)(?=^## \d+\. Case CAL-|^## \d+\. Cross-case|\Z)",
             calibration_pack,
             re.MULTILINE,
         )
         block = match.group(1) if match else ""
-        variants = [int(x) for x in re.findall(r"^#### Variant X([1-6])\\b", block, re.MULTILINE)]
+        variants = [int(x) for x in re.findall(r"^#### Variant X([1-6])\b", block, re.MULTILINE)]
         if variants != [1, 2, 3, 4, 5, 6]:
             errors.append(f"{case_id}: expected exactly neutral variants X1..X6; got {variants}")
         for phrase in ("Normative contract", "Candidate finding to assess", "Reviewer worksheet"):
             if phrase not in block:
                 errors.append(f"{case_id}: missing {phrase}")
     key_rows = re.findall(
-        r"^\\| (CAL-\\d{2}) \\| X([1-6]) \\| (P|I|F|N|M|IRR) —",
+        r"^\| (CAL-\d{2}) \| X([1-6]) \| (P|I|F|N|M|IRR) —",
         calibration_key,
         re.MULTILINE,
     )
