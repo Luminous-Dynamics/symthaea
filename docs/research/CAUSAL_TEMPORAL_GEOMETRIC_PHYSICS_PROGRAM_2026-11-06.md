@@ -169,16 +169,24 @@ known-object tests remain open. No object classification is performed.
 
 ### UAP sensor-placement design
 
-The triangulation primitive now exposes a local Fisher-information matrix
-and ranks candidate sensor placements using D-optimal log(det(FIM)),
-A-optimal covariance trace and the information condition number. Candidate
-bearings are predicted from declared sensor origin and body-to-ECEF
-orientation. An independent Python reference on a fixed synthetic geometry
-produced a highest-ranked candidate with log(det(FIM)) 28.7783 and local
-CRLB covariance trace 5.54e-4 m^2. It does not account for target-region
-uncertainty, sensor pose/boresight covariance, clock drift, visibility,
-terrain, atmosphere or deployment cost. The next benchmark is robust
-placement under these nuisance parameters and known-object trajectories.
+The triangulation primitive exposes a local Fisher-information matrix,
+point-target D/A-optimal placement, and a finite-target-region robust ranking.
+For every target hypothesis, existing sensor bearings are re-predicted from
+their sensor poses and declared angular noise; the implementation does not
+reuse the nominal measured bearing at a different target location. The robust
+score reports prior-weighted expected log(det(FIM)) and covariance trace plus
+worst-case information, covariance and condition-number metrics. Its
+lexicographic objective maximizes worst-case log(det(FIM)), then expected
+log(det(FIM)), then minimizes worst-case covariance trace.
+
+An independent NumPy reference on three target hypotheses and three candidate
+placements ranked the elevated candidate first: expected log(det(FIM)) 28.820,
+worst-case log(det(FIM)) 27.507, expected CRLB trace 5.94e-4 m^2, and worst-case
+trace 1.13e-3 m^2. These are finite-scenario synthetic results, not Rust
+execution or field performance. The criterion does not provide a continuous
+target-region guarantee and still omits pose/boresight covariance, clock drift,
+correlated errors, visibility, terrain, atmosphere and deployment cost. Full
+protocol: docs/research/uap-bearing-sensor-placement-reference-v0.2.md.
 
 ### Broader physics-module audit
 
@@ -274,6 +282,17 @@ The paper's own scope matters:
 - The paper notes that experimental determinations of the fine-structure
   constant remain in tension, making future independent measurement decisive.
 
+The 2022 CODATA recommended inverse fine-structure constant is
+137.035999177(21). The proposal's candidate value 137.035999189566... differs
+from that central value by about 1.26e-8, roughly 0.60 of the quoted CODATA
+standard uncertainty (the candidate currently supplies no independently
+derived uncertainty of its own). Numerical proximity at this level is a
+reproduction target, not evidence of identification with the QED coupling.
+A physical claim would still need a parameter-free derivation, a defined
+uncertainty budget, independent predictions such as the scale dependence of
+the coupling, and tests against alternative formula selection and
+post-selection/complexity penalties.
+
 Work package: independently reproduce the finite-dimensional construction,
 formalization and algebraic value before testing its physical interpretation.
 Do not market the number as a derivation of QED.
@@ -353,7 +372,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, signature, Christoffel, Riemann/Ricci and geodesic reference kernel (prototype added) | Rust tests + independent curvature, conserved quantities and weak-field regression; ADM constraints remain future work |
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
-| CTGP-11 | UAP evidence pipeline | Calibration/provenance, bearing-only triangulation, local covariance and Fisher-information sensor-placement prototypes added | Rust tests + pose/time covariance, region-robust design, Monte Carlo coverage and blind known-object challenge |
+| CTGP-11 | UAP evidence pipeline | Calibration/provenance, bearing triangulation, local covariance, point FIM and finite-target-region robust placement prototypes added | Pinned Rust tests + exact Rust/Python agreement, pose/time covariance, Monte Carlo coverage and blind known-object challenge |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
 | CTGP-13 | Scientific evidence plane | Shared exact-head BLAKE3 manifest/receipt contract (prototype added) | Unit tests; reject dirty trees, stale heads, queued/skipped checks and missing log/output digests |
 
@@ -421,14 +440,28 @@ between competing hypotheses, not simply to the most complex simulation.
    parallax controls with known ground truth.
 9. Track-level false-positive rate and calibration error at fixed recall,
    with confidence intervals and a sealed test set.
+10. Sensor-placement comparison on shared candidate sets: point-target D/A/E
+    optimality, expected-FIM/Bayesian design, finite-region minimax and
+    cost-constrained Pareto fronts.
+11. Target-region refinement: increase hypothesis density and compare robust
+    scores/rankings; reject any claim that a finite point set bounds the
+    continuous region without a separate interpolation/error argument.
+12. Local CRLB coverage audit: Monte Carlo empirical covariance, bias,
+    NEES/NIS and 50/90/95/99% ellipsoid coverage under correctly specified
+    and misspecified noise, pose and clock models.
 
 ### New 2026 frontier comparator: anisotropic-Heisenberg DTCs
 
-A January 28, 2026 Nature Communications paper by Switzer et al. reports a
-two-dimensional DTC with anisotropic Heisenberg interactions, combining IBM
-quantum processors and tensor-network methods. That is a distinct target from
-the clean 2D kicked-Ising demonstration on the 133-qubit Heron processor.
-Symthaea now has an anisotropic-XYZ graph solver with explicit second-order
+The 28 January 2026 Nature Communications paper by Switzer et al. reports
+a two-dimensional DTC with anisotropic Heisenberg interactions, combining IBM
+quantum processors and tensor-network methods; its experimental lattice has
+144 qubits. A separate 24 February 2026 npj Quantum Information paper reports
+clean two-dimensional kicked-Ising DTC dynamics on a 133-qubit IBM Heron
+processor for up to 100 Floquet cycles. These are distinct Hamiltonians,
+hardware layouts and protocols. Symthaea's anisotropic-XYZ graph is a small
+numerical prototype, not a replication of either experiment. The immediate
+benchmark is protocol-matched small-system exact evolution and convergence
+against tensor-network reference data before any scale claim.lver with explicit second-order
 Trotter control, but it does not yet reproduce either paper's full phase
 diagram or hardware/tensor-network scale. The next gate is exact small-system
 dense agreement, convergence versus Trotter slices, and an independent
@@ -485,7 +518,7 @@ physical fidelity only count after matched benchmarks.
 | Chain Theory | Independent 172-row algebraic enumerator | Author's Python/Lean source and third-party audit | Full CSV byte diff, pinned Lean build and assumption audit | Formalize alternative grammars and falsify/derive the physical bridge |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
 | GR / GravCraft | Minkowski/Schwarzschild metric, connection, curvature and geodesic kernel | Einstein Toolkit, SpECTRE, analytic GR references | Curvature, invariants, convergence and coordinate checks | Constraint-consistent 3+1 evolution and stress-energy/energy-condition audit |
-| UAP | Calibration/provenance, bearing triangulation, local covariance and FIM-based placement prototype | NASA-recommended calibrated multi-sensor methodology; sensor-fusion toolchains and CRLB optimal-design literature | Synthetic 93–97% ellipsoid coverage, exact Rust/Python agreement, region-robust placement and blind known-object calibration | Low false-positive track reconstruction on sealed data with pose/time covariance and cost-aware sensor placement |
+| UAP | Calibration/provenance, bearing triangulation, local covariance and point/finite-region FIM placement prototypes | Calibrated multi-sensor methodology; EKF/UKF/factor-graph tracking; CRLB-based placement | Synthetic 93–97% ellipsoid coverage, exact Rust/Python agreement, increasing-region-grid stability and blind known-object calibration | Low false-positive track reconstruction on sealed data with nuisance covariance and cost-aware placement |
 | Evidence plane | Exact-head BLAKE3 manifest and receipt prototype | Reproducible-build, SBOM and scientific workflow provenance systems | Tamper/stale-head/skip/dirty-tree negative controls | Reusable proof-carrying experiments across Symthaea, Mycelix and Sol-Atlas |
 
 ### Measurable targets
@@ -525,6 +558,31 @@ physical fidelity only count after matched benchmarks.
    input/output digests and explicit claim boundary.
 8. Preserve independent baselines, negative controls and failed results;
    no theory, benchmark or physical claim self-certifies.
+
+## External research references checked 2026-11-07
+
+- NASA UAP Independent Study Team (2023), Final Report: calibration, sensor
+  metadata, synchronized multi-sensor observations and explicit evidence
+  thresholds are prerequisites for reliable UAP analysis.
+  https://science.nasa.gov/uap/
+- NIST, Metrological Traceability: traceability requires an unbroken
+  calibration chain with stated measurement uncertainty at every link.
+  https://www.nist.gov/metrology/metrological-traceability
+- Xu et al. (2025), Optimal Sensor Placement for Target Localization in IoT
+  Systems: a CRLB-based overview of placement criteria and methods.
+  https://doi.org/10.1109/MIOT.2025.3575317
+- Switzer et al. (2026), Realization of two-dimensional discrete time crystals
+  with anisotropic Heisenberg coupling, Nature Communications 17, 605.
+  https://doi.org/10.1038/s41467-025-67787-1
+- Shinjo et al. (2026), Unveiling clean two-dimensional discrete time crystals
+  on a digital quantum computer, npj Quantum Information 12, 41.
+  https://www.nature.com/articles/s41534-026-01193-3
+- Adamson and Wallden (2026), Benincasa-Dowker-Glaser causal set actions by
+  quantum counting, Physical Review Research 8, 023188.
+  https://doi.org/10.1103/qdst-yrh6
+- NIST CODATA (2022 adjustment; published 2025), Recommended Values of the
+  Fundamental Physical Constants.
+  https://physics.nist.gov/constants
 
 ## Scientific non-claims
 
