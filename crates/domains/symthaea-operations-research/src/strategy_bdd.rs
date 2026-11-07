@@ -2287,6 +2287,37 @@ mod tests {
     }
 
     #[test]
+    fn multi_start_frontier_sifting_matches_exact_minimum_for_all_three_input_functions() {
+        for function_mask in 0..256usize {
+            let values: Vec<bool> = (0..8)
+                .map(|assignment| ((function_mask >> assignment) & 1) != 0)
+                .collect();
+            let source = function(&[0, 1, 2], &values);
+            let support = minimize_strategy_function_support(&source, budget()).unwrap();
+            let exact = find_exact_minimum_robdd_order(&support.function, budget()).unwrap();
+            let multi_start =
+                multi_start_sift_strategy_function_robdd(&support.function, budget()).unwrap();
+
+            assert_eq!(
+                multi_start.optimized_node_count,
+                exact.minimum_node_count,
+                "function truth-table mask {function_mask}"
+            );
+            assert!(multi_start.order_evaluations <= budget().max_variable_order_evaluations);
+            assert!(
+                multi_start.refined_max_frontier <= multi_start.min_fill_max_frontier,
+                "function truth-table mask {function_mask}"
+            );
+            verify_robdd_matches_strategy_function(
+                &multi_start.bdd,
+                &support.function,
+                budget(),
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
     fn frontier_refinement_reduces_vertex_separation_without_worsening_maximum() {
         let graph = vec![
             BTreeSet::from([3]),
