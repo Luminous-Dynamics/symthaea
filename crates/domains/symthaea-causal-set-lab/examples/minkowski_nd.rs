@@ -29,10 +29,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             causet.estimate_myrheim_meyer_dimension(8.0).unwrap(),
             causet.longest_chain_length(),
         );
+        let interval_histogram = causet.interval_size_histogram();
+        let shown_bins = interval_histogram.len().min(8);
+        let tail_abundance: u64 = interval_histogram[shown_bins..].iter().sum();
         println!(
-            "D={dimension},interval_histogram={:?}",
-            causet.interval_size_histogram()
+            "D={dimension},interval_histogram_k0_to_k7={:?},tail_abundance={tail_abundance}",
+            &interval_histogram[..shown_bins]
         );
+        if dimension == 4 {
+            println!(
+                "bdg_action_4d_dimensionless_bracket={}",
+                causet.bdg_action_4d_dimensionless_bracket()?
+            );
+            println!("bdg_action_physical_prefactor=4*sqrt(6)*(ell/ell_p)^2");
+        }
     }
 
     println!(
