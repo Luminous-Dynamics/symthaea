@@ -1242,6 +1242,123 @@
         "note"
       ],
       "additionalProperties": false
+    },
+    "active_exploration": {
+      "type": "object",
+      "properties": {
+        "mode_comparison": {
+          "type": "object",
+          "properties": {
+            "arms": {
+              "type": "array",
+              "minItems": 4,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "static_fixed_evidence_packet",
+                  "active_literature_and_tool_exploration",
+                  "active_random_retrieval_matched_cost",
+                  "no_external_search_control"
+                ]
+              }
+            },
+            "shared_budget_envelope_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "temporal_literature_cutoff": {
+              "type": "string",
+              "minLength": 1
+            },
+            "allowed_sources_and_query_contract_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "query_limit_and_cost_method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retrieved_evidence_visibility_policy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pre_treatment_capability_tier_manifest_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "capability_tiers_frozen_before_treatment": {
+              "const": true
+            },
+            "matched_total_tokens_and_tool_budget": {
+              "const": true
+            },
+            "report_effect_by_capability_tier": {
+              "const": true
+            }
+          },
+          "required": [
+            "arms",
+            "shared_budget_envelope_digest",
+            "temporal_literature_cutoff",
+            "allowed_sources_and_query_contract_digest",
+            "query_limit_and_cost_method",
+            "retrieved_evidence_visibility_policy",
+            "pre_treatment_capability_tier_manifest_digest",
+            "capability_tiers_frozen_before_treatment",
+            "matched_total_tokens_and_tool_budget",
+            "report_effect_by_capability_tier"
+          ],
+          "additionalProperties": false
+        },
+        "construct_outcomes": {
+          "type": "array",
+          "minItems": 8,
+          "items": {
+            "type": "string",
+            "enum": [
+              "grounding_and_source_coverage",
+              "feasibility",
+              "clarity",
+              "specificity",
+              "impact",
+              "originality",
+              "mechanism_novelty",
+              "independent_empirical_value"
+            ]
+          }
+        },
+        "anti_goodhart_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "mode_comparison",
+        "construct_outcomes",
+        "anti_goodhart_policy"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -1264,7 +1381,8 @@
     "governance",
     "reporting",
     "claim_ceiling",
-    "decision_theory"
+    "decision_theory",
+    "active_exploration"
   ],
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema",
