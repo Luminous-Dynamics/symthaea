@@ -1403,8 +1403,10 @@ fn removing_environment_scope_dimensions_cannot_upgrade_a_specific_observation()
         .unwrap()
         .value;
     evidence_value["environment"] = json!({
+        "id": "device-42",
         "platform": "Android",
-        "id": "device-42"
+        "architecture": "aarch64",
+        "isolation": "process"
     });
     evidence_value["evidence_id"] =
         json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
