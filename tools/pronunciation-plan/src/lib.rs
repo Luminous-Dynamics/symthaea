@@ -104,6 +104,13 @@ pub struct SelectionReceipt {
     /// Non-empty reference to a review/override record; avoid storing personal
     /// reviewer identity in the pronunciation artifact itself.
     pub evidence_reference: String,
+    /// BLAKE3 digest of the exact serialized pronunciation candidate that was
+    /// selected. This detects later edits to phones, syllables, scores, or
+    /// provenance while retaining an otherwise unchanged receipt.
+    pub candidate_digest: String,
+    /// BLAKE3 digest binding the selected candidate to the exact source text,
+    /// language, lexical byte span, and schema version.
+    pub selection_digest: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,9 +122,103 @@ pub enum SelectionAuthority {
     ApprovedPolicy,
 }
 
+#[derive(Serialize)]
+struct CandidateDigestPayload<'a> {
+    domain: &'static str,
+    candidate: &'a PronunciationCandidate,
+}
+
+#[derive(Serialize)]
+struct SelectionDigestPayload<'a> {
+    domain: &'static str,
+    schema_version: u32,
+    language: &'a str,
+    source_text: &'a str,
+    start_byte: usize,
+    end_byte: usize,
+    surface: &'a str,
+    selected_candidate_id: &'a str,
+    candidate_digest: &'a str,
+    authority: SelectionAuthority,
+    evidence_reference: &'a str,
+}
+
+fn candidate_digest(candidate: &PronunciationCandidate) -> Result<String, String> {
+    let payload = CandidateDigestPayload {
+        domain: "luminous-dynamics/pronunciation-candidate/v1",
+        candidate,
+    };
+    let bytes = serde_json::to_vec(&payload)
+        .map_err(|error| format!("cannot serialize pronunciation candidate: {error}"))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+fn selection_digest(
+    schema_version: u32,
+    language: &str,
+    source_text: &str,
+    word: &WordPronunciation,
+    selected_candidate_id: &str,
+    candidate_digest: &str,
+    authority: SelectionAuthority,
+    evidence_reference: &str,
+) -> Result<String, String> {
+    let payload = SelectionDigestPayload {
+        domain: "luminous-dynamics/pronunciation-selection/v1",
+        schema_version,
+        language,
+        source_text,
+        start_byte: word.start_byte,
+        end_byte: word.end_byte,
+        surface: &word.surface,
+        selected_candidate_id,
+        candidate_digest,
+        authority,
+        evidence_reference,
+    };
+    let bytes = serde_json::to_vec(&payload)
+        .map_err(|error| format!("cannot serialize pronunciation selection binding: {error}"))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+impl SelectionReceipt {
+    /// Create an integrity-bound receipt after choosing a candidate. The
+    /// authority and evidence reference still require an independently
+    /// verifiable review/override record; these digests bind that record to
+    /// the exact candidate and lexical context in this plan.
+    pub fn bind(
+        authority: SelectionAuthority,
+        evidence_reference: impl Into<String>,
+        schema_version: u32,
+        language: &str,
+        source_text: &str,
+        word: &WordPronunciation,
+        candidate: &PronunciationCandidate,
+    ) -> Result<Self, String> {
+        let candidate_digest = candidate_digest(candidate)?;
+        let evidence_reference = evidence_reference.into();
+        let selection_digest = selection_digest(
+            schema_version,
+            language,
+            source_text,
+            word,
+            &candidate.candidate_id,
+            &candidate_digest,
+            authority,
+            &evidence_reference,
+        )?;
+        Ok(Self {
+            authority,
+            evidence_reference,
+            candidate_digest,
+            selection_digest,
+        })
+    }
+}
+
 impl PronunciationPlan {
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1 {
+        if self.schema_version != 2 {
             return Err(format!(
                 "unsupported pronunciation-plan schema version {}",
                 self.schema_version
@@ -158,7 +259,13 @@ impl PronunciationPlan {
                     "word {word_index} span contains whitespace; each pronunciation span must contain one lexical token"
                 ));
             }
-            validate_word_state(word_index, word)?;
+            validate_word_state(
+                word_index,
+                word,
+                self.schema_version,
+                &self.language,
+                &self.source_text,
+            )?;
 
             previous_end = word.end_byte;
         }
@@ -215,7 +322,13 @@ fn valid_source_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
-fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), String> {
+fn validate_word_state(
+    index: usize,
+    word: &WordPronunciation,
+    schema_version: u32,
+    language: &str,
+    source_text: &str,
+) -> Result<(), String> {
     let mut ids = std::collections::BTreeSet::new();
     for candidate in &word.candidates {
         if candidate.candidate_id.trim().is_empty() || !ids.insert(candidate.candidate_id.as_str())
@@ -307,6 +420,32 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
             if receipt.evidence_reference.trim().is_empty() {
                 return Err(format!(
                     "word {index} selection evidence reference is empty"
+                ));
+            }
+            let selected_candidate = word
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == selected)
+                .expect("selected candidate ID was checked above");
+            let expected_candidate_digest = candidate_digest(selected_candidate)?;
+            if receipt.candidate_digest != expected_candidate_digest {
+                return Err(format!(
+                    "word {index} selection receipt does not bind the exact selected pronunciation candidate"
+                ));
+            }
+            let expected_selection_digest = selection_digest(
+                schema_version,
+                language,
+                source_text,
+                word,
+                selected,
+                &expected_candidate_digest,
+                receipt.authority,
+                &receipt.evidence_reference,
+            )?;
+            if receipt.selection_digest != expected_selection_digest {
+                return Err(format!(
+                    "word {index} selection receipt does not bind the exact language/text/span context"
                 ));
             }
         }
@@ -725,10 +864,28 @@ mod tests {
         }
     }
 
+    fn selected_receipt(
+        language: &str,
+        source_text: &str,
+        word: &WordPronunciation,
+        candidate_index: usize,
+    ) -> SelectionReceipt {
+        SelectionReceipt::bind(
+            SelectionAuthority::HumanReviewer,
+            "review:fixture",
+            2,
+            language,
+            source_text,
+            word,
+            &word.candidates[candidate_index],
+        )
+        .unwrap()
+    }
+
     #[test]
     fn contextual_heteronym_retains_multiple_candidates_until_review() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -753,12 +910,9 @@ mod tests {
             vec![candidate("present", "iː", CandidateSource::Dictionary)],
         );
         selected.selected_candidate_id = Some("present".into());
-        selected.selection_receipt = Some(SelectionReceipt {
-            authority: SelectionAuthority::HumanReviewer,
-            evidence_reference: "review:fixture-001".into(),
-        });
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![selected],
@@ -767,9 +921,95 @@ mod tests {
     }
 
     #[test]
+    fn changing_selected_phones_invalidates_the_old_receipt() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
+        let mut plan = PronunciationPlan {
+            schema_version: 2,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+        plan.words[0].candidates[0].syllables[0].phones[1].ipa = "æ".into();
+        let error = plan.validate().unwrap_err();
+        assert!(
+            error.contains("exact selected pronunciation candidate"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn changing_language_or_source_context_invalidates_the_old_receipt() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
+        let mut plan = PronunciationPlan {
+            schema_version: 2,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+        plan.language = "en-GB".into();
+        let error = plan.validate().unwrap_err();
+        assert!(
+            error.contains("exact language/text/span context"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn changing_selection_authority_or_evidence_reference_invalidates_receipt() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
+        let mut plan = PronunciationPlan {
+            schema_version: 2,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+
+        plan.words[0].selection_receipt.as_mut().unwrap().authority = SelectionAuthority::User;
+        let authority_error = plan.validate().unwrap_err();
+        assert!(
+            authority_error.contains("exact language/text/span context"),
+            "{authority_error}"
+        );
+
+        let rebound_receipt = selected_receipt("en-US", "read", &plan.words[0], 0);
+        plan.words[0].selection_receipt = Some(rebound_receipt);
+        plan.words[0]
+            .selection_receipt
+            .as_mut()
+            .unwrap()
+            .evidence_reference = "review:substituted".into();
+        let evidence_error = plan.validate().unwrap_err();
+        assert!(
+            evidence_error.contains("exact language/text/span context"),
+            "{evidence_error}"
+        );
+    }
+
+    #[test]
     fn out_of_vocabulary_is_explicit_and_contains_no_guessed_phone() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "xqzpl".into(),
             words: vec![word("xqzpl", 0, ResolutionState::OutOfVocabulary, vec![])],
@@ -780,7 +1020,7 @@ mod tests {
     #[test]
     fn unrepresented_source_text_cannot_be_silently_dropped() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "light bright".into(),
             words: vec![word(
@@ -797,7 +1037,7 @@ mod tests {
     #[test]
     fn one_pronunciation_span_cannot_merge_multiple_whitespace_separated_words() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "hello world".into(),
             words: vec![word(
@@ -814,7 +1054,7 @@ mod tests {
     #[test]
     fn spans_must_be_valid_utf8_boundaries_and_match_the_surface() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "café".into(),
             words: vec![word(
@@ -827,7 +1067,7 @@ mod tests {
         assert!(plan.validate().is_err());
 
         let split = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "café".into(),
             words: vec![WordPronunciation {
@@ -852,12 +1092,9 @@ mod tests {
             vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
         );
         unknown.selected_candidate_id = Some("missing".into());
-        unknown.selection_receipt = Some(SelectionReceipt {
-            authority: SelectionAuthority::User,
-            evidence_reference: "user-choice:1".into(),
-        });
+        unknown.selection_receipt = Some(selected_receipt("en", "read", &unknown, 0));
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![unknown],
@@ -874,7 +1111,7 @@ mod tests {
         let mut invalid = candidate("bad", "ɛ", CandidateSource::Dictionary);
         invalid.syllables[0].phones[1].ipa = "ˈɛ".into();
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word("read", 0, ResolutionState::NeedsReview, vec![invalid])],
@@ -886,7 +1123,7 @@ mod tests {
             .phones
             .retain(|phone| phone.kind == PhoneKind::Consonant);
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -913,7 +1150,7 @@ mod tests {
         let mut bad_score = candidate("bad-score", "ɛ", CandidateSource::ModelG2p);
         bad_score.raw_provider_score = Some(f32::NAN);
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -928,7 +1165,7 @@ mod tests {
         let mut bad_source = candidate("bad-source", "ɛ", CandidateSource::ModelG2p);
         bad_source.provenance.source_digest.clear();
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -943,7 +1180,7 @@ mod tests {
     #[test]
     fn unresolved_heteronym_is_valid_but_not_renderable() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -973,12 +1210,9 @@ mod tests {
             vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
         );
         selected.selected_candidate_id = Some("past".into());
-        selected.selection_receipt = Some(SelectionReceipt {
-            authority: SelectionAuthority::HumanReviewer,
-            evidence_reference: "review:read-past-001".into(),
-        });
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![selected],
@@ -986,7 +1220,12 @@ mod tests {
         assert!(plan.validate_renderable().is_ok());
     }
 
-    fn selected_word(surface: &str, start_byte: usize, vowel: &str) -> WordPronunciation {
+    fn selected_word(
+        surface: &str,
+        start_byte: usize,
+        vowel: &str,
+        source_text: &str,
+    ) -> WordPronunciation {
         let mut candidate = PronunciationCandidate {
             candidate_id: format!("{surface}-variant-1"),
             provenance: provenance(CandidateSource::HumanReviewed, "review-fixture"),
@@ -1010,29 +1249,31 @@ mod tests {
             }],
         };
         candidate.provenance.source_digest = format!("blake3:{}", "0".repeat(64));
-        WordPronunciation {
+        let mut word = WordPronunciation {
             start_byte,
             end_byte: start_byte + surface.len(),
             surface: surface.into(),
             state: ResolutionState::Selected,
             selected_candidate_id: Some(candidate.candidate_id.clone()),
             candidates: vec![candidate],
-            selection_receipt: Some(SelectionReceipt {
-                authority: SelectionAuthority::HumanReviewer,
-                evidence_reference: "review:fixture".into(),
-            }),
-        }
+            selection_receipt: None,
+        };
+        word.selection_receipt = Some(selected_receipt("en-US", source_text, &word, 0));
+        word
     }
 
     fn alignment_fixture() -> (PronunciationPlan, VocalScoreAlignment) {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![
                 ScoreEvent {
                     start_s: 0.0,
@@ -1133,13 +1374,16 @@ mod tests {
     #[test]
     fn multiple_syllables_can_share_one_long_note_without_overlap() {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![ScoreEvent {
                 start_s: 0.0,
                 duration_s: 1.0,
@@ -1183,13 +1427,16 @@ mod tests {
     #[test]
     fn syllable_intervals_must_cover_each_note_without_gaps_or_overlap() {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let mut alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![ScoreEvent {
                 start_s: 0.0,
                 duration_s: 1.0,
@@ -1242,13 +1489,16 @@ mod tests {
     #[test]
     fn melisma_cannot_skip_an_explicit_rest() {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![
                 ScoreEvent {
                     start_s: 0.0,
