@@ -630,3 +630,22 @@ Unary marker factors attach one feature per variable state. A single VE pass ret
 This uses established expectation-semiring / dual-number machinery rather than claiming a new algebra: Li & Eisner (2009) describe first-/second-order expectation semirings and one inside pass for expectations/gradients; see https://aclanthology.org/D09-1005/ and https://www.cs.jhu.edu/~jason/papers/eisner.fsmnlp01.pdf.
 
 Qualification must compare both routes on the same frozen graphs. The one-pass route has a moment vector whose width is the sum of variable cardinalities, so its memory and scalar arithmetic may exceed repeated conditioning for broad queries. Report moment dimension, peak table payload, rational bit-height, semiring operation counts and measured time. It is an algorithmic alternative, not presumed faster.
+
+
+## 16. Checked BP implementation and legacy semantic corrections — 2026-11-07
+
+Draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10939 adds a checked log-domain sum-product API alongside the legacy `run_bp` path. The checked API validates IDs/scopes/cardinalities/tables/adjacency/configuration; rejects negative, non-finite and all-zero factors; ignores cached messages; uses log-sum-exp; preserves exact-zero support; and returns a typed no-support error instead of a uniform fallback.
+
+Its result labels distinguish:
+- undamped, converged forest inference (algorithmically exact up to f64 rounding);
+- damped forest inference (approximate because damping can preserve mass on exact-zero states);
+- converged loopy BP (approximate);
+- iteration exhaustion (not converged).
+
+The 11 authored tests include direct exhaustive comparison on two- and three-variable trees, zero-support contradiction, malformed input, extreme repeated likelihood dynamic range, schedule comparison, forest/loopy labeling, and damped / unconverged status checks. Rust compile/test and exact-head CI remain unverified; draft workflows are not passes.
+
+Two separate issues now track the remaining legacy semantic defects:
+- https://github.com/Luminous-Dynamics/symthaea/issues/10940 — joint MAP traceback and truthful assignment score. Per-variable max-marginal argmax is not a global MAP assignment.
+- https://github.com/Luminous-Dynamics/symthaea/issues/10941 — true factor beliefs and Bethe free energy. Product of singleton marginals is mean-field, not the BP factor belief.
+
+These are intentionally not folded into the checked sum-product PR.
