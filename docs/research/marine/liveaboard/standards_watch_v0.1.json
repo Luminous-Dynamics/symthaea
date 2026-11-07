@@ -1,0 +1,94 @@
+{
+  "schema_version": "0.1.0",
+  "checked_at": "2026-11-07",
+  "status_semantics": "Published editions remain the published references until a replacement is formally published; DIS / target publication dates are not compliance evidence.",
+  "standards": [
+    {
+      "id": "ISO 16315:2026",
+      "edition": 2,
+      "publication_date": "2026-02-06",
+      "status": "published",
+      "scope": "AC/DC electrical systems used for electrical propulsion and hybrid propulsion on small craft up to 24 m LH; DC below 1500 V, single-phase AC up to 1000 V, and three-phase AC up to 1000 V.",
+      "applicability_note": "Directly relevant to LOS-18 electrical propulsion if vessel type, voltage and system scope match. Obtain the licensed standard and have applicability reviewed before compliance claims.",
+      "source": "https://www.iso.org/standard/84203.html"
+    },
+    {
+      "id": "ISO 12217-1:2022",
+      "edition": 4,
+      "publication_date": "2022-12",
+      "status": "published_current_pending_revision",
+      "scope": "Stability and buoyancy assessment/categorization for non-sailing boats, principally 6–24 m LH.",
+      "next_revision": {
+        "id": "ISO/DIS 12217-1.2",
+        "edition": 5,
+        "status_as_of_2026_11_07": "DIS ballot closed 2026-11-04; still shown as under development on the ISO page",
+        "tc188_schedule": "IS publication target before 2026-11-13",
+        "not_published_as_of": "2026-11-07"
+      },
+      "source": "https://www.iso.org/standard/79072.html",
+      "revision_source": "https://www.iso.org/standard/88604.html",
+      "work_programme": "https://committee.iso.org/sites/tc188/home/projects/ongoing/ongoing-1.html",
+      "design_note": "DIS preview includes habitable-multihull inversion susceptibility, viable means of escape and inverted flotation. Do not apply the draft as a published standard."
+    },
+    {
+      "id": "ISO 12217-2:2022",
+      "edition": 4,
+      "publication_date": "2022-12",
+      "status": "published_current_pending_revision",
+      "scope": "Stability and buoyancy assessment/categorization for sailing boats, principally 6–24 m LH.",
+      "next_revision": {
+        "id": "ISO/DIS 12217-2.2",
+        "edition": 5,
+        "status_as_of_2026_11_07": "second DIS ballot closed 2026-11-03; still shown as under development on the ISO page",
+        "tc188_schedule": "IS publication target before 2026-11-13",
+        "not_published_as_of": "2026-11-07"
+      },
+      "source": "https://www.iso.org/standard/79073.html",
+      "revision_source": "https://www.iso.org/standard/88606.html",
+      "work_programme": "https://committee.iso.org/sites/tc188/home/projects/ongoing/ongoing-1.html",
+      "design_note": "DIS preview includes habitable-multihull inversion susceptibility, viable means of escape and inverted flotation."
+    },
+    {
+      "id": "ISO 12215-5:2019",
+      "edition": 2,
+      "corrected_version": "2024-03",
+      "status": "published_confirmed_current_2026",
+      "scope": "Monohull design pressures, design stresses and scantlings up to 24 m LH or load-line length.",
+      "source": "https://www.iso.org/standard/69552.html"
+    },
+    {
+      "id": "ISO 12215-7:2020",
+      "edition": 1,
+      "status": "published_confirmed_current_2026",
+      "scope": "Multihull global loads, local design pressures and local scantlings up to 24 m LH or load-line length.",
+      "source": "https://www.iso.org/standard/73457.html"
+    },
+    {
+      "id": "ISO 12215-9:2026",
+      "edition": 2,
+      "publication_month": "2026-08",
+      "status": "under_publication_stage_60_00_as_checked_2026_11_07",
+      "scope": "Sailing-craft appendage loads and scantlings for monohull sailing craft up to 24 m.",
+      "source": "https://www.iso.org/standard/85208.html",
+      "note": "The ISO public record showed stage 60.00 under publication when checked. Verify publication and applicable edition at actual design review; do not assume the title year alone establishes current status."
+    }
+  ],
+  "registry_fields": [
+    "exact_standard_identifier",
+    "edition_and_amendments",
+    "status_and_checked_at",
+    "published_or_draft_source",
+    "jurisdiction",
+    "vessel_use_and_length_scope",
+    "architecture_applicability",
+    "design_obligation_owner",
+    "reviewer",
+    "licence_or_access_status"
+  ],
+  "nonclaims": [
+    "This register is not a compliance determination.",
+    "Do not copy restricted standards text.",
+    "Flag, class, SAMSA, route and vessel-use applicability require separate review.",
+    "A small-craft length scope does not prove that all relevant conventions or local regulations apply or do not apply."
+  ]
+}
