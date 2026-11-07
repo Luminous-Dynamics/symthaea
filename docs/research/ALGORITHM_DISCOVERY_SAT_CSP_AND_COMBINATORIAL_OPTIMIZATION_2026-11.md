@@ -224,6 +224,7 @@ Pinned source identity observed 2026-11-07:
 - File size: 1,262,695 bytes.
 - Header: `solverid,instanceid,runtime,status,score,vresult`.
 - 13,200 records: 33 solver IDs × 400 instances. The relevant Main Track groups contain 19 `[main]` solvers and 12 `[main-ai]` solvers; `[exp-ai]` entries are kept outside these Main Track comparisons.
+- Independent input-integrity audit: 13,200 unique solver/instance pairs, all 33 solvers have the identical 400-instance universe, all score strings have exactly two decimal places, and zero verified-status/result-label mismatches were found. The exact status histogram and recomputed baseline answers are frozen in [`SATCOMP26_RESULTS_AUDIT_EXPECTED_V1.json`](SATCOMP26_RESULTS_AUDIT_EXPECTED_V1.json) for the Rust auditor's regression tests.
 - The organizers' index records an August 10, 2026 update adding two solvers omitted by manual intake and publishing updated scores, slides and sources: [official competition index](https://github.com/satcompetition/2026/).
 
 ### Updated Main Track results
