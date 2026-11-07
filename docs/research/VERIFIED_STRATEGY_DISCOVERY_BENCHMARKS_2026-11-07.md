@@ -254,3 +254,19 @@ First reproduce the published historical reference (approximately 92% ranking ac
 The acquisition function should estimate expected value of information: probability that an experiment changes a decision, multiplied by the consequence of that decision, balanced against experiment cost and coverage obligations. An experiment can be valuable because it falsifies a proposed transformation or invalidates an attractive strategy, not only because it improves a score.
 
 **No adaptive peeking at the confirmatory set.** Repeatedly selecting the most informative examples from a reused test set creates selection bias. Active sampling is for development and diagnosis; final promotion still requires a sealed evaluation and valid uncertainty accounting. Use #10805's existing receipt/manifest format to record the sampling policy, selected instance IDs and selection-model version; do not create a parallel evidence format.
+
+
+## 12. Future quantified benchmark family: QBF / #QBF / MaxQBF
+
+Do not merge QBF results with SAT, #SAT or PMC tracks. The recent ECCC report TR26-279 (posted 27 October 2026), *On Knowledge Compilation Languages for QBFs*, introduces tree/DAG compilation languages and proof systems for #QBF, and reports an initial tree-like compilation/counting implementation that can represent doubly exponential counts. It compares against d4-QBF. This is a new research baseline, not yet a Symthaea result: https://eccc.weizmann.ac.il/report/2026/279/.
+
+Projected knowledge compilation also now has a formally validated proof framework that carries Skolem assignments, with a C checker and a CakeML/HOL4-verified checker (Bryant, Tan & Heule, SAT 2025): https://doi.org/10.4230/LIPIcs.SAT.2025.8.
+
+Before benchmarking QBF, pin a distinct contract for:
+- quantifier prefix and alternation depth;
+- existential Skolem dependencies;
+- truth / #QBF / MaxQBF semantics;
+- count magnitude and exact representation;
+- proof backend and checker acceptance.
+
+Evaluate d4-QBF and reproducible artifacts for TR26-279 when available, tree versus DAG compilation, relevant #QBF proof systems and uncompiled QBF baselines. Record alternation depth, dependency width, Skolem artifact size, compilation size, exact count bit width, checker time/memory and time-to-trusted-result. No QBF implementation or SOTA claim follows from the structural prefix validator alone.
