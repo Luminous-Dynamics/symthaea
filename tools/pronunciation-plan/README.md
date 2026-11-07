@@ -21,6 +21,12 @@ The library checks schema version, language presence, exact source-text spans, f
 
 Synthetic tests cover contextual heteronyms, user/human selection receipts, OOV without guessed phones, missing source coverage, UTF-8 span errors, unknown candidate selection, stress/length markers mixed into phone tokens, consonant-only syllables, non-finite scores, and missing provenance.
 
+## Score alignment contract
+
+The same crate also defines a research-only `VocalScoreAlignment` contract. It binds every selected pronunciation syllable to one or more ordered score-event indices, supports medial/opening/final melisma, requires the designated sustained phone to be an explicit vowel, and makes rests explicit. Every sung score event is assigned exactly once, every rest remains unbound, and phrase spans partition the syllable sequence with finite breath durations. Score events are monophonic and chronological; unrepresented time gaps must be represented as explicit rests.
+
+This removes the current constructor's "surplus notes become final-syllable melisma" assumption from the target architecture. The current production constructor remains a compatibility adapter until a separately reviewed integration is made.
+
 ## Integration path
 
 1. Adapt the exact Piper Plus and current Muse outputs into candidate records without discarding raw outputs.
