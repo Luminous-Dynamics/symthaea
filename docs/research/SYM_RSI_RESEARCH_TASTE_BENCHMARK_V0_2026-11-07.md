@@ -111,3 +111,21 @@ A research-taste result is not a scientific discovery. Future-paper matching is 
 7. MASS (2026-10-08): https://arxiv.org/abs/2610.12176
 8. REUSE (2026-09-29): https://arxiv.org/abs/2609.33180
 9. SelfImprove-Bench (2026-11-02): https://arxiv.org/abs/2611.02797
+
+## 7. Synthetic decision-case slate
+
+The first fixture pack is in:
+- `docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_DECISION_FIXTURES_V0_2026-11-07.json`
+- `docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_DECISION_SCHEMA_V0_2026-11-07.json`
+
+It contains 16 synthetic policy cases over all five stages:
+- direction selection: value-per-cost ranking, duplicate/popularity trap, low-cost value-of-information pilot;
+- approach design: unfalsifiable bundled mechanism, concrete mechanism with intermediate predictions, reproduction incorrectly labelled as novelty;
+- experiment design: non-discriminating experiment, paired controlled confirmation, staged low-cost screening;
+- interpretation: underpowered positive point estimate, falsified mechanism with credible alternative, evaluator drift/confirmation leakage;
+- transfer: frozen mechanism transfer, task-specific retuning mislabelled as zero-shot, protected-capability regression, success-only memory mislabelled as continuity.
+
+Every case records the expected action, required response elements, prohibited inferences and evidence to request. The fixture-pack status is `SYNTHETIC_POLICY_CASES_NOT_EXPERT_GOLD_OR_BENCHMARK_RESULTS`. Expected actions are rule-derived from the explicitly stated synthetic facts; they are not human expert labels or evidence that a model can make the decisions. Real task packs still require independent domain review and prospective outcomes.
+
+A custom structural walk against the companion schema found zero errors, 16 unique fixture IDs, full coverage of all five stages, and non-empty anti-inference/evidence-request fields. This is a structure check, not a full standards-library JSON Schema run or an agent evaluation.
+
