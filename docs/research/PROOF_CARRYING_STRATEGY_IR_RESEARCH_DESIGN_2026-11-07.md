@@ -348,3 +348,38 @@ Long-term strategy discovery should jointly optimize:
 6. robustness on held-out quantifier alternation depths and application families.
 
 A smaller, independently checkable strategy is often the more useful synthesis result even when two strategies solve the same quantified instance.
+
+
+## 16. Strategy-function optimization as a verifiable compilation pipeline
+
+The strategy synthesis output should have two separate correctness levels:
+
+- **Game certificate:** the Skolem/Herbrand functions satisfy the original CNF matrix for all assignments of the opposing player under the original ordered quantifier prefix.
+- **Compiled representation certificate:** each compact BDD computes exactly the same function as the source strategy table over its declared semantic dependency scope.
+
+Do not let the second certificate stand in for the first. A BDD can faithfully compile a function that is not a winning strategy.
+
+The current bounded representation pipeline introduces:
+- exhaustive semantic-support reduction (only inessential dependencies may be removed);
+- a distinction between semantic dependency order and BDD decision order;
+- a reduced ordered BDD with deterministic node IDs;
+- exact order search when the small-scope permutation count fits the budget;
+- deterministic sifting when it does not;
+- bounded graph validation, reachable-node checks and exhaustive table equivalence.
+
+The next research step is a structural seed order from the interaction graph of the strategy function. For a pair of input dependencies, an edge can be inferred when the second Boolean derivative is non-zero for some assignment to the remaining inputs. Deterministic min-fill/frontier-style orders can then be used as additional sifting starts. This graph is only an ordering heuristic; it is not a proof that higher-order interactions are absent.
+
+The QBF search path now also measures partial-matrix checks and early decisive subtrees. When the already assigned prefix makes the CNF definitely TRUE or permanently FALSE, the producer can stop that subtree and fill the remaining winning-player functions with tables over the still-free dependencies. Each branch owns only rows consistent with its assigned dependency values, so sibling branches can merge without silently overwriting one another. The independent strategy checker remains the acceptance gate.
+
+Evaluation should optimize a multi-objective tuple rather than a single benchmark score:
+
+1. QBF decision correctness;
+2. strategy extraction coverage;
+3. strategy circuit/BDD size;
+4. support size and dependency width;
+5. proof or synthesis time;
+6. construction peak memory;
+7. independent checker time and simplicity;
+8. robust performance on held-out quantifier patterns and application families.
+
+A small certificate is valuable only if the original strategy is sound and the compiled object is independently checkable.
