@@ -430,3 +430,47 @@ The current finite research lane uses exhaustive small QBF oracles, generated mu
 ### Candidate next paradigm: frontier-seeded multi-start ordering
 
 Use the Boolean function's interaction graph (pairwise non-zero mixed Boolean derivatives) to create deterministic min-fill/frontier-style seed orders. Run the same bounded sifting from several seeds and retain the smallest independently verified ROBDD. Compare this against natural-order sifting and exact optima on small functions. Do not assume pairwise interaction graphs capture every high-order dependency; retain exact small-scope results as the oracle and test the seeds on held-out functions.
+
+
+## 14. Frontier-refined multi-start ordering
+
+The current ROBDD ordering pipeline now compares deterministic starts from:
+- natural dependency order;
+- reverse dependency order;
+- pairwise Boolean-interaction graph min-fill;
+- reverse min-fill;
+- min-fill refined by bounded insertion over the vertex-separation frontier;
+- reverse frontier-refined order.
+
+The interaction graph is computed exactly from the truth table. An edge ((i,j)) exists if the mixed Boolean derivative (f_{00}\oplus f_{01}\oplus f_{10}\oplus f_{11}) is nonzero for at least one assignment to the other inputs. This graph is only an ordering heuristic; it is not the semantic dependency graph and does not claim to capture higher-order structure completely.
+
+Frontier refinement optimizes the lexicographic tuple:
+1. maximum live frontier;
+2. total live-frontier mass;
+3. frontier profile.
+
+Only strict improvements are accepted. Therefore the maximum frontier cannot exceed the min-fill seed's maximum frontier. BDD node count, not graph score, decides which independently verified final BDD is selected.
+
+### Qualification experiments
+
+- Exhaustively compare the pairwise-interaction graph with an independently written mixed-derivative oracle over all 256 three-input Boolean functions.
+- Use a fixed five-vertex graph where min-fill has frontier profile `[0,1,2,3]`; bounded insertion produces `[0,1,2,1]`, reducing maximum frontier from 3 to 2.
+- Test order permutation, graph symmetry, self-edge and out-of-range rejection.
+- Enforce separate interaction-check, frontier-order and BDD-order evaluation budgets.
+- Verify the final selected BDD against every truth-table row.
+
+These finite experiments establish exact graph construction on three-input functions and a frontier improvement on a specific graph. They do not establish improved average BDD size on application QBF strategies. The benchmark must report whether lower frontier actually predicts lower ROBDD nodes across held-out function families, and include counterexamples where it does not.
+
+### New target metrics
+
+| Metric | Required comparison |
+|---|---|
+| Interaction graph cost | Pair checks and runtime versus truth-table size |
+| Structural seed | Min-fill versus frontier-refined max/total frontier |
+| Multi-start coverage | Unique seeds actually evaluated under global budget |
+| Final ROBDD quality | Nodes versus natural-order and natural-sifting baselines |
+| Optimality gap | Exact minimum on scopes where (n!\) is affordable |
+| Construction resources | Peak nodes, peak bytes and order-evaluation count |
+| Correctness | Exhaustive BDD equivalence and original QBF strategy acceptance |
+
+No claim of dominance is warranted unless the frontier seed reduces verified BDD node count on held-out, application-derived strategy functions at matched memory and time budgets.
