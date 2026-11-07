@@ -1299,7 +1299,7 @@
               "items": {
                 "type": "string",
                 "enum": [
-                  "global_verified_state",
+                  "full_verified_state",
                   "fixed_mechanism_scope_routed_clusters",
                   "adaptive_mechanism_scope_routed_clusters",
                   "shuffled_scope_routing",
