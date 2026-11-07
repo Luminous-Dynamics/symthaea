@@ -238,64 +238,139 @@ impl VocalPerformance {
         {
             bail!("lyrics, language, and syllables are required");
         }
-        let mut previous_start = 0.0f32;
-        for (i, syllable) in self.syllables.iter().enumerate() {
-            let note = syllable.note;
-            if !note.frequency.is_finite()
-                || note.frequency <= 0.0
-                || !note.start_time.is_finite()
-                || note.start_time < 0.0
-                || !note.duration.is_finite()
-                || note.duration <= 0.0
-                || syllable.phonemes.is_empty()
-            {
-                bail!("invalid vocal syllable {i}");
+
+        let duration_s = self.duration_s();
+        if !duration_s.is_finite() || duration_s <= 0.0 {
+            bail!("vocal performance duration must be finite and positive");
+        }
+
+        let mut previous_syllable_start = 0.0f32;
+        for (syllable_index, syllable) in self.syllables.iter().enumerate() {
+            if syllable.lyric.trim().is_empty() || syllable.phonemes.is_empty() {
+                bail!("vocal syllable {syllable_index} requires a lyric and phonemes");
             }
-            if syllable.phrase_index >= self.phrases.len()
-                || !syllable.consonant_advance_s.is_finite()
-                || syllable.consonant_advance_s < 0.0
-                || syllable.consonant_advance_s > 0.15
-            {
-                bail!("invalid phrase or consonant timing in vocal syllable {i}");
-            }
-            let mut note_start = note.start_time;
-            for melisma in &syllable.melisma_notes {
-                if !melisma.frequency.is_finite()
-                    || melisma.frequency <= 0.0
-                    || melisma.start_time < note_start
-                    || melisma.duration <= 0.0
-                {
-                    bail!("invalid melisma note in vocal syllable {i}");
-                }
-                note_start = melisma.start_time;
-            }
-            if i > 0 && note.start_time < previous_start {
+            let note_end = validate_note(
+                &syllable.note,
+                &format!("vocal syllable {syllable_index} note"),
+            )?;
+            if syllable.note.start_time < previous_syllable_start {
                 bail!("vocal syllables must be chronological");
             }
-            previous_start = note.start_time;
+            previous_syllable_start = syllable.note.start_time;
+
+            if syllable.phrase_index >= self.phrases.len()
+                || !syllable.consonant_advance_s.is_finite()
+                || !(0.0..=0.15).contains(&syllable.consonant_advance_s)
+            {
+                bail!("invalid phrase or consonant timing in vocal syllable {syllable_index}");
+            }
+            if !syllable.portamento.is_finite()
+                || !(0.0..=1.0).contains(&syllable.portamento)
+                || !syllable.vibrato_onset.is_finite()
+                || !(0.0..=1.0).contains(&syllable.vibrato_onset)
+                || !syllable.vibrato_rate_hz.is_finite()
+                || syllable.vibrato_rate_hz < 0.0
+                || !syllable.vibrato_depth_cents.is_finite()
+                || syllable.vibrato_depth_cents < 0.0
+                || (syllable.vibrato_depth_cents > 0.0 && syllable.vibrato_rate_hz <= 0.0)
+                || !syllable.breathiness.is_finite()
+                || !(0.0..=1.0).contains(&syllable.breathiness)
+                || !syllable.energy.is_finite()
+                || !(0.0..=1.0).contains(&syllable.energy)
+            {
+                bail!("invalid vocal expression controls in syllable {syllable_index}");
+            }
+
+            for (phoneme_index, phoneme) in syllable.phonemes.iter().enumerate() {
+                if phoneme.ipa.trim().is_empty()
+                    || !phoneme.natural_duration_s.is_finite()
+                    || phoneme.natural_duration_s <= 0.0
+                    || phoneme.stress > 2
+                {
+                    bail!(
+                        "invalid phoneme {phoneme_index} in vocal syllable {syllable_index}"
+                    );
+                }
+            }
+
+            let mut previous_note_end = note_end;
+            for (melisma_index, melisma) in syllable.melisma_notes.iter().enumerate() {
+                let melisma_end = validate_note(
+                    melisma,
+                    &format!(
+                        "melisma note {melisma_index} in vocal syllable {syllable_index}"
+                    ),
+                )?;
+                if melisma.start_time < previous_note_end {
+                    bail!(
+                        "melisma notes overlap or are not chronological in vocal syllable {syllable_index}"
+                    );
+                }
+                previous_note_end = melisma_end;
+            }
         }
-        for (i, phrase) in self.phrases.iter().enumerate() {
-            if phrase.syllable_start >= phrase.syllable_end
+
+        let mut next_syllable = 0usize;
+        for (phrase_index, phrase) in self.phrases.iter().enumerate() {
+            if phrase.syllable_start != next_syllable
+                || phrase.syllable_start >= phrase.syllable_end
                 || phrase.syllable_end > self.syllables.len()
                 || phrase.expression_curve.is_empty()
+                || !phrase.breath_before_s.is_finite()
                 || phrase.breath_before_s < 0.0
+                || !phrase.breath_after_s.is_finite()
                 || phrase.breath_after_s < 0.0
             {
-                bail!("invalid vocal phrase {i}");
+                bail!("invalid or non-partitioning vocal phrase {phrase_index}");
             }
-            if phrase.expression_curve.iter().any(|point| {
-                !point.time_s.is_finite()
+            for syllable_index in phrase.syllable_start..phrase.syllable_end {
+                if self.syllables[syllable_index].phrase_index != phrase_index {
+                    bail!(
+                        "vocal syllable {syllable_index} does not match its declared phrase range"
+                    );
+                }
+            }
+
+            let mut previous_expression_time = None;
+            for (point_index, point) in phrase.expression_curve.iter().enumerate() {
+                if !point.time_s.is_finite()
+                    || point.time_s < 0.0
+                    || point.time_s > duration_s
                     || !point.energy.is_finite()
                     || !(0.0..=1.0).contains(&point.energy)
+                    || !point.breathiness.is_finite()
                     || !(0.0..=1.0).contains(&point.breathiness)
+                    || !point.tension.is_finite()
                     || !(0.0..=1.0).contains(&point.tension)
-            }) {
-                bail!("invalid expression curve in vocal phrase {i}");
+                    || previous_expression_time.is_some_and(|time| point.time_s < time)
+                {
+                    bail!(
+                        "invalid or non-chronological expression point {point_index} in phrase {phrase_index}"
+                    );
+                }
+                previous_expression_time = Some(point.time_s);
             }
+            next_syllable = phrase.syllable_end;
+        }
+        if next_syllable != self.syllables.len() {
+            bail!("vocal phrase ranges must cover every syllable exactly once");
+        }
+
+        let mut previous_pitch_time = None;
+        for (point_index, point) in self.pitch_curve.iter().enumerate() {
+            if !point.time_s.is_finite()
+                || point.time_s < 0.0
+                || point.time_s > duration_s
+                || !point.frequency_hz.is_finite()
+                || point.frequency_hz <= 0.0
+                || previous_pitch_time.is_some_and(|time| point.time_s < time)
+            {
+                bail!("invalid or non-chronological pitch curve point {point_index}");
+            }
+            previous_pitch_time = Some(point.time_s);
         }
         Ok(())
     }
-
     pub fn duration_s(&self) -> f32 {
         self.syllables
             .iter()
@@ -303,6 +378,26 @@ impl VocalPerformance {
             .fold(0.0, f32::max)
     }
 }
+
+fn validate_note(note: &Note, context: &str) -> Result<f32> {
+    if !note.frequency.is_finite()
+        || note.frequency <= 0.0
+        || !note.start_time.is_finite()
+        || note.start_time < 0.0
+        || !note.duration.is_finite()
+        || note.duration <= 0.0
+        || !note.velocity.is_finite()
+        || !(0.0..=1.0).contains(&note.velocity)
+    {
+        bail!("{context} has invalid pitch, timing, duration, or velocity");
+    }
+    let end_time = note.start_time + note.duration;
+    if !end_time.is_finite() || end_time <= note.start_time {
+        bail!("{context} has an invalid end time");
+    }
+    Ok(end_time)
+}
+
 
 impl VocalSyllable {
     pub fn notes(&self) -> impl Iterator<Item = &Note> {
