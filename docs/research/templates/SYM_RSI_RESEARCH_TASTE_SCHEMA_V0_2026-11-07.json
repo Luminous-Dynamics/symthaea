@@ -1152,6 +1152,96 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "decision_theory": {
+      "type": "object",
+      "properties": {
+        "decision_options_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "hypothesis_prior_distribution_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "posterior_update_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utility_function_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "outcome_value_scale_and_units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_value_without_experiment_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_value_with_experiment_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evsi_estimation_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_experiment_cost_and_opportunity_cost_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "downside_risk_measure_and_limit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robustness_and_sensitivity_plan": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utility_weights_frozen_before_outcomes": {
+          "const": true
+        },
+        "post_hoc_utility_reweighting_prohibited": {
+          "const": true
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "decision_options_manifest_digest",
+        "hypothesis_prior_distribution_ref",
+        "posterior_update_method",
+        "utility_function_digest",
+        "outcome_value_scale_and_units",
+        "expected_value_without_experiment_definition",
+        "expected_value_with_experiment_definition",
+        "evsi_estimation_method",
+        "expected_experiment_cost_and_opportunity_cost_ref",
+        "downside_risk_measure_and_limit",
+        "robustness_and_sensitivity_plan",
+        "utility_weights_frozen_before_outcomes",
+        "post_hoc_utility_reweighting_prohibited",
+        "note"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -1173,7 +1263,8 @@
     "analysis_plan",
     "governance",
     "reporting",
-    "claim_ceiling"
+    "claim_ceiling",
+    "decision_theory"
   ],
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema",
