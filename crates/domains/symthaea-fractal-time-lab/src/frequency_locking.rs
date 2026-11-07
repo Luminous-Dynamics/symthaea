@@ -66,15 +66,9 @@ impl Default for FrequencyLockingConfig {
 pub enum FrequencyLockingError {
     EmptySweep,
     InvalidConfiguration,
-    NonFiniteDetuning {
-        index: usize,
-    },
-    NonIncreasingDetuning {
-        index: usize,
-    },
-    InvalidTrace {
-        index: usize,
-    },
+    NonFiniteDetuning { index: usize },
+    NonIncreasingDetuning { index: usize },
+    InvalidTrace { index: usize },
     TransformLengthOverflow,
     NonFiniteSpectrum,
 }
@@ -96,7 +90,9 @@ impl fmt::Display for FrequencyLockingError {
                 "trace at sweep index {index} is too short or contains non-finite samples"
             ),
             Self::TransformLengthOverflow => write!(f, "FFT transform length overflow"),
-            Self::NonFiniteSpectrum => write!(f, "spectral calculation produced a non-finite value"),
+            Self::NonFiniteSpectrum => {
+                write!(f, "spectral calculation produced a non-finite value")
+            }
         }
     }
 }
@@ -176,10 +172,7 @@ pub fn estimate_subharmonic_peak(
         return None;
     }
 
-    let transform_length = samples
-        .len()
-        .checked_mul(4)?
-        .checked_next_power_of_two()?;
+    let transform_length = samples.len().checked_mul(4)?.checked_next_power_of_two()?;
     let mut spectrum = vec![Complex::new(0.0, 0.0); transform_length];
     let mean = samples.iter().sum::<f64>() / samples.len() as f64;
 
@@ -201,8 +194,8 @@ pub fn estimate_subharmonic_peak(
     let lower_frequency = (target_frequency - search_half_width).max(0.0);
     let upper_frequency = (target_frequency + search_half_width).min(0.5);
     let minimum_bin = ((lower_frequency * transform_length as f64).ceil() as usize).max(1);
-    let maximum_bin = ((upper_frequency * transform_length as f64).floor() as usize)
-        .min(transform_length / 2);
+    let maximum_bin =
+        ((upper_frequency * transform_length as f64).floor() as usize).min(transform_length / 2);
     if minimum_bin > maximum_bin {
         return None;
     }
@@ -210,7 +203,11 @@ pub fn estimate_subharmonic_peak(
     let mut magnitudes = Vec::with_capacity(maximum_bin - minimum_bin + 1);
     for bin in minimum_bin..=maximum_bin {
         let magnitude = spectrum[bin].norm();
-        let one_sided_scale = if bin == transform_length / 2 { 1.0 } else { 2.0 };
+        let one_sided_scale = if bin == transform_length / 2 {
+            1.0
+        } else {
+            2.0
+        };
         let amplitude = one_sided_scale * magnitude / window_sum;
         if !amplitude.is_finite() {
             return None;
@@ -369,8 +366,7 @@ pub fn assess_frequency_locking(
         locked_points,
         longest_contiguous_points,
         observed_locking_span_rad,
-        frequency_locking_detected: longest_contiguous_points
-            >= config.minimum_contiguous_points,
+        frequency_locking_detected: longest_contiguous_points >= config.minimum_contiguous_points,
         target_frequency: config.target_frequency,
         frequency_tolerance: config.frequency_tolerance,
     })
@@ -408,9 +404,7 @@ mod tests {
 
     #[test]
     fn frequency_locking_reports_a_contiguous_detuning_span() {
-        let signals: Vec<Vec<f64>> = (0..5)
-            .map(|_| stable_period_two_signal(512, 0.8))
-            .collect();
+        let signals: Vec<Vec<f64>> = (0..5).map(|_| stable_period_two_signal(512, 0.8)).collect();
         let detunings = [-0.2, -0.1, 0.0, 0.1, 0.2];
         let traces: Vec<PulseSweepTrace<'_>> = detunings
             .iter()
