@@ -187,6 +187,105 @@
     "This inventory is derived from source declarations, not a measured checkpoint size.",
     "It does not prove the full Serialize/Deserialize representation is a stable durable wire format.",
     "It does not prove the current HME stores any of these artifacts.",
-    "Field mutability classifications require further source/call-site audit before compression or split-segment design."
-  ]
+    "Field mutability classifications require further source/call-site audit before compression or split-segment design.",
+    "The Bridge field classification is a source audit; it does not prove that fields are currently durably persisted."
+  ],
+  "bridge_type": {
+    "name": "HdcLtcBridge",
+    "source_file": "src/hdc_ltc_bridge.rs",
+    "derives": [
+      "Debug",
+      "Clone"
+    ],
+    "serde_derive": false,
+    "fields": [
+      {
+        "field": "network",
+        "class": "complete_inner_network",
+        "required_for_bridge_checkpoint": true,
+        "details": "Must carry the complete LearnerCheckpoint field set; not just NetworkStateSnapshot."
+      },
+      {
+        "field": "config",
+        "class": "bridge_configuration",
+        "required_for_bridge_checkpoint": true,
+        "details": "Includes input/output dimensions, HDC dimension, architecture, activation, adaptive resize policy and initialization seed."
+      },
+      {
+        "field": "input_projection",
+        "class": "deterministic_projection_base",
+        "required_for_bridge_checkpoint": true,
+        "details": "Observed read-only in project_to_hdc/project_to_hdc_vec and reinitialized on resize; preserve exact values or versioned PRNG/GenesisSeed regeneration lineage."
+      },
+      {
+        "field": "output_projection",
+        "class": "trainable_projection",
+        "required_for_bridge_checkpoint": true,
+        "details": "Read by project_from_hdc and mutated in train_step by rank-one outer-product gradient; preserve dense values or exact ordered factor updates."
+      },
+      {
+        "field": "current_output",
+        "class": "cached_dynamic_output",
+        "required_for_bridge_checkpoint": true,
+        "details": "Either persist or recompute and independently verify against the declared projection/output contract."
+      },
+      {
+        "field": "total_steps",
+        "class": "execution_counter_and_resize_seed_input",
+        "required_for_bridge_checkpoint": true,
+        "details": "Influences deterministic resize seed lineage."
+      },
+      {
+        "field": "state_diversity",
+        "class": "running_observable_metric",
+        "required_for_bridge_checkpoint": true,
+        "details": "Persist or recompute under a versioned exact policy; do not silently reset if externally observed."
+      },
+      {
+        "field": "cycles_since_resize",
+        "class": "adaptive_controller_state",
+        "required_for_bridge_checkpoint": true,
+        "details": "Affects when the next adaptive resize may occur."
+      },
+      {
+        "field": "genesis",
+        "class": "deterministic_reinitialization_lineage",
+        "required_for_bridge_checkpoint": true,
+        "details": "Optional GenesisSeed used to reinitialize projections/network after resize."
+      },
+      {
+        "field": "predict_scratch",
+        "class": "transient_scratch_buffer",
+        "required_for_bridge_checkpoint": false,
+        "details": "Reconstruct empty."
+      },
+      {
+        "field": "train_scratch",
+        "class": "transient_scratch_buffer",
+        "required_for_bridge_checkpoint": false,
+        "details": "Reconstruct empty."
+      },
+      {
+        "field": "eval_scratch",
+        "class": "transient_scratch_buffer",
+        "required_for_bridge_checkpoint": false,
+        "details": "Reconstruct empty."
+      }
+    ],
+    "bridge_checkpoint_required_classes": [
+      "complete inner LearnerCheckpoint",
+      "bridge config and current HDC dimension",
+      "input projection exact bytes or deterministic regeneration profile+seed+algorithm version",
+      "output projection dense bytes or exact update-factor representation",
+      "current output/cache and counters under explicit persist-or-recompute verification contract",
+      "adaptive resize cooldown and deterministic initialization lineage",
+      "source commit/profile and projection algorithm version"
+    ],
+    "observed_source_behavior": [
+      "HdcLtcBridge derives Debug + Clone rather than Serialize/Deserialize.",
+      "The input projection is initialized in new/from_genesis and rebuilt in maybe_resize; no writer was found in inspected source paths outside construction/resize.",
+      "The output projection is initialized in new/from_genesis, rebuilt in maybe_resize, read in project_from_hdc and updated in train_step by an outer-product gradient.",
+      "maybe_resize rebuilds the inner network and projection matrices rather than converting the full learner state; state-continuity must be qualified separately under #6560/#6561/#7749."
+    ]
+  }
 }
