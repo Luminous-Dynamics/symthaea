@@ -545,3 +545,6 @@ Therefore, an API named `similarity()` is not necessarily a full-dimensional exa
 The exact query contract must use a scalar full-dimension reference over every coordinate, with independently checked SIMD kernels as implementations of that same contract. A stride-based or otherwise sampled similarity path may remain useful for adaptive cognitive operation, but it must be explicitly typed as approximate, have its own quality/recall curve, and must never emit an Exact qualification status. Exact retrieval semantics must not depend on a global runtime stride or compile-time feature selection.
 
 Also reuse [#7955 — metadata-first scans and payload cache residency](https://github.com/Luminous-Dynamics/symthaea/issues/7955), plus #7934/#7922. HME should compare metadata-first SoA and interleaved layouts using the existing cold-open methodology rather than create a duplicate layout/residency experiment.
+### Related HDC core contract
+
+Exact/stride-sampled similarity semantics are tracked separately in [#10918 — HDC-SEMANTICS-002](https://github.com/Luminous-Dynamics/symthaea/issues/10918). HME must consume the canonical full-dimension exact reference and must not create a competing similarity implementation. The existing stride-based path is treated as an explicitly approximate/adaptive mode.
