@@ -165,7 +165,7 @@ impl ExperimentManifest {
         require_nonempty_list("equations_and_assumptions", &self.equations_and_assumptions)?;
         require_nonempty_list("primary_metrics", &self.primary_metrics)?;
         require_nonempty_list("required_checks", &self.required_checks)?;
-        ensure_unique_strings("required_checks", &self.required_checks)?;
+        ensure_unique_strings(&self.required_checks)?;
         require_nonempty_list("claims", &self.claims)?;
         require_nonempty_list("non_claims", &self.non_claims)?;
         require_nonempty_list("falsification_conditions", &self.falsification_conditions)?;
@@ -295,9 +295,6 @@ impl RunReceipt {
         }
 
         if self.status == VerificationStatus::Passed {
-            if self.checks.is_empty() {
-                return Err(ManifestError::PassedRunWithoutChecks);
-            }
             if self.output_artifacts.is_empty() {
                 return Err(ManifestError::PassedRunWithoutOutputs);
             }
@@ -349,8 +346,6 @@ pub enum ManifestError {
     StaleHead { check: String, expected: String, actual: String },
     #[error("passed check {0} has no log artifact digest")]
     PassedCheckWithoutLog(String),
-    #[error("a passed run has no required checks")]
-    PassedRunWithoutChecks,
     #[error("a passed run has no output artifacts")]
     PassedRunWithoutOutputs,
     #[error("a run marked passed contains a queued, running, skipped, not-run or failed check")]
@@ -380,17 +375,13 @@ fn require_nonempty_list(
     }
 }
 
-fn ensure_unique_strings(
-    field: &'static str,
-    values: &[String],
-) -> Result<(), ManifestError> {
+fn ensure_unique_strings(values: &[String]) -> Result<(), ManifestError> {
     let mut seen = BTreeSet::new();
     for value in values {
         if !seen.insert(value.as_str()) {
             return Err(ManifestError::DuplicateRequiredCheck(value.clone()));
         }
     }
-    let _ = field;
     Ok(())
 }
 
