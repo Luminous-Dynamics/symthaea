@@ -3,10 +3,7 @@
 
 use std::error::Error;
 use symthaea_uap_observatory::{
-    RayObservation,
-    SensorPlacementCandidate,
-    SensorToEcefQuaternion,
-    EcefVector3,
+    EcefVector3, RayObservation, SensorPlacementCandidate, SensorToEcefQuaternion,
     rank_sensor_placements,
 };
 
@@ -77,7 +74,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("epistemic_status=SYNTHETIC_LOCAL_FISHER_INFORMATION_DESIGN_NOT_DEPLOYMENT_ADVICE");
     println!("target_ecef_m=50,40,200");
     println!("angular_sigma_rad={sigma}");
-    println!("candidate,logdet_information,a_optimal_trace_m2,condition_number,cov_xx,cov_yy,cov_zz");
+    println!(
+        "candidate,logdet_information,a_optimal_trace_m2,condition_number,cov_xx,cov_yy,cov_zz"
+    );
     for score in ranking {
         let covariance = score.covariance_lower_bound_m2;
         println!(
