@@ -1008,7 +1008,7 @@ mod tests {
                 ],
             }],
         };
-        candidate.provenance.source_digest = "blake3:review-fixture".into();
+        candidate.provenance.source_digest = format!("blake3:{}", "0".repeat(64));
         WordPronunciation {
             start_byte,
             end_byte: start_byte + surface.len(),
