@@ -544,3 +544,8 @@ Do not build a universal solver that tries to beat every specialized library. Bu
 - records evidence lineage, dependence, model discrepancy and abstention reasons.
 
 The moat is not another implementation of sum-product. It is end-to-end, evidence-qualified inference and decisions across changing models, observations, sources and physical processes.
+
+
+### Proof-carrying follow-up
+
+Issue https://github.com/Luminous-Dynamics/symthaea/issues/10935 proposes exact rational posterior certificates by reusing the independent elimination replay framework in ETH-017 (#10203). This is a design/issue only; no rational posterior certificate or independent checker has been implemented yet.
