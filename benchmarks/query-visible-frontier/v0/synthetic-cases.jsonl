@@ -1,0 +1,211 @@
+{
+  "schema_version": "symthaea:qvf-r-case:v0.1",
+  "case_id": "qvfr:synthetic:receipt-index-replica-rights-v0.1",
+  "qualification_authority": "SyntheticQualificationOnly",
+  "clock_basis": "SyntheticFixtureOnly",
+  "contract_refs": [
+    "symthaea:issue/10651",
+    "symthaea:issue/10816",
+    "symthaea:issue/9075",
+    "mycelix:issue/2631",
+    "mycelix:issue/2779",
+    "mycelix:issue/2825",
+    "mycelix:issue/2832"
+  ],
+  "source_artifacts": [
+    {
+      "artifact_ref": "artifact:power-report-2025",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "temporal_assertion_refs": [
+        "time-assertion:power-report-validity"
+      ],
+      "provenance_family_ref": "family:utility-authority-report",
+      "initial_rights_decision_ref": "rights:power-report-allow"
+    },
+    {
+      "artifact_ref": "artifact:independent-audit-2025",
+      "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "temporal_assertion_refs": [
+        "time-assertion:independent-audit-validity"
+      ],
+      "provenance_family_ref": "family:independent-audit",
+      "initial_rights_decision_ref": "rights:audit-allow"
+    }
+  ],
+  "materializations": [
+    {
+      "representation_ref": "representation:power-report-embedding-v1",
+      "representation_kind": "embedding",
+      "representation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parent_artifact_refs": [
+        "artifact:power-report-2025"
+      ],
+      "transform_ref": "transform:extract-embed",
+      "transform_version": "1.0.0",
+      "embedding_profile_ref": "embedding-profile:multi-v1",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "materialized_at": "2026-11-07T10:10:00Z",
+      "materialization_observation_ref": "materialization:power-report-rev7",
+      "inherited_provenance_family_refs": [
+        "family:utility-authority-report"
+      ],
+      "dependency_state": "active"
+    },
+    {
+      "representation_ref": "representation:audit-summary-bridge-v1",
+      "representation_kind": "bridge_fact",
+      "representation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "parent_artifact_refs": [
+        "artifact:power-report-2025",
+        "artifact:independent-audit-2025"
+      ],
+      "transform_ref": "transform:bridge-synthesis",
+      "transform_version": "0.1.0",
+      "embedding_profile_ref": "embedding-profile:multi-v1",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "materialized_at": "2026-11-07T10:09:00Z",
+      "materialization_observation_ref": "materialization:bridge-v1-rev7",
+      "inherited_provenance_family_refs": [
+        "family:utility-authority-report",
+        "family:independent-audit"
+      ],
+      "dependency_state": "active"
+    }
+  ],
+  "visibility_observations": [
+    {
+      "observation_ref": "visibility:power-report-replica-a",
+      "representation_ref": "representation:power-report-embedding-v1",
+      "replica_ref": "replica:research-a",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "visibility_state": "Visible",
+      "observed_at": "2026-11-07T10:13:00Z",
+      "evidence_ref": "observation:replica-a-watermark-7"
+    },
+    {
+      "observation_ref": "visibility:bridge-replica-a",
+      "representation_ref": "representation:audit-summary-bridge-v1",
+      "replica_ref": "replica:research-a",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "visibility_state": "Visible",
+      "observed_at": "2026-11-07T10:10:00Z",
+      "evidence_ref": "observation:replica-a-watermark-7"
+    }
+  ],
+  "rights_events": [
+    {
+      "rights_event_ref": "rights-event:audit-revocation",
+      "target_ref": "artifact:independent-audit-2025",
+      "target_kind": "artifact",
+      "decision_ref": "rights:audit-revoked",
+      "payload_access": "Deny",
+      "metadata_access": "Allow",
+      "effective_at": "2026-11-07T10:12:00Z"
+    }
+  ],
+  "queries": [
+    {
+      "query_ref": "query:early-before-embedding",
+      "query_commitment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "retrieval_plan_ref": "plan:historical-power-compare",
+      "execution_receipt_ref": "receipt:synthetic:q1",
+      "valid_at_ref": "validity:2025-reporting-period",
+      "known_at_cutoff": "2026-11-07T10:05:00Z",
+      "executed_at": "2026-11-07T10:05:00Z",
+      "serving_replica_ref": "replica:research-a",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "authorization_chain_ref": "authorization-chain:synthetic-public-research"
+    },
+    {
+      "query_ref": "query:indexed-not-yet-replica-visible",
+      "query_commitment_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "retrieval_plan_ref": "plan:historical-power-compare",
+      "execution_receipt_ref": "receipt:synthetic:q2",
+      "valid_at_ref": "validity:2025-reporting-period",
+      "known_at_cutoff": "2026-11-07T10:11:00Z",
+      "executed_at": "2026-11-07T10:11:00Z",
+      "serving_replica_ref": "replica:research-a",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "authorization_chain_ref": "authorization-chain:synthetic-public-research"
+    },
+    {
+      "query_ref": "query:visible-on-replica",
+      "query_commitment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "retrieval_plan_ref": "plan:historical-power-compare",
+      "execution_receipt_ref": "receipt:synthetic:q3",
+      "valid_at_ref": "validity:2025-reporting-period",
+      "known_at_cutoff": "2026-11-07T10:14:00Z",
+      "executed_at": "2026-11-07T10:14:00Z",
+      "serving_replica_ref": "replica:research-a",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "authorization_chain_ref": "authorization-chain:synthetic-public-research"
+    },
+    {
+      "query_ref": "query:unknown-on-replica-b",
+      "query_commitment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "retrieval_plan_ref": "plan:historical-power-compare",
+      "execution_receipt_ref": "receipt:synthetic:q4",
+      "valid_at_ref": "validity:2025-reporting-period",
+      "known_at_cutoff": "2026-11-07T10:14:00Z",
+      "executed_at": "2026-11-07T10:14:00Z",
+      "serving_replica_ref": "replica:research-b",
+      "index_ref": "index:research-v3",
+      "index_revision_ref": "index-revision:7",
+      "authorization_chain_ref": "authorization-chain:synthetic-public-research"
+    }
+  ],
+  "expected_outcomes": [
+    {
+      "query_ref": "query:early-before-embedding",
+      "representation_ref": "representation:power-report-embedding-v1",
+      "expected_state": "NotMaterializedByCutoff",
+      "reason_ref": "reason:embedding-after-query-cutoff",
+      "required_evidence_refs": [
+        "materialization:power-report-rev7"
+      ]
+    },
+    {
+      "query_ref": "query:indexed-not-yet-replica-visible",
+      "representation_ref": "representation:power-report-embedding-v1",
+      "expected_state": "NotVisibleOnServingReplicaByCutoff",
+      "reason_ref": "reason:replica-visible-after-query-cutoff",
+      "required_evidence_refs": [
+        "visibility:power-report-replica-a"
+      ]
+    },
+    {
+      "query_ref": "query:visible-on-replica",
+      "representation_ref": "representation:power-report-embedding-v1",
+      "expected_state": "EligibleForRetrieval",
+      "reason_ref": "reason:materialized-and-visible-before-cutoff",
+      "required_evidence_refs": [
+        "materialization:power-report-rev7",
+        "visibility:power-report-replica-a"
+      ]
+    },
+    {
+      "query_ref": "query:unknown-on-replica-b",
+      "representation_ref": "representation:power-report-embedding-v1",
+      "expected_state": "VisibilityUnknown",
+      "reason_ref": "reason:no-replica-b-visibility-observation",
+      "required_evidence_refs": []
+    },
+    {
+      "query_ref": "query:visible-on-replica",
+      "representation_ref": "representation:audit-summary-bridge-v1",
+      "expected_state": "DerivedRepresentationInvalidated",
+      "reason_ref": "reason:parent-rights-revoked-after-indexing",
+      "required_evidence_refs": [
+        "rights-event:audit-revocation",
+        "materialization:bridge-v1-rev7"
+      ]
+    }
+  ]
+}
