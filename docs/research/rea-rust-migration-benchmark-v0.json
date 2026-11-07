@@ -2493,7 +2493,17 @@
         "numeric_intent_is_not_inferred_from_lexical_form_or_magnitude",
         "value_constructed_evidence_reports_lexical_coverage_unavailable_without_raw_source_binding",
         "numeric_intent_profile_digest_change_invalidates_stale_typed_numeric_derivation",
-        "negative_zero_exponent_overflow_underflow_and_decimal_tie_controls_follow_declared_profile"
+        "negative_zero_exponent_overflow_underflow_and_decimal_tie_controls_follow_declared_profile",
+        "population_complete_within_declared_query_but_source_population_definition_unverified",
+        "valid_first_page_with_later_pages_withheld",
+        "terminal_cursor_seen_after_intermediate_page_gap",
+        "hidden_filter_excludes_relevant_population_class",
+        "transparency_registry_view_complete_but_issuer_selectively_withheld_statements",
+        "enumeration_and_acquisition_complete_but_one_item_processing_failed_or_unsupported",
+        "provider_self_report_all_pages_or_all_processed_does_not_upgrade_whole_population_completeness",
+        "zero_observed_items_without_qualified_expectation_remains_unknown_not_absence",
+        "different_provider_names_share_same_incomplete_upstream_collection",
+        "independent_population_manifests_disagree_and_completeness_becomes_conflicted"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2556,7 +2566,13 @@
         "fixed_decimal_exact_round_trip_rate",
         "numeric_intent_false_inference_rate",
         "numeric_profile_digest_scope_binding_accuracy",
-        "unit_scale_and_rounding_policy_conformance"
+        "unit_scale_and_rounding_policy_conformance",
+        "omission_detection_recall_by_fault_family",
+        "enumeration_coverage_accounting_completeness",
+        "acquisition_coverage_accounting_completeness",
+        "processing_coverage_accounting_completeness",
+        "self_report_completeness_uplift_rate",
+        "selective_publication_detection_rate"
       ],
       "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.; first frozen public seed contains 18 labeled cases; do not generalize the finite conformance result to unseen artifacts or semantic predicates. Additional finite-suite gates: zero false CompleteWithin outcomes on seeded omitted-page, cursor-gap, selective-issuer-publication and incomplete-processing controls; 100% retention/accounting of partial, failed, unsupported and unresolved items; zero completeness uplift from self-assertion or provider-name diversity; and explicit lexical-coverage-state reporting for numeric precision.",
       "protocol": [
@@ -2697,6 +2713,15 @@
         ],
         "integration_status": "design-only; no REA Evidence v1 identity or claim evaluator v0 behavior change",
         "non_implication": "JCS canonical equality does not establish exact decimal semantics, measurement units or numeric truth"
+      },
+      "population_completeness_boundary": {
+        "population_definition": "The declared query/snapshot is a scoped population, not automatically the real-world universe.",
+        "enumeration": "Pagination/cursor/sequence completeness is separate from successful acquisition.",
+        "acquisition": "Every enumerated item must be recorded as acquired, failed or unavailable.",
+        "processing": "Every acquired item must be recorded as processed, failed or unsupported; provider self-report cannot override an unprocessed item.",
+        "issuer_participation": "A complete view of registered statements does not establish that an issuer submitted every statement it created or observed.",
+        "absence": "Zero observations without a qualified expectation does not prove absence.",
+        "claim_ceiling": "V0 may support the exact provider report but whole_archive_completeness remains unverified until a dedicated predicate rule exists."
       }
     }
   ],
