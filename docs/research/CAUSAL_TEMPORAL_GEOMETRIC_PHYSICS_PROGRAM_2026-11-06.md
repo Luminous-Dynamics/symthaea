@@ -574,16 +574,22 @@ physical fidelity only count after matched benchmarks.
 ## Immediate next actions
 
 1. Run `cargo fmt --check` and targeted `cargo test -p ...` for all new
-   crates with the pinned Rust toolchain; the current environment has not run
-   these and no skipped CI check is treated as a pass.
+   crates with the pinned Rust toolchain. Prior exact-head CI confirmed the
+   causal-set and Chain Theory packages before the latest interval-histogram,
+   BDG and arbitrary-state additions; the new exact-head run must validate
+   those additions. No skipped or queued check is treated as a pass.
 2. Run the Chain Theory audit example, extract the emitted CSV section with
    `sed -n '/^record,construction,slot_kinds/,$p'`, and diff all 172 rows
    against the author's commit-pinned CSV.
 3. Run the causal-set 1+1D and N-dimensional examples; add sampled-coordinate
    distribution tests and scale the N log N implementation against brute force.
 4. Compare the exact Floquet graph engine with an independent dense matrix
-   Floquet operator for N<=9; then add randomized initial states, disorder,
-   heating and finite-size scaling.
+   Floquet operator for N<=9. Run
+   `cargo run -p symthaea-fractal-time-lab --example initial_state_ensemble`
+   to preserve the seeded all-up/down, defect, random-product and Haar-like
+   state sweep under J=0 and interacting controls. Then extend to disorder,
+   heating and finite-size scaling; report state-class distributions rather
+   than selecting a best initial state.
 5. Add coordinate-transform and step-size convergence tests to the metric
    geometry kernel; only then begin replacing the GravCraft shift shortcut.
 6. Extend UAP triangulation into clock synchronization, pose/boresight
