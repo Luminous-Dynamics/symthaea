@@ -3,10 +3,11 @@ use marine_autonomy_vector_bench::{
 };
 
 fn row(id: &str, stock: f64, use_per_day: f64) -> ResourceBudget {
+    let unit = if id == "food_protein" { "kg" } else { "L" };
     ResourceBudget {
         dimension_id: id.to_owned(),
-        quantity_unit: Some("L".to_owned()),
-        rate_unit: Some("L/day".to_owned()),
+        quantity_unit: Some(unit.to_owned()),
+        rate_unit: Some(format!("{unit}/day")),
         usable_stock: Some(Interval::new(stock, stock)),
         net_depletion_per_day: Some(Interval::new(use_per_day, use_per_day)),
         configuration_digest: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned()),
