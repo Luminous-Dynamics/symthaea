@@ -11,7 +11,7 @@ Do not equate "G2P returned a string" with "the word was understood". Preserve m
 - \`out_of_vocabulary\`: no candidate was invented;
 - \`unsupported\`: the selected language/profile cannot handle the token.
 
-The plan uses UTF-8 byte spans into the exact original text. Every non-whitespace source character must be covered by one and only one word span. A selected pronunciation is bound to a candidate with a non-empty evidence reference. Raw provider scores are retained as *raw scores*, never described as calibrated probabilities.
+The plan uses UTF-8 byte spans into the exact original text. Every non-whitespace source character must be covered by one and only one lexical-token span; one span cannot merge whitespace-separated words. A selected pronunciation is bound to a candidate with a non-empty evidence reference. Raw provider scores are retained as *raw scores*, never described as calibrated probabilities.
 
 A renderer should receive a frozen, validated pronunciation plan and syllable-to-score alignment. It must not rerun G2P, reselect a heteronym, or silently approximate an unsupported phone during rendering.
 
@@ -23,7 +23,7 @@ Synthetic tests cover contextual heteronyms, user/human selection receipts, OOV 
 
 ## Score alignment contract
 
-The same crate also defines a research-only `VocalScoreAlignment` contract. It binds every selected pronunciation syllable to one or more ordered score-event indices, supports medial/opening/final melisma, requires the designated sustained phone to be an explicit vowel, and makes rests explicit. Every sung score event is assigned exactly once, every rest remains unbound, and phrase spans partition the syllable sequence with finite breath durations. Score events are monophonic and chronological; unrepresented time gaps must be represented as explicit rests.
+The same crate also defines a research-only `VocalScoreAlignment` contract. A syllable binds to one or more ordered time intervals inside score events. It supports both **many syllables subdividing one long note** and **one syllable spanning consecutive notes as melisma**. Multi-note melisma requires a designated vowel phone; rests remain explicit and cannot be bound. Every sung note's complete interval must be partitioned exactly once by syllable intervals—no overlap or uncovered time—and phrase spans partition the syllable sequence with finite breath durations. Score events are monophonic and chronological; unrepresented time gaps must be represented as explicit rests.
 
 This removes the current constructor's "surplus notes become final-syllable melisma" assumption from the target architecture. The current production constructor remains a compatibility adapter until a separately reviewed integration is made.
 
@@ -33,7 +33,7 @@ This removes the current constructor's "surplus notes become final-syllable meli
 2. Add CMUdict/curated variant candidates with context metadata and clear licensing receipts.
 3. Annotate a speaker/dialect-balanced English pilot with human-reviewed phones and stress.
 4. Calibrate provider scores against held-out word-level correctness and OOV detection.
-5. Add a score-alignment object that binds selected syllables to note indices; represent melisma as one selected vowel spanning several note events.
+5. Use the score-alignment object to bind syllables to sub-intervals within note events. Validate both rapid syllabic subdivisions of one note and a single nucleus sustained across consecutive notes.
 6. Only then migrate the production VocalPerformance constructor and DiffSinger worker to consume a frozen pronunciation artifact.
 
 ## Claim boundary
