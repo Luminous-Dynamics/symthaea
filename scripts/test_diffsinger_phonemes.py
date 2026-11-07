@@ -149,6 +149,61 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         self.assertEqual(events[4][2], 261.63)
         self.assertEqual(events[6][2], 293.66)
 
+    def test_consonant_anticipation_borrows_from_the_preceding_vowel(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                {
+                    "phonemes": [
+                        {"ipa": "m", "is_vowel": False, "natural_duration_s": 0.1},
+                        {"ipa": "a", "is_vowel": True, "natural_duration_s": 0.3},
+                        {"ipa": "t", "is_vowel": False, "natural_duration_s": 0.1},
+                    ],
+                    "note": {"start_time": 0.0, "duration": 0.5, "frequency": 220.0},
+                    "melisma_notes": [],
+                    "consonant_advance_s": 0.0,
+                },
+                {
+                    "phonemes": [
+                        {"ipa": "k", "is_vowel": False, "natural_duration_s": 0.05},
+                        {"ipa": "ɛ", "is_vowel": True, "natural_duration_s": 0.3},
+                    ],
+                    "note": {"start_time": 0.5, "duration": 0.5, "frequency": 246.94},
+                    "melisma_notes": [],
+                    "consonant_advance_s": 0.05,
+                },
+            ],
+        }
+        events = flatten_performance_phones(performance, minimum_silence_ms=5.0)
+        self.assertEqual([event[0] for event in events], ["m", "ah", "t", "k", "eh"])
+        # The next /k/ starts at 450 ms, borrowing 50 ms from the first vowel.
+        self.assertAlmostEqual(events[1][1], 250.0)
+        self.assertAlmostEqual(events[3][1], 50.0)
+        self.assertAlmostEqual(sum(event[1] for event in events), 1_000.0)
+
+    def test_consonant_anticipation_requires_a_preceding_vowel_to_borrow(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                {
+                    "phonemes": [{"ipa": "m", "is_vowel": False, "natural_duration_s": 0.1}],
+                    "note": {"start_time": 0.0, "duration": 0.1, "frequency": 220.0},
+                    "melisma_notes": [],
+                },
+                {
+                    "phonemes": [
+                        {"ipa": "k", "is_vowel": False, "natural_duration_s": 0.05},
+                        {"ipa": "ɛ", "is_vowel": True, "natural_duration_s": 0.3},
+                    ],
+                    "note": {"start_time": 0.1, "duration": 0.5, "frequency": 246.94},
+                    "melisma_notes": [],
+                    "consonant_advance_s": 0.05,
+                },
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "no preceding vowel"):
+            flatten_performance_phones(performance, minimum_silence_ms=5.0)
+
     def test_flattened_score_rejects_overlap_and_consonant_only_melisma(self) -> None:
         overlapping = {
             "language": "en",
