@@ -762,6 +762,302 @@ pub fn parse_and_validate_pivotal_corrections(
     Ok(validate_pivotal_correction_fixtures(&pack))
 }
 
+const TYPED_DECISION_SCHEMA_VERSION: &str = "sym-rsi-typed-research-decision-records-v0";
+const TYPED_DECISION_STATUS: &str =
+    "SYNTHETIC_DECISION_CONTRACT_CASES_NOT_DCR_REPRODUCTION_OR_AGENT_RESULTS";
+const TYPED_DECISION_COUNT: usize = 5;
+const PROBABILITY_TOLERANCE: f64 = 1e-9;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DecisionActionProbabilityV0 {
+    pub action: String,
+    pub probability: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResearchStateSnapshotV0 {
+    pub research_state_id: String,
+    pub state_digest: String,
+    pub evidence_prefix_digest: String,
+    pub visible_evidence_ids: Vec<String>,
+    pub identifiability: String,
+    pub available_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TypedResearchDecisionV0 {
+    pub decision_id: String,
+    pub decision_type: String,
+    pub research_state: ResearchStateSnapshotV0,
+    pub action_probabilities: Vec<DecisionActionProbabilityV0>,
+    pub selected_action: String,
+    pub expected_selected_action: String,
+    pub prediction_set: Vec<String>,
+    pub nominal_coverage: f64,
+    pub rationale_evidence_refs: Vec<String>,
+    pub abstention_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TypedResearchDecisionPackV0 {
+    pub schema_version: String,
+    pub status: String,
+    pub source_issue: String,
+    pub purpose: String,
+    pub records: Vec<TypedResearchDecisionV0>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct TypedDecisionValidationReport {
+    pub valid: bool,
+    pub record_count: usize,
+    pub issues: Vec<String>,
+    pub limitations: Vec<String>,
+}
+
+const TYPED_DECISION_CASES: [(&str, &str, &str, &str); TYPED_DECISION_COUNT] = [
+    ("DR-01", "direction_selection", "identifiable", "DIRECTION-A"),
+    ("DR-02", "experiment_selection", "identifiable", "PROBE-1"),
+    ("DR-03", "result_interpretation", "equivalence_class", "REPORT_EQUIVALENCE_CLASS"),
+    ("DR-04", "model_abstention", "not_identifiable", "ABSTAIN"),
+    ("DR-05", "correction_acceptance", "identifiable", "ACCEPT_CORRECTION_FOR_TEST"),
+];
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn is_nonempty_text(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
+pub fn validate_typed_research_decision_pack(
+    pack: &TypedResearchDecisionPackV0,
+) -> TypedDecisionValidationReport {
+    let mut issues = Vec::new();
+    let mut ids = BTreeSet::new();
+
+    if pack.schema_version != TYPED_DECISION_SCHEMA_VERSION {
+        issues.push("SCHEMA_VERSION: unsupported typed decision schema".to_owned());
+    }
+    if pack.status != TYPED_DECISION_STATUS {
+        issues.push("STATUS: records must remain synthetic and not expert gold".to_owned());
+    }
+    if pack.source_issue != "#10877" {
+        issues.push("SOURCE_ISSUE: expected #10877".to_owned());
+    }
+    if !is_nonempty_text(&pack.purpose) {
+        issues.push("PURPOSE: missing".to_owned());
+    }
+    if pack.records.len() != TYPED_DECISION_COUNT {
+        issues.push(format!(
+            "RECORD_COUNT: expected {TYPED_DECISION_COUNT}, found {}",
+            pack.records.len()
+        ));
+    }
+
+    for record in &pack.records {
+        if !ids.insert(record.decision_id.as_str()) {
+            issues.push(format!("DUPLICATE_DECISION_ID: {}", record.decision_id));
+        }
+
+        let expected = TYPED_DECISION_CASES
+            .iter()
+            .find(|(id, _, _, _)| *id == record.decision_id);
+        match expected {
+            Some((_, decision_type, identifiability, selected_action)) => {
+                if record.decision_type != *decision_type
+                    || record.research_state.identifiability != *identifiability
+                    || record.selected_action != *selected_action
+                    || record.expected_selected_action != *selected_action
+                {
+                    issues.push(format!(
+                        "{}: canonical decision type / identifiability / selected action changed",
+                        record.decision_id
+                    ));
+                }
+            }
+            None => issues.push(format!("UNKNOWN_DECISION_ID: {}", record.decision_id)),
+        }
+
+        if !is_nonempty_text(&record.research_state.research_state_id)
+            || !is_sha256_hex(&record.research_state.state_digest)
+            || !is_sha256_hex(&record.research_state.evidence_prefix_digest)
+        {
+            issues.push(format!(
+                "{}: Research State identity or evidence-prefix digest is invalid",
+                record.decision_id
+            ));
+        }
+
+        let allowed_types = [
+            "direction_selection",
+            "approach_selection",
+            "experiment_selection",
+            "tool_allocation",
+            "result_interpretation",
+            "stop_continue_pivot_replicate",
+            "correction_acceptance",
+            "transfer_acceptance",
+            "evidence_request",
+            "model_abstention",
+        ];
+        if !allowed_types.contains(&record.decision_type.as_str()) {
+            issues.push(format!("{}: unsupported typed decision class", record.decision_id));
+        }
+
+        let mut visible_ids = BTreeSet::new();
+        for evidence_id in &record.research_state.visible_evidence_ids {
+            if !is_nonempty_text(evidence_id) || !visible_ids.insert(evidence_id.as_str()) {
+                issues.push(format!(
+                    "{}: empty or duplicate visible evidence identity",
+                    record.decision_id
+                ));
+            }
+        }
+        if visible_ids.is_empty() {
+            issues.push(format!("{}: Research State has no visible evidence IDs", record.decision_id));
+        }
+
+        let mut available = BTreeSet::new();
+        for action in &record.research_state.available_actions {
+            if !is_nonempty_text(action) || !available.insert(action.as_str()) {
+                issues.push(format!(
+                    "{}: empty or duplicate admissible action",
+                    record.decision_id
+                ));
+            }
+        }
+        if !available.contains("ABSTAIN") {
+            issues.push(format!("{}: ABSTAIN must be an explicit admissible action", record.decision_id));
+        }
+        if !available.contains(record.selected_action.as_str()) {
+            issues.push(format!("{}: selected action is not admissible in the bound Research State", record.decision_id));
+        }
+
+        let mut probability_actions = BTreeSet::new();
+        let mut probability_sum = 0.0;
+        let mut probability_by_action = BTreeMap::new();
+        for entry in &record.action_probabilities {
+            if !is_nonempty_text(&entry.action)
+                || !entry.probability.is_finite()
+                || !(0.0..=1.0).contains(&entry.probability)
+                || !probability_actions.insert(entry.action.as_str())
+            {
+                issues.push(format!("{}: invalid, duplicate or non-finite action probability", record.decision_id));
+                continue;
+            }
+            probability_sum += entry.probability;
+            probability_by_action.insert(entry.action.as_str(), entry.probability);
+        }
+        if probability_actions != available {
+            issues.push(format!("{}: probability options must exactly match the admissible action set", record.decision_id));
+        }
+        if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
+            issues.push(format!("{}: action probabilities must sum to one", record.decision_id));
+        }
+
+        if !record.nominal_coverage.is_finite()
+            || record.nominal_coverage <= 0.0
+            || record.nominal_coverage > 1.0
+        {
+            issues.push(format!("{}: nominal prediction-set coverage must be in (0, 1]", record.decision_id));
+        }
+
+        let mut prediction_actions = BTreeSet::new();
+        let mut prediction_mass = 0.0;
+        for action in &record.prediction_set {
+            if !prediction_actions.insert(action.as_str()) || !available.contains(action.as_str()) {
+                issues.push(format!("{}: prediction set contains a duplicate or inadmissible action", record.decision_id));
+            }
+            prediction_mass += probability_by_action.get(action.as_str()).copied().unwrap_or(0.0);
+        }
+        if prediction_actions.is_empty()
+            || !prediction_mass.is_finite()
+            || prediction_mass + PROBABILITY_TOLERANCE < record.nominal_coverage
+        {
+            issues.push(format!(
+                "{}: calibrated prediction set does not meet its declared probability mass",
+                record.decision_id
+            ));
+        }
+
+        if record.rationale_evidence_refs.is_empty() {
+            issues.push(format!("{}: rationale must cite visible evidence", record.decision_id));
+        }
+        let mut rationale_ids = BTreeSet::new();
+        for evidence_id in &record.rationale_evidence_refs {
+            if !visible_ids.contains(evidence_id.as_str()) || !rationale_ids.insert(evidence_id.as_str()) {
+                issues.push(format!(
+                    "{}: rationale cites evidence outside the bound visible evidence prefix or repeats it",
+                    record.decision_id
+                ));
+            }
+        }
+
+        match record.selected_action.as_str() {
+            "ABSTAIN" if record.abstention_reason.as_deref().is_none_or(|reason| !is_nonempty_text(reason)) => {
+                issues.push(format!("{}: abstention requires a non-empty reason", record.decision_id));
+            }
+            "ABSTAIN" => {}
+            _ if record.abstention_reason.is_some() => {
+                issues.push(format!("{}: abstention reason must be absent for a non-abstaining decision", record.decision_id));
+            }
+            _ => {}
+        }
+
+        if record.research_state.identifiability == "not_identifiable"
+            && record.selected_action != "ABSTAIN"
+        {
+            issues.push(format!("{}: not-identifiable state must abstain", record.decision_id));
+        }
+        if record.research_state.identifiability == "equivalence_class"
+            && !["REPORT_EQUIVALENCE_CLASS", "ABSTAIN"].contains(&record.selected_action.as_str())
+        {
+            issues.push(format!("{}: equivalence-class state cannot claim a unique model", record.decision_id));
+        }
+        if !["identifiable", "equivalence_class", "not_identifiable"]
+            .contains(&record.research_state.identifiability.as_str())
+        {
+            issues.push(format!("{}: unsupported identifiability status", record.decision_id));
+        }
+    }
+
+    for (id, _, _, _) in TYPED_DECISION_CASES {
+        if !ids.contains(id) {
+            issues.push(format!("REQUIRED_DECISION_MISSING: {id}"));
+        }
+    }
+
+    issues.sort();
+    issues.dedup();
+    TypedDecisionValidationReport {
+        valid: issues.is_empty(),
+        record_count: pack.records.len(),
+        issues,
+        limitations: vec![
+            "These records are synthetic contract examples, not a DCR reproduction or expert gold.".to_owned(),
+            "A structurally valid decision record does not establish that the selected action is scientifically correct.".to_owned(),
+            "Nominal prediction-set mass is not empirical calibration; coverage requires held-out adjudicated cases.".to_owned(),
+            "Evidence references are identifiers only; source truth and claim entailment require independent owners.".to_owned(),
+        ],
+    }
+}
+
+pub fn parse_and_validate_typed_research_decisions(
+    contents: &str,
+) -> Result<TypedDecisionValidationReport, serde_json::Error> {
+    let pack: TypedResearchDecisionPackV0 = serde_json::from_str(contents)?;
+    Ok(validate_typed_research_decision_pack(&pack))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -773,6 +1069,8 @@ mod tests {
         include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_EXAMPLE_V0_2026-11-07.json");
     const PIVOTAL_FIXTURES: &str =
         include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_PIVOTAL_CORRECTION_FIXTURES_V0_2026-11-07.json");
+    const TYPED_DECISION_FIXTURES: &str =
+        include_str!("../../../docs/research/fixtures/SYM_RSI_TYPED_RESEARCH_DECISION_RECORDS_V0_2026-11-07.json");
 
 
     fn valid_pack() -> DecisionFixturePack {
@@ -800,6 +1098,71 @@ mod tests {
 
     fn pack_value() -> Value {
         serde_json::to_value(valid_pack()).expect("fixture pack serializes")
+    }
+
+    #[test]
+    fn accepts_checked_in_typed_research_decision_records() {
+        let pack: TypedResearchDecisionPackV0 =
+            serde_json::from_str(TYPED_DECISION_FIXTURES).expect("typed decision fixture JSON parses");
+        let report = validate_typed_research_decision_pack(&pack);
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.record_count, 5);
+    }
+
+    #[test]
+    fn rejects_action_probability_mass_not_equal_to_one() {
+        let mut value: Value =
+            serde_json::from_str(TYPED_DECISION_FIXTURES).expect("typed decision fixtures parse");
+        value["records"][0]["action_probabilities"][0]["probability"] = Value::from(0.2);
+        let pack: TypedResearchDecisionPackV0 =
+            serde_json::from_value(value).expect("mutated records parse");
+        let report = validate_typed_research_decision_pack(&pack);
+        assert!(report.issues.iter().any(|issue| issue.contains("action probabilities must sum to one")));
+    }
+
+    #[test]
+    fn rejects_rationale_reference_outside_visible_evidence_prefix() {
+        let mut value: Value =
+            serde_json::from_str(TYPED_DECISION_FIXTURES).expect("typed decision fixtures parse");
+        value["records"][0]["rationale_evidence_refs"][0] = Value::String("hidden-evidence".to_owned());
+        let pack: TypedResearchDecisionPackV0 =
+            serde_json::from_value(value).expect("mutated records parse");
+        let report = validate_typed_research_decision_pack(&pack);
+        assert!(report.issues.iter().any(|issue| issue.contains("rationale cites evidence outside")));
+    }
+
+    #[test]
+    fn rejects_nonidentifiable_state_that_selects_a_unique_model() {
+        let mut value: Value =
+            serde_json::from_str(TYPED_DECISION_FIXTURES).expect("typed decision fixtures parse");
+        value["records"][3]["selected_action"] = Value::String("CLAIM_UNIQUE_MODEL".to_owned());
+        value["records"][3]["expected_selected_action"] = Value::String("CLAIM_UNIQUE_MODEL".to_owned());
+        let pack: TypedResearchDecisionPackV0 =
+            serde_json::from_value(value).expect("mutated records parse");
+        let report = validate_typed_research_decision_pack(&pack);
+        assert!(report.issues.iter().any(|issue| issue.contains("not-identifiable state must abstain")));
+    }
+
+    #[test]
+    fn rejects_prediction_set_below_nominal_probability_mass() {
+        let mut value: Value =
+            serde_json::from_str(TYPED_DECISION_FIXTURES).expect("typed decision fixtures parse");
+        value["records"][0]["prediction_set"] = serde_json::json!(["DIRECTION-A"]);
+        let pack: TypedResearchDecisionPackV0 =
+            serde_json::from_value(value).expect("mutated records parse");
+        let report = validate_typed_research_decision_pack(&pack);
+        assert!(report.issues.iter().any(|issue| issue.contains("prediction set does not meet")));
+    }
+
+    #[test]
+    fn rejects_invalid_research_state_digest() {
+        let mut value: Value =
+            serde_json::from_str(TYPED_DECISION_FIXTURES).expect("typed decision fixtures parse");
+        value["records"][0]["research_state"]["state_digest"] = Value::String("short".to_owned());
+        let pack: TypedResearchDecisionPackV0 =
+            serde_json::from_value(value).expect("mutated records parse");
+        let report = validate_typed_research_decision_pack(&pack);
+        assert!(report.issues.iter().any(|issue| issue.contains("Research State identity")));
     }
 
     #[test]
