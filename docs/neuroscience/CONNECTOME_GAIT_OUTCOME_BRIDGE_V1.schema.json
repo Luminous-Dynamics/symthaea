@@ -200,6 +200,7 @@
       "additionalProperties": false,
       "required": [
         "sender",
+        "probe_class",
         "recipient",
         "phase_bin",
         "magnitude_bin",
@@ -232,6 +233,15 @@
         "delay_index": {
           "type": "integer",
           "minimum": 0
+        },
+        "probe_class": {
+          "enum": [
+            "local_phase_kick",
+            "load_or_contact",
+            "proprioceptive_channel",
+            "descending_command",
+            "mechanical_body_or_substrate"
+          ]
         }
       }
     },
