@@ -86,7 +86,8 @@
           "required_output": {
             "quantity": 80,
             "unit": "L",
-            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+            "quality_acceptance_ref": "synthetic:accepted-water-quality",
+            "carrier": "potable_water"
           },
           "window": {
             "earliest_start_s": 28800,
@@ -99,7 +100,8 @@
             "power_max_w": 1200,
             "energy_min_wh": 1200,
             "energy_max_wh": 1200,
-            "profile_ref": "synthetic:power-profile:watermaker_daily"
+            "profile_ref": "synthetic:power-profile:watermaker_daily",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -132,7 +134,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 1.2,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "seawater_feed",
+              "quantity": 94.4,
+              "unit": "L",
+              "availability_ref": "synthetic:seawater-intake-stock",
+              "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
+            }
+          ]
         },
         {
           "service_id": "hot_water_recovery",
@@ -148,7 +166,8 @@
           "required_output": {
             "quantity": 2,
             "unit": "kWh_th",
-            "quality_acceptance_ref": "synthetic:thermal-service-complete"
+            "quality_acceptance_ref": "synthetic:thermal-service-complete",
+            "carrier": "thermal_energy"
           },
           "window": {
             "earliest_start_s": 32400,
@@ -161,7 +180,8 @@
             "power_max_w": 1800,
             "energy_min_wh": 900,
             "energy_max_wh": 900,
-            "profile_ref": "synthetic:power-profile:hot_water_recovery"
+            "profile_ref": "synthetic:power-profile:hot_water_recovery",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -187,7 +207,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 0.9,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "recoverable_heat",
+              "quantity": 1.1,
+              "unit": "kWh_th",
+              "availability_ref": "synthetic:generator-recovered-heat-or-store",
+              "quality_constraint_ref": "synthetic:usable-heat-grade-and-exchanger-envelope"
+            }
+          ]
         },
         {
           "service_id": "workshop_charge",
@@ -203,7 +239,8 @@
           "required_output": {
             "quantity": 2,
             "unit": "kWh_e",
-            "quality_acceptance_ref": "synthetic:charge-complete"
+            "quality_acceptance_ref": "synthetic:charge-complete",
+            "carrier": "electrical_energy"
           },
           "window": {
             "earliest_start_s": 32400,
@@ -216,7 +253,8 @@
             "power_max_w": 1000,
             "energy_min_wh": 2000,
             "energy_max_wh": 2000,
-            "profile_ref": "synthetic:power-profile:workshop_charge"
+            "profile_ref": "synthetic:power-profile:workshop_charge",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -242,7 +280,16 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 2.2,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            }
+          ]
         }
       ],
       "hard_constraints": [
@@ -390,6 +437,13 @@
         "temperature_c": 24,
         "qualification": "within_synthetic_qualified_envelope",
         "qualification_ref": "synthetic:ro-envelope-v0.1"
+      },
+      "thermal_resources": {
+        "recoverable_heat_available_kwh_th": 2.5,
+        "heat_store_available_kwh_th": 1,
+        "useful_heat_temperature_c": 68,
+        "evidence_class": "synthetic",
+        "note": "Illustrative thermal stock availability only; not a measured generator heat-recovery system or exchanger qualification."
       }
     },
     {
@@ -450,7 +504,8 @@
           "required_output": {
             "quantity": 60,
             "unit": "L",
-            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+            "quality_acceptance_ref": "synthetic:accepted-water-quality",
+            "carrier": "potable_water"
           },
           "window": {
             "earliest_start_s": 14400,
@@ -463,7 +518,8 @@
             "power_max_w": 1200,
             "energy_min_wh": 900,
             "energy_max_wh": 900,
-            "profile_ref": "synthetic:power-profile:watermaker_replenishment"
+            "profile_ref": "synthetic:power-profile:watermaker_replenishment",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -489,7 +545,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 0.9,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "seawater_feed",
+              "quantity": 70.8,
+              "unit": "L",
+              "availability_ref": "synthetic:seawater-intake-stock",
+              "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
+            }
+          ]
         },
         {
           "service_id": "hot_water_optional",
@@ -505,7 +577,8 @@
           "required_output": {
             "quantity": 1.5,
             "unit": "kWh_th",
-            "quality_acceptance_ref": "synthetic:thermal-service-complete"
+            "quality_acceptance_ref": "synthetic:thermal-service-complete",
+            "carrier": "thermal_energy"
           },
           "window": {
             "earliest_start_s": 7200,
@@ -518,7 +591,8 @@
             "power_max_w": 1800,
             "energy_min_wh": 900,
             "energy_max_wh": 900,
-            "profile_ref": "synthetic:power-profile:hot_water_optional"
+            "profile_ref": "synthetic:power-profile:hot_water_optional",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -544,7 +618,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 0.9,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "recoverable_heat",
+              "quantity": 0.825,
+              "unit": "kWh_th",
+              "availability_ref": "synthetic:generator-recovered-heat-or-store",
+              "quality_constraint_ref": "synthetic:usable-heat-grade-and-exchanger-envelope"
+            }
+          ]
         }
       ],
       "hard_constraints": [
@@ -640,6 +730,13 @@
         "temperature_c": 22,
         "qualification": "within_synthetic_qualified_envelope",
         "qualification_ref": "synthetic:ro-envelope-v0.1"
+      },
+      "thermal_resources": {
+        "recoverable_heat_available_kwh_th": 1,
+        "heat_store_available_kwh_th": 0.5,
+        "useful_heat_temperature_c": 68,
+        "evidence_class": "synthetic",
+        "note": "Illustrative thermal stock availability only; not a measured generator heat-recovery system or exchanger qualification."
       }
     },
     {
@@ -724,7 +821,8 @@
           "required_output": {
             "quantity": 100,
             "unit": "L",
-            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+            "quality_acceptance_ref": "synthetic:accepted-water-quality",
+            "carrier": "potable_water"
           },
           "window": {
             "earliest_start_s": 25200,
@@ -737,7 +835,8 @@
             "power_max_w": 1200,
             "energy_min_wh": 1500,
             "energy_max_wh": 1500,
-            "profile_ref": "synthetic:power-profile:urgent_water_reserve"
+            "profile_ref": "synthetic:power-profile:urgent_water_reserve",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -763,7 +862,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 1.5,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "seawater_feed",
+              "quantity": 118,
+              "unit": "L",
+              "availability_ref": "synthetic:seawater-intake-stock",
+              "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
+            }
+          ]
         },
         {
           "service_id": "discretionary_hot_water",
@@ -779,7 +894,8 @@
           "required_output": {
             "quantity": 2,
             "unit": "kWh_th",
-            "quality_acceptance_ref": "synthetic:thermal-service-complete"
+            "quality_acceptance_ref": "synthetic:thermal-service-complete",
+            "carrier": "thermal_energy"
           },
           "window": {
             "earliest_start_s": 28800,
@@ -792,7 +908,8 @@
             "power_max_w": 1800,
             "energy_min_wh": 900,
             "energy_max_wh": 900,
-            "profile_ref": "synthetic:power-profile:discretionary_hot_water"
+            "profile_ref": "synthetic:power-profile:discretionary_hot_water",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -818,7 +935,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 0.9,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "recoverable_heat",
+              "quantity": 1.1,
+              "unit": "kWh_th",
+              "availability_ref": "synthetic:generator-recovered-heat-or-store",
+              "quality_constraint_ref": "synthetic:usable-heat-grade-and-exchanger-envelope"
+            }
+          ]
         }
       ],
       "hard_constraints": [
@@ -965,6 +1098,13 @@
         "temperature_c": 27,
         "qualification": "within_synthetic_qualified_envelope",
         "qualification_ref": "synthetic:ro-envelope-v0.1"
+      },
+      "thermal_resources": {
+        "recoverable_heat_available_kwh_th": 1.5,
+        "heat_store_available_kwh_th": 0.5,
+        "useful_heat_temperature_c": 68,
+        "evidence_class": "synthetic",
+        "note": "Illustrative thermal stock availability only; not a measured generator heat-recovery system or exchanger qualification."
       }
     },
     {
@@ -1025,7 +1165,8 @@
           "required_output": {
             "quantity": 100,
             "unit": "L",
-            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+            "quality_acceptance_ref": "synthetic:accepted-water-quality",
+            "carrier": "potable_water"
           },
           "window": {
             "earliest_start_s": 7200,
@@ -1038,7 +1179,8 @@
             "power_max_w": 1200,
             "energy_min_wh": 1200,
             "energy_max_wh": 1200,
-            "profile_ref": "synthetic:power-profile:watermaker_attempt"
+            "profile_ref": "synthetic:power-profile:watermaker_attempt",
+            "carrier": "electrical_energy"
           },
           "prerequisites": [
             {
@@ -1064,7 +1206,23 @@
             "source_ref": "synthetic:marine-resource-ops-v0.1",
             "evidence_class": "synthetic",
             "design_revision": "LOS-18-concept-v0.1"
-          }
+          },
+          "input_requirements": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 1.2,
+              "unit": "kWh_e",
+              "availability_ref": "synthetic:electrical-energy-budget",
+              "quality_constraint_ref": "synthetic:bus-operating-envelope"
+            },
+            {
+              "carrier": "seawater_feed",
+              "quantity": 118,
+              "unit": "L",
+              "availability_ref": "synthetic:seawater-intake-stock",
+              "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
+            }
+          ]
         }
       ],
       "hard_constraints": [
@@ -1159,6 +1317,13 @@
         "temperature_c": 29,
         "qualification": "outside_synthetic_qualified_envelope",
         "qualification_ref": "synthetic:ro-envelope-v0.1"
+      },
+      "thermal_resources": {
+        "recoverable_heat_available_kwh_th": 0,
+        "heat_store_available_kwh_th": 0.5,
+        "useful_heat_temperature_c": null,
+        "evidence_class": "synthetic",
+        "note": "Illustrative thermal stock availability only; not a measured generator heat-recovery system or exchanger qualification."
       }
     }
   ]
