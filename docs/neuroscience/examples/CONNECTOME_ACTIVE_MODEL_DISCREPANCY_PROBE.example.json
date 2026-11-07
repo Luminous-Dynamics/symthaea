@@ -69,6 +69,9 @@
     "adjudication_status": "ADMITTED_FOR_SENSITIVITY",
     "ancestry_group_ids": [
       "raw-volume-shared"
+    ],
+    "challenger_discovery_unit_ids": [
+      "animal-discovery-03"
     ]
   },
   "actions": [
@@ -267,6 +270,11 @@
       "B-model-probe": 0.5,
       "C-disallowed-perfect": 0
     },
-    "status": "SYNTHETIC_CONTRACT_VALIDATED"
+    "status": "SYNTHETIC_CONTRACT_VALIDATED",
+    "model_mutual_information_bits_diagnostic": {
+      "A-query-resolve": 0,
+      "B-model-probe": 0.31127812445913283,
+      "C-disallowed-perfect": 0
+    }
   }
 }
