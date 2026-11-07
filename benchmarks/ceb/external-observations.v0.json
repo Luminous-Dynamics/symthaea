@@ -421,6 +421,28 @@
       "supports": [
         "CEB-DEBUG"
       ]
+    },
+    {
+      "source_id": "cgarf-paper",
+      "source_url": "https://doi.org/10.1007/s10664-026-10940-1",
+      "title": "CGARF: a causality-guided framework for reliable automated program repair",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-08-22",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "secrepobench-leaderboard",
+      "source_url": "https://secrepobench.github.io/",
+      "title": "SecRepoBench secure repository-level code completion benchmark and leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-SECURE"
+      ]
     }
   ],
   "comparators": [
@@ -1313,6 +1335,49 @@
         "Provides node- and edge-level intervention hierarchy and identifiability theory; empirical validation uses two external simulators.",
         "The two-simulator count is experimental scope, not a model-performance metric.",
         "This is not a software-engineering benchmark or code-review evaluation."
+      ]
+    },
+    {
+      "comparator_id": "cgarf-swebench-repair",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "CGARF",
+      "benchmark_version": "Empirical Software Engineering; published 2026-08-22; DOI 10.1007/s10664-026-10940-1",
+      "split": "SWE-bench Lite and SWE-bench Verified; 12 configurations (3 localization methods × 4 models)",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task counts per split not reported in retrieved result summary"
+      },
+      "source_id": "cgarf-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Causal Graph-Augmented Multi-Agent Debate ranks candidate root-cause locations; Self-Reflection Consistency Distillation stabilizes patch generation; Two-Stage Patch Filtering combines functional tests, causal matching and group similarity.",
+        "Evaluates automated repair using three localization methods and four models across 12 configurations on SWE-bench Lite and Verified.",
+        "Reports repair success improvements of 2–4 percentage points and about 3 percentage points average patch applicability gain; these are cross-configuration effect summaries, not CEB review metrics.",
+        "Exact task denominators, uncertainty intervals and per-configuration values must be taken from the full paper before quantitative replication.",
+        "Causal graphs in a repair pipeline do not by themselves establish reviewer causal-claim identifiability or incident attribution."
+      ]
+    },
+    {
+      "comparator_id": "secrepobench-secure-completion",
+      "lane_id": "CEB-SECURE",
+      "benchmark_name": "SecRepoBench",
+      "benchmark_version": "Public benchmark/leaderboard snapshot accessed 2026-11-07",
+      "split": "318 secure code completion tasks from 27 C/C++ repositories across 15 CWEs",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 318,
+        "unit": "code_completion_tasks"
+      },
+      "source_id": "secrepobench-leaderboard",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Secure code completion on partially implemented functions with full repository context; not code review or vulnerability-introducing PR diagnosis.",
+        "Correctness uses developer-written tests and security uses OSS-Fuzz-derived proof-of-concept inputs.",
+        "Leaderboard rows are setup-specific; do not treat a single setup as a universal industry ceiling.",
+        "Security completion metrics are not CEB-SECURE joint secure-functional pass unless the exact task, denominator, oracle and execution policy are matched."
       ]
     }
   ],
@@ -5172,6 +5237,181 @@
         }
       },
       "notes": []
+    },
+    {
+      "observation_id": "cgarf-repair-success-gain-lower",
+      "comparator_id": "cgarf-swebench-repair",
+      "source_locator": "CGARF, Empirical Software Engineering, DOI 10.1007/s10664-026-10940-1, abstract/result summary",
+      "system": {
+        "system_id": "cgarf-twelve-configurations",
+        "model": "CGARF",
+        "harness": "CGARF repair pipeline",
+        "configuration": "Aggregate reported range across 12 configurations on SWE-bench Lite/Verified"
+      },
+      "metric": {
+        "metric_id": "repair_success_gain_range_bound",
+        "label": "Repair success gain range bound",
+        "definition": "Lower bound of the reported 2–4 percentage-point repair success improvement over the corresponding baseline configurations.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points",
+        "direction": "maximize",
+        "raw_display": "+2 pp (lower bound of reported range)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "repair_success_gain_range_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Range bound, not an exact average or a CEB review score.",
+        "Per-configuration task denominators and confidence intervals are not encoded in this registry row."
+      ]
+    },
+    {
+      "observation_id": "cgarf-repair-success-gain-upper",
+      "comparator_id": "cgarf-swebench-repair",
+      "source_locator": "CGARF, Empirical Software Engineering, DOI 10.1007/s10664-026-10940-1, abstract/result summary",
+      "system": {
+        "system_id": "cgarf-twelve-configurations",
+        "model": "CGARF",
+        "harness": "CGARF repair pipeline",
+        "configuration": "Aggregate reported range across 12 configurations on SWE-bench Lite/Verified"
+      },
+      "metric": {
+        "metric_id": "repair_success_gain_range_bound",
+        "label": "Repair success gain range bound",
+        "definition": "Upper bound of the reported 2–4 percentage-point repair success improvement over the corresponding baseline configurations.",
+        "value": 4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points",
+        "direction": "maximize",
+        "raw_display": "+4 pp (upper bound of reported range)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "repair_success_gain_range_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Range bound, not an exact average or a CEB review score.",
+        "Per-configuration task denominators and confidence intervals are not encoded in this registry row."
+      ]
+    },
+    {
+      "observation_id": "cgarf-patch-applicability-gain",
+      "comparator_id": "cgarf-swebench-repair",
+      "source_locator": "CGARF, Empirical Software Engineering, DOI 10.1007/s10664-026-10940-1, abstract/result summary",
+      "system": {
+        "system_id": "cgarf-twelve-configurations",
+        "model": "CGARF",
+        "harness": "CGARF repair pipeline",
+        "configuration": "Average reported gain across 12 configurations on SWE-bench Lite/Verified"
+      },
+      "metric": {
+        "metric_id": "patch_applicability_gain",
+        "label": "Patch applicability gain",
+        "definition": "Approximate average increase in patch applicability reported by the authors across the evaluated configurations.",
+        "value": 3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points_approximate",
+        "direction": "maximize",
+        "raw_display": "about +3 percentage points",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "patch_applicability_gain",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Approximate average from the paper summary; uncertainty and per-split denominators not reported here.",
+        "Patch applicability is not reviewer actionable precision or repair correctness."
+      ]
+    },
+    {
+      "observation_id": "secrepobench-top-setup-secure-pass-at-1",
+      "comparator_id": "secrepobench-secure-completion",
+      "source_locator": "SecRepoBench live benchmark website/leaderboard, top visible setup row captured 2026-11-07",
+      "system": {
+        "system_id": "secrepobench-imagecodex-gpt51-review",
+        "model": "ImageGPT-5.1-Codex-Max",
+        "harness": "ImageCodex review setup",
+        "configuration": "Top visible leaderboard row; repository code completion"
+      },
+      "metric": {
+        "metric_id": "secure_pass_at_1",
+        "label": "Secure pass@1",
+        "definition": "Fraction of secure code completion tasks passing the combined functional and security acceptance checks under this setup.",
+        "value": 60.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "60.1%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "secure_pass_at_1",
+          "applies_to_task_count": 318
+        }
+      },
+      "notes": [
+        "Top visible setup row; benchmark includes 318 tasks, 27 repositories and 15 CWEs.",
+        "Secure code completion, not PR review or CEB-REVIEW causal diagnosis."
+      ]
+    },
+    {
+      "observation_id": "secrepobench-top-setup-pass-at-1",
+      "comparator_id": "secrepobench-secure-completion",
+      "source_locator": "SecRepoBench live benchmark website/leaderboard, top visible setup row captured 2026-11-07",
+      "system": {
+        "system_id": "secrepobench-imagecodex-gpt51-review",
+        "model": "ImageGPT-5.1-Codex-Max",
+        "harness": "ImageCodex review setup",
+        "configuration": "Top visible leaderboard row; repository code completion"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Functional pass@1",
+        "definition": "Fraction of completion tasks passing the functional test acceptance criteria under this setup.",
+        "value": 76.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "76.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 318
+        }
+      },
+      "notes": [
+        "Top visible setup row; benchmark includes 318 tasks, 27 repositories and 15 CWEs.",
+        "Functional pass@1 is not the joint CEB secure-functional pass metric."
+      ]
     }
   ]
 }
