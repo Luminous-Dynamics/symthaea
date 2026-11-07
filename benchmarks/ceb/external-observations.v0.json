@@ -299,6 +299,17 @@
       "supports": [
         "CEB-RESOLUTION"
       ]
+    },
+    {
+      "source_id": "kodus-state-ai-code-review",
+      "source_url": "https://kodus.io/data",
+      "title": "Kodus State of AI Code Review 2026 production-pipeline analytics",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-06-08",
+      "supports": [
+        "CEB-REVIEW"
+      ]
     }
   ],
   "comparators": [
@@ -846,6 +857,89 @@
         "Narrow population: reproducible, maintainer-tested Python library fixes in the pinned Python 3.13 container, not the general software-bug population.",
         "The deterministic gate checks a named fail-to-pass test; this does not establish whole-repository correctness, causal uniqueness or CEB independent pristine regrade.",
         "The default runner is sandboxed, but the optional agentic path is not; respect the project's host-execution warning."
+      ]
+    },
+    {
+      "comparator_id": "kodus-production-all-suggestions",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "All review suggestions; implementation/adaptation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 180739,
+        "unit": "review_suggestions"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Across 22,743 AI-authored PRs in the report's supported GitHub/GitLab/Bitbucket/Azure DevOps pipeline; data window begins 2025-09-01 and snapshot ends 2026-06-08.",
+        "33% of 180,739 review suggestions were classified implemented/adapted by changes to flagged lines in later diffs.",
+        "A later diff is not proof the specific suggestion caused the change or that the resulting change was correct.",
+        "The rate by PR-created month rises from 25% to 48% over the cited eight-month period; recent months are right-censored and June is partial.",
+        "Descriptive platform analytics, not randomized treatment effects or independent human truth adjudication."
+      ]
+    },
+    {
+      "comparator_id": "kodus-production-bug-suggestions",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "Bug-class suggestions; implementation/adaptation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 100014,
+        "unit": "bug_suggestions"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "34.5% of bug-class suggestions were classified implemented/adapted by later changes to flagged lines.",
+        "This is an uptake/implementation outcome, not defect precision, correctness or verified remediation.",
+        "Later changes can be independently motivated, bundled or unrelated; the source's rule detects changes to flagged lines rather than causal attribution.",
+        "Descriptive data from the Kodus production pipeline, not a randomized treatment effect."
+      ]
+    },
+    {
+      "comparator_id": "kodus-production-security-suggestions",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "Security-class suggestions; implementation/adaptation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 7409,
+        "unit": "security_suggestions"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "31.2% of security-class suggestions were classified implemented/adapted by later changes to flagged lines.",
+        "This is not vulnerability correctness, verified security remediation or incident reduction.",
+        "The report's implementation classifier and open-flag measures include false positives and accepted risk; no claim of causal attribution is made."
+      ]
+    },
+    {
+      "comparator_id": "kodus-flagged-merged-pr-open-flags",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "Flagged merged PRs; at least one flag remains open",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 13609,
+        "unit": "flagged_merged_PRs"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "71.8% of 13,609 flagged merged PRs had at least one flag still open.",
+        "The open flag includes false positives and accepted risk; this is not a defect escape rate or a rate of unremediated true bugs.",
+        "Do not mix this PR-level denominator with the suggestion-level denominator of 180,739."
       ]
     }
   ],
@@ -3613,6 +3707,142 @@
       },
       "notes": [
         "Pool later grew to 89; published reference remains 46/70. Not 65.7% of bugs generally."
+      ]
+    },
+    {
+      "observation_id": "kodus-production-all-implemented-rate",
+      "comparator_id": "kodus-production-all-suggestions",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-all",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "all suggestion classes"
+      },
+      "metric": {
+        "metric_id": "implemented_adapted_rate",
+        "label": "Implemented/adapted suggestion rate",
+        "definition": "Fraction of review suggestions with flagged lines changed in a later diff according to Kodus' implementation/adaptation classifier.",
+        "value": 33,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "33.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "implemented_adapted_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Observed uptake only; not correctness or causal attribution."
+      ]
+    },
+    {
+      "observation_id": "kodus-production-bug-implemented-rate",
+      "comparator_id": "kodus-production-bug-suggestions",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-bugs",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "bug-class suggestions"
+      },
+      "metric": {
+        "metric_id": "bug_suggestion_implementation_rate",
+        "label": "Bug-suggestion implementation/adaptation rate",
+        "definition": "Fraction of bug-class review suggestions classified implemented/adapted by later changes to flagged lines.",
+        "value": 34.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "34.5%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "bug_suggestion_implementation_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Uptake/implementation, not target-defect precision or verified remediation."
+      ]
+    },
+    {
+      "observation_id": "kodus-production-security-implemented-rate",
+      "comparator_id": "kodus-production-security-suggestions",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-security",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "security-class suggestions"
+      },
+      "metric": {
+        "metric_id": "security_suggestion_implementation_rate",
+        "label": "Security-suggestion implementation/adaptation rate",
+        "definition": "Fraction of security-class review suggestions classified implemented/adapted by later changes to flagged lines.",
+        "value": 31.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "31.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "security_suggestion_implementation_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Uptake/implementation, not security correctness or verified vulnerability removal."
+      ]
+    },
+    {
+      "observation_id": "kodus-flagged-merged-pr-open-flag-rate",
+      "comparator_id": "kodus-flagged-merged-pr-open-flags",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-flagged-merged",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "flagged merged pull requests"
+      },
+      "metric": {
+        "metric_id": "flagged_merged_pr_open_flag_rate",
+        "label": "Flagged merged PRs with at least one open flag",
+        "definition": "Fraction of flagged merged PRs with at least one associated review flag still open at the report snapshot.",
+        "value": 71.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "71.8%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "flagged_merged_pr_open_flag_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Open flags include false positives and accepted risk; not a true-defect escape rate."
       ]
     }
   ]
