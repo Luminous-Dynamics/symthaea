@@ -968,7 +968,7 @@ mod tests {
 
     #[test]
     fn stress_without_boundaries_and_duplicate_variant_ids_are_rejected() {
-        let refs = vec![reference(
+        let duplicate_refs = vec![reference(
             "word",
             false,
             vec![
@@ -976,12 +976,17 @@ mod tests {
                 variant("duplicate", &["w", "ɜ", "d"], &[3], &[1]),
             ],
         )];
-        let preds = vec![candidate("word", &["w", "ɜ", "d"], &[3], &[1], false)];
-        assert!(validate_inputs(&refs, &preds).is_err());
+        let valid_prediction = vec![candidate("word", &["w", "ɜ", "d"], &[3], &[1], false)];
+        assert!(validate_inputs(&duplicate_refs, &valid_prediction).is_err());
 
+        let valid_refs = vec![reference(
+            "word",
+            false,
+            vec![variant("valid", &["w", "ɜ", "d"], &[3], &[1])],
+        )];
         let mut invalid = candidate("word", &["w", "ɜ", "d"], &[3], &[1], false);
         invalid.syllable_boundaries = None;
-        assert!(validate_inputs(&refs[..0], &[invalid]).is_err());
+        assert!(validate_inputs(&valid_refs, &[invalid]).is_err());
     }
 
     #[test]
