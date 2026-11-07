@@ -161,7 +161,10 @@ impl ExperimentManifest {
         require_nonempty("seed_policy", &self.seed_policy)?;
         require_nonempty("baseline_description", &self.baseline_description)?;
         require_nonempty("uncertainty_method", &self.uncertainty_method)?;
-        require_nonempty_list("coordinate_and_unit_conventions", &self.coordinate_and_unit_conventions)?;
+        require_nonempty_list(
+            "coordinate_and_unit_conventions",
+            &self.coordinate_and_unit_conventions,
+        )?;
         require_nonempty_list("equations_and_assumptions", &self.equations_and_assumptions)?;
         require_nonempty_list("primary_metrics", &self.primary_metrics)?;
         require_nonempty_list("required_checks", &self.required_checks)?;
@@ -284,8 +287,11 @@ impl RunReceipt {
             }
             check.validate_against(manifest)?;
         }
-        let required_checks: BTreeSet<&str> =
-            manifest.required_checks.iter().map(String::as_str).collect();
+        let required_checks: BTreeSet<&str> = manifest
+            .required_checks
+            .iter()
+            .map(String::as_str)
+            .collect();
         if observed_checks != required_checks {
             return Err(ManifestError::RequiredCheckSetMismatch);
         }
@@ -298,7 +304,11 @@ impl RunReceipt {
             if self.output_artifacts.is_empty() {
                 return Err(ManifestError::PassedRunWithoutOutputs);
             }
-            if self.checks.iter().any(|check| check.status != VerificationStatus::Passed) {
+            if self
+                .checks
+                .iter()
+                .any(|check| check.status != VerificationStatus::Passed)
+            {
                 return Err(ManifestError::PassedRunWithNonPassingCheck);
             }
         }
@@ -343,7 +353,11 @@ pub enum ManifestError {
     #[error("run head {actual} does not match manifest head {expected}")]
     StaleRunHead { expected: String, actual: String },
     #[error("passed check {check} is for head {actual}, expected {expected}")]
-    StaleHead { check: String, expected: String, actual: String },
+    StaleHead {
+        check: String,
+        expected: String,
+        actual: String,
+    },
     #[error("passed check {0} has no log artifact digest")]
     PassedCheckWithoutLog(String),
     #[error("a passed run has no output artifacts")]
@@ -364,10 +378,7 @@ fn require_nonempty(field: &'static str, value: &str) -> Result<(), ManifestErro
     }
 }
 
-fn require_nonempty_list(
-    field: &'static str,
-    values: &[String],
-) -> Result<(), ManifestError> {
+fn require_nonempty_list(field: &'static str, values: &[String]) -> Result<(), ManifestError> {
     if values.is_empty() || values.iter().any(|value| value.trim().is_empty()) {
         Err(ManifestError::EmptyList(field))
     } else {
@@ -442,9 +453,13 @@ mod tests {
             ],
             uncertainty_method: "multi-seed sample SD and t interval".to_string(),
             claim_boundary: ClaimBoundary::NumericalSimulation,
-            claims: vec!["the finite-sample estimator approaches the flat 1+1D reference".to_string()],
+            claims: vec![
+                "the finite-sample estimator approaches the flat 1+1D reference".to_string(),
+            ],
             non_claims: vec!["does not establish causal-set quantum gravity".to_string()],
-            falsification_conditions: vec!["ordering fraction fails to approach 0.5 under increasing N".to_string()],
+            falsification_conditions: vec![
+                "ordering fraction fails to approach 0.5 under increasing N".to_string(),
+            ],
         }
     }
 
@@ -458,21 +473,30 @@ mod tests {
                     name: "unit-tests".to_string(),
                     status: VerificationStatus::Passed,
                     source_commit_sha: manifest.source_commit_sha.clone(),
-                    log_artifact: Some(ArtifactDigest::from_bytes("unit-tests.log", b"test result: ok")),
+                    log_artifact: Some(ArtifactDigest::from_bytes(
+                        "unit-tests.log",
+                        b"test result: ok",
+                    )),
                     notes: "exact-head Rust test run".to_string(),
                 },
                 VerificationCheck {
                     name: "analytic-oracle".to_string(),
                     status: VerificationStatus::Passed,
                     source_commit_sha: manifest.source_commit_sha.clone(),
-                    log_artifact: Some(ArtifactDigest::from_bytes("oracle.log", b"oracle result: match")),
+                    log_artifact: Some(ArtifactDigest::from_bytes(
+                        "oracle.log",
+                        b"oracle result: match",
+                    )),
                     notes: "independent analytic reference matched".to_string(),
                 },
                 VerificationCheck {
                     name: "format-check".to_string(),
                     status: VerificationStatus::Passed,
                     source_commit_sha: manifest.source_commit_sha.clone(),
-                    log_artifact: Some(ArtifactDigest::from_bytes("format.log", b"format result: clean")),
+                    log_artifact: Some(ArtifactDigest::from_bytes(
+                        "format.log",
+                        b"format result: clean",
+                    )),
                     notes: "format check completed on the exact source head".to_string(),
                 },
             ],
@@ -505,7 +529,9 @@ mod tests {
         assert!(digest.verify_bytes(b"frozen-input").is_ok());
         assert_eq!(
             digest.verify_bytes(b"tampered-input"),
-            Err(ManifestError::ArtifactBytesMismatch("input.bin".to_string()))
+            Err(ManifestError::ArtifactBytesMismatch(
+                "input.bin".to_string()
+            ))
         );
     }
 
@@ -516,14 +542,18 @@ mod tests {
         manifest.input_artifacts.push(input);
         assert_eq!(
             manifest.validate(),
-            Err(ManifestError::DuplicateArtifactPath("fixture.json".to_string()))
+            Err(ManifestError::DuplicateArtifactPath(
+                "fixture.json".to_string()
+            ))
         );
 
         let mut manifest = manifest();
         manifest.required_checks.push("unit-tests".to_string());
         assert_eq!(
             manifest.validate(),
-            Err(ManifestError::DuplicateRequiredCheck("unit-tests".to_string()))
+            Err(ManifestError::DuplicateRequiredCheck(
+                "unit-tests".to_string()
+            ))
         );
     }
 
@@ -588,7 +618,9 @@ mod tests {
         no_log.checks[0].log_artifact = None;
         assert_eq!(
             no_log.validate_against(&manifest),
-            Err(ManifestError::PassedCheckWithoutLog("unit-tests".to_string()))
+            Err(ManifestError::PassedCheckWithoutLog(
+                "unit-tests".to_string()
+            ))
         );
     }
 
