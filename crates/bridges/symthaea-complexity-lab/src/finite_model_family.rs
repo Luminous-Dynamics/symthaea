@@ -156,6 +156,9 @@ pub enum FiniteFamilyError {
     InvalidQueryVariable { variable_index: usize },
     DuplicateQueryVariable { variable_index: usize },
     QueryStateOutOfRange { variable_index: usize, state: usize, cardinality: usize },
+    AssignmentSpaceOverflow,
+    AssignmentLimitExceeded { required: usize, limit: usize },
+    EnumerationPartitionMismatch { model_digest: String },
     CardinalityManifestMismatch {
         model_digest: String,
         expected: Vec<usize>,
@@ -191,6 +194,15 @@ impl fmt::Display for FiniteFamilyError {
             Self::QueryStateOutOfRange { variable_index, state, cardinality } => write!(
                 f,
                 "joint event state {state} is outside variable {variable_index} cardinality {cardinality}"
+            ),
+            Self::AssignmentSpaceOverflow => write!(f, "full assignment-space size overflowed usize"),
+            Self::AssignmentLimitExceeded { required, limit } => write!(
+                f,
+                "exact enumeration requires {required} full assignments; configured limit is {limit}"
+            ),
+            Self::EnumerationPartitionMismatch { model_digest } => write!(
+                f,
+                "direct assignment enumeration disagrees with variable-elimination partition for model {model_digest}"
             ),
             Self::CardinalityManifestMismatch {
                 model_digest,
@@ -639,6 +651,348 @@ pub fn evaluate_finite_model_joint_event(
     })
 }
 
+
+/// A maximizing assignment and the model witnessing its probability.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CredalMapAssignment {
+    pub assignment: Vec<usize>,
+    pub probability: CheckedRational,
+    pub witness_model: String,
+}
+
+/// Per-model posterior over the requested MAP query variables.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CredalMapModelRecord {
+    pub model_digest: String,
+    pub evidence_mass: CheckedRational,
+    /// Indexed by the canonical mixed-radix query assignment order.
+    pub query_probabilities: Option<Vec<CheckedRational>>,
+    pub elimination_stats: Option<EliminationStats>,
+}
+
+/// Exact finite-family maximax and maximin MAP over an explicit model set.
+///
+/// This is an exact small-instance reference for a *finite enumerated* family,
+/// not a solver over arbitrary convex credal sets. For each query assignment q:
+///
+///   maximax chooses argmax_q max_m P_m(q | evidence)
+///   maximin chooses argmax_q min_m P_m(q | evidence)
+///
+/// Maximin is withheld when any family member assigns zero evidence mass;
+/// silently dropping that member would change the lower envelope. Maximax is
+/// returned over supported models only, with the conditioning-domain status
+/// making partial support explicit.
+///
+/// The implementation directly enumerates all complete assignments, sums
+/// hidden-variable assignments into each query-state mass, and checks that the
+/// enumerated mass equals the exact VE partition function for every supported
+/// model. The caller must set a full-assignment limit to bound work and memory.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FiniteFamilyCredalMapResult {
+    pub query_variables: Vec<usize>,
+    pub query_cardinalities: Vec<usize>,
+    pub model_count: usize,
+    pub supported_model_count: usize,
+    pub zero_evidence_model_count: usize,
+    pub conditioning_status: ConditioningDomainStatus,
+    pub maximax: Option<CredalMapAssignment>,
+    /// None for partial or entirely unsupported conditioning domains.
+    pub maximin: Option<CredalMapAssignment>,
+    pub model_records: Vec<CredalMapModelRecord>,
+}
+
+#[derive(Clone, Copy)]
+struct ProbabilityWitness {
+    probability: CheckedRational,
+    model_index: usize,
+}
+
+/// Exact finite-family maximax/maximin MAP on a caller-selected query subset.
+///
+/// Query variables are canonicalized into ascending variable-index order.
+/// Assignments are returned in that same order. All unqueried variables are
+/// summed out exactly. The family is unweighted; no model averaging is inferred.
+pub fn evaluate_finite_family_credal_map(
+    models: &[FiniteModelRef<'_>],
+    query_variables: &[usize],
+    elimination_order: &[usize],
+    max_full_assignments: usize,
+) -> Result<FiniteFamilyCredalMapResult, FiniteFamilyError> {
+    if models.is_empty() {
+        return Err(FiniteFamilyError::EmptyFamily);
+    }
+    if max_full_assignments == 0 {
+        return Err(FiniteFamilyError::AssignmentLimitExceeded {
+            required: 1,
+            limit: 0,
+        });
+    }
+
+    let mut ordered = models.iter().copied().collect::<Vec<_>>();
+    for (index, model) in ordered.iter().enumerate() {
+        if !is_sha256_digest(model.model_digest) {
+            return Err(FiniteFamilyError::InvalidModelDigest {
+                index,
+                digest: model.model_digest.to_owned(),
+            });
+        }
+    }
+    ordered.sort_by(|left, right| left.model_digest.cmp(right.model_digest));
+
+    let mut seen = BTreeSet::new();
+    for model in &ordered {
+        if !seen.insert(model.model_digest) {
+            return Err(FiniteFamilyError::DuplicateModelDigest {
+                digest: model.model_digest.to_owned(),
+            });
+        }
+    }
+
+    let cardinalities = ordered[0].graph.cardinalities().to_vec();
+    let mut canonical_query = query_variables.to_vec();
+    canonical_query.sort_unstable();
+    for (position, &variable) in canonical_query.iter().enumerate() {
+        if variable >= cardinalities.len() {
+            return Err(FiniteFamilyError::InvalidQueryVariable {
+                variable_index: variable,
+            });
+        }
+        if position > 0 && canonical_query[position - 1] == variable {
+            return Err(FiniteFamilyError::DuplicateQueryVariable {
+                variable_index: variable,
+            });
+        }
+    }
+    let query_cardinalities = canonical_query
+        .iter()
+        .map(|&variable| cardinalities[variable])
+        .collect::<Vec<_>>();
+
+    let full_assignment_count = cardinalities.iter().try_fold(1usize, |count, &cardinality| {
+        count.checked_mul(cardinality)
+    }).ok_or(FiniteFamilyError::AssignmentSpaceOverflow)?;
+    if full_assignment_count > max_full_assignments {
+        return Err(FiniteFamilyError::AssignmentLimitExceeded {
+            required: full_assignment_count,
+            limit: max_full_assignments,
+        });
+    }
+    let query_assignment_count = query_cardinalities.iter().try_fold(1usize, |count, &cardinality| {
+        count.checked_mul(cardinality)
+    }).ok_or(FiniteFamilyError::AssignmentSpaceOverflow)?;
+
+    let mut max_by_query: Vec<Option<ProbabilityWitness>> =
+        vec![None; query_assignment_count];
+    let mut min_by_query: Vec<Option<ProbabilityWitness>> =
+        vec![None; query_assignment_count];
+    let mut model_records = Vec::with_capacity(ordered.len());
+    let mut supported_model_count = 0usize;
+    let mut zero_evidence_model_count = 0usize;
+
+    for (model_index, model) in ordered.iter().enumerate() {
+        if model.graph.cardinalities() != cardinalities.as_slice() {
+            return Err(FiniteFamilyError::CardinalityManifestMismatch {
+                model_digest: model.model_digest.to_owned(),
+                expected: cardinalities.clone(),
+                actual: model.graph.cardinalities().to_vec(),
+            });
+        }
+
+        for (factor_index, factor) in model.graph.factors().iter().enumerate() {
+            if factor.values.iter().any(|value| value.is_negative()) {
+                let value = factor.values.iter().find(|value| value.is_negative())
+                    .expect("negative factor value was detected");
+                return Err(FiniteFamilyError::ModelInference {
+                    model_digest: model.model_digest.to_owned(),
+                    source: RationalInferenceError::NegativePotential {
+                        factor_index,
+                        numerator: value.numerator(),
+                        denominator: value.denominator(),
+                    },
+                });
+            }
+        }
+
+        let (evidence_mass, elimination_stats) = model.graph.evaluate(elimination_order)
+            .map_err(|source| FiniteFamilyError::ModelInference {
+                model_digest: model.model_digest.to_owned(),
+                source: RationalInferenceError::Elimination(source),
+            })?;
+
+        if evidence_mass.is_zero() {
+            zero_evidence_model_count += 1;
+            model_records.push(CredalMapModelRecord {
+                model_digest: model.model_digest.to_owned(),
+                evidence_mass: CheckedRational::zero(),
+                query_probabilities: None,
+                elimination_stats: Some(elimination_stats),
+            });
+            continue;
+        }
+
+        let mut query_masses = vec![CheckedRational::zero(); query_assignment_count];
+        let mut enumerated_partition = CheckedRational::zero();
+        let mut assignment = vec![0usize; cardinalities.len()];
+
+        for full_index in 0..full_assignment_count {
+            decode_mixed_radix(full_index, &cardinalities, &mut assignment);
+
+            let mut joint_mass = CheckedRational::one();
+            for factor in model.graph.factors() {
+                let table_index = factor.scope.iter().fold(0usize, |index, &variable| {
+                    index * cardinalities[variable] + assignment[variable]
+                });
+                joint_mass = joint_mass.checked_mul(factor.values[table_index])
+                    .map_err(|source| FiniteFamilyError::ModelInference {
+                        model_digest: model.model_digest.to_owned(),
+                        source: RationalInferenceError::Arithmetic(source),
+                    })?;
+                if joint_mass.is_zero() {
+                    break;
+                }
+            }
+
+            enumerated_partition = enumerated_partition.checked_add(joint_mass)
+                .map_err(|source| FiniteFamilyError::ModelInference {
+                    model_digest: model.model_digest.to_owned(),
+                    source: RationalInferenceError::Arithmetic(source),
+                })?;
+
+            let query_index = canonical_query.iter().fold(0usize, |index, &variable| {
+                index * cardinalities[variable] + assignment[variable]
+            });
+            query_masses[query_index] = query_masses[query_index].checked_add(joint_mass)
+                .map_err(|source| FiniteFamilyError::ModelInference {
+                    model_digest: model.model_digest.to_owned(),
+                    source: RationalInferenceError::Arithmetic(source),
+                })?;
+        }
+
+        if enumerated_partition != evidence_mass {
+            return Err(FiniteFamilyError::EnumerationPartitionMismatch {
+                model_digest: model.model_digest.to_owned(),
+            });
+        }
+
+        let mut query_probabilities = Vec::with_capacity(query_assignment_count);
+        for (query_index, query_mass) in query_masses.into_iter().enumerate() {
+            let probability = query_mass.checked_div(evidence_mass)
+                .map_err(|source| FiniteFamilyError::ModelInference {
+                    model_digest: model.model_digest.to_owned(),
+                    source: RationalInferenceError::Arithmetic(source),
+                })?;
+            query_probabilities.push(probability);
+
+            match max_by_query[query_index] {
+                None => {
+                    max_by_query[query_index] = Some(ProbabilityWitness {
+                        probability,
+                        model_index,
+                    });
+                    min_by_query[query_index] = Some(ProbabilityWitness {
+                        probability,
+                        model_index,
+                    });
+                }
+                Some(current_max) => {
+                    if probability > current_max.probability {
+                        max_by_query[query_index] = Some(ProbabilityWitness {
+                            probability,
+                            model_index,
+                        });
+                    }
+                    let current_min = min_by_query[query_index]
+                        .expect("max and min witnesses are initialized together");
+                    if probability < current_min.probability {
+                        min_by_query[query_index] = Some(ProbabilityWitness {
+                            probability,
+                            model_index,
+                        });
+                    }
+                }
+            }
+        }
+
+        supported_model_count += 1;
+        model_records.push(CredalMapModelRecord {
+            model_digest: model.model_digest.to_owned(),
+            evidence_mass,
+            query_probabilities: Some(query_probabilities),
+            elimination_stats: Some(elimination_stats),
+        });
+    }
+
+    let conditioning_status = if supported_model_count == 0 {
+        ConditioningDomainStatus::NoSupportedModels
+    } else if zero_evidence_model_count > 0 {
+        ConditioningDomainStatus::PartialConditioningDomain
+    } else {
+        ConditioningDomainStatus::Complete
+    };
+
+    let maximax = if supported_model_count == 0 {
+        None
+    } else {
+        let mut best: Option<(usize, ProbabilityWitness)> = None;
+        for (query_index, witness) in max_by_query.iter().enumerate() {
+            let witness = witness.expect("supported model initializes each query assignment");
+            if best.map_or(true, |(_, current)| witness.probability > current.probability) {
+                best = Some((query_index, witness));
+            }
+        }
+        best.map(|(query_index, witness)| CredalMapAssignment {
+            assignment: decode_query_assignment(query_index, &query_cardinalities),
+            probability: witness.probability,
+            witness_model: ordered[witness.model_index].model_digest.to_owned(),
+        })
+    };
+
+    let maximin = if conditioning_status != ConditioningDomainStatus::Complete {
+        None
+    } else {
+        let mut best: Option<(usize, ProbabilityWitness)> = None;
+        for (query_index, witness) in min_by_query.iter().enumerate() {
+            let witness = witness.expect("complete family initializes every query assignment");
+            if best.map_or(true, |(_, current)| witness.probability > current.probability) {
+                best = Some((query_index, witness));
+            }
+        }
+        best.map(|(query_index, witness)| CredalMapAssignment {
+            assignment: decode_query_assignment(query_index, &query_cardinalities),
+            probability: witness.probability,
+            witness_model: ordered[witness.model_index].model_digest.to_owned(),
+        })
+    };
+
+    Ok(FiniteFamilyCredalMapResult {
+        query_variables: canonical_query,
+        query_cardinalities,
+        model_count: models.len(),
+        supported_model_count,
+        zero_evidence_model_count,
+        conditioning_status,
+        maximax,
+        maximin,
+        model_records,
+    })
+}
+
+fn decode_mixed_radix(mut index: usize, cardinalities: &[usize], output: &mut [usize]) {
+    for position in (0..cardinalities.len()).rev() {
+        output[position] = index % cardinalities[position];
+        index /= cardinalities[position];
+    }
+}
+
+fn decode_query_assignment(mut index: usize, cardinalities: &[usize]) -> Vec<usize> {
+    let mut assignment = vec![0usize; cardinalities.len()];
+    for position in (0..cardinalities.len()).rev() {
+        assignment[position] = index % cardinalities[position];
+        index /= cardinalities[position];
+    }
+    assignment
+}
+
 fn is_sha256_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -940,6 +1294,94 @@ mod tests {
         assert!(matches!(
             canonical_model_transcript(&model),
             Err(CanonicalModelTranscriptError::NegativeProbabilityPotential { factor_index: 0 })
+        ));
+    }
+
+
+    #[test]
+    fn finite_family_maximax_and_maximin_map_are_distinct_exact_objectives() {
+        let mut model_a = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        model_a.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
+
+        let mut model_b = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        model_b.add_factor(vec![0, 1], vec![q(4, 1), q(3, 1), q(2, 1), q(1, 1)]).unwrap();
+
+        let id_a = digest('a');
+        let id_b = digest('b');
+        let models = [
+            FiniteModelRef { model_digest: &id_a, graph: &model_a },
+            FiniteModelRef { model_digest: &id_b, graph: &model_b },
+        ];
+        let result = evaluate_finite_family_credal_map(&models, &[0], &[0, 1], 4).unwrap();
+
+        assert_eq!(result.conditioning_status, ConditioningDomainStatus::Complete);
+        let maximax = result.maximax.unwrap();
+        assert_eq!(maximax.assignment, vec![0]);
+        assert_eq!(maximax.probability, q(7, 10));
+        assert_eq!(maximax.witness_model, id_b);
+
+        let maximin = result.maximin.unwrap();
+        assert_eq!(maximin.assignment, vec![0]);
+        assert_eq!(maximin.probability, q(3, 10));
+        assert_eq!(maximin.witness_model, id_a);
+    }
+
+    #[test]
+    fn credal_map_sums_hidden_variables_and_canonicalizes_query_scope() {
+        let mut model = ExactFactorGraph::new(
+            vec![2, 2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        model.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
+        model.add_factor(vec![1, 2], vec![q(4, 1), q(3, 1), q(2, 1), q(1, 1)]).unwrap();
+        let id = digest('a');
+        let models = [FiniteModelRef { model_digest: &id, graph: &model }];
+
+        let left = evaluate_finite_family_credal_map(&models, &[0, 2], &[0, 1, 2], 8).unwrap();
+        let right = evaluate_finite_family_credal_map(&models, &[2, 0], &[0, 1, 2], 8).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(left.query_variables, vec![0, 2]);
+    }
+
+    #[test]
+    fn partial_evidence_support_withholds_maximin_but_marks_maximax_partial() {
+        let supported = graph([q(1, 1), q(1, 1)]);
+        let mut impossible = graph([q(1, 1), q(0, 1)]);
+        impossible.add_factor(vec![0], vec![q(0, 1), q(1, 1)]).unwrap();
+        let id_a = digest('a');
+        let id_b = digest('b');
+        let models = [
+            FiniteModelRef { model_digest: &id_a, graph: &supported },
+            FiniteModelRef { model_digest: &id_b, graph: &impossible },
+        ];
+
+        let result = evaluate_finite_family_credal_map(&models, &[0], &[0], 2).unwrap();
+        assert_eq!(result.conditioning_status, ConditioningDomainStatus::PartialConditioningDomain);
+        assert!(result.maximax.is_some());
+        assert_eq!(result.maximin, None);
+    }
+
+    #[test]
+    fn credal_map_enforces_full_assignment_resource_limit() {
+        let model = ExactFactorGraph::new(
+            vec![2, 2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        let id = digest('a');
+        let models = [FiniteModelRef { model_digest: &id, graph: &model }];
+        assert!(matches!(
+            evaluate_finite_family_credal_map(&models, &[0], &[0, 1, 2], 7),
+            Err(FiniteFamilyError::AssignmentLimitExceeded { required: 8, limit: 7 })
         ));
     }
 
