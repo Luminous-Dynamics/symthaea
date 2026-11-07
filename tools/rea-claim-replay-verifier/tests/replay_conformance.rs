@@ -1416,14 +1416,14 @@ fn removing_environment_scope_dimensions_cannot_upgrade_a_specific_observation()
     exact_scope.scope.environment_id = Some("device-42".to_owned());
     let (exact_claim_bytes, exact_result_bytes) =
         produce(&exact_scope, std::slice::from_ref(&evidence));
-    let exact = replay_claim_evaluation(
-        &exact_claim_bytes,
-        &[&evidence_bytes],
-        &exact_result_bytes,
-    )
-    .unwrap();
+    let exact =
+        replay_claim_evaluation(&exact_claim_bytes, &[&evidence_bytes], &exact_result_bytes)
+            .unwrap();
     assert_eq!(exact.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(exact.expected_disposition, Disposition::SupportedWithinScope);
+    assert_eq!(
+        exact.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
 
     // Removing either requested dimension broadens the claim beyond what the
     // specific environment observation can establish. It must not preserve
@@ -1436,8 +1436,7 @@ fn removing_environment_scope_dimensions_cannot_upgrade_a_specific_observation()
         let mut broadened = exact_scope.clone();
         broadened.scope.platform = platform;
         broadened.scope.environment_id = environment_id;
-        let (claim_bytes, result_bytes) =
-            produce(&broadened, std::slice::from_ref(&evidence));
+        let (claim_bytes, result_bytes) = produce(&broadened, std::slice::from_ref(&evidence));
         let replay =
             replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
 
@@ -1459,8 +1458,7 @@ fn removing_environment_scope_dimensions_cannot_upgrade_a_specific_observation()
         );
 
         let stale_positive =
-            replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &exact_result_bytes)
-                .unwrap();
+            replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &exact_result_bytes).unwrap();
         assert_eq!(
             stale_positive.outcome,
             ReplayOutcome::ReplayMismatch,
@@ -1505,16 +1503,14 @@ fn confidence_and_authority_labels_cannot_promote_unimplemented_predicates() {
                 let mut value = original.value.clone();
                 value["confidence"] = json!(confidence);
                 value["authority"] = json!(authority);
-                value["evidence_id"] =
-                    json!(rea_compat::compute_evidence_id(&value).unwrap());
+                value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
                 let evidence_bytes = serde_json::to_vec(&value).unwrap();
                 let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
 
                 let mut claim = provider_claim(evidence.evidence_id.clone());
                 claim.predicate = predicate;
                 claim.source_predicate_type = None;
-                let (claim_bytes, result_bytes) =
-                    produce(&claim, std::slice::from_ref(&evidence));
+                let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
                 let replay =
                     replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes)
                         .unwrap();
@@ -1534,10 +1530,7 @@ fn confidence_and_authority_labels_cannot_promote_unimplemented_predicates() {
                     result["evidence_assessments"][0]["kind"],
                     json!("not_evaluated")
                 );
-                assert_eq!(
-                    result["rule_id"],
-                    json!("no-registered-predicate-rule/v0")
-                );
+                assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
             }
         }
     }
@@ -1558,4 +1551,3 @@ fn unknown_temporal_scope_fields_are_rejected_instead_of_ignored() {
         replay_claim_evaluation(&changed_claim, &[fixture_bytes()], &result_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidClaim);
 }
-
