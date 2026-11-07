@@ -16,7 +16,7 @@ The offline reference contract defines five roles:
 | Role | Agent visibility | Search feedback | Use |
 |---|---|---|---|
 | train | Features + labels | None | Fit candidate model |
-| search | Features allowed, labels hidden | External score only | Guide candidate search |
+| search | Features and labels hidden from agent | External score only | Guide candidate search |
 | selection | Hidden from agent/search | Not returned during search | Select final candidate after search stops |
 | confirmation | Hidden until candidate frozen | No search feedback | Independent final confirmation |
 | transfer | New task family, hidden during search | No tuning feedback | Test method/domain transfer |
@@ -29,7 +29,7 @@ A new split, evaluator or task-family contract creates a new epoch. Do not silen
 
 The HCE manifest binds evaluator and split commitment digests and requires an independent overlap audit. The Rust validator cannot prove disjoint underlying populations from digests. The custodian must inspect actual membership IDs, source manifests, labels, mounts, credentials, access logs, output channels and evaluator execution environment.
 
-The search agent must not receive hidden labels or evaluator code. The orchestrator receives only a search score from the external evaluator. Final-selection and confirmation results must not flow back into search. The same evaluator identity/epoch applies across candidate arms. Test-set extraction, external benchmark-label downloads, cached-result contamination, metadata leakage and candidate-specific evaluator changes are hard integrity failures.
+The search agent must not receive search-split features, labels or evaluator code. The orchestrator submits the candidate to the external evaluator and returns only the search score. Final-selection and confirmation results must not flow back into search. The same evaluator identity/epoch applies across candidate arms. Test-set extraction, external benchmark-label downloads, cached-result contamination, metadata leakage and candidate-specific evaluator changes are hard integrity failures.
 
 AIRA₂'s 80/10/10 train/search/selection split is a useful comparator, not a universal split ratio. Symthaea adds an independently controlled confirmation and fresh-family transfer layer so selection is distinct from final evidence.
 
