@@ -87,6 +87,26 @@ pub enum QuantifierScopeError {
     NotExistential {
         variable: usize,
     },
+    NotUniversal {
+        variable: usize,
+    },
+    DuplicateHerbrandDependency {
+        universal: usize,
+        dependency: usize,
+    },
+    HerbrandDependencyCountExceedsVariableCount {
+        universal: usize,
+        required: usize,
+        variable_count: usize,
+    },
+    HerbrandDependencyNotAvailable {
+        universal: usize,
+        dependency: usize,
+    },
+    StrategyDependencyOrderMismatch {
+        variable: usize,
+        dependency: usize,
+    },
     DuplicateSkolemDependency {
         existential: usize,
         dependency: usize,
@@ -226,6 +246,105 @@ impl ValidatedQuantifierPrefix {
         Ok(dependencies)
     }
 
+    /// Return all existential variables preceding a universal variable.
+    ///
+    /// This is the dual Herbrand dependency scope. Variables in the same
+    /// universal block do not depend on one another.
+    pub fn universal_dependencies(
+        &self,
+        variable: usize,
+    ) -> Result<Vec<usize>, QuantifierScopeError> {
+        let Some(&(target_block, quantifier)) = self.locations.get(variable) else {
+            return Err(QuantifierScopeError::QuantifiedVariableOutOfRange {
+                block: self.blocks.len(),
+                variable,
+                variable_count: self.variable_count,
+            });
+        };
+        if quantifier != Quantifier::ForAll {
+            return Err(QuantifierScopeError::NotUniversal { variable });
+        }
+
+        let mut dependencies = Vec::new();
+        for block in self.blocks.iter().take(target_block) {
+            if block.quantifier == Quantifier::Exists {
+                dependencies.extend(block.variables.iter().copied());
+            }
+        }
+        Ok(dependencies)
+    }
+
+    /// Validate a declared Herbrand dependency set against the prefix.
+    ///
+    /// A universal strategy may ignore available earlier existential
+    /// variables. Dependencies are a duplicate-free subset, listed in prefix
+    /// order so that truth-table keys have a canonical meaning.
+    pub fn validate_herbrand_dependencies(
+        &self,
+        universal: usize,
+        declared: &[usize],
+    ) -> Result<(), QuantifierScopeError> {
+        let Some(&(target_block, quantifier)) = self.locations.get(universal) else {
+            return Err(QuantifierScopeError::QuantifiedVariableOutOfRange {
+                block: self.blocks.len(),
+                variable: universal,
+                variable_count: self.variable_count,
+            });
+        };
+        if quantifier != Quantifier::ForAll {
+            return Err(QuantifierScopeError::NotUniversal { variable: universal });
+        }
+        if declared.len() > self.variable_count {
+            return Err(
+                QuantifierScopeError::HerbrandDependencyCountExceedsVariableCount {
+                    universal,
+                    required: declared.len(),
+                    variable_count: self.variable_count,
+                },
+            );
+        }
+
+        let mut seen = vec![false; self.variable_count];
+        for &dependency in declared {
+            if dependency >= self.variable_count {
+                return Err(QuantifierScopeError::HerbrandDependencyNotAvailable {
+                    universal,
+                    dependency,
+                });
+            }
+            if seen[dependency] {
+                return Err(QuantifierScopeError::DuplicateHerbrandDependency {
+                    universal,
+                    dependency,
+                });
+            }
+            seen[dependency] = true;
+            let (dependency_block, dependency_quantifier) = self.locations[dependency];
+            if dependency_quantifier != Quantifier::Exists || dependency_block >= target_block {
+                return Err(QuantifierScopeError::HerbrandDependencyNotAvailable {
+                    universal,
+                    dependency,
+                });
+            }
+        }
+
+        let allowed = self.universal_dependencies(universal)?;
+        let mut cursor = 0usize;
+        for &dependency in declared {
+            let Some(offset) = allowed[cursor..]
+                .iter()
+                .position(|candidate| *candidate == dependency)
+            else {
+                return Err(QuantifierScopeError::StrategyDependencyOrderMismatch {
+                    variable: universal,
+                    dependency,
+                });
+            };
+            cursor = cursor.saturating_add(offset).saturating_add(1);
+        }
+        Ok(())
+    }
+
     /// Validate a declared Skolem dependency set against the prefix.
     ///
     /// A Skolem function may ignore available earlier universal variables, so
@@ -360,6 +479,84 @@ mod tests {
         .unwrap();
         assert_eq!(prefix.existential_dependencies(1).unwrap(), vec![0]);
         assert_eq!(prefix.existential_dependencies(2).unwrap(), vec![0]);
+    }
+
+    #[test]
+    fn universal_dependencies_follow_prefix_order() {
+        let prefix = standard_prefix();
+        assert_eq!(prefix.universal_dependencies(0).unwrap(), vec![]);
+        assert_eq!(prefix.universal_dependencies(2).unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn universal_may_ignore_available_existential_dependencies() {
+        let prefix = ValidatedQuantifierPrefix::new(
+            4,
+            vec![
+                block(Quantifier::Exists, &[0]),
+                block(Quantifier::Exists, &[1]),
+                block(Quantifier::ForAll, &[2]),
+                block(Quantifier::ForAll, &[3]),
+            ],
+            QuantifierPrefixBudget::default(),
+        )
+        .unwrap();
+        assert!(prefix.validate_herbrand_dependencies(3, &[0]).is_ok());
+        assert!(prefix.validate_herbrand_dependencies(3, &[]).is_ok());
+    }
+
+    #[test]
+    fn universal_cannot_depend_on_future_existential() {
+        let prefix = standard_prefix();
+        assert_eq!(
+            prefix.validate_herbrand_dependencies(2, &[3]).unwrap_err(),
+            QuantifierScopeError::HerbrandDependencyNotAvailable {
+                universal: 2,
+                dependency: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn universal_rejects_duplicate_herbrand_dependencies() {
+        let prefix = ValidatedQuantifierPrefix::new(
+            3,
+            vec![
+                block(Quantifier::Exists, &[0, 1]),
+                block(Quantifier::ForAll, &[2]),
+            ],
+            QuantifierPrefixBudget::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            prefix.validate_herbrand_dependencies(2, &[0, 0]).unwrap_err(),
+            QuantifierScopeError::DuplicateHerbrandDependency {
+                universal: 2,
+                dependency: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn strategy_dependencies_must_use_canonical_prefix_order() {
+        let prefix = ValidatedQuantifierPrefix::new(
+            4,
+            vec![
+                block(Quantifier::Exists, &[0]),
+                block(Quantifier::ForAll, &[1]),
+                block(Quantifier::Exists, &[2]),
+                block(Quantifier::ForAll, &[3]),
+            ],
+            QuantifierPrefixBudget::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            prefix.validate_herbrand_dependencies(3, &[2, 0]).unwrap_err(),
+            QuantifierScopeError::StrategyDependencyOrderMismatch {
+                variable: 3,
+                dependency: 0,
+            }
+        );
     }
 
     #[test]
