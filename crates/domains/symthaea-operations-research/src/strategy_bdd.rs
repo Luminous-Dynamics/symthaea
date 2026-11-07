@@ -591,13 +591,29 @@ pub fn compile_strategy_function_to_robdd_with_order(
         nodes,
         root,
     };
-    validate_robdd(&bdd)?;
+    validate_robdd_with_budget(&bdd, budget)?;
     Ok(bdd)
 }
 
 /// Check topological node numbering, increasing variable order, reduction,
 /// uniqueness, and root/edge validity without consulting the source function.
-pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
+/// Validate an ROBDD against explicit dependency and node budgets.
+pub fn validate_robdd_with_budget(
+    bdd: &ReducedOrderedBdd,
+    budget: StrategyBddBudget,
+) -> Result<(), StrategyBddError> {
+    if bdd.dependencies.len() > budget.max_dependency_variables {
+        return Err(StrategyBddError::DependencyBudgetExceeded {
+            required: bdd.dependencies.len(),
+            limit: budget.max_dependency_variables,
+        });
+    }
+    if bdd.nodes.len() > budget.max_bdd_nodes {
+        return Err(StrategyBddError::NodeBudgetExceeded {
+            required: bdd.nodes.len(),
+            limit: budget.max_bdd_nodes,
+        });
+    }
     validate_variable_order(bdd.dependencies.len(), &bdd.variable_order)?;
 
     let mut dependencies_seen = BTreeSet::new();
@@ -690,6 +706,11 @@ pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
         return Err(StrategyBddError::UnreachableNode { node });
     }
     Ok(())
+}
+
+/// Validate against the default resource envelope.
+pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
+    validate_robdd_with_budget(bdd, StrategyBddBudget::default())
 }
 
 /// Deterministically sift each dependency through every BDD order position.
@@ -832,9 +853,11 @@ pub fn find_exact_minimum_robdd_order(
     let initial_node_count = initial_bdd.nodes.len();
     let mut best_order = order.clone();
     let mut best_bdd = initial_bdd;
-    let mut orders_evaluated = 0usize;
+    // The identity order was compiled above and is the first lexicographic
+    // permutation. Count it once, then enumerate every remaining permutation.
+    let mut orders_evaluated = 1usize;
 
-    loop {
+    while next_permutation(&mut order) {
         let candidate_bdd =
             compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
         orders_evaluated = orders_evaluated
@@ -845,9 +868,6 @@ pub fn find_exact_minimum_robdd_order(
         {
             best_order = order.clone();
             best_bdd = candidate_bdd;
-        }
-        if !next_permutation(&mut order) {
-            break;
         }
     }
 
@@ -861,12 +881,21 @@ pub fn find_exact_minimum_robdd_order(
     })
 }
 
-/// Evaluate an ROBDD for one assignment in dependency-list order.
+/// Evaluate an ROBDD using the default resource envelope.
 pub fn evaluate_robdd(
     bdd: &ReducedOrderedBdd,
     assignment: &[bool],
 ) -> Result<bool, StrategyBddError> {
-    validate_robdd(bdd)?;
+    evaluate_robdd_with_budget(bdd, assignment, StrategyBddBudget::default())
+}
+
+/// Evaluate an ROBDD under an explicit structural resource budget.
+pub fn evaluate_robdd_with_budget(
+    bdd: &ReducedOrderedBdd,
+    assignment: &[bool],
+    budget: StrategyBddBudget,
+) -> Result<bool, StrategyBddError> {
+    validate_robdd_with_budget(bdd, budget)?;
     if assignment.len() != bdd.dependencies.len() {
         return Err(StrategyBddError::EvaluationAssignmentWidthMismatch {
             expected: bdd.dependencies.len(),
@@ -907,7 +936,7 @@ pub fn verify_robdd_matches_strategy_function(
     function: &BooleanStrategyFunction,
     budget: StrategyBddBudget,
 ) -> Result<StrategyBddReport, StrategyBddError> {
-    validate_robdd(bdd)?;
+    validate_robdd_with_budget(bdd, budget)?;
     if bdd.dependencies != function.dependencies {
         return Err(StrategyBddError::DependencyScopeMismatch {
             expected: function.dependencies.clone(),
@@ -923,7 +952,7 @@ pub fn verify_robdd_matches_strategy_function(
         let Some(&table_value) = function.table.get(&assignment) else {
             return Err(StrategyBddError::MissingTruthTableRow { key: assignment });
         };
-        let bdd_value = evaluate_robdd(bdd, &assignment)?;
+        let bdd_value = evaluate_robdd_with_budget(bdd, &assignment, budget)?;
         if table_value != bdd_value {
             return Err(StrategyBddError::SemanticMismatch {
                 assignment,
