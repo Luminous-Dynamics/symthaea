@@ -156,6 +156,49 @@ pub struct ThreeBallSequentialDiscoveryResult {
 pub struct ThreeBallSequentialPolicyArm {
     pub policy_kind: ThreeBallSequentialPolicyKind,
     pub episodes: Vec<ThreeBallSequentialDiscoveryResult>,
+    pub summary: ThreeBallSequentialPolicySummary,
+}
+
+/// Outcome summary for one paired policy arm. All means are over episodes,
+/// with identical seed coverage across arms.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallSequentialPolicySummary {
+    pub episode_count: usize,
+    pub mean_final_true_semantic_class_posterior: f64,
+    pub mean_final_model_entropy_nats: f64,
+    pub mean_true_class_brier_score: f64,
+    pub mean_true_class_negative_log_probability: f64,
+    pub correct_semantic_class_commitment_rate: f64,
+    pub mean_cumulative_reward: f64,
+    pub mean_gaze_count: f64,
+}
+
+/// Percentile interval from deterministic paired bootstrap resampling.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallBootstrapInterval {
+    pub lower: f64,
+    pub upper: f64,
+    pub confidence_level: f64,
+    pub replicates: usize,
+}
+
+/// Paired candidate-minus-reference contrasts. Positive and negative values
+/// are interpreted according to the metric; raw per-seed episodes are kept.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallPairedPolicyContrast {
+    pub reference_policy_kind: ThreeBallSequentialPolicyKind,
+    pub candidate_policy_kind: ThreeBallSequentialPolicyKind,
+    pub paired_seed_count: usize,
+    pub mean_delta_final_true_semantic_class_posterior: f64,
+    pub ci95_delta_final_true_semantic_class_posterior: Option<ThreeBallBootstrapInterval>,
+    pub mean_delta_brier_score: f64,
+    pub ci95_delta_brier_score: Option<ThreeBallBootstrapInterval>,
+    pub mean_delta_correct_commitment_rate: f64,
+    pub ci95_delta_correct_commitment_rate: Option<ThreeBallBootstrapInterval>,
+    pub mean_delta_cumulative_reward: f64,
+    pub ci95_delta_cumulative_reward: Option<ThreeBallBootstrapInterval>,
+    pub mean_delta_gaze_count: f64,
+    pub ci95_delta_gaze_count: Option<ThreeBallBootstrapInterval>,
 }
 
 /// Reproducible paired policy matrix. This stores raw per-seed episodes rather
@@ -170,7 +213,10 @@ pub struct ThreeBallPairedPolicyBenchmark {
     pub true_rule_one_based_index: usize,
     pub model_family: ThreeBallModelFamily,
     pub seeds: Vec<u64>,
+    /// First supplied arm is the preregistered reference for paired contrasts.
+    pub reference_policy_kind: ThreeBallSequentialPolicyKind,
     pub arms: Vec<ThreeBallSequentialPolicyArm>,
+    pub paired_comparisons: Vec<ThreeBallPairedPolicyContrast>,
 }
 
 /// Run a paired policy-ablation matrix over identical environment seeds.
@@ -218,9 +264,37 @@ pub fn run_three_ball_paired_policy_benchmark(
                 },
             )?);
         }
+        let summary = summarize_policy_episodes(&episodes);
         arms.push(ThreeBallSequentialPolicyArm {
             policy_kind,
             episodes,
+            summary,
+        });
+    }
+
+    let reference_policy_kind = arms[0].policy_kind;
+    let mut paired_comparisons = Vec::with_capacity(arms.len().saturating_sub(1));
+    for (candidate_index, candidate) in arms.iter().enumerate().skip(1) {
+        let reference = &arms[0].episodes;
+        let candidate_episodes = &candidate.episodes;
+        let deltas = paired_policy_metric_deltas(reference, candidate_episodes);
+        let bootstrap_seed = 0xB007_57A9_2026_0000_u64 ^ candidate_index as u64;
+        paired_comparisons.push(ThreeBallPairedPolicyContrast {
+            reference_policy_kind,
+            candidate_policy_kind: candidate.policy_kind,
+            paired_seed_count: seeds.len(),
+            mean_delta_final_true_semantic_class_posterior: mean(&deltas.final_true_posterior),
+            ci95_delta_final_true_semantic_class_posterior: bootstrap_interval(
+                &deltas.final_true_posterior, bootstrap_seed ^ 0x01,
+            ),
+            mean_delta_brier_score: mean(&deltas.brier),
+            ci95_delta_brier_score: bootstrap_interval(&deltas.brier, bootstrap_seed ^ 0x02),
+            mean_delta_correct_commitment_rate: mean(&deltas.correct_commitment),
+            ci95_delta_correct_commitment_rate: bootstrap_interval(&deltas.correct_commitment, bootstrap_seed ^ 0x03),
+            mean_delta_cumulative_reward: mean(&deltas.reward),
+            ci95_delta_cumulative_reward: bootstrap_interval(&deltas.reward, bootstrap_seed ^ 0x04),
+            mean_delta_gaze_count: mean(&deltas.gaze_count),
+            ci95_delta_gaze_count: bootstrap_interval(&deltas.gaze_count, bootstrap_seed ^ 0x05),
         });
     }
 
@@ -232,7 +306,9 @@ pub fn run_three_ball_paired_policy_benchmark(
         true_rule_one_based_index,
         model_family: base_config.model_family,
         seeds: seeds.to_vec(),
+        reference_policy_kind,
         arms,
+        paired_comparisons,
     })
 }
 
@@ -556,6 +632,134 @@ pub fn run_three_ball_sequential_discovery(
                 )
             })
             .collect(),
+    })
+}
+
+#[derive(Debug)]
+struct PairedPolicyMetricDeltas {
+    final_true_posterior: Vec<f64>,
+    brier: Vec<f64>,
+    correct_commitment: Vec<f64>,
+    reward: Vec<f64>,
+    gaze_count: Vec<f64>,
+}
+
+fn summarize_policy_episodes(
+    episodes: &[ThreeBallSequentialDiscoveryResult],
+) -> ThreeBallSequentialPolicySummary {
+    let count = episodes.len() as f64;
+    ThreeBallSequentialPolicySummary {
+        episode_count: episodes.len(),
+        mean_final_true_semantic_class_posterior: episodes
+            .iter()
+            .map(|episode| episode.final_true_semantic_class_posterior)
+            .sum::<f64>()
+            / count,
+        mean_final_model_entropy_nats: episodes
+            .iter()
+            .map(|episode| episode.final_model_entropy_nats)
+            .sum::<f64>()
+            / count,
+        mean_true_class_brier_score: episodes
+            .iter()
+            .map(|episode| episode.mean_true_class_brier_score)
+            .sum::<f64>()
+            / count,
+        mean_true_class_negative_log_probability: episodes
+            .iter()
+            .map(|episode| episode.mean_true_class_negative_log_probability)
+            .sum::<f64>()
+            / count,
+        correct_semantic_class_commitment_rate: episodes
+            .iter()
+            .filter(|episode| episode.trials_to_correct_rule_commitment.is_some())
+            .count() as f64
+            / count,
+        mean_cumulative_reward: episodes
+            .iter()
+            .map(|episode| episode.cumulative_reward as f64)
+            .sum::<f64>()
+            / count,
+        mean_gaze_count: episodes
+            .iter()
+            .map(|episode| episode.gaze_count as f64)
+            .sum::<f64>()
+            / count,
+    }
+}
+
+fn paired_policy_metric_deltas(
+    reference: &[ThreeBallSequentialDiscoveryResult],
+    candidate: &[ThreeBallSequentialDiscoveryResult],
+) -> PairedPolicyMetricDeltas {
+    debug_assert_eq!(reference.len(), candidate.len());
+    PairedPolicyMetricDeltas {
+        final_true_posterior: reference
+            .iter()
+            .zip(candidate)
+            .map(|(left, right)| {
+                right.final_true_semantic_class_posterior
+                    - left.final_true_semantic_class_posterior
+            })
+            .collect(),
+        brier: reference
+            .iter()
+            .zip(candidate)
+            .map(|(left, right)| {
+                right.mean_true_class_brier_score - left.mean_true_class_brier_score
+            })
+            .collect(),
+        correct_commitment: reference
+            .iter()
+            .zip(candidate)
+            .map(|(left, right)| {
+                f64::from(right.trials_to_correct_rule_commitment.is_some())
+                    - f64::from(left.trials_to_correct_rule_commitment.is_some())
+            })
+            .collect(),
+        reward: reference
+            .iter()
+            .zip(candidate)
+            .map(|(left, right)| (right.cumulative_reward - left.cumulative_reward) as f64)
+            .collect(),
+        gaze_count: reference
+            .iter()
+            .zip(candidate)
+            .map(|(left, right)| (right.gaze_count as f64) - (left.gaze_count as f64))
+            .collect(),
+    }
+}
+
+fn mean(values: &[f64]) -> f64 {
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+/// Deterministic 95% percentile bootstrap over paired seed-level differences.
+/// Fewer than two pairs do not support an interval and return None.
+fn bootstrap_interval(
+    values: &[f64],
+    seed: u64,
+) -> Option<ThreeBallBootstrapInterval> {
+    if values.len() < 2 {
+        return None;
+    }
+    const REPLICATES: usize = 2_000;
+    let mut rng = SplitMix64::new(seed);
+    let mut bootstrap_means = Vec::with_capacity(REPLICATES);
+    for _ in 0..REPLICATES {
+        let total = (0..values.len())
+            .map(|_| values[rng.below(values.len() as u64)])
+            .sum::<f64>();
+        bootstrap_means.push(total / values.len() as f64);
+    }
+    bootstrap_means.sort_by(f64::total_cmp);
+    let lower_index = ((REPLICATES - 1) as f64 * 0.025).floor() as usize;
+    let upper_index = ((REPLICATES - 1) as f64 * 0.975).ceil() as usize;
+    Some(ThreeBallBootstrapInterval {
+        lower: bootstrap_means[lower_index],
+        upper: bootstrap_means[upper_index],
+        confidence_level: 0.95,
+        replicates: REPLICATES,
     })
 }
 
