@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Bounded, dry-run aircraft engineering study and receipt validation.
+pub mod aircraft_design_loop;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
