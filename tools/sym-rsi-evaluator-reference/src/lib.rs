@@ -533,9 +533,9 @@ pub fn validate_state_routing_fixture_pack(
     }
     for (field, actual, expected) in [
         ("expected_fixture_count", pack.expected_fixture_count, STATE_ROUTING_TOTAL),
-        ("expected_negative_count", pack.expected_negative_count, STATE_ROUTING_NEGATIVE),
-        ("expected_positive_count", pack.expected_positive_count, STATE_ROUTING_POSITIVE),
-        ("expected_abstention_count", pack.expected_abstention_count, STATE_ROUTING_ABSTENTION),
+        ("expected_negative_count", pack.expected_negative_count, STATE_ROUTING_NEGATIVE_COUNT),
+        ("expected_positive_count", pack.expected_positive_count, STATE_ROUTING_POSITIVE_COUNT),
+        ("expected_abstention_count", pack.expected_abstention_count, STATE_ROUTING_ABSTENTION_COUNT),
     ] {
         if actual != expected {
             report.issue("DECLARED_COUNT", format!("{field}: expected {expected}, got {actual}"));
@@ -656,13 +656,13 @@ pub fn validate_state_routing_fixture_pack(
     report.abstention_control_count = abstentions;
 
     if negatives != STATE_ROUTING_NEGATIVE_COUNT {
-        report.issue("NEGATIVE_CONTROL_COUNT", format!("expected {}, found {negatives}", STATE_ROUTING_NEGATIVE));
+        report.issue("NEGATIVE_CONTROL_COUNT", format!("expected {}, found {negatives}", STATE_ROUTING_NEGATIVE_COUNT));
     }
     if positives != STATE_ROUTING_POSITIVE_COUNT {
-        report.issue("POSITIVE_CONTROL_COUNT", format!("expected {}, found {positives}", STATE_ROUTING_POSITIVE));
+        report.issue("POSITIVE_CONTROL_COUNT", format!("expected {}, found {positives}", STATE_ROUTING_POSITIVE_COUNT));
     }
     if abstentions != STATE_ROUTING_ABSTENTION_COUNT {
-        report.issue("ABSTENTION_CONTROL_COUNT", format!("expected {}, found {abstentions}", STATE_ROUTING_ABSTENTION));
+        report.issue("ABSTENTION_CONTROL_COUNT", format!("expected {}, found {abstentions}", STATE_ROUTING_ABSTENTION_COUNT));
     }
     for (fixture_id, control_id, _, _) in STATE_ROUTING_NEGATIVE_CONTROLS {
         if !ids.contains(fixture_id) {
