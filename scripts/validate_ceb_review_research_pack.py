@@ -679,7 +679,8 @@ def main() -> int:
     failures = validate_documents(
         triangulation, challenge, adjudication, scorecard, preregistration,
         gold_completeness, sequential_evidence, evidence_crosswalk,
-        calibration_pack, calibration_key, counterfactual_qualification
+        calibration_pack, calibration_key, counterfactual_qualification, cross_framing,
+        cross_framing_calibration_pack
     )
     if failures:
         for failure in failures:
