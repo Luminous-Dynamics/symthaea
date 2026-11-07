@@ -5,7 +5,7 @@
 
 ## Findings addressed by this patch
 
-The shared VocalPerformance constructor now explicitly reflects the current English-only Muse G2P frontend. It rejects non-English language tags and rejects a melody with fewer notes than the lyric syllable count rather than silently dropping trailing lyrics. Surplus melody notes continue to be represented as melisma.
+The shared VocalPerformance constructor now explicitly reflects the current English-only Muse G2P frontend. It rejects non-English language tags, and preflights orthography so unsupported graphemes, digits and internal punctuation cannot be silently skipped by the ASCII letter fallback. Boundary punctuation around supported words is accepted. It also rejects a melody with fewer notes than the lyric syllable count rather than silently dropping trailing lyrics. Surplus melody notes continue to be represented as melisma.
 
 The physical-tract singing prototype in `src/voice/functional_singing.rs` was not declared by `src/voice/mod.rs`. I temporarily exposed it behind the `singing` feature to test its actual integration contract. Exact-head compilation then showed that it references a set of physical renderer types and controller methods absent from the current `symthaea-vocal-tract` crate API (including `GesturePlanner`, `BranchedWaveguideV2`, `PhysicalTractFrame`, `phoneme_latent`, and `latent_output`). The module was therefore removed from the compiled module graph again, and the prototype file was restored unchanged. It is not a working or production-integrated backend in the current tree.
 
