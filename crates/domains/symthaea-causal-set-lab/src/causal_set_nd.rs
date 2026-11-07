@@ -47,13 +47,26 @@ impl EventNd {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CausalSetNdError {
-    UnsupportedDimension { dimension: usize },
+    UnsupportedDimension {
+        dimension: usize,
+    },
     InvalidProperTime,
-    NonFiniteEvent { id: usize },
-    DuplicateEventId { id: usize },
-    CoordinateCount { id: usize, expected: usize, actual: usize },
+    NonFiniteEvent {
+        id: usize,
+    },
+    DuplicateEventId {
+        id: usize,
+    },
+    CoordinateCount {
+        id: usize,
+        expected: usize,
+        actual: usize,
+    },
     InvalidRapidity,
-    InvalidBoostAxis { axis: usize, spatial_dimensions: usize },
+    InvalidBoostAxis {
+        axis: usize,
+        spatial_dimensions: usize,
+    },
 }
 
 impl fmt::Display for CausalSetNdError {
@@ -62,15 +75,33 @@ impl fmt::Display for CausalSetNdError {
             Self::UnsupportedDimension { dimension } => {
                 write!(f, "spacetime dimension must be 2, 3 or 4, got {dimension}")
             }
-            Self::InvalidProperTime => write!(f, "proper-time separation must be finite and positive"),
+            Self::InvalidProperTime => {
+                write!(f, "proper-time separation must be finite and positive")
+            }
             Self::NonFiniteEvent { id } => write!(f, "event {id} has a non-finite coordinate"),
             Self::DuplicateEventId { id } => write!(f, "event id {id} is duplicated"),
-            Self::CoordinateCount { id, expected, actual } => {
-                write!(f, "event {id} has {actual} coordinates; expected {expected}")
+            Self::CoordinateCount {
+                id,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "event {id} has {actual} coordinates; expected {expected}"
+                )
             }
-            Self::InvalidRapidity => write!(f, "rapidity must be finite with representable boost factors"),
-            Self::InvalidBoostAxis { axis, spatial_dimensions } => {
-                write!(f, "spatial boost axis {axis} is outside 0..{spatial_dimensions}")
+            Self::InvalidRapidity => write!(
+                f,
+                "rapidity must be finite with representable boost factors"
+            ),
+            Self::InvalidBoostAxis {
+                axis,
+                spatial_dimensions,
+            } => {
+                write!(
+                    f,
+                    "spatial boost axis {axis} is outside 0..{spatial_dimensions}"
+                )
             }
         }
     }
@@ -86,10 +117,7 @@ pub struct CausalSetNd {
 }
 
 impl CausalSetNd {
-    pub fn new(
-        spacetime_dimension: usize,
-        events: Vec<EventNd>,
-    ) -> Result<Self, CausalSetNdError> {
+    pub fn new(spacetime_dimension: usize, events: Vec<EventNd>) -> Result<Self, CausalSetNdError> {
         validate_dimension(spacetime_dimension)?;
         let mut ids = std::collections::HashSet::with_capacity(events.len());
         for event in &events {
@@ -100,14 +128,21 @@ impl CausalSetNd {
                     actual: event.coordinates.len(),
                 });
             }
-            if event.coordinates.iter().any(|coordinate| !coordinate.is_finite()) {
+            if event
+                .coordinates
+                .iter()
+                .any(|coordinate| !coordinate.is_finite())
+            {
                 return Err(CausalSetNdError::NonFiniteEvent { id: event.id });
             }
             if !ids.insert(event.id) {
                 return Err(CausalSetNdError::DuplicateEventId { id: event.id });
             }
         }
-        Ok(Self { spacetime_dimension, events })
+        Ok(Self {
+            spacetime_dimension,
+            events,
+        })
     }
 
     /// Fixed-cardinality Poisson sprinkling into a flat Alexandrov interval.
@@ -173,21 +208,15 @@ impl CausalSetNd {
     /// Alexandrov-interval spacetime volume for endpoint proper-time T.
     ///
     /// V_D = V_(D-1) T^D / (2^(D-1) D), where V_n is the unit n-ball volume.
-    pub fn minkowski_interval_volume(
-        spacetime_dimension: usize,
-        proper_time: f64,
-    ) -> Option<f64> {
-        if !(2..=4).contains(&spacetime_dimension)
-            || !proper_time.is_finite()
-            || proper_time <= 0.0
+    pub fn minkowski_interval_volume(spacetime_dimension: usize, proper_time: f64) -> Option<f64> {
+        if !(2..=4).contains(&spacetime_dimension) || !proper_time.is_finite() || proper_time <= 0.0
         {
             return None;
         }
         let spatial_dimension = spacetime_dimension - 1;
         let log_unit_ball = (spatial_dimension as f64 / 2.0) * PI.ln()
             - ln_gamma(spatial_dimension as f64 / 2.0 + 1.0);
-        let log_volume = log_unit_ball
-            + spacetime_dimension as f64 * proper_time.ln()
+        let log_volume = log_unit_ball + spacetime_dimension as f64 * proper_time.ln()
             - spatial_dimension as f64 * 2.0_f64.ln()
             - (spacetime_dimension as f64).ln();
         Some(log_volume.exp())
@@ -250,14 +279,13 @@ impl CausalSetNd {
     /// Passive Lorentz boost along one selected spatial axis.
     ///
     /// axis is zero-based among spatial coordinates, not including time.
-    pub fn lorentz_boosted(
-        &self,
-        rapidity: f64,
-        axis: usize,
-    ) -> Result<Self, CausalSetNdError> {
+    pub fn lorentz_boosted(&self, rapidity: f64, axis: usize) -> Result<Self, CausalSetNdError> {
         let spatial_dimensions = self.spatial_dimensions();
         if axis >= spatial_dimensions {
-            return Err(CausalSetNdError::InvalidBoostAxis { axis, spatial_dimensions });
+            return Err(CausalSetNdError::InvalidBoostAxis {
+                axis,
+                spatial_dimensions,
+            });
         }
         if !rapidity.is_finite() {
             return Err(CausalSetNdError::InvalidRapidity);
@@ -269,14 +297,21 @@ impl CausalSetNd {
         }
 
         let coordinate_axis = axis + 1;
-        let events = self.events.iter().map(|event| {
-            let mut coordinates = event.coordinates.clone();
-            let time = event.coordinates[0];
-            let position = event.coordinates[coordinate_axis];
-            coordinates[0] = cosh * time - sinh * position;
-            coordinates[coordinate_axis] = cosh * position - sinh * time;
-            EventNd { id: event.id, coordinates }
-        }).collect();
+        let events = self
+            .events
+            .iter()
+            .map(|event| {
+                let mut coordinates = event.coordinates.clone();
+                let time = event.coordinates[0];
+                let position = event.coordinates[coordinate_axis];
+                coordinates[0] = cosh * time - sinh * position;
+                coordinates[coordinate_axis] = cosh * position - sinh * time;
+                EventNd {
+                    id: event.id,
+                    coordinates,
+                }
+            })
+            .collect();
 
         // A boost changes the coordinate shape of the Alexandrov interval,
         // so construction here validates finite coordinates, not original
@@ -315,8 +350,7 @@ pub fn expected_ordering_fraction(spacetime_dimension: f64) -> Option<f64> {
     if !spacetime_dimension.is_finite() || !(1.0..=32.0).contains(&spacetime_dimension) {
         return None;
     }
-    let log_r = ln_gamma(spacetime_dimension + 1.0)
-        + ln_gamma(spacetime_dimension / 2.0)
+    let log_r = ln_gamma(spacetime_dimension + 1.0) + ln_gamma(spacetime_dimension / 2.0)
         - 2.0_f64.ln()
         - ln_gamma(1.5 * spacetime_dimension);
     let value = log_r.exp();
@@ -407,8 +441,12 @@ mod tests {
     #[test]
     fn interval_volumes_match_closed_form_references() {
         assert!((CausalSetNd::minkowski_interval_volume(2, 1.0).unwrap() - 0.5).abs() < 1e-12);
-        assert!((CausalSetNd::minkowski_interval_volume(3, 1.0).unwrap() - PI / 12.0).abs() < 1e-12);
-        assert!((CausalSetNd::minkowski_interval_volume(4, 1.0).unwrap() - PI / 24.0).abs() < 1e-12);
+        assert!(
+            (CausalSetNd::minkowski_interval_volume(3, 1.0).unwrap() - PI / 12.0).abs() < 1e-12
+        );
+        assert!(
+            (CausalSetNd::minkowski_interval_volume(4, 1.0).unwrap() - PI / 24.0).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -421,8 +459,10 @@ mod tests {
     #[test]
     fn fixed_seed_sprinkling_is_reproducible_in_all_supported_dimensions() {
         for dimension in 2..=4 {
-            let first = CausalSetNd::sprinkle_fixed_cardinality(0xC0FFEE, 256, dimension, 2.0).unwrap();
-            let second = CausalSetNd::sprinkle_fixed_cardinality(0xC0FFEE, 256, dimension, 2.0).unwrap();
+            let first =
+                CausalSetNd::sprinkle_fixed_cardinality(0xC0FFEE, 256, dimension, 2.0).unwrap();
+            let second =
+                CausalSetNd::sprinkle_fixed_cardinality(0xC0FFEE, 256, dimension, 2.0).unwrap();
             assert_eq!(first.events(), second.events());
         }
     }
@@ -430,13 +470,18 @@ mod tests {
     #[test]
     fn lorentz_boost_preserves_pair_counts_order_fraction_and_chain_length() {
         for dimension in 2..=4 {
-            let causet = CausalSetNd::sprinkle_fixed_cardinality(0x51A7, 384, dimension, 1.0).unwrap();
+            let causet =
+                CausalSetNd::sprinkle_fixed_cardinality(0x51A7, 384, dimension, 1.0).unwrap();
             for rapidity in [-1.2, -0.35, 0.0, 0.6, 1.2] {
                 let boosted = causet.lorentz_boosted(rapidity, 0).unwrap();
                 assert_eq!(causet.related_pair_count(), boosted.related_pair_count());
-                assert_eq!(causet.longest_chain_length(), boosted.longest_chain_length());
+                assert_eq!(
+                    causet.longest_chain_length(),
+                    boosted.longest_chain_length()
+                );
                 assert!(
-                    (causet.ordering_fraction().unwrap() - boosted.ordering_fraction().unwrap()).abs()
+                    (causet.ordering_fraction().unwrap() - boosted.ordering_fraction().unwrap())
+                        .abs()
                         < 1e-12
                 );
             }
@@ -476,10 +521,16 @@ mod tests {
             Err(CausalSetNdError::UnsupportedDimension { .. })
         ));
         assert!(CausalSetNd::sprinkle_fixed_cardinality(1, 10, 3, 0.0).is_err());
-        assert!(CausalSetNd::new(
-            2,
-            vec![EventNd { id: 0, coordinates: vec![f64::NAN, 0.0] }]
-        ).is_err());
+        assert!(
+            CausalSetNd::new(
+                2,
+                vec![EventNd {
+                    id: 0,
+                    coordinates: vec![f64::NAN, 0.0]
+                }]
+            )
+            .is_err()
+        );
         let valid = CausalSetNd::sprinkle_fixed_cardinality(1, 8, 3, 1.0).unwrap();
         assert!(valid.lorentz_boosted(f64::INFINITY, 0).is_err());
         assert!(valid.lorentz_boosted(0.5, 3).is_err());
