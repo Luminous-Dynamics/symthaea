@@ -36,9 +36,9 @@ class G2PReferenceScorerTests(unittest.TestCase):
             root = Path(directory)
             candidates = root / "candidates.tsv"
             candidates.write_text(
-                'case_id\\ttext\\tpiper_ipa_tokens\\tmuse_word_ipa_tokens\\tprosody_debug\\n'
-                'ordinary\\tread\\t["ɹ", "ɛ", "d"]\\t[["ɹ", "ɛ", "d"]]\\t[]\\n'
-                'oov\\txqzpl\\t["ɛ", "k", "s", "k"]\\t[["k", "s", "z", "p", "l"]]\\t[]\\n',
+                'case_id\ttext\tpiper_ipa_tokens\tmuse_word_ipa_tokens\tprosody_debug\n'
+                'ordinary\tread\t["ɹ", "ɛ", "d"]\t[["ɹ", "ɛ", "d"]]\t[]\n'
+                'oov\txqzpl\t["ɛ", "k", "s", "k"]\t[["k", "s", "z", "p", "l"]]\t[]\n',
                 encoding="utf-8",
             )
             references = root / "references.csv"
