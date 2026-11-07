@@ -5,6 +5,8 @@ on:
     paths:
       - "src/voice/functional_singing.rs"
       - "src/voice/mod.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "scripts/diffsinger_worker.py"
       - "scripts/diffsinger_phonemes.py"
       - "scripts/test_diffsinger_phonemes.py"
@@ -52,3 +54,6 @@ jobs:
 
       - name: Format-check only the changed Rust files
         run: rustfmt +1.96.0 --edition 2024 --check src/voice/functional_singing.rs src/voice/mod.rs
+
+      - name: Compile the feature-gated vocal renderer
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
