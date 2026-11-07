@@ -123,6 +123,7 @@ pub enum OperatorTraceError {
     ToolPermissionMismatch(u32),
     ToolPermissionUnexpected(u32),
     InvalidActionDigest { step: u32, field: &'static str },
+    ActionInputMismatch(u32),
     ToolNotAllowedForAction(u32),
     ToolRequiredForAction(u32),
     HypothesisRequired(u32),
@@ -208,6 +209,9 @@ impl OperatorTrace {
         let mut awaiting_observation: Option<OperatorActionDisposition> = None;
         let mut needs_revision = false;
         let mut submitted = false;
+        let mut last_inspection_digest: Option<String> = None;
+        let mut current_plan_digest: Option<String> = None;
+        let mut last_observation_digest: Option<String> = None;
         let mut total_cost = 0.0f64;
         let mut previous_end = None;
         let first_start = self.actions[0].start_ms;
@@ -295,13 +299,14 @@ impl OperatorTrace {
             match action.kind {
                 OperatorActionKind::Inspect => {
                     inspect_count += 1;
-                    if action.disposition == OperatorActionDisposition::Succeeded
-                        && action.output_sha256.as_deref().is_none_or(|digest| !valid_digest(digest))
-                    {
-                        return Err(OperatorTraceError::InvalidActionDigest {
-                            step: action.step,
-                            field: "output_sha256",
-                        });
+                    if action.disposition == OperatorActionDisposition::Succeeded {
+                        let output = action.output_sha256.as_deref()
+                            .filter(|digest| valid_digest(digest))
+                            .ok_or(OperatorTraceError::InvalidActionDigest {
+                                step: action.step,
+                                field: "output_sha256",
+                            })?;
+                        last_inspection_digest = Some(output.to_owned());
                     }
                 }
                 OperatorActionKind::Hypothesize => {
@@ -311,12 +316,22 @@ impl OperatorTrace {
                     if action.disposition != OperatorActionDisposition::Succeeded {
                         return Err(OperatorTraceError::HypothesisRequired(action.step));
                     }
-                    if action.output_sha256.as_deref().is_none_or(|digest| !valid_digest(digest)) {
-                        return Err(OperatorTraceError::InvalidActionDigest {
+                    let input = action.input_sha256.as_deref()
+                        .filter(|digest| valid_digest(digest))
+                        .ok_or(OperatorTraceError::InvalidActionDigest {
+                            step: action.step,
+                            field: "input_sha256",
+                        })?;
+                    if last_inspection_digest.as_deref() != Some(input) {
+                        return Err(OperatorTraceError::ActionInputMismatch(action.step));
+                    }
+                    let output = action.output_sha256.as_deref()
+                        .filter(|digest| valid_digest(digest))
+                        .ok_or(OperatorTraceError::InvalidActionDigest {
                             step: action.step,
                             field: "output_sha256",
-                        });
-                    }
+                        })?;
+                    current_plan_digest = Some(output.to_owned());
                     hypothesized = true;
                     hypothesis_count += 1;
                 }
@@ -326,6 +341,15 @@ impl OperatorTrace {
                     }
                     if !hypothesized {
                         return Err(OperatorTraceError::HypothesisRequired(action.step));
+                    }
+                    let input = action.input_sha256.as_deref()
+                        .filter(|digest| valid_digest(digest))
+                        .ok_or(OperatorTraceError::InvalidActionDigest {
+                            step: action.step,
+                            field: "input_sha256",
+                        })?;
+                    if current_plan_digest.as_deref() != Some(input) {
+                        return Err(OperatorTraceError::ActionInputMismatch(action.step));
                     }
                     execution_count += 1;
                     if execution_count > self.max_tool_calls {
@@ -349,6 +373,7 @@ impl OperatorTrace {
                         });
                     }
                     observation_count += 1;
+                    last_observation_digest = action.output_sha256.clone();
                     match execution_result {
                         OperatorActionDisposition::Succeeded => {
                             successful_executions += 1;
@@ -367,14 +392,28 @@ impl OperatorTrace {
                     if !needs_revision {
                         return Err(OperatorTraceError::RevisionWithoutFailure(action.step));
                     }
-                    if action.disposition != OperatorActionDisposition::Succeeded
-                        || action.output_sha256.as_deref().is_none_or(|digest| !valid_digest(digest))
-                    {
+                    if action.disposition != OperatorActionDisposition::Succeeded {
                         return Err(OperatorTraceError::InvalidActionDigest {
                             step: action.step,
                             field: "output_sha256",
                         });
                     }
+                    let input = action.input_sha256.as_deref()
+                        .filter(|digest| valid_digest(digest))
+                        .ok_or(OperatorTraceError::InvalidActionDigest {
+                            step: action.step,
+                            field: "input_sha256",
+                        })?;
+                    if last_observation_digest.as_deref() != Some(input) {
+                        return Err(OperatorTraceError::ActionInputMismatch(action.step));
+                    }
+                    let output = action.output_sha256.as_deref()
+                        .filter(|digest| valid_digest(digest))
+                        .ok_or(OperatorTraceError::InvalidActionDigest {
+                            step: action.step,
+                            field: "output_sha256",
+                        })?;
+                    current_plan_digest = Some(output.to_owned());
                     needs_revision = false;
                     hypothesized = true;
                     revision_count += 1;
@@ -392,6 +431,9 @@ impl OperatorTrace {
                         || action.output_sha256.as_deref().is_none_or(|digest| !valid_digest(digest))
                     {
                         return Err(OperatorTraceError::InvalidSubmit(action.step));
+                    }
+                    if last_observation_digest.as_deref() != action.input_sha256.as_deref() {
+                        return Err(OperatorTraceError::ActionInputMismatch(action.step));
                     }
                     submitted = true;
                 }
