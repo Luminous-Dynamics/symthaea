@@ -1,0 +1,13 @@
+[package]
+name = "connectome-closed-anytime-fwer"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Exact closed anytime-FWER audit for hierarchical phase-response mechanisms"
+
+[lib]
+path = "src/lib.rs"
+
+# Standalone validation crate: intentionally outside the root workspace.
+[workspace]
