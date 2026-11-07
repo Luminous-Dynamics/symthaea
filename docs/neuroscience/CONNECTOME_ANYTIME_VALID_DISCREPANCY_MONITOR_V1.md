@@ -128,7 +128,7 @@ Compare on identical finite worlds, observation kernels, action policies and com
 - zero silent alternative-prior refresh;
 - exact separation of threshold crossing, support exhaustion and out-of-support outcomes;
 - online-path wealth agrees with exact whole-tree replay;
-- changing alpha below the exact null crossing probability must fail the audit.
+- injecting a declared false-alarm probability above alpha must fail the audit; changing alpha recomputes the threshold and crossing event rather than reusing a previous event probability.
 
 **Biological evaluation targets (not achieved)**
 Use animal/session/target as the independent unit and report power-versus-cost, detection delay, false-alarm frequency, calibration, out-of-support rate and audit coverage. Choose thresholds only after a source-bound pilot estimates independent-unit variance and expected prevalence. Do not use neurons, pairs or time bins as IID biological replicates.
