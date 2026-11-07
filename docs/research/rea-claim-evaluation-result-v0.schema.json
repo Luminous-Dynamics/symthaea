@@ -18,6 +18,7 @@
     "source_predicate_type",
     "requested_evidence_ids",
     "assumptions",
+    "numeric_precision_warnings",
     "evidence_assessments",
     "missing_evidence_ids",
     "unmet_obligations",
@@ -91,19 +92,31 @@
           "minLength": 1
         },
         "platform": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "platform_version": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "environment_id": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "asserted_value": {},
     "source_predicate_type": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "requested_evidence_ids": {
       "type": "array",
@@ -149,19 +162,34 @@
             ]
           },
           "provider_id": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "provider_name": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "provider_version": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "confidence": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "authority": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "reason": {
             "type": "string",
@@ -199,6 +227,42 @@
     "derivation_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "numeric_precision_warnings": {
+      "type": "array",
+      "description": "Integer-token precision warnings from the asserted value and referenced Evidence records before RFC 8785 binary64 canonicalization.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "evidence_id",
+          "json_pointer",
+          "integer_value"
+        ],
+        "properties": {
+          "source": {
+            "enum": [
+              "asserted_value",
+              "evidence_record"
+            ]
+          },
+          "evidence_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^ev_[0-9a-f]{64}$"
+          },
+          "json_pointer": {
+            "type": "string"
+          },
+          "integer_value": {
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]*)$"
+          }
+        }
+      }
     }
   }
 }
