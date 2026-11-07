@@ -798,9 +798,5 @@ pub use triangulation::{
 pub mod tracking_metrics;
 
 pub use tracking_metrics::{
-    GospaBreakdown,
-    GospaConfig,
-    GospaError,
-    MAX_GOSPA_ASSIGNMENT_SIDE,
-    gospa_frame,
+    GospaBreakdown, GospaConfig, GospaError, MAX_GOSPA_ASSIGNMENT_SIDE, gospa_frame,
 };
