@@ -1836,6 +1836,54 @@ mod tests {
                 .is_some_and(|margin| margin > 0.0)
         );
 
+        // Verify the learned correspondence on a disjoint probe sequence.
+        // No assignment is recomputed on the held-out probes.
+        let held_out_probes = [
+            CfCFunctionalProbe {
+                input: vec![0.71, -0.19],
+                dt: 0.03,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.63, 0.42],
+                dt: 0.17,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.08, 0.94],
+                dt: 0.29,
+            },
+        ];
+        let source_held_out =
+            cfc_hidden_unit_activation_signatures(&original, 0, &held_out_probes)
+                .expect("source held-out signatures");
+        let candidate_held_out =
+            cfc_hidden_unit_activation_signatures(&permuted, 0, &held_out_probes)
+                .expect("candidate held-out signatures");
+        assert_ne!(source_held_out.probe_digest, alignment.probe_digest);
+        assert_eq!(source_held_out.probe_digest, candidate_held_out.probe_digest);
+        assert_eq!(source_held_out.architecture_digest, alignment.architecture_digest);
+        assert_eq!(candidate_held_out.architecture_digest, alignment.architecture_digest);
+        assert_eq!(source_held_out.manifest_digest, alignment.manifest_digest);
+        assert_eq!(candidate_held_out.manifest_digest, alignment.manifest_digest);
+        let mut held_out_squared_error = 0.0_f64;
+        let mut held_out_coordinate_count = 0usize;
+        for (source_unit, candidate_unit) in
+            alignment.source_to_candidate.iter().copied().enumerate()
+        {
+            for (source_activation, candidate_activation) in source_held_out.signatures[source_unit]
+                .iter()
+                .zip(candidate_held_out.signatures[candidate_unit].iter())
+            {
+                held_out_squared_error += (source_activation - candidate_activation).powi(2);
+                held_out_coordinate_count += 1;
+            }
+        }
+        let held_out_mse =
+            held_out_squared_error / held_out_coordinate_count as f64;
+        assert!(
+            held_out_mse < 1e-10,
+            "the selection-time mapping must generalize to held-out probes, mse={held_out_mse}"
+        );
+
         let mut original_eval = original.clone();
         let mut permuted_eval = permuted.clone();
         let mut squared_error = 0.0_f64;
