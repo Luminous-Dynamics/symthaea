@@ -143,12 +143,7 @@ impl WalkState<'_> {
         }
     }
 
-    fn visit_object(
-        &mut self,
-        token: &str,
-        pointer: &str,
-        depth: usize,
-    ) -> Result<(), AuditError> {
+    fn visit_object(&mut self, token: &str, pointer: &str, depth: usize) -> Result<(), AuditError> {
         let mut deserializer = serde_json::Deserializer::from_str(token);
         let result = deserializer.deserialize_map(ObjectVisitor {
             state: self,
@@ -166,12 +161,7 @@ impl WalkState<'_> {
             .map_err(|error| AuditError::new(AuditErrorKind::InvalidJson, error.to_string()))
     }
 
-    fn visit_array(
-        &mut self,
-        token: &str,
-        pointer: &str,
-        depth: usize,
-    ) -> Result<(), AuditError> {
+    fn visit_array(&mut self, token: &str, pointer: &str, depth: usize) -> Result<(), AuditError> {
         let mut deserializer = serde_json::Deserializer::from_str(token);
         let result = deserializer.deserialize_seq(ArrayVisitor {
             state: self,
@@ -259,9 +249,7 @@ impl<'de> Visitor<'de> for ObjectVisitor<'_, '_> {
 
             let child = map.next_value::<&RawValue>()?;
             let child_pointer = join_pointer(&self.pointer, &key);
-            if let Err(error) = self
-                .state
-                .visit(child, &child_pointer, self.depth + 1)
+            if let Err(error) = self.state.visit(child, &child_pointer, self.depth + 1)
             {
                 self.state.deferred_error = Some(error.clone());
                 return Err(de::Error::custom(error));
@@ -291,9 +279,7 @@ impl<'de> Visitor<'de> for ArrayVisitor<'_, '_> {
         let mut index = 0usize;
         while let Some(child) = sequence.next_element::<&RawValue>()? {
             let child_pointer = join_pointer(&self.pointer, &index.to_string());
-            if let Err(error) = self
-                .state
-                .visit(child, &child_pointer, self.depth + 1)
+            if let Err(error) = self.state.visit(child, &child_pointer, self.depth + 1)
             {
                 self.state.deferred_error = Some(error.clone());
                 return Err(de::Error::custom(error));
@@ -407,9 +393,8 @@ mod tests {
     #[test]
     fn preserves_u64_and_arbitrarily_long_integer_lexemes_exactly() {
         let huge = "9".repeat(120);
-        let input = format!(
-            r#"{{"u64_max":18446744073709551615,"huge":{huge},"negative_huge":-{huge}}}"#
-        );
+        let input =
+            format!(r#"{{"u64_max":18446744073709551615,"huge":{huge},"negative_huge":-{huge}}}"#);
         let actual = audit_json(input.as_bytes()).unwrap();
         assert_eq!(
             actual.numeric_precision_warnings,
