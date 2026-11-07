@@ -59,11 +59,27 @@
       "source": "https://doi.org/10.1016/j.oceaneng.2025.122825",
       "method": "25-ship concept database; heave/pitch transfer-function model in head seas; external ship verification",
       "reference_criteria_reported_in_related_paper": {
-        "MSI_percent": 10,
-        "scope": "published criteria table context, not LOS acceptance"
+        "iso_22834_yacht_example": {
+          "EGA_rms_deg": "<2",
+          "MSI_percent": "<10"
+        },
+        "iso_2631_1_example": {
+          "MSI_percent": "<10"
+        },
+        "marin_comfort_rating_example": {
+          "MIR_passenger": "<10",
+          "MIR_crew": "<20"
+        },
+        "nordforsk_example": {
+          "vertical_acceleration_rms_g": "<0.02",
+          "lateral_acceleration_rms_g": "<0.03",
+          "roll_rms_deg": "<2",
+          "VDV": "<1"
+        }
       },
       "applicability": "small cruise ship concept design only; transfer to LOS-18 / multihulls not assumed",
-      "note": "Acquire and review exact article and its criteria table before adopting any numbers."
+      "note": "Acquire and review exact article and its criteria table before adopting any numbers.",
+      "criteria_note": "These are heterogeneous criteria collated in the article's literature table, not thresholds generated or validated by the paper's model. Their units, methods, task/population and exposure conditions differ; do not compare them as one score or adopt them for LOS-18 without applicability review."
     },
     {
       "id": "MII-task-effectiveness-literature-summary-2026",
