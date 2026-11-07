@@ -34,7 +34,7 @@ The important methodological result is the difference between full and reduced v
 
 ### 2.2 SWE-Cycle: isolated phases do not establish autonomous completion
 
-[SWE-Cycle](https://arxiv.org/abs/2605.13139) contains **489 rigorously filtered instances** and separates environment reconstruction, implementation and verification-test generation from the integrated FullCycle task. The FullCycle condition requires an agent to work from a bare repository without the preconfigured environment or human scaffolding provided to isolated phases. The paper reports a sharp drop moving from isolated tasks to the complete cycle. Its SWE-Judge combines static review and dynamic execution for end-to-end grading.
+[SWE-Cycle](https://arxiv.org/abs/2605.13139) contains **489 rigorously filtered instances** and separates environment reconstruction, implementation and verification-test generation from the integrated FullCycle task. The FullCycle condition requires an agent to work from a bare repository without the preconfigured environment or human scaffolding provided to isolated phases. The paper reports a sharp drop from isolated tasks to the integrated FullCycle condition. Its SWE-Judge combines static review and dynamic execution for end-to-end grading.
 
 **CEB implication:** a system that can implement a change when given a prepared environment has not demonstrated that it can reconstruct the environment, diagnose setup failures, create valid checks and complete the whole workflow. Phase-specific scores must remain separate from FullCycle outcomes.
 
@@ -74,7 +74,7 @@ This creates a scope-aware evidence ladder:
 | B5 — Operational | end-to-end production-shaped path, deployment/configuration, resource/performance/security gates | declared operational requirements for the tested environment and horizon | universal safety or untested operating conditions |
 | B6 — Evolution | follow-on commits, upgrades/migrations, evidence continuity and repair survival | persistence of the qualified claim across later revisions/events | correctness outside the sequence and applicability domain |
 
-Levels are **evidence scopes, not an additive quality score**. A task may not need B5 or B6. The applicable boundary is defined by the frozen requirement before agent evaluation. A source-only task can legitimately finish at B0/B1; a serving feature may require B4/B5. A narrower pass must never be upgraded to a broader claim.
+Levels are **evidence scopes, not an additive quality score**. A task may not need B5 or B6. The applicable boundary is defined by the frozen requirement before agent evaluation. A source-only task can legitimately finish at B0/B1; a serving feature may require B4/B5. A narrower pass must never be upgraded to a broader claim. Narrower evidence cannot silently certify a broader claim.
 
 ## 4. Task authoring: paired boundary controls
 
