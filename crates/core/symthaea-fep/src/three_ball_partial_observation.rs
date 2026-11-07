@@ -1092,7 +1092,9 @@ mod tests {
         )
         .expect("quotient choices");
         for (left, right) in source_choices.iter().zip(quotient_choices.iter()) {
-            assert!((left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-10);
+            assert!(
+                (left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-10
+            );
         }
 
         let source_policy = score_three_ball_gaze_policies(
