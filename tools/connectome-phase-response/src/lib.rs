@@ -143,8 +143,8 @@ pub enum MeasurementStatus {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RowOutcome {
     Measured {
-        control: [Phase; LEG_COUNT],
-        perturbed: [Phase; LEG_COUNT],
+        control: [PhaseSample; LEG_COUNT],
+        perturbed: [PhaseSample; LEG_COUNT],
     },
     Unavailable(MeasurementStatus),
 }
@@ -160,7 +160,10 @@ pub struct TransferRow {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PhaseReset {
     pub source_leg: Option<LegId>,
+    /// Wrapped phase displacement, in canonical microturns.
     pub by_leg: [Phase; LEG_COUNT],
+    /// Integer changes in cycle winding. Kept separate from wrapped phase.
+    pub cycle_slips_by_leg: [i64; LEG_COUNT],
 }
 
 impl PhaseReset {
@@ -177,6 +180,19 @@ impl PhaseReset {
 
     pub fn local_reset(self) -> Option<Phase> {
         self.source_leg.map(|leg| self.by_leg[leg.index()])
+    }
+
+    pub fn off_diagonal_cycle_slips_l1(self) -> u64 {
+        self.cycle_slips_by_leg
+            .iter()
+            .enumerate()
+            .filter(|(axis, _)| self.source_leg.map(LegId::index) != Some(*axis))
+            .map(|(_, slips)| slips.unsigned_abs())
+            .sum()
+    }
+
+    pub fn local_cycle_slips(self) -> Option<i64> {
+        self.source_leg.map(|leg| self.cycle_slips_by_leg[leg.index()])
     }
 }
 
@@ -238,11 +254,18 @@ impl PhaseResponseSurface {
         match &row.outcome {
             RowOutcome::Measured { control, perturbed } => {
                 let by_leg = std::array::from_fn(|axis| {
-                    Phase::difference(perturbed[axis], control[axis])
+                    Phase::difference(
+                        perturbed[axis].fractional_phase(),
+                        control[axis].fractional_phase(),
+                    )
+                });
+                let cycle_slips_by_leg = std::array::from_fn(|axis| {
+                    perturbed[axis].cycle_index() - control[axis].cycle_index()
                 });
                 Ok(PhaseReset {
                     source_leg: key.source_leg,
                     by_leg,
+                    cycle_slips_by_leg,
                 })
             }
             RowOutcome::Unavailable(status) => Err(PhaseError::Unavailable(*status)),
@@ -261,6 +284,7 @@ impl PhaseResponseSurface {
 pub struct ProbePrediction {
     pub key: ProbeKey,
     pub by_leg: [Phase; LEG_COUNT],
+    pub cycle_slips_by_leg: [i64; LEG_COUNT],
 }
 
 /// A model signature contains steady-state summaries and the full phase-reset
@@ -275,7 +299,9 @@ pub struct ModelSignature {
 }
 
 impl ModelSignature {
-    fn prediction_map(&self) -> Result<BTreeMap<ProbeKey, [Phase; LEG_COUNT]>, PhaseError> {
+    fn prediction_map(
+        &self,
+    ) -> Result<BTreeMap<ProbeKey, ([Phase; LEG_COUNT], [i64; LEG_COUNT])>, PhaseError> {
         if self.model_id.is_empty() {
             return Err(PhaseError::EmptyModelId);
         }
@@ -285,7 +311,13 @@ impl ModelSignature {
         let mut map = BTreeMap::new();
         for prediction in &self.predictions {
             prediction.key.validate()?;
-            if map.insert(prediction.key, prediction.by_leg).is_some() {
+            if map
+                .insert(
+                    prediction.key,
+                    (prediction.by_leg, prediction.cycle_slips_by_leg),
+                )
+                .is_some()
+            {
                 return Err(PhaseError::DuplicatePredictionKey(self.model_id.clone()));
             }
         }
@@ -344,7 +376,10 @@ pub fn minimum_pairwise_probe_separation(
         let mut minimum = u64::MAX;
         for left in 0..maps.len() {
             for right in (left + 1)..maps.len() {
-                let distance = response_vector_distance(&maps[left][&key], &maps[right][&key]);
+                let distance = response_vector_distance(
+                    &maps[left][&key].0,
+                    &maps[right][&key].0,
+                );
                 minimum = minimum.min(distance);
             }
         }
@@ -353,11 +388,67 @@ pub fn minimum_pairwise_probe_separation(
     Ok(result)
 }
 
-/// Minimum separation across all model pairs and all supplied probe cells.
-/// A zero value means at least one pair is indistinguishable under this finite
-/// design; it says nothing about untested phase bins or interventions.
+/// Compute the minimum pairwise cycle-slip separation for every probe cell.
+/// This remains a separate quantity from fractional phase distance.
+pub fn minimum_pairwise_cycle_slip_separation(
+    models: &[ModelSignature],
+) -> Result<BTreeMap<ProbeKey, u64>, PhaseError> {
+    if models.len() < 2 {
+        return Err(PhaseError::InsufficientModels);
+    }
+    let mut ids = BTreeSet::new();
+    let maps = models
+        .iter()
+        .map(|model| {
+            if !ids.insert(model.model_id.clone()) {
+                return Err(PhaseError::DuplicateModelId(model.model_id.clone()));
+            }
+            model.prediction_map()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let reference_keys: BTreeSet<_> = maps[0].keys().copied().collect();
+    for (index, map) in maps.iter().enumerate().skip(1) {
+        let keys: BTreeSet<_> = map.keys().copied().collect();
+        if keys != reference_keys {
+            return Err(PhaseError::ModelProbeGridMismatch {
+                model_id: models[index].model_id.clone(),
+            });
+        }
+    }
+
+    let mut result = BTreeMap::new();
+    for key in reference_keys {
+        let mut minimum = u64::MAX;
+        for left in 0..maps.len() {
+            for right in (left + 1)..maps.len() {
+                let distance = maps[left][&key]
+                    .1
+                    .iter()
+                    .zip(maps[right][&key].1.iter())
+                    .map(|(a, b)| a.abs_diff(*b))
+                    .sum::<u64>();
+                minimum = minimum.min(distance);
+            }
+        }
+        result.insert(key, minimum);
+    }
+    Ok(result)
+}
+
+/// Minimum separation across all model pairs and supplied probe cells, for
+/// the fractional phase component only.
 pub fn minimum_campaign_separation(models: &[ModelSignature]) -> Result<u64, PhaseError> {
     let by_probe = minimum_pairwise_probe_separation(models)?;
+    by_probe.values().copied().min().ok_or(PhaseError::EmptyProbeGrid)
+}
+
+/// Minimum separation across all model pairs and supplied probe cells, for
+/// integer cycle slips only.
+pub fn minimum_campaign_cycle_slip_separation(
+    models: &[ModelSignature],
+) -> Result<u64, PhaseError> {
+    let by_probe = minimum_pairwise_cycle_slip_separation(models)?;
     by_probe.values().copied().min().ok_or(PhaseError::EmptyProbeGrid)
 }
 
@@ -408,6 +499,43 @@ impl fmt::Display for PhaseError {
 
 impl Error for PhaseError {}
 
+/// One phase sample with both its integer cycle winding and fractional
+/// position on the cycle. Keeping both prevents a full step/cycle slip from
+/// being aliased to zero by circular wrapping.
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub struct PhaseSample {
+    cycle_index: i64,
+    fractional_phase: Phase,
+}
+
+impl PhaseSample {
+    /// Split an unwrapped microturn count into integer cycle winding and
+    /// canonical fractional phase.
+    pub fn from_unwrapped_microturns(value: i64) -> Self {
+        let whole = value.div_euclid(PHASE_SCALE);
+        let remainder = value.rem_euclid(PHASE_SCALE);
+        if remainder >= PHASE_HALF_TURN {
+            Self {
+                cycle_index: whole + 1,
+                fractional_phase: Phase::from_microturns(remainder - PHASE_SCALE),
+            }
+        } else {
+            Self {
+                cycle_index: whole,
+                fractional_phase: Phase::from_microturns(remainder),
+            }
+        }
+    }
+
+    pub const fn cycle_index(self) -> i64 {
+        self.cycle_index
+    }
+
+    pub const fn fractional_phase(self) -> Phase {
+        self.fractional_phase
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,6 +554,10 @@ mod tests {
         [Phase::from_microturns(0); LEG_COUNT]
     }
 
+    fn zero_samples() -> [PhaseSample; LEG_COUNT] {
+        [PhaseSample::from_unwrapped_microturns(0); LEG_COUNT]
+    }
+
     #[test]
     fn phase_difference_wraps_across_cycle_boundary() {
         let left = Phase::from_microturns(490_000);
@@ -438,10 +570,10 @@ mod tests {
     #[test]
     fn phase_reset_keeps_sender_recipient_axes_and_off_diagonal_transfer() {
         let probe = key(Context::BallContact, 0, 2, 1);
-        let control = zeros();
-        let mut perturbed = zeros();
-        perturbed[0] = Phase::from_microturns(100_000);
-        perturbed[2] = Phase::from_microturns(25_000);
+        let control = zero_samples();
+        let mut perturbed = zero_samples();
+        perturbed[0] = PhaseSample::from_unwrapped_microturns(100_000);
+        perturbed[2] = PhaseSample::from_unwrapped_microturns(25_000);
         let surface = PhaseResponseSurface::new(vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Measured { control, perturbed },
@@ -456,9 +588,9 @@ mod tests {
     #[test]
     fn local_only_response_is_not_confused_with_cross_leg_transfer() {
         let probe = key(Context::AirStepping, 3, 0, 1);
-        let control = zeros();
-        let mut perturbed = zeros();
-        perturbed[3] = Phase::from_microturns(-80_000);
+        let control = zero_samples();
+        let mut perturbed = zero_samples();
+        perturbed[3] = PhaseSample::from_unwrapped_microturns(-80_000);
         let surface = PhaseResponseSurface::new(vec![TransferRow {
             key: probe,
             outcome: RowOutcome::Measured { control, perturbed },
@@ -527,13 +659,13 @@ mod tests {
             model_id: "central-only".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: local_only }],
+            predictions: vec![ProbePrediction { key: probe, by_leg: local_only, cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
         let proprioceptive = ModelSignature {
             model_id: "central-plus-proprioception".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: sensory_transfer }],
+            predictions: vec![ProbePrediction { key: probe, by_leg: sensory_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
         let separation = minimum_pairwise_probe_separation(&[central, proprioceptive]).unwrap();
         assert_eq!(separation[&probe], 30_000);
@@ -556,13 +688,13 @@ mod tests {
             model_id: "a".to_string(),
             steady_state_frequency_millihz: 10_000,
             steady_state_plv_milli: 500,
-            predictions: vec![ProbePrediction { key: probe_a, by_leg: zeros() }],
+            predictions: vec![ProbePrediction { key: probe_a, by_leg: zeros(), cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
         let second = ModelSignature {
             model_id: "b".to_string(),
             steady_state_frequency_millihz: 10_000,
             steady_state_plv_milli: 500,
-            predictions: vec![ProbePrediction { key: probe_b, by_leg: zeros() }],
+            predictions: vec![ProbePrediction { key: probe_b, by_leg: zeros(), cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
         assert!(matches!(
             minimum_pairwise_probe_separation(&[first, second]),
@@ -617,7 +749,7 @@ mod tests {
             model_id: "direct-central-coupling".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer }],
+            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
         let common_drive = ModelSignature {
             model_id: "latent-shared-input".to_string(),
@@ -646,6 +778,60 @@ mod tests {
             .unwrap();
             assert_eq!(surface.phase_reset(&probe), Err(PhaseError::Unavailable(status)));
         }
+    }
+
+    #[test]
+    fn full_cycle_slip_is_not_aliased_to_zero_phase() {
+        let probe = key(Context::BallContact, 0, 1, 1);
+        let control = zero_samples();
+        let mut perturbed = zero_samples();
+        perturbed[0] = PhaseSample::from_unwrapped_microturns(1_000_000);
+        perturbed[2] = PhaseSample::from_unwrapped_microturns(1_100_000);
+        let surface = PhaseResponseSurface::new(vec![TransferRow {
+            key: probe,
+            outcome: RowOutcome::Measured { control, perturbed },
+        }]).unwrap();
+
+        let response = surface.phase_reset(&probe).unwrap();
+        assert_eq!(response.by_leg[0].microturns(), 0);
+        assert_eq!(response.cycle_slips_by_leg[0], 1);
+        assert_eq!(response.by_leg[2].microturns(), 100_000);
+        assert_eq!(response.cycle_slips_by_leg[2], 1);
+        assert_eq!(response.off_diagonal_cycle_slips_l1(), 1);
+    }
+
+    #[test]
+    fn model_separation_keeps_cycle_slips_separate_from_fractional_phase() {
+        let probe = key(Context::BallContact, 0, 0, 1);
+        let fractional = zeros();
+        let central = ModelSignature {
+            model_id: "central".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 920,
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: fractional,
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
+        };
+        let slipped = ModelSignature {
+            model_id: "cycle-slip".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 920,
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: fractional,
+                cycle_slips_by_leg: [0, 1, 0, 0, 0, 0],
+            }],
+        };
+        assert_eq!(
+            minimum_pairwise_probe_separation(&[central.clone(), slipped.clone()]).unwrap()[&probe],
+            0
+        );
+        assert_eq!(
+            minimum_pairwise_cycle_slip_separation(&[central, slipped]).unwrap()[&probe],
+            1
+        );
     }
 
 }
