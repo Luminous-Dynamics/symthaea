@@ -4,6 +4,9 @@
 //! It does not execute campaigns, verify upstream signatures, evaluate results,
 //! access hidden truth, issue receipts, or authorize benchmark promotion.
 
+pub mod job_lifecycle;
+pub use job_lifecycle::{JobContractError, JobStatus, LabJob};
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
