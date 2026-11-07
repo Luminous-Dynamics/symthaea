@@ -464,8 +464,11 @@ pub fn bearing_fisher_information(
     observations: &[RayObservation],
     assumed_target_ecef_m: Vector3,
 ) -> Result<[[f64; 3]; 3], TriangulationError> {
-    if observations.is_empty() || !assumed_target_ecef_m.is_finite() {
+    if observations.is_empty() {
         return Err(TriangulationError::InsufficientObservations);
+    }
+    if !assumed_target_ecef_m.is_finite() {
+        return Err(TriangulationError::NonFiniteVector);
     }
     let rays = predicted_existing_sensor_rays(observations, assumed_target_ecef_m)?;
     angular_information_matrix(&rays, assumed_target_ecef_m)
@@ -1208,6 +1211,23 @@ mod tests {
             rank_sensor_placements_over_target_region(&existing, &hypotheses, &candidates)
                 .unwrap();
         assert_eq!(ranking.len(), 3);
+        assert_eq!(ranking[0].sensor_id, "high");
+        assert!(
+            (ranking[0].expected_log_determinant_information - 28.819_964_335_2).abs()
+                < 1.0e-8
+        );
+        assert!(
+            (ranking[0].worst_case_log_determinant_information - 27.507_265_299_7).abs()
+                < 1.0e-8
+        );
+        assert!(
+            (ranking[0].expected_a_optimal_variance_sum_m2 - 5.937_469_984_0e-4).abs()
+                < 1.0e-12
+        );
+        assert!(
+            (ranking[0].worst_case_a_optimal_variance_sum_m2 - 1.134_356_489_3e-3).abs()
+                < 1.0e-12
+        );
         assert!(ranking.iter().all(|score| score.target_hypotheses == 3));
         assert!(ranking.iter().all(|score| {
             score.expected_log_determinant_information.is_finite()
