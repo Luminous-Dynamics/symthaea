@@ -1715,7 +1715,8 @@ fn confidence_and_authority_labels_cannot_promote_precision_warned_unimplemented
                         .as_array()
                         .unwrap()
                         .iter()
-                        .any(|warning| warning["json_pointer"] == json!("/normalized_result/large_count")),
+                        .any(|warning| warning["json_pointer"]
+                            == json!("/normalized_result/large_count")),
                     "precision diagnostics were not retained for {predicate:?}/{confidence}/{authority}"
                 );
             }
@@ -1795,8 +1796,7 @@ fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_com
     let mut completeness_claim = report_claim;
     completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
     completeness_claim.source_predicate_type = None;
-    let (claim_bytes, result_bytes) =
-        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
@@ -1865,8 +1865,7 @@ fn terminal_pagination_and_self_reported_all_pages_do_not_prove_population_compl
     let mut completeness_claim = observation_claim;
     completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
     completeness_claim.source_predicate_type = None;
-    let (claim_bytes, result_bytes) =
-        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
@@ -1882,7 +1881,10 @@ fn terminal_pagination_and_self_reported_all_pages_do_not_prove_population_compl
             .as_array()
             .unwrap()
             .iter()
-            .any(|item| item.as_str().unwrap().contains("No predicate-specific verifier"))
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("No predicate-specific verifier"))
     );
 }
 
@@ -1935,8 +1937,7 @@ fn incomplete_downstream_processing_cannot_promote_whole_population_completeness
     let mut completeness_claim = observation_claim;
     completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
     completeness_claim.source_predicate_type = None;
-    let (claim_bytes, result_bytes) =
-        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
@@ -1970,13 +1971,11 @@ fn unsafe_integer_precision_warnings_survive_recursive_key_permutations() {
         replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
     assert_eq!(original_replay.outcome, ReplayOutcome::ReplayMatch);
 
-    let reversed_claim = json_with_reversed_object_keys(
-        &serde_json::from_slice::<Value>(&claim_bytes).unwrap(),
-    );
+    let reversed_claim =
+        json_with_reversed_object_keys(&serde_json::from_slice::<Value>(&claim_bytes).unwrap());
     let reversed_evidence = json_with_reversed_object_keys(&evidence_value);
-    let reversed_result = json_with_reversed_object_keys(
-        &serde_json::from_slice::<Value>(&result_bytes).unwrap(),
-    );
+    let reversed_result =
+        json_with_reversed_object_keys(&serde_json::from_slice::<Value>(&result_bytes).unwrap());
 
     let replay = replay_claim_evaluation(
         reversed_claim.as_bytes(),
