@@ -1638,4 +1638,95 @@ fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_com
                 .unwrap()
                 .contains("No predicate-specific verifier"))
     );
+
+#[test]
+fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let reported_completeness = [
+        json!({
+            "kind": "declared_query",
+            "query": "all statements for issuer during interval T",
+            "snapshot_id": "snapshot-01",
+            "page_count": 4,
+            "terminal_cursor_seen": true,
+            "all_pages_seen": true,
+            "observed_count": 400,
+            "reported_total_count": 400,
+            "hidden_filter": null
+        }),
+        json!({
+            "kind": "issuer_participation",
+            "issuer_claims_all_issued_statements_submitted": true,
+            "independent_issuer_history_audit": null,
+            "withheld_statement_check": null
+        }),
+        json!({
+            "kind": "transparency_view",
+            "all_registered_entries_enumerated": true,
+            "checkpoint_verified": true,
+            "issuer_submission_completeness_established": false
+        }),
+    ];
+
+    let mut evidence_values = Vec::new();
+    let mut evidence_bytes = Vec::new();
+    for (index, report) in reported_completeness.into_iter().enumerate() {
+        let mut value = original.value.clone();
+        value["provider"]["id"] = json!(format!("population-provider-{index}"));
+        value["provider"]["name"] = json!(format!("Population Provider {index}"));
+        value["analysis_profile"]["provider"] = value["provider"].clone();
+        value["analysis_profile"]["digest"] =
+            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+        value["confidence"] = json!("observed");
+        value["authority"] = json!("external-service");
+        value["normalized_result"]["population_completeness"] = report;
+        value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+        let bytes = serde_json::to_vec(&value).unwrap();
+        evidence_values.push(rea_compat::verify_evidence_json(&bytes).unwrap());
+        evidence_bytes.push(bytes);
+    }
+
+    let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
+    claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    claim.source_predicate_type = None;
+    claim.asserted_value = json!({
+        "whole_archive_complete": true,
+        "issuer_history_complete": true
+    });
+    claim.evidence_ids = evidence_values
+        .iter()
+        .map(|evidence| evidence.evidence_id.clone())
+        .collect();
+
+    let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
+    let supplied: Vec<&[u8]> = evidence_bytes.iter().map(Vec::as_slice).collect();
+    let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    assert_eq!(replay.reported_disposition, Disposition::Unverified);
+    assert_eq!(replay.evidence_count, 3);
+    assert_eq!(replay.rule_id, "no-registered-predicate-rule/v0");
+
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert!(
+        result["evidence_assessments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|assessment| assessment["kind"] == json!("not_evaluated"))
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
+    );
+}
+
 }
