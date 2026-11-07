@@ -248,9 +248,7 @@ pub fn accept_verified_sequential_candidate(
     verified: bool,
 ) -> Result<(SequentialEditSession, SequentialStepReceipt), SequentialWeightProgramError> {
     validate_template(template)?;
-    if session.format_version != 1
-        || session.template_digest != template_digest(template)?
-    {
+    if session.format_version != 1 || session.template_digest != template_digest(template)? {
         return Err(SequentialWeightProgramError::StalePreparedCandidate);
     }
     if prepared.session_digest != session_digest(session)?
@@ -266,10 +264,7 @@ pub fn accept_verified_sequential_candidate(
     {
         return Err(SequentialWeightProgramError::StalePreparedCandidate);
     }
-    let expected_program_digest = hash_value(
-        b"symthaea-weight-program-v1\0",
-        &prepared.program,
-    )?;
+    let expected_program_digest = hash_value(b"symthaea-weight-program-v1\0", &prepared.program)?;
     if expected_program_digest != prepared.candidate.receipt.program_digest {
         return Err(SequentialWeightProgramError::StalePreparedCandidate);
     }
@@ -300,9 +295,7 @@ pub fn accept_verified_sequential_candidate(
 
     let cumulative_l2_path =
         session.cumulative_l2_path + f64::from(prepared.candidate.receipt.total_l2_delta);
-    if !cumulative_l2_path.is_finite()
-        || cumulative_l2_path > template.max_cumulative_l2_path
-    {
+    if !cumulative_l2_path.is_finite() || cumulative_l2_path > template.max_cumulative_l2_path {
         return Err(SequentialWeightProgramError::CumulativeL2BudgetExceeded);
     }
     let cumulative_parameter_change_events = session
@@ -359,7 +352,10 @@ fn validate_template(
     hypotheses.dedup();
     if template.fault_hypothesis_ids.is_empty()
         || hypotheses.len() != template.fault_hypothesis_ids.len()
-        || template.fault_hypothesis_ids.iter().any(|id| id.trim().is_empty())
+        || template
+            .fault_hypothesis_ids
+            .iter()
+            .any(|id| id.trim().is_empty())
     {
         return Err(SequentialWeightProgramError::InvalidFaultHypotheses);
     }
@@ -384,7 +380,9 @@ fn validate_snapshot_binding(
     snapshot: &WeightModelSnapshot,
 ) -> Result<(), SequentialWeightProgramError> {
     if template.architecture_digest != snapshot.architecture_digest {
-        return Err(SequentialWeightProgramError::TemplateMismatch("architecture"));
+        return Err(SequentialWeightProgramError::TemplateMismatch(
+            "architecture",
+        ));
     }
     if template.manifest_digest != snapshot.manifest_digest {
         return Err(SequentialWeightProgramError::TemplateMismatch("manifest"));
@@ -410,7 +408,9 @@ fn validate_session_binding(
         || session.target_specification_digest != snapshot.target_specification_digest
         || session.latest_candidate_model_digest != snapshot.model_digest
     {
-        return Err(SequentialWeightProgramError::TemplateMismatch("session/model binding"));
+        return Err(SequentialWeightProgramError::TemplateMismatch(
+            "session/model binding",
+        ));
     }
     Ok(())
 }
@@ -421,9 +421,7 @@ fn template_digest(
     hash_value(b"symthaea-sequential-weight-template-v1\0", template)
 }
 
-fn session_digest(
-    session: &SequentialEditSession,
-) -> Result<String, SequentialWeightProgramError> {
+fn session_digest(session: &SequentialEditSession) -> Result<String, SequentialWeightProgramError> {
     hash_value(b"symthaea-sequential-edit-session-v1\0", session)
 }
 
@@ -467,7 +465,9 @@ fn validate_digest(value: &str) -> Result<(), SequentialWeightProgramError> {
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
-        return Err(SequentialWeightProgramError::InvalidDigest("sha256/blake3 digest"));
+        return Err(SequentialWeightProgramError::InvalidDigest(
+            "sha256/blake3 digest",
+        ));
     }
     Ok(())
 }
@@ -476,8 +476,8 @@ fn validate_digest(value: &str) -> Result<(), SequentialWeightProgramError> {
 mod tests {
     use super::*;
     use crate::weight_space_program::{
-        CfCWeightGroupId, ParameterGroupConstraints, ParameterGroupRole,
-        ParameterGroupSnapshot, WeightProgramTarget,
+        CfCWeightGroupId, ParameterGroupConstraints, ParameterGroupRole, ParameterGroupSnapshot,
+        WeightProgramTarget,
     };
 
     fn digest(byte: char) -> String {
@@ -527,7 +527,12 @@ mod tests {
         }
     }
 
-    fn batch(session_id: &str, index: usize, parent: &str, evidence: char) -> SequentialEvidenceBatch {
+    fn batch(
+        session_id: &str,
+        index: usize,
+        parent: &str,
+        evidence: char,
+    ) -> SequentialEvidenceBatch {
         SequentialEvidenceBatch {
             session_id: session_id.to_owned(),
             batch_index: index,
@@ -542,8 +547,8 @@ mod tests {
         let base = snapshot();
         let template = template();
         let session_id = digest('f');
-        let session = begin_sequential_edit_session(session_id.clone(), &template, &base)
-            .expect("begin");
+        let session =
+            begin_sequential_edit_session(session_id.clone(), &template, &base).expect("begin");
         let prepared = prepare_sequential_candidate(
             &session,
             &template,
@@ -551,7 +556,10 @@ mod tests {
             &batch(&session_id, 0, &base.model_digest, '1'),
         )
         .expect("prepare");
-        assert_eq!(session.next_batch_index, 0, "preparation is not advancement");
+        assert_eq!(
+            session.next_batch_index, 0,
+            "preparation is not advancement"
+        );
         assert_eq!(prepared.candidate.receipt.changed_parameter_count, 2);
         assert!(prepared.candidate.receipt.total_l2_delta > 0.0);
         assert!(matches!(
@@ -589,8 +597,8 @@ mod tests {
         let base = snapshot();
         let template = template();
         let session_id = digest('f');
-        let session = begin_sequential_edit_session(session_id.clone(), &template, &base)
-            .expect("begin");
+        let session =
+            begin_sequential_edit_session(session_id.clone(), &template, &base).expect("begin");
         assert!(matches!(
             prepare_sequential_candidate(
                 &session,
@@ -636,8 +644,8 @@ mod tests {
         let base = snapshot();
         let template = template();
         let session_id = digest('f');
-        let session = begin_sequential_edit_session(session_id.clone(), &template, &base)
-            .expect("begin");
+        let session =
+            begin_sequential_edit_session(session_id.clone(), &template, &base).expect("begin");
         let prepared0 = prepare_sequential_candidate(
             &session,
             &template,
