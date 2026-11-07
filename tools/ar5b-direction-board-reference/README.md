@@ -2,7 +2,7 @@
 
 Standalone Rust reference for the verifier-grounded direction allocator specified in #9230.
 
-This tool is deliberately advisory-only. It computes a deterministic allocation suggestion over a fixed next-budget envelope. It does not launch workers, mint direction identities, execute candidates, approve promotions, or act as a scheduler or authority kernel.
+This tool is deliberately advisory-only. It computes a deterministic allocation suggestion over a fixed next-budget envelope. It consumes a separately referenced active-worker allocation snapshot and never confuses already-active work with new recommendations. It does not launch workers, mint direction identities, execute candidates, approve promotions, or act as a scheduler or authority kernel.
 
 ## Run
 
@@ -25,7 +25,7 @@ For each verifier-qualified direction, the reference:
 6. Applies an explicit per-direction maximum share of the next budget.
 7. Offers a separate, priced `NEW` option with a maximum share and verifier-intake reference. `NEW` is a budget reservation for verifier intake; it is not a candidate-minted direction or an admission decision.
 
-The greedy allocation loop uses deterministic lexical tie-breaking and never spends more than the declared budget. Any unallocated budget is reported rather than silently reassigned outside the declared candidates.
+The greedy allocation loop uses deterministic lexical tie-breaking and never spends more than the declared available budget or any candidate's share cap. The report distinguishes total budget, active budget, reserved/unavailable budget, new recommendations and the unallocated remainder of the available budget. Active allocations are sourced from the referenced external snapshot; the board does not mint or mutate that registry.
 
 ## Identity and evidence requirements
 
@@ -34,6 +34,7 @@ Every existing direction must include:
 - target capability, solution-object, construction-principle and scope/assumption digests;
 - verifier assignment and protected-capability audit references;
 - a qualified status and passing protected-capability floor;
+- active evaluation count and claimed cost from the independent worker-allocation snapshot;
 - paired observations bound to task-family digests, local-best deltas, dispositions and costs.
 
 The validator rejects repeated IDs/fingerprints, unqualified directions, missing verifier references, failed capability floors, invalid costs, and unsupported positive outcomes on inconclusive/invalid observations.
@@ -43,6 +44,7 @@ The validator rejects repeated IDs/fingerprints, unqualified directions, missing
 - Fingerprint uniqueness checks only the verifier-supplied canonical fingerprints. It cannot determine whether two descriptions are semantic aliases; the independent verifier must canonicalize and audit them.
 - The prior/shrinkage/UCB-like score is a transparent heuristic, not a calibrated posterior, confidence interval, causal effect or optimal bandit policy.
 - Expected evaluation costs and protected-floor declarations are inputs; they require independent measurement/audit.
+- Active worker allocation counts/costs are trusted only as far as the referenced snapshot; this crate does not authenticate that registry.
 - The reference does not perform task-family transfer testing or prove a direction's scientific novelty.
 - A valid allocation report is a recommendation under the declared input and budget, not evidence that the board improves research outcomes or that the outer-loop improver has improved.
 
