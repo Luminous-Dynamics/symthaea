@@ -140,12 +140,24 @@ For pairwise preference, use a Bradley-Terry or equivalent rater-aware model and
 
 For a whole-song preference track intended to be comparable with Artificial Analysis AA-Music-Vocal v1.1, its current methodology provides a useful normalization reference: blinded same-prompt pairwise voting, a minimum 10-second listen per clip, static-gain normalization toward -16 LUFS with a -1 dBTP ceiling, and no compression, limiting or EQ. Its model Elo is estimated with Bradley-Terry maximum likelihood and reported with 95% uncertainty intervals. Muse should preserve original dry WAVs and hashes, derive listening copies under one fixed normalization procedure, and report the exact procedure; score-conditioned Track A remains a separate evaluation task.
 
+## 2026 research frontier update
+
+Two ACL 2026 song-generation papers are relevant and should be kept distinct from score-conditioned SVS:
+
+- **SegTune (ACL 2026):** uses a global style prompt plus locally timed segment prompts and an LLM duration predictor to place sentence-level lyric timestamps. It also proposes segment-alignment and singer-attribute evaluation. Its contribution is temporal control of whole-song regions; it does not by itself establish phone-to-note interval fidelity. Symthaea should benchmark against its local-style-following behavior in Track F and add finer phone/syllable/note alignment in Track A. Source: https://aclanthology.org/2026.acl-long.586/
+- **Muse: Towards Reproducible Long-Form Song Generation with Fine-Grained Style Control (Findings ACL 2026):** despite the shared name, this is a separate research system, not Luminous Dynamics' Muse. Its paper describes 116,000 licensed synthetic songs, a Qwen-based model extended with MuCodec discrete audio tokens, and evaluation of phoneme error rate, text/music style similarity, and aesthetic quality. This is a useful reproducible long-form song baseline and dataset/methodology reference, not a direct replacement for our score-conditioned voice renderers. Source: https://aclanthology.org/2026.findings-acl.1129/
+- **SoulX-Singer:** remains the highest-priority open score-conditioned SVS baseline for identical MIDI/lyric/voice-reference experiments. Its report describes more than 42,000 hours of vocal data and Mandarin, English and Cantonese support. Source: https://arxiv.org/abs/2602.07803
+
+A public task aggregator also lists heterogeneous SVS metrics across distinct datasets: e.g. MOS predictor scores, PESQ, WER and F0 RMSE. These figures must not be compared as if they were one leaderboard; dataset, language, ground-truth status and metric differ. Use the page only as a catalogue of task/metric coverage, not as a single SOTA ranking. Source: https://www.sota2.com/research/task/singing-voice-synthesis
+
 ## Cross-benchmark comparison
 
 | Benchmark/system | Task it measures | How Symthaea should use it |
 |---|---|---|
 | Artificial Analysis AA-Music-Vocal v1.1 | Blind prompt-to-song human preference; generated lyrics and vocals | Commercial whole-song frontier; a separate Track F |
 | SoulX-Singer and SoulX-Singer-Eval | Zero-shot score/MIDI or F0-conditioned singing; lyric, melody and identity dimensions | Primary external open baseline for Track A/B |
+| SegTune (ACL 2026) | Whole-song generation with local segment prompts and sentence-level lyric timestamps | Track F segment-control baseline; add phone/note exactness beyond its segment granularity |
+| Muse (Jiang et al., Findings ACL 2026) | Reproducible long-form song generation with segment style control, PER, style similarity and aesthetic evaluation | Separate long-form Track F baseline; not the Luminous Dynamics Muse project |
 | SingMOS-Pro | Singing-quality predictors and annotated MOS corpus | Auxiliary quality screen and metric calibration |
 | MusicJudge | Joint lyric correctness and pitch/rhythm fidelity at music-block level | Independent evaluator design reference |
 | DiffSinger | Phoneme/duration/F0-conditioned SVS baseline | Explicit control baseline |
@@ -161,6 +173,8 @@ Sources:
 - SoulX-Singer-Eval: https://github.com/Soul-AILab/SoulX-Singer-Eval
 - SingMOS-Pro: https://doi.org/10.1109/ICASSP55912.2026.11460899
 - MusicJudge: https://arxiv.org/abs/2606.26451
+- SegTune: https://aclanthology.org/2026.acl-long.586/
+- Muse (Jiang et al., Findings ACL 2026): https://aclanthology.org/2026.findings-acl.1129/
 - DiffSinger: https://github.com/openvpi/DiffSinger
 
 
