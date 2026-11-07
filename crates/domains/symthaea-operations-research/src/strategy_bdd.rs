@@ -1005,7 +1005,7 @@ mod tests {
 
     #[test]
     fn identity_function_uses_one_node() {
-        let source = function(&[7, 2], &[false, false, true, true]);
+        let source = function(&[7, 2], &[false, true, false, true]);
         let bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
         assert_eq!(bdd.nodes.len(), 1);
         assert!(!evaluate_robdd(&bdd, &[false, false]).unwrap());
