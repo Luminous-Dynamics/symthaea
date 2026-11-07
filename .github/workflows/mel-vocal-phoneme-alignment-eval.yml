@@ -19,14 +19,14 @@ jobs:
       - name: Check out exact pull request branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Verify exact checked-out revision
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "MEL_VOCAL_ALIGNMENT_REVISION=$actual" >> "$GITHUB_ENV"
       - name: Install pinned Rust
