@@ -105,3 +105,17 @@ This avoids creating a parallel water-treatment simulator, desalination physics 
 ## 8. Claim ceiling
 
 Manufacturer data establish only what a supplier publishes. The derived kWh/m³ figures in the CSV are arithmetic transformations of those published figures, not measurement. A bench test qualifies only the specific device/configuration, feed envelope, meter boundary and method tested. No watermaker result alone establishes potable-water safety, full vessel autonomy, legal brine disposal, whole-vessel seaworthiness or regulatory approval.
+
+
+## 9. Synthetic mission-screen example (not a demand standard)
+
+A companion JSON fixture uses a deliberately hypothetical case: four permanent occupants, 25 L/person/day, therefore 100 L/day of qualified product demand over a 30-day target. This is a design scenario assumption, not an asserted normal consumption rate or a potable-water requirement.
+
+Using published nameplate ratings only, the arithmetic estimates:
+- Schenker Zen 30: about 3.33 h/day and 0.37 kWh/day.
+- Spectra LB 800: about 0.78 h/day and 0.23–0.47 kWh/day.
+- Rainman AC-140L: about 0.65–1.00 h/day and 0.81–1.25 kWh/day.
+
+These numbers deliberately exclude startup, flush, preservation, standby, post-treatment, product pump, off-spec diversion, environmental derating, maintenance, and conversion losses. They are not net usable water nor full-system energy. The fixture exists to provide a reproducible arithmetic bridge from vendor nameplate figures to a mission-service question; it does not compare or rank products.
+
+Before this becomes a mission input, replace the scenario demand with an approved project requirement and replace all vendor nameplate inputs with matched, instrumented bench results and independent product-water quality evidence.
