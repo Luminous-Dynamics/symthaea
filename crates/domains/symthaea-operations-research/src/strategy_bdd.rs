@@ -2079,7 +2079,7 @@ mod tests {
 
     #[test]
     fn interaction_graph_matches_independent_mixed_derivative_oracle_for_all_three_variable_functions()
-    {
+     {
         for function_mask in 0..256usize {
             let values: Vec<bool> = (0..8)
                 .map(|assignment| ((function_mask >> assignment) & 1) != 0)
