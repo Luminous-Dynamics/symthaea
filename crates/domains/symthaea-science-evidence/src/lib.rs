@@ -185,8 +185,6 @@ impl VerificationCheck {
     fn validate_against(&self, manifest: &ExperimentManifest) -> Result<(), ManifestError> {
         require_nonempty("verification check name", &self.name)?;
         require_nonempty("verification check notes", &self.notes)?;
-        if self.status == VerificationStatus::Passed {
-        }
         if !is_git_sha(&self.source_commit_sha)
             || self.source_commit_sha != manifest.source_commit_sha
         {
