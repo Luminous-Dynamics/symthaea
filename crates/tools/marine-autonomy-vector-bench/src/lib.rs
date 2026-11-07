@@ -650,7 +650,8 @@ mod tests {
         assert!(report.dimensions.iter().all(|dimension| {
             dimension.disposition == DimensionDisposition::SufficientWithinDeclaredBounds
         }));
-        assert_eq!(report.dimensions[0].endurance.unwrap().minimum_days, Some(30.0));
+        let water = report.dimensions.iter().find(|dimension| dimension.dimension_id == "potable_water").unwrap();
+        assert_eq!(water.endurance.unwrap().minimum_days, Some(30.0));
     }
 
     #[test]
