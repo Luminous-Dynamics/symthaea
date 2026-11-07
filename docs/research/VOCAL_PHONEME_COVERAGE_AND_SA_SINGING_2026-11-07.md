@@ -270,3 +270,7 @@ For South African languages, start with language-specific reviewer agreements an
 ## Claim boundary
 
 This document and patch establish stricter input handling and expose the existing functional renderer. They do not establish human-level naturalness, SOTA performance, a trained Symthaea voice, or supported African-language singing.
+
+### Formant phrase-expression experiment
+
+The integrated FormantSingingEngine now interpolates phrase expression points over the frame timeline. It maps energy to a relative frame-energy scale, breathiness to reduced periodic voicing plus modest resonance widening, and tension to resonance-bandwidth narrowing. This is an intentionally approximate source-filter control mapping—not a calibrated vocal-fold biomechanical model. Tests assert the numerical transformation on a synthetic frame, while perceptual effects still require listening and acoustic evaluation. Phrase breath-before/after metadata is not rendered as an inhalation and remains unsupported.
