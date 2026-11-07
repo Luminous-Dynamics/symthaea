@@ -208,6 +208,31 @@ Do not require the same node names or an identical drawing. Reviewers must ident
 
 For CTG calibration, compare first-pass graphs before either reviewer sees the other or the key. Preserve the independent graphs and edge-level rationale; never replace them with a consensus graph. The third adjudicator records the accepted semantic path/gate set and the evidence that resolves each disagreement.
 
+
+### 6.2 Causal-identifiability addendum (CID cases only)
+
+Use this addendum for the six cases in [Causal-Identifiability Development Challenge V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md). Each reviewer must lock their own compatible-model set and disposition before viewing the other reviewer's work or the public key.
+
+| Field | Reviewer response |
+|---|---|
+| Exact claim/query | |
+| Evidence and authority class | |
+| Explicit assumptions / scope boundary | |
+| Candidate model | |
+| Material evidence-compatible alternatives | |
+| Disagreement witness (query/intervention) | |
+| Each model's predicted outcome | |
+| Claim disposition | identified / partially_identified / non_identifiable / contradicted / unresolved |
+| Minimum discriminating evidence request | |
+| Evidence-request authority/safety/cost | |
+| Current claim ceiling | |
+| Unresolved remainder | |
+
+Adjudicate two questions separately: (1) are the candidate's alternative models genuinely compatible with the supplied evidence, and (2) does the requested evidence actually distinguish at least one material pair? “Ask for more tests” is not a valid evidence request unless the alternatives predict different outcomes for those tests. Do not use reviewer confidence as a substitute for identifiability.
+
+The third adjudicator preserves both first-pass model sets and dispositions, records the disagreement witness and accepted claim ceiling, and explains why the proposed evidence request is or is not discriminating. Do not overwrite first-pass labels with a consensus graph/model.
+
+
 ## 7. Agreement analysis and interpretation
 
 The calibration exercise has two purposes: reveal unclear rules and train reviewers to apply the same distinctions. It does not create a new CEB performance metric.
