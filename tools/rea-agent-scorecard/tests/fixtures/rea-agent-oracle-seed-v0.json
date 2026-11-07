@@ -1,0 +1,105 @@
+{
+  "schema": "luminous.rea.agent-oracle.v0",
+  "corpus_id": "rea-agent-grounding-public-seed",
+  "corpus_version": "0.1.0",
+  "tasks": [
+    {
+      "task_id": "positive-grounded",
+      "fault_family": "positive-source-grounding",
+      "expected_value": {"occurrence_id": "classes.dex#0", "status": "complete"},
+      "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "operation": "inspect_artifact",
+      "occurrence_id": "classes.dex#0",
+      "must_abstain": false
+    },
+    {
+      "task_id": "correct-but-ungrounded",
+      "fault_family": "parametric-leakage",
+      "expected_value": {"status": "remembered-answer"},
+      "subject_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "operation": "inspect_artifact",
+      "must_abstain": false
+    },
+    {
+      "task_id": "false-supported",
+      "fault_family": "false-positive-entailment",
+      "expected_value": {"status": "safe"},
+      "subject_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "operation": "inspect_artifact",
+      "must_abstain": false
+    },
+    {
+      "task_id": "wrong-subject-binding",
+      "fault_family": "scope-binding",
+      "expected_value": {"status": "complete"},
+      "subject_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "operation": "inspect_artifact",
+      "must_abstain": false
+    },
+    {
+      "task_id": "relevant-base",
+      "fault_family": "counterfactual-relevant",
+      "expected_value": {"version": 1},
+      "subject_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "operation": "inspect_artifact",
+      "pair_id": "changed-version-01",
+      "pair_role": "relevant_base",
+      "must_abstain": false
+    },
+    {
+      "task_id": "relevant-variant",
+      "fault_family": "counterfactual-relevant",
+      "expected_value": {"version": 2},
+      "subject_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "operation": "inspect_artifact",
+      "pair_id": "changed-version-01",
+      "pair_role": "relevant_variant",
+      "must_abstain": false
+    },
+    {
+      "task_id": "irrelevant-base",
+      "fault_family": "counterfactual-irrelevant",
+      "expected_value": {"version": 3},
+      "subject_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "operation": "inspect_artifact",
+      "pair_id": "irrelevant-repack-01",
+      "pair_role": "irrelevant_base",
+      "must_abstain": false
+    },
+    {
+      "task_id": "irrelevant-variant",
+      "fault_family": "counterfactual-irrelevant",
+      "expected_value": {"version": 3},
+      "subject_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "operation": "inspect_artifact",
+      "pair_id": "irrelevant-repack-01",
+      "pair_role": "irrelevant_variant",
+      "must_abstain": false
+    },
+    {
+      "task_id": "replay-digest-mismatch",
+      "fault_family": "replay-integrity",
+      "expected_value": {"status": "complete"},
+      "subject_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "operation": "inspect_artifact",
+      "must_abstain": false
+    },
+    {
+      "task_id": "wrong-duplicate-occurrence",
+      "fault_family": "occurrence-attribution",
+      "expected_value": {"occurrence_id": "duplicate-name#1", "status": "complete"},
+      "subject_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "operation": "inspect_artifact",
+      "occurrence_id": "duplicate-name#1",
+      "must_abstain": false
+    },
+    {
+      "task_id": "unsupported-control",
+      "fault_family": "abstention",
+      "expected_value": null,
+      "subject_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "operation": "inspect_artifact",
+      "must_abstain": true
+    }
+  ]
+}
