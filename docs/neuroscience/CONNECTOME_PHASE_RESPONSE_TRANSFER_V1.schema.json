@@ -178,7 +178,85 @@
           "minimum": 0,
           "maximum": 255
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "probe_class": {
+                "const": "DESCENDING_COMMAND"
+              }
+            },
+            "required": [
+              "probe_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_leg_id": {
+                "const": null
+              },
+              "descending_neuron_id": {
+                "enum": [
+                  "DNg100",
+                  "DNg97",
+                  "DNb08"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "probe_class": {
+                "const": "LOCAL_PHASE_KICK"
+              }
+            },
+            "required": [
+              "probe_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_leg_id": {
+                "enum": [
+                  "left_fore",
+                  "left_middle",
+                  "left_hind",
+                  "right_fore",
+                  "right_middle",
+                  "right_hind"
+                ]
+              },
+              "descending_neuron_id": {
+                "const": null
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "probe_class": {
+                "not": {
+                  "const": "DESCENDING_COMMAND"
+                }
+              }
+            },
+            "required": [
+              "probe_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "descending_neuron_id": {
+                "const": null
+              }
+            }
+          }
+        }
+      ]
     },
     "phase_sample": {
       "type": "object",
