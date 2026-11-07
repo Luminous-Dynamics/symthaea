@@ -1,0 +1,489 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.schema.json",
+  "title": "Connectome active response-model discrepancy probe input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "dataset_binding",
+    "query",
+    "worlds",
+    "models",
+    "challenge_binding",
+    "actions",
+    "predictions",
+    "split_manifest",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "dataset_binding": {
+      "$ref": "#/$defs/dataset_binding"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/model"
+      }
+    },
+    "challenge_binding": {
+      "$ref": "#/$defs/challenge_binding"
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split_manifest"
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "revision_sha256",
+        "evidence_tier",
+        "source_access_receipt_sha256"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "evidence_tier": {
+          "const": "SYNTHETIC"
+        },
+        "source_access_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256",
+        "baseline_decision",
+        "loss_false_true",
+        "loss_true_false"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "baseline_decision": {
+          "type": "boolean"
+        },
+        "loss_false_true": {
+          "type": "number",
+          "minimum": 0
+        },
+        "loss_true_false": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "source_evidence_sha256",
+        "query_decision",
+        "prior_probability",
+        "biological_disposition"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "query_decision": {
+          "type": "boolean"
+        },
+        "prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "biological_disposition": {
+          "const": "ADMISSIBLE"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "role",
+        "model_sha256",
+        "observation_kernel_sha256",
+        "model_evidence_sha256",
+        "model_prior_probability",
+        "ancestry_group_ids"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "BASELINE",
+            "CHALLENGER"
+          ]
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "observation_kernel_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "model_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "model_prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ancestry_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "challenge_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_model_ids",
+        "challenger_model_ids",
+        "challenger_discovery_unit_ids",
+        "challenge_evidence_sha256",
+        "adjudication_status",
+        "ancestry_group_ids"
+      ],
+      "properties": {
+        "baseline_model_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenger_model_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenger_discovery_unit_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenge_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "adjudication_status": {
+          "const": "ADMITTED_FOR_SENSITIVITY"
+        },
+        "ancestry_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "action_kind",
+        "cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "safety_profile_sha256"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_kind": {
+          "enum": [
+            "OPTOGENETIC",
+            "ELECTRICAL",
+            "PHARMACOLOGICAL",
+            "SENSORY",
+            "BEHAVIORAL",
+            "OBSERVATION",
+            "SIMULATED",
+            "OTHER"
+          ]
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "safety_profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "world_id",
+        "model_id",
+        "outcomes"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "split_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_fit_units",
+        "challenger_discovery_units",
+        "confirmation_lockbox_units",
+        "split_sha256"
+      ],
+      "properties": {
+        "model_fit_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenger_discovery_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "confirmation_lockbox_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_query_loss",
+        "query_only_action_id",
+        "discrepancy_only_action_id",
+        "pareto_frontier_action_ids",
+        "query_value_per_cost",
+        "discrepancy_tv_per_cost",
+        "discrepancy_tv",
+        "status"
+      ],
+      "properties": {
+        "baseline_query_loss": {
+          "type": "number",
+          "minimum": 0
+        },
+        "query_only_action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "discrepancy_only_action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pareto_frontier_action_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "query_value_per_cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "discrepancy_tv_per_cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "discrepancy_tv": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "model_mutual_information_bits_diagnostic": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "status": {
+          "enum": [
+            "SYNTHETIC_CONTRACT_VALIDATED",
+            "NO_FEASIBLE_DISCREPANCY_PROBE"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-active-model-discrepancy-probes-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_binding": {
+    "dataset_id": "synthetic-query-discrepancy-probe",
+    "revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence_tier": "SYNTHETIC",
+    "source_access_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "query": {
+    "query_id": "critical-path-exists",
+    "query_spec_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "decision_rule_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "baseline_decision": true,
+    "loss_false_true": 1,
+    "loss_true_false": 1
+  },
+  "worlds": [
+    {
+      "world_id": "W-TRUE",
+      "source_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "query_decision": true,
+      "prior_probability": 0.5,
+      "biological_disposition": "ADMISSIBLE"
+    },
+    {
+      "world_id": "W-FALSE",
+      "source_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "query_decision": false,
+      "prior_probability": 0.5,
+      "biological_disposition": "ADMISSIBLE"
+    }
+  ],
+  "models": [
+    {
+      "model_id": "baseline",
+      "role": "BASELINE",
+      "model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_kernel_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "model_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "model_prior_probability": 0.5,
+      "ancestry_group_ids": [
+        "raw-volume-shared",
+        "baseline-training"
+      ]
+    },
+    {
+      "model_id": "challenger",
+      "role": "CHALLENGER",
+      "model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "observation_kernel_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "model_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "model_prior_probability": 0.5,
+      "ancestry_group_ids": [
+        "raw-volume-shared",
+        "challenger-calibration"
+      ]
+    }
+  ],
+  "challenge_binding": {
+    "baseline_model_ids": [
+      "baseline"
+    ],
+    "challenger_model_ids": [
+      "challenger"
+    ],
+    "challenge_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "adjudication_status": "ADMITTED_FOR_SENSITIVITY",
+    "ancestry_group_ids": [
+      "raw-volume-shared"
+    ],
+    "challenger_discovery_unit_ids": [
+      "animal-discovery-03"
+    ]
+  },
+  "actions": [
+    {
+      "action_id": "A-query-resolve",
+      "action_kind": "OPTOGENETIC",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "safety_profile_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    {
+      "action_id": "B-model-probe",
+      "action_kind": "ELECTRICAL",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "safety_profile_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "action_id": "C-disallowed-perfect",
+      "action_kind": "SIMULATED",
+      "cost_units": 0.1,
+      "feasibility_status": "DISALLOWED",
+      "feasibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "safety_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "predictions": [
+    {
+      "action_id": "A-query-resolve",
+      "world_id": "W-TRUE",
+      "model_id": "baseline",
+      "outcomes": [
+        {
+          "outcome_id": "T",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "A-query-resolve",
+      "world_id": "W-FALSE",
+      "model_id": "baseline",
+      "outcomes": [
+        {
+          "outcome_id": "F",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "A-query-resolve",
+      "world_id": "W-TRUE",
+      "model_id": "challenger",
+      "outcomes": [
+        {
+          "outcome_id": "T",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "A-query-resolve",
+      "world_id": "W-FALSE",
+      "model_id": "challenger",
+      "outcomes": [
+        {
+          "outcome_id": "F",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "B-model-probe",
+      "world_id": "W-TRUE",
+      "model_id": "baseline",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "B-model-probe",
+      "world_id": "W-FALSE",
+      "model_id": "baseline",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "B-model-probe",
+      "world_id": "W-TRUE",
+      "model_id": "challenger",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "B-model-probe",
+      "world_id": "W-FALSE",
+      "model_id": "challenger",
+      "outcomes": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "C-disallowed-perfect",
+      "world_id": "W-TRUE",
+      "model_id": "baseline",
+      "outcomes": [
+        {
+          "outcome_id": "T",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "C-disallowed-perfect",
+      "world_id": "W-FALSE",
+      "model_id": "baseline",
+      "outcomes": [
+        {
+          "outcome_id": "F",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "C-disallowed-perfect",
+      "world_id": "W-TRUE",
+      "model_id": "challenger",
+      "outcomes": [
+        {
+          "outcome_id": "T",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "action_id": "C-disallowed-perfect",
+      "world_id": "W-FALSE",
+      "model_id": "challenger",
+      "outcomes": [
+        {
+          "outcome_id": "F",
+          "probability": 1
+        }
+      ]
+    }
+  ],
+  "split_manifest": {
+    "model_fit_units": [
+      "animal-fit-01",
+      "animal-fit-02"
+    ],
+    "challenger_discovery_units": [
+      "animal-discovery-03"
+    ],
+    "confirmation_lockbox_units": [
+      "animal-confirm-04"
+    ],
+    "split_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "oracle_expectations": {
+    "baseline_query_loss": 0.5,
+    "query_only_action_id": "A-query-resolve",
+    "discrepancy_only_action_id": "B-model-probe",
+    "pareto_frontier_action_ids": [
+      "A-query-resolve",
+      "B-model-probe"
+    ],
+    "query_value_per_cost": {
+      "A-query-resolve": 0.5,
+      "B-model-probe": 0,
+      "C-disallowed-perfect": 5
+    },
+    "discrepancy_tv_per_cost": {
+      "A-query-resolve": 0,
+      "B-model-probe": 0.5,
+      "C-disallowed-perfect": 0
+    },
+    "discrepancy_tv": {
+      "A-query-resolve": 0,
+      "B-model-probe": 0.5,
+      "C-disallowed-perfect": 0
+    },
+    "status": "SYNTHETIC_CONTRACT_VALIDATED",
+    "model_mutual_information_bits_diagnostic": {
+      "A-query-resolve": 0,
+      "B-model-probe": 0.31127812445913283,
+      "C-disallowed-perfect": 0
+    }
+  }
+}
