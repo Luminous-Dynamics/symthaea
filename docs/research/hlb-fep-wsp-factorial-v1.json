@@ -388,7 +388,11 @@
         "evidence_batch_replay_rejection_rate",
         "stale_parent_rejection_rate",
         "verifier_gated_session_advancement",
-        "cumulative_l2_budget_violations"
+        "cumulative_l2_budget_violations",
+        "native_cfc_candidate_only_two_batch_execution",
+        "native_cfc_source_fingerprint_immutability",
+        "verifier_rejection_session_non_advancement",
+        "latest_native_candidate_parent_binding"
       ],
       "negative_controls": [
         "no_edit",
@@ -398,7 +402,11 @@
         "editor_reprompted_each_batch",
         "fixed_edit_program_without_measurement_feedback",
         "stationary_task_without_regime_shift",
-        "held_out_future_batch_leakage_canary"
+        "held_out_future_batch_leakage_canary",
+        "native_cfc_sequential_batch_rejected_before_verifier_acceptance",
+        "native_cfc_sequential_verifier_rejection_does_not_advance_session",
+        "native_cfc_sequential_accepted_batches_advance_exactly_once",
+        "native_cfc_original_source_model_never_mutated"
       ]
     },
     {
@@ -469,7 +477,10 @@
         "model_entropy_trajectory",
         "preference_phase_transition_trial",
         "source_vs_quotient_posterior_equivalence",
-        "seeded_episode_receipt_replay"
+        "seeded_episode_receipt_replay",
+        "source_labelled_duplicate_partition_count",
+        "constant_criterion_context_irrelevance_proof",
+        "nonconstant_criterion_mapping_unique_tensor_proof"
       ],
       "negative_controls": [
         "immediate_choice_without_gaze",
@@ -482,7 +493,9 @@
         "state_information_weight_zero",
         "both_epistemic_weights_zero",
         "source_labelled_vs_semantic_quotient_multi_trial_invariance",
-        "repeated_scene_without_state_prior_reset"
+        "repeated_scene_without_state_prior_reset",
+        "constant_criterion_mapping_context_factor_duplicates",
+        "nonconstant_criterion_mapping_duplicate_negative_control"
       ]
     },
     {
@@ -1058,7 +1071,11 @@
       "information_chain_rule_error_nats",
       "posterior_state_entropy",
       "posterior_model_entropy",
-      "gaze_observation_cost_nats"
+      "gaze_observation_cost_nats",
+      "three_ball_duplicate_partition_count",
+      "three_ball_constant_context_duplicate_partition_exactness",
+      "three_ball_paper_count_discrepancy_preserved_without_forced_deduplication",
+      "native_cfc_sequential_candidate_boundary_receipt_chain_integrity"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1167,7 +1184,9 @@
     "Preference schedule values are validated before the first trial, including post-commitment preferences that may not be reached in a finite test episode.",
     "An exactly certain semantic model posterior is represented in serialized receipts without non-finite JSON numbers; commitment logic treats posterior 1 as infinite log odds while the trace stores an explicit absence marker.",
     "Paired three-ball policy arms must use a domain-separated environment RNG and policy RNG so all policies receive identical hidden-scene sequences for matched seeds regardless of policy random draw count.",
-    "Policy ablation runs must preserve the same model family, true rule, scene seeds, scene reset schedule, trial horizon, action costs, and evaluator information; only the declared policy component may change."
+    "Policy ablation runs must preserve the same model family, true rule, scene seeds, scene reset schedule, trial horizon, action costs, and evaluator information; only the declared policy component may change.",
+    "The pinned SPM rule generator fixture must retain all 81 labelled hypotheses and their source prior mass, and must verify that the only exact feedback-tensor duplicate groups are the three triplicate constant-criterion mappings (75 exact tensors). The paper-reported 79-unique count must remain an explicit unresolved discrepancy; no relabeling or silent replacement is allowed.",
+    "The native CfC sequential WSP integration fixture must materialize two consecutive frozen-template evidence batches through candidate-only native snapshots, prove verifier rejection does not advance the session, prove accepted batches bind to the prior accepted native fingerprint and advance exactly once, and prove the original live/source network fingerprint remains unchanged."
   ],
   "research_references": [
     {
