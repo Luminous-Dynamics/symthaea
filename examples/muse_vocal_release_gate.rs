@@ -205,6 +205,10 @@ fn source_revision(args: &[String]) -> Result<String> {
         .context(
             "exact source revision unavailable; provide --source-revision, VOCAL_PHONEME_REVISION, or a clean Git checkout",
         )?;
+    validate_source_revision(&revision)
+}
+
+fn validate_source_revision(revision: &str) -> Result<String> {
     if revision.len() != 40 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         anyhow::bail!("source revision must be a 40-character hexadecimal Git commit SHA");
     }
@@ -442,6 +446,7 @@ fn main() -> Result<()> {
         .unwrap_or("5")
         .parse()
         .context("invalid --minimum-listeners")?;
+    let source_revision = source_revision(&args)?;
     std::fs::create_dir_all(&output)?;
     let salt = blind_salt(&args, &output)?;
 
@@ -523,7 +528,7 @@ fn main() -> Result<()> {
     }
     let run_manifest = RunManifest {
         schema: "muse-vocal-run/v1",
-        source_revision: source_revision(&args)?,
+        source_revision,
         voice_id: voice.clone(),
         diffsinger_worker: worker.as_ref().map(|path| path.display().to_string()),
         diffsinger_worker_blake3: worker.as_ref().map(|path| artifact_digest(path)).transpose()?,
@@ -713,4 +718,18 @@ mod rating_validation_tests {
         let result = validate_rating_inputs(&ratings, &clips, 1).unwrap();
         assert!(!result.complete);
     }
+    #[test]
+    fn source_revision_requires_exact_git_sha() {
+        let valid = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(validate_source_revision(valid).unwrap(), valid);
+        assert_eq!(
+            validate_source_revision("ABCDEF0123456789ABCDEF0123456789ABCDEF01").unwrap(),
+            "abcdef0123456789abcdef0123456789abcdef01"
+        );
+        assert!(validate_source_revision("queued").is_err());
+        assert!(validate_source_revision("0123456789abcdef").is_err());
+        assert!(validate_source_revision("z123456789abcdef0123456789abcdef01234567").is_err());
+    }
+
+
 }
