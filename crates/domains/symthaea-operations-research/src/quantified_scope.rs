@@ -54,26 +54,52 @@ pub struct ValidatedQuantifierPrefix {
 /// Errors in quantifier-prefix structure or Skolem dependencies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuantifierScopeError {
-    VariableBudgetExceeded { required: usize, limit: usize },
-    BlockBudgetExceeded { required: usize, limit: usize },
-    VariableOccurrenceBudgetExceeded { required: usize, limit: usize },
-    VariableOccurrenceCountMismatch { expected: usize, actual: usize },
-    EmptyQuantifierBlock { block: usize },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    BlockBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    VariableOccurrenceBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    VariableOccurrenceCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    EmptyQuantifierBlock {
+        block: usize,
+    },
     QuantifiedVariableOutOfRange {
         block: usize,
         variable: usize,
         variable_count: usize,
     },
-    VariableRepeated { variable: usize },
-    VariableMissing { variable: usize },
-    NotExistential { variable: usize },
-    DuplicateSkolemDependency { existential: usize, dependency: usize },
+    VariableRepeated {
+        variable: usize,
+    },
+    VariableMissing {
+        variable: usize,
+    },
+    NotExistential {
+        variable: usize,
+    },
+    DuplicateSkolemDependency {
+        existential: usize,
+        dependency: usize,
+    },
     SkolemDependencyCountExceedsVariableCount {
         existential: usize,
         required: usize,
         variable_count: usize,
     },
-    SkolemDependencyNotAvailable { existential: usize, dependency: usize },
+    SkolemDependencyNotAvailable {
+        existential: usize,
+        dependency: usize,
+    },
     ResourceAccountingOverflow,
 }
 
@@ -100,14 +126,20 @@ impl ValidatedQuantifierPrefix {
             });
         }
 
-        let occurrence_count = blocks.iter().enumerate().try_fold(0usize, |total, (block_index, block)| {
-            if block.variables.is_empty() {
-                return Err(QuantifierScopeError::EmptyQuantifierBlock { block: block_index });
-            }
-            total
-                .checked_add(block.variables.len())
-                .ok_or(QuantifierScopeError::ResourceAccountingOverflow)
-        })?;
+        let occurrence_count =
+            blocks
+                .iter()
+                .enumerate()
+                .try_fold(0usize, |total, (block_index, block)| {
+                    if block.variables.is_empty() {
+                        return Err(QuantifierScopeError::EmptyQuantifierBlock {
+                            block: block_index,
+                        });
+                    }
+                    total
+                        .checked_add(block.variables.len())
+                        .ok_or(QuantifierScopeError::ResourceAccountingOverflow)
+                })?;
 
         if occurrence_count > budget.max_variable_occurrences {
             return Err(QuantifierScopeError::VariableOccurrenceBudgetExceeded {
@@ -125,9 +157,7 @@ impl ValidatedQuantifierPrefix {
         let mut locations = vec![(usize::MAX, Quantifier::Exists); variable_count];
         for (block_index, block) in blocks.iter().enumerate() {
             if block.variables.is_empty() {
-                return Err(QuantifierScopeError::EmptyQuantifierBlock {
-                    block: block_index,
-                });
+                return Err(QuantifierScopeError::EmptyQuantifierBlock { block: block_index });
             }
             for &variable in &block.variables {
                 if variable >= variable_count {
@@ -213,14 +243,18 @@ impl ValidatedQuantifierPrefix {
             });
         };
         if quantifier != Quantifier::Exists {
-            return Err(QuantifierScopeError::NotExistential { variable: existential });
+            return Err(QuantifierScopeError::NotExistential {
+                variable: existential,
+            });
         }
         if declared.len() > self.variable_count {
-            return Err(QuantifierScopeError::SkolemDependencyCountExceedsVariableCount {
-                existential,
-                required: declared.len(),
-                variable_count: self.variable_count,
-            });
+            return Err(
+                QuantifierScopeError::SkolemDependencyCountExceedsVariableCount {
+                    existential,
+                    required: declared.len(),
+                    variable_count: self.variable_count,
+                },
+            );
         }
 
         let mut seen = vec![false; self.variable_count];
@@ -407,12 +441,8 @@ mod tests {
             max_variable_occurrences: 2,
         };
         assert_eq!(
-            ValidatedQuantifierPrefix::new(
-                3,
-                vec![block(Quantifier::Exists, &[0, 1, 2])],
-                budget,
-            )
-            .unwrap_err(),
+            ValidatedQuantifierPrefix::new(3, vec![block(Quantifier::Exists, &[0, 1, 2])], budget,)
+                .unwrap_err(),
             QuantifierScopeError::VariableBudgetExceeded {
                 required: 3,
                 limit: 2,
@@ -422,12 +452,8 @@ mod tests {
 
     #[test]
     fn empty_prefix_is_valid_for_empty_universe() {
-        let prefix = ValidatedQuantifierPrefix::new(
-            0,
-            vec![],
-            QuantifierPrefixBudget::default(),
-        )
-        .unwrap();
+        let prefix =
+            ValidatedQuantifierPrefix::new(0, vec![], QuantifierPrefixBudget::default()).unwrap();
         assert_eq!(prefix.variable_count(), 0);
         assert!(prefix.blocks().is_empty());
     }
