@@ -197,6 +197,14 @@ Use six separate support dimensions: exact lineage; change disentanglement; mech
 
 The detailed [CEB Review Counterfactual-Control Qualification V0](CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md) defines the annotations, confounder inventory, mutation-equivalence caveats, stop/go rules and human worksheet. It adds no metric lane, schema or receipt.
 
+## 3.15 From fixed benchmark prompts to matched information framings
+
+Issue-conditioned repair, realistic developer requests, diff-only review, repository-only discovery and failing-test-guided repair expose agents to different amounts and kinds of information. They cannot be ranked by raw percentages as if they measured one capability. *Saving SWE-Bench* reports significant model-specific performance changes when formal GitHub issues are converted to realistic user-style requests; its reported effects are tied to the paper's evaluated models and task subsets, not a universal correction factor. [Microsoft Research](https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/) · [arXiv:2510.08996](https://arxiv.org/abs/2510.08996).
+
+**CEB shift:** evaluate the same source/defect anchor under paired information conditions. Keep the source tree, requirement, oracle and environment fixed where possible; separately label wording-only mutation and information-package changes. A supplied failing test is additional evidence; repository-only discovery is a different objective from issue-conditioned repair. Use existing CEB-REVIEW, CEB-RESOLUTION, CEB-REPO and CEB-HUMAN metrics separately, cluster variants under the originating anchor, and do not create a cross-framing composite engineering-intelligence score.
+
+See [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) for framing arms, confounders, paired analysis and leakage controls.
+
 ## 4. Matched industry comparison design
 
 For every CEB slice, compare:
