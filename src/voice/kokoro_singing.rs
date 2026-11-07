@@ -62,6 +62,7 @@ fn kokoro_capability_manifest() -> SingingBackendCapabilities {
             control(SingingControl::Melisma, Approximated, "vowel source segments are redistributed across melisma notes"),
             control(SingingControl::ContinuousPitchCurve, Unsupported, "the renderer follows discrete note frequencies, not the VocalPerformance pitch_curve"),
             control(SingingControl::PhraseExpressionCurve, Unsupported, "the phrase-level expression curve is not consumed"),
+            control(SingingControl::PhraseBreathTiming, Unsupported, "breath_before_s and breath_after_s are authoring metadata; Kokoro does not synthesize breath events or schedule them from these fields"),
             control(SingingControl::Breathiness, Unsupported, "the VocalSyllable breathiness field is not applied"),
             control(SingingControl::Energy, Approximated, "syllable energy is mapped to a local gain factor"),
             control(SingingControl::Tension, Unsupported, "tension controls are not consumed"),
