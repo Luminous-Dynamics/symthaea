@@ -1,0 +1,391 @@
+{
+  "schema_version": "sym-rsi-research-taste-preregistration-v0",
+  "document_status": "TEMPLATE_NOT_PREREGISTERED",
+  "warning": "Unfilled research protocol template. It is not a preregistration, experiment, benchmark result, scientific discovery or R4 qualification.",
+  "issue_refs": {
+    "research_taste": "#10877",
+    "r4_ignition": "#10497",
+    "causal_attribution": "#10717",
+    "evaluator_research": "#10756",
+    "direction_board": "#9230",
+    "paper_to_environment": "#9332",
+    "evidence_continuity": "#10630",
+    "canonical_receipts": "#10314/#10370/#10533",
+    "statistics": "#8438/#9433/#10513"
+  },
+  "study": {
+    "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "protocol_version": "v0",
+    "preregistered_at_utc": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "preregistration_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "question": "Can a research system choose valuable problems, formulate concrete mechanisms, design discriminating experiments, interpret results accurately, and transfer these judgments under an inclusive budget?",
+    "research_domains": [
+      "AI systems",
+      "machine learning",
+      "scientific mechanism discovery",
+      "software engineering/research tooling"
+    ],
+    "capability_decomposition": [
+      "direction_taste_problem_selection",
+      "approach_taste_mechanism_and_plan",
+      "experimental_taste_design_and_allocation",
+      "interpretive_taste_belief_update_and_next_action",
+      "transferable_research_taste"
+    ],
+    "claim_profile": {
+      "problem_selection": false,
+      "concrete_approach": false,
+      "experimental_design": false,
+      "result_interpretation": false,
+      "transfer": false,
+      "better_researcher": false,
+      "r4_ignition": false
+    }
+  },
+  "starting_state": {
+    "model_artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "model_version": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "system_prompt_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "harness_source_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "harness_build_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "tool_contract_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "memory_state_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "improvement_policy_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "coder_artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evaluator_epoch_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "source_build_evidence_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "task_population": {
+    "opportunity_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "problem_family_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "method_family_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "domain_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "baseline_state_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "task_generation_recipe_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "opportunity_cost_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "independent_domain_review_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "task_count": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "problem_family_count": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "domain_count": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "opportunity_fields": [
+      "problem_statement",
+      "time_scoped_literature_snapshot",
+      "baseline_and_known_limitations",
+      "open_hypotheses",
+      "data_and_tool_availability",
+      "constraints_and_rights",
+      "cost_envelope",
+      "affected_stakeholders",
+      "potential_negative_externalities"
+    ]
+  },
+  "experimental_arms": [
+    {
+      "arm_id": "human_expert",
+      "description": "Independent human researchers; individual pre-discussion judgments preserved; shared discussion/adjudication is a separate stage.",
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "frontier_model",
+      "description": "Frontier researcher with fixed implementation/coder service and preregistered model/tool budget.",
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "symthaea_incumbent",
+      "description": "Frozen incumbent research procedure and verified state.",
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "symthaea_successor",
+      "description": "Candidate improved research procedure starting from the same state and inclusive budget.",
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "structured_value_of_information",
+      "description": "Non-LLM expected-value/value-of-information portfolio baseline.",
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "random_popularity_control",
+      "description": "Random and topic-popularity/familiarity selection baselines, reported separately.",
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  ],
+  "matched_conditions": {
+    "shared_total_budget_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "same_task_population": true,
+    "same_baseline_information": true,
+    "same_coder_for_researcher_comparison": true,
+    "same_evaluator_epoch": true,
+    "same_tools_and_tool_permissions": true,
+    "same_wall_clock_limit": true,
+    "all_inference_and_implementation_costs_included": true,
+    "human_active_and_review_time_costed": true,
+    "failed_invalid_refused_and_incomplete_runs_retained": true,
+    "execution_order_randomized": true,
+    "arm_specific_differences": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "splits": {
+    "discovery": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "visible_to_researcher": true
+    },
+    "development": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "visible_to_researcher": true
+    },
+    "calibration": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "usage_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "sealed_outcome_confirmation": {
+      "manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_researcher": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "one_shot_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "fresh_problem_family_transfer": {
+      "manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_researcher": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retuning_prohibited": true
+    },
+    "future_publication_matching": {
+      "temporal_literature_cutoff": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "reference_corpus_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "post_cutoff_publication_window": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "independent_adjudicator": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "disjointness_audit": {
+      "audit_method_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "audit_report_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "independent_auditor": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_overlap_count": 0,
+      "unit": "problem_family_method_family_source_paper_lineage"
+    }
+  },
+  "fixed_coder": {
+    "implementation_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "environment_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "researcher_cannot_access_test_data": true,
+    "researcher_cannot_modify_coder": true,
+    "researcher_only_proposes_experiments_and_interprets_results": true,
+    "implementation_failures_reported_separately": true
+  },
+  "decision_records": {
+    "problem_selection_fields": [
+      "ranked_problem_id",
+      "expected_value_distribution",
+      "importance_and_neglectedness",
+      "tractability_and_resource_feasibility",
+      "opportunity_cost",
+      "selection_confidence",
+      "decision_time_and_evidence_snapshot"
+    ],
+    "approach_fields": [
+      "hypothesis",
+      "causal_mechanism",
+      "predicted_intermediate_observations",
+      "proposed_solution_object_and_typed_delta",
+      "assumptions_and_scope",
+      "competing_explanations",
+      "failure_modes",
+      "practical_effect_threshold"
+    ],
+    "experiment_fields": [
+      "experiment_id",
+      "discriminating_hypotheses",
+      "primary_and_protected_outcomes",
+      "controls_and_ablations",
+      "sample_size_and_precision_rationale",
+      "randomization_or_pairing_plan",
+      "stopping_and_sequential_look_policy",
+      "predicted_effect_distribution",
+      "expected_information_gain",
+      "expected_compute_and_total_cost",
+      "data_rights_and_safety_review"
+    ],
+    "interpretation_fields": [
+      "observed_result_and_uncertainty",
+      "prediction_error",
+      "missingness_and_invalidity_classification",
+      "confounds_and_alternative_explanations",
+      "belief_update",
+      "claim_ceiling",
+      "next_action",
+      "falsifying_observation_for_preferred_mechanism"
+    ],
+    "allowed_next_actions": [
+      "accept",
+      "replicate",
+      "continue",
+      "pivot",
+      "stop",
+      "abstain",
+      "escalate_to_human"
+    ]
+  },
+  "blind_review": {
+    "reviewer_count": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "reviewer_qualification_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "blinding_protocol_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "inter_rater_reliability_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "discussion_stage_separate_from_independent_scores": true,
+    "dimensions": [
+      "significance",
+      "novelty",
+      "soundness",
+      "feasibility",
+      "expected_success",
+      "method_specificity",
+      "falsifiability",
+      "evidence_grounding",
+      "ethical_and_data_rights_compliance"
+    ],
+    "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "outcomes": {
+    "primary": {
+      "name": "independently_confirmed_useful_research_value_per_inclusive_cost",
+      "estimand": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "decision_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cluster_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "practical_effect_threshold": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "secondary": [
+      "problem_selection_realized_value_and_calibration",
+      "concrete_approach_and_mechanism_feasibility",
+      "experimental_compute_multiplier_vs_human_reference",
+      "expected_information_gain_realized_per_cost",
+      "prospective_effect_prediction_calibration",
+      "correct_continue_pivot_stop_replicate_abstain_decisions",
+      "future_publication_match_citation_match_reported_separately",
+      "independent_discovery_value_without_future_paper_match",
+      "fresh_family_and_domain_transfer",
+      "false_claim_and_overclaim_rate",
+      "human_review_minutes_and_override_rate"
+    ],
+    "prediction_metrics": {
+      "probability_scoring_rule": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "effect_interval_coverage": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "calibration_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "base_rate_baseline": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "prediction_timestamp_rule": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "noncompensatory_gates": [
+      "zero sealed-data leakage",
+      "no candidate-controlled coder/evaluator/confirmation material",
+      "all attempts and costs retained",
+      "no post-hoc checkpoint or problem selection on sealed outcomes",
+      "critical data-rights or safety violation is a hard failure",
+      "scientific discovery claims require independent empirical evidence"
+    ]
+  },
+  "resource_budget": {
+    "currency_and_price_basis": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "total_budget": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "shared_budget_envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "per_arm_caps": {
+      "model_input_output_tokens": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "model_calls": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "coder_calls": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "evaluator_calls": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accelerator_hours_by_type": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cpu_hours": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "wall_clock_hours": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "peak_memory": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "energy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_active_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_review_and_rework_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "data_and_external_service_cost": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "externalized_costs_prohibited": true
+  },
+  "analysis_plan": {
+    "statistical_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "clustered_dependence": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "paired_or_blocked_design": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "uncertainty_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "confidence_level": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "multiplicity_and_sequential_looks": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "missingness_and_refusal_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "stopping_rule": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "sensitivity_analyses": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "analysis_code_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "all_attempts_reported": true
+  },
+  "governance": {
+    "researcher_can_access_sealed_outcomes": false,
+    "researcher_can_modify_coder": false,
+    "researcher_can_modify_evaluator": false,
+    "independent_confirmation_custodian": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "independent_domain_reviewers": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evaluator_epoch_owner": "#10708",
+    "promotion_authority": "#10573",
+    "canonical_receipt_owners": "#10314/#10370/#10533",
+    "statistics_owners": "#8438/#9433/#10513"
+  },
+  "reporting": {
+    "raw_decision_records_required": true,
+    "all_attempts_and_failures_required": true,
+    "per_stage_scores_and_uncertainty_required": true,
+    "human_disagreement_and_inter_rater_reliability_required": true,
+    "inclusive_cost_ledger_required": true,
+    "all_domains_and_families_reported": true,
+    "future_paper_matching_and_realized_value_separated": true,
+    "transfer_results_reported_separately": true,
+    "limitations_and_unidentified_effects_required": true
+  },
+  "claim_ceiling": "Research judgment and efficiency are not themselves proof of a scientific discovery. Future-paper matching is not truth. A useful research process is not R4 until a successor improves the research procedure from the same start and matched inclusive budget, with repeatability and fresh-family transfer.",
+  "decision_theory": {
+    "decision_options_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "hypothesis_prior_distribution_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "posterior_update_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "utility_function_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "outcome_value_scale_and_units": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "expected_value_without_experiment_definition": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "expected_value_with_experiment_definition": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evsi_estimation_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "expected_experiment_cost_and_opportunity_cost_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "downside_risk_measure_and_limit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "robustness_and_sensitivity_plan": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "utility_weights_frozen_before_outcomes": true,
+    "post_hoc_utility_reweighting_prohibited": true,
+    "note": "Expected information gain and expected value of sample information are distinct. A result is decision-relevant only if it can change the selected action or its expected utility after accounting for full cost and downside risk."
+  },
+  "active_exploration": {
+    "mode_comparison": {
+      "arms": [
+        "static_fixed_evidence_packet",
+        "active_literature_and_tool_exploration",
+        "active_random_retrieval_matched_cost",
+        "no_external_search_control"
+      ],
+      "shared_budget_envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "temporal_literature_cutoff": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "allowed_sources_and_query_contract_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "query_limit_and_cost_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retrieved_evidence_visibility_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "pre_treatment_capability_tier_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "capability_tiers_frozen_before_treatment": true,
+      "matched_total_tokens_and_tool_budget": true,
+      "report_effect_by_capability_tier": true
+    },
+    "construct_outcomes": [
+      "grounding_and_source_coverage",
+      "feasibility",
+      "clarity",
+      "specificity",
+      "impact",
+      "originality",
+      "mechanism_novelty",
+      "independent_empirical_value"
+    ],
+    "anti_goodhart_policy": "Citation/future-paper matching is a retrospective community-alignment signal, not truth or sole novelty criterion. Independent validated discoveries without a later-paper match remain separately scored."
+  }
+}
