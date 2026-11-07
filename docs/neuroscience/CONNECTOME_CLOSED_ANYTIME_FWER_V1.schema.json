@@ -80,8 +80,6 @@
         "global_filtration_sha256",
         "confirmation_split_sha256",
         "e_process_values",
-        "global_filtration_sha256",
-        "confirmation_split_sha256",
         "component_validity_receipt_sha256",
         "component_status"
       ],
