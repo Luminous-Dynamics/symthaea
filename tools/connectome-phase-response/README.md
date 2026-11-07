@@ -28,6 +28,8 @@ A measured row has paired six-leg control and perturbed phases. The output vecto
 
 The local reset is the sender-axis component; off-diagonal transfer is the sum of absolute circular phase reset in the other axes. For a global descending input without a single sender leg, all six axes are retained.
 
+Descending-command probe keys require the exact source identity DNg100, DNg97 or DNb08. A generic descending-command row is invalid; this prevents distinct command pathways from being pooled in the same transfer surface.
+
 ## Fail-closed semantics
 
 No response, failed assay, missing track, out-of-support and not-assessed are explicit states. They are not encoded as six zero phase shifts. Probe keys preserve context, perturbation class, sender leg, phase bin and response delay. Duplicate rows, missing grid cells, invalid phase bins and mismatched model probe grids are rejected.
