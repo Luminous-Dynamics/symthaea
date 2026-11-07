@@ -38,5 +38,12 @@
       ]
     }
   ],
-  "experiment_cost": 0.1
+  "direct_experiment_cost": 0.1,
+  "opportunity_cost": 0,
+  "downside_loss_by_outcome": [
+    0,
+    0
+  ],
+  "cvar_confidence": 0.95,
+  "max_cvar_downside_loss": 0
 }
