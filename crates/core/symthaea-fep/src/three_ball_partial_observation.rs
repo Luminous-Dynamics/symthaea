@@ -969,7 +969,6 @@ mod tests {
 
     #[test]
     fn correlated_model_state_prior_lets_gaze_disambiguate_model_identity() {
-        let space = build_three_ball_rule_space();
         let states = enumerate_three_ball_hidden_states();
         let mut joint = vec![vec![0.0; THREE_BALL_HIDDEN_STATE_COUNT]; 2];
         let per_state_mass = 0.5 / 9.0;
