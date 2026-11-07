@@ -8,6 +8,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'crates/domains/symthaea-*/Cargo.toml'
+      - '.github/workflows/causal-physics-lockfile-reconcile.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +21,7 @@ concurrency:
 jobs:
   regenerate-and-validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout exact event head
         uses: actions/checkout@v4
@@ -33,7 +34,7 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Record source identity
+      - name: Record source identity and preserve committed lockfile
         id: identity
         shell: bash
         run: |
@@ -42,21 +43,69 @@ jobs:
           echo "source_tree_clean=$(test -z "$(git status --porcelain)" && echo true || echo false)" >> "$GITHUB_OUTPUT"
           rustc --version
           cargo --version
+          cp Cargo.lock committed-Cargo.lock
+          sha256sum committed-Cargo.lock | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # This gate intentionally runs against the lockfile from the checked-out
+      # commit. It records failure without aborting so the generated graph and
+      # a reviewable artifact are still produced; the final enforcement step
+      # fails the workflow if the committed graph itself is not valid.
+      - name: Validate checked-in dependency graph with --locked
+        id: committed
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=0
+          if ! cargo metadata --locked --format-version 1 > committed-cargo-metadata.json; then
+            echo "committed Cargo.lock: cargo metadata --locked FAILED" | tee -a "$GITHUB_STEP_SUMMARY"
+            status=1
+          else
+            echo "committed Cargo.lock: cargo metadata --locked passed" | tee -a "$GITHUB_STEP_SUMMARY"
+            for package in \
+              symthaea-chain-theory-audit \
+              symthaea-fractal-time-lab \
+              symthaea-causal-set-lab \
+              symthaea-metric-geometry-lab \
+              symthaea-science-evidence \
+              symthaea-uap-observatory
+            do
+              if cargo test --locked -p "$package" --lib; then
+                echo "committed graph: $package PASS" | tee -a "$GITHUB_STEP_SUMMARY"
+              else
+                echo "committed graph: $package FAIL" | tee -a "$GITHUB_STEP_SUMMARY"
+                status=1
+              fi
+            done
+          fi
+          if [ "$status" -eq 0 ]; then
+            echo "result=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
 
       - name: Regenerate full workspace lockfile
         run: cargo generate-lockfile
 
-      - name: Record regenerated lockfile digest
+      - name: Compare committed and generated lockfiles
+        id: compare
         shell: bash
         run: |
           set -euo pipefail
+          if cmp -s committed-Cargo.lock Cargo.lock; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            echo "generated lockfile matches the committed lockfile" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            echo "generated lockfile differs from the committed lockfile; review Cargo.lock.diff" | tee -a "$GITHUB_STEP_SUMMARY"
+            diff -u committed-Cargo.lock Cargo.lock > Cargo.lock.diff || test "$?" -eq 1
+          fi
           sha256sum Cargo.lock | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "The generated lockfile is exported as an artifact for an explicit, reviewable commit."
 
-      - name: Verify lockfile is self-consistent
-        run: cargo metadata --locked --format-version 1 > cargo-metadata.json
+      - name: Verify regenerated lockfile is self-consistent
+        run: cargo metadata --locked --format-version 1 > generated-cargo-metadata.json
 
-      - name: Validate focused physics libraries with locked graph
+      - name: Validate focused physics libraries on regenerated graph
         run: |
           set -euo pipefail
           for package in \
@@ -70,13 +119,23 @@ jobs:
             cargo test --locked -p "$package" --lib
           done
 
-      - name: Upload reconciled lockfile and validation metadata
+      - name: Upload both lockfiles, metadata and diff
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: causal-physics-lockfile-${{ github.sha }}
           path: |
+            committed-Cargo.lock
             Cargo.lock
-            cargo-metadata.json
-          if-no-files-found: error
+            Cargo.lock.diff
+            committed-cargo-metadata.json
+            generated-cargo-metadata.json
+          if-no-files-found: warn
           retention-days: 7
+
+      - name: Require checked-in lockfile validation
+        if: always() && steps.committed.outputs.result != 'pass'
+        shell: bash
+        run: |
+          echo "::error::The committed Cargo.lock did not pass the exact --locked validation. Review the artifact and commit a reconciled lockfile; do not weaken --locked."
+          exit 1
