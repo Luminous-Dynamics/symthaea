@@ -47,6 +47,7 @@ COMPARATORS = (
     "CR-Bench-v2",
     "CRBugBench",
     "CodeReviewBench",
+    "Kodus State of AI Code Review",
     "Martian Code Review Benchmark",
     "SWE-sweep",
     "LoopControlBench",
@@ -649,6 +650,7 @@ def self_test() -> list[str]:
         ("missing expected behavior", "challenge", challenge.replace("**Expected review behavior:** Y", "Expected", 1)),
         ("missing comparator", "triangulation", triangulation.replace("SecPRBench", "OtherBench")),
         ("missing CodeReviewBench", "triangulation", triangulation.replace("CodeReviewBench", "OtherBench")),
+        ("missing Kodus state report", "triangulation", triangulation.replace("Kodus State of AI Code Review", "OtherBench")),
         ("missing evidence authority", "adjudication", adjudication.replace("compiler_resolved", "deleted_class")),
         ("missing isolation gate", "challenge", challenge.replace("#10064", "removed_gate")),
         ("missing primary metric mapping", "adjudication", adjudication.replace("reviewer_burden", "removed_metric")),
@@ -740,7 +742,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 36 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 37 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
