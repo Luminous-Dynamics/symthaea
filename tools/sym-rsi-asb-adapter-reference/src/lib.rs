@@ -4,6 +4,7 @@
 //! It does not execute campaigns, verify upstream signatures, evaluate results,
 //! access hidden truth, issue receipts, or authorize benchmark promotion.
 
+pub mod api_contract;
 pub mod job_lifecycle;
 pub use job_lifecycle::{JobContractError, JobStatus, LabJob};
 
