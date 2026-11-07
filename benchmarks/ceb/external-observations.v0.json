@@ -5249,7 +5249,7 @@
         "configuration": "Aggregate reported range across 12 configurations on SWE-bench Lite/Verified"
       },
       "metric": {
-        "metric_id": "repair_success_gain_range_bound",
+        "metric_id": "repair_success_gain_lower_bound",
         "label": "Repair success gain range bound",
         "definition": "Lower bound of the reported 2–4 percentage-point repair success improvement over the corresponding baseline configurations.",
         "value": 2,
@@ -5264,7 +5264,7 @@
           "margin": null,
           "confidence_level": "not reported",
           "method": "not reported in retrieved source summary",
-          "applies_to_metric_id": "repair_success_gain_range_bound",
+          "applies_to_metric_id": "repair_success_gain_lower_bound",
           "applies_to_task_count": null
         }
       },
@@ -5284,7 +5284,7 @@
         "configuration": "Aggregate reported range across 12 configurations on SWE-bench Lite/Verified"
       },
       "metric": {
-        "metric_id": "repair_success_gain_range_bound",
+        "metric_id": "repair_success_gain_upper_bound",
         "label": "Repair success gain range bound",
         "definition": "Upper bound of the reported 2–4 percentage-point repair success improvement over the corresponding baseline configurations.",
         "value": 4,
@@ -5299,7 +5299,7 @@
           "margin": null,
           "confidence_level": "not reported",
           "method": "not reported in retrieved source summary",
-          "applies_to_metric_id": "repair_success_gain_range_bound",
+          "applies_to_metric_id": "repair_success_gain_upper_bound",
           "applies_to_task_count": null
         }
       },
