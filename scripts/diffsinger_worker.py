@@ -46,8 +46,10 @@ import onnxruntime as ort
 from diffsinger_phonemes import (
     duration_per_mapped_phone,
     map_syllable_phones,
+    note_timing,
     require_melisma_vowel,
     resolve_language_id,
+    timeline_gap_ms,
 )
 
 HEAD_FRAMES = 8
@@ -121,25 +123,70 @@ class DiffSingerModel:
                 f"DiffSinger worker currently supports language='en' only; got {language!r}"
             )
         language_id = self.language_id(language)
-        for syllable_index, syllable in enumerate(performance["syllables"]):
-            phonemes = syllable["phonemes"]
+        syllables = performance.get("syllables")
+        if not isinstance(syllables, list) or not syllables:
+            raise ValueError("performance requires a non-empty syllables array")
+
+        previous_end_s = 0.0
+        for syllable_index, syllable in enumerate(syllables):
+            if not isinstance(syllable, dict):
+                raise ValueError(f"syllable {syllable_index} must be an object")
+            phonemes = syllable.get("phonemes")
             mapped_groups, last_vowel = map_syllable_phones(phonemes, syllable_index)
-            total_natural_ms = max(sum(p["natural_duration_s"] * 1000.0 for p in phonemes), 1.0)
-            note_ms = max(syllable["note"]["duration"] * 1000.0, 1.0)
+            note_start_s, note_duration_s, note_hz, note_end_s = note_timing(
+                syllable.get("note"),
+                f"syllable {syllable_index} note",
+            )
+
+            gap_ms = timeline_gap_ms(
+                note_start_s,
+                previous_end_s,
+                f"syllable {syllable_index} onset",
+            )
+            if gap_ms >= FRAME_MS * 0.5:
+                arpabet_phonemes.append("SP")
+                durations_ms.append(gap_ms)
+                target_hz.append(note_hz)
+
+            total_natural_ms = sum(
+                float(phone["natural_duration_s"]) * 1000.0 for phone in phonemes
+            )
+            if not math.isfinite(total_natural_ms) or total_natural_ms <= 0.0:
+                raise ValueError(f"syllable {syllable_index} has invalid natural phone duration")
+            note_ms = max(note_duration_s * 1000.0, 1.0)
             for phoneme, mapped_phones in zip(phonemes, mapped_groups, strict=True):
                 per_token_ms = duration_per_mapped_phone(
-                    phoneme["natural_duration_s"] * 1000.0,
+                    float(phoneme["natural_duration_s"]) * 1000.0,
                     len(mapped_phones),
                 )
                 for arpabet in mapped_phones:
                     arpabet_phonemes.append(arpabet)
                     share = per_token_ms / total_natural_ms
                     durations_ms.append(max(share * note_ms, 1.0))
-                    target_hz.append(syllable["note"]["frequency"])
-            for melisma_note in syllable["melisma_notes"]:
+                    target_hz.append(note_hz)
+
+            previous_end_s = note_end_s
+            melisma_notes = syllable.get("melisma_notes")
+            if not isinstance(melisma_notes, list):
+                raise ValueError(f"syllable {syllable_index}.melisma_notes must be an array")
+            for melisma_index, melisma_note in enumerate(melisma_notes):
+                melisma_start_s, melisma_duration_s, melisma_hz, melisma_end_s = note_timing(
+                    melisma_note,
+                    f"syllable {syllable_index} melisma note {melisma_index}",
+                )
+                melisma_gap_ms = timeline_gap_ms(
+                    melisma_start_s,
+                    previous_end_s,
+                    f"syllable {syllable_index} melisma note {melisma_index}",
+                )
+                if melisma_gap_ms >= FRAME_MS * 0.5:
+                    arpabet_phonemes.append("SP")
+                    durations_ms.append(melisma_gap_ms)
+                    target_hz.append(melisma_hz)
                 arpabet_phonemes.append(require_melisma_vowel(last_vowel, syllable_index))
-                durations_ms.append(max(melisma_note["duration"] * 1000.0, 1.0))
-                target_hz.append(melisma_note["frequency"])
+                durations_ms.append(max(melisma_duration_s * 1000.0, 1.0))
+                target_hz.append(melisma_hz)
+                previous_end_s = melisma_end_s
 
         if not arpabet_phonemes:
             return None
@@ -151,6 +198,10 @@ class DiffSingerModel:
         languages = [0]
         for arpabet in arpabet_phonemes:
             namespaced = f"en/{arpabet}"
+            if arpabet == "SP":
+                tokens.append(silence_token)
+                languages.append(0)
+                continue
             token = self.phoneme_token(namespaced)
             if token is None:
                 raise ValueError(f"voicebank phonemes.json has no entry for '{namespaced}'")
