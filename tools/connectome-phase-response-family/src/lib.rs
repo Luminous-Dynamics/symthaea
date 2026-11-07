@@ -187,8 +187,7 @@ impl PhaseResponseClaimKey {
             "right_middle",
             "right_hind",
         ];
-        if !LEGS.contains(&self.sender_leg.as_str())
-            || !LEGS.contains(&self.recipient_leg.as_str())
+        if !LEGS.contains(&self.sender_leg.as_str()) || !LEGS.contains(&self.recipient_leg.as_str())
         {
             return Err(FamilyError("claim key contains an unknown leg axis".into()));
         }
@@ -203,7 +202,9 @@ impl PhaseResponseClaimKey {
         }
         if let Some(neuron) = &self.descending_neuron {
             if !matches!(neuron.as_str(), "DNg100" | "DNg97" | "DNb08") {
-                return Err(FamilyError("unregistered descending-neuron identity".into()));
+                return Err(FamilyError(
+                    "unregistered descending-neuron identity".into(),
+                ));
             }
         }
         if self.phase_bin >= 8 {
@@ -280,7 +281,9 @@ fn valid_digest(value: &str) -> bool {
 
 pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyError> {
     if manifest.family_id.is_empty() || manifest.campaign_id.is_empty() {
-        return Err(FamilyError("family_id and campaign_id must be non-empty".into()));
+        return Err(FamilyError(
+            "family_id and campaign_id must be non-empty".into(),
+        ));
     }
     if manifest.requested_guarantee != "FWER" {
         return Err(FamilyError(
@@ -298,10 +301,11 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
         || !valid_digest(&manifest.global_filtration_sha256)
         || !valid_digest(&manifest.confirmation_split_sha256)
     {
-        return Err(FamilyError("malformed family, filtration or split digest".into()));
+        return Err(FamilyError(
+            "malformed family, filtration or split digest".into(),
+        ));
     }
-    if manifest.alpha.is_zero()
-        || manifest.alpha.checked_cmp(Rational::one())? == Ordering::Greater
+    if manifest.alpha.is_zero() || manifest.alpha.checked_cmp(Rational::one())? == Ordering::Greater
     {
         return Err(FamilyError("alpha must be in (0,1]".into()));
     }
@@ -318,7 +322,9 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
         .checked_sub(1)
         .ok_or_else(|| FamilyError("empty e-process path".into()))?;
     if horizon == 0 {
-        return Err(FamilyError("V1 requires at least one evidence update".into()));
+        return Err(FamilyError(
+            "V1 requires at least one evidence update".into(),
+        ));
     }
 
     let mut audits = Vec::with_capacity(manifest.claims.len());
@@ -333,13 +339,25 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
         for (label, digest) in [
             ("query specification", claim.query_spec_sha256.as_str()),
             ("null envelope", claim.null_envelope_sha256.as_str()),
-            ("component e-process receipt", claim.component_e_process_receipt_sha256.as_str()),
-            ("component validity receipt", claim.component_validity_receipt_sha256.as_str()),
+            (
+                "component e-process receipt",
+                claim.component_e_process_receipt_sha256.as_str(),
+            ),
+            (
+                "component validity receipt",
+                claim.component_validity_receipt_sha256.as_str(),
+            ),
             ("claim filtration", claim.global_filtration_sha256.as_str()),
-            ("claim confirmation split", claim.confirmation_split_sha256.as_str()),
+            (
+                "claim confirmation split",
+                claim.confirmation_split_sha256.as_str(),
+            ),
         ] {
             if !valid_digest(digest) {
-                return Err(FamilyError(format!("malformed {label} digest for {}", claim.claim_id)));
+                return Err(FamilyError(format!(
+                    "malformed {label} digest for {}",
+                    claim.claim_id
+                )));
             }
         }
         if claim.global_filtration_sha256 != manifest.global_filtration_sha256 {
@@ -358,13 +376,19 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
             ));
         }
         if claim.weight.is_zero() {
-            return Err(FamilyError("confirmatory claim has zero allocated weight".into()));
+            return Err(FamilyError(
+                "confirmatory claim has zero allocated weight".into(),
+            ));
         }
         if claim.e_process_values.len() != horizon + 1 {
-            return Err(FamilyError("e-process paths do not share one horizon".into()));
+            return Err(FamilyError(
+                "e-process paths do not share one horizon".into(),
+            ));
         }
         if claim.e_process_values[0] != Rational::one() {
-            return Err(FamilyError("every component e-process must start at one".into()));
+            return Err(FamilyError(
+                "every component e-process must start at one".into(),
+            ));
         }
 
         allocated_weight = allocated_weight.checked_add(claim.weight)?;
@@ -523,7 +547,10 @@ mod tests {
         let mut manifest = fixture();
         manifest.claims[0].e_process_values = vec![r(1, 1), r(25, 1), r(3, 1)];
         let report = audit_family(&manifest).expect("nonmonotone e-process path is valid");
-        assert_eq!(report.claims[0].running_maxima, vec![r(1, 1), r(25, 1), r(25, 1)]);
+        assert_eq!(
+            report.claims[0].running_maxima,
+            vec![r(1, 1), r(25, 1), r(25, 1)]
+        );
         assert_eq!(report.claims[0].rejection_path, vec![false, true, true]);
     }
 
