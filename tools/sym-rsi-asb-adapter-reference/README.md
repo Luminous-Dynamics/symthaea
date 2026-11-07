@@ -4,9 +4,11 @@ This standalone offline Rust crate validates the checked-in, pinned AS-Bench com
 
 `docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json`
 
-It checks the upstream repository/commit/API/schema pin, eight Git blob identities, exact v0 campaign identities, round × batch budget arithmetic, discovery and held-out-learning gate mappings, upstream reference-result labels, the provenance distinction between replay and digital-twin outputs, typed Lab API v1 campaign/status/catalog/job payloads, and strict campaign request preflight.
+It checks the upstream repository/commit/API/schema pin, ten Git blob identities, exact v0 campaign identities, round × batch budget arithmetic, discovery and held-out-learning gate mappings, upstream reference-result labels, the provenance distinction between replay and digital-twin outputs, typed Lab API v1 campaign/status/catalog/job payloads, and strict campaign request preflight.
 
 It is deliberately **not** a campaign runner, metric evaluator, oracle, receipt/authentication service, scheduler, memory service or promotion authority. A valid manifest proves only that the local compatibility declaration matches this crate's frozen contract.
+
+The `api_v1` module defines transport-independent types for the public campaign card, status, catalogs, experiment requests/responses, job list summaries, deliverables and API errors. It rejects a public campaign card that contains the private `backend` field, checks stage/budget consistency, validates catalog design IDs and duplicate selections, and checks deliverable kind/version/size. The `job_lifecycle` module ensures only a completed job with one result row per requested design can advance a stage. The lab remains authoritative for every server-side rule.
 
 The `job_lifecycle` module models the pinned API v1 statuses `queued`, `running`, `completed` and `failed`. It only exposes usable measurement rows when a job is completed and the result-row count matches the requested design count. Pending and failed jobs never advance a campaign stage. It does not submit requests or decide whether a source measurement is scientifically valid.
 
