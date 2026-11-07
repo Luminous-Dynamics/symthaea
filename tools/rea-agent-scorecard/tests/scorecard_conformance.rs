@@ -2,14 +2,14 @@
 mod rea_compat;
 
 use rea_agent_scorecard::{
-    OracleCorpus, ReplayInput, ScorecardMetrics, Submission, SubmissionSet,
-    SUBMISSIONS_SCHEMA, evaluate_scorecard, parse_oracle_json,
+    OracleCorpus, ReplayInput, Submission, SubmissionSet, SUBMISSIONS_SCHEMA,
+    evaluate_scorecard, parse_oracle_json,
 };
 use rea_compat::{
-    ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, analysis_profile_digest,
-    compute_evidence_id, evaluate_claim, verify_evidence_json,
+    ClaimPredicate, ClaimRequest, ClaimScope, analysis_profile_digest, compute_evidence_id,
+    evaluate_claim, verify_evidence_json,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 
 fn oracle_bytes() -> &'static [u8] {
     include_bytes!("fixtures/rea-agent-oracle-seed-v0.json")
