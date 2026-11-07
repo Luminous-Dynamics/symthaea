@@ -778,6 +778,29 @@ mod tests {
     }
 
     #[test]
+    fn test_stream_session_exposes_audio_discontinuity_boundary() {
+        let config = StreamConfig {
+            buffer_duration: 0.05,
+            frame_duration: 0.025,
+            hop_duration: 0.010,
+            ..StreamConfig::default()
+        };
+        let mut session = StreamSession::new(config);
+        session.start();
+
+        // 200 ms arrives before the consumer runs; the 50 ms buffer retains
+        // only the tail and the first output frame must expose the gap.
+        let samples: Vec<f32> = (0..3_200usize)
+            .map(|i| {
+                (std::f32::consts::TAU * 180.0 * i as f32 / 16_000.0).sin()
+            })
+            .collect();
+        session.push(&samples);
+
+        assert_eq!(session.discontinuity_boundaries(), &[0]);
+    }
+
+    #[test]
     fn test_latency() {
         let low_latency = StreamConfig::low_latency();
         let high_quality = StreamConfig::high_quality();
