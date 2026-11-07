@@ -34,7 +34,9 @@ A score in one layer must not be presented as a result in another. For example, 
 
 MLPerf Storage v3.0 added a vector-database workload in 2026. Its published CLOSED configuration uses 10 million 1,536-dimensional float32 vectors (about 61 GB raw) in Milvus with DiskANN, measures sustained top-10 queries, reports QPS and p99 latency, and checks recall against exact brute-force ground truth. It is a useful on-disk ANN / random-read storage comparator, but its embedding dimension and ANN semantics are not the same as Symthaea's 16K–256K HDC profiles. HME should use its measurement discipline and only claim MLPerf compliance if it runs the exact suite and configuration. Treat results as workload-specific, not as a universal storage ranking.
 
-For vector search, report the recall–throughput–latency–index-size frontier. ANN-Benchmarks is useful for recall versus QPS and index/build overhead; MLPerf Storage is useful for storage-path behavior. Neither replaces HME's canonical exact HDC oracle.
+For vector search, report the recall–throughput–latency–index-size frontier. ANN-Benchmarks is useful for recall versus QPS and index/build overhead; VectorDBBench adds practical multi-backend performance cases and current 2026 catalog support for 1M/10M/100M-vector datasets; MLPerf Storage is useful for on-disk I/O behavior. Use the same dataset, metric, filter, recall target and hardware configuration wherever the suite permits. None replaces HME's canonical exact HDC oracle.
+
+MLPerf Storage v3.0's published CLOSED vector-database case uses 10 million 1,536-dimensional float32 vectors in Milvus/DiskANN (~61 GB raw), measures sustained top-10 queries and reports QPS, p99 latency and recall against exact brute-force ground truth. This is a useful on-disk ANN/storage profile, not a direct semantic or dimensional match for 16K–256K HDC. Read QPS and recall together; a faster result at lower recall is not a fair speedup.
 
 The existing symthaea-hdc-store is a critical incumbent: its format-v2 is a fixed 16,384-bit BinaryHV mmap store with redundant checksummed headers, strict HdcStoreReader, deterministic exact full-store scan, optional LSH scan with examined/total/exact/fallback diagnostics, journaled batch updates, recovery/failpoints, snapshots, compaction and portable restore. HME should delegate this representation family to that store rather than clone it. Its schema is not a generic 2K–256K ContinuousHV store; a distinct ContinuousHV segment profile remains a possible HME extension after the exact semantics are established. #7922 and #7934 own the existing store's missing layout and workload evidence.
 
@@ -53,6 +55,10 @@ Use the official evaluators and keep each benchmark's score separate:
 Reuse #8427 for the cross-benchmark cost-quality frontier and #9145 for TimlMemBench. Reuse #9075 for valid-time / known-time behavior, #9177 for proof-aware minimal sufficient context, and #9139 for consolidation governance. Do not create duplicate adapters or benchmark runners.
 
 A storage-only experiment cannot establish that HME improves an agent's answers. The downstream track must integrate the actual Broca reader and report both retrieval and reader results separately. Keep backbone comparisons distinct from memory-substrate comparisons.
+
+### Published vendor numbers are reference points, not a leaderboard
+
+Public vendor pages currently report, for example, Mem0 LongMemEval 94.4% / LoCoMo 92.5% at a top-200 retrieval budget and roughly 6.8–7.0K mean tokens, while Zep reports LongMemEval 90.2% / LoCoMo 94.7% with its own reader/judge, context sizes and latency accounting. These are vendor-published claims, not independent common-harness measurements and not directly rankable against each other or against Symthaea. Their value is to reveal the competitive range and the metrics vendors expose. HME/Broca must reproduce the same benchmark version, exact question set, reader/backbone, judge, prompt, context budget, token accounting and latency boundary before making a comparative claim. Preserve per-category scores; do not optimize only a single aggregate.
 
 ## 2. Paradigm shifts worth testing
 
