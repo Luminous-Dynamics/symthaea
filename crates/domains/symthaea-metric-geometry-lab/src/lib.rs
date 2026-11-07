@@ -24,6 +24,29 @@ use std::fmt;
 pub type Vector4 = [f64; 4];
 pub type Matrix4 = [[f64; 4]; 4];
 pub type Christoffel4 = [[[f64; 4]; 4]; 4];
+/// R^rho_(sigma mu nu), with the derivative convention documented below.
+pub type Riemann4 = [[[[f64; 4]; 4]; 4]; 4];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MetricInertia {
+    pub negative: usize,
+    pub zero: usize,
+    pub positive: usize,
+}
+
+impl MetricInertia {
+    pub fn is_lorentzian_minus_plus_plus_plus(self) -> bool {
+        self.negative == 1 && self.zero == 0 && self.positive == 3
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CurvatureTensors4 {
+    pub riemann: Riemann4,
+    pub ricci: Matrix4,
+    pub ricci_scalar: f64,
+    pub kretschmann_scalar: f64,
+}
 
 const DERIVATIVE_RELATIVE_STEP: f64 = 1.0e-5;
 const MATRIX_PIVOT_TOLERANCE: f64 = 1.0e-14;
@@ -135,6 +158,96 @@ impl MetricTensor4 {
             }
         }
         Ok(inverse)
+    }
+
+    /// Count negative, zero and positive eigenvalues using a symmetric
+    /// Jacobi diagonalization. The result is invariant under nonsingular
+    /// coordinate changes by Sylvester's law of inertia.
+    pub fn inertia(&self) -> MetricInertia {
+        let mut matrix = self.components;
+        let scale = matrix
+            .iter()
+            .flat_map(|row| row.iter())
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        if scale == 0.0 {
+            return MetricInertia {
+                negative: 0,
+                zero: 4,
+                positive: 0,
+            };
+        }
+        let tolerance = 1.0e-13 * scale;
+
+        for _ in 0..128 {
+            let mut p = 0;
+            let mut q = 1;
+            let mut largest = matrix[p][q].abs();
+            for row in 0..4 {
+                for column in (row + 1)..4 {
+                    if matrix[row][column].abs() > largest {
+                        largest = matrix[row][column].abs();
+                        p = row;
+                        q = column;
+                    }
+                }
+            }
+            if largest <= tolerance {
+                break;
+            }
+
+            let off_diagonal = matrix[p][q];
+            let tau = (matrix[q][q] - matrix[p][p]) / (2.0 * off_diagonal);
+            let denominator = tau.abs() + tau.hypot(1.0);
+            let t = if tau >= 0.0 {
+                1.0 / denominator
+            } else {
+                -1.0 / denominator
+            };
+            let cosine = 1.0 / (1.0 + t * t).sqrt();
+            let sine = t * cosine;
+            let pp = matrix[p][p];
+            let qq = matrix[q][q];
+
+            for index in 0..4 {
+                if index == p || index == q {
+                    continue;
+                }
+                let ip = matrix[index][p];
+                let iq = matrix[index][q];
+                matrix[index][p] = cosine * ip - sine * iq;
+                matrix[p][index] = matrix[index][p];
+                matrix[index][q] = sine * ip + cosine * iq;
+                matrix[q][index] = matrix[index][q];
+            }
+
+            matrix[p][p] = pp - t * off_diagonal;
+            matrix[q][q] = qq + t * off_diagonal;
+            matrix[p][q] = 0.0;
+            matrix[q][p] = 0.0;
+        }
+
+        let mut inertia = MetricInertia {
+            negative: 0,
+            zero: 0,
+            positive: 0,
+        };
+        for axis in 0..4 {
+            let eigenvalue = matrix[axis][axis];
+            if eigenvalue < -tolerance {
+                inertia.negative += 1;
+            } else if eigenvalue > tolerance {
+                inertia.positive += 1;
+            } else {
+                inertia.zero += 1;
+            }
+        }
+        inertia
+    }
+
+    /// True exactly when the numerical inertia is (-,+,+,+), within the
+    /// relative eigenvalue tolerance used by the inertia calculation.
+    pub fn is_lorentzian_minus_plus_plus_plus(&self) -> bool {
+        self.inertia().is_lorentzian_minus_plus_plus_plus()
     }
 
     /// Contract g_mu_nu u^mu v^nu.
@@ -286,6 +399,139 @@ pub fn christoffel_symbols<M: MetricField>(
         }
     }
     Ok(gamma)
+}
+
+/// Riemann tensor with convention
+///
+/// R^rho_(sigma mu nu) = partial_mu Gamma^rho_(nu sigma)
+///   - partial_nu Gamma^rho_(mu sigma)
+///   + Gamma^rho_(mu lambda) Gamma^lambda_(nu sigma)
+///   - Gamma^rho_(nu lambda) Gamma^lambda_(mu sigma).
+///
+/// Metric derivatives are centered finite differences. Curvature therefore
+/// has one additional numerical differentiation and must be convergence-tested.
+pub fn riemann_tensor<M: MetricField>(
+    field: &M,
+    coordinates: Vector4,
+) -> Result<Riemann4, MetricError> {
+    validate_coordinates(coordinates)?;
+    let gamma = christoffel_symbols(field, coordinates)?;
+    let mut gamma_derivatives = [[[[0.0_f64; 4]; 4]; 4]; 4];
+
+    for axis in 0..4 {
+        let step = field.derivative_step(axis, coordinates[axis]);
+        if !step.is_finite() || step <= 0.0 {
+            return Err(MetricError::InvalidStep);
+        }
+        let mut plus = coordinates;
+        let mut minus = coordinates;
+        plus[axis] += step;
+        minus[axis] -= step;
+        let gamma_plus = christoffel_symbols(field, plus)?;
+        let gamma_minus = christoffel_symbols(field, minus)?;
+        for rho in 0..4 {
+            for sigma in 0..4 {
+                for nu in 0..4 {
+                    gamma_derivatives[axis][rho][nu][sigma] =
+                        (gamma_plus[rho][nu][sigma] - gamma_minus[rho][nu][sigma])
+                            / (2.0 * step);
+                }
+            }
+        }
+    }
+
+    let mut riemann = [[[[0.0_f64; 4]; 4]; 4]; 4];
+    for rho in 0..4 {
+        for sigma in 0..4 {
+            for mu in 0..4 {
+                for nu in 0..4 {
+                    let mut value = gamma_derivatives[mu][rho][nu][sigma]
+                        - gamma_derivatives[nu][rho][mu][sigma];
+                    for lambda in 0..4 {
+                        value += gamma[rho][mu][lambda] * gamma[lambda][nu][sigma]
+                            - gamma[rho][nu][lambda] * gamma[lambda][mu][sigma];
+                    }
+                    riemann[rho][sigma][mu][nu] = value;
+                }
+            }
+        }
+    }
+    Ok(riemann)
+}
+
+/// Compute Riemann, Ricci, Ricci scalar and the Kretschmann invariant.
+///
+/// The Kretschmann scalar is R_abcd R^abcd. In vacuum Schwarzschild,
+/// R_mu_nu and R vanish while K = 48 M^2/r^6.
+pub fn curvature_tensors<M: MetricField>(
+    field: &M,
+    coordinates: Vector4,
+) -> Result<CurvatureTensors4, MetricError> {
+    let metric = field.metric(coordinates)?;
+    let inverse = metric.inverse()?;
+    let riemann = riemann_tensor(field, coordinates)?;
+
+    let mut ricci = [[0.0_f64; 4]; 4];
+    for sigma in 0..4 {
+        for nu in 0..4 {
+            for rho in 0..4 {
+                ricci[sigma][nu] += riemann[rho][sigma][rho][nu];
+            }
+        }
+    }
+
+    let mut ricci_scalar = 0.0;
+    for mu in 0..4 {
+        for nu in 0..4 {
+            ricci_scalar += inverse[mu][nu] * ricci[mu][nu];
+        }
+    }
+
+    let mut riemann_lower = [[[[0.0_f64; 4]; 4]; 4]; 4];
+    for alpha in 0..4 {
+        for beta in 0..4 {
+            for gamma in 0..4 {
+                for delta in 0..4 {
+                    for rho in 0..4 {
+                        riemann_lower[alpha][beta][gamma][delta] +=
+                            metric.components[alpha][rho]
+                                * riemann[rho][beta][gamma][delta];
+                    }
+                }
+            }
+        }
+    }
+
+    let mut kretschmann_scalar = 0.0;
+    for alpha in 0..4 {
+        for beta in 0..4 {
+            for gamma in 0..4 {
+                for delta in 0..4 {
+                    for a in 0..4 {
+                        for b in 0..4 {
+                            for c in 0..4 {
+                                for d in 0..4 {
+                                    kretschmann_scalar += riemann_lower[alpha][beta][gamma][delta]
+                                        * inverse[alpha][a]
+                                        * inverse[beta][b]
+                                        * inverse[gamma][c]
+                                        * inverse[delta][d]
+                                        * riemann_lower[a][b][c][d];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(CurvatureTensors4 {
+        riemann,
+        ricci,
+        ricci_scalar,
+        kretschmann_scalar,
+    })
 }
 
 /// A point and tangent of a timelike, null or spacelike geodesic.
@@ -440,6 +686,71 @@ mod tests {
         assert!((gamma[1][1][1] - expected_r_rr).abs() < 1e-9);
         assert!((gamma[1][2][2] - expected_r_theta_theta).abs() < 1e-8);
         assert!((gamma[2][1][2] - expected_theta_r_theta).abs() < 1e-9);
+    }
+
+    #[test]
+    fn metric_inertia_identifies_lorentzian_signature() {
+        let minkowski = MinkowskiCartesian.metric([0.0; 4]).unwrap();
+        assert_eq!(
+            minkowski.inertia(),
+            MetricInertia { negative: 1, zero: 0, positive: 3 }
+        );
+        assert!(minkowski.is_lorentzian_minus_plus_plus_plus());
+
+        let schwarzschild = SchwarzschildExterior::new(1.0).unwrap();
+        let exterior = schwarzschild.metric([0.0, 10.0, PI / 2.0, 0.0]).unwrap();
+        assert_eq!(
+            exterior.inertia(),
+            MetricInertia { negative: 1, zero: 0, positive: 3 }
+        );
+
+        let euclidean = MetricTensor4::new([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
+        .unwrap();
+        assert!(!euclidean.is_lorentzian_minus_plus_plus_plus());
+    }
+
+    #[test]
+    fn minkowski_curvature_is_zero() {
+        let field = MinkowskiCartesian;
+        let curvature = curvature_tensors(&field, [2.0, 3.0, -4.0, 1.5]).unwrap();
+        assert!(curvature.ricci_scalar.abs() < 1e-10);
+        assert!(curvature.kretschmann_scalar.abs() < 1e-10);
+        let max_riemann = curvature
+            .riemann
+            .iter()
+            .flat_map(|a| a.iter())
+            .flat_map(|b| b.iter())
+            .flat_map(|c| c.iter())
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        assert!(max_riemann < 1e-10);
+    }
+
+    #[test]
+    fn schwarzschild_exterior_is_vacuum_and_kretschmann_matches_analytic_value() {
+        let mass = 1.0;
+        let radius: f64 = 10.0;
+        let field = SchwarzschildExterior::new(mass).unwrap();
+        let curvature =
+            curvature_tensors(&field, [0.0, radius, PI / 2.0, 0.0]).unwrap();
+
+        let max_ricci = curvature
+            .ricci
+            .iter()
+            .flat_map(|row| row.iter())
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        assert!(max_ricci < 1e-6, "max Ricci component={max_ricci}");
+        assert!(curvature.ricci_scalar.abs() < 1e-7);
+        let expected = 48.0 * mass * mass / radius.powi(6);
+        assert!(
+            (curvature.kretschmann_scalar - expected).abs() < 1e-8,
+            "K={}, expected={expected}",
+            curvature.kretschmann_scalar
+        );
     }
 
     #[test]
