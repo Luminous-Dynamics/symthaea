@@ -732,12 +732,15 @@ mod tests {
             Complex::new(0.4, 0.2),
             Complex::new(0.1, 0.9),
         ];
-        let initial_norm = initial.iter().map(|amplitude| amplitude.norm_sqr()).sum::<f64>().sqrt();
+        let initial_norm = initial
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
         for amplitude in &mut initial {
             *amplitude /= initial_norm;
         }
-        let reference =
-            dense_floquet_step_reference(&initial, 3, &edges, &fields, pulse_angle);
+        let reference = dense_floquet_step_reference(&initial, 3, &edges, &fields, pulse_angle);
 
         let mut errors = Vec::new();
         for slices in [1, 2, 4, 8, 16] {
