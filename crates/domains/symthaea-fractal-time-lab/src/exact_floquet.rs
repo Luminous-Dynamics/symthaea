@@ -243,6 +243,73 @@ impl KickedIsingFloquet {
     }
 }
 
+/// Finite-window period-doubling statistics for a stroboscopic signal.
+///
+/// These are signal diagnostics only. A large subharmonic response is not
+/// proof of a discrete time-crystalline phase: an ideal pi pulse gives an
+/// exact two-cycle even at zero interaction. Physical phase claims require
+/// interaction dependence, phase rigidity, finite-size and lifetime studies.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SubharmonicResponse {
+    /// Mean of (-1)^n m_n over the selected measurement window.
+    pub mean_demodulated_order: f64,
+    /// Mean absolute demodulated order; distinguishes cancellation from a
+    /// stable signed order parameter.
+    pub mean_absolute_order: f64,
+    /// |mean_demodulated_order| / mean_absolute_order, in [0, 1].
+    /// This is a finite-window sign-coherence statistic, not a DTC phase
+    /// rigidity proof.
+    pub sign_coherence: f64,
+    /// Number of samples used.
+    pub samples: usize,
+}
+
+/// Analyze a stroboscopic magnetization trace beginning at sample index start.
+///
+/// Sample zero is the initial state and sample n is after n Floquet periods.
+/// None is returned for an invalid start, fewer than two samples or any
+/// non-finite value.
+pub fn analyze_subharmonic_response(
+    signal: &[f64],
+    start: usize,
+) -> Option<SubharmonicResponse> {
+    if start >= signal.len() || signal.len() - start < 2 {
+        return None;
+    }
+    if signal.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+
+    let mut signed_sum = 0.0;
+    let mut absolute_sum = 0.0;
+    let mut samples = 0_usize;
+    for (period, magnetization) in signal.iter().enumerate().skip(start) {
+        let demodulated = if period % 2 == 0 {
+            *magnetization
+        } else {
+            -*magnetization
+        };
+        signed_sum += demodulated;
+        absolute_sum += demodulated.abs();
+        samples += 1;
+    }
+
+    let mean_demodulated_order = signed_sum / samples as f64;
+    let mean_absolute_order = absolute_sum / samples as f64;
+    let sign_coherence = if mean_absolute_order > f64::EPSILON {
+        (mean_demodulated_order.abs() / mean_absolute_order).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    Some(SubharmonicResponse {
+        mean_demodulated_order,
+        mean_absolute_order,
+        sign_coherence,
+        samples,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,6 +387,43 @@ mod tests {
             (demodulated_first - demodulated_last).abs() > 0.5,
             "negative control unexpectedly phase-locked"
         );
+    }
+
+    #[test]
+    fn subharmonic_metric_distinguishes_period_two_trace_and_phase_slip() {
+        let mut ideal =
+            KickedIsingFloquet::new(4, vec![0.0; 3], vec![0.0; 4], PI).unwrap();
+        let ideal_signal = ideal.stroboscopic_magnetization(100);
+        let ideal_response = analyze_subharmonic_response(&ideal_signal, 20).unwrap();
+        assert!((ideal_response.mean_demodulated_order - 1.0).abs() < 1e-12);
+        assert!((ideal_response.sign_coherence - 1.0).abs() < 1e-12);
+
+        let mut unlocked =
+            KickedIsingFloquet::new(8, vec![0.0; 7], vec![0.0; 8], PI + 0.1).unwrap();
+        let unlocked_signal = unlocked.stroboscopic_magnetization(100);
+        let unlocked_response = analyze_subharmonic_response(&unlocked_signal, 20).unwrap();
+
+        let mut interacting =
+            KickedIsingFloquet::new(8, vec![0.5; 7], vec![0.0; 8], PI + 0.1).unwrap();
+        let interacting_signal = interacting.stroboscopic_magnetization(100);
+        let interacting_response =
+            analyze_subharmonic_response(&interacting_signal, 20).unwrap();
+
+        assert!(
+            interacting_response.mean_demodulated_order
+                > unlocked_response.mean_demodulated_order + 0.5
+        );
+        assert!(
+            interacting_response.mean_absolute_order
+                > unlocked_response.mean_absolute_order + 0.5
+        );
+    }
+
+    #[test]
+    fn subharmonic_metric_rejects_invalid_windows_and_non_finite_data() {
+        assert!(analyze_subharmonic_response(&[1.0], 0).is_none());
+        assert!(analyze_subharmonic_response(&[1.0, -1.0], 2).is_none());
+        assert!(analyze_subharmonic_response(&[1.0, f64::NAN], 0).is_none());
     }
 
     #[test]
