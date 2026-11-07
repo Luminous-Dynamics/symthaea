@@ -1,0 +1,599 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_GAIT_OUTCOME_BRIDGE_V1.schema.json",
+  "title": "Connectome gait outcome bridge packet V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_scope",
+    "packets",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "packets": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/packet"
+      }
+    },
+    "oracle_expectations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/report"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "leg": {
+      "enum": [
+        "left_fore",
+        "left_middle",
+        "left_hind",
+        "right_fore",
+        "right_middle",
+        "right_hind"
+      ]
+    },
+    "condition": {
+      "enum": [
+        "ball_contact",
+        "slippery_surface",
+        "air_stepping",
+        "air_feco_silenced",
+        "other_control"
+      ]
+    },
+    "stimulus": {
+      "enum": [
+        "dng100",
+        "dng97",
+        "dnb08",
+        "no_stimulation",
+        "other"
+      ]
+    },
+    "source_access": {
+      "enum": [
+        "synthetic",
+        "permission_verified",
+        "permission_unverified",
+        "restricted"
+      ]
+    },
+    "endpoint": {
+      "enum": [
+        "local_joint_rhythmicity",
+        "per_leg_stepping",
+        "pairwise_interleg_coupling",
+        "tripod_coordination",
+        "phase_reset_transfer",
+        "embodied_behaviour"
+      ]
+    },
+    "metric_id": {
+      "enum": [
+        "pugliese_autocorrelation_oscillation_score",
+        "pugliese_autocorrelation_frequency",
+        "pugliese_single_leg_step_frequency",
+        "generic_phase_vector_strength",
+        "sapkal_butterworth_hilbert_plv_v2",
+        "tcs_natvar_2024",
+        "tcs_sapkal_2026_v2",
+        "phase_reset_fractional_microturns_v1",
+        "phase_reset_cycle_slips_v1",
+        "fictrac_forward_velocity"
+      ]
+    },
+    "unit": {
+      "enum": [
+        "score_0_to_1",
+        "cycles_per_sample",
+        "hertz",
+        "phase_vector_strength",
+        "ratio",
+        "microturns",
+        "cycle_slips",
+        "millimetres_per_second"
+      ]
+    },
+    "availability": {
+      "enum": [
+        "measured",
+        "not_available",
+        "not_assessed",
+        "failed_assay",
+        "missing_track",
+        "out_of_support",
+        "not_estimable"
+      ]
+    },
+    "aggregation": {
+      "enum": [
+        "frame",
+        "event",
+        "trial"
+      ]
+    },
+    "tripod_group": {
+      "enum": [
+        "left_fore_right_middle_left_hind",
+        "right_fore_left_middle_right_hind"
+      ]
+    },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision_sha256",
+        "raw_trajectory_sha256",
+        "animal_id",
+        "session_id",
+        "trial_id",
+        "condition",
+        "stimulus"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_trajectory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "animal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "stimulus": {
+          "$ref": "#/$defs/stimulus"
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first",
+        "second"
+      ],
+      "properties": {
+        "first": {
+          "$ref": "#/$defs/leg"
+        },
+        "second": {
+          "$ref": "#/$defs/leg"
+        }
+      }
+    },
+    "transfer_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sender",
+        "recipient",
+        "phase_bin",
+        "magnitude_bin",
+        "delay_index"
+      ],
+      "properties": {
+        "sender": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/leg"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recipient": {
+          "$ref": "#/$defs/leg"
+        },
+        "phase_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "magnitude_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "delay_index": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_id",
+        "source_binding",
+        "endpoint",
+        "metric_id",
+        "availability",
+        "unit",
+        "value",
+        "aggregation",
+        "method_sha256",
+        "preprocessing_sha256",
+        "phase_estimator_sha256",
+        "channel_id",
+        "leg",
+        "pair",
+        "tripod_group",
+        "transfer_probe",
+        "numerator_ticks",
+        "denominator_ticks",
+        "sample_count",
+        "support_count",
+        "window_start_frame",
+        "window_end_frame"
+      ],
+      "properties": {
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_binding": {
+          "$ref": "#/$defs/source_binding"
+        },
+        "endpoint": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "metric_id": {
+          "$ref": "#/$defs/metric_id"
+        },
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "unit": {
+          "$ref": "#/$defs/unit"
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "aggregation": {
+          "$ref": "#/$defs/aggregation"
+        },
+        "method_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "preprocessing_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phase_estimator_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "channel_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "leg": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/leg"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pair"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tripod_group": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tripod_group"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transfer_probe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/transfer_probe"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "numerator_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "denominator_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sample_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "support_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "window_start_frame": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "window_end_frame": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_id",
+        "dataset_id",
+        "dataset_revision_sha256",
+        "raw_trajectory_sha256",
+        "source_code_sha256",
+        "analysis_pipeline_sha256",
+        "source_access",
+        "animal_id",
+        "session_id",
+        "trial_id",
+        "condition",
+        "stimulus",
+        "sampling_hz_numerator",
+        "sampling_hz_denominator",
+        "frame_count",
+        "fictrac_columns_available",
+        "expected_transfer_probe_count",
+        "expected_transfer_grid_sha256",
+        "measurements"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_trajectory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_pipeline_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_access": {
+          "$ref": "#/$defs/source_access"
+        },
+        "animal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "stimulus": {
+          "$ref": "#/$defs/stimulus"
+        },
+        "sampling_hz_numerator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampling_hz_denominator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fictrac_columns_available": {
+          "type": "boolean"
+        },
+        "expected_transfer_probe_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_transfer_grid_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "measurements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/measurement"
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measured",
+        "required",
+        "state"
+      ],
+      "properties": {
+        "measured": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": {
+          "enum": [
+            "not_reported",
+            "not_available",
+            "none_measured",
+            "partial",
+            "complete"
+          ]
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_id",
+        "summary",
+        "local_rhythm",
+        "per_leg_stepping",
+        "pairwise_measured",
+        "tripod_measured",
+        "phase_reset",
+        "fictrac_velocity",
+        "emits_global_gait_certification"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "enum": [
+            "no_rhythm_or_interleg_data",
+            "rhythm_only",
+            "interleg_coverage_partial",
+            "interleg_coverage_complete"
+          ]
+        },
+        "local_rhythm": {
+          "$ref": "#/$defs/coverage"
+        },
+        "per_leg_stepping": {
+          "$ref": "#/$defs/coverage"
+        },
+        "pairwise_measured": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "tripod_measured": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "phase_reset": {
+          "$ref": "#/$defs/coverage"
+        },
+        "fictrac_velocity": {
+          "enum": [
+            "not_reported",
+            "not_available",
+            "none_measured",
+            "complete"
+          ]
+        },
+        "emits_global_gait_certification": {
+          "const": false
+        }
+      }
+    }
+  }
+}
