@@ -357,5 +357,35 @@
     "utility_weights_frozen_before_outcomes": true,
     "post_hoc_utility_reweighting_prohibited": true,
     "note": "Expected information gain and expected value of sample information are distinct. A result is decision-relevant only if it can change the selected action or its expected utility after accounting for full cost and downside risk."
+  },
+  "active_exploration": {
+    "mode_comparison": {
+      "arms": [
+        "static_fixed_evidence_packet",
+        "active_literature_and_tool_exploration",
+        "active_random_retrieval_matched_cost",
+        "no_external_search_control"
+      ],
+      "shared_budget_envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "temporal_literature_cutoff": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "allowed_sources_and_query_contract_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "query_limit_and_cost_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retrieved_evidence_visibility_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "pre_treatment_capability_tier_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "capability_tiers_frozen_before_treatment": true,
+      "matched_total_tokens_and_tool_budget": true,
+      "report_effect_by_capability_tier": true
+    },
+    "construct_outcomes": [
+      "grounding_and_source_coverage",
+      "feasibility",
+      "clarity",
+      "specificity",
+      "impact",
+      "originality",
+      "mechanism_novelty",
+      "independent_empirical_value"
+    ],
+    "anti_goodhart_policy": "Citation/future-paper matching is a retrospective community-alignment signal, not truth or sole novelty criterion. Independent validated discoveries without a later-paper match remain separately scored."
   }
 }
