@@ -375,7 +375,7 @@ Diagnostics: alignment precision, activation/functional probe budget, weight-dis
 
 Compare raw flattened-weight inspection, random functional probes, activation-probe alignment, greedy accumulated-margin probe selection, permutation-equivariant weight-space editors, SWI's typed group alignment, Deep-Align (when the exact architecture is supported), and a labelled oracle-alignment upper bound. The oracle is verifier-only. A permutation-only change must not be called a defect; a repair must still be evaluated using native model fingerprints and actual behavior.
 
-**Executable anchor now present on this branch:** `src/dynamics/cfc/weight_program_adapter.rs::consistent_hidden_unit_permutation_preserves_cfc_function` materializes the equivalence-preserving permutation through the actual `WeightProgram → materialize_cfc_weight_program → cloned SWI candidate` path. It checks that the native fingerprint changes while a four-step temporal probe sequence remains equivalent. The paired partial-permutation negative control changes only the input-projection rows and must change the output sequence. The fixture is intentionally narrow: one small, one-layer, no-backbone CfC network. It validates one exact symmetry family, not arbitrary multi-layer/backbone transformations.
+**Executable anchor now present on this branch:** `src/dynamics/cfc/weight_program_adapter.rs::consistent_hidden_unit_permutation_preserves_cfc_function` materializes the equivalence-preserving permutation through the actual `WeightProgram → materialize_cfc_weight_program → cloned SWI candidate` path. It checks that the native fingerprint changes while a four-step temporal probe sequence remains equivalent. The paired partial-permutation negative control changes only the input-projection rows and must change the output sequence. The first fixture remains intentionally narrow: one small, one-layer, no-backbone CfC network. The branch now also has a multi-layer canonicalizer for feed-forward, non-residual, unidirectional CfC stacks without backbones. It consumes one fingerprint-bound alignment receipt per layer and propagates each permutation through that layer's input-projection rows, the adjacent layer's input-projection columns, both axes of the recurrent projection, hidden bias, time constants, and the final output projection. The new two-layer seeded regression test constructs two independent permutations, recovers each layer's inverse correspondence from functional probes, builds the typed WeightProgram, materializes it on a candidate clone, verifies that the canonicalized native fingerprint returns to the source fingerprint, and checks held-out sequence equivalence. Residual, bidirectional, and backbone configurations remain fail-closed and unsupported; this is not yet a general symmetry solver for arbitrary CfC topologies.
 
 **Second executable increment: functional-signature alignment and adaptive probe design.** The adapter now builds model- and probe-digest-bound activation-signature receipts, aligns units with a deterministic Hungarian assignment, and reports an accumulated assignment margin against the best alternative. Receipts bind model digest, architecture digest, parameter-manifest digest, layer index, and ordered probe-set digest; source and candidate must share architecture, manifest, layer, and exact probe sequence. A fail-closed acceptance gate rejects malformed digests, non-bijective mappings, excessive activation error, and low/absent assignment margins. The margin uses *summed* probe evidence, while the fit metric remains mean-squared activation error; duplicating a consistent probe therefore increases confidence evidence without changing fit error.
 
@@ -609,6 +609,19 @@ A single synthetic fixture, one seed, one successful PR workflow, or an aggregat
 - Evaluate structured cross-dimensional mixing separately from coordinate-wise baseline.
 - Compare scalar-tau and per-coordinate-tau liquid variants as distinct models.
 - Measure temporal credit assignment (local targets vs eligibility traces/e-prop/BPTT) only after the task harness is qualified.
+
+### Stage 3.1 — Multi-layer symmetry quotient
+
+The next concrete expansion is now implemented for one restricted topology class: stacked feed-forward CfC networks with no residual connections, no backbone, and no bidirectional path. A layerwise alignment bundle is accepted only when each layer has one fresh receipt bound to the same source model digest, candidate model digest, architecture digest, and manifest digest, with the layer-specific probe digest and mapping retained independently.
+
+The group action is compositional. For layer i, its hidden permutation acts on:
+- rows of its input projection;
+- columns of its input projection using layer i-1's permutation (except at the external input);
+- rows and columns of its recurrent projection;
+- its hidden bias and time-constant vectors;
+- the final output projection's columns, using the last layer's permutation.
+
+This is a quotient-space operation: it changes coordinates while preserving the realized network function. The resulting edit is still a typed candidate-only WeightProgram; the native fingerprint and held-out functional probes are checked independently. The current two-layer test is a correctness fixture, not a performance benchmark and not support for residual/backbone/bidirectional models.
 
 ### Stage 4 — generalization and publication
 - Expand from synthetic planted faults to held-out fault families and small real networks.
