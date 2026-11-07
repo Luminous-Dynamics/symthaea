@@ -9,5 +9,8 @@ description = "Exact closed anytime-FWER audit for hierarchical phase-response m
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+connectome-asof-filtration = { path = "../connectome-asof-filtration" }
+
 # Standalone validation crate: intentionally outside the root workspace.
 [workspace]
