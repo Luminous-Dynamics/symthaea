@@ -1076,6 +1076,8 @@ mod tests {
             max_literals: 256,
             max_total_assignment_evaluations: 4,
             max_projection_support: 8,
+            max_projection_fragments: 64,
+            max_projection_support_entries: 1 << 8,
         };
         assert_eq!(
             count_models(&branch_fixture(), tight).unwrap_err(),
@@ -1095,6 +1097,8 @@ mod tests {
             max_literals: 256,
             max_total_assignment_evaluations: 12,
             max_projection_support: 8,
+            max_projection_fragments: 64,
+            max_projection_support_entries: 1 << 8,
         };
         assert_eq!(
             verify_branch_sum(&branch_fixture(), 0, tight).unwrap_err(),
@@ -1114,6 +1118,8 @@ mod tests {
             max_literals: 256,
             max_total_assignment_evaluations: 35,
             max_projection_support: 8,
+            max_projection_fragments: 64,
+            max_projection_support_entries: 1 << 8,
         };
         assert_eq!(
             verify_independent_product(
