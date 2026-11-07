@@ -140,7 +140,7 @@ Include licensed human-sung anchors and strong model baselines. Use ITU-R BS.153
 
 These are proposed test-contract targets, not observed results:
 
-- 100% deterministic correctness on synthetic alignment fixtures, including same-symbol wrong-word/syllable and vowel-class negative controls.
+- 100% deterministic correctness on synthetic alignment fixtures, including same-symbol wrong-word, wrong-syllable, and vowel-class negative controls.
 - Zero accepted malformed, out-of-range, or non-finite phone events.
 - 100% expected melisma spans covered on the synthetic positive control; zero coverage on the deliberately truncated negative control.
 - Timing metrics must be undefined (not zero) when there are no exact phone matches.
