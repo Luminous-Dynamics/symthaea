@@ -713,6 +713,103 @@ mod tests {
         serde_json::from_value(value).expect("mutated fixture pack deserializes")
     }
 
+    const STATE_ROUTING_FIXTURE_PACK: &str =
+        include_str!("../../../docs/research/fixtures/SYM_RSI_STATE_ROUTING_FIXTURES_V0_2026-11-07.json");
+
+    fn valid_state_routing_pack() -> StateRoutingFixturePack {
+        serde_json::from_str(STATE_ROUTING_FIXTURE_PACK)
+            .expect("checked-in state-routing fixture pack parses")
+    }
+
+    fn state_routing_as_value(pack: &StateRoutingFixturePack) -> Value {
+        serde_json::to_value(pack).expect("state-routing fixture pack serializes")
+    }
+
+    fn state_routing_from_value(value: Value) -> StateRoutingFixturePack {
+        serde_json::from_value(value).expect("mutated state-routing fixture pack deserializes")
+    }
+
+
+    #[test]
+    fn accepts_checked_in_state_routing_fixture_pack() {
+        let report = validate_state_routing_fixture_pack(&valid_state_routing_pack());
+        assert!(
+            report.valid_fixture_pack,
+            "unexpected issues: {:?}",
+            report.issues
+        );
+        assert_eq!(report.fixture_count, STATE_ROUTING_TOTAL);
+        assert_eq!(report.negative_control_count, STATE_ROUTING_NEGATIVE_COUNT);
+        assert_eq!(report.positive_control_count, STATE_ROUTING_POSITIVE_COUNT);
+        assert_eq!(report.abstention_control_count, STATE_ROUTING_ABSTENTION_COUNT);
+    }
+
+    #[test]
+    fn rejects_state_routing_pack_promoted_to_results() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        value["status"] = Value::String("BENCHMARK_RESULTS".to_owned());
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("STATUS:")));
+    }
+
+    #[test]
+    fn rejects_duplicate_state_routing_control_id() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        let duplicate = value["fixtures"][0]["control_id"].clone();
+        value["fixtures"][1]["control_id"] = duplicate;
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("DUPLICATE_CONTROL_ID:")));
+    }
+
+    #[test]
+    fn rejects_state_routing_negative_without_hard_gate() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        value["fixtures"][0]["hard_gate"] = Value::Bool(false);
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("NEGATIVE_NOT_HARD_GATE:")));
+    }
+
+    #[test]
+    fn rejects_wrong_state_routing_negative_disposition() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        value["fixtures"][0]["disposition"] = Value::String("ALLOW_SCOPED_REUSE".to_owned());
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("NEGATIVE_DISPOSITION_MISMATCH:")));
+    }
+
+    #[test]
+    fn rejects_state_routing_positive_marked_as_hard_gate() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        value["fixtures"][10]["hard_gate"] = Value::Bool(true);
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("POSITIVE_MARKED_HARD_GATE:")));
+    }
+
+    #[test]
+    fn rejects_forced_state_routing_instead_of_abstention() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        value["fixtures"][14]["disposition"] = Value::String("ALLOW_SCOPED_REUSE".to_owned());
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("ABSTENTION_DISPOSITION_MISMATCH:")));
+    }
+
+    #[test]
+    fn rejects_duplicate_state_routing_fixture_ids() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        let duplicate_id = value["fixtures"][0]["fixture_id"].clone();
+        value["fixtures"][1]["fixture_id"] = duplicate_id;
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("DUPLICATE_FIXTURE_ID:")));
+    }
+
+    #[test]
+    fn rejects_empty_state_routing_evidence_field_name() {
+        let mut value = state_routing_as_value(&valid_state_routing_pack());
+        value["fixtures"][0]["fields"][0] = Value::String(String::new());
+        let report = validate_state_routing_fixture_pack(&state_routing_from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("FIELD_NAME_EMPTY:")));
+    }
+
     #[test]
     fn accepts_checked_in_synthetic_fixture_pack() {
         let report = validate_fixture_pack(&valid_pack());
