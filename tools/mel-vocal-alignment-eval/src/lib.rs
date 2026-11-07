@@ -422,7 +422,6 @@ fn mean(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
-
 /// Conventional median: arithmetic mean of the two center values for even n.
 /// Empty timing support remains None rather than a synthetic zero.
 fn median(values: &[f64]) -> Option<f64> {
@@ -514,7 +513,6 @@ mod tests {
         assert_eq!(result.timing.onset_mae_ms, Some(0.0));
         assert_eq!(result.timing.offset_p95_ms, Some(0.0));
     }
-
 
     #[test]
     fn onset_timing_reports_median_and_published_threshold_coverage() {
