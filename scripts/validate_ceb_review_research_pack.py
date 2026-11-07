@@ -17,6 +17,8 @@ TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.
 GOLD_COMPLETENESS = "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
 SEQUENTIAL_EVIDENCE = "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
 EVIDENCE_CROSSWALK = "docs/research/CEB_REVIEW_EVIDENCE_ACTION_CROSSWALK_V0_2026-11-07.md"
+CALIBRATION_PACK = "docs/research/CEB_REVIEW_HUMAN_CALIBRATION_PACK_V0_2026-11-07.md"
+CALIBRATION_KEY = "docs/research/CEB_REVIEW_HUMAN_CALIBRATION_KEY_V0_2026-11-07.md"
 PREREGISTRATION = "docs/research/CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md"
 CHALLENGE = "docs/research/CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md"
 ADJUDICATION = "docs/research/CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md"
@@ -41,6 +43,7 @@ COMPARATORS = (
     "CR-Bench-v2",
     "CRBugBench",
     "CodeReviewBench",
+    "Martian Code Review Benchmark",
 )
 EXECUTION_GATES = ("#10064", "#10369")
 
@@ -65,6 +68,8 @@ def validate_documents(
     gold_completeness: str,
     sequential_evidence: str,
     evidence_crosswalk: str,
+    calibration_pack: str,
+    calibration_key: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -96,6 +101,8 @@ def validate_documents(
         "https://arxiv.org/abs/2610.33509",
         "https://arxiv.org/abs/2611.02566",
         "https://arxiv.org/abs/2610.13668",
+        "https://www.codereviewbench.com/leaderboard",
+        "https://www.codereviewbenchmark.com/",
     ):
         if url not in triangulation:
             errors.append(f"triangulation document is missing source URL {url}")
@@ -168,6 +175,10 @@ def validate_documents(
         errors.append("ReviewBench augmented-recall denominator caveat is missing")
     if "CodeReviewBench human-flagged bug recall" not in triangulation:
         errors.append("triangulation must distinguish CodeReviewBench human-flagged-bug recall")
+    if "Martian production review adoption" not in triangulation:
+        errors.append("triangulation must distinguish Martian production adoption from correctness")
+    if "adoption is not proof of correctness" not in triangulation.lower():
+        errors.append("triangulation must state that adoption is not proof of correctness")
     if "Gold-Completeness and Open-Set Discovery" not in triangulation:
         errors.append("triangulation must link the gold-completeness protocol")
     if "Sequential Evidence Acquisition" not in triangulation:
@@ -232,6 +243,49 @@ def validate_documents(
         if required not in evidence_crosswalk:
             errors.append(f"evidence-action crosswalk is missing {required}")
 
+    case_ids = re.findall(r"^## \\d+\\. Case (CAL-\\d{2})", calibration_pack, re.MULTILINE)
+    expected_cases = ["CAL-01", "CAL-02", "CAL-03"]
+    if case_ids != expected_cases:
+        errors.append(f"human calibration pack must contain CAL-01..CAL-03 exactly once and in order; got {case_ids}")
+    for case_id in expected_cases:
+        match = re.search(
+            rf"^## \\d+\\. Case {case_id}\\b([\\s\\S]*?)(?=^## \\d+\\. Case CAL-|^## \\d+\\. Cross-case|\\Z)",
+            calibration_pack,
+            re.MULTILINE,
+        )
+        block = match.group(1) if match else ""
+        variants = [int(x) for x in re.findall(r"^#### Variant X([1-6])\\b", block, re.MULTILINE)]
+        if variants != [1, 2, 3, 4, 5, 6]:
+            errors.append(f"{case_id}: expected exactly neutral variants X1..X6; got {variants}")
+        for phrase in ("Normative contract", "Candidate finding to assess", "Reviewer worksheet"):
+            if phrase not in block:
+                errors.append(f"{case_id}: missing {phrase}")
+    key_rows = re.findall(
+        r"^\\| (CAL-\\d{2}) \\| X([1-6]) \\| (P|I|F|N|M|IRR) —",
+        calibration_key,
+        re.MULTILINE,
+    )
+    key_pairs = [(case_id, int(variant)) for case_id, variant, _ in key_rows]
+    if len(key_rows) != 18 or len(set(key_pairs)) != 18:
+        errors.append(f"calibration key must map 18 unique case/variant pairs; got {len(key_rows)} rows and {len(set(key_pairs))} unique")
+    if set(case_id for case_id, _, _ in key_rows) != set(expected_cases):
+        errors.append("calibration key must cover all three calibration cases")
+    for case_id in expected_cases:
+        states = [state for row_case, _, state in key_rows if row_case == case_id]
+        if sorted(states) != sorted(["P", "I", "F", "N", "M", "IRR"]):
+            errors.append(f"{case_id}: key must assign each P/I/F/N/M/IRR state exactly once")
+    for required in (
+        "public synthetic development/calibration material",
+        "not an admitted task set",
+        "permanently ineligible as a sealed CEB holdout",
+        "No code was compiled or executed",
+    ):
+        if required.lower() not in calibration_pack.lower():
+            errors.append(f"human calibration pack is missing claim boundary: {required}")
+    if "public development answer key" not in calibration_key.lower():
+        errors.append("calibration answer key must remain labelled public development material")
+    if "not hidden ground truth" not in calibration_key.lower():
+        errors.append("calibration answer key must not claim hidden/oracle authority")
     return errors
 
 
@@ -308,8 +362,27 @@ def self_test() -> list[str]:
         "#10064 #10369",
     ))
 
-    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str) -> list[str]:
-        return validate_documents(t, ch, a, s, p, g, e, x)
+    calibration_pack = "\\n".join((
+        "public synthetic development/calibration material; not an admitted task set",
+        *(
+            f"## {idx + 2}. Case CAL-{case:02d}\\nNormative contract\\nCandidate finding to assess\\n"
+            + "\\n".join(f"#### Variant X{variant}\\nsource excerpt" for variant in range(1, 7))
+            + "\\nReviewer worksheet"
+            for idx, case in enumerate(range(1, 4))
+        ),
+        "permanently ineligible as a sealed CEB holdout; No code was compiled or executed",
+    ))
+    calibration_key = "\\n".join((
+        "public development answer key; not hidden ground truth",
+        *(
+            f"| CAL-{case:02d} | X{variant} | {state} — state |"
+            for case in range(1, 4)
+            for variant, state in enumerate(["P", "I", "F", "N", "M", "IRR"], 1)
+        ),
+    ))
+
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str) -> list[str]:
+        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck)
 
     crosswalk = "\n".join((
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
@@ -321,7 +394,8 @@ def self_test() -> list[str]:
     ))
     valid = run(
         triangulation, challenge, adjudication, scorecard,
-        preregistration, gold_completeness, sequential_evidence, crosswalk
+        preregistration, gold_completeness, sequential_evidence, crosswalk,
+        calibration_pack, calibration_key
     )
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
@@ -347,6 +421,10 @@ def self_test() -> list[str]:
         ("duplicate crosswalk scenario", "crosswalk", crosswalk.replace("ERG-S02", "ERG-S01", 1)),
         ("missing crosswalk scenario", "crosswalk", crosswalk.replace("| ERG-S02 |", "| ERG-SXX |", 1)),
         ("missing crosswalk execution gate", "crosswalk", crosswalk.replace("#10064", "gate removed")),
+        ("missing calibration case", "calibration_pack", calibration_pack.replace("Case CAL-02", "Case CAL-XX", 1)),
+        ("missing calibration variant", "calibration_pack", calibration_pack.replace("#### Variant X6", "#### Variant X7", 1)),
+        ("missing calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X3 |", "| CAL-02 | X8 |", 1)),
+        ("duplicate calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X1 |", "| CAL-01 | X1 |", 1)),
     )
     for label, target, mutant in mutations:
         args = {
@@ -358,6 +436,8 @@ def self_test() -> list[str]:
             "gold": gold_completeness,
             "evidence": sequential_evidence,
             "crosswalk": crosswalk,
+            "calibration_pack": calibration_pack,
+            "calibration_key": calibration_key,
         }
         args[target] = mutant
         result = run(
@@ -369,6 +449,8 @@ def self_test() -> list[str]:
             args["gold"],
             args["evidence"],
             args["crosswalk"],
+            args["calibration_pack"],
+            args["calibration_key"],
         )
         if not result:
             return [f"negative self-test was accepted: {label}"]
@@ -396,7 +478,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 20 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 24 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -407,11 +489,17 @@ def main() -> int:
         gold_completeness = read_required(args.repo_root, GOLD_COMPLETENESS)
         sequential_evidence = read_required(args.repo_root, SEQUENTIAL_EVIDENCE)
         evidence_crosswalk = read_required(args.repo_root, EVIDENCE_CROSSWALK)
+        calibration_pack = read_required(args.repo_root, CALIBRATION_PACK)
+        calibration_key = read_required(args.repo_root, CALIBRATION_KEY)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    failures = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration, gold_completeness, sequential_evidence, evidence_crosswalk)
+    failures = validate_documents(
+        triangulation, challenge, adjudication, scorecard, preregistration,
+        gold_completeness, sequential_evidence, evidence_crosswalk,
+        calibration_pack, calibration_key
+    )
     if failures:
         for failure in failures:
             print(f"ERROR: {failure}", file=sys.stderr)
@@ -422,7 +510,8 @@ def main() -> int:
         "CEB_REVIEW_RESEARCH_PACK_PASS: "
         f"scenarios={len(ids)} comparators={len(COMPARATORS)} "
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
-        "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26"
+        "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26 "
+        "human_calibration_cases=3 variants=18 answer_key=separate-public"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
