@@ -701,6 +701,74 @@ impl SingingBackendCapabilities {
     }
 }
 
+/// Requirements a caller places on one render. This makes backend control
+/// claims executable instead of leaving the capability manifest as metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SingingRenderPolicy {
+    pub required_controls: Vec<SingingControl>,
+    pub allow_approximated: bool,
+    pub allow_conditional: bool,
+}
+
+impl SingingRenderPolicy {
+    pub fn new(
+        required_controls: Vec<SingingControl>,
+        allow_approximated: bool,
+        allow_conditional: bool,
+    ) -> Result<Self> {
+        let mut seen = std::collections::HashSet::new();
+        for control in &required_controls {
+            if !seen.insert(*control) {
+                bail!("render policy declares {control:?} more than once");
+            }
+        }
+        Ok(Self {
+            required_controls,
+            allow_approximated,
+            allow_conditional,
+        })
+    }
+
+    /// Minimum common contract for controlled score-conditioned comparisons.
+    /// Lyric text is deliberately absent: a phoneme-native backend may consume
+    /// an independently selected pronunciation plan rather than raw text.
+    pub fn score_conditioned_comparison() -> Self {
+        Self {
+            required_controls: vec![
+                SingingControl::Language,
+                SingingControl::ExactPhoneSequence,
+                SingingControl::SyllableAlignment,
+                SingingControl::NotePitch,
+                SingingControl::NoteDuration,
+                SingingControl::AbsoluteOnsetAndRests,
+                SingingControl::Melisma,
+            ],
+            allow_approximated: true,
+            allow_conditional: true,
+        }
+    }
+
+    pub fn validate_against(&self, capabilities: &SingingBackendCapabilities) -> Result<()> {
+        capabilities.validate()?;
+        for control in &self.required_controls {
+            let support = capabilities.support(*control);
+            let accepted = match support {
+                CapabilitySupport::Native => true,
+                CapabilitySupport::Approximated => self.allow_approximated,
+                CapabilitySupport::Conditional => self.allow_conditional,
+                CapabilitySupport::Unsupported => false,
+            };
+            if !accepted {
+                bail!(
+                    "backend {} cannot satisfy required control {control:?}: declared {support:?}",
+                    capabilities.backend_id
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
 pub trait SingingVoiceEngine {
     fn id(&self) -> &str;
 
@@ -709,6 +777,19 @@ pub trait SingingVoiceEngine {
     /// unsupported rather than assuming parity between implementations.
     fn capabilities(&self) -> SingingBackendCapabilities {
         SingingBackendCapabilities::undeclared(self.id())
+    }
+
+    /// Validate the performance and requested control contract before calling
+    /// the renderer. Legacy render remains available for existing callers;
+    /// controlled comparisons should use this policy-aware entrypoint.
+    fn render_with_policy(
+        &mut self,
+        performance: &VocalPerformance,
+        policy: &SingingRenderPolicy,
+    ) -> Result<VocalStem> {
+        performance.validate()?;
+        policy.validate_against(&self.capabilities())?;
+        self.render(performance)
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem>;
@@ -762,6 +843,73 @@ mod tests {
             })
             .collect();
         assert!(SingingBackendCapabilities::new("fixture", controls).is_err());
+    }
+
+    fn capability_fixture(
+        support: CapabilitySupport,
+    ) -> SingingBackendCapabilities {
+        SingingBackendCapabilities::new(
+            "fixture",
+            SingingControl::ALL
+                .into_iter()
+                .map(|control| ControlCapability {
+                    control,
+                    support,
+                    rationale: "test fixture declaration".to_string(),
+                })
+                .collect(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn render_policy_admits_only_declared_control_levels() {
+        let native = capability_fixture(CapabilitySupport::Native);
+        let policy = SingingRenderPolicy::new(
+            vec![SingingControl::ExactPhoneSequence, SingingControl::NotePitch],
+            false,
+            false,
+        )
+        .unwrap();
+        assert!(policy.validate_against(&native).is_ok());
+
+        let approximated = capability_fixture(CapabilitySupport::Approximated);
+        assert!(policy.validate_against(&approximated).is_err());
+        let permissive = SingingRenderPolicy::new(
+            vec![SingingControl::ExactPhoneSequence],
+            true,
+            false,
+        )
+        .unwrap();
+        assert!(permissive.validate_against(&approximated).is_ok());
+
+        let conditional = capability_fixture(CapabilitySupport::Conditional);
+        assert!(permissive.validate_against(&conditional).is_err());
+        let conditional_policy = SingingRenderPolicy::new(
+            vec![SingingControl::Language],
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(conditional_policy.validate_against(&conditional).is_ok());
+
+        let unsupported = SingingBackendCapabilities::undeclared("unverified");
+        assert!(conditional_policy.validate_against(&unsupported).is_err());
+    }
+
+    #[test]
+    fn render_policy_rejects_duplicate_required_controls() {
+        let error = SingingRenderPolicy::new(
+            vec![
+                SingingControl::NotePitch,
+                SingingControl::NotePitch,
+            ],
+            true,
+            true,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("more than once"), "{error}");
     }
 
     #[test]
