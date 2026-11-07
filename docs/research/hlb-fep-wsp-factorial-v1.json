@@ -440,6 +440,36 @@
         "causal_intervention_holdout_groups",
         "unseen_procedural_task_semantics"
       ]
+    },
+    {
+      "id": "three_ball_joint_belief_active_perception",
+      "environment": "Finite-hypothesis three-ball task with a joint posterior over source or semantic-quotient rule identity and 27 hidden ball-colour configurations. Candidate policies compare immediate colour choice against one gaze observation, posterior conditioning, and a downstream choice. This is a two-step receding-horizon adapter, not the full SPM POMDP or a parameter-learning benchmark.",
+      "primary_outcomes": [
+        "correct_choice_after_observation",
+        "rule_identification_accuracy",
+        "trials_to_rule_identification",
+        "gaze_observation_cost",
+        "two_step_policy_regret"
+      ],
+      "diagnostics": [
+        "model_information_gain_nats",
+        "conditional_state_information_gain_nats",
+        "joint_information_gain_nats",
+        "information_chain_rule_error_nats",
+        "posterior_model_entropy",
+        "posterior_state_entropy",
+        "selected_gaze_location",
+        "contingent_choice_by_visual_outcome",
+        "immediate_choice_when_no_gaze"
+      ],
+      "negative_controls": [
+        "immediate_choice_without_gaze",
+        "uniform_random_gaze",
+        "constant_visual_sensor_independent_of_hidden_state",
+        "model_state_independent_prior",
+        "semantic_quotient_vs_source_labelled_hypotheses",
+        "impossible_gaze_feedback_observations_rejected"
+      ]
     }
   ],
   "baselines": [
@@ -754,6 +784,22 @@
     {
       "id": "strict_structural_zero_dirichlet_bmr",
       "scope": "Strict simplex-face BMR with exact structural zeros and zero evidence for posterior counts outside reduced support"
+    },
+    {
+      "id": "uniform_random_gaze",
+      "scope": "Random legal gaze location with identical action costs and one-observation horizon"
+    },
+    {
+      "id": "maximum_state_information_gaze",
+      "scope": "Greedy gaze selection maximizing conditional hidden-state information only"
+    },
+    {
+      "id": "two_step_active_inference_gaze_choice",
+      "scope": "Two-step gaze/observation/choice lookahead using joint model-state belief, pragmatic feedback preferences, conditional state information, model information, and action costs"
+    },
+    {
+      "id": "immediate_choice_without_gaze",
+      "scope": "Choose from current joint belief without taking an additional visual observation"
     }
   ],
   "seeds": {
@@ -845,7 +891,11 @@
       "known_state_feedback_model_information_gain_nats",
       "known_state_feedback_expected_free_energy_nats",
       "known_state_feedback_action_ranking_regret",
-      "known_state_feedback_score_decomposition_error_nats"
+      "known_state_feedback_score_decomposition_error_nats",
+      "correct_choice_after_observation",
+      "trials_to_rule_identification",
+      "gaze_observation_cost",
+      "two_step_policy_regret"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -910,7 +960,12 @@
       "spm_bmr_log_evidence_ratio_difference_nats_vs_pinned_reference",
       "spm_full_prior_global_normalization_error",
       "spm_pseudocount_coordinate_coverage",
-      "strict_vs_spm_posterior_model_kl_nats"
+      "strict_vs_spm_posterior_model_kl_nats",
+      "conditional_state_information_gain_nats",
+      "information_chain_rule_error_nats",
+      "posterior_state_entropy",
+      "posterior_model_entropy",
+      "gaze_observation_cost_nats"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1005,7 +1060,11 @@
     "The known-state action score is compared against random, pragmatic-only (lambda_info=0), model-EIG-only, and combined one-step FEP-style baselines under the same legal action set and cost; preference risk, model EIG, epistemic weight, and action cost are reported separately. This is not evidence of full POMDP performance or production ActiveInferenceAgent integration.",
     "The three-ball source-reproduction profile must use the pinned SPM globally normalized prior over all Dirichlet tensor entries, not independent per-column arithmetic normalization.",
     "The three-ball source-reproduction profile must apply the pinned SPM 1/32 pseudocount to every posterior, full-prior, and reduced-prior coordinate in Dirichlet model evidence; strict structural-zero BMR is registered as a separate ablation.",
-    "The BMR reference test must reproduce spm_MDP_log_evidence with first-dimension multivariate-beta columns and source-pinned SPM revision metadata; the source digest and formula must be recorded in the experiment receipt."
+    "The BMR reference test must reproduce spm_MDP_log_evidence with first-dimension multivariate-beta columns and source-pinned SPM revision metadata; the source digest and formula must be recorded in the experiment receipt.",
+    "The three-ball partial-observation policy maintains a normalized joint P(model,state) belief; it must not replace it with independent marginals after evidence introduces model/state correlation.",
+    "Gaze information is measured as model information plus conditional state information I(State; Observation | Model); the joint mutual-information chain-rule residual is reported and bounded.",
+    "The two-step gaze/choice policy is labelled a bounded receding-horizon approximation; it is not called a full SPM POMDP reproduction or a continuous-parameter learner.",
+    "A constant visual sensor independent of hidden state must produce zero conditional state information gain; impossible observations must fail closed."
   ],
   "research_references": [
     {
