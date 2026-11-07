@@ -1956,6 +1956,7 @@ fn unsafe_integer_precision_warnings_survive_recursive_key_permutations() {
         .unwrap()
         .value;
     evidence_value["normalized_result"]["large_count"] = json!(9_007_199_254_740_993_u64);
+    evidence_value["normalized_result"]["asserted_counter"] = json!(9_007_199_254_740_994_u64);
     evidence_value["parameters"]["large_offset"] = json!(18_446_744_073_709_551_615_u64);
     evidence_value["evidence_id"] =
         json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
@@ -1964,7 +1965,6 @@ fn unsafe_integer_precision_warnings_survive_recursive_key_permutations() {
     let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
     let mut claim = provider_claim(evidence.evidence_id.clone());
     claim.asserted_value = evidence.value["normalized_result"].clone();
-    claim.asserted_value["asserted_counter"] = json!(9_007_199_254_740_994_u64);
     let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
 
     let original_replay =
