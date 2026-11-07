@@ -297,6 +297,11 @@ impl SingingVoiceEngine for FormantSingingEngine {
                     "phrase expression points are not mapped into formant-frame controls",
                 ),
                 capability(
+                    SingingControl::PhraseBreathTiming,
+                    CapabilitySupport::Unsupported,
+                    "phrase breath durations are not synthesized; only score-note timing gaps become silent frames",
+                ),
+                capability(
                     SingingControl::Breathiness,
                     CapabilitySupport::Unsupported,
                     "per-syllable breathiness is not represented by the legacy FormantFrame contract",
