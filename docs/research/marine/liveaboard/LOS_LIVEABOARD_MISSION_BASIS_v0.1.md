@@ -106,6 +106,8 @@ The companion vessel_benchmark_register.csv keeps each source/configuration sepa
 - Symthaea: requirements, mission identity, engineering interpretation, evidence contracts and candidate proposal.
 - Existing marine-bench owners: catamaran candidates, energy budget, voyage traces, matched trials, operating-envelope completeness, validation and uncertainty.
 - Symtropy: spatial configuration, interior/access/service clearances, assembly/resource scheduling and deterministic scenario replay; not a substitute for validated CFD or structural FEA.
+- [MARINE-AUTONOMY-VECTOR-001 #10956](https://github.com/Luminous-Dynamics/symthaea/issues/10956): per-resource mission endurance (water, food, waste, consumables, spares) using upstream stock/depletion evidence; no scalar autonomy shortcut.
+- [MARINE-HABITABILITY-SEAKEEPING-001 #10966](https://github.com/Luminous-Dynamics/symthaea/issues/10966): task/location/posture-specific motion comfort and workability; composes validated seakeeping outputs and human-factor methods rather than creating a new motion solver.
 - Mycelix: component provenance, custody, manufacturing and inspection records; not engineering approval.
 - Sol-Atlas: source-aware route, site, climate, solar and port infrastructure projections.
 - Robotics/HAL: bounded inspection/assembly/maintenance adapters; physical safety remains local and independently assured.
