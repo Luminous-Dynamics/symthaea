@@ -377,7 +377,11 @@ mod tests {
         capabilities.validate().unwrap();
         assert_eq!(
             capabilities.support(SingingControl::AbsoluteOnsetAndRests),
-            CapabilitySupport::Native
+            CapabilitySupport::Approximated
+        );
+        assert_eq!(
+            capabilities.support(SingingControl::ConsonantAnticipation),
+            CapabilitySupport::Unsupported
         );
         assert_eq!(
             capabilities.support(SingingControl::Melisma),
