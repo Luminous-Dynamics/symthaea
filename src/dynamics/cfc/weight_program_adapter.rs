@@ -259,6 +259,10 @@ pub struct CfCActivationSignatureSet {
     pub format_version: u32,
     /// Native model fingerprint from which these signatures were measured.
     pub model_digest: String,
+    /// Architecture digest: config, topology, layer semantics, and dimensions.
+    pub architecture_digest: String,
+    /// Parameter manifest digest: semantic groups, shapes, and coordinate order.
+    pub manifest_digest: String,
     /// Digest of the ordered elapsed-time/input probe sequence.
     pub probe_digest: String,
     /// Layer whose hidden units were measured.
@@ -286,10 +290,12 @@ pub fn cfc_hidden_unit_activation_signatures(
         });
     }
 
-    let model_digest = network
+    let fingerprint = network
         .fingerprint()
-        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?
-        .model_digest;
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    let model_digest = fingerprint.model_digest;
+    let architecture_digest = fingerprint.architecture_digest;
+    let manifest_digest = fingerprint.manifest_digest;
     let probe_digest = cfc_probe_set_digest(layer_index, probes);
 
     let mut evaluation = network.clone();
@@ -346,6 +352,8 @@ pub fn cfc_hidden_unit_activation_signatures(
     Ok(CfCActivationSignatureSet {
         format_version: 1,
         model_digest,
+        architecture_digest,
+        manifest_digest,
         probe_digest,
         layer_index,
         signatures,
@@ -383,6 +391,10 @@ pub struct CfCHiddenUnitAlignment {
     pub source_model_digest: String,
     /// Candidate model fingerprint to which the mapping is bound.
     pub candidate_model_digest: String,
+    /// Shared architecture digest required for valid permutation correspondence.
+    pub architecture_digest: String,
+    /// Shared parameter-manifest digest required for coordinate correspondence.
+    pub manifest_digest: String,
     /// Ordered functional probe-set digest used for this alignment.
     pub probe_digest: String,
     /// Layer whose units were matched.
@@ -445,6 +457,10 @@ pub enum CfCPermutationAlignmentError {
     },
     #[error("no finite complete hidden-unit assignment exists")]
     NoFeasibleAssignment,
+    #[error("source and candidate architecture digests differ: {source} vs {candidate}")]
+    ArchitectureMismatch { source: String, candidate: String },
+    #[error("source and candidate parameter-manifest digests differ: {source} vs {candidate}")]
+    ManifestMismatch { source: String, candidate: String },
     #[error("source and candidate probe digests differ: {source} vs {candidate}")]
     ProbeSetMismatch { source: String, candidate: String },
     #[error("source and candidate layer indices differ: {source} vs {candidate}")]
@@ -515,12 +531,36 @@ pub fn align_cfc_hidden_unit_signatures(
                 field: "model",
             });
         }
+        if !is_lowercase_hex_digest(&signature_set.architecture_digest) {
+            return Err(CfCPermutationAlignmentError::InvalidSignatureDigest {
+                side,
+                field: "architecture",
+            });
+        }
+        if !is_lowercase_hex_digest(&signature_set.manifest_digest) {
+            return Err(CfCPermutationAlignmentError::InvalidSignatureDigest {
+                side,
+                field: "manifest",
+            });
+        }
         if !is_lowercase_hex_digest(&signature_set.probe_digest) {
             return Err(CfCPermutationAlignmentError::InvalidSignatureDigest {
                 side,
                 field: "probe",
             });
         }
+    }
+    if source_signature_set.architecture_digest != candidate_signature_set.architecture_digest {
+        return Err(CfCPermutationAlignmentError::ArchitectureMismatch {
+            source: source_signature_set.architecture_digest.clone(),
+            candidate: candidate_signature_set.architecture_digest.clone(),
+        });
+    }
+    if source_signature_set.manifest_digest != candidate_signature_set.manifest_digest {
+        return Err(CfCPermutationAlignmentError::ManifestMismatch {
+            source: source_signature_set.manifest_digest.clone(),
+            candidate: candidate_signature_set.manifest_digest.clone(),
+        });
     }
     if source_signature_set.probe_digest != candidate_signature_set.probe_digest {
         return Err(CfCPermutationAlignmentError::ProbeSetMismatch {
@@ -605,6 +645,8 @@ pub fn align_cfc_hidden_unit_signatures(
         format_version: 1,
         source_model_digest: source_signature_set.model_digest.clone(),
         candidate_model_digest: candidate_signature_set.model_digest.clone(),
+        architecture_digest: source_signature_set.architecture_digest.clone(),
+        manifest_digest: source_signature_set.manifest_digest.clone(),
         probe_digest: source_signature_set.probe_digest.clone(),
         layer_index: source_signature_set.layer_index,
         source_to_candidate,
@@ -644,6 +686,16 @@ pub fn validate_cfc_alignment_for_parameter_transfer(
     if !is_lowercase_hex_digest(&alignment.candidate_model_digest) {
         return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
             field: "candidate_model_digest",
+        });
+    }
+    if !is_lowercase_hex_digest(&alignment.architecture_digest) {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "architecture_digest",
+        });
+    }
+    if !is_lowercase_hex_digest(&alignment.manifest_digest) {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "manifest_digest",
         });
     }
     if !is_lowercase_hex_digest(&alignment.probe_digest) {
@@ -865,6 +917,8 @@ mod tests {
         CfCActivationSignatureSet {
             format_version: 1,
             model_digest: digest(model),
+            architecture_digest: digest('x'),
+            manifest_digest: digest('y'),
             probe_digest: digest(probe),
             layer_index: 0,
             signatures,
@@ -1027,6 +1081,8 @@ mod tests {
         assert_eq!(alignment.source_to_candidate, vec![1, 2, 0]);
         assert_eq!(alignment.source_model_digest, digest('a'));
         assert_eq!(alignment.candidate_model_digest, digest('b'));
+        assert_eq!(alignment.architecture_digest, digest('x'));
+        assert_eq!(alignment.manifest_digest, digest('y'));
         assert_eq!(alignment.probe_digest, digest('c'));
         assert!(alignment.mean_squared_activation_error < 1e-15);
         assert!(
@@ -1181,6 +1237,24 @@ mod tests {
                 .minimum_assignment_margin
                 .is_some_and(|margin| margin < 1e-15)
         );
+    }
+
+    #[test]
+    fn activation_alignment_rejects_different_architectures_and_manifests() {
+        let source = signature_set(vec![vec![0.0, 1.0]], 'a', 'c');
+        let mut different_architecture = signature_set(vec![vec![0.0, 1.0]], 'b', 'c');
+        different_architecture.architecture_digest = digest('u');
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&source, &different_architecture),
+            Err(CfCPermutationAlignmentError::ArchitectureMismatch { .. })
+        ));
+
+        let mut different_manifest = signature_set(vec![vec![0.0, 1.0]], 'b', 'c');
+        different_manifest.manifest_digest = digest('v');
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&source, &different_manifest),
+            Err(CfCPermutationAlignmentError::ManifestMismatch { .. })
+        ));
     }
 
     #[test]
