@@ -235,8 +235,8 @@ def self_test() -> list[str]:
     ))
     scorecard = (
         "3.10 From code location to causal mechanism diagnosis\n"
-        "3.11 From human-found gold to open-set completeness\n"
-        "3.12 From tools to sequential evidence acquisition"
+        "3.11 From human-found gold to independently audited open-set discovery\n"
+        "3.12 From tool use to sequential evidence acquisition"
     )
     preregistration = "\n".join((
         "P — Parent / pre-introduction",
