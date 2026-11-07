@@ -25,7 +25,7 @@ For each verifier-qualified direction, the reference:
 6. Applies an explicit per-direction maximum share of the next budget.
 7. Offers a separate, priced `NEW` option with a maximum share and verifier-intake reference. `NEW` is a budget reservation for verifier intake; it is not a candidate-minted direction or an admission decision.
 
-The greedy allocation loop uses deterministic lexical tie-breaking and never spends more than the declared available budget or any candidate's share cap. The report distinguishes total budget, active budget, reserved/unavailable budget, new recommendations and the unallocated remainder of the available budget. Active allocations are sourced from the referenced external snapshot; the board does not mint or mutate that registry.
+The greedy allocation loop uses deterministic lexical tie-breaking and never spends more than the declared available budget or any candidate's share cap. The total campaign envelope must reconcile **completed historical attempt costs + active-worker costs + next-decision available costs + reserved/unavailable costs**. The report distinguishes all four categories plus new recommendations and the unallocated remainder of available budget. Completed history is charged even when an attempt was invalid or inconclusive. Active allocations are sourced from the referenced external snapshot; the board does not mint or mutate that registry.
 
 ## Identity and evidence requirements
 
@@ -45,6 +45,7 @@ The validator rejects repeated IDs/fingerprints, unqualified directions, missing
 - The prior/shrinkage/UCB-like score is a transparent heuristic, not a calibrated posterior, confidence interval, causal effect or optimal bandit policy.
 - Expected evaluation costs and protected-floor declarations are inputs; they require independent measurement/audit.
 - Active worker allocation counts/costs are trusted only as far as the referenced snapshot; this crate does not authenticate that registry.
+- The total-budget invariant includes historical attempts, active work and remaining availability; otherwise search costs from prior generations could be silently externalized.
 - The reference does not perform task-family transfer testing or prove a direction's scientific novelty.
 - A valid allocation report is a recommendation under the declared input and budget, not evidence that the board improves research outcomes or that the outer-loop improver has improved.
 
