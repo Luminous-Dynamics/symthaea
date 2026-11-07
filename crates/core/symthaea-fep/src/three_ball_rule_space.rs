@@ -526,7 +526,14 @@ pub fn build_three_ball_feedback_action_prediction(
     action_id: impl Into<String>,
 ) -> Result<DirichletActionPrediction, ThreeBallFeedbackDecisionError> {
     build_three_ball_feedback_action_prediction_with_mode(
-        space, full_posterior, models, ball_colours, gaze, choice, action_id, false,
+        space,
+        full_posterior,
+        models,
+        ball_colours,
+        gaze,
+        choice,
+        action_id,
+        false,
     )
 }
 
@@ -543,7 +550,14 @@ pub fn build_three_ball_feedback_action_prediction_spm_compatible(
     action_id: impl Into<String>,
 ) -> Result<DirichletActionPrediction, ThreeBallFeedbackDecisionError> {
     build_three_ball_feedback_action_prediction_with_mode(
-        space, full_posterior, models, ball_colours, gaze, choice, action_id, true,
+        space,
+        full_posterior,
+        models,
+        ball_colours,
+        gaze,
+        choice,
+        action_id,
+        true,
     )
 }
 
@@ -641,8 +655,7 @@ fn build_three_ball_feedback_action_prediction_with_mode(
         }
         let total = concentrations.iter().sum::<f64>();
         let probabilities = if spm_compatible && total == 0.0 {
-            vec![1.0 / THREE_BALL_FEEDBACK_OUTCOME_COUNT as f64;
-                THREE_BALL_FEEDBACK_OUTCOME_COUNT]
+            vec![1.0 / THREE_BALL_FEEDBACK_OUTCOME_COUNT as f64; THREE_BALL_FEEDBACK_OUTCOME_COUNT]
         } else {
             if !total.is_finite() || total <= 0.0 {
                 return Err(
@@ -732,7 +745,14 @@ pub fn score_three_ball_known_state_feedback_actions(
     config: ThreeBallFeedbackDecisionConfig,
 ) -> Result<ThreeBallFeedbackDecision, ThreeBallFeedbackDecisionError> {
     score_three_ball_known_state_feedback_actions_with_mode(
-        space, full_posterior, models, ball_colours, gaze, actions, config, false,
+        space,
+        full_posterior,
+        models,
+        ball_colours,
+        gaze,
+        actions,
+        config,
+        false,
     )
 }
 
@@ -748,7 +768,14 @@ pub fn score_three_ball_known_state_feedback_actions_spm_compatible(
     config: ThreeBallFeedbackDecisionConfig,
 ) -> Result<ThreeBallFeedbackDecision, ThreeBallFeedbackDecisionError> {
     score_three_ball_known_state_feedback_actions_with_mode(
-        space, full_posterior, models, ball_colours, gaze, actions, config, true,
+        space,
+        full_posterior,
+        models,
+        ball_colours,
+        gaze,
+        actions,
+        config,
+        true,
     )
 }
 
@@ -1543,13 +1570,16 @@ mod tests {
         let raw_total = space
             .rules
             .iter()
-            .map(|rule| rule.prior_probability
-                * rule.parameter_prior.columns.iter().flatten().sum::<f64>())
+            .map(|rule| {
+                rule.prior_probability * rule.parameter_prior.columns.iter().flatten().sum::<f64>()
+            })
             .sum::<f64>();
         assert!((prior.columns.iter().flatten().sum::<f64>() - 1.0).abs() < 1e-12);
         for column in 0..THREE_BALL_HIDDEN_STATE_COLUMN_COUNT {
             let column_mass = prior.columns[column].iter().sum::<f64>();
-            assert!((column_mass - 1.0 / THREE_BALL_HIDDEN_STATE_COLUMN_COUNT as f64).abs() < 1e-12);
+            assert!(
+                (column_mass - 1.0 / THREE_BALL_HIDDEN_STATE_COLUMN_COUNT as f64).abs() < 1e-12
+            );
             for outcome in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
                 let raw = space
                     .rules
@@ -1558,9 +1588,7 @@ mod tests {
                         rule.prior_probability * rule.parameter_prior.columns[column][outcome]
                     })
                     .sum::<f64>();
-                assert!(
-                    (prior.columns[column][outcome] - raw / raw_total).abs() < 1e-12
-                );
+                assert!((prior.columns[column][outcome] - raw / raw_total).abs() < 1e-12);
             }
         }
     }
@@ -1570,10 +1598,12 @@ mod tests {
         let space = build_three_ball_rule_space();
         let models = space.reduced_model_hypotheses();
         let prior = &space.spm_model_average_prior;
-        let result =
-            reduce_dirichlet_models_spm_compatible(prior, prior, &models)
-                .expect("source-faithful BMR at zero evidence");
-        assert_eq!(result.models.len(), THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT);
+        let result = reduce_dirichlet_models_spm_compatible(prior, prior, &models)
+            .expect("source-faithful BMR at zero evidence");
+        assert_eq!(
+            result.models.len(),
+            THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT
+        );
         for model in result.models {
             assert!((model.posterior_probability - 1.0 / 81.0).abs() < 1e-10);
             assert!(model.log_evidence_ratio.abs() < 1e-10);
@@ -1598,17 +1628,23 @@ mod tests {
                 }
             }
         }
-        let (column, outcome) = selected.expect("one source rule excludes outcomes supported by others");
+        let (column, outcome) =
+            selected.expect("one source rule excludes outcomes supported by others");
         posterior.columns[column][outcome] += 1.0;
 
         let strict = reduce_dirichlet_models(&posterior, prior, &models)
             .expect("strict-support reduction retains other supported hypotheses");
-        let source_compatible =
-            reduce_dirichlet_models_spm_compatible(&posterior, prior, &models)
-                .expect("SPM smoothing keeps each reduced likelihood column integrable");
-        let strict_first = strict.models.iter().find(|model| model.model_id == first_model.model_id)
+        let source_compatible = reduce_dirichlet_models_spm_compatible(&posterior, prior, &models)
+            .expect("SPM smoothing keeps each reduced likelihood column integrable");
+        let strict_first = strict
+            .models
+            .iter()
+            .find(|model| model.model_id == first_model.model_id)
             .expect("strict first model");
-        let spm_first = source_compatible.models.iter().find(|model| model.model_id == first_model.model_id)
+        let spm_first = source_compatible
+            .models
+            .iter()
+            .find(|model| model.model_id == first_model.model_id)
             .expect("SPM first model");
         assert_eq!(strict_first.log_evidence_ratio, f64::NEG_INFINITY);
         assert!(spm_first.log_evidence_ratio.is_finite());
@@ -1717,8 +1753,7 @@ mod tests {
         .expect("source-compatible one-step feedback decision");
         assert_eq!(decision.action_scores.len(), 3);
         assert!(decision.action_scores.iter().all(|score| {
-            score.expected_free_energy_nats.is_finite()
-                && score.model_information_gain_nats >= 0.0
+            score.expected_free_energy_nats.is_finite() && score.model_information_gain_nats >= 0.0
         }));
     }
 
