@@ -1261,12 +1261,7 @@ mod tests {
             variables: vec!["x".into(), "y".into()],
             clauses: vec![],
         };
-        let prefix = make_prefix(
-            vec![
-                block(Quantifier::Exists, &[1, 0]),
-            ],
-            2,
-        );
+        let prefix = make_prefix(vec![block(Quantifier::Exists, &[1, 0])], 2);
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         result.strategy.functions.reverse();
         assert!(matches!(
@@ -1335,17 +1330,18 @@ mod tests {
                         .collect();
                     let prefix = make_prefix(blocks, 3);
                     let expected = independent_qbf_oracle(&problem, &prefix);
-                    let result =
-                        evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
+                    let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
                     assert_eq!(
-                        result.value,
-                        expected,
+                        result.value, expected,
                         "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
                     );
                     let checked =
                         verify_winning_strategy(&problem, &prefix, &result.strategy, budget())
                             .unwrap();
-                    assert_eq!(checked.opponent_assignments_checked, result.verification.opponent_assignments_checked);
+                    assert_eq!(
+                        checked.opponent_assignments_checked,
+                        result.verification.opponent_assignments_checked
+                    );
                 }
             }
         }
