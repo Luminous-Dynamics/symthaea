@@ -229,6 +229,8 @@ Use this addendum for the six cases in [Causal-Identifiability Development Chall
 | Current claim ceiling | |
 | Unresolved remainder | |
 
+The canonical disposition token is `non_identifiable`; “non-identifiable” is its prose spelling and must remain distinct from `unresolved`.
+
 Adjudicate two questions separately: (1) are the candidate's alternative models genuinely compatible with the supplied evidence, and (2) does the requested evidence actually distinguish at least one material pair? “Ask for more tests” is not a valid evidence request unless the alternatives predict different outcomes for those tests. Do not use reviewer confidence as a substitute for identifiability.
 
 The third adjudicator preserves both first-pass model sets and dispositions, records the disagreement witness and accepted claim ceiling, and explains why the proposed evidence request is or is not discriminating. Do not overwrite first-pass labels with a consensus graph/model.
