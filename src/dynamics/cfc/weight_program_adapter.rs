@@ -3271,14 +3271,14 @@ mod tests {
         let first_prepared =
             prepare_sequential_candidate(&session, &template, &initial_snapshot, &first_batch)
                 .expect("prepare first evidence batch");
-        let first_native = materialize_cfc_weight_program(
-            &source,
-            task_digest.clone(),
-            &first_prepared.program,
-        )
-        .expect("materialize first native CfC candidate");
+        let first_native =
+            materialize_cfc_weight_program(&source, task_digest.clone(), &first_prepared.program)
+                .expect("materialize first native CfC candidate");
         assert_eq!(
-            source.fingerprint().expect("source remains immutable").model_digest,
+            source
+                .fingerprint()
+                .expect("source remains immutable")
+                .model_digest,
             initial_snapshot.model_digest
         );
         assert_ne!(
@@ -3305,16 +3305,15 @@ mod tests {
 
         // Only a positive verifier attestation over the exact native candidate
         // advances the reusable edit program to the next evidence batch.
-        let (session_after_first, first_receipt) =
-            accept_verified_sequential_candidate(
-                &session,
-                &template,
-                &first_prepared,
-                &first_native.candidate_native_model_digest,
-                &digest('v'),
-                true,
-            )
-            .expect("accept verified first native candidate");
+        let (session_after_first, first_receipt) = accept_verified_sequential_candidate(
+            &session,
+            &template,
+            &first_prepared,
+            &first_native.candidate_native_model_digest,
+            &digest('v'),
+            true,
+        )
+        .expect("accept verified first native candidate");
         assert_eq!(first_receipt.batch_index, 0);
         assert_eq!(
             session_after_first.latest_candidate_model_digest,
@@ -3348,16 +3347,15 @@ mod tests {
             &second_prepared.program,
         )
         .expect("materialize second native CfC candidate");
-        let (session_after_second, second_receipt) =
-            accept_verified_sequential_candidate(
-                &session_after_first,
-                &template,
-                &second_prepared,
-                &second_native.candidate_native_model_digest,
-                &digest('w'),
-                true,
-            )
-            .expect("accept verified second native candidate");
+        let (session_after_second, second_receipt) = accept_verified_sequential_candidate(
+            &session_after_first,
+            &template,
+            &second_prepared,
+            &second_native.candidate_native_model_digest,
+            &digest('w'),
+            true,
+        )
+        .expect("accept verified second native candidate");
 
         assert_eq!(second_receipt.batch_index, 1);
         assert_eq!(session_after_second.next_batch_index, 2);
@@ -3369,16 +3367,16 @@ mod tests {
             second_native.candidate_native_model_digest,
             first_native.candidate_native_model_digest
         );
-        assert!(
-            session_after_second.cumulative_l2_path
-                > session_after_first.cumulative_l2_path
-        );
+        assert!(session_after_second.cumulative_l2_path > session_after_first.cumulative_l2_path);
         assert_eq!(
             session_after_second.cumulative_parameter_change_events,
             2 * tau_group.values.len()
         );
         assert_eq!(
-            source.fingerprint().expect("original source still immutable").model_digest,
+            source
+                .fingerprint()
+                .expect("original source still immutable")
+                .model_digest,
             initial_snapshot.model_digest
         );
     }
