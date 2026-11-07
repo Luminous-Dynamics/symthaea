@@ -43,7 +43,7 @@ jobs:
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(fixture)
           assert fixture["claim_scope"] == "synthetic_known_truth"
-          assert fixture["oracle_expectations"]["phase_reset_microturns"] == [100000, 0, 25000, 0, 0, 0]
+          assert fixture["oracle_expectations"]["phase_reset_fractional_microturns"] == [100000, 0, 25000, 0, 0, 0]
           assert fixture["rows"][1]["outcome"]["status"] == "NO_RESPONSE"
           print("phase-response schema/fixture: PASS")
           PY
