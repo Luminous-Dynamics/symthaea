@@ -304,17 +304,35 @@ fn render_vowel_notes(
     destination_len: usize,
 ) -> Vec<f32> {
     let notes: Vec<_> = syllable.notes().collect();
-    let total_duration = notes.iter().map(|n| n.duration.max(0.01)).sum::<f32>();
-    let note_weights: Vec<f32> = notes.iter().map(|n| n.duration.max(0.01)).collect();
+    let note_weights: Vec<f32> = notes.iter().map(|note| note.duration.max(0.01)).collect();
     let source_boundaries = acoustic_boundaries(source, &note_weights, sample_rate);
-    let mut output = Vec::with_capacity(destination_len);
-    let mut assigned = 0usize;
+    let Some(first_note) = notes.first() else {
+        return vec![0.0; destination_len];
+    };
+    let Some(last_note) = notes.last() else {
+        return vec![0.0; destination_len];
+    };
+    let timeline_start = first_note.start_time;
+    let timeline_end = last_note.start_time + last_note.duration;
+    let timeline_span = (timeline_end - timeline_start).max(1e-6);
+    let mut output = vec![0.0f32; destination_len];
+
+    // Compress the full note-and-rest timeline into the available vowel
+    // budget. This preserves the relative position of explicit gaps instead
+    // of concatenating every melisma note into continuous audio.
     for (index, note) in notes.iter().enumerate() {
-        let length = if index + 1 == notes.len() {
-            destination_len.saturating_sub(assigned)
-        } else {
-            (destination_len as f32 * note.duration.max(0.01) / total_duration) as usize
-        };
+        let start_fraction = ((note.start_time - timeline_start) / timeline_span).clamp(0.0, 1.0);
+        let end_fraction = ((note.start_time + note.duration - timeline_start) / timeline_span)
+            .clamp(0.0, 1.0);
+        let start = (start_fraction * destination_len as f32).round() as usize;
+        let end = (end_fraction * destination_len as f32).round() as usize;
+        let start = start.min(destination_len);
+        let end = end.min(destination_len).max(start);
+        let length = end - start;
+        if length == 0 {
+            continue;
+        }
+
         let chunk = &source[source_boundaries[index]..source_boundaries[index + 1]];
         let source_f0 = estimate_f0_track(chunk, sample_rate)
             .or_else(|| estimate_f0_track(source, sample_rate))
@@ -323,10 +341,10 @@ fn render_vowel_notes(
         let mut segment = retune_to_length(chunk, ratio, length);
         add_expression_vibrato(&mut segment, sample_rate, syllable);
         fade_edges(&mut segment, (sample_rate as f32 * 0.002) as usize);
-        output.extend(segment);
-        assigned += length;
+        for (destination, sample) in output[start..end].iter_mut().zip(segment) {
+            *destination += sample;
+        }
     }
-    output.resize(destination_len, 0.0);
     output
 }
 
@@ -616,6 +634,58 @@ fn fade_edges(samples: &mut [f32], fade: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn melisma_vowel_renderer_preserves_absolute_note_gaps() {
+        let sample_rate = 8_000u32;
+        let first = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.2,
+            velocity: 0.7,
+        };
+        let second = Note {
+            frequency: 220.0,
+            start_time: 0.4,
+            duration: 0.2,
+            velocity: 0.7,
+        };
+        let syllable = VocalSyllable {
+            lyric: "a".to_string(),
+            phonemes: Vec::new(),
+            note: first,
+            melisma_notes: vec![second],
+            slur: true,
+            articulation: super::super::singing_engine::VocalArticulation::Legato,
+            consonant_advance_s: 0.0,
+            phrase_index: 0,
+            portamento: 0.0,
+            vibrato_onset: 1.0,
+            vibrato_rate_hz: 0.0,
+            vibrato_depth_cents: 0.0,
+            breathiness: 0.0,
+            energy: 1.0,
+        };
+        let source: Vec<f32> = (0..9_600)
+            .map(|index| {
+                (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin()
+            })
+            .collect();
+        let output = render_vowel_notes(&source, &syllable, sample_rate, 4_800);
+
+        assert_eq!(output.len(), 4_800);
+        let rms = |samples: &[f32]| {
+            (samples.iter().map(|sample| sample * sample).sum::<f32>()
+                / samples.len().max(1) as f32)
+                .sqrt()
+        };
+        assert!(rms(&output[..1_400]) > 1e-3, "first note should contain audio");
+        assert!(
+            output[1_600..3_200].iter().all(|sample| sample.abs() < 1e-8),
+            "the 200ms gap must remain silent"
+        );
+        assert!(rms(&output[3_400..4_700]) > 1e-3, "melisma note should contain audio");
+    }
 
     #[test]
     fn retune_preserves_requested_duration() {
