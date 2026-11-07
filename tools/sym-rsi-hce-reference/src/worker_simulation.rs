@@ -302,6 +302,8 @@ mod tests {
         assert_eq!(sync_report.total_worker_busy_ms, async_report.total_worker_busy_ms);
         assert_eq!(sync_report.total_resource_cost_units, async_report.total_resource_cost_units);
         assert_eq!(sync_report.unique_valid_candidates, async_report.unique_valid_candidates);
+        assert!((sync_report.worker_utilization - async_report.worker_utilization).abs() < 1e-12);
+        assert!((sync_report.valid_candidates_per_hour - async_report.valid_candidates_per_hour).abs() < 1e-12);
         let sync_makespan = sync.attempts.iter().map(|attempt| attempt.end_ms).max().unwrap();
         let async_makespan = async_trace.attempts.iter().map(|attempt| attempt.end_ms).max().unwrap();
         assert_eq!(sync_makespan, 1_400);
