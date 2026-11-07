@@ -721,6 +721,7 @@ def self_test() -> list[str]:
             args["counterfactual_qualification"],
             args["cross_framing"],
             args["cross_framing_calibration_pack"],
+            args["production_impact"],
         )
         if not result:
             return [f"negative self-test was accepted: {label}"]
