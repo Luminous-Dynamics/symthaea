@@ -12,6 +12,8 @@ A plausible single model is not identified merely because it is simpler, more co
 
 ## 2. CID-S01 — omitted authorization helper
 
+**Claim kind:** Source structural possibility / mutation-path completeness. The handler's local gate can be assessed from source, but tenant-policy semantics and all-caller coverage remain unproved.
+
 **Expected disposition:** non_identifiable for the claim that tenant/resource authority is enforced.
 
 The visible source establishes that this handler calls a helper with actor, tenant and resource arguments before this particular store mutation. It does not establish what the helper checks, what backing state it uses, or whether other mutation callers exist.
@@ -26,6 +28,8 @@ The visible source establishes that this handler calls a helper with actor, tena
 
 ## 3. CID-S02 — configuration-dependent implementation
 
+**Claim kind:** Build-world selection. This asks which conditional definition is present in the shipped artifact, not whether the source contains both definitions.
+
 **Expected disposition:** non_identifiable for the claim that the shipped artifact selects the fail-closed definition.
 
 The source proves two mutually exclusive cfg-selected implementations exist. Without the exact resolved build world and artifact identity, neither implementation can be attributed to the shipped binary.
@@ -39,6 +43,8 @@ The source proves two mutually exclusive cfg-selected implementations exist. Wit
 **Claim ceiling:** “The source contains a fail-closed implementation under strict-policy and a fail-open implementation otherwise.” Do not claim which branch is deployed.
 
 ## 4. CID-S03 — cache eviction and latent workload
+
+**Claim kind:** Actual-cause attribution for the observed failures and identifiability of the cache-eviction intervention effect under latent workload confounding.
 
 **Expected disposition:** non_identifiable for the claim that eviction caused the request failures.
 
@@ -56,7 +62,9 @@ Temporal precedence alone does not rule out a common cause. The visible request 
 
 ## 5. CID-S04 — overdetermination
 
-**Expected disposition:** partially_identified for “at least one sufficient route was active” if the supplied incident record is trusted; non_identifiable for which route produced the observed duplicate.
+**Claim kinds:** Source structural sufficiency and residual-path analysis are identified from the declared contract: both code branches are conditionally sufficient routes. Actual-cause attribution to a specific route in the incident is non_identifiable because no branch execution or gate values are supplied.
+
+**Expected disposition:** identified for the conditional source-level claim that each branch is a sufficient route when its gate is active; non_identifiable for which route, if any, produced the reported incident. Do not infer that at least one supplied route actually executed from the outcome alone unless the incident record also establishes that this function was the exclusive producer.
 
 The two branches are OR alternatives, each with its own gate. Either may produce the same duplicate. The outcome alone does not identify which path executed; both may also have executed.
 
@@ -67,6 +75,8 @@ The two branches are OR alternatives, each with its own gate. Either may produce
 **Claim ceiling:** “The code contains two independently sufficient in-scope routes under their respective gates.” For the incident, say “at least one route was active” only under the declared trusted incident evidence; do not choose one actual cause or claim a one-route repair is complete.
 
 ## 6. CID-S05 — temporal race
+
+**Claim kinds:** Source structural possibility is identified: the stale-authorization path exists under the stated event-order condition. Execution realization and incident attribution remain non_identifiable without a qualified happens-before/event record tied to the job.
 
 **Expected disposition:** non_identifiable for whether this specific incident's worker mutation happened after revocation. A source-level possibility claim can be identified from the supplied control flow: the job carries an enqueue-time boolean and the worker uses it without a current check.
 
@@ -81,6 +91,8 @@ The two branches are OR alternatives, each with its own gate. Either may produce
 **Claim ceiling:** “The source permits a stale-authorization path if revocation precedes worker use.” Do not say this path occurred in the incident from the supplied packet.
 
 ## 7. CID-S06 — bundled repair
+
+**Claim kinds:** Actual-cause attribution to an individual repair component and the interventional effect of changing only the key identity are non_identifiable. The incident-level observation is bounded to the bundled revision and the supplied follow-up sample.
 
 **Expected disposition:** non_identifiable for the claim that stable key identity alone caused remediation.
 
