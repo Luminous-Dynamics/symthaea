@@ -1,0 +1,48 @@
+name: Pronunciation plan contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/pronunciation-plan/**"
+      - ".github/workflows/pronunciation-plan-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pronunciation-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "PRONUNCIATION_PLAN_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check standalone contract
+        run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+
+      - name: Resolve pinned dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/pronunciation-plan/Cargo.toml
+
+      - name: Test pronunciation lattice and fail-closed render contract
+        run: cargo +1.96.0 test --locked --manifest-path tools/pronunciation-plan/Cargo.toml
+
+      - name: Confirm exact revision was retained
+        run: test "$(git rev-parse HEAD)" = "$PRONUNCIATION_PLAN_REVISION"
