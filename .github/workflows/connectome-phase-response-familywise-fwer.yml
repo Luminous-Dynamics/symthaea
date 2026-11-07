@@ -36,6 +36,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
           python3 - <<'PY'
           import json
+          from fractions import Fraction
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
@@ -44,7 +45,7 @@ jobs:
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(fixture)
           assert fixture["requested_guarantee"] == "FWER"
-          assert sum(float(claim["weight"].split("/")[0]) / (float(claim["weight"].split("/")[1]) if "/" in claim["weight"] else 1) for claim in fixture["claims"]) == 1.0
+          assert sum((Fraction(claim["weight"]) for claim in fixture["claims"]), Fraction(0)) == 1
           print("phase-response familywise schema/fixture: PASS")
           PY
       - name: Run standalone exact-rational Rust audit
