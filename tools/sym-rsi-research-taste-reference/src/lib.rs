@@ -565,6 +565,203 @@ pub fn parse_and_calculate_evsi(contents: &str) -> Result<EvsiReport, Box<dyn st
     Ok(calculate_evsi(&problem)?)
 }
 
+const PIVOTAL_FIXTURE_SCHEMA_VERSION: &str =
+    "sym-rsi-research-taste-pivotal-correction-fixtures-v0";
+const PIVOTAL_FIXTURE_STATUS: &str =
+    "SYNTHETIC_POLICY_CASES_NOT_SCIPIVOT_REPRODUCTION_OR_EXPERT_GOLD";
+const EXPECTED_PIVOTAL_FIXTURES: usize = 9;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PivotalCorrectionPolicy {
+    pub adjudication: String,
+    pub context_ablation: String,
+    pub scoring: String,
+    pub denominator: String,
+    pub no_single_oracle: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PivotalCorrectionFixture {
+    pub fixture_id: String,
+    pub decision_class: String,
+    pub context_effect: String,
+    pub scenario: String,
+    pub facts: Value,
+    pub original_plan: String,
+    pub proposed_correction: String,
+    pub expected_disposition: String,
+    pub required_response: Vec<String>,
+    pub prohibited_inference: Vec<String>,
+    pub evidence_to_request: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PivotalCorrectionFixturePack {
+    pub schema_version: String,
+    pub status: String,
+    pub source_issue: String,
+    pub purpose: String,
+    pub evaluation_policy: PivotalCorrectionPolicy,
+    pub fixtures: Vec<PivotalCorrectionFixture>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PivotalCorrectionValidationReport {
+    pub valid_fixture_pack: bool,
+    pub fixture_count: usize,
+    /// Counts for must_change, must_be_invariant, must_abstain.
+    pub context_effect_counts: [usize; 3],
+    pub issues: Vec<String>,
+    pub limitations: Vec<String>,
+}
+
+const PIVOTAL_CORRECTION_CONTRACT: [(&str, &str, &str, &str); EXPECTED_PIVOTAL_FIXTURES] = [
+    ("PJ-01", "decision_relevant_contradiction", "must_change", "accept_correction_for_discriminating_test"),
+    ("PJ-02", "unsupported_correction", "must_change", "reject_correction_request_new_evidence"),
+    ("PJ-03", "irrelevant_context", "must_be_invariant", "preserve_original_request_relevance"),
+    ("PJ-04", "sunk_cost_and_falsification", "must_change", "reject_sunk_cost_continue_and_evaluate_pilot"),
+    ("PJ-05", "non_identifiable_evidence", "must_abstain", "abstain_request_discriminating_design"),
+    ("PJ-06", "negative_net_decision_value", "must_change", "stop_experiment_negative_net_value"),
+    ("PJ-07", "downside_risk_veto", "must_change", "veto_or_escalate_risk_limit"),
+    ("PJ-08", "conflicting_expert_corrections", "must_abstain", "abstain_request_assumption_discriminating_evidence"),
+    ("PJ-09", "analysis_integrity_failure", "must_change", "invalidate_claim_and_requalify_analysis"),
+];
+
+fn pivotal_context_index(effect: &str) -> Option<usize> {
+    match effect {
+        "must_change" => Some(0),
+        "must_be_invariant" => Some(1),
+        "must_abstain" => Some(2),
+        _ => None,
+    }
+}
+
+pub fn validate_pivotal_correction_fixtures(
+    pack: &PivotalCorrectionFixturePack,
+) -> PivotalCorrectionValidationReport {
+    let mut issues = Vec::new();
+    let mut context_effect_counts = [0usize; 3];
+    let mut fixture_ids = BTreeSet::new();
+
+    if pack.schema_version != PIVOTAL_FIXTURE_SCHEMA_VERSION {
+        issues.push("SCHEMA_VERSION: unsupported pivotal-correction fixture schema".to_owned());
+    }
+    if pack.status != PIVOTAL_FIXTURE_STATUS {
+        issues.push("STATUS: pack must remain explicitly synthetic and not expert gold".to_owned());
+    }
+    if pack.source_issue != "#10877" {
+        issues.push("SOURCE_ISSUE: expected #10877".to_owned());
+    }
+    if !non_empty(&pack.purpose) {
+        issues.push("PURPOSE: missing".to_owned());
+    }
+    for (name, value) in [
+        ("adjudication", pack.evaluation_policy.adjudication.as_str()),
+        ("context_ablation", pack.evaluation_policy.context_ablation.as_str()),
+        ("scoring", pack.evaluation_policy.scoring.as_str()),
+        ("denominator", pack.evaluation_policy.denominator.as_str()),
+        ("no_single_oracle", pack.evaluation_policy.no_single_oracle.as_str()),
+    ] {
+        if !non_empty(value) {
+            issues.push(format!("POLICY_FIELD: {name}"));
+        }
+    }
+    if pack.fixtures.len() != EXPECTED_PIVOTAL_FIXTURES {
+        issues.push(format!(
+            "FIXTURE_COUNT: expected {EXPECTED_PIVOTAL_FIXTURES}, found {}",
+            pack.fixtures.len()
+        ));
+    }
+
+    for fixture in &pack.fixtures {
+        if !fixture_ids.insert(fixture.fixture_id.clone()) {
+            issues.push(format!("DUPLICATE_FIXTURE_ID: {}", fixture.fixture_id));
+        }
+        if !non_empty(&fixture.scenario)
+            || !non_empty(&fixture.original_plan)
+            || !non_empty(&fixture.proposed_correction)
+        {
+            issues.push(format!("SCENARIO_OR_PLAN_MISSING: {}", fixture.fixture_id));
+        }
+        if !fixture.facts.is_object()
+            || fixture.facts.as_object().is_some_and(|object| object.is_empty())
+        {
+            issues.push(format!("FACTS_MISSING: {}", fixture.fixture_id));
+        }
+        for (field, values) in [
+            ("required_response", fixture.required_response.as_slice()),
+            ("prohibited_inference", fixture.prohibited_inference.as_slice()),
+            ("evidence_to_request", fixture.evidence_to_request.as_slice()),
+        ] {
+            if values.is_empty() || values.iter().any(|value| !non_empty(value)) {
+                issues.push(format!("{field}: empty or invalid for {}", fixture.fixture_id));
+            }
+            if values.iter().collect::<BTreeSet<_>>().len() != values.len() {
+                issues.push(format!("{field}: duplicate entries for {}", fixture.fixture_id));
+            }
+        }
+
+        match pivotal_context_index(&fixture.context_effect) {
+            Some(index) => context_effect_counts[index] += 1,
+            None => issues.push(format!("CONTEXT_EFFECT: invalid for {}", fixture.fixture_id)),
+        }
+
+        match PIVOTAL_CORRECTION_CONTRACT
+            .iter()
+            .find(|(id, _, _, _)| *id == fixture.fixture_id)
+        {
+            Some((_, expected_class, expected_context, expected_disposition)) => {
+                if fixture.decision_class != *expected_class {
+                    issues.push(format!("DECISION_CLASS_MISMATCH: {}", fixture.fixture_id));
+                }
+                if fixture.context_effect != *expected_context {
+                    issues.push(format!("CONTEXT_EFFECT_MISMATCH: {}", fixture.fixture_id));
+                }
+                if fixture.expected_disposition != *expected_disposition {
+                    issues.push(format!("DISPOSITION_MISMATCH: {}", fixture.fixture_id));
+                }
+            }
+            None => issues.push(format!("UNKNOWN_PIVOTAL_FIXTURE_ID: {}", fixture.fixture_id)),
+        }
+    }
+
+    for (id, _, _, _) in PIVOTAL_CORRECTION_CONTRACT {
+        if !fixture_ids.contains(id) {
+            issues.push(format!("REQUIRED_PIVOTAL_FIXTURE_MISSING: {id}"));
+        }
+    }
+    if context_effect_counts != [6, 1, 2] {
+        issues.push(format!(
+            "CONTEXT_EFFECT_COUNTS: expected [6, 1, 2], found {context_effect_counts:?}"
+        ));
+    }
+
+    issues.sort();
+    issues.dedup();
+    PivotalCorrectionValidationReport {
+        valid_fixture_pack: issues.is_empty(),
+        fixture_count: pack.fixtures.len(),
+        context_effect_counts,
+        issues,
+        limitations: vec![
+            "These cases are synthetic policy controls, not a reproduction of SciPiVot or expert gold.".to_owned(),
+            "A valid fixture pack does not establish that an agent makes the expected decision.".to_owned(),
+            "Human corrections are candidate evidence and are not assumed to be universally correct.".to_owned(),
+            "This validator does not measure calibration, scientific truth, or realized project outcomes.".to_owned(),
+        ],
+    }
+}
+
+pub fn parse_and_validate_pivotal_corrections(
+    contents: &str,
+) -> Result<PivotalCorrectionValidationReport, serde_json::Error> {
+    let pack: PivotalCorrectionFixturePack = serde_json::from_str(contents)?;
+    Ok(validate_pivotal_correction_fixtures(&pack))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -574,6 +771,9 @@ mod tests {
         include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_DECISION_FIXTURES_V0_2026-11-07.json");
     const EVSI_EXAMPLE: &str =
         include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_EXAMPLE_V0_2026-11-07.json");
+    const PIVOTAL_FIXTURES: &str =
+        include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_PIVOTAL_CORRECTION_FIXTURES_V0_2026-11-07.json");
+
 
     fn valid_pack() -> DecisionFixturePack {
         serde_json::from_str(FIXTURES).expect("checked-in decision fixtures parse")
@@ -600,6 +800,71 @@ mod tests {
 
     fn pack_value() -> Value {
         serde_json::to_value(valid_pack()).expect("fixture pack serializes")
+    }
+
+    #[test]
+    fn accepts_checked_in_pivotal_correction_fixture_pack() {
+        let report = parse_and_validate_pivotal_corrections(PIVOTAL_FIXTURES)
+            .expect("pivotal correction fixtures parse");
+        assert!(report.valid_fixture_pack, "{:?}", report.issues);
+        assert_eq!(report.fixture_count, 9);
+        assert_eq!(report.context_effect_counts, [6, 1, 2]);
+    }
+
+    #[test]
+    fn rejects_pivotal_correction_pack_claimed_as_expert_gold() {
+        let mut value: Value =
+            serde_json::from_str(PIVOTAL_FIXTURES).expect("pivotal fixtures parse");
+        value["status"] = Value::String("EXPERT_GOLD".to_owned());
+        let pack: PivotalCorrectionFixturePack =
+            serde_json::from_value(value).expect("mutated pack parses");
+        let report = validate_pivotal_correction_fixtures(&pack);
+        assert!(report.issues.iter().any(|issue| issue.starts_with("STATUS:")));
+    }
+
+    #[test]
+    fn rejects_changed_pivotal_disposition() {
+        let mut value: Value =
+            serde_json::from_str(PIVOTAL_FIXTURES).expect("pivotal fixtures parse");
+        value["fixtures"][0]["expected_disposition"] =
+            Value::String("always_accept_human_correction".to_owned());
+        let pack: PivotalCorrectionFixturePack =
+            serde_json::from_value(value).expect("mutated pack parses");
+        let report = validate_pivotal_correction_fixtures(&pack);
+        assert!(report.issues.iter().any(|issue| issue.starts_with("DISPOSITION_MISMATCH: PJ-01")));
+    }
+
+    #[test]
+    fn rejects_context_invariance_mutated_into_context_sensitivity() {
+        let mut value: Value =
+            serde_json::from_str(PIVOTAL_FIXTURES).expect("pivotal fixtures parse");
+        value["fixtures"][2]["context_effect"] = Value::String("must_change".to_owned());
+        let pack: PivotalCorrectionFixturePack =
+            serde_json::from_value(value).expect("mutated pack parses");
+        let report = validate_pivotal_correction_fixtures(&pack);
+        assert!(report.issues.iter().any(|issue| issue.starts_with("CONTEXT_EFFECT_MISMATCH: PJ-03")));
+    }
+
+    #[test]
+    fn rejects_duplicate_pivotal_fixture_ids() {
+        let mut value: Value =
+            serde_json::from_str(PIVOTAL_FIXTURES).expect("pivotal fixtures parse");
+        value["fixtures"][1]["fixture_id"] = Value::String("PJ-01".to_owned());
+        let pack: PivotalCorrectionFixturePack =
+            serde_json::from_value(value).expect("mutated pack parses");
+        let report = validate_pivotal_correction_fixtures(&pack);
+        assert!(report.issues.iter().any(|issue| issue.starts_with("DUPLICATE_FIXTURE_ID:")));
+    }
+
+    #[test]
+    fn rejects_missing_evidence_to_request() {
+        let mut value: Value =
+            serde_json::from_str(PIVOTAL_FIXTURES).expect("pivotal fixtures parse");
+        value["fixtures"][0]["evidence_to_request"] = Value::Array(Vec::new());
+        let pack: PivotalCorrectionFixturePack =
+            serde_json::from_value(value).expect("mutated pack parses");
+        let report = validate_pivotal_correction_fixtures(&pack);
+        assert!(report.issues.iter().any(|issue| issue.starts_with("evidence_to_request:")));
     }
 
     #[test]
