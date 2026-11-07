@@ -11,6 +11,7 @@ on:
       - "src/rea_compat/**"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-claim-replay-verifier/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   push:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - "src/rea_compat/**"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-claim-replay-verifier/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   workflow_dispatch:
 
@@ -44,6 +46,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
       HUSKY: "0"
+      RUSTUP_TOOLCHAIN: "1.99.1"
     steps:
       - name: Checkout Symthaea revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -64,6 +67,15 @@ jobs:
           node-version: 22.23.4
           cache: npm
           cache-dependency-path: rea-upstream/package-lock.json
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          rustup default 1.99.1
+          test "$(rustc --version)" = "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
 
       - name: Verify upstream source pin
         working-directory: rea-upstream
@@ -106,3 +118,31 @@ jobs:
 
       - name: Rust Evidence identity and upstream differential tests
         run: cargo test --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked
+
+      - name: Rust Evidence harness Clippy
+        run: cargo clippy --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Generate isolated claim replay verifier lockfile
+        run: |
+          cargo metadata \
+            --manifest-path tools/rea-claim-replay-verifier/Cargo.toml \
+            --format-version 1 \
+            > "$RUNNER_TEMP/rea-claim-replay-metadata.json"
+
+      - name: Archive claim replay verifier lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-claim-replay-verifier-lockfile
+          path: tools/rea-claim-replay-verifier/Cargo.lock
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Rust format check for independent claim replay verifier
+        run: cargo fmt --manifest-path tools/rea-claim-replay-verifier/Cargo.toml -- --check
+
+      - name: Independent claim result replay conformance
+        run: cargo test --manifest-path tools/rea-claim-replay-verifier/Cargo.toml --locked
+
+      - name: Independent claim replay Clippy
+        run: cargo clippy --manifest-path tools/rea-claim-replay-verifier/Cargo.toml --locked --all-targets -- -D warnings
