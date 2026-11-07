@@ -6,9 +6,11 @@
 //! returns typed errors when support is empty. It deliberately does not return
 //! a Bethe free-energy value or a joint MAP assignment.
 //!
-//! A converged result on an acyclic factor graph is exact for the declared
-//! finite factorization. A converged result on a cyclic graph remains
-//! approximate.
+//! An undamped, converged result on an acyclic factor graph is algorithmically
+//! exact for the declared finite factorization (with ordinary f64 rounding).
+//! Damping can preserve mass on states that have exact-zero support and is
+//! therefore labelled approximate even on a forest. A converged cyclic graph
+//! is always labelled approximate.
 
 use super::{BPConfig, FactorGraph, MessageSchedule};
 use std::collections::{HashMap, HashSet};
@@ -60,19 +62,29 @@ impl fmt::Display for CheckedBPError {
 }
 impl Error for CheckedBPError {}
 
-/// Structure-level exactness claim for the validated factor graph.
+/// Structure of the validated bipartite variable/factor graph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GraphStructure {
-    /// The bipartite variable/factor graph is a forest.
     Forest,
-    /// The bipartite variable/factor graph contains at least one cycle.
     Loopy,
 }
 
+/// Inference guarantee after applying the configured update schedule.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InferenceStatus {
+    /// Undamped sum-product converged on a forest. Exact algorithmically;
+    /// returned f64 values still have ordinary floating-point rounding.
+    ExactForest,
+    /// A damped forest run converged to the tolerance. This is an iterative
+    /// approximation because damping can preserve mass on exact-zero states.
+    ApproximateDampedForest,
+    /// A loopy BP fixed point converged. It remains approximate.
+    ApproximateLoopy,
+    /// The iteration limit was reached before the residual tolerance.
+    NotConverged,
+}
+
 /// Checked sum-product result.
-///
-/// Exactness on a forest additionally requires `converged == true`.
-/// A converged loopy fixed point is still approximate.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CheckedBPResult {
     pub beliefs: Vec<Vec<f64>>,
@@ -81,6 +93,7 @@ pub struct CheckedBPResult {
     /// Maximum absolute probability-message change on the final iteration.
     pub max_message_delta: f64,
     pub graph_structure: GraphStructure,
+    pub inference_status: InferenceStatus,
 }
 
 /// Run validated sum-product belief propagation in the log domain.
@@ -203,12 +216,23 @@ pub fn run_sum_product(
         beliefs.push(log_belief.into_iter().map(f64::exp).collect());
     }
 
+    let inference_status = if !converged {
+        InferenceStatus::NotConverged
+    } else {
+        match (structure, config.damping == 1.0) {
+            (GraphStructure::Forest, true) => InferenceStatus::ExactForest,
+            (GraphStructure::Forest, false) => InferenceStatus::ApproximateDampedForest,
+            (GraphStructure::Loopy, _) => InferenceStatus::ApproximateLoopy,
+        }
+    };
+
     Ok(CheckedBPResult {
         beliefs,
         converged,
         iterations,
         max_message_delta: final_delta,
         graph_structure: structure,
+        inference_status,
     })
 }
 
@@ -490,6 +514,7 @@ mod tests {
         let result = run_sum_product(&graph, &BPConfig::default()).unwrap();
         assert!(result.converged);
         assert_eq!(result.graph_structure, GraphStructure::Forest);
+        assert_eq!(result.inference_status, InferenceStatus::ExactForest);
         assert!((result.beliefs[0][0] - 0.4).abs() < 1.0e-10);
         assert!((result.beliefs[0][1] - 0.6).abs() < 1.0e-10);
         assert!((result.beliefs[1][0] - 0.5).abs() < 1.0e-10);
@@ -567,10 +592,8 @@ mod tests {
         }
 
         let result = run_sum_product(&graph, &BPConfig::default()).unwrap();
-        let expected_zero = 1.0 / (1.0 + 2.0_f64.powi(600));
         assert!(result.beliefs[0][0] < 1.0e-100);
         assert!((result.beliefs[0][1] - 1.0).abs() < 1.0e-12);
-        assert!(expected_zero.is_finite());
     }
 
     #[test]
@@ -599,6 +622,19 @@ mod tests {
         graph.add_factor(&[a, c], vec![0.9, 0.1, 0.1, 0.9]);
         let result = run_sum_product(&graph, &BPConfig::default()).unwrap();
         assert_eq!(result.graph_structure, GraphStructure::Loopy);
+        assert_eq!(result.inference_status, InferenceStatus::ApproximateLoopy);
+    }
+
+    #[test]
+    fn damped_forest_is_not_mislabeled_exact() {
+        let graph = two_node_tree();
+        let result = run_sum_product(&graph, &BPConfig {
+            damping: 0.5,
+            ..BPConfig::default()
+        }).unwrap();
+        assert!(result.converged);
+        assert_eq!(result.graph_structure, GraphStructure::Forest);
+        assert_eq!(result.inference_status, InferenceStatus::ApproximateDampedForest);
     }
 
     #[test]
