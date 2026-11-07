@@ -1,3 +1,6 @@
+# Cargo workspace placeholders are excluded explicitly so glob discovery
+# remains deterministic and manifest-backed on every pinned-toolchain run.
+
 [workspace]
 resolver = "2"
 members = [
