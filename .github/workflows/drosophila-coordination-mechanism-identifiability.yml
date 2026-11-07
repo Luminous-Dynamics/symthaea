@@ -1,0 +1,113 @@
+name: Drosophila coordination mechanism-identifiability contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/drosophila-coordination-identifiability/**"
+      - "docs/neuroscience/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.md"
+      - "docs/neuroscience/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.schema.json"
+      - "docs/neuroscience/examples/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.example.json"
+      - ".github/workflows/drosophila-coordination-mechanism-identifiability.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/drosophila-coordination-identifiability/**"
+      - "docs/neuroscience/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.md"
+      - "docs/neuroscience/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.schema.json"
+      - "docs/neuroscience/examples/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.example.json"
+      - ".github/workflows/drosophila-coordination-mechanism-identifiability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-coordination-identifiability:
+    name: Validate six-leg mechanism-equivalence adversarial fixture
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Validate Draft 2020-12 schema and synthetic collision oracle
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/DROSOPHILA_COORDINATION_MECHANISM_IDENTIFIABILITY_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          worlds = fixture["worlds"]
+          summaries = {
+              (
+                  w["baseline_summary"]["mean_frequency_millihz"],
+                  w["baseline_summary"]["aggregate_phase_locking_milli"],
+                  w["baseline_summary"]["tripod_occupancy_milli"],
+              )
+              for w in worlds
+          }
+          assert len(summaries) == 1
+          assert all(sum(w["baseline_trajectory"]["stance_count_histogram_milli"]) == 1000 for w in worlds)
+          registered = {i["intervention_id"] for i in fixture["interventions"]}
+          assert len(registered) == 4
+          assert all({p["intervention_id"] for p in w["interventions"]} == registered for w in worlds)
+          feasible = {i["intervention_id"] for i in fixture["interventions"] if i["feasible"]}
+          def signature(world, include_trajectory, include_feasible):
+              out = []
+              if include_trajectory:
+                  out.extend(world["baseline_trajectory"]["pairwise_phase_offsets_microturns"])
+                  out.extend(world["baseline_trajectory"]["stance_count_histogram_milli"])
+              if include_feasible:
+                  for prediction in sorted(world["interventions"], key=lambda x: x["intervention_id"]):
+                      if prediction["intervention_id"] not in feasible:
+                          continue
+                      for frame in prediction["frames"]:
+                          out.extend(frame["phase_reset_by_leg_microturns"])
+                          out.extend(frame["cycle_slips_by_leg"])
+                          out.extend(frame["frequency_by_leg_millihz"])
+                          out.append(frame["tripod_occupancy_milli"])
+              return tuple(out)
+          def classes(key):
+              groups = {}
+              for world in worlds:
+                  groups.setdefault(key(world), []).append(world["world_id"])
+              return sorted(sorted(v) for v in groups.values())
+          summary_classes = classes(lambda w: (
+              w["baseline_summary"]["mean_frequency_millihz"],
+              w["baseline_summary"]["aggregate_phase_locking_milli"],
+              w["baseline_summary"]["tripod_occupancy_milli"],
+          ))
+          baseline_classes = classes(lambda w: (
+              tuple(sorted(w["baseline_summary"].items())),
+              tuple(signature(w, True, False))
+          ))
+          portfolio_classes = classes(lambda w: (
+              tuple(sorted(w["baseline_summary"].items())),
+              tuple(signature(w, True, True))
+          ))
+          assert len(summary_classes) == 1
+          assert len(baseline_classes) == 2
+          assert len(portfolio_classes) == 4
+          unresolved = [x for x in portfolio_classes if len(x) > 1]
+          assert unresolved == [["W-central", "W-shared-drive"]]
+          oracle = fixture["oracle_expectations"]
+          assert oracle["total_world_pairs"] == 10
+          assert oracle["summary_unresolved_pairs"] == 10
+          assert oracle["baseline_separated_pairs"] == 4
+          assert oracle["feasible_portfolio_separated_pairs"] == 9
+          assert oracle["feasible_portfolio_unresolved_pairs"] == 1
+          assert oracle["status"] == "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO"
+          print("coordination mechanism-identifiability schema/oracle: PASS")
+          PY
+      - name: Format standalone Rust crate
+        run: cargo fmt --manifest-path tools/drosophila-coordination-identifiability/Cargo.toml -- --check
+      - name: Run exact mechanism-equivalence tests
+        run: cargo test --manifest-path tools/drosophila-coordination-identifiability/Cargo.toml --locked
