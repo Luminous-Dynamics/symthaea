@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "open-research-followup-integrity-fixtures-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "open-research-followup-integrity-fixtures-v0"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^2026-11-07$"
+    },
+    "status": {
+      "const": "SYNTHETIC_DESIGN_FIXTURES_NOT_EVIDENCE"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owners": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 2
+      }
+    },
+    "source_paper": {
+      "type": "string",
+      "format": "uri"
+    },
+    "expected_negative_controls": {
+      "const": 12
+    },
+    "expected_positive_or_limited_controls": {
+      "const": 3
+    },
+    "claim_dispositions": {
+      "type": "array",
+      "minItems": 9,
+      "items": {
+        "type": "string"
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^OU-(N[0-9]{2}|P0[1-3])$"
+          },
+          "fixture_class": {
+            "enum": [
+              "adversarial_negative_control",
+              "positive_or_limited_claim_control"
+            ]
+          },
+          "control_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "synthetic_only": {
+            "const": true
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "enum": [
+              "REJECT_CLAIM",
+              "NARROW_OR_REJECT_CLAIM",
+              "REPRODUCTION_ONLY",
+              "FAIL_DOMAIN_CONDITIONS",
+              "MARK_UNEXECUTED",
+              "ABSTAIN_INDETERMINATE",
+              "REJECT_CONFIRMATION",
+              "ELIGIBLE_FOR_INDEPENDENT_REVIEW",
+              "ALLOW_PROPOSAL_ONLY"
+            ]
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "expected_claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_report_fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "owner_refs": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "fixture_id",
+          "fixture_class",
+          "control_id",
+          "synthetic_only",
+          "scenario",
+          "expected_disposition",
+          "hard_gate",
+          "expected_claim_ceiling",
+          "required_report_fields",
+          "owner_refs"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "fixture_class": {
+                  "const": "adversarial_negative_control"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "hard_gate": {
+                  "const": true
+                },
+                "fixture_id": {
+                  "pattern": "^OU-N[0-9]{2}$"
+                }
+              },
+              "required": [
+                "hard_gate"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "fixture_class": {
+                  "const": "positive_or_limited_claim_control"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "hard_gate": {
+                  "const": false
+                },
+                "fixture_id": {
+                  "pattern": "^OU-P0[1-3]$"
+                }
+              },
+              "required": [
+                "hard_gate"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "claim_policy": {
+      "type": "object",
+      "properties": {
+        "proposal_is_not_execution": {
+          "const": true
+        },
+        "execution_requires_exact_run_environment_method_and_input_bindings": {
+          "const": true
+        },
+        "numeric_claims_require_raw_result_replay": {
+          "const": true
+        },
+        "failed_and_null_runs_remain_in_denominator": {
+          "const": true
+        },
+        "reproduction_is_not_novelty": {
+          "const": true
+        },
+        "task_score_is_not_original_scientific_contribution": {
+          "const": true
+        },
+        "domain_condition_failure_is_noncompensatory": {
+          "const": true
+        },
+        "contradictory_evidence_requires_abstention": {
+          "const": true
+        },
+        "sealed_access_compromise_invalidates_confirmation": {
+          "const": true
+        }
+      },
+      "required": [
+        "proposal_is_not_execution",
+        "execution_requires_exact_run_environment_method_and_input_bindings",
+        "numeric_claims_require_raw_result_replay",
+        "failed_and_null_runs_remain_in_denominator",
+        "reproduction_is_not_novelty",
+        "task_score_is_not_original_scientific_contribution",
+        "domain_condition_failure_is_noncompensatory",
+        "contradictory_evidence_requires_abstention",
+        "sealed_access_compromise_invalidates_confirmation"
+      ],
+      "additionalProperties": false
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "date",
+    "status",
+    "purpose",
+    "owners",
+    "source_paper",
+    "expected_negative_controls",
+    "expected_positive_or_limited_controls",
+    "claim_dispositions",
+    "fixtures",
+    "claim_policy",
+    "claim_ceiling"
+  ],
+  "additionalProperties": false
+}
