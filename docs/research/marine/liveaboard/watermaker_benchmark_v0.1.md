@@ -34,7 +34,15 @@ Sources:
 - Spectra LB 800 manufacturer fact sheet: https://www.spectrawatermakers.com/downloads/all-downloads/fact-sheets/lb-800-fact-sheet.pdf
 - Rainman modular watermaker: https://www.rainmandesal.com/modular-watermaker/
 
-## 3. Standardized test article and system boundary
+## 3. Membrane-element standard reference: ISO 25175:2026
+
+ISO 25175:2026, Edition 1 (published 25 June 2026), defines marine RO/NF membrane-element test methods for air tightness and separation performance, including permeation and salt rejection. Apply it to qualified **membrane-element** characterization where the exact licensed method and applicability fit.
+
+Important boundary: ISO 25175 is not a complete installed watermaker system test. It does not, by its published scope, qualify vessel intake/pre-treatment, electrical energy for the complete service, flushing/preservation, intermittency, product storage/distribution, potable-water safety or brine discharge. Keep those as separate installed-system/service tests in this protocol.
+
+Official ISO record: https://www.iso.org/standard/89252.html
+
+## 4. Standardized test article and system boundary
 
 Treat the watermaker as an installed subsystem:
 
@@ -107,7 +115,7 @@ This avoids creating a parallel water-treatment simulator, desalination physics 
 Manufacturer data establish only what a supplier publishes. The derived kWh/m³ figures in the CSV are arithmetic transformations of those published figures, not measurement. A bench test qualifies only the specific device/configuration, feed envelope, meter boundary and method tested. No watermaker result alone establishes potable-water safety, full vessel autonomy, legal brine disposal, whole-vessel seaworthiness or regulatory approval.
 
 
-## 9. Synthetic mission-screen example (not a demand standard)
+## 10. Synthetic mission-screen example (not a demand standard)
 
 A companion JSON fixture uses a deliberately hypothetical case: four permanent occupants, 25 L/person/day, therefore 100 L/day of qualified product demand over a 30-day target. This is a design scenario assumption, not an asserted normal consumption rate or a potable-water requirement.
 
