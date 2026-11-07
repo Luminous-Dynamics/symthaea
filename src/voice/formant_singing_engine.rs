@@ -11,8 +11,8 @@ use symthaea_muse::singing_bridge::{render_sung_frames, sing};
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
 use super::singing_engine::{
-    CapabilitySupport, ControlCapability, SingingBackendCapabilities, SingingControl,
-    SingingVoiceEngine, VocalPerformance, VocalStem,
+    CapabilitySupport, ControlCapability, ExpressionPoint, SingingBackendCapabilities,
+    SingingControl, SingingVoiceEngine, VocalPerformance, VocalStem,
 };
 use super::vocoder::{FormantVocoder, VocoderConfig};
 
@@ -220,6 +220,83 @@ fn complete_timeline(raw: &[FormantFrame], duration_s: f32) -> Result<Vec<Forman
     Ok(completed)
 }
 
+/// Interpolate a phrase-level expression target at an absolute performance time.
+fn expression_at(curve: &[ExpressionPoint], time_s: f32) -> Option<ExpressionPoint> {
+    let first = *curve.first()?;
+    let last = *curve.last()?;
+    if time_s <= first.time_s {
+        return Some(first);
+    }
+    if time_s >= last.time_s {
+        return Some(last);
+    }
+    let right = curve.partition_point(|point| point.time_s < time_s);
+    let left = right.saturating_sub(1);
+    let from = curve[left];
+    let to = curve[right];
+    let span = (to.time_s - from.time_s).max(f32::EPSILON);
+    let t = ((time_s - from.time_s) / span).clamp(0.0, 1.0);
+    Some(ExpressionPoint {
+        time_s,
+        energy: from.energy + (to.energy - from.energy) * t,
+        breathiness: from.breathiness + (to.breathiness - from.breathiness) * t,
+        tension: from.tension + (to.tension - from.tension) * t,
+    })
+}
+
+/// Apply the controls that the legacy source-filter frame can express.
+///
+/// Energy is applied as a ratio against the phrase's mean syllable energy.
+/// Breathiness is approximated by lowering periodic voicing and slightly
+/// widening resonances. Tension is approximated by narrowing bandwidths.
+/// This does not change glottal Rd, create a separate aspiration envelope,
+/// or synthesize phrase inhalations; those remain explicit capability limits.
+fn apply_phrase_expression(frames: &mut [FormantFrame], performance: &VocalPerformance) {
+    for phrase in &performance.phrases {
+        let phrase_syllables = &performance.syllables[phrase.syllable_start..phrase.syllable_end];
+        let Some(first) = phrase_syllables.first() else {
+            continue;
+        };
+        let Some(last) = phrase_syllables.last() else {
+            continue;
+        };
+        let start_s = first.note.start_time;
+        let end_s = last.end_time_s();
+        let base_energy = phrase_syllables
+            .iter()
+            .map(|syllable| syllable.energy)
+            .sum::<f32>()
+            / phrase_syllables.len() as f32;
+
+        for frame in frames
+            .iter_mut()
+            .filter(|frame| frame.time >= start_s && frame.time <= end_s)
+        {
+            let Some(expression) = expression_at(&phrase.expression_curve, frame.time) else {
+                continue;
+            };
+            if base_energy > f32::EPSILON {
+                frame.energy = (frame.energy * (expression.energy / base_energy)).clamp(0.0, 1.0);
+            }
+            let breathiness = expression.breathiness.clamp(0.0, 1.0);
+            let tension = expression.tension.clamp(0.0, 1.0);
+            if matches!(
+                frame.source_type,
+                SourceType::Vowel | SourceType::Liquid | SourceType::Nasal
+            ) {
+                frame.voicing =
+                    (frame.voicing * (1.0 - 0.25 * breathiness)).clamp(0.0, 1.0);
+            }
+            let breath_bandwidth = 1.0 + 0.08 * breathiness;
+            let tension_bandwidth = 1.2 - 0.4 * tension;
+            let bandwidth_scale = breath_bandwidth * tension_bandwidth;
+            frame.b1 = (frame.b1 * bandwidth_scale).max(20.0);
+            frame.b2 = (frame.b2 * bandwidth_scale).max(20.0);
+            frame.b3 = (frame.b3 * bandwidth_scale).max(20.0);
+        }
+    }
+}
+
 fn capability(
     control: SingingControl,
     support: CapabilitySupport,
@@ -349,7 +426,8 @@ impl SingingVoiceEngine for FormantSingingEngine {
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
         let aligned = self.aligned_syllables(performance)?;
         let raw = render_sung_frames(&aligned, FRAME_RATE_HZ);
-        let frames = complete_timeline(&raw, performance.duration_s())?;
+        let mut frames = complete_timeline(&raw, performance.duration_s())?;
+        apply_phrase_expression(&mut frames, performance);
         let samples = self.vocoder.synthesize(&frames);
         let stem = VocalStem {
             samples,
