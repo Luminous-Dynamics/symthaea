@@ -969,6 +969,48 @@ mod tests {
     }
 
     #[test]
+    fn changing_selection_authority_or_evidence_reference_invalidates_receipt() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
+        let mut plan = PronunciationPlan {
+            schema_version: 2,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+
+        plan.words[0].selection_receipt.as_mut().unwrap().authority = SelectionAuthority::User;
+        let authority_error = plan.validate().unwrap_err();
+        assert!(
+            authority_error.contains("exact language/text/span context"),
+            "{authority_error}"
+        );
+
+        plan.words[0].selection_receipt = Some(selected_receipt(
+            "en-US",
+            "read",
+            &plan.words[0],
+            0,
+        ));
+        plan.words[0]
+            .selection_receipt
+            .as_mut()
+            .unwrap()
+            .evidence_reference = "review:substituted".into();
+        let evidence_error = plan.validate().unwrap_err();
+        assert!(
+            evidence_error.contains("exact language/text/span context"),
+            "{evidence_error}"
+        );
+    }
+
+    #[test]
     fn out_of_vocabulary_is_explicit_and_contains_no_guessed_phone() {
         let plan = PronunciationPlan {
             schema_version: 2,
