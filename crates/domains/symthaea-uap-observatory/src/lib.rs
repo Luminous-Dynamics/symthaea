@@ -790,9 +790,9 @@ pub mod triangulation;
 pub use triangulation::{
     Quaternion as SensorToEcefQuaternion, RayObservation, RobustSensorPlacementScore,
     SensorPlacementCandidate, SensorPlacementScore, TargetHypothesis, TriangulatedPosition,
-    TriangulationConfig, TriangulationError, Vector3 as EcefVector3,
-    bearing_fisher_information, rank_sensor_placements, rank_sensor_placements_over_target_region,
-    triangulate_bearings, triangulate_bearings_with_config,
+    TriangulationConfig, TriangulationError, Vector3 as EcefVector3, bearing_fisher_information,
+    rank_sensor_placements, rank_sensor_placements_over_target_region, triangulate_bearings,
+    triangulate_bearings_with_config,
 };
 
 /// Frame-level multi-target GOSPA metrics; trajectory-level metrics remain future work.
