@@ -204,3 +204,12 @@ SAT research has demonstrated that proof-checking architecture can materially ch
 This suggests a specific Symthaea direction: discover not only algorithms that solve quickly, but decompositions and proof-production schedules that make independent checking cheaper and more parallelizable. Evaluate proof generation, streaming/online checking and final artifact size together. Do not assume that all proof formats or all solver families admit the same trade-off.
 
 Source: Dominik Schreiber, *Trusted Scalable SAT Solving with On-The-Fly LRAT Checking*, SAT 2024, https://doi.org/10.4230/LIPIcs.SAT.2024.25.
+
+
+## 10. Proof-system-aware benchmark requirements
+
+Add proof backend as a controlled experimental factor. For SAT, compare proof-capable pinned baselines such as CaDiCaL 3.0 alongside the relevant Kissat baseline, keeping incremental capability and proof requirements visible rather than comparing unlike interfaces. CaDiCaL 3.0 reports adapting Kissat techniques to incremental solving and efficient linear proof production with hints; see https://doi.org/10.4230/LIPIcs.SAT.2026.40.
+
+For exact #SAT, evaluate certificate-capable systems separately. The July 2026 analysis of kcps, MICE, CPOG and CLIP finds CPOG simulates MICE and kcps, while MICE and kcps are exponentially incomparable. CLIP simulates all three. These are proof-system strength statements, not a guarantee of practical proof-size or checker-time dominance. See https://doi.org/10.1007/s10817-026-09757-w and https://pmc.ncbi.nlm.nih.gov/articles/PMC13385077/.
+
+For every proof-aware experiment report: solving time, proof-generation overhead, certificate bytes, peak proof/checker memory, checker wall/CPU time, streaming feasibility, independent checker outcome and time-to-trusted-result. Keep solver search seed/configuration fixed between proof/no-proof ablations where feasible; disclose when proof logging changes search behaviour.
