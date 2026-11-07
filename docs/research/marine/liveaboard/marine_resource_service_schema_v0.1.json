@@ -9,13 +9,14 @@
     "revision",
     "service_class",
     "mission_case",
-    "required_output",
     "window",
     "power_profile",
     "prerequisites",
     "flexibility",
     "acceptance",
-    "evidence"
+    "evidence",
+    "required_output",
+    "input_requirements"
   ],
   "properties": {
     "service_id": {
@@ -71,7 +72,8 @@
       "required": [
         "quantity",
         "unit",
-        "quality_acceptance_ref"
+        "quality_acceptance_ref",
+        "carrier"
       ],
       "properties": {
         "quantity": {
@@ -85,6 +87,17 @@
         "quality_acceptance_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "carrier": {
+          "enum": [
+            "electrical_energy",
+            "thermal_energy",
+            "recoverable_heat",
+            "potable_water",
+            "seawater_feed",
+            "fuel",
+            "other_material"
+          ]
         }
       }
     },
@@ -124,7 +137,8 @@
         "power_max_w",
         "energy_min_wh",
         "energy_max_wh",
-        "profile_ref"
+        "profile_ref",
+        "carrier"
       ],
       "properties": {
         "power_min_w": {
@@ -146,6 +160,9 @@
         "profile_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "carrier": {
+          "const": "electrical_energy"
         }
       }
     },
@@ -262,6 +279,50 @@
         "design_revision": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "input_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "quantity",
+          "unit",
+          "availability_ref",
+          "quality_constraint_ref"
+        ],
+        "properties": {
+          "carrier": {
+            "enum": [
+              "electrical_energy",
+              "thermal_energy",
+              "recoverable_heat",
+              "potable_water",
+              "seawater_feed",
+              "fuel",
+              "other_material"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "availability_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quality_constraint_ref": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }
