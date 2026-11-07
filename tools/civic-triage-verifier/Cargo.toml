@@ -1,0 +1,17 @@
+[package]
+name = "civic-triage-verifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Standalone strict verifier for the synthetic CIVIC-TRIAGE-001 corpus"
+
+# Keep this small verifier outside the parent Symthaea workspace. It must not
+# silently add dependencies or compilation load to the production workspace.
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
