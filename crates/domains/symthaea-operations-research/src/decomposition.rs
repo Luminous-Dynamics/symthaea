@@ -161,7 +161,7 @@ fn check_total_assignment_evaluations(
 ) -> Result<(), DecompositionError> {
     let total = variable_counts.iter().try_fold(0u128, |sum, &count| {
         sum.checked_add(assignment_count(count, budget)?)
-            .ok_or(DecompositionError::CountOverflow)
+            .ok_or(DecompositionError::ResourceAccountingOverflow)
     })?;
     if total > budget.max_total_assignment_evaluations {
         return Err(DecompositionError::AssignmentBudgetExceeded {
