@@ -111,6 +111,10 @@ pub enum QuantifierScopeError {
         existential: usize,
         dependency: usize,
     },
+    SkolemDependencyOrderMismatch {
+        existential: usize,
+        dependency: usize,
+    },
     SkolemDependencyCountExceedsVariableCount {
         existential: usize,
         required: usize,
@@ -399,6 +403,21 @@ impl ValidatedQuantifierPrefix {
                 });
             }
         }
+
+        let allowed = self.existential_dependencies(existential)?;
+        let mut cursor = 0usize;
+        for &dependency in declared {
+            let Some(offset) = allowed[cursor..]
+                .iter()
+                .position(|candidate| *candidate == dependency)
+            else {
+                return Err(QuantifierScopeError::SkolemDependencyOrderMismatch {
+                    existential,
+                    dependency,
+                });
+            };
+            cursor = cursor.saturating_add(offset).saturating_add(1);
+        }
         Ok(())
     }
 }
@@ -450,6 +469,28 @@ mod tests {
             QuantifierScopeError::SkolemDependencyNotAvailable {
                 existential: 1,
                 dependency: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn skolem_dependencies_must_use_canonical_prefix_order() {
+        let prefix = ValidatedQuantifierPrefix::new(
+            4,
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+                block(Quantifier::ForAll, &[2]),
+                block(Quantifier::Exists, &[3]),
+            ],
+            QuantifierPrefixBudget::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            prefix.validate_skolem_dependencies(3, &[2, 0]).unwrap_err(),
+            QuantifierScopeError::SkolemDependencyOrderMismatch {
+                existential: 3,
+                dependency: 0,
             }
         );
     }
