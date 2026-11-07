@@ -474,7 +474,9 @@ pub fn audit_admission(ledger: &GlobalLedger, admission: &FiltrationAdmission) -
         .entries
         .iter()
         .filter_map(|entry| match &entry.payload {
-            LedgerPayload::Evidence(event) => Some((event.event_id.as_str(), event)),
+            LedgerPayload::Evidence(event) => {
+                Some((event.event_id.as_str(), (entry.sequence, event)))
+            }
             _ => None,
         })
         .collect();
@@ -841,6 +843,7 @@ mod tests {
             qc_at_ms: Some(111),
             availability_state: AvailabilityState::Approved,
             split: EvidenceSplit::Exploration,
+            confirmatory_family_id: None,
         };
         ledger
             .entries
