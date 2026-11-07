@@ -273,3 +273,16 @@ Required ablations:
 5. representation/decomposition chosen without proof-cost awareness versus jointly chosen with proof-cost awareness.
 
 The scientific question is whether proof-aware strategy synthesis can improve time-to-trusted-answer or extend the set of instances with practically checkable results, without degrading mathematical correctness.
+
+
+## 15. Quantifier-aware scope extension
+
+A plain visible/hidden variable split is adequate for the initial PMC examples but is not a sufficient semantic type for quantified Boolean formulas. Prenex QBF carries an ordered quantifier prefix; an existential variable's Skolem function can depend only on universal variables quantified before it. The strategy type system must preserve the prefix order and legal dependencies rather than flattening them into unordered role sets.
+
+A structural prototype is now present in `symthaea-operations-research::quantified_scope`. It validates exact prefix coverage, block non-emptiness, uniqueness, bounds and standard prenex Skolem dependency scopes. It does not solve QBF/#QBF/MaxQBF or certify Skolem functions.
+
+This extension is motivated by:
+- Bryant, Tan & Heule, *Certifying Projected Knowledge Compilation*, SAT 2025: projected compilation certificates encode Skolem assignments; soundness was validated in HOL4, with C and CakeML/HOL4 checkers. https://doi.org/10.4230/LIPIcs.SAT.2025.8
+- Chede, Krishan & Shukla, *On Knowledge Compilation Languages for QBFs*, ECCC TR26-279, posted 27 October 2026. It explores tree/DAG representations, #QBF proof systems and an initial model counter that handles doubly exponential counts, compared against d4-QBF. https://eccc.weizmann.ac.il/report/2026/279/
+
+The next research objective is to compose quantifier-prefix validation, Skolem evidence, compiled representation guarantees and independently checked quantified result semantics. Keep actual quantified solving outside v1 until the proof objects and independent checker exist.
