@@ -465,12 +465,52 @@ The field is moving quickly, and there is no single "SOTA" across these differen
 | Weight-space learning | Dayan, Eitan & Maron, ICML 2026, permutation-equivariant weight-space networks | A theoretical expressivity analysis, universality results under stated assumptions, and a reported 34% improvement over prior SOTA on their own benchmarks | Include their permutation-equivariant family as a baseline where implementable. Compare function-space generalization, symmetry handling, task transfer, parameter count, and compute. Do not equate SWI's candidate editor with a trained weight-space learner. |
 | Continuous-time networks | NIALIM / DFA-CfN / PRDFA-CfN, IEEE TNNLS 2026 | A revised closed-form approximation with an error upper bound and reported results across six sequence domains | Reproduce at least two appropriate public tasks with exact splits, missingness, sampling intervals, parameter count, and reference solver accuracy before making a CfC superiority claim. |
 | Active inference | Friston et al., Nature Communications 2026, active structure learning and the three-ball rule-discovery paradigm | Model-structure information gain can guide observation selection; BMR can efficiently compare reduced models after evidence accumulation | Reproduce the bounded task, then test whether Symthaea's state/parameter/model decomposition improves observations-to-correct-model and calibration. The paper assumes a known generative model family; it is not a result for general perception or open-ended reasoning. |
-| Weight-space programming | Takehi et al., MIT CSAIL 2026, plus OpenWSP's independent records | Direct weight inspection/editing can produce striking small-model results, but outcomes depend heavily on prompts, editor budgets, sampling, token limits, and evaluation protocol | Pin every checkpoint, prompt/editor revision, tool permission, edit budget, and evaluation. Report live and calibration runs separately; do not cite one headline as portable capability. |
+| Weight-space programming | Takehi et al., MIT CSAIL 2026; OpenWSP; Alan Turing Institute replication (2026) | Small-network policy compilation into weights can work, but new-task classification and deeper weight-only interpretation are much harder: the Turing replication reports 50% average handwritten-digit accuracy versus 82% for a fitted template baseline; on Breakout, two independent decompilers matched the network over 49,189 states | Separate program-to-weights compilation from learning new representations and from weight-only auditing. Include executable-program, non-program classification, input-layer-only, activation-probe and full functional baselines. |
+| Sequential weight-space adaptation | Li et al., WeightLoop (arXiv:2611.07319, 5 Nov 2026) | A fixed editor writes a reusable bounded editing program; successive assay batches supply evidence for persistent predictor updates. Authors report targeted edits improved mean ranking utility in 7/8 endpoint-budget settings (all 8 vs random edits) and discovery across 3 sequential tasks in offline replay | Reproduce the sequential batch protocol and separate fixed-program reuse from per-batch LLM re-prompting, online/gradient updates and random matched edits. Record endpoint budgets, assays, editor calls, candidate evaluations, drift and held-out retention. This is a fresh preprint claim, not yet an independent replication. |
 | HDC/VSA | 2025 comparative review across popular HD/VSA tasks and 121 UCI datasets | HDC has resource and compositional advantages in some settings, but conventional SVM/RVFL baselines can win selected classification tasks | Require identical feature inputs and conventional baselines. Win on compositional OOD transfer, robust online learning, memory/latency, or proof/privacy compatibility rather than assuming HDC wins ordinary classification. |
 
 A recent independent WSP replication illustrates why protocol identity matters: OpenWSP reports 12.9% on a live MATH-500 evaluation against the MIT authors' reported 48.1% and a 50.6% local calibration of the released edit. Its live evaluation used four samples per problem, compared with one for local calibration, and 84.25% of live generations hit the token limit. This is not a controlled refutation of the MIT result, but it demonstrates that raw scores from different evaluation conditions are not interchangeable. The benchmark should preserve the full evaluation configuration and keep all attempt/calibration rows visible.
 
 **Honest position today:** Symthaea has a distinctive, increasingly auditable implementation foundation—typed candidate-only parameter programs, native transactional adapters, explicit epistemic information primitives, and a symmetry-aware test. It does not yet have a production epistemic controller, an autonomous WSP proposer, a measured integrated factorial result, or a demonstrated advantage over the above external baselines. The near-term research contribution should be reproducibility, functional-equivalence-aware weight repair, and a well-controlled comparison—not a premature general-intelligence or SOTA claim.
+
+## 6.2 Evidence-feedback WSP: from one-shot edits to persistent, qualified adaptation
+
+The most important recent extension is the distinction between **writing a weight edit** and **writing a bounded program that keeps adapting a predictor as new evidence arrives**.
+
+Li et al.'s WeightLoop (arXiv:2611.07319, submitted 5 November 2026) proposes this second form: an LLM inspects the task and predictor once, writes a bounded reusable editing program, then measurement batches drive updates without another LLM call or gradient retraining. The authors report targeted improvements in seven of eight endpoint-budget settings and across three sequential discovery tasks in offline replay. These are author-reported preprint results, not an independently reproduced capability claim. See https://arxiv.org/abs/2611.07319.
+
+The Alan Turing Institute's 2026 replication provides a useful counterweight. Its working note reports faithful Breakout policy compilation into weights and exact agreement by two independent decompilers over 49,189 game states, but only 50% average accuracy on handwritten digits versus 82% for a fitted template baseline. It also finds that weight-only reading largely recovers input layout while missing much of the task's underlying computation. See https://www.turing.ac.uk/news/publications/replicating-weight-space-programming-writing-and-reading-neural-network-weights. The practical implication: **program compilation, representation learning, behavioral identification, and causal fault diagnosis are four different benchmarks**. Success on one must not be used to claim the others.
+
+### The Symthaea architecture to test
+
+1. **Compile once:** a WSP proposer may create a typed, bounded WeightProgram with exact target groups, task/fault hypothesis IDs, evidence receipt IDs, base/architecture/manifest digests, parameter budgets and native invariants.
+2. **Acquire evidence:** a separate FEP policy chooses which observation or assay to acquire from action-conditioned predictive outcomes and expected state/parameter/model information. Probe cost and the value/preference channel remain explicit.
+3. **Stage candidate updates:** each evidence batch produces a new candidate from an immutable model snapshot. Candidate changes must be bound to the exact evidence-batch digest and to the edit-program digest. The live predictor remains unchanged during proposal and evaluation.
+4. **Verify and promote:** an independent verifier evaluates the candidate on predeclared held-out observations, task-retention sets and negative controls. Only a distinct, explicit promotion boundary can replace the deployed predictor; rollback remains available.
+
+This composition is stronger than simply calling an LLM after every batch: the editor can be amortized into a reusable program, FEP can spend the measurement budget on disambiguating evidence, and SWI can constrain and audit every edit. But the pieces must be compared separately before the joint system is credited with an improvement.
+
+### Registered sequential-feedback experiment
+
+The manifest task sequential_evidence_weight_space_programming adds seven controls:
+
+- no edit;
+- random edit matched for parameter count and norm at each batch;
+- feedback-blind fixed program;
+- fixed WeightProgram compiled once and reused across batches;
+- editor re-prompted after every evidence batch;
+- a matched gradient/online update;
+- FEP-selected measurements plus a fixed WSP edit program.
+
+Use both stationary tasks and declared regime shifts. Include shuffled feedback, delayed feedback, and a held-out future-batch leakage canary. The proposer must not see future assay labels or final discovery endpoints.
+
+Primary metrics: cumulative ranking utility, final discovery utility, held-out prediction loss, cumulative regret, and discovery per endpoint budget. Diagnostics: editor-call count, program reuse, candidate evaluations, changed-parameter count, cumulative parameter drift, task retention, calibration after feedback, rollback rate and time to detect a regime shift.
+
+**Required comparison:** fixed editor reuse must be measured against the full per-batch editor cost, not just final model quality. Report total LLM calls, tokens, inference and candidate-evaluation compute, assay/query count, latency, parameter drift and final held-out utility. A fixed edit program that improves one endpoint while damaging prior tasks is not successful continual adaptation.
+
+### Claim boundary
+
+The present branch has a typed WeightProgram foundation and candidate-only CfC/HDC-LTC adapters. It does **not** yet contain a WSP proposer that authors reusable programs from task descriptions, nor a persistent evidence-batch executor or production promotion controller. The sequential WeightLoop task is therefore a registered benchmark and architecture target, not an implemented WeightLoop reproduction. Do not label the current SWI work as recursive self-improvement.
 
 ## 7. Metrics and hard acceptance gates
 
