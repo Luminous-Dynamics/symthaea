@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use symthaea_chain_theory_audit::{
-    pair_electric_charge_audit, readout_dimension_matches_running_ladder,
-    record_rows, reproduce, unbroken_generator_decomposition, weak_angle_normalization_audit,
+    pair_electric_charge_audit, readout_dimension_matches_running_ladder, record_rows, reproduce,
+    unbroken_generator_decomposition, weak_angle_normalization_audit,
 };
 
 fn main() {
@@ -45,8 +45,7 @@ fn main() {
     );
     println!(
         "generator_has_weak_component={} generator_has_colour_component={}",
-        !generator.weak_isospin_coefficient_is_zero,
-        generator.colour_coefficient_is_nonzero
+        !generator.weak_isospin_coefficient_is_zero, generator.colour_coefficient_is_nonzero
     );
     let pair = pair_electric_charge_audit();
     println!(
