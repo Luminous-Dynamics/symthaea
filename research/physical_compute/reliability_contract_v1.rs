@@ -129,7 +129,7 @@ impl FaultMap {
     pub fn healthy_cells(&self) -> usize {
         (0..self.rows).flat_map(|r| (0..self.cols).map(move |c| (r, c)))
             .filter(|(r, c)| !self.failed_rows[*r] && !self.failed_cols[*c]
-                && self.cells[r * self.cols + c] == Cell::Healthy)
+                && self.cells[*r * self.cols + *c] == Cell::Healthy)
             .count()
     }
 
