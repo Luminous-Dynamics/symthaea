@@ -30,6 +30,7 @@ use std::error::Error;
 use std::fmt;
 
 pub const MAX_OSPA2_ASSIGNMENT_SIDE: usize = 20;
+pub const MAX_OSPA2_WINDOW_LENGTH: usize = 100_000;
 
 /// One truth or estimated trajectory over a fixed, aligned time window.
 #[derive(Clone, Debug, PartialEq)]
@@ -83,6 +84,12 @@ impl Ospa2Config {
         if self.window_length == 0 {
             return Err(Ospa2Error::InvalidWindowLength);
         }
+        if self.window_length > MAX_OSPA2_WINDOW_LENGTH {
+            return Err(Ospa2Error::WindowTooLong {
+                count: self.window_length,
+                maximum: MAX_OSPA2_WINDOW_LENGTH,
+            });
+        }
 
         match &self.window_weights {
             None => Ok(vec![1.0 / self.window_length as f64; self.window_length]),
@@ -128,6 +135,7 @@ pub enum Ospa2Error {
     InvalidOrder,
     InvalidWindowSumOrder,
     InvalidWindowLength,
+    WindowTooLong { count: usize, maximum: usize },
     WindowWeightCount { expected: usize, actual: usize },
     InvalidWindowWeight { index: usize },
     ZeroWindowWeightSum,
@@ -156,6 +164,10 @@ impl fmt::Display for Ospa2Error {
                 write!(f, "OSPA(2) temporal order q must lie in [1,4]")
             }
             Self::InvalidWindowLength => write!(f, "OSPA(2) window length must be nonzero"),
+            Self::WindowTooLong { count, maximum } => write!(
+                f,
+                "OSPA(2) window has {count} frames; maximum supported is {maximum}"
+            ),
             Self::WindowWeightCount { expected, actual } => {
                 write!(f, "OSPA(2) has {actual} window weights; expected {expected}")
             }
@@ -528,6 +540,23 @@ mod tests {
             ospa2_track_sets(&nan, &[], &config(1)),
             Err(Ospa2Error::NonFinitePosition { .. })
         ));
+    }
+
+    #[test]
+    fn oversized_window_is_rejected_before_uniform_weight_allocation() {
+        let config = Ospa2Config::uniform(
+            10.0,
+            2.0,
+            2.0,
+            MAX_OSPA2_WINDOW_LENGTH + 1,
+        );
+        assert_eq!(
+            ospa2_track_sets(&[], &[], &config),
+            Err(Ospa2Error::WindowTooLong {
+                count: MAX_OSPA2_WINDOW_LENGTH + 1,
+                maximum: MAX_OSPA2_WINDOW_LENGTH,
+            })
+        );
     }
 
     #[test]
