@@ -368,7 +368,7 @@
       "route_fixed_per_task_instance": true,
       "cross_cluster_transfer_requires_receipt": true,
       "required_ablation_arms": [
-        "global_verified_state",
+        "full_verified_state",
         "fixed_mechanism_scope_routed_clusters",
         "adaptive_mechanism_scope_routed_clusters",
         "shuffled_scope_routing",
