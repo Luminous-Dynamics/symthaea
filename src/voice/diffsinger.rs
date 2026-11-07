@@ -207,5 +207,15 @@ mod capability_manifest_tests {
         super::super::singing_engine::SingingRenderPolicy::score_conditioned_comparison()
             .validate_against(&manifest)
             .unwrap();
+        assert!(
+            super::super::singing_engine::SingingRenderPolicy::phrase_expression_comparison()
+                .validate_against(&manifest)
+                .is_err()
+        );
+        assert!(
+            super::super::singing_engine::SingingRenderPolicy::phrase_breath_comparison()
+                .validate_against(&manifest)
+                .is_err()
+        );
     }
 }
