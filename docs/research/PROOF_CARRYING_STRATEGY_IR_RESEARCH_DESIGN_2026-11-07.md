@@ -415,3 +415,19 @@ A safe entry point now composes the two independent semantic layers:
 4. Retain selected multi-start seed, interaction checks, frontier measurements, sifting evaluations, support-reduction counts and BDD node totals in the compiled bundle.
 
 This does not make the proof format itself checked: the finite reference path still verifies strategy behavior directly. The future proof-derived adapter is tracked separately in [#11034](https://github.com/Luminous-Dynamics/symthaea/issues/11034), and must add an independent proof checker before its extraction output can be admitted.
+
+
+## 19. Exact #SAT proof logging and the CPOG candidate
+
+Exact #SAT proof evidence and QBF Skolem/Herbrand strategy evidence are separate mathematical objects.
+
+The 2026 paper *The Relative Strength of #SAT Proof Systems* establishes that CPOG polynomially simulates both MICE and kcps, while MICE and kcps are exponentially incomparable. CLIP simulates all three but is a stronger theoretical reference. This creates a concrete, source-backed reason to evaluate CPOG as the common proof-logging target for exact #SAT rather than inventing a new counting-proof format.
+
+The implementation boundary is tracked in #11036. Before coding:
+- pin the paper's full formal CPOG rules and any public artifact;
+- compare those rules with the current typed AND/OR hyperedge and exact decomposition semantics;
+- demonstrate rule-by-rule mapping, not a name-based equivalence;
+- independently check CPOG graph structure, partition/scope constraints, count aggregation and binding to the original CNF universe;
+- preserve the distinction between #SAT, projected #SAT, weighted/algebraic counting, QBF truth, QBF strategies and #QBF strategy counting.
+
+The CPOG simulation result is a proof-complexity relation, not an empirical runtime guarantee. Measure proof size/generation and independent checking on held-out exact #SAT families before promoting it as the practical common target.
