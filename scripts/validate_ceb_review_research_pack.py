@@ -618,6 +618,7 @@ def self_test() -> list[str]:
     ))
 
     production_impact = "\\n".join((
+        "Four states",
         "Truth Utility Uptake Outcome",
         "cluster-randomized presentation experiment",
         "intention-to-treat",
