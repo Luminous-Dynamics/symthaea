@@ -354,6 +354,10 @@ struct PolicyCache {
 }
 
 impl PolicyCache {
+    fn get(&self, user: UserId, resource: ResourceId) -> Option<Decision> {
+        self.entries.get(&(user, resource)).copied()
+    }
+
     fn insert(&mut self, user: UserId, resource: ResourceId, decision: Decision) {
         self.entries.insert((user, resource), decision);
     }
