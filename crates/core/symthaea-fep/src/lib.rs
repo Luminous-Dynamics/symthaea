@@ -150,6 +150,7 @@ pub mod markov_blanket;
 mod motor;
 mod td_learning;
 pub mod three_ball_partial_observation;
+pub mod three_ball_sequential_discovery;
 pub mod three_ball_rule_space;
 pub mod types;
 
