@@ -576,4 +576,76 @@ mod tests {
         let right = [Phase::from_microturns(-490_000); LEG_COUNT];
         assert_eq!(response_vector_distance(&left, &right), 6 * 20_000);
     }
+    #[test]
+    fn phase_bin_can_be_uninformative_while_another_bin_separates_models() {
+        let phase_zero = key(Context::BallContact, 0, 0, 1);
+        let phase_half = key(Context::BallContact, 0, 4, 1);
+        let mut common = zeros();
+        common[0] = Phase::from_microturns(50_000);
+        let mut separated = common;
+        separated[2] = Phase::from_microturns(40_000);
+        let model_a = ModelSignature {
+            model_id: "central".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 900,
+            predictions: vec![
+                ProbePrediction { key: phase_zero, by_leg: common },
+                ProbePrediction { key: phase_half, by_leg: common },
+            ],
+        };
+        let model_b = ModelSignature {
+            model_id: "sensory".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 900,
+            predictions: vec![
+                ProbePrediction { key: phase_zero, by_leg: common },
+                ProbePrediction { key: phase_half, by_leg: separated },
+            ],
+        };
+        let separation = minimum_pairwise_probe_separation(&[model_a, model_b]).unwrap();
+        assert_eq!(separation[&phase_zero], 0);
+        assert_eq!(separation[&phase_half], 40_000);
+    }
+
+    #[test]
+    fn shared_input_challenger_can_mimic_off_diagonal_transfer() {
+        let probe = key(Context::BallContact, 0, 2, 1);
+        let mut apparent_transfer = zeros();
+        apparent_transfer[0] = Phase::from_microturns(70_000);
+        apparent_transfer[3] = Phase::from_microturns(20_000);
+        let central_path = ModelSignature {
+            model_id: "direct-central-coupling".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 920,
+            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer }],
+        };
+        let common_drive = ModelSignature {
+            model_id: "latent-shared-input".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 920,
+            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer }],
+        };
+        assert_eq!(minimum_campaign_separation(&[central_path, common_drive]).unwrap(), 0);
+    }
+
+    #[test]
+    fn all_unavailable_states_remain_typed() {
+        let statuses = [
+            MeasurementStatus::NoResponse,
+            MeasurementStatus::FailedAssay,
+            MeasurementStatus::MissingTrack,
+            MeasurementStatus::OutOfSupport,
+            MeasurementStatus::NotAssessed,
+        ];
+        let probe = key(Context::AirStepping, 1, 2, 1);
+        for status in statuses {
+            let surface = PhaseResponseSurface::new(vec![TransferRow {
+                key: probe,
+                outcome: RowOutcome::Unavailable(status),
+            }])
+            .unwrap();
+            assert_eq!(surface.phase_reset(&probe), Err(PhaseError::Unavailable(status)));
+        }
+    }
+
 }
