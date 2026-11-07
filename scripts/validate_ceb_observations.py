@@ -222,6 +222,53 @@ def semantic_errors(payload: dict) -> list[str]:
         if "not ceb defect recall@5" not in caveats:
             errors.append("SoftReX comparator must retain Top-N-vs-CEB Recall@5 scope caveat")
 
+    # Preserve causal-guided repair and secure repository completion as distinct
+    # contextual comparators; neither becomes a direct code-review equivalence.
+    required_adjacent_comparators = {
+        "cgarf-swebench-repair": ("CEB-DEBUG", "cgarf-paper", "not_reported", None),
+        "secrepobench-secure-completion": ("CEB-SECURE", "secrepobench-leaderboard", "reported", 318),
+    }
+    for comparator_id, expected in required_adjacent_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing adjacent research comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        denom = comparator["sample_denominator"]
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        if denom["status"] != denominator_status or denom["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_adjacent_observations = {
+        "cgarf-repair-success-gain-lower": ("cgarf-swebench-repair", "repair_success_gain_range_bound", 2),
+        "cgarf-repair-success-gain-upper": ("cgarf-swebench-repair", "repair_success_gain_range_bound", 4),
+        "cgarf-patch-applicability-gain": ("cgarf-swebench-repair", "patch_applicability_gain", 3),
+        "secrepobench-top-setup-secure-pass-at-1": ("secrepobench-secure-completion", "secure_pass_at_1", 60.1),
+        "secrepobench-top-setup-pass-at-1": ("secrepobench-secure-completion", "pass_at_1", 76.4),
+    }
+    for observation_id, expected in required_adjacent_observations.items():
+        observation = next((row for row in observations if row["observation_id"] == observation_id), None)
+        if observation is None:
+            errors.append(f"missing adjacent research observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            observation["comparator_id"] != comparator_id
+            or observation["metric"]["metric_id"] != metric_id
+            or observation["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    if "cgarf-swebench-repair" in comparators:
+        caveats = " ".join(comparators["cgarf-swebench-repair"]["caveats"]).lower()
+        if "not ceb review" not in caveats and "not reviewer" not in caveats:
+            errors.append("CGARF must retain its repair-vs-review caveat")
+    if "secrepobench-secure-completion" in comparators:
+        caveats = " ".join(comparators["secrepobench-secure-completion"]["caveats"]).lower()
+        if "not code review" not in caveats or "not ceb-secure" not in caveats:
+            errors.append("SecRepoBench must retain its secure-completion-vs-CEB caveat")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -424,6 +471,18 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     row = next(row for row in mutant["observations"] if row["observation_id"] == "poscm-uai26-simulators")
     row["metric"]["value"] = 95
     must_reject(mutant, "POSCM simulator count misrepresented as a performance score")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "cgarf-repair-success-gain-upper"
+    ]
+    must_reject(mutant, "CGARF repair gain range upper bound removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "secrepobench-top-setup-secure-pass-at-1")
+    row["metric"]["value"] = 76.4
+    must_reject(mutant, "SecRepoBench secure-pass conflated with functional pass")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
