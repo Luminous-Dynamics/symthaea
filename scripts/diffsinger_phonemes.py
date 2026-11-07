@@ -189,7 +189,6 @@ def _append_weighted_group(
 
 def flatten_performance_phones(
     performance: object,
-    minimum_silence_ms: float,
 ) -> list[tuple[str, float, float]]:
     """Flatten an English v2 performance into (ARPAbet/SP, duration_ms, Hz).
 
@@ -207,12 +206,6 @@ def flatten_performance_phones(
             f"DiffSinger phone flattening currently supports language='en' only; "
             f"got {performance.get('language')!r}"
         )
-    if (
-        type(minimum_silence_ms) not in (int, float)
-        or not math.isfinite(minimum_silence_ms)
-        or minimum_silence_ms < 0.0
-    ):
-        raise ValueError("minimum_silence_ms must be finite and non-negative")
     syllables = performance.get("syllables")
     if not isinstance(syllables, list) or not syllables:
         raise ValueError("performance requires a non-empty syllables array")
@@ -351,7 +344,7 @@ def flatten_performance_phones(
             previous_end_s,
             f"syllable {syllable_index} onset",
         )
-        if gap_ms >= minimum_silence_ms and gap_ms > 0.0:
+        if gap_ms > 0.0:
             events.append(("SP", gap_ms, note_hz))
         # Sub-frame gaps are below the renderer's timing resolution; preserve
         # the event order and accept less than half a frame of onset error.
@@ -397,7 +390,7 @@ def flatten_performance_phones(
                     previous_end_s,
                     f"syllable {syllable_index} melisma note {melisma_index}",
                 )
-                if melisma_gap_ms >= minimum_silence_ms and melisma_gap_ms > 0.0:
+                if melisma_gap_ms > 0.0:
                     events.append(("SP", melisma_gap_ms, melisma_hz))
                 if last_vowel is None:
                     raise ValueError(
