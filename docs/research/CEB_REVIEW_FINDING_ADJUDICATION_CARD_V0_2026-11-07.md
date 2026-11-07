@@ -162,3 +162,23 @@ Before finalizing a label, confirm:
 - [ ] The judge/matcher is not treated as independent truth without audit.
 - [ ] Reviewer time and total model/tool cost are retained.
 - [ ] Unresolved cases remain unresolved when evidence is insufficient.
+
+## K. Counterfactual-control validity (when a finding uses P/I/F/N/M/IRR)
+
+Use [CEB Review Counterfactual-Control Qualification V0](CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md). Complete this section for every historical or constructed source-state control that supports a causal claim.
+
+- Control state: **P / I / F / N / M / IRR**
+- Exact commit/tree/blob identity and parent edge:
+- Is this a historical source observation or a designed intervention?
+- Changed hunks independently classified? **yes / no / disputed**
+- Target-causal versus test/doc/refactor/dependency/environment/unrelated changes:
+- Trigger/path/operation and in-scope alternate paths:
+- Residual target path after fix/intervention:
+- Confounders and environment differences:
+- Intervention fidelity: **supported / limited / unresolved / N/A**
+- Evidence status by qualification dimension: **Q1 lineage / Q2 disentanglement / Q3 mechanism / Q4 fidelity / Q5 environment / Q6 outcome**
+- What exact claim does this control support?
+- Which claims remain unsupported?
+
+A historical fix is not a minimal intervention by default. A passing repaired revision does not establish whole-program safety. A source-only control cannot establish runtime behavior. If patch tangling or residual paths cannot be resolved, narrow the claim or leave the control unresolved.
+
