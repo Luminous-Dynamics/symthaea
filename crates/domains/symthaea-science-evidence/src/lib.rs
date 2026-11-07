@@ -537,11 +537,11 @@ mod tests {
 
     #[test]
     fn duplicate_artifact_paths_and_required_check_names_are_rejected() {
-        let mut manifest = manifest();
-        let input = manifest.input_artifacts[0].clone();
-        manifest.input_artifacts.push(input);
+        let mut duplicate_path_manifest = manifest();
+        let input = duplicate_path_manifest.input_artifacts[0].clone();
+        duplicate_path_manifest.input_artifacts.push(input);
         assert_eq!(
-            manifest.validate(),
+            duplicate_path_manifest.validate(),
             Err(ManifestError::DuplicateArtifactPath(
                 "fixture.json".to_string()
             ))
@@ -640,11 +640,11 @@ mod tests {
 
     #[test]
     fn dirty_tree_and_environment_mismatch_cannot_qualify_as_pass() {
-        let mut manifest = manifest();
-        manifest.source_tree_clean = false;
-        let receipt = passing_receipt(&manifest);
+        let mut dirty_manifest = manifest();
+        dirty_manifest.source_tree_clean = false;
+        let receipt = passing_receipt(&dirty_manifest);
         assert_eq!(
-            receipt.validate_against(&manifest),
+            receipt.validate_against(&dirty_manifest),
             Err(ManifestError::DirtySourceTreeCannotPass)
         );
 
