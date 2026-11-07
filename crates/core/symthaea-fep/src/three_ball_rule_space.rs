@@ -440,16 +440,16 @@ mod tests {
         // gaze=left, choice=red. Centre red selects left red: correct.
         assert_eq!(columns[0], vec![0.0, 1.0, 0.0]);
 
-        // Column 3 changes right to green while left and centre stay red:
-        // rule 65 still selects left red: correct.
-        assert_eq!(columns[3], vec![0.0, 1.0, 0.0]);
+        // Column 3 changes centre to green while left and right stay red:
+        // rule 65 selects centre green, so choosing red is incorrect.
+        assert_eq!(columns[3], vec![0.0, 0.0, 1.0]);
 
         // First no-choice block: feedback is no-feedback for every scene.
         assert_eq!(columns[3 * 3 * 3 * 4 * 3], vec![1.0, 0.0, 0.0]);
 
         // State left=red, centre=green, right=blue, gaze=left, choice=red.
         // Rule 65 selects centre green, so choosing red is incorrect.
-        let centre_green_state = 1 + 3 + 9 + 27;
+        let centre_green_state = 3 + 2 * 9;
         assert_eq!(columns[centre_green_state], vec![0.0, 0.0, 1.0]);
     }
 
