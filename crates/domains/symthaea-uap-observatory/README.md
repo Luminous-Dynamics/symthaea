@@ -60,6 +60,21 @@ The triangulation module now exposes:
 - Candidate observations are predicted using the candidate's active
   sensor-body-to-ECEF quaternion and declared per-axis angular uncertainty.
 
+- `rank_sensor_placements_over_target_region`: robust finite-scenario design
+  over a weighted set of plausible target locations. It reports prior-weighted
+  expected D/A-optimal scores and worst-case information/covariance scores,
+  ranking first by worst-case D-optimality.
+- Existing sensor poses are reprojected toward each hypothesized target before
+  recomputing the local Fisher matrix; the nominal measured bearing is not
+  reused as if it were valid at every target hypothesis.
+
+The target-region API is still a finite-scenario approximation. It does not
+prove a continuous-region guarantee, and currently rejects a sensor geometry
+if it is unobservable at any supplied target hypothesis. The current objective
+is minimax log(det(FIM)), followed by expected log(det(FIM)); this is distinct
+from pure Bayesian D-optimality and should be compared against expected-FIM,
+A-optimal, E-optimal, and minimax CRLB designs.
+
 This turns triangulation into a sensor-design question: given an assumed
 target region and current observations, which sensor placement is expected
 to add the most independent geometric information?
