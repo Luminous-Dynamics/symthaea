@@ -357,6 +357,30 @@ Do not multiply KDDR by Usefulness Rate or combine them into a single opaque sco
 **Invalid behavior:** Count semantic similarity as target detection; classify the finding as invalid solely because it does not match the target label.
 
 
+### ERG-S18 — Correct file, wrong causal mechanism
+
+**Evidence pack:** The review points to the exact function containing a vulnerability. The explanation asserts an adjacent mechanism (for example, a bounds error) while the actual defect is a trust-boundary violation in the same function. Both explanations sound plausible from local lines; the frozen source/spec evidence distinguishes them.
+
+**Expected behavior:** Do not award the target defect hit on location overlap. Require a causal account of the trigger, relevant path/state, unsafe operation and violated condition. If the evidence supports only the file location but not the mechanism, disposition remains unresolved or mechanism-misdiagnosed.
+
+**Invalid behavior:** Credit any comment in the root-cause file; reward lexical overlap with the reference; treat location precision as causal correctness.
+
+### ERG-S19 — Same diagnosis on introducing and repaired revisions
+
+**Evidence pack:** The agent reviews a buggy introducing revision and its repaired companion. It submits essentially the same target diagnosis for both. The repair diff removes or invalidates the causal step in the target mechanism; unrelated issues may remain in the PR.
+
+**Expected behavior:** Evaluate the claim against each exact source revision. The target-specific diagnosis should not be credited on the repaired companion when the causal chain is no longer live. Do not infer that the entire repaired PR is defect-free.
+
+**Invalid behavior:** Reuse a historical target label as proof the vulnerability is currently present; treat target-specific absence as whole-PR safety; ignore intervening changes between revisions.
+
+### ERG-S20 — Multi-file mechanism is only partially explained
+
+**Evidence pack:** A defect requires a caller-controlled state transition in one crate and a missing invariant check in another. The review identifies the changed callee but omits the caller precondition and therefore gives an incorrect explanation of when the unsafe operation occurs.
+
+**Expected behavior:** Trace and cite the complete relevant call/data/control path. Distinguish a correct component observation from an incomplete causal diagnosis. Preserve unresolved status if the necessary cross-file invariant cannot be established from available evidence.
+
+**Invalid behavior:** Treat a correct function-name/line citation as a complete root cause; extrapolate local tests to downstream callers; invent a runtime path without an observed trace.
+
 ## 18. Claim boundary
 
-This document contributes twelve synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
+This document contributes twenty synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
