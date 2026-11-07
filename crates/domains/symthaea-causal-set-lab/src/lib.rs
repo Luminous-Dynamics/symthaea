@@ -39,9 +39,7 @@ impl Event2D {
 
     /// Strict causal precedence. Null-separated events are included.
     pub fn causally_precedes(self, other: Self) -> bool {
-        self.u <= other.u
-            && self.v <= other.v
-            && (self.u < other.u || self.v < other.v)
+        self.u <= other.u && self.v <= other.v && (self.u < other.u || self.v < other.v)
     }
 }
 
@@ -59,10 +57,17 @@ impl fmt::Display for CausalSetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidExtent => write!(f, "null-coordinate extents must be finite and positive"),
-            Self::InvalidRapidity => write!(f, "rapidity must be finite and its boost scales representable"),
+            Self::InvalidRapidity => write!(
+                f,
+                "rapidity must be finite and its boost scales representable"
+            ),
             Self::NonFiniteEvent { id } => write!(f, "event {id} has a non-finite coordinate"),
-            Self::NegativeCoordinate { id } => write!(f, "event {id} has a negative null coordinate"),
-            Self::EventOutsideBounds { id } => write!(f, "event {id} lies outside the declared interval bounds"),
+            Self::NegativeCoordinate { id } => {
+                write!(f, "event {id} has a negative null coordinate")
+            }
+            Self::EventOutsideBounds { id } => {
+                write!(f, "event {id} lies outside the declared interval bounds")
+            }
             Self::DuplicateEventId { id } => write!(f, "event id {id} is duplicated"),
         }
     }
@@ -90,11 +95,7 @@ impl CausalSet2D {
         u_extent: f64,
         v_extent: f64,
     ) -> Result<Self, CausalSetError> {
-        if !u_extent.is_finite()
-            || !v_extent.is_finite()
-            || u_extent <= 0.0
-            || v_extent <= 0.0
-        {
+        if !u_extent.is_finite() || !v_extent.is_finite() || u_extent <= 0.0 || v_extent <= 0.0 {
             return Err(CausalSetError::InvalidExtent);
         }
 
@@ -126,7 +127,11 @@ impl CausalSet2D {
             }
         }
 
-        Ok(Self { events, u_extent, v_extent })
+        Ok(Self {
+            events,
+            u_extent,
+            v_extent,
+        })
     }
 
     /// Fixed-N sprinkling into a 1+1D Minkowski Alexandrov interval.
@@ -206,11 +211,15 @@ impl CausalSet2D {
             return Err(CausalSetError::InvalidRapidity);
         }
 
-        let events = self.events.iter().map(|event| Event2D {
-            id: event.id,
-            u: event.u * u_scale,
-            v: event.v * v_scale,
-        }).collect();
+        let events = self
+            .events
+            .iter()
+            .map(|event| Event2D {
+                id: event.id,
+                u: event.u * u_scale,
+                v: event.v * v_scale,
+            })
+            .collect();
 
         Self::new(events, u_extent, v_extent)
     }
@@ -375,8 +384,7 @@ pub fn expected_ordering_fraction(dimension: f64) -> Option<f64> {
     if !dimension.is_finite() || !(1.0..=32.0).contains(&dimension) {
         return None;
     }
-    let log_r = ln_gamma(dimension + 1.0)
-        + ln_gamma(dimension / 2.0)
+    let log_r = ln_gamma(dimension + 1.0) + ln_gamma(dimension / 2.0)
         - 2.0_f64.ln()
         - ln_gamma(1.5 * dimension);
     let value = log_r.exp();
@@ -451,7 +459,9 @@ struct FenwickTree {
 
 impl FenwickTree {
     fn new(size: usize) -> Self {
-        Self { tree: vec![0; size + 1] }
+        Self {
+            tree: vec![0; size + 1],
+        }
     }
 
     fn add(&mut self, index: usize, value: u64) {
@@ -553,7 +563,10 @@ mod tests {
         for dimension in [2.0, 3.0, 4.0, 5.0] {
             let fraction = expected_ordering_fraction(dimension).unwrap();
             let recovered = estimate_dimension_from_ordering_fraction(fraction, 8.0).unwrap();
-            assert!((recovered - dimension).abs() < 1e-8, "d={dimension}, recovered={recovered}");
+            assert!(
+                (recovered - dimension).abs() < 1e-8,
+                "d={dimension}, recovered={recovered}"
+            );
         }
     }
 
@@ -568,9 +581,15 @@ mod tests {
     fn one_plus_one_minkowski_recovers_half_ordering_fraction() {
         let causet = CausalSet2D::sprinkle_fixed_cardinality(0xC0FFEE, 1_500, 1.0).unwrap();
         let fraction = causet.ordering_fraction().unwrap();
-        assert!((fraction - 0.5).abs() < 0.06, "ordering fraction={fraction}");
+        assert!(
+            (fraction - 0.5).abs() < 0.06,
+            "ordering fraction={fraction}"
+        );
         let dimension = causet.estimate_myrheim_meyer_dimension(8.0).unwrap();
-        assert!((dimension - 2.0).abs() < 0.25, "estimated dimension={dimension}");
+        assert!(
+            (dimension - 2.0).abs() < 0.25,
+            "estimated dimension={dimension}"
+        );
     }
 
     #[test]
@@ -602,9 +621,21 @@ mod tests {
     fn identical_coordinate_events_are_not_related_or_chained() {
         let causet = CausalSet2D::new(
             vec![
-                Event2D { id: 10, u: 0.1, v: 0.1 },
-                Event2D { id: 11, u: 0.1, v: 0.1 },
-                Event2D { id: 12, u: 0.2, v: 0.2 },
+                Event2D {
+                    id: 10,
+                    u: 0.1,
+                    v: 0.1,
+                },
+                Event2D {
+                    id: 11,
+                    u: 0.1,
+                    v: 0.1,
+                },
+                Event2D {
+                    id: 12,
+                    u: 0.2,
+                    v: 0.2,
+                },
             ],
             1.0,
             1.0,
@@ -613,8 +644,14 @@ mod tests {
 
         assert_eq!(causet.related_pair_count(), 2);
         assert_eq!(causet.longest_chain_length(), 2);
-        assert_eq!(causet.related_pair_count(), brute_related_pair_count(&causet));
-        assert_eq!(causet.longest_chain_length(), brute_longest_chain_length(&causet));
+        assert_eq!(
+            causet.related_pair_count(),
+            brute_related_pair_count(&causet)
+        );
+        assert_eq!(
+            causet.longest_chain_length(),
+            brute_longest_chain_length(&causet)
+        );
     }
 
     #[test]
@@ -645,8 +682,16 @@ mod tests {
                 "longest-chain mismatch for seed={seed}"
             );
             for pair in chain.windows(2) {
-                let a = *causet.events().iter().find(|event| event.id == pair[0]).unwrap();
-                let b = *causet.events().iter().find(|event| event.id == pair[1]).unwrap();
+                let a = *causet
+                    .events()
+                    .iter()
+                    .find(|event| event.id == pair[0])
+                    .unwrap();
+                let b = *causet
+                    .events()
+                    .iter()
+                    .find(|event| event.id == pair[1])
+                    .unwrap();
                 assert!(
                     a.causally_precedes(b),
                     "returned chain contains a non-causal edge for seed={seed}"
@@ -658,15 +703,36 @@ mod tests {
     #[test]
     fn invalid_coordinates_are_rejected() {
         assert!(CausalSet2D::sprinkle_fixed_cardinality(1, 10, 0.0).is_err());
-        assert!(CausalSet2D::new(
-            vec![Event2D { id: 0, u: f64::NAN, v: 0.5 }],
-            1.0,
-            1.0
-        ).is_err());
-        assert!(CausalSet2D::new(
-            vec![Event2D { id: 0, u: 0.2, v: 0.3 }, Event2D { id: 0, u: 0.4, v: 0.5 }],
-            1.0,
-            1.0
-        ).is_err());
+        assert!(
+            CausalSet2D::new(
+                vec![Event2D {
+                    id: 0,
+                    u: f64::NAN,
+                    v: 0.5
+                }],
+                1.0,
+                1.0
+            )
+            .is_err()
+        );
+        assert!(
+            CausalSet2D::new(
+                vec![
+                    Event2D {
+                        id: 0,
+                        u: 0.2,
+                        v: 0.3
+                    },
+                    Event2D {
+                        id: 0,
+                        u: 0.4,
+                        v: 0.5
+                    }
+                ],
+                1.0,
+                1.0
+            )
+            .is_err()
+        );
     }
 }
