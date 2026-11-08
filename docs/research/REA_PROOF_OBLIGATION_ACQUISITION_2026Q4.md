@@ -118,6 +118,68 @@ A Rust fixture checker validates both views, checks exact case/candidate corresp
 
 Important limitation: the grader-only development file remains public in this repository. It is not a hidden test set and cannot support contamination-resistant evaluation. Hidden evaluation cases and gold labels must be held in a separately access-controlled service or private repository, with no oracle material available to the agent runtime. A filename, metadata flag, or branch boundary is not access control.
 
+## 3.2 Decompose retrieval, extraction, warrant and provenance
+
+Recent evidence-based QA and fact-checking studies reinforce that "retrieval failure" is not one failure mode:
+
+- Usmanova et al. (EMNLP 2026) found that replacing retrieved evidence with gold annotations raised veracity accuracy by 14–22 percentage points in their evaluated cross-domain settings; rankings changed across datasets and metrics. This is an oracle gap, not a REA result. https://aclanthology.org/2026.emnlp-main.1915/
+- Mo et al. (EMNLP 2026), *Diagnosing the Fact-Grounding Gap in Multi-Hop Question Answering*, separate retrieval failures from extraction failures. They report extraction failures account for nearly half of per-hop deficiencies in their evaluation, and that tested retrieval interventions did not resolve those extraction failures. https://aclanthology.org/2026.emnlp-main.834/
+- Akhtar et al. (TACL 2026), Ev2R, combine reference alignment with verdict-support evaluation and use adversarial perturbations such as evidence deletion, irrelevant insertion, redundancy, argument reordering and meaning-preserving number/word transformations. https://aclanthology.org/2026.tacl-1.25/
+- Qian et al. (Findings EMNLP 2026), ForceBench, hold cited evidence fixed while altering claim strength; their reported generic prompting MVR is 47.2%, reduced to 24.5% by explicit warrant prompts, but not eliminated. These are external measurements. https://aclanthology.org/2026.findings-emnlp.1577/
+
+REA should measure four serial but independently fallible stages:
+
+1. **Retrieval:** Was the necessary source/span made available to the system?
+2. **Extraction:** Did the system recover the correct atomic proposition, value, relation, time and scope from the source?
+3. **Warrant:** Does that proposition actually establish the required claim obligation at the requested force?
+4. **Provenance/admissibility:** Is the observation bound to the right artifact, time, source lineage and population, and is its evidence class admissible?
+
+A source can be retrieved but misread. A fact can be extracted exactly but not entail the claim. A passage can entail a claim but be stale or derived from a non-independent source. A supported local observation can still be insufficient for a whole-population claim.
+
+### Matched oracle interventions
+
+Where a case has human-adjudicated source spans and propositions, evaluate matched arms under the same task, target, compute budget and grader:
+
+- **R0 — system retrieval:** end-to-end retrieval and claim evaluation.
+- **R1 — gold document/span availability:** replace only the retrieved source set with the adjudicated relevant spans; keep extraction and warrant unchanged.
+- **R2 — gold proposition extraction:** provide adjudicated atomic propositions extracted from the same source spans; keep warrant unchanged.
+- **R3 — gold admissibility/warrant map:** provide human-adjudicated obligation-to-evidence relations; measure the residual readiness/decision implementation error.
+- **R4 — adversarial evidence controls:** remove a premise, insert irrelevant evidence, duplicate a source, reorder dependent premises, alter time/scope/number wording, or substitute a stale/conflicted source.
+
+Derived diagnostic gaps:
+```
+retrieval_gap   = score(R1) - score(R0)
+extraction_gap = score(R2) - score(R1)
+warrant_gap    = score(R3) - score(R2)
+```
+
+These differences are diagnostics, not additive capability scores. They may be negative, and each must be reported with paired confidence intervals. R3 is not a model capability leaderboard result: it is an upper-bound diagnostic with oracle adjudication.
+
+### Extraction representation
+
+An extracted proposition is a derived object, never a replacement for the raw source. It must retain:
+- exact source/evidence ID and raw digest;
+- exact byte/line/JSON-pointer span or other source-native locator;
+- extractor identity/version and extraction operation digest;
+- proposition predicate, subject, object/value, relation, modality, time interval and scope;
+- ambiguity/alternatives and unresolved coreference;
+- whether the proposition was directly stated, normalized, inferred or model-generated.
+
+Do not let paraphrase or premise normalization silently upgrade evidence force. Every extracted atom must be replayable to its exact source span; unsupported components remain explicit.
+
+### Metrics added
+
+- retrieval recall@k for mandatory admissible premises, plus precision and source-family diversity;
+- extraction exactness by subject/relation/value/modality/time/scope fields;
+- source-span traceability and extraction replay;
+- warrant correctness conditional on identical fixed evidence;
+- evidence-admissibility error conditional on the same extracted propositions;
+- oracle intervention gap by stage and domain;
+- adversarial degradation and semantics-preserving invariance;
+- false-ready rate and useful coverage after each intervention.
+
+Never collapse these into one score. If R1 closes most of the gap, invest in retrieval. If R2 closes it, improve extraction. If only R3 closes it, the bottleneck is warrant/admissibility. If none closes it, inspect claim semantics, action policy, oracle quality or hidden-state mismatch.
+
 ## 4. Metrics
 
 Report independent scorecards, not one composite:
