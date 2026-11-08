@@ -506,6 +506,66 @@ mod tests {
     }
 
     #[test]
+    fn lower_information_probe_wins_when_it_reduces_decision_risk() {
+        let hypotheses: Vec<DecisionHypothesis> = (0..4)
+            .map(|index| {
+                let fault_a = index < 2;
+                let nuisance_zero = index % 2 == 0;
+                DecisionHypothesis {
+                    id: format!("model-{index}"),
+                    prior_probability: 0.25,
+                    outcome_probabilities_by_action: vec![
+                        if nuisance_zero {
+                            vec![1.0, 0.0]
+                        } else {
+                            vec![0.0, 1.0]
+                        },
+                        if fault_a {
+                            vec![0.7, 0.3]
+                        } else {
+                            vec![0.3, 0.7]
+                        },
+                    ],
+                    loss_by_final_decision: if fault_a {
+                        vec![0.0, 1.0]
+                    } else {
+                        vec![1.0, 0.0]
+                    },
+                }
+            })
+            .collect();
+        let actions = vec![
+            DiagnosticAction {
+                id: "reveal-irrelevant-nuisance".into(),
+                observation_cost: 0.0,
+                safety_risk: 0.0,
+            },
+            DiagnosticAction {
+                id: "weakly-identify-decision-relevant-fault".into(),
+                observation_cost: 0.0,
+                safety_risk: 0.0,
+            },
+        ];
+
+        let result = evaluate_decision_focused_diagnostics(
+            &hypotheses,
+            &actions,
+            DecisionDiagnosticConfig::default(),
+        )
+        .expect("valid decision-focused diagnostic problem");
+
+        assert!(
+            result.actions[0].model_information_gain_nats
+                > result.actions[1].model_information_gain_nats
+        );
+        assert!(result.actions[0].expected_value_of_sample_information.abs() < 1e-12);
+        assert!(
+            (result.actions[1].expected_value_of_sample_information - 0.2).abs() < 1e-12
+        );
+        assert_eq!(result.selected_action_index, Some(1));
+    }
+
+    #[test]
     fn high_information_without_decision_value_does_not_trigger_a_probe() {
         let (hypotheses, actions) = binary_diagnosis(true);
         let result = evaluate_decision_focused_diagnostics(
