@@ -1491,7 +1491,8 @@
         "alignment_tie_policy",
         "unscorable_segment_count",
         "feature_profile_schema_version",
-        "feature_profile_status"
+        "feature_profile_status",
+        "feature_dimension_diagnostics_sha256"
       ],
       "properties": {
         "mode": {
@@ -1608,6 +1609,24 @@
             "QUALIFIED",
             "RETIRED"
           ]
+        },
+        "feature_dimension_diagnostics_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
         }
       },
       "allOf": [
@@ -1662,6 +1681,9 @@
               },
               "feature_profile_status": {
                 "const": "NOT_APPLICABLE"
+              },
+              "feature_dimension_diagnostics_sha256": {
+                "type": "null"
               }
             }
           }
@@ -1732,6 +1754,9 @@
                   "QUALIFIED",
                   "RETIRED"
                 ]
+              },
+              "feature_dimension_diagnostics_sha256": {
+                "$ref": "#/$defs/sha256"
               }
             }
           }
