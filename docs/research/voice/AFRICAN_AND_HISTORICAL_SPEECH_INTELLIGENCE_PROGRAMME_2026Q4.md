@@ -934,3 +934,14 @@ Target a measurable advantage on the intersection of natural African code-switch
 ### 20.6 Preference/evaluation leakage gate
 
 AHA-style counterfactual preference data is a training resource, not ground truth. The receipt schema now requires separate preference-training and held-out evaluation pair manifests for an admitted run, plus a disjointness-audit digest, exact overlap count and status. Confirmatory qualification requires zero overlap and VERIFIED_DISJOINT. The synthetic example has no preference-training manifest and keeps the gate NOT_APPLICABLE.
+
+### 20.7 Prospective pair-level performance targets
+
+These are stretch goals for an adequately sampled, human-adjudicated cohort—not achieved results:
+- text-nuisance joint-correct rate at least 95% with at least 95% pair answer coverage;
+- audio-relevant joint counterfactual sensitivity at least 95%;
+- audio-relevant false invariance at most 1% among pairs where both sides claim;
+- acoustic-nuisance semantic stability at least 95%, with at least 90% joint-claim coverage;
+- speaker/session/source-clustered paired confidence intervals and worst-group reporting.
+
+The thresholds must be preregistered before confirmatory evaluation. Undersampled cells remain non-estimable; an always-abstaining system cannot qualify through invariance alone.
