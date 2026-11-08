@@ -274,6 +274,7 @@ impl From<ObservabilityError> for BudgetedDesignError {
 /// include shared/correlated measurement errors, their joint whitening must be
 /// performed before using this additive contribution interface.
 pub fn greedy_budgeted_design(
+    scenarios: &[DesignScenario],
     options: &[ExperimentOption],
     config: &BudgetedDesignConfig,
 ) -> Result<BudgetedDesignReport, BudgetedDesignError> {
