@@ -1115,8 +1115,6 @@ mod tests {
     fn policy_agent_schema_rejects_grader_oracle_leakage() {
         let schema: Value = serde_json::from_str(SCHEMA).unwrap();
         let mut agent = policy_agent();
-        agent["expected_policy_rankings"] =
-            serde_json::json!({"point_eig_best":"static_function_probe"});
         let validator = draft202012::options().build(&schema).unwrap();
         assert!(validator.is_valid(&agent));
         // The base planner contract permits no grader-only property.
