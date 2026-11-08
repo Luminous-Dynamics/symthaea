@@ -60,7 +60,11 @@ jobs:
               .a0.evidence_references_valid == .a0.episodes and
               .a2.evidence_references_valid == .a2.episodes and
               .a0.false_unique_structure_claims == 0 and
-              .a2.false_unique_structure_claims == 0
+              .a2.false_unique_structure_claims == 0 and
+              .a0.correct_identified_structure_cases == .a0.oracle_identified_structure_cases and
+              .a2.correct_identified_structure_cases == .a2.oracle_identified_structure_cases and
+              .a0.missed_identifiable_structure_cases == 0 and
+              .a2.missed_identifiable_structure_cases == 0
             )
           ' "$report"
           printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-finite-policy-census.source-sha"
