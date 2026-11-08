@@ -1,0 +1,314 @@
+{
+  "schema": "luminous.rea.numeric-intent-corpus.v0",
+  "corpus_id": "rea-numeric-intent-known-answer-v0",
+  "status": "design_fixture_only",
+  "semantics_note": "Expected labels are design-time reference outcomes, not outputs from an implemented validator. raw_value_token is a string so the fixture preserves the exact source spelling.",
+  "cases": [
+    {
+      "id": "binary64-integer-vs-decimal-token",
+      "path": "/reading",
+      "raw_value_token": "42.0",
+      "intent": "binary64",
+      "contract": {
+        "semantics": "rfc8785_ecmascript_binary64",
+        "non_finite_policy": "reject",
+        "negative_zero_policy": "jcs_canonicalizes_to_zero"
+      },
+      "expected": "valid_binary64",
+      "expected_canonical_number": "42"
+    },
+    {
+      "id": "binary64-decimal-near-equivalent",
+      "path": "/reading",
+      "raw_value_token": "0.10000000000000001",
+      "intent": "binary64",
+      "contract": {
+        "semantics": "rfc8785_ecmascript_binary64",
+        "non_finite_policy": "reject",
+        "negative_zero_policy": "jcs_canonicalizes_to_zero"
+      },
+      "expected": "valid_binary64",
+      "expected_canonical_number": "0.1"
+    },
+    {
+      "id": "binary64-negative-zero",
+      "path": "/reading",
+      "raw_value_token": "-0",
+      "intent": "binary64",
+      "contract": {
+        "semantics": "rfc8785_ecmascript_binary64",
+        "non_finite_policy": "reject",
+        "negative_zero_policy": "jcs_canonicalizes_to_zero"
+      },
+      "expected": "valid_binary64",
+      "expected_canonical_number": "0"
+    },
+    {
+      "id": "binary64-exponent",
+      "path": "/reading",
+      "raw_value_token": "1e3",
+      "intent": "binary64",
+      "contract": {
+        "semantics": "rfc8785_ecmascript_binary64",
+        "non_finite_policy": "reject",
+        "negative_zero_policy": "jcs_canonicalizes_to_zero"
+      },
+      "expected": "valid_binary64",
+      "expected_canonical_number": "1000"
+    },
+    {
+      "id": "safe-integer-inclusive-upper-bound",
+      "path": "/counter",
+      "raw_value_token": "9007199254740991",
+      "intent": "safe_integer",
+      "contract": {
+        "signedness": "signed",
+        "min_value": "-9007199254740991",
+        "max_value": "9007199254740991",
+        "integer_form_only": true,
+        "safe_range_only": true
+      },
+      "expected": "valid_safe_integer"
+    },
+    {
+      "id": "safe-integer-first-unsafe",
+      "path": "/counter",
+      "raw_value_token": "9007199254740992",
+      "intent": "safe_integer",
+      "contract": {
+        "signedness": "signed",
+        "min_value": "-9007199254740991",
+        "max_value": "9007199254740991",
+        "integer_form_only": true,
+        "safe_range_only": true
+      },
+      "expected": "unsafe_integer"
+    },
+    {
+      "id": "safe-integer-exponent-token",
+      "path": "/counter",
+      "raw_value_token": "1e3",
+      "intent": "safe_integer",
+      "contract": {
+        "signedness": "signed",
+        "min_value": "-9007199254740991",
+        "max_value": "9007199254740991",
+        "integer_form_only": true,
+        "safe_range_only": true
+      },
+      "expected": "lexical_form_mismatch"
+    },
+    {
+      "id": "exact-integer-string-beyond-safe-range",
+      "path": "/account_id",
+      "raw_value_token": "\"9007199254740993\"",
+      "intent": "exact_integer_string",
+      "contract": {
+        "signedness": "unsigned",
+        "max_digits": 32,
+        "min_value": "0",
+        "max_value": "18446744073709551615",
+        "leading_zero_policy": "reject",
+        "plus_sign_policy": "reject",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "valid_exact_integer_string",
+      "expected_preserved_value": "9007199254740993"
+    },
+    {
+      "id": "exact-integer-string-leading-zero",
+      "path": "/account_id",
+      "raw_value_token": "\"00042\"",
+      "intent": "exact_integer_string",
+      "contract": {
+        "signedness": "unsigned",
+        "max_digits": 32,
+        "min_value": "0",
+        "max_value": "18446744073709551615",
+        "leading_zero_policy": "reject",
+        "plus_sign_policy": "reject",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "invalid_integer_grammar"
+    },
+    {
+      "id": "exact-integer-string-plus-sign",
+      "path": "/account_id",
+      "raw_value_token": "\"+42\"",
+      "intent": "exact_integer_string",
+      "contract": {
+        "signedness": "signed",
+        "max_digits": 32,
+        "min_value": "-99999999999999999999",
+        "max_value": "99999999999999999999",
+        "leading_zero_policy": "reject",
+        "plus_sign_policy": "reject",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "invalid_integer_grammar"
+    },
+    {
+      "id": "exact-integer-string-negative-zero",
+      "path": "/account_id",
+      "raw_value_token": "\"-0\"",
+      "intent": "exact_integer_string",
+      "contract": {
+        "signedness": "signed",
+        "max_digits": 32,
+        "min_value": "-99999999999999999999",
+        "max_value": "99999999999999999999",
+        "leading_zero_policy": "reject",
+        "plus_sign_policy": "reject",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "negative_zero_rejected"
+    },
+    {
+      "id": "fixed-decimal-string-scale-two",
+      "path": "/price",
+      "raw_value_token": "\"0.10\"",
+      "intent": "fixed_decimal_string",
+      "contract": {
+        "signedness": "unsigned",
+        "scale": 2,
+        "max_integer_digits": 12,
+        "scale_policy": "exact",
+        "exponent_policy": "reject",
+        "rounding_policy": "reject_excess_scale",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "valid_fixed_decimal",
+      "expected_preserved_value": "0.10"
+    },
+    {
+      "id": "fixed-decimal-string-scale-mismatch",
+      "path": "/price",
+      "raw_value_token": "\"0.1\"",
+      "intent": "fixed_decimal_string",
+      "contract": {
+        "signedness": "unsigned",
+        "scale": 2,
+        "max_integer_digits": 12,
+        "scale_policy": "exact",
+        "exponent_policy": "reject",
+        "rounding_policy": "reject_excess_scale",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "scale_mismatch"
+    },
+    {
+      "id": "fixed-decimal-exponent-rejected",
+      "path": "/price",
+      "raw_value_token": "\"1e-2\"",
+      "intent": "fixed_decimal_string",
+      "contract": {
+        "signedness": "unsigned",
+        "scale": 2,
+        "max_integer_digits": 12,
+        "scale_policy": "exact",
+        "exponent_policy": "reject",
+        "rounding_policy": "reject_excess_scale",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "exponent_not_allowed"
+    },
+    {
+      "id": "opaque-numeric-no-arithmetic",
+      "path": "/vendor_metric",
+      "raw_value_token": "123456789012345678901234567890",
+      "intent": "opaque_numeric",
+      "contract": {
+        "arithmetic_policy": "forbidden",
+        "ordering_policy": "forbidden",
+        "equivalence_policy": "none"
+      },
+      "expected": "opaque_preserved_arithmetic_forbidden"
+    },
+    {
+      "id": "numeric-token-where-exact-string-required",
+      "path": "/account_id",
+      "raw_value_token": "9007199254740993",
+      "intent": "exact_integer_string",
+      "contract": {
+        "signedness": "unsigned",
+        "max_digits": 32,
+        "min_value": "0",
+        "max_value": "18446744073709551615",
+        "leading_zero_policy": "reject",
+        "plus_sign_policy": "reject",
+        "negative_zero_policy": "reject"
+      },
+      "expected": "type_mismatch"
+    },
+    {
+      "id": "same-dimension-different-quantity-kind",
+      "path": "/moment",
+      "raw_value_token": "1000",
+      "intent": "safe_integer",
+      "contract": {
+        "signedness": "signed",
+        "min_value": "-9007199254740991",
+        "max_value": "9007199254740991",
+        "integer_form_only": true,
+        "safe_range_only": true
+      },
+      "quantity_kind_ref": "urn:example:quantity:torque",
+      "unit_code_ref": "urn:example:unit:newton-metre",
+      "expected": "quantity_kind_mismatch_against_energy"
+    },
+    {
+      "id": "same-number-different-unit",
+      "path": "/length",
+      "raw_value_token": "1000",
+      "intent": "safe_integer",
+      "contract": {
+        "signedness": "signed",
+        "min_value": "-9007199254740991",
+        "max_value": "9007199254740991",
+        "integer_form_only": true,
+        "safe_range_only": true
+      },
+      "quantity_kind_ref": "urn:example:quantity:length",
+      "unit_code_ref": "urn:example:unit:millimetre",
+      "comparison_unit_code_ref": "urn:example:unit:metre",
+      "expected": "unit_mismatch_no_implicit_conversion"
+    },
+    {
+      "id": "profile-path-not-declared",
+      "path": "/unlisted",
+      "raw_value_token": "4",
+      "intent": "none",
+      "expected": "unsupported_path"
+    },
+    {
+      "id": "duplicate-profile-path",
+      "path": "/counter",
+      "raw_value_token": "4",
+      "intent": "safe_integer",
+      "second_profile_path": "/counter",
+      "expected": "invalid_profile_duplicate_pointer"
+    },
+    {
+      "id": "profile-digest-mismatch",
+      "path": "/counter",
+      "raw_value_token": "4",
+      "intent": "safe_integer",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "profile_digest_mismatch"
+    },
+    {
+      "id": "constructed-value-without-source-bytes",
+      "path": "/counter",
+      "raw_value_token": null,
+      "intent": "safe_integer",
+      "expected": "lexical_coverage_unavailable_not_audited"
+    },
+    {
+      "id": "null-is-not-a-number",
+      "path": "/counter",
+      "raw_value_token": "null",
+      "intent": "safe_integer",
+      "expected": "type_mismatch"
+    }
+  ]
+}
