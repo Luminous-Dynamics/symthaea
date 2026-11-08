@@ -203,11 +203,12 @@ where
     }
 
     lower_order.sort_by(|left, right| {
-        right
-            .interval
-            .lower
-            .total_cmp(&left.interval.lower)
-            .then_with(|| left.id.cmp(&right.id))
+        let lower_order = if left.interval.lower == right.interval.lower {
+            std::cmp::Ordering::Equal
+        } else {
+            right.interval.lower.total_cmp(&left.interval.lower)
+        };
+        lower_order.then_with(|| left.id.cmp(&right.id))
     });
     let threshold = lower_order[top_k - 1].interval.lower;
 
@@ -439,6 +440,17 @@ mod tests {
                 "false-prune disagreement in generated case {case_index}"
             );
         }
+    }
+
+    #[test]
+    fn threshold_ties_use_stable_id_even_for_signed_zero() {
+        let records = vec![
+            record("z", 0.0, 0.2),
+            record("a", -0.0, 0.2),
+        ];
+        let plan = select_refinement_set(&records, 1, complete_coverage(2)).unwrap();
+        assert_eq!(plan.threshold.to_bits(), (-0.0f32).to_bits());
+        assert_eq!(plan.refinement_ids, vec!["a".to_owned(), "z".to_owned()]);
     }
 
     #[test]
