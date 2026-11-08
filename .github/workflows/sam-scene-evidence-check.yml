@@ -2,6 +2,7 @@ name: SAM Scene Evidence Contract
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "docs/autonomy/SAM_SCENE_EVIDENCE_*.json"
       - "docs/autonomy/SAM_SCENE_EVIDENCE_*.md"
