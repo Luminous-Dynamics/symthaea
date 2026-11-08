@@ -23,7 +23,7 @@ From this directory:
     julia --project=. -e 'using Pkg; Pkg.instantiate(); include("compare_occupation_flow.jl")'
 
 The harness prints exact rational values, iteration count and residual for
-each of six queries under both algorithms. It hard-fails if a value differs
+each of twelve queries under both algorithms. It hard-fails if a value differs
 from the preregistered rational oracle.
 
 This repository/container has no Julia executable, so the harness is
