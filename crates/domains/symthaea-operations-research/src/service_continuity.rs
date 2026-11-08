@@ -21,14 +21,24 @@ pub struct ServiceContract {
 pub struct EvidenceEvent {
     pub event_id: String, pub at_seconds: u64, pub kind: EventKind,
     pub service_id: String, pub component_id: String,
+    /// Exact revision installed or tested at the event time.
+    pub component_revision_digest: String,
+    /// Work-order identity for maintenance, spare, test and release events.
+    pub maintenance_task_id: Option<String>,
     pub delivered_rate_after: f64, pub evidence_ref: String,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SpareState { CompatibleOnboard, CompatibleArrivesLater, WrongRevision, Unknown }
+pub enum SpareState { NotRequired, CompatibleOnboard, CompatibleArrivesLater, WrongRevision, Unknown }
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaintenanceTask {
     pub task_id: String, pub service_id: String, pub component_id: String,
     pub procedure_approved: bool, pub qualified_personnel_present: bool,
+    /// Revision on the failed component at fault observation.
+    pub faulted_component_revision_digest: String,
+    /// Exact replacement/retained revision authorized by this maintenance task.
+    pub target_component_revision_digest: String,
+    /// Revision identity of the spare, when the task uses one.
+    pub spare_component_revision_digest: Option<String>,
     pub spare_state: SpareState, pub required_tests: Vec<String>,
     pub completed_tests: Vec<String>, pub configuration_updated: bool,
     pub authorized_release: bool,
@@ -49,6 +59,7 @@ pub enum EvaluationError {
     EmptyComponentId(String), EmptyEvidenceReference(String), InvalidEventRate(String),
     ConflictingRatesAtSameInstant { service_id: String, at_seconds: u64 },
     EmptyTaskId, DuplicateTaskId(String), UnknownTaskService(String), EmptyTaskComponent(String),
+    InvalidRevisionDigest(String), UnknownMaintenanceTask(String), MaintenanceTaskIdentityMismatch(String),
 }
 /// Deficit integral is in that service's unit-hours; never sum across unlike services.
 #[derive(Clone, Debug, PartialEq)]
@@ -100,6 +111,10 @@ pub fn evaluate_service_continuity(
     })
 }
 
+fn is_sha256_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
+
 fn validate_case(case: &ServiceContinuityCase) -> Result<(), EvaluationError> {
     if case.case_id.trim().is_empty() { return Err(EvaluationError::EmptyCaseId); }
     if case.timeline_seconds == 0 { return Err(EvaluationError::ZeroTimeline); }
@@ -134,6 +149,9 @@ fn validate_case(case: &ServiceContinuityCase) -> Result<(), EvaluationError> {
             return Err(EvaluationError::UnknownEventService(e.service_id.clone()));
         };
         if e.component_id.trim().is_empty() { return Err(EvaluationError::EmptyComponentId(e.event_id.clone())); }
+        if !is_sha256_digest(&e.component_revision_digest) {
+            return Err(EvaluationError::InvalidRevisionDigest(e.event_id.clone()));
+        }
         if e.evidence_ref.trim().is_empty() {
             return Err(EvaluationError::EmptyEvidenceReference(e.event_id.clone()));
         }
@@ -153,6 +171,8 @@ fn validate_case(case: &ServiceContinuityCase) -> Result<(), EvaluationError> {
         }
     }
     let mut task_ids = BTreeSet::new();
+    let task_by_id: BTreeMap<&str, &MaintenanceTask> = case.maintenance_tasks.iter()
+        .map(|t| (t.task_id.as_str(), t)).collect();
     for t in &case.maintenance_tasks {
         if t.task_id.trim().is_empty() { return Err(EvaluationError::EmptyTaskId); }
         if !task_ids.insert(t.task_id.as_str()) {
@@ -162,6 +182,31 @@ fn validate_case(case: &ServiceContinuityCase) -> Result<(), EvaluationError> {
             return Err(EvaluationError::UnknownTaskService(t.service_id.clone()));
         }
         if t.component_id.trim().is_empty() { return Err(EvaluationError::EmptyTaskComponent(t.task_id.clone())); }
+        if !is_sha256_digest(&t.faulted_component_revision_digest)
+            || !is_sha256_digest(&t.target_component_revision_digest)
+            || t.spare_component_revision_digest.as_deref().is_some_and(|d| !is_sha256_digest(d)) {
+            return Err(EvaluationError::InvalidRevisionDigest(t.task_id.clone()));
+        }
+    }
+    for e in &case.events {
+        if let Some(task_id) = e.maintenance_task_id.as_deref() {
+            let Some(task) = task_by_id.get(task_id) else {
+                return Err(EvaluationError::UnknownMaintenanceTask(task_id.to_owned()));
+            };
+            if task.service_id != e.service_id || task.component_id != e.component_id {
+                return Err(EvaluationError::MaintenanceTaskIdentityMismatch(e.event_id.clone()));
+            }
+            let requires_target_revision = matches!(e.kind,
+                EventKind::RepairCompleted | EventKind::PostTestPassed | EventKind::PostTestFailed
+                    | EventKind::ConfigurationUpdated | EventKind::SpareArrived | EventKind::AuthorizedRelease);
+            if requires_target_revision && e.component_revision_digest != task.target_component_revision_digest {
+                return Err(EvaluationError::InvalidRevisionDigest(e.event_id.clone()));
+            }
+            if e.kind == EventKind::ComponentFailure
+                && e.component_revision_digest != task.faulted_component_revision_digest {
+                return Err(EvaluationError::InvalidRevisionDigest(e.event_id.clone()));
+            }
+        }
     }
     Ok(())
 }
@@ -245,40 +290,54 @@ fn evaluate_service(
 fn release_accepted(
     release: &EvidenceEvent, events: &[&EvidenceEvent], tasks: &[&MaintenanceTask],
 ) -> bool {
-    let matches: Vec<&MaintenanceTask> = tasks.iter().copied()
-        .filter(|t| t.component_id == release.component_id).collect();
-    if matches.is_empty() { return false; }
+    let Some(task_id) = release.maintenance_task_id.as_deref() else { return false; };
+    let Some(task) = tasks.iter().copied().find(|t| t.task_id == task_id
+        && t.service_id == release.service_id && t.component_id == release.component_id) else {
+        return false;
+    };
+    if release.component_revision_digest != task.target_component_revision_digest {
+        return false;
+    }
     let evidence: Vec<&EvidenceEvent> = events.iter().copied()
         .filter(|e| e.component_id == release.component_id && e.at_seconds < release.at_seconds)
         .collect();
-    let last_fault = evidence.iter().filter(|e| matches!(e.kind, EventKind::ComponentFailure
+    let latest_fault = evidence.iter().filter(|e| matches!(e.kind, EventKind::ComponentFailure
         | EventKind::ServiceUnavailable | EventKind::CommonDependencyFailure))
+        .max_by_key(|e| e.at_seconds);
+    let Some(fault) = latest_fault else { return false; };
+    if fault.component_revision_digest != task.faulted_component_revision_digest {
+        return false;
+    }
+    let task_evidence: Vec<&EvidenceEvent> = evidence.iter().copied()
+        .filter(|e| e.maintenance_task_id.as_deref() == Some(task_id)
+            && e.component_revision_digest == task.target_component_revision_digest).collect();
+    let last_repair = task_evidence.iter().filter(|e| e.kind == EventKind::RepairCompleted)
         .map(|e| e.at_seconds).max();
-    let last_repair = evidence.iter().filter(|e| e.kind == EventKind::RepairCompleted)
+    let Some(repair) = last_repair else { return false; };
+    if repair <= fault.at_seconds { return false; }
+    let last_failed_test = task_evidence.iter().filter(|e| e.kind == EventKind::PostTestFailed)
         .map(|e| e.at_seconds).max();
-    let (Some(fault), Some(repair)) = (last_fault, last_repair) else { return false; };
-    if repair <= fault { return false; }
-    let last_failed_test = evidence.iter().filter(|e| e.kind == EventKind::PostTestFailed)
-        .map(|e| e.at_seconds).max();
-    let pass = evidence.iter().filter(|e| e.kind == EventKind::PostTestPassed)
+    let pass = task_evidence.iter().filter(|e| e.kind == EventKind::PostTestPassed)
         .map(|e| e.at_seconds).max();
     let Some(pass) = pass else { return false; };
     if pass <= repair || last_failed_test.is_some_and(|failed| failed >= pass) { return false; }
-    if !evidence.iter().any(|e| e.kind == EventKind::ConfigurationUpdated && e.at_seconds > pass) {
+    if !task_evidence.iter().any(|e| e.kind == EventKind::ConfigurationUpdated && e.at_seconds > pass) {
         return false;
     }
-    let spare_arrived = evidence.iter().any(|e| e.kind == EventKind::SpareArrived);
-    matches.iter().all(|t| {
-        let tests_ok = t.required_tests.iter().all(|required|
-            t.completed_tests.iter().any(|done| done == required));
-        t.procedure_approved && t.qualified_personnel_present && tests_ok
-            && t.configuration_updated && t.authorized_release
-            && match t.spare_state {
-                SpareState::CompatibleOnboard => true,
-                SpareState::CompatibleArrivesLater => spare_arrived,
-                SpareState::WrongRevision | SpareState::Unknown => false,
-            }
-    })
+    let spare_arrived = task_evidence.iter().any(|e| e.kind == EventKind::SpareArrived);
+    let spare_matches = match task.spare_state {
+        SpareState::NotRequired => task.spare_component_revision_digest.is_none(),
+        SpareState::CompatibleOnboard => task.spare_component_revision_digest.as_deref()
+            == Some(task.target_component_revision_digest.as_str()),
+        SpareState::CompatibleArrivesLater => spare_arrived
+            && task.spare_component_revision_digest.as_deref()
+                == Some(task.target_component_revision_digest.as_str()),
+        SpareState::WrongRevision | SpareState::Unknown => false,
+    };
+    let tests_ok = task.required_tests.iter().all(|required|
+        task.completed_tests.iter().any(|done| done == required));
+    task.procedure_approved && task.qualified_personnel_present && tests_ok
+        && task.configuration_updated && task.authorized_release && spare_matches
 }
 
 #[cfg(test)]
@@ -290,11 +349,15 @@ mod tests {
     }
     fn event(id:&str, t:u64, kind:EventKind, rate:f64) -> EvidenceEvent {
         EvidenceEvent { event_id:id.into(), at_seconds:t, kind, service_id:"water".into(),
-            component_id:"maker_A".into(), delivered_rate_after:rate, evidence_ref:format!("fixture:{id}") }
+            component_id:"maker_A".into(), component_revision_digest:"a".repeat(64),
+            maintenance_task_id:None, delivered_rate_after:rate, evidence_ref:format!("fixture:{id}") }
     }
     fn task() -> MaintenanceTask {
         MaintenanceTask { task_id:"replace_maker_A".into(), service_id:"water".into(),
             component_id:"maker_A".into(), procedure_approved:true, qualified_personnel_present:true,
+            faulted_component_revision_digest:"a".repeat(64),
+            target_component_revision_digest:"a".repeat(64),
+            spare_component_revision_digest:Some("a".repeat(64)),
             spare_state:SpareState::CompatibleOnboard, required_tests:vec!["flow_quality".into()],
             completed_tests:vec!["flow_quality".into()], configuration_updated:true, authorized_release:true }
     }
@@ -308,11 +371,11 @@ mod tests {
         let events=vec![
             event("failure",3600,EventKind::ComponentFailure,45.0),
             event("buffer",3600,EventKind::BufferSupplyActive,45.0),
-            event("repair_start",7200,EventKind::RepairStarted,45.0),
-            event("repair_done",14400,EventKind::RepairCompleted,45.0),
-            event("test",18000,EventKind::PostTestPassed,45.0),
-            event("config",18600,EventKind::ConfigurationUpdated,45.0),
-            event("release",19200,EventKind::AuthorizedRelease,80.0)];
+            { let mut e = event("repair_start",7200,EventKind::RepairStarted,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
+            { let mut e = event("repair_done",14400,EventKind::RepairCompleted,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
+            { let mut e = event("test",18000,EventKind::PostTestPassed,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
+            { let mut e = { let mut e = event("config",18600,EventKind::ConfigurationUpdated,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e }; e.maintenance_task_id = Some("replace_maker_A".into()); e },
+            { let mut e = { let mut e = event("release",19200,EventKind::AuthorizedRelease,80.0); e.maintenance_task_id = Some("replace_maker_A".into()); e }; e.maintenance_task_id = Some("replace_maker_A".into()); e }];
         let out=evaluate_service_continuity(&case(events,vec![task()],86400)).unwrap();
         let s=&out.services[0];
         assert_eq!(out.disposition,ContinuityDisposition::NoFloorBreach);
@@ -326,7 +389,7 @@ mod tests {
         let events=vec![
             event("failure",3600,EventKind::ComponentFailure,45.0),
             event("empty",86400,EventKind::ServiceUnavailable,0.0),
-            event("spare",108000,EventKind::SpareArrived,0.0)];
+            { let mut e = event("spare",108000,EventKind::SpareArrived,0.0); e.maintenance_task_id = Some("replace_maker_A".into()); e }];
         let mut t=task(); t.spare_state=SpareState::CompatibleArrivesLater;
         t.completed_tests.clear(); t.configuration_updated=false; t.authorized_release=false;
         let out=evaluate_service_continuity(&case(events,vec![t],172800)).unwrap();
@@ -345,14 +408,15 @@ mod tests {
     fn failed_post_test_and_wrong_revision_reject_release() {
         let events=vec![
             event("failure",1800,EventKind::ComponentFailure,0.0),
-            event("repair",3600,EventKind::RepairCompleted,0.0),
-            event("test_fail",5400,EventKind::PostTestFailed,0.0),
+            { let mut e = event("repair",3600,EventKind::RepairCompleted,0.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
+            { let mut e = event("test_fail",5400,EventKind::PostTestFailed,0.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
             event("config",6000,EventKind::ConfigurationUpdated,0.0),
             event("release",7200,EventKind::AuthorizedRelease,80.0)];
         let mut t=task(); t.completed_tests.clear(); t.configuration_updated=false; t.authorized_release=false;
         let out=evaluate_service_continuity(&case(events.clone(),vec![t],86400)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
         let mut wrong=task(); wrong.spare_state=SpareState::WrongRevision;
+        wrong.spare_component_revision_digest=Some("b".repeat(64));
         let mut passing=events; passing[2]=event("test_pass",5400,EventKind::PostTestPassed,0.0);
         let out=evaluate_service_continuity(&case(passing,vec![wrong],86400)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
