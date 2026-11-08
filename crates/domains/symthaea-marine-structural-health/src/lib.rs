@@ -65,6 +65,9 @@ pub struct AcceptanceBounds {
 pub struct InspectionEvidence<'a> {
     pub expected_region_id: &'a str,
     pub observed_region_id: &'a str,
+    pub expected_structure_revision: &'a str,
+    pub observed_structure_revision: &'a str,
+    pub acceptance_criterion_ref: Option<&'a str>,
     pub method_qualification: MethodQualification,
     pub data_quality: DataQuality,
     pub calibration: CalibrationStatus,
@@ -86,6 +89,7 @@ pub enum IndeterminateReason {
     MeasurementUncertaintyCrossesCriterion,
     InvalidAcceptanceBounds,
     MissingAcceptanceBound,
+    MissingAcceptanceCriterion,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -96,6 +100,7 @@ pub enum UnsupportedReason {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EvidenceRejection {
     RegionIdentityMismatch,
+    StructureRevisionMismatch,
 }
 
 /// A positive result applies only to the exact inspected scope. It is not a
@@ -146,6 +151,12 @@ pub fn evaluate_inspection(
         );
     }
 
+    if evidence.expected_structure_revision != evidence.observed_structure_revision {
+        return InspectionAssessment::EvidenceRejected(
+            EvidenceRejection::StructureRevisionMismatch,
+        );
+    }
+
     if evidence.method_qualification != MethodQualification::QualifiedForDeclaredScope {
         return InspectionAssessment::Unsupported(
             UnsupportedReason::MethodNotQualified,
@@ -175,6 +186,15 @@ pub fn evaluate_inspection(
     if evidence.coverage_fraction < evidence.required_coverage_fraction {
         return InspectionAssessment::Indeterminate(
             IndeterminateReason::CoverageIncomplete,
+        );
+    }
+
+    if evidence
+        .acceptance_criterion_ref
+        .is_none_or(|criterion| criterion.trim().is_empty())
+    {
+        return InspectionAssessment::Indeterminate(
+            IndeterminateReason::MissingAcceptanceCriterion,
         );
     }
 
@@ -365,6 +385,9 @@ mod tests {
         InspectionEvidence {
             expected_region_id: "plate-01",
             observed_region_id: "plate-01",
+            expected_structure_revision: "REV-1",
+            observed_structure_revision: "REV-1",
+            acceptance_criterion_ref: Some("criterion:plate-thickness-v1"),
             method_qualification: MethodQualification::QualifiedForDeclaredScope,
             data_quality: DataQuality::Valid,
             calibration: CalibrationStatus::Current,
@@ -461,6 +484,30 @@ mod tests {
             evaluate_inspection(input),
             InspectionAssessment::EvidenceRejected(
                 EvidenceRejection::RegionIdentityMismatch
+            )
+        );
+    }
+
+    #[test]
+    fn superseded_structure_revision_is_rejected() {
+        let mut input = evidence(InspectionResult::NoIndication);
+        input.observed_structure_revision = "REV-0";
+        assert_eq!(
+            evaluate_inspection(input),
+            InspectionAssessment::EvidenceRejected(
+                EvidenceRejection::StructureRevisionMismatch
+            )
+        );
+    }
+
+    #[test]
+    fn missing_acceptance_criterion_cannot_produce_a_clear_disposition() {
+        let mut input = evidence(InspectionResult::NoIndication);
+        input.acceptance_criterion_ref = None;
+        assert_eq!(
+            evaluate_inspection(input),
+            InspectionAssessment::Indeterminate(
+                IndeterminateReason::MissingAcceptanceCriterion
             )
         );
     }
