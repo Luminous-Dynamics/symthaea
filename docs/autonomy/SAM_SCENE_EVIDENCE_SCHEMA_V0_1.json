@@ -1,0 +1,902 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/SAM_SCENE_EVIDENCE_SCHEMA_V0_1.json",
+  "title": "SAM Scene Evidence Contract v0.1",
+  "description": "Structural envelope for road-scene evidence snapshots. Passing this schema establishes structural conformance only, not measurement validity, sensor truth, ODD applicability or safety.",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "schema_version",
+    "claim_ceiling",
+    "snapshot"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "luminous.sam.scene-evidence"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot": {
+      "$ref": "#/$defs/snapshot"
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finiteNumber": {
+      "type": "number"
+    },
+    "vector3": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finiteNumber"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "clock": {
+      "type": "object",
+      "required": [
+        "clock_domain_id",
+        "event_tick_ns",
+        "receive_tick_ns",
+        "processing_tick_ns",
+        "clock_transform_id",
+        "clock_uncertainty_ns"
+      ],
+      "properties": {
+        "clock_domain_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "event_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receive_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "processing_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clock_transform_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "clock_uncertainty_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": [
+        "frame_id",
+        "kind",
+        "axes",
+        "handedness",
+        "length_unit",
+        "angle_unit",
+        "transform_id"
+      ],
+      "properties": {
+        "frame_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "kind": {
+          "enum": [
+            "local_road",
+            "world",
+            "ego",
+            "sensor",
+            "camera_image",
+            "lidar",
+            "radar",
+            "other"
+          ]
+        },
+        "axes": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "handedness": {
+          "enum": [
+            "right",
+            "left",
+            "not_applicable"
+          ]
+        },
+        "length_unit": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "angle_unit": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "transform_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "modality",
+        "failure_domain_id",
+        "source_event_id",
+        "payload_reference",
+        "acquisition_tick_ns",
+        "receive_tick_ns",
+        "clock_domain_id",
+        "clock_transform_id",
+        "calibration_profile_id",
+        "extrinsic_profile_id",
+        "reference_frame_id",
+        "evidence_kind",
+        "currentness"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "modality": {
+          "enum": [
+            "rgb_camera",
+            "stereo_camera",
+            "lidar",
+            "radar",
+            "ultrasonic",
+            "imu",
+            "gnss",
+            "wheel_odometry",
+            "map",
+            "v2x",
+            "synthetic",
+            "other"
+          ]
+        },
+        "failure_domain_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "source_event_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "payload_reference": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "acquisition_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receive_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clock_domain_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "clock_transform_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "calibration_profile_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "extrinsic_profile_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "reference_frame_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "evidence_kind": {
+          "enum": [
+            "measurement",
+            "synthetic_observation",
+            "estimate",
+            "prediction",
+            "map_prior",
+            "advisory",
+            "unknown"
+          ]
+        },
+        "currentness": {
+          "enum": [
+            "current",
+            "current_for_fixture",
+            "stale",
+            "expired",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "required": [
+        "representation",
+        "state_order",
+        "units"
+      ],
+      "properties": {
+        "representation": {
+          "enum": [
+            "diagonal_covariance",
+            "full_covariance",
+            "interval_set",
+            "polytope",
+            "prediction_set",
+            "unknown"
+          ]
+        },
+        "state_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagonal": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "classHypotheses": {
+      "type": "object",
+      "required": [
+        "vocabulary_id",
+        "distribution_status",
+        "scores",
+        "model_id"
+      ],
+      "properties": {
+        "vocabulary_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "distribution_status": {
+          "enum": [
+            "calibrated_probability",
+            "uncalibrated_ranking_only",
+            "set_valued",
+            "unknown"
+          ]
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "class",
+              "score"
+            ],
+            "properties": {
+              "class": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "model_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "calibration_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "objectHypothesis": {
+      "type": "object",
+      "required": [
+        "hypothesis_id",
+        "track_lineage_id",
+        "association_state",
+        "epistemic_state",
+        "reference_frame_id",
+        "measurement_time_tick_ns",
+        "position_m",
+        "orientation_yaw_rad",
+        "velocity_mps",
+        "acceleration_mps2",
+        "extent_m",
+        "class_hypotheses",
+        "uncertainty",
+        "visibility",
+        "source_refs",
+        "estimator_id"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "track_lineage_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "association_state": {
+          "enum": [
+            "confirmed",
+            "provisional",
+            "ambiguous",
+            "split",
+            "merged",
+            "unmatched",
+            "retired"
+          ]
+        },
+        "epistemic_state": {
+          "enum": [
+            "observed",
+            "estimated",
+            "predicted",
+            "occluded",
+            "contradicted",
+            "stale",
+            "out_of_scope",
+            "unknown"
+          ]
+        },
+        "reference_frame_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "measurement_time_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "position_m": {
+          "$ref": "#/$defs/vector3"
+        },
+        "orientation_yaw_rad": {
+          "type": "number"
+        },
+        "velocity_mps": {
+          "$ref": "#/$defs/vector3"
+        },
+        "acceleration_mps2": {
+          "$ref": "#/$defs/vector3"
+        },
+        "extent_m": {
+          "type": "object",
+          "required": [
+            "length",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "length": {
+              "type": "number",
+              "minimum": 0
+            },
+            "width": {
+              "type": "number",
+              "minimum": 0
+            },
+            "height": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "class_hypotheses": {
+          "$ref": "#/$defs/classHypotheses"
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        },
+        "visibility": {
+          "type": "object",
+          "required": [
+            "status",
+            "last_observed_tick_ns",
+            "occluding_region_id"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "visible",
+                "partially_occluded",
+                "occluded",
+                "out_of_view",
+                "unknown"
+              ]
+            },
+            "last_observed_tick_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "occluding_region_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "estimator_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "sequence",
+        "scenario_id",
+        "odd_profile_id",
+        "vehicle_configuration_id",
+        "policy_profile_id",
+        "time",
+        "reference_frames",
+        "sources",
+        "ego_state",
+        "road_geometry",
+        "object_hypotheses",
+        "free_space",
+        "vision_hdc_proposals",
+        "prediction_set_refs",
+        "admission",
+        "unresolved"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parent_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "odd_profile_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "vehicle_configuration_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "policy_profile_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "time": {
+          "$ref": "#/$defs/clock"
+        },
+        "reference_frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frame"
+          },
+          "minItems": 1
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          },
+          "minItems": 1
+        },
+        "ego_state": {
+          "type": "object",
+          "required": [
+            "state_kind",
+            "reference_frame_id",
+            "estimator_id",
+            "measurement_time_tick_ns",
+            "position_m",
+            "orientation_rpy_rad",
+            "velocity_mps",
+            "acceleration_mps2",
+            "uncertainty",
+            "source_refs"
+          ],
+          "properties": {
+            "state_kind": {
+              "enum": [
+                "observed",
+                "estimated",
+                "predicted",
+                "unknown"
+              ]
+            },
+            "reference_frame_id": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "estimator_id": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "measurement_time_tick_ns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "position_m": {
+              "$ref": "#/$defs/vector3"
+            },
+            "orientation_rpy_rad": {
+              "$ref": "#/$defs/vector3"
+            },
+            "velocity_mps": {
+              "$ref": "#/$defs/vector3"
+            },
+            "acceleration_mps2": {
+              "$ref": "#/$defs/vector3"
+            },
+            "uncertainty": {
+              "$ref": "#/$defs/uncertainty"
+            },
+            "source_refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            }
+          }
+        },
+        "road_geometry": {
+          "type": "object",
+          "required": [
+            "state_kind",
+            "reference_frame_id",
+            "map_profile_id",
+            "lane_hypotheses"
+          ],
+          "properties": {
+            "state_kind": {
+              "enum": [
+                "observed",
+                "estimated",
+                "predicted",
+                "unknown"
+              ]
+            },
+            "reference_frame_id": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "map_profile_id": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "lane_hypotheses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "lane_id",
+                  "direction",
+                  "centerline_points_m",
+                  "source_refs",
+                  "applicability"
+                ],
+                "properties": {
+                  "lane_id": {
+                    "$ref": "#/$defs/nonEmptyString"
+                  },
+                  "direction": {
+                    "enum": [
+                      "forward",
+                      "reverse",
+                      "bidirectional",
+                      "unknown"
+                    ]
+                  },
+                  "centerline_points_m": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/vector3"
+                    },
+                    "minItems": 2
+                  },
+                  "left_boundary_points_m": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/vector3"
+                    }
+                  },
+                  "right_boundary_points_m": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/vector3"
+                    }
+                  },
+                  "source_refs": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/nonEmptyString"
+                    }
+                  },
+                  "applicability": {
+                    "$ref": "#/$defs/nonEmptyString"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "object_hypotheses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/objectHypothesis"
+          }
+        },
+        "free_space": {
+          "type": "object",
+          "required": [
+            "reference_frame_id",
+            "coverage_profile_id",
+            "regions"
+          ],
+          "properties": {
+            "reference_frame_id": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "coverage_profile_id": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "regions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "region_id",
+                  "state",
+                  "polygon_points_m",
+                  "source_refs",
+                  "coverage_note"
+                ],
+                "properties": {
+                  "region_id": {
+                    "$ref": "#/$defs/nonEmptyString"
+                  },
+                  "state": {
+                    "enum": [
+                      "observed_free",
+                      "occupied",
+                      "occluded",
+                      "unobserved",
+                      "out_of_range",
+                      "sensor_invalid",
+                      "unknown"
+                    ]
+                  },
+                  "polygon_points_m": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/vector3"
+                    },
+                    "minItems": 3
+                  },
+                  "source_refs": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/nonEmptyString"
+                    }
+                  },
+                  "coverage_note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "vision_hdc_proposals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "proposal_id",
+              "source_id",
+              "representation_kind",
+              "image_frame_id",
+              "centroid_px",
+              "appearance_hv_ref",
+              "candidate_track_lineage_id",
+              "metric_geometry_authority",
+              "semantic_class_authority"
+            ],
+            "properties": {
+              "proposal_id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "source_id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "representation_kind": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "image_frame_id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "centroid_px": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "appearance_hv_ref": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "candidate_track_lineage_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "metric_geometry_authority": {
+                "const": "none"
+              },
+              "semantic_class_authority": {
+                "const": "none"
+              }
+            }
+          }
+        },
+        "prediction_set_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "prediction_set_id",
+              "track_lineage_id",
+              "predictor_id",
+              "horizon_ms",
+              "evaluation_owner",
+              "status"
+            ],
+            "properties": {
+              "prediction_set_id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "track_lineage_id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "predictor_id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "horizon_ms": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "minItems": 1
+              },
+              "evaluation_owner": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "status": {
+                "enum": [
+                  "qualified",
+                  "synthetic_unqualified",
+                  "unsupported",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        },
+        "admission": {
+          "type": "object",
+          "required": [
+            "numeric_validity",
+            "clock_alignment",
+            "reference_frame_transform",
+            "calibration_currentness",
+            "source_independence",
+            "semantic_class_calibration",
+            "free_space_completeness",
+            "physical_model_applicability",
+            "actuator_authority"
+          ],
+          "properties": {
+            "numeric_validity": {
+              "enum": [
+                "admitted",
+                "admitted_for_fixture",
+                "rejected",
+                "unknown"
+              ]
+            },
+            "clock_alignment": {
+              "enum": [
+                "admitted",
+                "admitted_for_fixture",
+                "rejected",
+                "unknown"
+              ]
+            },
+            "reference_frame_transform": {
+              "enum": [
+                "admitted",
+                "admitted_for_fixture",
+                "rejected",
+                "unknown"
+              ]
+            },
+            "calibration_currentness": {
+              "enum": [
+                "admitted",
+                "admitted_for_fixture",
+                "rejected",
+                "unknown"
+              ]
+            },
+            "source_independence": {
+              "enum": [
+                "established",
+                "not_established",
+                "unknown"
+              ]
+            },
+            "semantic_class_calibration": {
+              "enum": [
+                "admitted",
+                "not_admitted",
+                "unknown"
+              ]
+            },
+            "free_space_completeness": {
+              "enum": [
+                "complete",
+                "partial",
+                "unknown",
+                "rejected"
+              ]
+            },
+            "physical_model_applicability": {
+              "enum": [
+                "admitted",
+                "not_admitted",
+                "unknown"
+              ]
+            },
+            "actuator_authority": {
+              "const": "none"
+            }
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
