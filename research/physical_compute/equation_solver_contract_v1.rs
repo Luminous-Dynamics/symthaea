@@ -101,6 +101,8 @@ impl DenseMatrix {
     }
 }
 
+/// Compensated dot product. This reduces avoidable summation error in the
+/// digital reference; it does not make the reference exact arithmetic.
 pub fn dot(a: &[f64], b: &[f64]) -> Result<f64, MatrixError> {
     if a.len() != b.len() {
         return Err(MatrixError::DimensionMismatch);
@@ -108,7 +110,25 @@ pub fn dot(a: &[f64], b: &[f64]) -> Result<f64, MatrixError> {
     if a.iter().chain(b.iter()).any(|v| !v.is_finite()) {
         return Err(MatrixError::NonFinite);
     }
-    let value = a.iter().zip(b).map(|(x, y)| x * y).sum::<f64>();
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+    for (left, right) in a.iter().zip(b) {
+        let product = left * right;
+        if !product.is_finite() {
+            return Err(MatrixError::NonFinite);
+        }
+        let next = sum + product;
+        if !next.is_finite() {
+            return Err(MatrixError::NonFinite);
+        }
+        if sum.abs() >= product.abs() {
+            correction += (sum - next) + product;
+        } else {
+            correction += (product - next) + sum;
+        }
+        sum = next;
+    }
+    let value = sum + correction;
     if value.is_finite() {
         Ok(value)
     } else {
@@ -159,7 +179,7 @@ pub fn rank_one_spd_known_solution(
 }
 
 pub fn cholesky_solve(a: &DenseMatrix, b: &[f64]) -> Result<Vec<f64>, MatrixError> {
-    let n = a.n;
+    let n = a.dimension();
     if b.len() != n {
         return Err(MatrixError::DimensionMismatch);
     }
@@ -221,6 +241,114 @@ pub fn cholesky_solve(a: &DenseMatrix, b: &[f64]) -> Result<Vec<f64>, MatrixErro
     Ok(x)
 }
 
+/// A matrix-free linear operator interface for solver comparisons.
+///
+/// Implementations must return deterministic results for a given input.
+/// Conjugate gradient additionally requires a symmetric positive-definite
+/// operator; the generic type system cannot prove that property.
+pub trait LinearOperator {
+    fn dimension(&self) -> usize;
+    fn mat_vec(&self, x: &[f64]) -> Result<Vec<f64>, MatrixError>;
+    fn frobenius_norm(&self) -> f64;
+}
+
+impl LinearOperator for DenseMatrix {
+    fn dimension(&self) -> usize {
+        self.n
+    }
+
+    fn mat_vec(&self, x: &[f64]) -> Result<Vec<f64>, MatrixError> {
+        DenseMatrix::mat_vec(self, x)
+    }
+
+    fn frobenius_norm(&self) -> f64 {
+        DenseMatrix::frobenius_norm(self)
+    }
+}
+
+/// Matrix-free 1-D Poisson operator (the standard second-difference stencil):
+/// diagonal = 2, adjacent off-diagonal = -1.
+///
+/// This is symmetric positive definite, tridiagonal, and costs O(n) storage
+/// and O(n) per matrix-vector product instead of O(n^2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Poisson1d {
+    n: usize,
+}
+
+impl Poisson1d {
+    pub const MAX_DIMENSION: usize = 16 * 1024 * 1024;
+
+    pub fn new(n: usize) -> Result<Self, MatrixError> {
+        if n == 0 {
+            return Err(MatrixError::Empty);
+        }
+        if n > Self::MAX_DIMENSION {
+            return Err(MatrixError::TooLarge);
+        }
+        Ok(Self { n })
+    }
+
+    pub fn known_solution(
+        &self,
+        x_truth: &[f64],
+    ) -> Result<(Vec<f64>, f64), MatrixError> {
+        if x_truth.len() != self.n {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if x_truth.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        let rhs = self.mat_vec(x_truth)?;
+        let angle = std::f64::consts::PI / (2.0 * (self.n as f64 + 1.0));
+        let sine = angle.sin();
+        let cosine = angle.cos();
+        let condition_number = (cosine * cosine) / (sine * sine);
+        if !condition_number.is_finite() {
+            return Err(MatrixError::NonFinite);
+        }
+        Ok((rhs, condition_number))
+    }
+}
+
+impl LinearOperator for Poisson1d {
+    fn dimension(&self) -> usize {
+        self.n
+    }
+
+    fn mat_vec(&self, x: &[f64]) -> Result<Vec<f64>, MatrixError> {
+        if x.len() != self.n {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if x.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        let mut out = Vec::new();
+        out.try_reserve_exact(self.n).map_err(|_| MatrixError::AllocationFailed)?;
+        out.resize(self.n, 0.0);
+        for i in 0..self.n {
+            let mut value = 2.0 * x[i];
+            if i > 0 {
+                value -= x[i - 1];
+            }
+            if i + 1 < self.n {
+                value -= x[i + 1];
+            }
+            if !value.is_finite() {
+                return Err(MatrixError::NonFinite);
+            }
+            out[i] = value;
+        }
+        Ok(out)
+    }
+
+    fn frobenius_norm(&self) -> f64 {
+        // There are n diagonal entries of magnitude 2 and 2(n-1)
+        // off-diagonal entries of magnitude 1.
+        ((4.0 * self.n as f64) + (2.0 * self.n.saturating_sub(1) as f64)).sqrt()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct IterativeSolution {
     pub x: Vec<f64>,
@@ -231,8 +359,8 @@ pub struct IterativeSolution {
 
 /// Unpreconditioned conjugate gradients for symmetric positive-definite A.
 /// The stopping threshold is relative to ||b||_2 (with a defined zero-b case).
-pub fn conjugate_gradient(
-    a: &DenseMatrix,
+pub fn conjugate_gradient<A: LinearOperator>(
+    a: &A,
     b: &[f64],
     relative_tolerance: f64,
     max_iterations: usize,
@@ -348,13 +476,13 @@ pub struct ErrorMetrics {
 
 /// Evaluate a candidate against b and an evaluator-only reference solution.
 /// The reference must not be exposed to the candidate or its online verifier.
-pub fn error_metrics(
-    a: &DenseMatrix,
+pub fn error_metrics<A: LinearOperator>(
+    a: &A,
     b: &[f64],
     x: &[f64],
     x_truth: &[f64],
 ) -> Result<ErrorMetrics, MatrixError> {
-    if b.len() != a.n || x.len() != a.n || x_truth.len() != a.n {
+    if b.len() != a.dimension() || x.len() != a.dimension() || x_truth.len() != a.dimension() {
         return Err(MatrixError::DimensionMismatch);
     }
     if b.iter().chain(x.iter()).chain(x_truth.iter()).any(|v| !v.is_finite()) {
@@ -459,6 +587,49 @@ mod tests {
 
         let nonsymmetric = DenseMatrix::new(2, vec![1.0, 2.0, 0.0, 1.0]).unwrap();
         assert_eq!(cholesky_solve(&nonsymmetric, &[1.0, 1.0]), Err(MatrixError::NotSymmetric));
+    }
+
+    #[test]
+    fn matrix_free_poisson_operator_matches_known_spectrum_and_solution() {
+        let n = 32;
+        let operator = Poisson1d::new(n).unwrap();
+        let truth: Vec<f64> = (0..n).map(|i| ((i + 1) as f64 * 0.17).sin()).collect();
+        let (rhs, condition) = operator.known_solution(&truth).unwrap();
+        let theta = std::f64::consts::PI / (2.0 * (n as f64 + 1.0));
+        let expected = theta.cos().powi(2) / theta.sin().powi(2);
+        assert!((condition - expected).abs() / expected < 1.0e-12);
+        let reconstructed = operator.mat_vec(&truth).unwrap();
+        assert_eq!(rhs, reconstructed);
+        assert!(operator.frobenius_norm().is_finite());
+    }
+
+    #[test]
+    fn conjugate_gradient_solves_matrix_free_poisson_system() {
+        let n = 64;
+        let operator = Poisson1d::new(n).unwrap();
+        let truth: Vec<f64> = (0..n).map(|i| (0.11 * (i as f64 + 1.0)).sin()).collect();
+        let (rhs, _) = operator.known_solution(&truth).unwrap();
+        let solution = conjugate_gradient(&operator, &rhs, 1.0e-11, 4 * n).unwrap();
+        assert!(solution.converged);
+        let metrics = error_metrics(&operator, &rhs, &solution.x, &truth).unwrap();
+        assert!(metrics.relative_residual < 1.0e-10);
+        assert!(metrics.relative_forward_error < 1.0e-8);
+    }
+
+    #[test]
+    fn poisson_operator_rejects_invalid_dimensions_and_non_finite_input() {
+        assert_eq!(Poisson1d::new(0), Err(MatrixError::Empty));
+        assert_eq!(Poisson1d::new(Poisson1d::MAX_DIMENSION + 1), Err(MatrixError::TooLarge));
+        let operator = Poisson1d::new(4).unwrap();
+        assert_eq!(operator.mat_vec(&[1.0, f64::NAN, 2.0, 3.0]), Err(MatrixError::NonFinite));
+        assert_eq!(operator.known_solution(&[1.0]), Err(MatrixError::DimensionMismatch));
+    }
+
+    #[test]
+    fn compensated_dot_handles_cancellation_better_than_naive_order() {
+        let a = [1.0e16, 1.0, -1.0e16];
+        let b = [1.0, 1.0, 1.0];
+        assert_eq!(dot(&a, &b).unwrap(), 1.0);
     }
 
     #[test]
