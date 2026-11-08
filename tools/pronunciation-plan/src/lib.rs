@@ -1318,6 +1318,235 @@ mod tests {
         }
     }
 
+    fn xhosa_profile_fixture() -> LanguageProfileManifest {
+        let source_revision = "59a93768d72b5804f8b87bc3dd409320c8f0c328";
+        LanguageProfileManifest {
+            schema_version: 1,
+            profile_id: "xh-ZA-za-lex-nchlt-2017".into(),
+            profile_digest: format!("blake3:{}", "1".repeat(64)),
+            language_tag: "xh-ZA".into(),
+            dialect: "isiXhosa NCHLT 2013 resource profile; research only".into(),
+            orthography_id: "za-lex-xho-graphemeset".into(),
+            inventory_version: "za-lex-xho-phonemeset-2017".into(),
+            phone_inventory: vec![
+                LanguageProfilePhone {
+                    ipa: "ǀ".into(),
+                    kind: PhoneKind::Consonant,
+                    features: vec![PhoneFeature::Click, PhoneFeature::ClickDental],
+                },
+                LanguageProfilePhone {
+                    ipa: "a".into(),
+                    kind: PhoneKind::Vowel,
+                    features: vec![PhoneFeature::VowelLow, PhoneFeature::VowelBack],
+                },
+                LanguageProfilePhone {
+                    ipa: "m".into(),
+                    kind: PhoneKind::SyllabicConsonant,
+                    features: vec![PhoneFeature::Syllabic, PhoneFeature::Nasal, PhoneFeature::Voiced],
+                },
+            ],
+            resources: vec![LanguageResourceReceipt {
+                resource_id: "za-lex-xho-phonemeset".into(),
+                source_repository: "https://github.com/NWU-MuST/za_lex".into(),
+                source_revision: source_revision.into(),
+                resource_path: "data/xho/phonemeset.json".into(),
+                source_digest: format!("git-sha1:{}", "2".repeat(40)),
+                license_document_path: "data/xho/COPYRIGHT".into(),
+                license_document_digest: format!("git-sha1:{}", "3".repeat(40)),
+                license_expression: "CC-BY-3.0".into(),
+                attribution: "DAC, CSIR and NWU".into(),
+                rights_status: ResourceRightsStatus::MetadataAudited,
+                legal_review_reference: None,
+            }],
+            capabilities: vec![
+                LanguageTaskCapability {
+                    task: LanguageTask::GraphemeToPhoneme,
+                    status: LanguageTaskStatus::ResearchOnly,
+                    evidence_reference: Some("upstream-rule-fixture:2017".into()),
+                    evidence_digest: Some(format!("git-sha1:{}", "4".repeat(40))),
+                },
+                LanguageTaskCapability {
+                    task: LanguageTask::Syllabification,
+                    status: LanguageTaskStatus::ResearchOnly,
+                    evidence_reference: Some("upstream-syllabifier-fixture:2017".into()),
+                    evidence_digest: Some(format!("git-sha1:{}", "5".repeat(40))),
+                },
+                LanguageTaskCapability {
+                    task: LanguageTask::SingingSynthesis,
+                    status: LanguageTaskStatus::ResearchOnly,
+                    evidence_reference: None,
+                    evidence_digest: None,
+                },
+                LanguageTaskCapability {
+                    task: LanguageTask::Morphology,
+                    status: LanguageTaskStatus::NotEvaluated,
+                    evidence_reference: None,
+                    evidence_digest: None,
+                },
+                LanguageTaskCapability {
+                    task: LanguageTask::TonePrediction,
+                    status: LanguageTaskStatus::Unsupported,
+                    evidence_reference: Some("NCHLT-2013-phone-set-does-not-encode-tone".into()),
+                    evidence_digest: None,
+                },
+                LanguageTaskCapability {
+                    task: LanguageTask::SpeechSynthesis,
+                    status: LanguageTaskStatus::NotEvaluated,
+                    evidence_reference: None,
+                    evidence_digest: None,
+                },
+            ],
+        }
+    }
+
+    fn xhosa_profiled_plan() -> ProfiledPronunciationPlan {
+        let profile = xhosa_profile_fixture();
+        let mut word = word(
+            "ca",
+            0,
+            ResolutionState::Selected,
+            vec![PronunciationCandidate {
+                candidate_id: "click-a".into(),
+                provenance: provenance(CandidateSource::CommunityReviewed, "xhosa-fixture"),
+                raw_provider_score: None,
+                syllables: vec![PronunciationSyllable {
+                    stress: 0,
+                    phones: vec![
+                        Phone {
+                            ipa: "ǀ".into(),
+                            kind: PhoneKind::Consonant,
+                        },
+                        Phone {
+                            ipa: "a".into(),
+                            kind: PhoneKind::Vowel,
+                        },
+                    ],
+                }],
+            }],
+        );
+        word.selected_candidate_id = Some("click-a".into());
+        word.selection_receipt = Some(SelectionReceipt {
+            authority: SelectionAuthority::CommunityReview,
+            evidence_reference: "review-fixture:xhosa-click-ca".into(),
+        });
+        ProfiledPronunciationPlan {
+            schema_version: 1,
+            language_profile_id: profile.profile_id.clone(),
+            language_profile_digest: profile.profile_digest.clone(),
+            pronunciation: PronunciationPlan {
+                schema_version: 1,
+                language: "xh-ZA".into(),
+                source_text: "ca".into(),
+                words: vec![word],
+            },
+        }
+    }
+
+    #[test]
+    fn versioned_language_profile_accepts_click_phone_and_exact_plan_binding() {
+        let profile = xhosa_profile_fixture();
+        let plan = xhosa_profiled_plan();
+        assert!(profile.validate().is_ok());
+        assert!(plan.validate_against(&profile).is_ok());
+    }
+
+    #[test]
+    fn profiled_plan_rejects_unknown_phone_wrong_language_and_wrong_digest() {
+        let profile = xhosa_profile_fixture();
+        let mut unknown_phone = xhosa_profiled_plan();
+        unknown_phone.pronunciation.words[0].candidates[0].syllables[0].phones[0].ipa = "ǁ".into();
+        assert!(
+            unknown_phone
+                .validate_against(&profile)
+                .unwrap_err()
+                .contains("outside profile")
+        );
+
+        let mut wrong_language = xhosa_profiled_plan();
+        wrong_language.pronunciation.language = "en-ZA".into();
+        assert!(
+            wrong_language
+                .validate_against(&profile)
+                .unwrap_err()
+                .contains("does not match profile language")
+        );
+
+        let mut wrong_digest = xhosa_profiled_plan();
+        wrong_digest.language_profile_digest = format!("blake3:{}", "f".repeat(64));
+        assert!(
+            wrong_digest
+                .validate_against(&profile)
+                .unwrap_err()
+                .contains("ID/digest mismatch")
+        );
+    }
+
+    #[test]
+    fn profile_rejects_click_without_unique_place_and_syllabic_phone_without_feature() {
+        let mut profile = xhosa_profile_fixture();
+        profile.phone_inventory[0].features = vec![PhoneFeature::Click];
+        assert!(
+            profile
+                .validate()
+                .unwrap_err()
+                .contains("exactly one explicit click place")
+        );
+
+        let mut profile = xhosa_profile_fixture();
+        profile.phone_inventory[2].features = vec![PhoneFeature::Nasal, PhoneFeature::Voiced];
+        assert!(
+            profile
+                .validate()
+                .unwrap_err()
+                .contains("lacks the syllabic feature")
+        );
+    }
+
+    #[test]
+    fn metadata_only_profile_cannot_qualify_singing_rendering() {
+        let profile = xhosa_profile_fixture();
+        let plan = xhosa_profiled_plan();
+        let error = plan
+            .validate_for_task(&profile, LanguageTask::SingingSynthesis)
+            .unwrap_err();
+        assert!(error.contains("ResearchOnly, not Qualified"), "{error}");
+    }
+
+    #[test]
+    fn qualified_language_capability_requires_evidence_receipt() {
+        let mut profile = xhosa_profile_fixture();
+        let singing = profile
+            .capabilities
+            .iter_mut()
+            .find(|capability| capability.task == LanguageTask::SingingSynthesis)
+            .unwrap();
+        singing.status = LanguageTaskStatus::Qualified;
+        singing.evidence_reference = None;
+        singing.evidence_digest = None;
+        assert!(
+            profile
+                .validate()
+                .unwrap_err()
+                .contains("requires evidence reference and digest")
+        );
+    }
+
+    #[test]
+    fn language_profile_rejects_excluded_or_unlicensed_resource() {
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].rights_status = ResourceRightsStatus::Excluded;
+        assert!(profile.validate().unwrap_err().contains("excluded resource"));
+
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].license_expression = "NOASSERTION".into();
+        assert!(
+            profile
+                .validate()
+                .unwrap_err()
+                .contains("incomplete provenance/license metadata")
+        );
+    }
+
     #[test]
     fn contextual_heteronym_retains_multiple_candidates_until_review() {
         let plan = PronunciationPlan {
