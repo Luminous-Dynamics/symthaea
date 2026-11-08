@@ -880,3 +880,50 @@ Files:
 - acoustic_counterfactual_pair_golden_v0.1.schema.json
 
 No model benchmark or Rust PASS is implied by registry or fixture presence.
+## 22. Industry comparison: coverage, adaptation, efficiency and evidence
+
+### 22.1 Major open / research baselines
+
+**Meta Omnilingual ASR**
+- Meta describes more than 1,600 supported language coverage, a 7B multilingual speech representation model, smaller model variants and few-example extension for previously unsupported languages.
+- Coverage and few-shot extension are important baselines, but neither establishes performance on every language, variety or natural code-switch pattern.
+- https://ai.meta.com/blog/omnilingual-asr-advancing-automatic-speech-recognition/
+- https://ai.meta.com/research/publications/omnilingual-asr-open-source-multilingual-speech-recognition-for-1600-languages/
+
+**Microsoft PazaBench / Paza**
+- The official PazaBench publication reports 52 evaluated ASR models across 39 African languages, harmonizing six public corpora and reporting WER, CER and inverse real-time factor.
+- Paza's released fine-tuned models described by Microsoft cover six Kenyan languages, not every language in the 39-language benchmark.
+- Microsoft reports encoder-only models about 28x faster than multitask LLMs at competitive accuracy in its tested setup, plus strong gains from modest in-domain data. These are Paza results, not Symthaea results.
+- https://www.microsoft.com/en-us/research/publication/pazabench-large-scale-asr-benchmark-for-low-resource-languages-in-africa/
+- https://labs.ai.azure.com/innovations/paza/
+
+**Sunbird SunflowerASR-51**
+- Its current model card reports macro-average WER 0.293 / CER 0.091 on the 51-language Sunbird Speech Benchmark and comparisons to Omnilingual 7B, Gemini 3.5 Flash and GPT-4o-transcribe.
+- Important qualification: the Sunbird evaluation corpus is assembled from held-out splits of source collections used for Sunflower training, while comparison systems are out-of-domain there. The card identifies AfriVox-v2 and SimbaBench as its arm's-length comparisons.
+- The described inference setup supplies a language token. It is not a direct automatic language-identification or natural code-switching comparison.
+- https://huggingface.co/Sunbird/SunflowerASR-51-african-languages
+
+**Google Gemini audio**
+- Google's September 15, 2026 announcement describes Gemini 3.8 Live / Extended Thinking and Gemini 3.5 Transcribe with stated transcription coverage across 85+ languages.
+- Compare native streaming conversation and dedicated transcription separately, pinning exact model/API revisions and supported capabilities.
+- https://blog.google/innovation-and-ai/technology/developers-tools/build-real-time-voice-applications-gemini-audio/
+
+### 22.2 Alignment / timestamp comparison
+
+FA-Bench is already incorporated in #10871 and should be reused rather than duplicated. Its October 2026 framework separates reference-transcript forced alignment from recognizer-output end-to-end alignment, tests 21 open models and 9 commercial APIs, and uses tolerance-based boundary F1. The authors report 9–14% MAE score inflation in some recognition-dependent conversational settings; reproduce the exact official scorer and splits.
+- https://arxiv.org/abs/2609.32396
+- https://github.com/olewave/fa-bench
+
+### 22.3 Fair-comparison protocol
+
+1. Pin exact model/API revision, language token/ID access, decoding settings, normalization, audio duration limits, sample rate, channel policy, chunking and timestamp capability.
+2. Separate oracle-language transcription from automatic language identification and natural code-switch recognition.
+3. Separate reference-transcript alignment from recognizer-output end-to-end alignment.
+4. Use common audio and source/speaker-disjoint splits; audit training-source overlap before confirmatory use.
+5. Report WER/CER, PIER/SETER/SPER, profile-qualified FER/TER, boundary F1, acoustic faithfulness and paired causal invariance/sensitivity as distinct metrics.
+6. Report p50/p95 latency, RTFx, throughput, memory, energy/cost per correctly recognized utterance and selective coverage/risk. Match total-system compute for hybrid/LLM selectors.
+7. Report worst-language/worst-variety results and paired uncertainty intervals. Do not rank systems on incomparable subsets or average away unsupported languages.
+
+### 22.4 Competitive objective
+
+Target a measurable advantage on the intersection of natural African code-switching, phonological fidelity and evidence-grounded interpretation while remaining on the latency/cost Pareto frontier. Do not claim universal superiority over a provider from an isolated paper table.
