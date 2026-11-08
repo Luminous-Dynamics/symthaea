@@ -17,6 +17,7 @@ on:
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
       - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
       - "crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs"
       - "crates/core/symthaea-fep/src/gaussian_model_information_gain.rs"
       - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
       - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
@@ -48,6 +49,7 @@ on:
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
       - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
       - "crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs"
       - "crates/core/symthaea-fep/src/gaussian_model_information_gain.rs"
       - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
       - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
@@ -126,6 +128,7 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/bayesian_model_reduction.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/dirichlet_model_reduction.rs
@@ -166,6 +169,7 @@ jobs:
           cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib decision_relevant_information::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib decision_diagnostic_benchmark::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib gaussian_model_information_gain::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib bayesian_model_reduction::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib dirichlet_model_reduction::tests -- --nocapture
@@ -179,6 +183,25 @@ jobs:
           cargo test --locked --release -p symthaea-core --lib hdc::structured_mixer::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark -- --nocapture
 
+
+      - name: Run decision-focused diagnostic policy benchmark
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark > research-results/hlb-decision-diagnostic.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-decision-diagnostic-result-v1" and
+            .status == "synthetic_fixture_result_not_environment_result" and
+            .source_sha == $source_sha and
+            .protocol.episodes == 10000 and
+            (.result.policies | length == 5) and
+            (.result.paired_evsi_contrasts | length == 4) and
+            ([.result.policies[].episodes] | all(. == 10000)) and
+            ([.result.paired_evsi_contrasts[].episodes] | all(. == 10000))
+          ' research-results/hlb-decision-diagnostic.json >/dev/null
+          cat research-results/hlb-decision-diagnostic.json
 
       - name: Run packed BinaryHV bundle-capacity pilot
         run: |
@@ -201,7 +224,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs research-results/hlb-decision-diagnostic.json crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
