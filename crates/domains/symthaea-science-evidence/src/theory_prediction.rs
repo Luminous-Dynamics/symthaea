@@ -51,8 +51,8 @@ pub enum NoiseCalibrationStatus {
 pub struct TheoryModel {
     pub theory_id: String,
     pub family: String,
-    /// BLAKE3 digest of the model equations/specification artifact.
-    pub model_spec_blake3_hex: String,
+    /// Content-addressed model equations/assumptions/specification artifact.
+    pub model_spec_artifact: super::ArtifactDigest,
     /// Full source commit associated with this model version.
     pub source_revision_sha: String,
     pub role: TheoryModelRole,
@@ -166,8 +166,8 @@ pub enum TheoryPredictionError {
     InvalidUnresolvedModelRole,
     #[error("exactly one OTHER_UNRESOLVED model is required")]
     MissingOrDuplicateUnresolvedModel,
-    #[error("model {theory_id} has an invalid BLAKE3 specification digest")]
-    InvalidModelDigest { theory_id: String },
+    #[error("model {theory_id} has an invalid or empty specification artifact")]
+    InvalidModelSpecificationArtifact { theory_id: String },
     #[error("model {theory_id} has an invalid full source commit SHA")]
     InvalidModelSourceRevision { theory_id: String },
     #[error("invalid observable ID at index {0}")]
@@ -254,8 +254,8 @@ impl TheoryPredictionLedger {
             if !model_ids.insert(model.theory_id.as_str()) {
                 return Err(TheoryPredictionError::DuplicateModelId(model.theory_id.clone()));
             }
-            if !is_lower_hex_digest(&model.model_spec_blake3_hex) {
-                return Err(TheoryPredictionError::InvalidModelDigest {
+            if model.model_spec_artifact.validate().is_err() {
+                return Err(TheoryPredictionError::InvalidModelSpecificationArtifact {
                     theory_id: model.theory_id.clone(),
                 });
             }
@@ -547,19 +547,19 @@ fn is_lower_hex_digest(value: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn digest(byte: u8) -> String {
-        (0..64).map(|_| byte as char).collect()
-    }
-
     fn sha() -> String {
         "1111111111111111111111111111111111111111".to_string()
     }
 
     fn model(id: &str, role: TheoryModelRole, marker: u8) -> TheoryModel {
+        let specification = format!("model-specification:{id}:version-1");
         TheoryModel {
             theory_id: id.to_string(),
             family: format!("family-{id}"),
-            model_spec_blake3_hex: digest(marker),
+            model_spec_artifact: super::super::ArtifactDigest::from_bytes(
+                format!("tests/fixtures/model-spec-{marker:02x}.txt"),
+                specification.as_bytes(),
+            ),
             source_revision_sha: sha(),
             role,
         }
