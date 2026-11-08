@@ -320,6 +320,7 @@ pub enum PolicyPortfolioError {
     PolicyMaskStateCountMismatch { time: usize, expected: usize, actual: usize },
     PolicyMaskActionCountMismatch { time: usize, state: usize, expected: usize, actual: usize },
     PolicyMaskEmptyActionSet { time: usize, state: usize },
+    PolicyMaskSlotIndexOutOfBounds { time: usize, state: usize, horizon: usize, state_count: usize },
     PolicyMaskActionIndexOutOfBounds { time: usize, state: usize, action: usize, action_count: usize },
     PolicyMaskActionNotAllowed { time: usize, state: usize, action: usize },
     PolicyMaskCannotSplit { time: usize, state: usize },
@@ -365,6 +366,7 @@ impl fmt::Display for PolicyPortfolioError {
             Self::PolicyMaskStateCountMismatch { time, expected, actual } => write!(f, "policy action mask at time {time} has {actual} states; expected {expected}"),
             Self::PolicyMaskActionCountMismatch { time, state, expected, actual } => write!(f, "policy action mask ({time},{state}) has {actual} actions; expected {expected}"),
             Self::PolicyMaskEmptyActionSet { time, state } => write!(f, "policy action mask permits no action at ({time},{state})"),
+            Self::PolicyMaskSlotIndexOutOfBounds { time, state, horizon, state_count } => write!(f, "policy action-mask slot ({time},{state}) is outside horizon {horizon} and state count {state_count}"),
             Self::PolicyMaskActionIndexOutOfBounds { time, state, action, action_count } => write!(f, "policy action-mask action {action} at ({time},{state}) is outside 0..{action_count}"),
             Self::PolicyMaskActionNotAllowed { time, state, action } => write!(f, "cannot branch on disallowed action {action} at ({time},{state})"),
             Self::PolicyMaskCannotSplit { time, state } => write!(f, "action mask at ({time},{state}) has no nonempty force/forbid split"),
@@ -1294,16 +1296,50 @@ impl FiniteUmdpPolicyActionMask {
         time: usize,
         state: usize,
         action: usize,
+        budget: PolicyActionMaskBudget,
     ) -> Result<(Self, Self), PolicyPortfolioError> {
         if self.family_sha256 != family.sha256() {
             return Err(PolicyPortfolioError::PolicyMaskFamilyDigestMismatch);
         }
-        if time >= self.horizon() || state >= self.state_count() || action >= self.action_count() {
+        if time >= self.horizon() || state >= self.state_count() {
+            return Err(PolicyPortfolioError::PolicyMaskSlotIndexOutOfBounds {
+                time,
+                state,
+                horizon: self.horizon(),
+                state_count: self.state_count(),
+            });
+        }
+        if action >= self.action_count() {
             return Err(PolicyPortfolioError::PolicyMaskActionIndexOutOfBounds {
                 time,
                 state,
                 action,
                 action_count: self.action_count(),
+            });
+        }
+        let mask_entries = self.horizon().checked_mul(self.state_count())
+            .and_then(|value| value.checked_mul(self.action_count()))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if mask_entries > budget.max_mask_entries {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask split entries",
+                required: mask_entries,
+                limit: budget.max_mask_entries,
+            });
+        }
+        let one_mask_bytes = mask_entries
+            .checked_mul(std::mem::size_of::<bool>())
+            .and_then(|value| value.checked_add(self.horizon().checked_mul(std::mem::size_of::<Vec<Vec<bool>>>())?))
+            .and_then(|value| value.checked_add(self.horizon().checked_mul(self.state_count())?.checked_mul(std::mem::size_of::<Vec<bool>>())?))
+            .and_then(|value| value.checked_add(std::mem::size_of::<FiniteUmdpPolicyActionMask>()))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        let split_bytes = one_mask_bytes.checked_mul(2)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if split_bytes > budget.max_output_memory_bytes {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask child split bytes",
+                required: split_bytes,
+                limit: budget.max_output_memory_bytes,
             });
         }
         if !self.allowed[time][state][action] {
@@ -1626,8 +1662,15 @@ pub fn compute_policy_mask_cluster_lower_bound(
     let per_model_bytes = cluster_model_indices.len()
         .checked_mul(std::mem::size_of::<PolicyMaskModelBound>())
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    // The unrestricted current/next vectors remain live while the masked
+    // evaluator allocates its own current/next pair.
+    let dp_scratch_bytes = states.checked_mul(4)
+        .and_then(|value| value.checked_mul(std::mem::size_of::<CheckedRational>()))
+        .and_then(|value| value.checked_add(4 * std::mem::size_of::<Vec<CheckedRational>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     let output_bytes = index_bytes
         .checked_add(per_model_bytes)
+        .and_then(|value| value.checked_add(dp_scratch_bytes))
         .and_then(|value| value.checked_add(std::mem::size_of::<Vec<usize>>()))
         .and_then(|value| value.checked_add(std::mem::size_of::<Vec<PolicyMaskModelBound>>()))
         .and_then(|value| value.checked_add(std::mem::size_of::<VerifiedPolicyMaskClusterLowerBound>()))
@@ -1814,6 +1857,194 @@ mod tests {
             vec![vec![rewards.iter().map(|reward| q(*reward, 1)).collect()]],
             vec![],
         ).unwrap()
+    }
+
+    fn policy_mask_budget() -> PolicyActionMaskBudget {
+        PolicyActionMaskBudget {
+            max_model_count: 8,
+            max_mask_entries: 10_000,
+            max_dp_multiply_adds: 1_000_000,
+            max_rational_bit_width: 64,
+            max_output_memory_bytes: 1_000_000,
+        }
+    }
+
+    #[test]
+    fn exact_action_mask_bound_is_zero_for_full_mask_and_exact_at_leaf() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let full = FiniteUmdpPolicyActionMask::new(
+            &family,
+            vec![vec![vec![true, true]]],
+        ).unwrap();
+        let full_bound = compute_policy_mask_cluster_lower_bound(
+            &family, &[0, 1], q(1, 2), &full, policy_mask_budget(),
+        ).unwrap();
+        assert_eq!(full_bound.lower_bound, q(0, 1));
+        assert_eq!(
+            full_bound.per_model.iter().map(|item| (
+                item.unrestricted_optimal_value,
+                item.masked_optimal_value,
+                item.regret_gap_lower_bound,
+            )).collect::<Vec<_>>(),
+            vec![(q(1,1), q(1,1), q(0,1)), (q(1,1), q(1,1), q(0,1))]
+        );
+        verify_policy_mask_cluster_lower_bound(
+            &family, &full, policy_mask_budget(), &full_bound,
+        ).unwrap();
+
+        let fixed_action_zero = FiniteUmdpPolicyActionMask::new(
+            &family,
+            vec![vec![vec![true, false]]],
+        ).unwrap();
+        let leaf_bound = compute_policy_mask_cluster_lower_bound(
+            &family, &[0, 1], q(1, 2), &fixed_action_zero, policy_mask_budget(),
+        ).unwrap();
+        assert_eq!(leaf_bound.lower_bound, q(1, 1));
+        assert_eq!(
+            leaf_bound.per_model.iter().map(|item| item.regret_gap_lower_bound).collect::<Vec<_>>(),
+            vec![q(0,1), q(1,1)]
+        );
+
+        let mut mutated = leaf_bound.clone();
+        mutated.per_model[1].masked_optimal_value = q(1, 1);
+        assert_eq!(
+            verify_policy_mask_cluster_lower_bound(
+                &family, &fixed_action_zero, policy_mask_budget(), &mutated,
+            ),
+            Err(PolicyPortfolioError::PolicyMaskCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn force_forbid_children_are_exhaustive_disjoint_and_source_bound() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let parent = FiniteUmdpPolicyActionMask::new(
+            &family,
+            vec![vec![vec![true, true]]],
+        ).unwrap();
+        let (forced, forbidden) = parent.split_on_action(
+            &family, 0, 0, 0, policy_mask_budget(),
+        ).unwrap();
+        assert_eq!(forced.allows(0, 0, 0), Some(true));
+        assert_eq!(forced.allows(0, 0, 1), Some(false));
+        assert_eq!(forbidden.allows(0, 0, 0), Some(false));
+        assert_eq!(forbidden.allows(0, 0, 1), Some(true));
+        for action in 0..2 {
+            let parent_allowed = parent.allows(0, 0, action).unwrap();
+            let forced_allowed = forced.allows(0, 0, action).unwrap();
+            let forbidden_allowed = forbidden.allows(0, 0, action).unwrap();
+            assert_eq!(forced_allowed && forbidden_allowed, false);
+            assert_eq!(forced_allowed || forbidden_allowed, parent_allowed);
+        }
+        let forced_bound = compute_policy_mask_cluster_lower_bound(
+            &family, &[0, 1], q(0,1), &forced, policy_mask_budget(),
+        ).unwrap();
+        let forbidden_bound = compute_policy_mask_cluster_lower_bound(
+            &family, &[0, 1], q(0,1), &forbidden, policy_mask_budget(),
+        ).unwrap();
+        assert_eq!(forced_bound.lower_bound, q(1,1));
+        assert_eq!(forbidden_bound.lower_bound, q(1,1));
+
+        assert_eq!(
+            parent.split_on_action(&family, 0, 0, 0, PolicyActionMaskBudget {
+                max_model_count: 8,
+                max_mask_entries: 1,
+                max_dp_multiply_adds: 1_000_000,
+                max_rational_bit_width: 64,
+                max_output_memory_bytes: 1_000_000,
+            }),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask split entries",
+                required: 2,
+                limit: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn masked_bellman_bound_handles_time_varying_actions_and_discount_exactly() {
+        let model = FiniteHorizonUmdpModel::new(
+            vec![q(1,1)],
+            vec![
+                vec![vec![q(1,1), q(0,1)]],
+                vec![vec![q(0,1), q(1,1)]],
+            ],
+            vec![
+                vec![
+                    vec![vec![q(1,1)], vec![q(1,1)]],
+                ],
+            ],
+        ).unwrap();
+        let family = FiniteUmdpModelFamily::new(vec![model]).unwrap();
+        let mask = FiniteUmdpPolicyActionMask::new(
+            &family,
+            vec![
+                vec![vec![false, true]],
+                vec![vec![false, true]],
+            ],
+        ).unwrap();
+        let lower = compute_policy_mask_cluster_lower_bound(
+            &family, &[0], q(1,2), &mask, policy_mask_budget(),
+        ).unwrap();
+        assert_eq!(lower.per_model[0].unrestricted_optimal_value, q(3,2));
+        assert_eq!(lower.per_model[0].masked_optimal_value, q(1,2));
+        assert_eq!(lower.lower_bound, q(1,1));
+    }
+
+    #[test]
+    fn action_mask_validation_family_binding_and_budget_fail_closed() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        assert!(matches!(
+            FiniteUmdpPolicyActionMask::new(&family, vec![vec![vec![false, false]]]),
+            Err(PolicyPortfolioError::PolicyMaskEmptyActionSet { time: 0, state: 0 })
+        ));
+        let full = FiniteUmdpPolicyActionMask::new(
+            &family, vec![vec![vec![true, true]]],
+        ).unwrap();
+        assert_eq!(
+            full.split_on_action(&family, 0, 0, 0, policy_mask_budget()),
+            Ok((
+                FiniteUmdpPolicyActionMask::new(&family, vec![vec![vec![true, false]]]).unwrap(),
+                FiniteUmdpPolicyActionMask::new(&family, vec![vec![vec![false, true]]]).unwrap(),
+            ))
+        );
+        assert_eq!(
+            full.split_on_action(&family, 0, 0, 1, PolicyActionMaskBudget {
+                max_model_count: 8,
+                max_mask_entries: 2,
+                max_dp_multiply_adds: 1_000_000,
+                max_rational_bit_width: 64,
+                max_output_memory_bytes: 1,
+            }),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask child split bytes",
+                required: 2 * (2 * std::mem::size_of::<bool>()
+                    + std::mem::size_of::<Vec<Vec<bool>>>()
+                    + std::mem::size_of::<Vec<bool>>()
+                    + std::mem::size_of::<FiniteUmdpPolicyActionMask>()),
+                limit: 1,
+            })
+        );
+
+        let other_family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[2, 0]),
+            one_state_model(&[0, 2]),
+        ]).unwrap();
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &other_family, &[0,1], q(1,2), &full, policy_mask_budget(),
+            ),
+            Err(PolicyPortfolioError::PolicyMaskFamilyDigestMismatch)
+        );
     }
 
     #[test]
