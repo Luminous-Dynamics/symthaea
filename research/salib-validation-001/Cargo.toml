@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-salib-validation"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.87"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+salib = { version = "=0.3.0", default-features = false, features = ["samplers", "estimators"] }
+
+[workspace]
