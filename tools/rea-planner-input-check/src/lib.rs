@@ -242,6 +242,7 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
     let evidence = array(case, "evidence", context)?;
     let mut evidence_by_id = BTreeMap::<String, &Value>::new();
     let mut source_roots = BTreeSet::new();
+    let mut source_families = BTreeSet::new();
     for item in evidence {
         let id = string(item, "evidence_id", context)?;
         if !is_evidence_id(id) {
@@ -249,6 +250,12 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
         }
         if evidence_by_id.insert(id.to_owned(), item).is_some() {
             return Err(ManifestError(format!("{context} has duplicate Evidence ID {id}")));
+        }
+        let family = string(item, "fixture_source_family_id", context)?;
+        if !source_families.insert(family.to_owned()) {
+            return Err(ManifestError(format!(
+                "{context} reuses a source-family root {family}"
+            )));
         }
         let origin = string(item, "origin", context)?;
         if origin == "IndependentObservation" {
@@ -661,7 +668,12 @@ pub fn validate_embedded_manifests() -> Result<(), ManifestError> {
         validate_grader_case(grader_case, planner_case, &context)?;
     }
 
-    let planner_text = PLANNER_MANIFEST.to_ascii_lowercase();
+    reject_grader_only_field_leaks(PLANNER_MANIFEST)?;
+    Ok(())
+}
+
+fn reject_grader_only_field_leaks(serialized_planner: &str) -> Result<(), ManifestError> {
+    let planner_text = serialized_planner.to_ascii_lowercase();
     for forbidden in [
         "held_out_dgp_id",
         "held_out_dgp_not_supplied_to_planner",
@@ -675,7 +687,6 @@ pub fn validate_embedded_manifests() -> Result<(), ManifestError> {
             )));
         }
     }
-
     Ok(())
 }
 
@@ -804,6 +815,79 @@ mod tests {
         value["cases"][0]["realized_hypothesis_id"] = Value::String("hypothesis_a".into());
         let text = serde_json::to_string(&value).unwrap().to_ascii_lowercase();
         assert!(text.contains("realized_hypothesis_id"));
+    }
+
+    fn entropy_bits(probabilities: &[f64]) -> f64 {
+        probabilities
+            .iter()
+            .filter(|probability| **probability > 0.0)
+            .map(|probability| -probability * probability.log2())
+            .sum()
+    }
+
+    fn fixture_candidate_eig(case_id: &str, candidate_id: &str) -> f64 {
+        let value = planner();
+        let case = value["cases"].as_array().unwrap().iter()
+            .find(|item| item["case_id"] == case_id).unwrap();
+        let candidate = case["candidates"].as_array().unwrap().iter()
+            .find(|item| item["id"] == candidate_id).unwrap();
+        let rows = candidate["point_likelihoods"].as_array().unwrap();
+        let row_a = rows.iter().find(|row| row["hypothesis_id"] == "hypothesis_a").unwrap();
+        let row_b = rows.iter().find(|row| row["hypothesis_id"] == "hypothesis_b").unwrap();
+        let a = row_a["outcome_probabilities"].as_array().unwrap();
+        let b = row_b["outcome_probabilities"].as_array().unwrap();
+        let prior_entropy = entropy_bits(&[0.5, 0.5]);
+        let mut expected_posterior_entropy = 0.0;
+        for index in 0..a.len() {
+            let pa = a[index].as_f64().unwrap();
+            let pb = b[index].as_f64().unwrap();
+            let outcome_mass = 0.5 * pa + 0.5 * pb;
+            if outcome_mass > 0.0 {
+                let posterior_a = 0.5 * pa / outcome_mass;
+                let posterior_b = 0.5 * pb / outcome_mass;
+                expected_posterior_entropy +=
+                    outcome_mass * entropy_bits(&[posterior_a, posterior_b]);
+            }
+        }
+        prior_entropy - expected_posterior_entropy
+    }
+
+    #[test]
+    fn pilot_encodes_high_eig_non_decisive_vs_lower_eig_obligation_closure() {
+        let static_probe = fixture_candidate_eig("REA-POA-001", "probe_many_functions");
+        let deployment_manifest =
+            fixture_candidate_eig("REA-POA-001", "verify_deployment_manifest");
+        assert!(static_probe > deployment_manifest);
+    }
+
+    #[test]
+    fn pilot_encodes_correlated_logs_as_more_informative_than_causal_intervention() {
+        let logs = fixture_candidate_eig("REA-POA-008", "collect_more_cache_logs");
+        let intervention = fixture_candidate_eig("REA-POA-008", "controlled_cache_bypass");
+        assert!(logs > intervention);
+    }
+
+    #[test]
+    fn pilot_encodes_unauthorized_probe_as_informative_but_denied() {
+        let unauthorized =
+            fixture_candidate_eig("REA-POA-013", "unauthorized_production_probe");
+        let authorized =
+            fixture_candidate_eig("REA-POA-013", "authorized_staging_reproduction");
+        assert!(unauthorized > authorized);
+        let value = planner();
+        let candidate = value["cases"].as_array().unwrap().iter()
+            .find(|item| item["case_id"] == "REA-POA-013").unwrap()["candidates"]
+            .as_array().unwrap().iter()
+            .find(|item| item["id"] == "unauthorized_production_probe").unwrap();
+        assert_eq!(candidate["authorization"], "Denied");
+    }
+
+    #[test]
+    fn grader_only_field_leak_is_rejected_by_the_semantic_guard() {
+        let mut value = planner();
+        value["cases"][0]["realized_hypothesis_id"] = Value::String("hypothesis_a".into());
+        let serialized = serde_json::to_string(&value).unwrap();
+        assert!(reject_grader_only_field_leaks(&serialized).is_err());
     }
 
     #[test]
