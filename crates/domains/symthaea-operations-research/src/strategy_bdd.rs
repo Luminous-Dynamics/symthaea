@@ -52,6 +52,7 @@ pub struct StrategyBddBudget {
     pub max_bdd_nodes: usize,
     pub max_support_checks: u128,
     pub max_interaction_checks: u128,
+    pub max_weighted_interaction_checks: u128,
     pub max_frontier_order_evaluations: usize,
     pub max_frontier_refinement_passes: usize,
     pub max_variable_order_evaluations: usize,
@@ -66,6 +67,7 @@ impl Default for StrategyBddBudget {
             max_bdd_nodes: 1 << 20,
             max_support_checks: 1 << 22,
             max_interaction_checks: 1 << 26,
+            max_weighted_interaction_checks: 1 << 26,
             max_frontier_order_evaluations: 1 << 12,
             max_frontier_refinement_passes: 2,
             max_variable_order_evaluations: 1 << 13,
@@ -157,6 +159,24 @@ pub enum StrategyBddError {
         vertex: usize,
         neighbor: usize,
     },
+    WeightedInteractionGraphCheckBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    WeightedInteractionGraphRowWidthMismatch {
+        row: usize,
+        expected: usize,
+        actual: usize,
+    },
+    WeightedInteractionGraphSelfWeight {
+        vertex: usize,
+    },
+    WeightedInteractionGraphAsymmetricWeight {
+        vertex: usize,
+        neighbor: usize,
+        forward: u128,
+        reverse: u128,
+    },
     StrategyVariableMismatch {
         original: usize,
         reduced: usize,
@@ -240,6 +260,10 @@ pub enum StrategyBddOrderSeed {
     InteractionMinFillReverse,
     FrontierRefinedMinFill,
     FrontierRefinedMinFillReverse,
+    ArithmeticWeightedMinFill,
+    ArithmeticWeightedMinFillReverse,
+    ArithmeticWeightedFrontierRefined,
+    ArithmeticWeightedFrontierRefinedReverse,
 }
 
 /// A bounded multi-start sifting result. The interaction graph is a heuristic
@@ -251,6 +275,10 @@ pub struct StrategyBddMultiStartReport {
     pub selected_initial_node_count: usize,
     pub optimized_node_count: usize,
     pub interaction_pair_checks: u128,
+    pub arithmetic_interaction_context_checks: u128,
+    pub arithmetic_interaction_total_weight: u128,
+    pub weighted_min_fill_max_frontier: usize,
+    pub weighted_refined_max_frontier: usize,
     pub frontier_refinement_evaluations: usize,
     pub min_fill_max_frontier: usize,
     pub refined_max_frontier: usize,
@@ -259,6 +287,16 @@ pub struct StrategyBddMultiStartReport {
     /// Whether every unique seed completed its configured sifting schedule.
     pub search_complete: bool,
     pub bdd: ReducedOrderedBdd,
+}
+
+/// Exact arithmetic mixed-derivative coupling weights for one Boolean strategy
+/// function. Each pair weight is the sum of |f00 - f01 - f10 + f11| over
+/// every assignment to the other inputs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyBddWeightedInteractionReport {
+    pub weights: Vec<Vec<u128>>,
+    pub contexts_checked: u128,
+    pub total_interaction_weight: u128,
 }
 
 /// Evidence from bounded insertion refinement of an interaction-graph order.
@@ -318,6 +356,10 @@ pub struct CompiledStrategyFunction {
     pub optimization_method: StrategyBddOptimizationMethod,
     pub order_seed: Option<StrategyBddOrderSeed>,
     pub interaction_pair_checks: u128,
+    pub arithmetic_interaction_context_checks: u128,
+    pub arithmetic_interaction_total_weight: u128,
+    pub weighted_min_fill_max_frontier: usize,
+    pub weighted_refined_max_frontier: usize,
     pub frontier_refinement_evaluations: usize,
     pub min_fill_max_frontier: usize,
     pub refined_max_frontier: usize,
@@ -1050,6 +1092,200 @@ pub fn strategy_interaction_graph(
     Ok((graph, checks))
 }
 
+/// Validate a symmetric, non-negative, zero-diagonal weighted interaction matrix.
+fn validate_weighted_interaction_matrix(
+    weights: &[Vec<u128>],
+) -> Result<(), StrategyBddError> {
+    let variable_count = weights.len();
+    for (vertex, row) in weights.iter().enumerate() {
+        if row.len() != variable_count {
+            return Err(StrategyBddError::WeightedInteractionGraphRowWidthMismatch {
+                row: vertex,
+                expected: variable_count,
+                actual: row.len(),
+            });
+        }
+        if row[vertex] != 0 {
+            return Err(StrategyBddError::WeightedInteractionGraphSelfWeight { vertex });
+        }
+    }
+    for vertex in 0..variable_count {
+        for neighbor in vertex + 1..variable_count {
+            if weights[vertex][neighbor] != weights[neighbor][vertex] {
+                return Err(StrategyBddError::WeightedInteractionGraphAsymmetricWeight {
+                    vertex,
+                    neighbor,
+                    forward: weights[vertex][neighbor],
+                    reverse: weights[neighbor][vertex],
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Sum arithmetic mixed finite differences for every dependency pair.
+///
+/// This complements the GF(2) interaction graph. In particular, XOR functions
+/// are affine over GF(2), so their GF(2) mixed derivatives vanish, while their
+/// real-valued multilinear interactions can still provide a useful weighted
+/// structural signal. The weights are ordering heuristics, never semantic
+/// dependency evidence.
+pub fn strategy_arithmetic_weighted_interaction_graph(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddWeightedInteractionReport, StrategyBddError> {
+    validate_truth_table(function, budget)?;
+    let dependency_count = function.dependencies.len();
+    let values = strategy_table_values(function)?;
+    let contexts_per_pair = checked_power_of_two(dependency_count.saturating_sub(2))?;
+    let mut weights = vec![vec![0u128; dependency_count]; dependency_count];
+    let mut contexts_checked = 0u128;
+    let mut total_interaction_weight = 0u128;
+
+    for first in 0..dependency_count {
+        for second in first + 1..dependency_count {
+            let mut pair_weight = 0u128;
+            for context in 0..contexts_per_pair {
+                contexts_checked = contexts_checked
+                    .checked_add(1)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                if contexts_checked > budget.max_weighted_interaction_checks {
+                    return Err(StrategyBddError::WeightedInteractionGraphCheckBudgetExceeded {
+                        required: contexts_checked,
+                        limit: budget.max_weighted_interaction_checks,
+                    });
+                }
+
+                let base = expand_context_mask(context as usize, first, second);
+                let f00 = i16::from(values[base]);
+                let f01 = i16::from(values[base | (1usize << second)]);
+                let f10 = i16::from(values[base | (1usize << first)]);
+                let f11 =
+                    i16::from(values[base | (1usize << first) | (1usize << second)]);
+                let magnitude = (f00 - f01 - f10 + f11).abs() as u128;
+                pair_weight = pair_weight
+                    .checked_add(magnitude)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+            }
+            weights[first][second] = pair_weight;
+            weights[second][first] = pair_weight;
+            total_interaction_weight = total_interaction_weight
+                .checked_add(pair_weight)
+                .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        }
+    }
+
+    validate_weighted_interaction_matrix(&weights)?;
+    Ok(StrategyBddWeightedInteractionReport {
+        weights,
+        contexts_checked,
+        total_interaction_weight,
+    })
+}
+
+/// Project non-zero arithmetic pair weights into a simple interaction graph.
+pub fn weighted_interaction_adjacency(
+    weights: &[Vec<u128>],
+) -> Result<Vec<BTreeSet<usize>>, StrategyBddError> {
+    validate_weighted_interaction_matrix(weights)?;
+    let mut graph = vec![BTreeSet::new(); weights.len()];
+    for first in 0..weights.len() {
+        for second in first + 1..weights.len() {
+            if weights[first][second] > 0 {
+                graph[first].insert(second);
+                graph[second].insert(first);
+            }
+        }
+    }
+    Ok(graph)
+}
+
+/// Weighted min-fill using the arithmetic mixed-derivative matrix.
+///
+/// A candidate's primary cost is the product-weight of fill edges it would
+/// introduce. Ties use fill-edge count, weighted degree, active degree and
+/// variable index. The fill graph itself is updated using ordinary clique
+/// completion, keeping the ordering deterministic.
+pub fn weighted_interaction_min_fill_order(
+    weights: &[Vec<u128>],
+) -> Result<Vec<usize>, StrategyBddError> {
+    validate_weighted_interaction_matrix(weights)?;
+    let variable_count = weights.len();
+    let mut adjacency = weighted_interaction_adjacency(weights)?;
+    let mut active = vec![true; variable_count];
+    let mut order = Vec::with_capacity(variable_count);
+
+    for _ in 0..variable_count {
+        let mut best: Option<(u128, usize, u128, usize, usize)> = None;
+        for variable in 0..variable_count {
+            if !active[variable] {
+                continue;
+            }
+            let neighbors: Vec<usize> = adjacency[variable]
+                .iter()
+                .copied()
+                .filter(|&neighbor| active[neighbor])
+                .collect();
+            let mut weighted_fill_cost = 0u128;
+            let mut fill_edges = 0usize;
+            let mut weighted_degree = 0u128;
+
+            for &neighbor in &neighbors {
+                weighted_degree = weighted_degree
+                    .checked_add(weights[variable][neighbor])
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+            }
+            for left in 0..neighbors.len() {
+                for right in left + 1..neighbors.len() {
+                    let a = neighbors[left];
+                    let b = neighbors[right];
+                    if !adjacency[a].contains(&b) {
+                        fill_edges = fill_edges
+                            .checked_add(1)
+                            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                        let product = weights[variable][a]
+                            .checked_mul(weights[variable][b])
+                            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                        weighted_fill_cost = weighted_fill_cost
+                            .checked_add(product)
+                            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                    }
+                }
+            }
+
+            let candidate = (
+                weighted_fill_cost,
+                fill_edges,
+                weighted_degree,
+                neighbors.len(),
+                variable,
+            );
+            if best.is_none_or(|current| candidate < current) {
+                best = Some(candidate);
+            }
+        }
+
+        let Some((_, _, _, _, selected)) = best else {
+            break;
+        };
+        let neighbors: Vec<usize> = adjacency[selected]
+            .iter()
+            .copied()
+            .filter(|&neighbor| active[neighbor])
+            .collect();
+        for left in 0..neighbors.len() {
+            for right in left + 1..neighbors.len() {
+                adjacency[neighbors[left]].insert(neighbors[right]);
+                adjacency[neighbors[right]].insert(neighbors[left]);
+            }
+        }
+        active[selected] = false;
+        order.push(selected);
+    }
+    Ok(order)
+}
+
 /// Deterministic min-fill order for an interaction graph. Ties are broken by
 /// active degree, then by the semantic dependency index.
 pub fn interaction_graph_min_fill_order(
@@ -1267,6 +1503,25 @@ pub fn multi_start_sift_strategy_function_robdd(
     let min_fill = interaction_graph_min_fill_order(&interaction_graph)?;
     let frontier_report =
         refine_interaction_order_by_frontier(&interaction_graph, &min_fill, budget)?;
+
+    let weighted_report = strategy_arithmetic_weighted_interaction_graph(function, budget)?;
+    let weighted_graph = weighted_interaction_adjacency(&weighted_report.weights)?;
+    let weighted_min_fill = weighted_interaction_min_fill_order(&weighted_report.weights)?;
+    let weighted_frontier_report =
+        refine_interaction_order_by_frontier(&weighted_graph, &weighted_min_fill, budget)?;
+    let weighted_min_fill_profile =
+        interaction_graph_frontier_profile(&weighted_graph, &weighted_min_fill)?;
+    let weighted_min_fill_max_frontier = weighted_min_fill_profile
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(0);
+    let weighted_refined_max_frontier = weighted_frontier_report
+        .refined_frontier_profile
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(0);
     let min_fill_profile = interaction_graph_frontier_profile(&interaction_graph, &min_fill)?;
     let min_fill_max_frontier = min_fill_profile.iter().copied().max().unwrap_or(0);
     let refined_max_frontier = frontier_report
@@ -1298,6 +1553,26 @@ pub fn multi_start_sift_strategy_function_robdd(
         (
             StrategyBddOrderSeed::FrontierRefinedMinFillReverse,
             refined_order.into_iter().rev().collect::<Vec<_>>(),
+        ),
+        (
+            StrategyBddOrderSeed::ArithmeticWeightedMinFill,
+            weighted_min_fill.clone(),
+        ),
+        (
+            StrategyBddOrderSeed::ArithmeticWeightedMinFillReverse,
+            weighted_min_fill.into_iter().rev().collect::<Vec<_>>(),
+        ),
+        (
+            StrategyBddOrderSeed::ArithmeticWeightedFrontierRefined,
+            weighted_frontier_report.refined_order.clone(),
+        ),
+        (
+            StrategyBddOrderSeed::ArithmeticWeightedFrontierRefinedReverse,
+            weighted_frontier_report
+                .refined_order
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>(),
         ),
     ];
 
@@ -1366,6 +1641,10 @@ pub fn multi_start_sift_strategy_function_robdd(
         selected_initial_node_count,
         optimized_node_count: selected_report.optimized_node_count,
         interaction_pair_checks,
+        arithmetic_interaction_context_checks: weighted_report.contexts_checked,
+        arithmetic_interaction_total_weight: weighted_report.total_interaction_weight,
+        weighted_min_fill_max_frontier,
+        weighted_refined_max_frontier,
         frontier_refinement_evaluations,
         min_fill_max_frontier,
         refined_max_frontier,
@@ -1501,6 +1780,10 @@ pub fn compile_winning_strategy_functions(
             optimization_method,
             order_seed,
             interaction_pair_checks,
+            arithmetic_interaction_context_checks,
+            arithmetic_interaction_total_weight,
+            weighted_min_fill_max_frontier,
+            weighted_refined_max_frontier,
             frontier_refinement_evaluations,
             min_fill_max_frontier,
             refined_max_frontier,
@@ -1519,6 +1802,10 @@ pub fn compile_winning_strategy_functions(
                 0,
                 0,
                 0,
+                0,
+                0,
+                0,
+                0,
                 report.orders_evaluated,
                 true,
                 report.bdd,
@@ -1529,6 +1816,10 @@ pub fn compile_winning_strategy_functions(
                 StrategyBddOptimizationMethod::MultiStartSifting,
                 Some(report.selected_seed),
                 report.interaction_pair_checks,
+                report.arithmetic_interaction_context_checks,
+                report.arithmetic_interaction_total_weight,
+                report.weighted_min_fill_max_frontier,
+                report.weighted_refined_max_frontier,
                 report.frontier_refinement_evaluations,
                 report.min_fill_max_frontier,
                 report.refined_max_frontier,
@@ -1567,6 +1858,10 @@ pub fn compile_winning_strategy_functions(
             optimization_method,
             order_seed,
             interaction_pair_checks,
+            arithmetic_interaction_context_checks,
+            arithmetic_interaction_total_weight,
+            weighted_min_fill_max_frontier,
+            weighted_refined_max_frontier,
             frontier_refinement_evaluations,
             min_fill_max_frontier,
             refined_max_frontier,
@@ -1731,6 +2026,7 @@ mod tests {
             max_bdd_nodes: 1 << 8,
             max_support_checks: 1 << 12,
             max_interaction_checks: 1 << 12,
+            max_weighted_interaction_checks: 1 << 12,
             max_frontier_order_evaluations: 1 << 12,
             max_frontier_refinement_passes: 2,
             max_variable_order_evaluations: 1 << 13,
@@ -2305,6 +2601,15 @@ mod tests {
         let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
         assert!(report.order_evaluations <= budget().max_variable_order_evaluations);
         assert!(!report.seed_orders.is_empty());
+        assert!(report.seed_orders.iter().any(|(seed, _)| {
+            matches!(
+                seed,
+                StrategyBddOrderSeed::ArithmeticWeightedMinFill
+                    | StrategyBddOrderSeed::ArithmeticWeightedFrontierRefined
+            )
+        }));
+        assert!(report.arithmetic_interaction_context_checks > 0);
+        assert!(report.arithmetic_interaction_total_weight > 0);
         assert!(report.optimized_node_count <= report.selected_initial_node_count);
         let compiled = compile_strategy_function_to_robdd_with_order(
             &source,
@@ -2314,6 +2619,91 @@ mod tests {
         .unwrap();
         assert_eq!(compiled, report.bdd);
         verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
+    }
+
+    #[test]
+    fn arithmetic_weighted_graph_detects_xor_coupling_missed_by_gf2_graph() {
+        // x XOR y XOR z is affine over GF(2): all second GF(2) mixed
+        // derivatives vanish. Its arithmetic mixed derivatives are non-zero.
+        let source = function(
+            &[0, 1, 2],
+            &[false, true, true, false, true, false, false, true],
+        );
+        let (gf2_graph, _) = strategy_interaction_graph(&source, budget()).unwrap();
+        assert!(gf2_graph.iter().all(BTreeSet::is_empty));
+
+        let report = strategy_arithmetic_weighted_interaction_graph(&source, budget()).unwrap();
+        assert_eq!(report.contexts_checked, 6);
+        assert_eq!(report.weights[0][1], 4);
+        assert_eq!(report.weights[0][2], 4);
+        assert_eq!(report.weights[1][2], 4);
+        assert_eq!(report.total_interaction_weight, 12);
+        let order = weighted_interaction_min_fill_order(&report.weights).unwrap();
+        assert_eq!(order, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn arithmetic_weighted_graph_matches_independent_integer_derivative_oracle() {
+        for function_mask in 0..256usize {
+            let values: Vec<bool> = (0..8)
+                .map(|assignment| ((function_mask >> assignment) & 1) != 0)
+                .collect();
+            let source = function(&[0, 1, 2], &values);
+            let report = strategy_arithmetic_weighted_interaction_graph(&source, budget()).unwrap();
+
+            for first in 0..3 {
+                for second in first + 1..3 {
+                    let remaining = 3 - first - second - 1;
+                    let other = 3 - first - second;
+                    let mut expected = 0u128;
+                    for context in 0..2usize.pow(remaining as u32) {
+                        let base = if context == 0 { 0 } else { 1usize << other };
+                        let f00 = i16::from(values[base]);
+                        let f01 = i16::from(values[base | (1 << second)]);
+                        let f10 = i16::from(values[base | (1 << first)]);
+                        let f11 = i16::from(values[base | (1 << first) | (1 << second)]);
+                        expected += (f00 - f01 - f10 + f11).abs() as u128;
+                    }
+                    assert_eq!(
+                        report.weights[first][second],
+                        expected,
+                        "function mask {function_mask}, pair ({first}, {second})"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn weighted_interaction_budget_is_fail_closed() {
+        let source = function(&[0, 1, 2], &[false, true, true, false, true, false, false, true]);
+        let tight = StrategyBddBudget {
+            max_weighted_interaction_checks: 0,
+            ..budget()
+        };
+        assert!(matches!(
+            strategy_arithmetic_weighted_interaction_graph(&source, tight),
+            Err(StrategyBddError::WeightedInteractionGraphCheckBudgetExceeded {
+                required: 1,
+                limit: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn weighted_interaction_validation_rejects_asymmetry_and_nonzero_diagonal() {
+        assert!(matches!(
+            weighted_interaction_min_fill_order(&vec![vec![0, 1], vec![0, 0]]),
+            Err(StrategyBddError::WeightedInteractionGraphAsymmetricWeight { .. })
+        ));
+        assert_eq!(
+            weighted_interaction_min_fill_order(&vec![vec![1]]).unwrap_err(),
+            StrategyBddError::WeightedInteractionGraphSelfWeight { vertex: 0 }
+        );
+        assert!(matches!(
+            weighted_interaction_min_fill_order(&vec![vec![0, 1], vec![1]]),
+            Err(StrategyBddError::WeightedInteractionGraphRowWidthMismatch { .. })
+        ));
     }
 
     #[test]
