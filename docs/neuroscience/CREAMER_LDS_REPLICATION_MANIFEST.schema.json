@@ -1,0 +1,859 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CREAMER_LDS_REPLICATION_MANIFEST.schema.json",
+  "title": "Creamer LDS Artifact-Pinned Replication Manifest",
+  "description": "Fail-closed manifest for reproducing the C. elegans connectome-constrained LDS. Source identities may be known before external biological bytes are downloaded. A reproduction cannot be promoted without exact input hashes, split membership, mask support, resolved config and scoring provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "replication_id",
+    "replication_status",
+    "code_repository",
+    "code_revision",
+    "source_files",
+    "manuscript_claims",
+    "configurations",
+    "activity_dataset",
+    "connectome_sources",
+    "split",
+    "model",
+    "metric_contract",
+    "environment",
+    "outputs",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "replication_id": {
+      "const": "creamer-c-elegans-connectome-lds-v1"
+    },
+    "replication_status": {
+      "enum": [
+        "INCOMPLETE_REQUIRES_ARTIFACTS",
+        "ARTIFACTS_PINNED_NOT_RUN",
+        "RUN_FAILED",
+        "REPRODUCED",
+        "DISCREPANCY_REMAINS"
+      ]
+    },
+    "code_repository": {
+      "const": "https://github.com/Nondairy-Creamer/Creamer_LDS_2026"
+    },
+    "code_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_files": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "git_blob_sha1"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "git_blob_sha1": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          }
+        }
+      }
+    },
+    "manuscript_claims": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_record",
+          "source_url",
+          "reported_percentage",
+          "mapping_status",
+          "archived_pdf_sha256"
+        ],
+        "properties": {
+          "source_record": {
+            "enum": [
+              "BIORXIV_V4_ABSTRACT",
+              "PUBMED_PMC_INDEXED_PREPRINT_RECORD"
+            ]
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "reported_percentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "mapping_status": {
+            "const": "VERSION_MAPPING_UNRESOLVED"
+          },
+          "archived_pdf_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "configurations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "config_path",
+          "git_blob_sha1",
+          "role",
+          "mask_kind",
+          "num_data_sets",
+          "num_train_steps",
+          "paper_eligible",
+          "eligibility_reason",
+          "resolved_config_sha256"
+        ],
+        "properties": {
+          "config_path": {
+            "type": "string"
+          },
+          "git_blob_sha1": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "role": {
+            "enum": [
+              "DEFAULT_DEVELOPMENT_OR_TEST",
+              "CANDIDATE_FULL_PAPER_CONFIG",
+              "VERIFIED_PAPER_CONFIG"
+            ]
+          },
+          "mask_kind": {
+            "enum": [
+              "synaptic",
+              "not_synaptic",
+              "full",
+              "unknown"
+            ]
+          },
+          "num_data_sets": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "num_train_steps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "paper_eligible": {
+            "type": "boolean"
+          },
+          "eligibility_reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolved_config_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "activity_dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "url",
+        "download_state",
+        "files",
+        "recording_count_reported",
+        "sha256_inventory"
+      ],
+      "properties": {
+        "provider": {
+          "const": "OSF"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "download_state": {
+          "enum": [
+            "NOT_MATERIALIZED",
+            "PARTIALLY_MATERIALIZED",
+            "MATERIALIZED"
+          ]
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact_file"
+          }
+        },
+        "recording_count_reported": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256_inventory": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "download_state": {
+                "const": "MATERIALIZED"
+              }
+            },
+            "required": [
+              "download_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "files": {
+                "minItems": 1
+              },
+              "sha256_inventory": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "connectome_sources": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file_name",
+          "provider",
+          "source_download_date_reported",
+          "download_state",
+          "sha256",
+          "size_bytes"
+        ],
+        "properties": {
+          "file_name": {
+            "enum": [
+              "white_1986_jsh.csv",
+              "white_1986_n2u.csv",
+              "witvliet_2020_7.csv",
+              "witvliet_2020_8.csv"
+            ]
+          },
+          "provider": {
+            "const": "NemaNode"
+          },
+          "source_download_date_reported": {
+            "type": "string",
+            "format": "date"
+          },
+          "download_state": {
+            "enum": [
+              "NOT_MATERIALIZED",
+              "MATERIALIZED"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "download_state": {
+                  "const": "MATERIALIZED"
+                }
+              },
+              "required": [
+                "download_state"
+              ]
+            },
+            "then": {
+              "properties": {
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "size_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "uniqueItems": true
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "recording_discovery_order",
+        "total_recordings_expected",
+        "training_recordings_expected",
+        "test_recordings_expected",
+        "training_recording_ids",
+        "test_recording_ids",
+        "hold_out_mode",
+        "hold_out_start",
+        "neuron_frequency_threshold",
+        "blacklisted_cells",
+        "eligibility_derived_from_training_only",
+        "recording_inventory_sha256",
+        "cell_eligibility_sha256",
+        "split_manifest_sha256"
+      ],
+      "properties": {
+        "strategy": {
+          "const": "WORM_LEVEL_SORTED_DISCOVERY_PLUS_EXPLICIT_HOLDOUS"
+        },
+        "recording_discovery_order": {
+          "const": "LEXICOGRAPHIC_PATH_ORDER"
+        },
+        "total_recordings_expected": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "training_recordings_expected": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "test_recordings_expected": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "training_recording_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "test_recording_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "hold_out_mode": {
+          "const": "worm"
+        },
+        "hold_out_start": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "neuron_frequency_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blacklisted_cells": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "eligibility_derived_from_training_only": {
+          "type": "boolean"
+        },
+        "recording_inventory_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "cell_eligibility_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "split_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_class",
+        "synaptic_mask_semantics",
+        "fit_mask_true_means_estimated",
+        "dynamics_lags",
+        "dynamics_input_lags",
+        "emissions_input_lags",
+        "training_steps",
+        "random_seed",
+        "mask_support_sha256",
+        "combined_connectome_sha256"
+      ],
+      "properties": {
+        "model_class": {
+          "const": "LATENT_LINEAR_GAUSSIAN_STATE_SPACE"
+        },
+        "synaptic_mask_semantics": {
+          "const": "chemical_or_gap_junction_adjacency_plus_identity"
+        },
+        "fit_mask_true_means_estimated": {
+          "const": true
+        },
+        "dynamics_lags": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dynamics_input_lags": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "emissions_input_lags": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "training_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "random_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mask_support_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "combined_connectome_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "metric_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scoring_script_path",
+        "scoring_script_git_blob_sha1",
+        "stimulus_triggered_average_window_seconds",
+        "reported_metric_families",
+        "diagonal_pairs_excluded",
+        "pair_eligibility_sha256",
+        "reproducibility_ceiling_sha256",
+        "metric_definition_sha256"
+      ],
+      "properties": {
+        "scoring_script_path": {
+          "type": "string"
+        },
+        "scoring_script_git_blob_sha1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "stimulus_triggered_average_window_seconds": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "reported_metric_families": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "STAM",
+              "CORRELATION"
+            ]
+          },
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "diagonal_pairs_excluded": {
+          "type": "boolean"
+        },
+        "pair_eligibility_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproducibility_ceiling_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "metric_definition_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python_version",
+        "mpi_implementation",
+        "package_lock_sha256",
+        "hardware_description",
+        "environment_manifest_sha256"
+      ],
+      "properties": {
+        "python_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mpi_implementation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "package_lock_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "hardware_description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "environment_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runs_performed",
+        "reproduction_report_sha256",
+        "connectome_constrained_score",
+        "fully_connected_score",
+        "shuffled_constrained_score",
+        "test_test_ceiling",
+        "reproduction_claim"
+      ],
+      "properties": {
+        "runs_performed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reproduction_report_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "connectome_constrained_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fully_connected_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shuffled_constrained_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "test_test_ceiling": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reproduction_claim": {
+          "enum": [
+            "NOT_RUN",
+            "FAILED",
+            "REPRODUCED_WITHIN_PREDECLARED_TOLERANCE",
+            "DISCREPANCY_REMAINS"
+          ]
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "artifact_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path",
+        "download_state",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "download_state": {
+          "enum": [
+            "NOT_MATERIALIZED",
+            "MATERIALIZED"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "download_state": {
+                "const": "MATERIALIZED"
+              }
+            },
+            "required": [
+              "download_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "replication_status": {
+            "const": "REPRODUCED"
+          }
+        },
+        "required": [
+          "replication_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "activity_dataset": {
+            "properties": {
+              "download_state": {
+                "const": "MATERIALIZED"
+              }
+            }
+          },
+          "connectome_sources": {
+            "items": {
+              "properties": {
+                "download_state": {
+                  "const": "MATERIALIZED"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "split": {
+            "properties": {
+              "training_recording_ids": {
+                "minItems": 1
+              },
+              "test_recording_ids": {
+                "minItems": 1
+              },
+              "recording_inventory_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "cell_eligibility_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "split_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "model": {
+            "properties": {
+              "mask_support_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "combined_connectome_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "metric_contract": {
+            "properties": {
+              "pair_eligibility_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "reproducibility_ceiling_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "metric_definition_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "environment": {
+            "properties": {
+              "package_lock_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "environment_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "outputs": {
+            "properties": {
+              "runs_performed": {
+                "minimum": 1
+              },
+              "reproduction_report_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "connectome_constrained_score": {
+                "type": "number"
+              },
+              "test_test_ceiling": {
+                "type": "number"
+              },
+              "reproduction_claim": {
+                "const": "REPRODUCED_WITHIN_PREDECLARED_TOLERANCE"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
