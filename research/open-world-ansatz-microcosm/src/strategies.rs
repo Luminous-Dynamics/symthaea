@@ -584,13 +584,14 @@ mod tests {
     }
 
     #[test]
-    fn structure_information_gain_is_invariant_to_parameterization_count() {
+    fn structure_information_gain_is_stable_to_family_cardinality_when_outcome_mix_is_unchanged() {
         let balanced = vec![
             (0_i64, 0_usize),
             (0_i64, 0_usize),
             (0_i64, 1_usize),
             (1_i64, 1_usize),
         ];
+        // Expand one family without changing its within-family outcome distribution.
         let overparameterized = std::iter::once((0_i64, 1_usize))
             .chain(std::iter::once((1_i64, 1_usize)))
             .chain(std::iter::repeat_n((0_i64, 0_usize), 100))
