@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/acoustic_faithfulness_golden_v0.1.schema.json",
+  "title": "Synthetic acoustic-faithfulness score vectors",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "purpose",
+    "policy",
+    "vectors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "policy": {
+      "type": "object"
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}
