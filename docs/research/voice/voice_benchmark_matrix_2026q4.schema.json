@@ -266,6 +266,18 @@
             "items": {
               "type": "string"
             }
+          },
+          "profile_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "profile_schema_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_example_path": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "additionalProperties": true
