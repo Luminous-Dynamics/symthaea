@@ -14,8 +14,7 @@
 //! numeric likelihoods.
 
 use super::theory_prediction::{
-    OTHER_UNRESOLVED_MODEL_ID, MeasurementNoiseModel, NoiseCalibrationStatus,
-    PredictionDisposition,
+    MeasurementNoiseModel, NoiseCalibrationStatus, OTHER_UNRESOLVED_MODEL_ID, PredictionDisposition,
 };
 use std::collections::BTreeSet;
 use thiserror::Error;
@@ -35,9 +34,7 @@ pub const MAX_EIG_QUADRATURE_INTERVALS: usize = 1024;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ModelUniverseCoverage {
     OpenWorld,
-    DeclaredClosed {
-        completeness_reference: String,
-    },
+    DeclaredClosed { completeness_reference: String },
 }
 
 /// Versioned named model included in a discrete model-identity design.
@@ -265,7 +262,9 @@ pub enum ModelDiscriminationError {
         experiment_id: String,
         model_id: String,
     },
-    #[error("quantitative prediction for {experiment_id}/{model_id} is missing its predictive uncertainty")]
+    #[error(
+        "quantitative prediction for {experiment_id}/{model_id} is missing its predictive uncertainty"
+    )]
     QuantitativePredictionMissingUncertainty {
         experiment_id: String,
         model_id: String,
@@ -316,9 +315,7 @@ impl ModelDiscriminationConfig {
                 maximum: MAX_EIG_QUADRATURE_INTERVALS,
             });
         }
-        if !self.quadrature_tolerance_nats.is_finite()
-            || self.quadrature_tolerance_nats <= 0.0
-        {
+        if !self.quadrature_tolerance_nats.is_finite() || self.quadrature_tolerance_nats <= 0.0 {
             return Err(ModelDiscriminationError::InvalidQuadratureTolerance);
         }
         if let ModelUniverseCoverage::DeclaredClosed {
@@ -553,10 +550,12 @@ fn validate_experiment(
             }
             _ => {
                 if prediction.predictive_mean.is_some() || prediction.predictive_sigma.is_some() {
-                    return Err(ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
-                        experiment_id: experiment.experiment_id.clone(),
-                        model_id: prediction.model_id.clone(),
-                    });
+                    return Err(
+                        ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
+                            experiment_id: experiment.experiment_id.clone(),
+                            model_id: prediction.model_id.clone(),
+                        },
+                    );
                 }
             }
         }
@@ -825,10 +824,7 @@ fn gaussian_model_identity_eig(
     Some(integral.max(0.0))
 }
 
-fn mutual_information_density(
-    observation: f64,
-    distributions: &[(f64, f64, f64)],
-) -> Option<f64> {
+fn mutual_information_density(observation: f64, distributions: &[(f64, f64, f64)]) -> Option<f64> {
     let log_likelihoods: Vec<f64> = distributions
         .iter()
         .map(|(mean, sigma, _)| normal_log_density(observation, *mean, *sigma))
@@ -840,10 +836,12 @@ fn mutual_information_density(
         .collect();
     let log_mixture = log_sum_exp(&log_joint)?;
     let mut density = 0.0;
-    for ((_, _, probability), (log_joint_value, log_likelihood)) in distributions
-        .iter()
-        .zip(log_joint.iter().copied().zip(log_likelihoods.iter().copied()))
-    {
+    for ((_, _, probability), (log_joint_value, log_likelihood)) in distributions.iter().zip(
+        log_joint
+            .iter()
+            .copied()
+            .zip(log_likelihoods.iter().copied()),
+    ) {
         let joint = log_joint_value.exp();
         if joint == 0.0 {
             continue;
@@ -860,9 +858,7 @@ fn mutual_information_density(
 
 fn normal_log_density(value: f64, mean: f64, sigma: f64) -> f64 {
     let standardized = (value - mean) / sigma;
-    -0.5 * std::f64::consts::TAU.ln()
-        - sigma.ln()
-        - 0.5 * standardized * standardized
+    -0.5 * std::f64::consts::TAU.ln() - sigma.ln() - 0.5 * standardized * standardized
 }
 
 fn log_sum_exp(values: &[f64]) -> Option<f64> {
@@ -870,7 +866,10 @@ fn log_sum_exp(values: &[f64]) -> Option<f64> {
     if !maximum.is_finite() {
         return None;
     }
-    let sum = values.iter().map(|value| (*value - maximum).exp()).sum::<f64>();
+    let sum = values
+        .iter()
+        .map(|value| (*value - maximum).exp())
+        .sum::<f64>();
     if !sum.is_finite() || sum <= 0.0 {
         return None;
     }
@@ -931,7 +930,10 @@ mod tests {
         }
     }
 
-    fn config(prior_scenarios: Vec<ModelPriorScenario>, intervals: usize) -> ModelDiscriminationConfig {
+    fn config(
+        prior_scenarios: Vec<ModelPriorScenario>,
+        intervals: usize,
+    ) -> ModelDiscriminationConfig {
         ModelDiscriminationConfig {
             model_universe: ModelUniverseCoverage::OpenWorld,
             prior_scenarios,
@@ -998,15 +1000,23 @@ mod tests {
         )
         .unwrap();
         assert!(
-            far.experiments[0].worst_case_model_identity_eig_nats.unwrap()
-                > close.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+            far.experiments[0]
+                .worst_case_model_identity_eig_nats
+                .unwrap()
+                > close.experiments[0]
+                    .worst_case_model_identity_eig_nats
+                    .unwrap()
         );
         assert!(
-            far.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+            far.experiments[0]
+                .worst_case_model_identity_eig_nats
+                .unwrap()
                 > std::f64::consts::LN_2 * 0.95
         );
         assert!(
-            far.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+            far.experiments[0]
+                .worst_case_model_identity_eig_nats
+                .unwrap()
                 <= std::f64::consts::LN_2 + 1.0e-6
         );
     }
@@ -1038,8 +1048,16 @@ mod tests {
             &config(vec![equal_prior()], 256),
         )
         .unwrap();
-        let left = report.experiments.iter().find(|score| score.experiment_id == "base").unwrap();
-        let right = report.experiments.iter().find(|score| score.experiment_id == "scaled").unwrap();
+        let left = report
+            .experiments
+            .iter()
+            .find(|score| score.experiment_id == "base")
+            .unwrap();
+        let right = report
+            .experiments
+            .iter()
+            .find(|score| score.experiment_id == "scaled")
+            .unwrap();
         assert!(
             (left.worst_case_model_identity_eig_nats.unwrap()
                 - right.worst_case_model_identity_eig_nats.unwrap())
