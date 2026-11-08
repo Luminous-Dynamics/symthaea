@@ -1179,6 +1179,7 @@ fn evaluate_dirichlet_model_information_gain_with_mode(
         .collect::<BTreeMap<_, _>>();
     let mut outcome_ids = BTreeSet::new();
     let mut full_probability_mass = 0.0;
+    let mut derived_mixture_probabilities = Vec::with_capacity(action.outcomes.len());
     for (index, outcome) in action.outcomes.iter().enumerate() {
         if outcome.outcome_id.trim().is_empty() {
             return Err(DirichletModelInformationGainError::EmptyOutcomeId { index });
@@ -1245,15 +1246,7 @@ fn evaluate_dirichlet_model_information_gain_with_mode(
                 },
             );
         }
-        if (probability - derived_mixture_probability).abs() > PROBABILITY_TOLERANCE {
-            return Err(
-                DirichletModelInformationGainError::FullPredictiveProbabilityMismatch {
-                    outcome_id: outcome.outcome_id.clone(),
-                    supplied: probability,
-                    derived: derived_mixture_probability,
-                },
-            );
-        }
+        derived_mixture_probabilities.push(derived_mixture_probability);
 
         if outcome.posterior_count_increment.len() != full_posterior.columns.len() {
             return Err(
@@ -1305,6 +1298,28 @@ fn evaluate_dirichlet_model_information_gain_with_mode(
                 DirichletModelInformationGainError::ModelPredictiveProbabilityMassNotNormalized {
                     model_id: model_id.clone(),
                     sum: *probability_mass,
+                },
+            );
+        }
+    }
+
+    // Validate conditional and marginal probability normalization before
+    // checking the mixture identity. This makes failures attributable to the
+    // first violated probability contract rather than masking a bad conditional
+    // model with a downstream marginal mismatch.
+    for (outcome, derived_probability) in action
+        .outcomes
+        .iter()
+        .zip(derived_mixture_probabilities.iter().copied())
+    {
+        if (outcome.full_model_predictive_probability - derived_probability).abs()
+            > PROBABILITY_TOLERANCE
+        {
+            return Err(
+                DirichletModelInformationGainError::FullPredictiveProbabilityMismatch {
+                    outcome_id: outcome.outcome_id.clone(),
+                    supplied: outcome.full_model_predictive_probability,
+                    derived: derived_probability,
                 },
             );
         }
