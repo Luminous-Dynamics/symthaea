@@ -1271,7 +1271,8 @@
         "jurisdiction_parametric_lane_semantics",
         "left_right_traffic_mirror_equivariance",
         "cross_contract_frame_and_profile_closure",
-        "fail_closed_negative_controls"
+        "fail_closed_negative_controls",
+        "source_role_domain_separation"
       ],
       "protocol": {
         "kind": "paired_synthetic_metamorphic_scene",
@@ -1300,7 +1301,16 @@
           "steering_angle",
           "steering_command"
         ],
-        "cross_contract_validation": true
+        "cross_contract_validation": true,
+        "source_roles": [
+          "local_sensor_observation",
+          "synthetic_sensor_observation",
+          "remote_cooperative_claim",
+          "simulator_oracle",
+          "map_prior",
+          "derived_estimate",
+          "unknown"
+        ]
       },
       "metrics": [
         "validator_test_pass_count",
@@ -1308,28 +1318,31 @@
         "invalid_profile_rejection_rate",
         "wrong_frame_profile_rejection_rate",
         "untransformed_steering_rejection_rate",
-        "unknown_passing_authority_rejection_rate"
+        "unknown_passing_authority_rejection_rate",
+        "source_role_cross_domain_rejection_rate"
       ],
       "source_status": "sam_reproduced",
       "rights_status": "synthetic_no_external_dataset",
       "validation_result": {
-        "exact_head": "3dc43bd653f84ee23c39f3c48ed6664a8aa682ab",
-        "workflow_run_id": 42485276624,
-        "unit_tests_total": 25,
-        "unit_tests_passed": 25,
+        "exact_head": "2c5bad4bfe702b6eab61a15e3e91c60d17de5c7c",
+        "workflow_run_id": 42518757049,
+        "unit_tests_total": 30,
+        "unit_tests_passed": 30,
         "unit_tests_failed": 0,
         "format": "passed",
         "scene_schema_and_fixture": "passed",
         "traffic_profile_schema_and_fixture": "passed",
         "cross_contract_profile_resolution": "passed",
         "cross_contract_road_frame_closure": "passed",
+        "source_role_domain_separation": "passed",
         "strict_clippy": "passed"
       },
       "caveats": [
         "This is a SAM-authored synthetic conformance suite, not an external leaderboard.",
         "Two paired synthetic scenes and three synthetic traffic profiles do not represent broad road-jurisdiction or scenario coverage.",
         "Passing tests do not establish national traffic-law correctness, local sensor accuracy, map fidelity, real-road generalization, roadworthiness or safety.",
-        "The paired-scene count and all control-family denominators must accompany future pass-rate claims."
+        "The paired-scene count and all control-family denominators must accompany future pass-rate claims.",
+        "The source-role checks validate declared provenance roles and prevent cross-domain relabelling; they do not authenticate sender identity, prove sensor calibration, source independence, spatial applicability or physical truth."
       ],
       "sources": [
         "https://github.com/Luminous-Dynamics/symthaea/pull/11111",
