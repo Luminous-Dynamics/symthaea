@@ -1,6 +1,6 @@
 # CEB Review Claim-Support Closure Challenge Key V0 — 2026-11-08
 
-**Status:** Public synthetic development answer key; not hidden ground truth, secure blinding or a sealed holdout.
+**Status:** Public synthetic development answer key; not hidden ground truth, secure blinding or a sealed holdout. This is not secure blinding and not a sealed holdout.
 **Challenge:** [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md).
 **Protocol:** [Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md).
 
