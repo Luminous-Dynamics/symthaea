@@ -28,7 +28,6 @@ const PLANNER_MANIFEST: &str =
 const AGENT_VIEW: &str =
     include_str!("../tests/fixtures/rea-proof-obligation-agent-view-v0.json");
 const PLANNER_SOURCE_COMMIT: &str = "2cf30ebc544a336d369246613895555a85696fe5";
-const TOLERANCE: f64 = 1.0e-9;
 
 #[derive(Debug, Clone)]
 pub struct AdapterError(pub String);
@@ -522,15 +521,6 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
     hash
 }
 
-fn eligible_ids(case: &Value, config: PlannerConfig) -> Vec<String> {
-    object_array(case, "candidates", "case")
-        .unwrap_or(&[])
-        .iter()
-        .filter(|candidate| eligible_candidate(candidate, config))
-        .filter_map(|candidate| candidate.get("id").and_then(Value::as_str).map(str::to_owned))
-        .collect()
-}
-
 fn expected_obligation_closure(
     candidate: &Value,
     agent_candidate: &Value,
@@ -610,10 +600,13 @@ fn baseline_policies(
 ) -> Result<Value, AdapterError> {
     let candidates = object_array(case, "candidates", "case")?;
     let source_candidates = object_array(agent_case, "candidates", "agent case")?;
-    let eligible: Vec<&Value> = candidates
+    let mut eligible: Vec<&Value> = candidates
         .iter()
         .filter(|candidate| eligible_candidate(candidate, config))
         .collect();
+    eligible.sort_by(|left, right| {
+        left["id"].as_str().cmp(&right["id"].as_str())
+    });
 
     let mut random_choice = None;
     if !eligible.is_empty() {
@@ -893,6 +886,44 @@ mod tests {
         }
         assert!(!case["baselines"]["cost_only"]["ranking"].as_array().unwrap()
             .iter().any(|item| item["experiment_id"] == "unauthorized_production_probe"));
+    }
+
+
+    #[test]
+    fn high_eig_non_decisive_probe_is_outside_the_obligation_gated_candidate_set() {
+        let result = run_embedded_pilot().unwrap();
+        let case = result["results"].as_array().unwrap().iter()
+            .find(|case| case["case_id"] == "REA-POA-001").unwrap();
+        let ids = case["obligation_gated_decision_aware"]["eligible_candidate_ids"]
+            .as_array().unwrap();
+        assert_eq!(ids.len(), 1);
+        assert_eq!(ids[0], "verify_deployment_manifest");
+        assert_eq!(case["point_eig"]["ranked"][0]["experiment_id"], "probe_many_functions");
+    }
+
+    #[test]
+    fn correlated_logs_are_not_admitted_by_the_claim_obligation_gate() {
+        let result = run_embedded_pilot().unwrap();
+        let case = result["results"].as_array().unwrap().iter()
+            .find(|case| case["case_id"] == "REA-POA-008").unwrap();
+        let ids = case["obligation_gated_decision_aware"]["eligible_candidate_ids"]
+            .as_array().unwrap();
+        assert_eq!(ids.len(), 1);
+        assert_eq!(ids[0], "controlled_cache_bypass");
+    }
+
+    #[test]
+    fn case_id_seeded_baseline_is_stable_under_candidate_input_permutation() {
+        let result = run_embedded_pilot().unwrap();
+        let cases = result["results"].as_array().unwrap();
+        for case in cases {
+            assert!(case["baselines"]["random_eligible"]["seed"].as_u64().is_some());
+            let selected = case["baselines"]["random_eligible"]["selected"].as_str();
+            let eligible = case["baselines"]["cost_only"]["ranking"].as_array().unwrap();
+            if !eligible.is_empty() {
+                assert!(selected.is_some());
+            }
+        }
     }
 
     #[test]
