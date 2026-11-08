@@ -283,6 +283,8 @@ Add DyadMem as a separate agent-memory track; do not pool its score with MEME or
 
 ### Luminous HME-Revise diagnostic suite
 
+The first synthetic contract fixture is [hme_revise_lifecycle_v0.json](fixtures/hme_revise_lifecycle_v0.json). It covers late-arriving corrections, bitemporal queries, dependency invalidation, deletion/resurrection after reopen, alternative proof sets and typed absence. It is not a runtime test or benchmark result.
+
 Use these public benchmarks plus a small project-owned deterministic diagnostic suite. Each fixture should be a graph of source events, claims, derived claims, temporal scopes and typed dependencies. It is not a replacement for the public benchmark.
 
 Required sequences:
