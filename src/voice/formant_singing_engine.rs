@@ -172,15 +172,17 @@ impl FormantSingingEngine {
                     syllable.stress,
                     binding_index,
                 )?;
-                let vowel_onset_s = first_start_s
-                    + first_durations[..phone_index].iter().sum::<f32>();
+                let vowel_onset_s =
+                    first_start_s + first_durations[..phone_index].iter().sum::<f32>();
 
-                let last_span = binding.spans.last().expect("multi-span binding is non-empty");
+                let last_span = binding
+                    .spans
+                    .last()
+                    .expect("multi-span binding is non-empty");
                 let last_event = &alignment.events[last_span.event_index];
                 let last_start_s = last_event.start_s + last_span.start_offset_s;
                 let last_end_s = last_event.start_s + last_span.end_offset_s;
-                let last_phone_refs: Vec<&Phone> =
-                    syllable.phones[phone_index..].iter().collect();
+                let last_phone_refs: Vec<&Phone> = syllable.phones[phone_index..].iter().collect();
                 let last_durations = allocate_resolved_phone_durations(
                     &last_phone_refs,
                     last_end_s - last_start_s,
