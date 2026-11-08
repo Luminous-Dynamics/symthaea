@@ -75,6 +75,12 @@ The planner only proposes observations. Execution produces new Evidence. A separ
 
 Do not let a candidate experiment's predicted outcome satisfy an obligation before it is executed and independently assessed.
 
+### Planner-runnability boundary
+
+The current 18-case v0 corpus is a claim-readiness and fixture-integrity dataset. It supplies candidate outcomes, costs and grader outcome-to-obligation effects, but it does not yet include the complete planner API inputs: grounded hypothesis priors/Evidence IDs, per-hypothesis outcome likelihood rows, robust scenario weights, or terminal decision utilities. Therefore the listed EIG/EVSI/minimax policies are proposed matched arms, not currently runnable v0 comparisons.
+
+Follow-on [#11125 — REA-RUST-051](https://github.com/Luminous-Dynamics/symthaea/issues/11125) owns the planner-runnable extension. It will reuse #10074/#10105/#10109/#10174 and #10314 rather than copying planner or receipt implementations. No comparative planner result or policy superiority claim is valid until that extension is qualified.
+
 ## 3. Fixture v0
 
 The fixture contains 18 original synthetic cases spanning:
