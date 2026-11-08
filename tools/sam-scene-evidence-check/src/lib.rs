@@ -348,11 +348,15 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
                     }
                     let evidence_from = evidence.get("effective_from").and_then(Value::as_str);
                     let evidence_until = evidence.get("effective_until").and_then(Value::as_str);
-                    if from.zip(evidence_from).is_some_and(|(profile_from, source_from)| {
-                        profile_from < source_from
-                    }) || until.zip(evidence_until).is_some_and(|(profile_until, source_until)| {
-                        profile_until > source_until
-                    }) {
+                    if from
+                        .zip(evidence_from)
+                        .is_some_and(|(profile_from, source_from)| profile_from < source_from)
+                        || until
+                            .zip(evidence_until)
+                            .is_some_and(|(profile_until, source_until)| {
+                                profile_until > source_until
+                            })
+                    {
                         errors.push(format!(
                             "profiles[{index}]: verification validity exceeds evidence {evidence_id:?} effective dates"
                         ));
