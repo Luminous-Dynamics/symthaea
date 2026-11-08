@@ -1901,28 +1901,6 @@ fn policy_mask_is_leaf(mask: &FiniteUmdpPolicyActionMask) -> bool {
     })
 }
 
-fn decode_leaf_policy_mask(
-    mask: &FiniteUmdpPolicyActionMask,
-) -> Result<Vec<usize>, PolicyPortfolioError> {
-    let entries = mask.horizon().checked_mul(mask.state_count())
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    let mut actions = Vec::new();
-    actions.try_reserve_exact(entries).map_err(|_| {
-        PolicyPortfolioError::AllocationFailed {
-            resource: "leaf action-mask policy",
-            entries,
-        }
-    })?;
-    for time in 0..mask.horizon() {
-        for state in 0..mask.state_count() {
-            let row = &mask.allowed[time][state];
-            let action = row.iter().position(|allowed| *allowed)
-                .ok_or(PolicyPortfolioError::PolicyMaskEmptyActionSet { time, state })?;
-            actions.push(action);
-        }
-    }
-    Ok(actions)
-}
 
 fn policy_index_from_actions(
     actions: &[usize],
@@ -2285,37 +2263,28 @@ pub fn solve_exact_cluster_policy_bnb(
         }
 
         if policy_mask_is_leaf(&mask) {
-            let leaf_policy = decode_leaf_policy_mask(&mask)?;
-            let leaf_index = policy_index_from_actions(&leaf_policy, actions)?;
-            let mut leaf_values = Vec::new();
-            leaf_values.try_reserve_exact(node_bound.per_model.len()).map_err(|_| {
-                PolicyPortfolioError::AllocationFailed { resource: "cluster B&B leaf policy values", entries: node_bound.per_model.len() }
-            })?;
-            let mut leaf_regrets = Vec::new();
-            leaf_regrets.try_reserve_exact(node_bound.per_model.len()).map_err(|_| {
-                PolicyPortfolioError::AllocationFailed { resource: "cluster B&B leaf policy regrets", entries: node_bound.per_model.len() }
-            })?;
-            let mut leaf_worst_models = Vec::new();
-            leaf_worst_models.try_reserve_exact(node_bound.per_model.len()).map_err(|_| {
-                PolicyPortfolioError::AllocationFailed { resource: "cluster B&B leaf worst-model indices", entries: node_bound.per_model.len() }
-            })?;
-            for witness in &node_bound.per_model {
-                leaf_values.push(witness.masked_optimal_value);
-                leaf_regrets.push(witness.regret_gap_lower_bound);
-                if witness.regret_gap_lower_bound == node_bound.lower_bound {
-                    leaf_worst_models.push(witness.model_index);
+            // A leaf contains one allowed action per slot. Reuse the incumbent
+            // output buffers to avoid a second copy of all model witnesses.
+            for time in 0..mask.horizon() {
+                for state in 0..mask.state_count() {
+                    let action = mask.allowed[time][state].iter()
+                        .position(|allowed| *allowed)
+                        .ok_or(PolicyPortfolioError::PolicyMaskEmptyActionSet { time, state })?;
+                    policy_actions[time * states + state] = action;
                 }
             }
-            if compare_signed(node_bound.lower_bound, minimax_regret) == Ordering::Less
-                || (node_bound.lower_bound == minimax_regret && leaf_index < policy_index)
-            {
-                minimax_regret = node_bound.lower_bound;
-                policy_index = leaf_index;
-                policy_actions = leaf_policy;
-                policy_values = leaf_values;
-                model_regrets = leaf_regrets;
-                worst_case_model_indices = leaf_worst_models;
+            policy_index = policy_index_from_actions(&policy_actions, actions)?;
+            policy_values.clear();
+            model_regrets.clear();
+            worst_case_model_indices.clear();
+            for witness in &node_bound.per_model {
+                policy_values.push(witness.masked_optimal_value);
+                model_regrets.push(witness.regret_gap_lower_bound);
+                if witness.regret_gap_lower_bound == node_bound.lower_bound {
+                    worst_case_model_indices.push(witness.model_index);
+                }
             }
+            minimax_regret = node_bound.lower_bound;
             continue;
         }
 
