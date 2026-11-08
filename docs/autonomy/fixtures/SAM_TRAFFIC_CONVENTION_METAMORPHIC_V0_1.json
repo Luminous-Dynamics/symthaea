@@ -226,5 +226,6 @@
   ],
   "schema_id": "luminous.sam.traffic-convention-profiles",
   "schema_version": "0.1.0",
-  "metamorphic_claim_ceiling": "paired_synthetic_metamorphic_conformance_only"
+  "metamorphic_claim_ceiling": "paired_synthetic_metamorphic_conformance_only",
+  "evidence_records": []
 }
