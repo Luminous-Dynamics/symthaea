@@ -18,7 +18,8 @@
 use std::collections::BTreeMap;
 
 use symthaea_core::hdc::continuous_hv_interval::{
-    ContinuousHVIntervalError, ContinuousHVScoreInterval,
+    ContinuousHVIntervalError, ContinuousHVScoreInterval, ResidualCertificateError,
+    verify_l2_residual_certificate,
 };
 use symthaea_core::hdc::unified_hv::CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1;
 use symthaea_core::hdc::ContinuousHV;
@@ -37,6 +38,8 @@ pub struct ContinuousHVGroupEnvelope {
     content_digest: [u8; 32],
     coordinate_minima: Vec<f32>,
     coordinate_maxima: Vec<f32>,
+    centroid: ContinuousHV,
+    radius_l2_upper: f32,
 }
 
 /// Fail-closed errors for group-envelope construction and query use.
@@ -71,6 +74,13 @@ pub enum GroupEnvelopeError {
         member_index: usize,
         /// Underlying profile error.
         error: symthaea_core::hdc::unified_hv::ContinuousHVProfileError,
+    },
+    /// A member's centroid residual could not be verified.
+    ResidualCertificate {
+        /// Position of the member whose residual failed.
+        member_index: usize,
+        /// Underlying residual validation error.
+        error: ResidualCertificateError,
     },
     /// The caller supplied a different manifest generation.
     ManifestGenerationMismatch {
@@ -113,6 +123,9 @@ impl std::fmt::Display for GroupEnvelopeError {
             ),
             Self::InvalidMemberProfile { member_index, error } => {
                 write!(f, "group member {member_index} has invalid profile: {error}")
+            }
+            Self::ResidualCertificate { member_index, error } => {
+                write!(f, "group member {member_index} exceeds centroid radius: {error}")
             }
             Self::ManifestGenerationMismatch { envelope_generation, requested_generation } => write!(
                 f,
@@ -163,6 +176,27 @@ pub fn member_id_set_digest(
         hasher.update(id.as_bytes());
     }
     Ok(*hasher.finalize().as_bytes())
+}
+
+fn next_up_f64_nonnegative(value: f64) -> f64 {
+    if value.is_nan() || value == f64::INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return f64::from_bits(1);
+    }
+    f64::from_bits(value.to_bits() + 1)
+}
+
+fn next_up_f32_positive(value: f32) -> f32 {
+    if value.is_nan() || value == f32::INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return f32::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f32::from_bits(if value > 0.0 { bits + 1 } else { bits - 1 })
 }
 
 impl ContinuousHVGroupEnvelope {
@@ -222,6 +256,69 @@ impl ContinuousHVGroupEnvelope {
         let member_ids: Vec<String> = by_id.keys().map(|id| (*id).to_owned()).collect();
         let member_set_digest = member_id_set_digest(&member_ids)?;
 
+        // Use the arithmetic mean as a deterministic group center. It need not
+        // be the minimum enclosing-ball center; the independently verified
+        // maximum radius makes any center safe.
+        let member_count = by_id.len() as f64;
+        let mut centroid_accumulator = vec![0.0f64; dimension];
+        for (_, vector) in by_id.values() {
+            for (index, value) in vector.values.iter().enumerate() {
+                centroid_accumulator[index] += *value as f64;
+            }
+        }
+        let centroid = ContinuousHV::from_vec(
+            centroid_accumulator
+                .into_iter()
+                .map(|sum| (sum / member_count) as f32)
+                .collect(),
+        );
+        centroid
+            .validate_full_resolution_profile("group_centroid")
+            .map_err(|error| GroupEnvelopeError::InvalidMemberProfile {
+                member_index: 0,
+                error,
+            })?;
+
+        // A finite coarse radius is guaranteed to cover any two vectors in
+        // [-1,1]^D. The verifier measures each source-to-centroid residual with
+        // outward f64 accumulation; convert the largest squared bound upward
+        // to f32 for the query-time L2-ball certificate.
+        let coarse_radius = (2.0 * (dimension as f64).sqrt() + 1.0) as f32;
+        if !coarse_radius.is_finite() {
+            return Err(GroupEnvelopeError::InvalidKthThreshold);
+        }
+        let mut max_residual_norm_squared_upper = 0.0f64;
+        for (member_index, (_, vector)) in by_id.values().enumerate() {
+            let verification = verify_l2_residual_certificate(
+                vector,
+                &centroid,
+                coarse_radius,
+            )
+            .map_err(|error| GroupEnvelopeError::ResidualCertificate {
+                member_index,
+                error,
+            })?;
+            max_residual_norm_squared_upper = max_residual_norm_squared_upper
+                .max(verification.residual_norm_squared_upper);
+        }
+        let radius_f64 = if max_residual_norm_squared_upper == 0.0 {
+            0.0
+        } else {
+            next_up_f64_nonnegative(max_residual_norm_squared_upper.sqrt())
+        };
+        let mut radius_l2_upper = radius_f64 as f32;
+        if (radius_l2_upper as f64) < radius_f64 {
+            radius_l2_upper = next_up_f32_positive(radius_l2_upper);
+        }
+        if radius_l2_upper > 0.0 {
+            // One additional binary32 step makes the persisted radius robust to
+            // the final conversion boundary; it only loosens the safe envelope.
+            radius_l2_upper = next_up_f32_positive(radius_l2_upper);
+        }
+        if !radius_l2_upper.is_finite() {
+            return Err(GroupEnvelopeError::InvalidKthThreshold);
+        }
+
         let mut hasher = blake3::Hasher::new();
         hasher.update(GROUP_ENVELOPE_DOMAIN);
         hasher.update(b"/content");
@@ -244,6 +341,10 @@ impl ContinuousHVGroupEnvelope {
         for value in coordinate_minima.iter().chain(&coordinate_maxima) {
             hasher.update(&value.to_bits().to_le_bytes());
         }
+        hasher.update(&radius_l2_upper.to_bits().to_le_bytes());
+        for value in &centroid.values {
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
 
         Ok(Self {
             manifest_generation,
@@ -254,6 +355,8 @@ impl ContinuousHVGroupEnvelope {
             content_digest: *hasher.finalize().as_bytes(),
             coordinate_minima,
             coordinate_maxima,
+            centroid,
+            radius_l2_upper,
         })
     }
 
@@ -310,12 +413,30 @@ impl ContinuousHVGroupEnvelope {
         if self.content_digest != expected_content_digest {
             return Err(GroupEnvelopeError::ContentDigestMismatch);
         }
-        query
+        let component_box = query
             .similarity_interval_full_resolution_for_component_bounds(
                 &self.coordinate_minima,
                 &self.coordinate_maxima,
             )
-            .map_err(GroupEnvelopeError::ScoreInterval)
+            .map_err(GroupEnvelopeError::ScoreInterval)?;
+        let centroid_ball = query
+            .similarity_interval_full_resolution_for_l2_ball_center(
+                &self.centroid,
+                self.radius_l2_upper,
+            )
+            .map_err(GroupEnvelopeError::ScoreInterval)?;
+
+        // Both enclosures contain every member. Their intersection is also a
+        // valid enclosure and is no wider than either synopsis independently.
+        let lower = component_box.lower.max(centroid_ball.lower);
+        let upper = component_box.upper.min(centroid_ball.upper);
+        if lower <= upper {
+            Ok(ContinuousHVScoreInterval { lower, upper })
+        } else {
+            // Disjoint independently-derived bounds indicate a numeric or
+            // provenance defect. The only safe response is no pruning.
+            Ok(ContinuousHVScoreInterval::uninformative())
+        }
     }
 
     /// Whether this entire group can be excluded from an exact top-k query.
