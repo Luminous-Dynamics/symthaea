@@ -793,3 +793,18 @@ This is still in-memory only. The memory object cannot by itself prove that the 
 A separate benchmark direction follows AgentIR (arXiv:2605.25092, 2026-05-24): workload-adaptive cascades can skip expensive retrieval channels on queries where they add little utility. AgentIR reports skipping the dense channel on 63% of LongMemEval queries at parity LLM-judged accuracy and much higher skip rates on LoCoMo under its own benchmark configuration. HME should compare cheap-first eligibility/metadata/lexical/BinaryHV/ContinuousHV channels. Classify each skip as proof-skipped, policy-skipped or model-skipped. A BM25 margin or learned router score cannot authorize exact HDC-cosine pruning; only an admissible score bound over all eligible records can do so.
 
 Current long-memory leaderboards also show why a storage benchmark and an answer benchmark are different: Supermemory's May 2026 report self-reports 97% LongMemEval-S Recall@20, while one SOTA2 RRF listing reports 92.9 Recall@5 alongside 24.8 strict answer accuracy under its own configured reader/judge. AML Cycle 1 has separate textual/coding and commercial/open-source divisions; Cycle 2 is expected mid-November 2026. These scores cannot be compared directly. HME must report retrieval Recall@k, strict downstream answer accuracy, knowledge-update/temporal correctness, abstention, source attribution, governance, token/context budget and cost separately.
+
+
+## 2026-11-08: centroid/radius group envelopes
+
+The group synopsis now combines two conservative enclosures:
+- coordinate-wise component extrema;
+- a deterministic arithmetic-mean centroid with a jointly verified L2 radius.
+
+The builder computes its own centroid, verifies every original member-to-centroid residual against a coarse L2 radius using the source-payload verifier, derives the maximum outward squared residual, and rounds the radius upward. It binds centroid bits and radius into the group content digest. Query-time logic evaluates both the coordinate box and centroid-ball interval, then intersects them; if they disagree, it falls back to [-1,1]. Pruning remains strict upper<threshold.
+
+A source-level test now constructs 12 groups × 8 members in 64D, derives the kth threshold from the complete exact corpus and checks every pruned group's members are all below that threshold. This test is authored but unexecuted.
+
+Independent JavaScript binary32-model simulations (not Rust execution) are documented in [hme_group_envelope_js_sanity_v0.json](fixtures/hme_group_envelope_js_sanity_v0.json): one clustered random-vector experiment observed 4,138 of 4,320 groups pruned with zero false-prune disagreements; a dimension/norm-stratified experiment checked 1,000 groups / 8,000 member scores with zero interval escapes and 144 deliberately uninformative fallbacks. A coordinate-box-only random control pruned zero groups. These are synthetic arithmetic/selectivity checks, not measurements of actual bytes read, page I/O, latency, or a representative HME corpus.
+
+The current group-envelope protocol and limitations are in [HME_GROUP_ENVELOPE_REFERENCE_2026-11-08.md](HME_GROUP_ENVELOPE_REFERENCE_2026-11-08.md). Segment persistence, reopen-time verifier binding, full eligible-corpus group accounting and physical page-read telemetry remain #10917/#11003 integration work.
