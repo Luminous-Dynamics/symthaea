@@ -284,7 +284,7 @@ The targets are prospective objectives. No current Symthaea or Symtropy measurem
 - **Claim boundary:** these are Waymo-reported, geography-, exposure-, case-definition- and methodology-dependent operational comparisons. They do not establish SAM performance, do not compare directly with simulation leaderboard scores, and do not establish a universal safety rate for other ODDs or jurisdictions. Reproduce from the data hub's downloadable datasets, dynamic benchmark methodology, release notes and outcome definitions before an independent comparison.
 - **Sources:** [Waymo Safety Impact data hub](https://waymo.com/safety/impact/), [September 24, 2026 release](https://blog.waymo.com/blog/shorts/safetydata-september26/).
 
-## 7. Compositional evidence ladder — how to compare systems without conflating claims
+## 8. Compositional evidence ladder — how to compare systems without conflating claims
 
 The current industry landscape contains benchmarks at different points in the autonomy evidence chain. A result at one rung does not establish capability at the next.
 
@@ -326,7 +326,20 @@ Core ablations:
 
 The primary success criterion is **downstream decision improvement without weakening feasibility, uncertainty calibration, tail-family performance, deadline guarantees or fallback integrity**. Visual quality is a supporting metric, never a safety surrogate.
 
-## 8. Registry status semantics
+## 9. SAM-developed synthetic conformance crucibles — not external leaderboards
+
+### SAM Scene Evidence + Traffic Convention Mirror Bundle v0.1
+
+- **Role:** verify that typed road-scene evidence and jurisdiction-bound traffic-side semantics remain distinct, while a paired left-hand-traffic/right-hand-traffic scene obeys the declared geometric and control-sign reflection.
+- **Protocol:** two paired synthetic crossing scenes (LHT/RHD and RHT/LHD) under one declared road-local frame, plus a third LHT/LHD steering-layout control profile. The explicit mirror transform is x'=x, y'=-y, z'=z, with heading, signed curvature, lateral offset/velocity, yaw-rate and steering signs transformed; steering-wheel position remains an independent profile field.
+- **Validator:** standalone nested Rust workspace, JSON Schema Draft 2020-12 plus cross-contract semantics. It validates scene and traffic profile fixtures together, including profile-ID resolution, road-frame closure, map/profile consistency, rule-evidence applicability, non-authoritative HDC proposals and zero actuator authority.
+- **Exact SAM result:** PR #11111 head `3dc43bd653f84ee23c39f3c48ed6664a8aa682ab`; dedicated workflow [run 42485276624](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42485276624) passed formatting, **25 Rust tests (25 passed / 0 failed)**, both Draft 2020-12 fixture validations, cross-contract closure and strict Clippy.
+- **Metrics to preserve:** validator test pass/fail count; mirror-equivariance pass rate over the declared paired scenes; invalid/missing/stale profile rejection; wrong-frame/profile mismatch rejection; untransformed steering rejection; unknown passing-authority rejection. Report the paired-scene denominator and each negative-control family separately.
+- **Next coverage expansion:** build a full factorial profile matrix across traffic side (LHT/RHT) and steering-wheel position (LHD/RHD); add multi-lane merges, roundabouts, overtaking, intersection priority and jurisdiction-specific rule evidence only with exact source/version/applicability. Add real-world paired road scenarios only after rights and local legal review.
+- **Claim boundary:** the 25 passing tests establish only conformance for the declared synthetic fixtures. They do not establish national traffic-law correctness, sensor accuracy, map fidelity, real-road generalization, roadworthiness or public-road safety.
+- **Sources:** [SAM scene-evidence PR #11111](https://github.com/Luminous-Dynamics/symthaea/pull/11111), [SAM-TRAFFIC-CONVENTION-001 #11123](https://github.com/Luminous-Dynamics/symthaea/issues/11123), [ISO 34502:2022](https://www.iso.org/standard/78951.html), [SAE J3164_202301](https://saemobilus.sae.org/standards/j3164_202301-ontology-lexicon-automated-driving-system-ads-operated-vehicle-behaviors-maneuvers-routine-normal-operating-scenarios).
+
+## 10. Registry status semantics
 
 - `upstream_reported`: published by benchmark/model authors.
 - `secondary_leaderboard_snapshot`: surfaced on a non-owner leaderboard; not independently verified.
