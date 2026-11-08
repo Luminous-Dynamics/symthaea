@@ -52,7 +52,7 @@ fn evaluate_sweep(
     let report = assess_frequency_locking(&traces, config)?;
 
     println!(
-        "{state_class},{coupling:.6},{},{:.9},{:.9},{:.9}",
+        "{state_class},{coupling:.6},{},{:.9},{:.9},{:.9},{:.9}",
         report.locked_points,
         report.longest_contiguous_points,
         report.observed_locking_span_rad,
