@@ -200,6 +200,8 @@
     "candidate_id_integrity_check": "NOT_APPLICABLE",
     "selected_transcript_exact_copy_check": "NOT_APPLICABLE",
     "source_interval_start_frame": null,
-    "source_interval_end_frame": null
+    "source_interval_end_frame": null,
+    "target_language_supervised_training_hours": 0,
+    "selector_output_sha256": null
   }
 }
