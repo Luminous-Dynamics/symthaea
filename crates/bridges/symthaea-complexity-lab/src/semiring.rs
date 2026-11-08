@@ -164,6 +164,65 @@ impl ExactSemiring for CheckedRational {
     }
 }
 
+/// Exact max-times algebra over nonnegative rational values.
+///
+/// Addition is maximum and multiplication is ordinary rational multiplication.
+/// The constructor rejects negative values so this type cannot accidentally be
+/// used as a probability-potential semiring with signed coefficients. Exact zero
+/// remains a first-class impossible-support value; no log floor is introduced.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct MaxTimesRational(CheckedRational);
+
+impl MaxTimesRational {
+    pub fn new(value: CheckedRational) -> Result<Self, SemiringError> {
+        if value.is_negative() {
+            return Err(SemiringError::Domain(
+                "max-times probability potentials must be nonnegative".to_owned(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub const fn zero() -> Self {
+        Self(CheckedRational::zero())
+    }
+
+    pub const fn one() -> Self {
+        Self(CheckedRational::one())
+    }
+
+    pub const fn value(self) -> CheckedRational {
+        self.0
+    }
+
+    fn checked_cmp(self, other: Self) -> Result<std::cmp::Ordering, SemiringError> {
+        // Denominators are canonical positive values and numerators are
+        // nonnegative. Fail closed if the exact cross-products exceed i128.
+        let left = self.0.numerator()
+            .checked_mul(other.0.denominator())
+            .ok_or(SemiringError::ScoreOverflow)?;
+        let right = other.0.numerator()
+            .checked_mul(self.0.denominator())
+            .ok_or(SemiringError::ScoreOverflow)?;
+        Ok(left.cmp(&right))
+    }
+}
+
+impl ExactSemiring for MaxTimesRational {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        match (*self).checked_cmp(*other)? {
+            std::cmp::Ordering::Less => Ok(*other),
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Ok(*self),
+        }
+    }
+
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        let product = self.0.checked_mul(other.0)
+            .map_err(|error| SemiringError::Domain(error.to_string()))?;
+        Ok(Self(product))
+    }
+}
+
 fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
     while right != 0 {
         let remainder = left % right;
@@ -677,6 +736,63 @@ mod tests {
         }
         let (value, _) = g.evaluate(&[2,1,0]).unwrap();
         assert!(value);
+    }
+
+    fn rational(numerator: i128, denominator: i128) -> CheckedRational {
+        CheckedRational::new(numerator, denominator).unwrap()
+    }
+
+    fn max_times(numerator: i128, denominator: i128) -> MaxTimesRational {
+        MaxTimesRational::new(rational(numerator, denominator)).unwrap()
+    }
+
+    #[test]
+    fn max_times_rational_obeys_exact_nonnegative_semiring_operations() {
+        let a = max_times(3, 5);
+        let b = max_times(2, 3);
+        let c = max_times(1, 4);
+        assert_eq!(a.checked_add(&b).unwrap(), b);
+        assert_eq!(a.checked_mul(&b).unwrap(), max_times(2, 5));
+        assert_eq!(a.checked_add(&MaxTimesRational::zero()).unwrap(), a);
+        assert_eq!(a.checked_mul(&MaxTimesRational::one()).unwrap(), a);
+        assert_eq!(
+            a.checked_mul(&b.checked_add(&c).unwrap()).unwrap(),
+            a.checked_mul(&b).unwrap().checked_add(&a.checked_mul(&c).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn max_times_rational_rejects_negative_potentials() {
+        assert!(MaxTimesRational::new(rational(-1, 2)).is_err());
+        assert_eq!(MaxTimesRational::new(rational(0, 1)).unwrap(), MaxTimesRational::zero());
+    }
+
+    #[test]
+    fn max_times_factor_graph_returns_exact_map_score() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![
+                max_times(1, 10),
+                max_times(3, 10),
+                max_times(2, 5),
+                max_times(1, 5),
+            ],
+        ).unwrap();
+        let (score, _) = graph.evaluate(&[0, 1]).unwrap();
+        assert_eq!(score, max_times(2, 5));
+    }
+
+    #[test]
+    fn max_times_comparison_overflow_is_an_explicit_failure() {
+        let max = i128::MAX;
+        let a = MaxTimesRational::new(rational(max, max - 1)).unwrap();
+        let b = MaxTimesRational::new(rational(max - 1, max - 2)).unwrap();
+        assert!(a.checked_add(&b).is_err());
     }
 
     #[test]
