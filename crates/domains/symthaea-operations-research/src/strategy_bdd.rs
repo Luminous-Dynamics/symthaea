@@ -2869,8 +2869,8 @@ mod tests {
         let source = function(
             &[0, 1, 2, 3],
             &[
-                false, false, false, false, false, false, false, true,
-                false, false, false, false, false, false, false, true,
+                false, false, false, false, false, false, false, true, false, false, false, false,
+                false, false, false, true,
             ],
         );
         let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
