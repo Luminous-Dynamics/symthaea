@@ -300,6 +300,24 @@ A separate singing corpus must be assembled with explicit, documented consent fo
 - VOCAL-STRICT-001 removes silent phoneme and language fallbacks, exposes the functional singer, and hardens the VocalPerformance contract.
 - Next: export a provenance-bound phone reference for a stratified subset of the 60-case gate; connect two independent aligners; add a versioned control-response manifest; then run a same-score Kokoro/DiffSinger/SoulX-Singer/functional-tract comparison.
 
+
+## Independent evaluation-bundle verification
+
+The release gate now writes separate `blind/` and `private/` directories. The blind bundle contains the randomized listener manifest, rating template and WAV files; the private bundle contains the source/case manifest, private backend key, objective report, human-reference rights receipts and release status.
+
+The standalone `tools/vocal-run-verifier` independently checks:
+- exact source commit and contiguous case IDs;
+- recomputed score digest from the serialized score-note list;
+- recomputed performance digest from canonical serialized VocalPerformance bytes;
+- clip ID derivation from the private salt/backend/case tuple;
+- one-to-one blind clip and private-key correspondence;
+- exact WAV-byte digest, filename confinement and rejection of symlinks;
+- capability-manifest canonical JSON digest, parsed-object equality and private-key agreement;
+- human-reference score/audio linkage plus pseudonym, consent and license receipt presence;
+- strict blind/private directory allowlists, so private keys and reports cannot accidentally leak to listeners.
+
+The verifier checks bundle integrity and consistency only. It does not prove that a renderer loaded the declared model weights, that an external consent/license reference is legally valid, or that the audio sounds good. Model/voicebank tree roots still need binding into the renderer instance under issue #10872.
+
 ## Claim boundary
 
 This benchmark spec is not a test result. A successful compiler run establishes buildability, not singing quality. A successful renderer run establishes valid output, not naturalness. A good preference score establishes listener preference on its tested population, not linguistic coverage, editability or general intelligence.
