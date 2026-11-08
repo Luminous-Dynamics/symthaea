@@ -602,8 +602,7 @@ pub fn plan_next_experiment_robust(
 #[cfg(test)]
 mod tests {
     use super::super::{
-        EvidenceOrigin, EvidenceProvenance, ExperimentProposal, Hypothesis, LikelihoodRow,
-        PlannerConfig, TargetImpact,
+        EvidenceOrigin, EvidenceProvenance, Hypothesis, LikelihoodRow, PlannerConfig, TargetImpact,
     };
     use super::*;
 
