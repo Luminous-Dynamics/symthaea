@@ -243,7 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .find(|score| score.experiment_id == candidate.experiment_id)
                 .and_then(|score| score.weighted_mean_eig_per_cost);
             println!(
-                "{},{:.9},{left}->{right},{:.9}",
+                "{},SCORED,{:.9},{left}->{right},{:.9}",
                 candidate.experiment_id,
                 divergence,
                 eig_per_cost.unwrap_or(f64::NAN),
