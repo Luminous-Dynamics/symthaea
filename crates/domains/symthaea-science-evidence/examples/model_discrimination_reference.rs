@@ -187,7 +187,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // all ordered model pairs, not model-identity EIG. A partial prediction
     // matrix remains NOT_COMPARABLE rather than receiving an artificial score.
     println!("objective=minimum_directed_pairwise_predictive_KL_not_model_identity_EIG");
-    println!("experiment,status,min_directed_pairwise_kl_nats,worst_pair,eig_per_cost_for_reference");
+    println!(
+        "experiment,status,min_directed_pairwise_kl_nats,worst_pair,eig_per_cost_for_reference"
+    );
     for candidate in &experiments {
         let Some(measurement_sigma) = candidate.measurement_sigma else {
             println!("{},NOT_COMPARABLE,,,", candidate.experiment_id);
@@ -252,7 +254,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{},NOT_COMPARABLE,,,", candidate.experiment_id);
         }
     }
-    println!("KL direction is explicit: D_KL(p_left || p_right); the minimum is over ordered pairs.");
-    println!("The minimum directed KL, model-identity EIG and model-recovery accuracy are distinct objectives.");
+    println!(
+        "KL direction is explicit: D_KL(p_left || p_right); the minimum is over ordered pairs."
+    );
+    println!(
+        "The minimum directed KL, model-identity EIG and model-recovery accuracy are distinct objectives."
+    );
     Ok(())
 }
