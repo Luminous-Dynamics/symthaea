@@ -235,7 +235,7 @@
         },
         "audio_false_invariance": {
           "numerator": 0,
-          "denominator": 2,
+          "denominator": 1,
           "rate": 0
         },
         "audio_joint_abstention": {
@@ -294,8 +294,8 @@
         },
         "audio_false_invariance": {
           "numerator": 1,
-          "denominator": 2,
-          "rate": 0.5
+          "denominator": 1,
+          "rate": 1
         },
         "audio_joint_abstention": {
           "numerator": 0,
