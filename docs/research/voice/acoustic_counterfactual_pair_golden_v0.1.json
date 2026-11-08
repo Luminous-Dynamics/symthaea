@@ -10,7 +10,9 @@
     "response_invariance": "Exact canonical CLAIM label or ABSTAIN outcomes match.",
     "false_invariance": "Same non-abstaining claim is emitted despite different adjudicated audio truths.",
     "abstention": "Reported separately; abstention does not count as evidence sensitivity or joint correctness.",
-    "denominator": "Every rate includes exact numerator and eligible-pair denominator; zero-denominator groups are null."
+    "denominator": "Every rate includes exact numerator and eligible-pair denominator; zero-denominator groups are null.",
+    "joint_answer_coverage": "Both members emit CLAIM, divided by all eligible pairs; report separately for each intervention kind.",
+    "conditional_correctness": "Both members are correct, conditioned on both members emitting CLAIM; null when no pair is jointly answered."
   },
   "vectors": [
     {
@@ -69,6 +71,16 @@
           "numerator": 0,
           "denominator": 1,
           "rate": 0
+        },
+        "text_nuisance_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_correct_given_answered": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
         }
       }
     },
@@ -128,6 +140,16 @@
           "numerator": 0,
           "denominator": 1,
           "rate": 0
+        },
+        "text_nuisance_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_correct_given_answered": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
         }
       }
     },
@@ -183,6 +205,16 @@
           "numerator": 1,
           "denominator": 1,
           "rate": 1
+        },
+        "text_nuisance_joint_answer_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_joint_correct_given_answered": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
         }
       }
     },
@@ -242,6 +274,16 @@
           "numerator": 0,
           "denominator": 1,
           "rate": 0
+        },
+        "audio_relevant_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_relevant_joint_sensitivity_given_answered": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
         }
       }
     },
@@ -301,6 +343,16 @@
           "numerator": 0,
           "denominator": 1,
           "rate": 0
+        },
+        "audio_relevant_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_relevant_joint_sensitivity_given_answered": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
         }
       }
     },
@@ -356,6 +408,16 @@
           "numerator": 1,
           "denominator": 1,
           "rate": 1
+        },
+        "audio_relevant_joint_answer_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_relevant_joint_sensitivity_given_answered": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
         }
       }
     },
@@ -420,6 +482,16 @@
           "numerator": 0,
           "denominator": 1,
           "rate": 0
+        },
+        "audio_nuisance_joint_claim_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_nuisance_joint_correct_given_answered": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
         }
       }
     },
@@ -482,6 +554,16 @@
           "numerator": 0,
           "denominator": 1,
           "rate": 0
+        },
+        "audio_nuisance_joint_claim_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_nuisance_joint_correct_given_answered": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
         }
       }
     }
