@@ -666,6 +666,117 @@ pub fn switch_boundary_precision_recall_f1<L: PartialEq>(
     })
 }
 
+/// A language transition at an exact token position.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SwitchTransition<L> {
+    /// Zero-based index of the first token in the new language run.
+    pub position: usize,
+    /// Language/variety tag immediately before the boundary.
+    pub from_language: L,
+    /// Language/variety tag at the boundary token.
+    pub to_language: L,
+}
+
+/// Exact transition-direction precision/recall/F1.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DirectionBoundaryResult<L> {
+    /// Reference transition tuples.
+    pub reference_transitions: Vec<SwitchTransition<L>>,
+    /// Predicted transition tuples.
+    pub predicted_transitions: Vec<SwitchTransition<L>>,
+    /// Exact (position, from, to) matches.
+    pub true_positives: usize,
+    /// Predicted transition tuples not present in the reference.
+    pub false_positives: usize,
+    /// Reference transition tuples not predicted.
+    pub false_negatives: usize,
+    /// TP / (TP + FP); absent when no transitions are predicted.
+    pub precision: Option<f64>,
+    /// TP / (TP + FN); absent when no reference transitions exist.
+    pub recall: Option<f64>,
+    /// 2TP / (2TP + FP + FN); absent when both transition sets are empty.
+    pub f1: Option<f64>,
+}
+
+fn switch_transitions<L: PartialEq + Clone>(tags: &[L]) -> Vec<SwitchTransition<L>> {
+    (1..tags.len())
+        .filter(|&position| tags[position] != tags[position - 1])
+        .map(|position| SwitchTransition {
+            position,
+            from_language: tags[position - 1].clone(),
+            to_language: tags[position].clone(),
+        })
+        .collect()
+}
+
+/// Compute exact switch-transition direction precision, recall and F1.
+///
+/// A match requires exact equality of token position, source language/variety
+/// and destination language/variety. A direction mismatch at a correct
+/// position is therefore one directional false positive and one directional
+/// false negative. This is intentionally distinct from position-only
+/// switch-boundary F1.
+///
+/// The caller supplies aligned reference and predicted language tags. This
+/// function performs no language identification, transliteration, alias
+/// mapping, normalization or token alignment.
+///
+/// Returns the same typed empty-sequence and tag-cardinality errors as the
+/// position-only boundary scorer.
+pub fn switch_transition_direction_precision_recall_f1<L: PartialEq + Clone>(
+    reference_tags: &[L],
+    predicted_tags: &[L],
+) -> Result<DirectionBoundaryResult<L>, BoundaryMetricError> {
+    if reference_tags.is_empty() {
+        return Err(BoundaryMetricError::EmptyTagSequence);
+    }
+    if reference_tags.len() != predicted_tags.len() {
+        return Err(BoundaryMetricError::TagLengthMismatch {
+            reference_tags: reference_tags.len(),
+            predicted_tags: predicted_tags.len(),
+        });
+    }
+
+    let reference_transitions = switch_transitions(reference_tags);
+    let predicted_transitions = switch_transitions(predicted_tags);
+
+    let true_positives = predicted_transitions
+        .iter()
+        .filter(|predicted| reference_transitions.contains(predicted))
+        .count();
+    let false_positives = predicted_transitions.len() - true_positives;
+    let false_negatives = reference_transitions.len() - true_positives;
+
+    let precision = if predicted_transitions.is_empty() {
+        None
+    } else {
+        Some(true_positives as f64 / predicted_transitions.len() as f64)
+    };
+    let recall = if reference_transitions.is_empty() {
+        None
+    } else {
+        Some(true_positives as f64 / reference_transitions.len() as f64)
+    };
+
+    let f1_denominator = 2 * true_positives + false_positives + false_negatives;
+    let f1 = if f1_denominator == 0 {
+        None
+    } else {
+        Some((2 * true_positives) as f64 / f1_denominator as f64)
+    };
+
+    Ok(DirectionBoundaryResult {
+        reference_transitions,
+        predicted_transitions,
+        true_positives,
+        false_positives,
+        false_negatives,
+        precision,
+        recall,
+        f1,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{SwitchMetricError, switch_aware_error_rates};
@@ -1150,5 +1261,150 @@ mod tests {
             })
         );
     }
+
+
+    #[test]
+    fn transition_direction_exact_match_has_perfect_scores() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu", "zu", "en"],
+            &["en", "zu", "zu", "en"],
+        ).expect("valid tags");
+        assert_eq!(result.true_positives, 2);
+        assert_eq!(result.false_positives, 0);
+        assert_eq!(result.false_negatives, 0);
+        assert_eq!(result.f1, Some(1.0));
+        assert_eq!(result.reference_transitions[0].from_language, "en");
+        assert_eq!(result.reference_transitions[0].to_language, "zu");
+    }
+
+    #[test]
+    fn reversed_transition_at_same_position_is_directional_fp_and_fn() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu"],
+            &["zu", "en"],
+        ).expect("valid tags");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 1);
+        assert_eq!(result.f1, Some(0.0));
+    }
+
+    #[test]
+    fn wrong_destination_at_same_position_is_directional_error() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu"],
+            &["en", "af"],
+        ).expect("valid tags");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 1);
+    }
+
+    #[test]
+    fn wrong_source_at_same_position_is_directional_error() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu"],
+            &["af", "zu"],
+        ).expect("valid tags");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 1);
+    }
+
+    #[test]
+    fn correct_direction_at_wrong_position_is_directional_fp_and_fn() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "en", "zu"],
+            &["en", "zu", "zu"],
+        ).expect("valid tags");
+        assert_eq!(result.reference_transitions[0].position, 2);
+        assert_eq!(result.predicted_transitions[0].position, 1);
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 1);
+    }
+
+    #[test]
+    fn transition_pairs_are_compared_independently() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu", "zu", "af"],
+            &["en", "zu", "en", "af"],
+        ).expect("valid tags");
+        assert_eq!(result.reference_transitions.len(), 2);
+        assert_eq!(result.predicted_transitions.len(), 3);
+        assert_eq!(result.true_positives, 1);
+        assert_eq!(result.false_positives, 2);
+        assert_eq!(result.false_negatives, 1);
+    }
+
+    #[test]
+    fn no_transitions_is_non_estimable() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "en", "en"],
+            &["zu", "zu", "zu"],
+        ).expect("valid tags");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 0);
+        assert_eq!(result.false_negatives, 0);
+        assert_eq!(result.precision, None);
+        assert_eq!(result.recall, None);
+        assert_eq!(result.f1, None);
+    }
+
+    #[test]
+    fn missing_predictions_yield_non_estimable_precision() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu"],
+            &["en", "en"],
+        ).expect("valid tags");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_negatives, 1);
+        assert_eq!(result.precision, None);
+        assert_eq!(result.recall, Some(0.0));
+    }
+
+    #[test]
+    fn predictions_without_reference_transitions_yield_non_estimable_recall() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "en"],
+            &["en", "zu"],
+        ).expect("valid tags");
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.precision, Some(0.0));
+        assert_eq!(result.recall, None);
+    }
+
+    #[test]
+    fn empty_reference_tags_are_rejected() {
+        let result = super::switch_transition_direction_precision_recall_f1::<&str>(&[], &[]);
+        assert_eq!(result, Err(super::BoundaryMetricError::EmptyTagSequence));
+    }
+
+    #[test]
+    fn tag_length_mismatch_is_rejected() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["en", "zu"],
+            &["en"],
+        );
+        assert_eq!(
+            result,
+            Err(super::BoundaryMetricError::TagLengthMismatch {
+                reference_tags: 2,
+                predicted_tags: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn repeated_same_language_tags_do_not_create_transitions() {
+        let result = super::switch_transition_direction_precision_recall_f1(
+            &["zu", "zu", "zu"],
+            &["zu", "zu", "zu"],
+        ).expect("valid tags");
+        assert!(result.reference_transitions.is_empty());
+        assert!(result.predicted_transitions.is_empty());
+        assert_eq!(result.f1, None);
+    }
+
 
 }
