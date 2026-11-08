@@ -299,6 +299,30 @@ pub fn verify_campaign(value: &Value) -> VerificationReport {
             );
         }
 
+        let sample_rate = number_at(channel, &["sampling", "sample_rate_hz"]);
+        let minimum_sample_rate =
+            number_at(channel, &["sampling", "minimum_required_sample_rate_hz"]);
+        match (sample_rate, minimum_sample_rate) {
+            (Some(actual), Some(required)) if actual >= required => {}
+            (Some(actual), Some(required)) => {
+                known_non_admissible = true;
+                report.add(
+                    CampaignDisposition::NotAdmissible,
+                    "sample_rate_below_method_minimum",
+                    format!("{base}.sampling.sample_rate_hz"),
+                    format!(
+                        "Channel {channel_id} sample rate {actual} Hz is below the method-declared minimum {required} Hz."
+                    ),
+                );
+            }
+            _ => report.add(
+                CampaignDisposition::Invalid,
+                "sample_rate_requirement_missing",
+                format!("{base}.sampling.minimum_required_sample_rate_hz"),
+                format!("Channel {channel_id} lacks a numeric sample rate or method minimum."),
+            ),
+        }
+
         let analogue_bandwidth =
             number_at(channel, &["sampling", "analogue_bandwidth_hz"]);
         let required_bandwidth =
@@ -612,6 +636,18 @@ mod tests {
     fn missing_sampling_adequacy_review_is_not_admissible() {
         let mut campaign = fixtures()["campaigns"][0].clone();
         campaign["channels"][0]["sampling"]["sampling_adequacy_review_ref"] = Value::Null;
+        assert_eq!(
+            verify_campaign(&campaign).disposition,
+            CampaignDisposition::NotAdmissible
+        );
+    }
+
+    #[test]
+    fn sample_rate_below_method_minimum_is_not_admissible() {
+        let mut campaign = fixtures()["campaigns"][0].clone();
+        campaign["channels"][0]["sampling"]["minimum_required_sample_rate_hz"] =
+            Value::from(1000.0);
+        campaign["channels"][0]["sampling"]["sample_rate_hz"] = Value::from(999.0);
         assert_eq!(
             verify_campaign(&campaign).disposition,
             CampaignDisposition::NotAdmissible
