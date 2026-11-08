@@ -939,11 +939,11 @@ mod tests {
                 primal: sparse_vector(14, &primal_entries),
                 dual: sparse_vector(36, &dual_entries),
             };
-            let verified = verify_primal_dual_optimality(built.problem(), &certificate).unwrap();
-            assert_eq!(
-                built.utility_from_lp_objective(verified.objective).unwrap(),
-                expected_utility
-            );
+            let bound_certificate = built.bind_certificate(certificate);
+            let verified = built.verify_bound_optimality(&bound_certificate).unwrap();
+            assert_eq!(verified.utility, expected_utility);
+            assert_eq!(verified.source_model_sha256, built.source_model_sha256());
+            assert_eq!(verified.compiled_lp_sha256, built.compiled_lp_sha256());
         }
     }
 
@@ -1203,6 +1203,47 @@ mod tests {
             built.verify_bound_optimality(&altered_lp),
             Err(OccupationFlowError::CertificateCompiledLpDigestMismatch)
         );
+    }
+
+    #[test]
+    fn verifies_digest_bound_minimization_gap_in_original_utility_orientation() {
+        let model = fixture();
+        let scores = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let built = build_occupation_flow_lp(
+            &model,
+            &scores,
+            UtilityDirection::Minimize,
+            budget(504),
+        ).unwrap();
+
+        // The primal point is the max-utility endpoint (U=32/25), hence
+        // -U=-32/25 is a valid lower bound for the maximization of -U.
+        // The dual witness proves the maximum of -U is -9/25.
+        let certificate = built.bind_certificate(PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(1,9,25),(5,1,10),(9,1,10),(11,7,5),(14,13,10),(27,1,1),(30,1,1),(34,1,1)],
+            ),
+        });
+        let verified = built.verify_bound_gap(&certificate, q(23, 25)).unwrap();
+        assert_eq!(verified.lower_utility, q(9, 25));
+        assert_eq!(verified.upper_utility, q(32, 25));
+        assert_eq!(verified.absolute_gap, q(23, 25));
+        assert_eq!(verified.source_model_sha256, built.source_model_sha256());
+        assert_eq!(verified.compiled_lp_sha256, built.compiled_lp_sha256());
+
+        assert!(matches!(
+            built.verify_bound_gap(&certificate, q(22, 25)),
+            Err(OccupationFlowError::Lp(LpCertificateError::GapExceedsRequested { .. }))
+        ));
     }
 
     #[test]
