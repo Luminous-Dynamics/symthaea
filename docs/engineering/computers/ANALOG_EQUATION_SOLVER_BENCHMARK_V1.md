@@ -30,6 +30,7 @@ This is a workload-to-primitive-and-substrate selection experiment, not a claim 
 - A matrix-free linear-operator interface shared by dense and structured workloads.
 - Matrix-free 1-D Poisson operator (second-difference stencil) with O(n) storage and O(n) MVM; its exact condition number is available from the discrete spectrum.
 - Unpreconditioned conjugate-gradient solve with explicit tolerance and iteration budget; it recomputes the true residual before acceptance and restarts the recurrence if residual replacement is needed.
+- Jacobi-preconditioned conjugate gradient, with a fixed diagonal preconditioner, positive-diagonal checks and independent true-residual acceptance.
 - Compensated dot-product accumulation in the digital reference to reduce avoidable summation error.
 - Compensated digital dot-product accumulation.
 - Separate residual norm, relative residual, relative backward error, absolute forward error and relative forward error.
@@ -49,7 +50,7 @@ rustc --edition=2021 --test research/physical_compute/equation_solver_contract_v
 /tmp/equation_solver_tests
 ```
 
-The 17 Rust unit tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
+The 19 Rust unit tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
 
 ## 3. Workload portfolio
 
@@ -120,10 +121,10 @@ For analog or mixed-precision paths, the verifier must use an independent numeri
 ## 5. Architecture comparison matrix
 
 A. Best tuned digital direct solver (Cholesky for SPD; LU where appropriate).  
-B. Best tuned digital iterative solver (CG for SPD; GMRES/BiCGSTAB only in a separately implemented nonsymmetric lane).  
+B. Best tuned digital iterative solver (CG / Jacobi-PCG for SPD; GMRES/BiCGSTAB only in a separately implemented nonsymmetric lane).  
 C. Analog MVM inside a digital iterative solver.  
 D. Direct analog dynamical/matrix-equation solve.  
-E. Analog preconditioning or approximate initial solution plus digital mixed-precision refinement.  
+E. Analog preconditioning or approximate initial solution plus digital mixed-precision refinement; compare against digital Jacobi-PCG as a baseline.  
 F. Adaptive mathematical representation and fault-aware mapping.  
 G. Independent residual/backward-error verification plus fail-closed rejection.  
 H. Combined topology-aware mapping, verification and fallback/recovery.
