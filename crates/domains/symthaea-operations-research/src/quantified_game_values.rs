@@ -809,6 +809,80 @@ mod tests {
         }
     }
 
+    fn two_variable_formulas() -> Vec<CnfProblem> {
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+        ];
+        let mut formulas = vec![CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![],
+        }];
+        for left_mask in 0..16usize {
+            let left: Vec<_> = (0..4)
+                .filter(|index| ((left_mask >> index) & 1) != 0)
+                .map(|index| literals[index])
+                .collect();
+            formulas.push(CnfProblem {
+                variables: vec!["x".into(), "y".into()],
+                clauses: vec![left.clone()],
+            });
+            for right_mask in 0..16usize {
+                let right: Vec<_> = (0..4)
+                    .filter(|index| ((right_mask >> index) & 1) != 0)
+                    .map(|index| literals[index])
+                    .collect();
+                formulas.push(CnfProblem {
+                    variables: vec!["x".into(), "y".into()],
+                    clauses: vec![left.clone(), right],
+                });
+            }
+        }
+        formulas
+    }
+
+    fn independent_matrix_value(problem: &CnfProblem, assignment: &[bool]) -> bool {
+        problem.clauses.iter().all(|clause| {
+            clause
+                .iter()
+                .any(|literal| assignment[literal.variable] == literal.positive)
+        })
+    }
+
+    fn independent_game_value(
+        problem: &CnfProblem,
+        order: &[(Quantifier, usize)],
+        assignment: &mut [bool],
+        position: usize,
+    ) -> bool {
+        if position == order.len() {
+            return independent_matrix_value(problem, assignment);
+        }
+        let (quantifier, variable) = order[position];
+        assignment[variable] = false;
+        let low = independent_game_value(problem, order, assignment, position + 1);
+        assignment[variable] = true;
+        let high = independent_game_value(problem, order, assignment, position + 1);
+        match quantifier {
+            Quantifier::Exists => low || high,
+            Quantifier::ForAll => low && high,
+        }
+    }
+
+    fn independent_value_after_prefix(
+        problem: &CnfProblem,
+        order: &[(Quantifier, usize)],
+        history: &[bool],
+    ) -> bool {
+        let mut assignment = vec![false; problem.variables.len()];
+        for (position, &(_, variable)) in order.iter().take(history.len()).enumerate() {
+            assignment[variable] = history[position];
+        }
+        independent_game_value(problem, order, &mut assignment, history.len())
+    }
+
     fn equality_problem() -> CnfProblem {
         CnfProblem {
             variables: vec!["x".into(), "y".into()],
@@ -1031,6 +1105,134 @@ mod tests {
             ),
             Err(GameValueProfileError::TruthTableEntryBudgetExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn full_history_skolem_and_herbrand_functions_keep_same_player_history() {
+        let problem = equality_problem();
+        let existential_prefix = prefix(
+            2,
+            vec![block(Quantifier::Exists, &[0]), block(Quantifier::Exists, &[1])],
+        );
+        let (existential_dag, _) =
+            build_qbf_game_proof_dag(&problem, &existential_prefix, dag_budget()).unwrap();
+        let existential_profile = extract_game_value_profile_from_dag(
+            &problem,
+            &existential_prefix,
+            &existential_dag,
+            dag_budget(),
+            profile_budget(),
+        )
+        .unwrap();
+        verify_game_value_profile(
+            &problem,
+            &existential_prefix,
+            &existential_profile,
+            profile_budget(),
+        )
+        .unwrap();
+        assert_eq!(existential_profile.skolem_functions[1].dependencies, vec![0]);
+        assert_eq!(
+            existential_profile.skolem_functions[1].table,
+            BTreeMap::from([(vec![false], false), (vec![true], true)])
+        );
+
+        let universal_prefix = prefix(
+            2,
+            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::ForAll, &[1])],
+        );
+        let (universal_dag, _) =
+            build_qbf_game_proof_dag(&problem, &universal_prefix, dag_budget()).unwrap();
+        let universal_profile = extract_game_value_profile_from_dag(
+            &problem,
+            &universal_prefix,
+            &universal_dag,
+            dag_budget(),
+            profile_budget(),
+        )
+        .unwrap();
+        verify_game_value_profile(
+            &problem,
+            &universal_prefix,
+            &universal_profile,
+            profile_budget(),
+        )
+        .unwrap();
+        assert_eq!(universal_profile.herbrand_functions[1].dependencies, vec![0]);
+        assert_eq!(
+            universal_profile.herbrand_functions[1].table,
+            BTreeMap::from([(vec![false], true), (vec![true], false)])
+        );
+    }
+
+    #[test]
+    fn exhaustive_two_variable_qbf_layers_match_independent_game_oracle() {
+        let formulas = two_variable_formulas();
+        assert_eq!(formulas.len(), 273);
+        let orders = [[0usize, 1usize], [1usize, 0usize]];
+
+        for (formula_index, problem) in formulas.iter().enumerate() {
+            for order in orders {
+                for quantifier_mask in 0..4usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = prefix(2, blocks);
+                    let dag_budget = dag_budget();
+                    let (dag, _) =
+                        build_qbf_game_proof_dag(problem, &prefix, dag_budget).unwrap();
+                    let profile = extract_game_value_profile_from_dag(
+                        problem,
+                        &prefix,
+                        &dag,
+                        dag_budget,
+                        profile_budget(),
+                    )
+                    .unwrap();
+                    verify_game_value_profile(problem, &prefix, &profile, profile_budget())
+                        .unwrap();
+
+                    let ordered: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            (
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                variable,
+                            )
+                        })
+                        .collect();
+                    for (layer_index, layer) in profile.layers.iter().enumerate() {
+                        let row_count = checked_power_of_two(layer_index).unwrap();
+                        for mask in 0..row_count {
+                            let history = prefix_assignment(mask, layer_index);
+                            let expected =
+                                independent_value_after_prefix(problem, &ordered, &history);
+                            assert_eq!(
+                                layer.values.get(&history),
+                                Some(&expected),
+                                "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}, layer {layer_index}, history {history:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]
