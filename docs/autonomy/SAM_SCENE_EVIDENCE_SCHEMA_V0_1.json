@@ -141,7 +141,8 @@
         "extrinsic_profile_id",
         "reference_frame_id",
         "evidence_kind",
-        "currentness"
+        "currentness",
+        "source_role"
       ],
       "properties": {
         "source_id": {
@@ -212,6 +213,17 @@
             "current_for_fixture",
             "stale",
             "expired",
+            "unknown"
+          ]
+        },
+        "source_role": {
+          "enum": [
+            "local_sensor_observation",
+            "synthetic_sensor_observation",
+            "remote_cooperative_claim",
+            "simulator_oracle",
+            "map_prior",
+            "derived_estimate",
             "unknown"
           ]
         }
@@ -466,7 +478,9 @@
         "prediction_set_refs",
         "admission",
         "unresolved",
-        "traffic_convention_profile_id"
+        "traffic_convention_profile_id",
+        "cooperative_advisory_refs",
+        "simulator_truth_refs"
       ],
       "properties": {
         "snapshot_id": {
@@ -900,6 +914,18 @@
         "traffic_convention_profile_id": {
           "type": "string",
           "minLength": 1
+        },
+        "cooperative_advisory_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "simulator_truth_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
         }
       }
     }
