@@ -405,7 +405,7 @@ The PQR-Search paper is now treated as a direct competitive baseline, not merely
 \Pr[\operatorname{Recall}(q)<\tau]\leq\delta
 \]
 
-for every fixed query, with probability over the index's random orthogonal transformation and the stated condition that queries and updates do not depend on that transformation. The authors report 20 datasets up to 100M vectors and dynamic-update audits. Their abstract reports that, in compared settings, PQR-Search incurred 2.5x HNSW single-query latency and 1.3x lower batch throughput where HNSW met the 0.99 per-query target, while average-recall-tuned HNSW left 3–29% of queries below 0.99. These are paper-reported figures, not reproduced HME comparisons.
+for every fixed query, with probability over the index's random orthogonal transformation and the stated condition that queries and updates do not depend on that transformation. The authors report 20 datasets up to 100M vectors and dynamic-update audits. Their abstract reports that, in compared settings, PQR-Search incurred 2.5x HNSW single-query latency and 1.3x lower batch throughput where HNSW met the 0.99 per-query target, while the current arXiv abstract reports 5–19% of in-distribution queries below 0.99 and up to 99.6% of real OOD queries below the target when the index was tuned without a query log. These are paper-reported figures, not reproduced HME comparisons.
 
 **Guarantee boundary:** per-fixed-query probabilistic recall is not deterministic exact top-k. A client choosing later queries after observing index-dependent responses requires a separate adaptive-query threat model; do not claim the original independence premise covers that case without proof.
 
