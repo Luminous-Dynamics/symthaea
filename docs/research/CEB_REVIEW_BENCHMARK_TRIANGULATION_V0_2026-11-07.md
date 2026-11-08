@@ -287,6 +287,16 @@ Gómez et al.'s 2026 systematic review of **Formal Verification Under Evolution 
 
 **CEB implication:** test claim-support closure across code, API contracts, configuration, runtime and authorization/policy changes. A source-only call graph cannot establish all of those dependencies. The opportunity is not another static analyzer; it is a traceable evaluation of whether engineering claims stay valid as their supporting system evolves.
 
+
+### 2.30 SWE-CI — long-horizon continuous-integration maintenance
+
+Chen et al.'s **SWE-CI** benchmark contains **100 repository-maintenance tasks**, each representing an evolution history averaging **233 days and 71 consecutive commits**. It frames software engineering as repeated CI-guided maintenance rather than one-shot issue repair. [Paper](https://arxiv.org/abs/2603.03823).
+
+**Scope and limitation:** this benchmark measures continuous maintenance/CI task performance, not the correctness of claim-support closure, evidence-disposition macro-F1, false-retain rate or decision-use validity. Its task horizon is contextual, not an interchangeable CEB metric denominator.
+
+**CEB implication:** use SWE-CI as a long-horizon stress comparator alongside SWE-Milestone. CEB's differentiator is to preserve the validity and provenance of earlier engineering claims across those changes, while charging the cost of selective revalidation against the existing CEB-CONTINUITY metrics.
+
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -480,6 +490,7 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Orujlu et al., [Partially Observed Structural Causal Models](https://proceedings.mlr.press/v337/orujlu26a.html), UAI 2026, PMLR 337.
 - Yuan et al., [CGARF: a causality-guided framework for reliable automated program repair](https://doi.org/10.1007/s10664-026-10940-1), published August 22, 2026.
 - Shen et al., [SecRepoBench](https://research.google/pubs/secrepobench-benchmarking-code-agents-for-secure-code-completion-in-real-world-repositories/), 2025; [leaderboard and methodology](https://secrepobench.github.io/), accessed November 7, 2026.
+- Chen et al., [SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration](https://arxiv.org/abs/2603.03823), March 4, 2026.
 
 - Jin and Chen, [Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement](https://doi.org/10.1007/s10515-026-00638-5), Automated Software Engineering 33, article 90 (June 26, 2026).
 - Li et al., [ReviewGrounder: Improving Review Substantiveness with Rubric-Guided, Tool-Integrated Agents](https://aclanthology.org/2026.acl-long.1477/), ACL 2026.
