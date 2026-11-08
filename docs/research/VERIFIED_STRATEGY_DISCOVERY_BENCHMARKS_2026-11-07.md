@@ -568,3 +568,47 @@ Compare under matched truth tables and identical resource limits:
 Report per function: source family, support size, both interaction matrices (or their digests and exact weights), pair/context checks, seed orders, induced-fill policy, frontier profiles, unique seed count, order evaluations, search-complete flag, initial/final nodes, exact minimum when available, build peak nodes/bytes, and independent checker time.
 
 Hold out complete function generators and QBF application families. The confirmatory split must not be used to tune weights or tie-breaks. The metric of interest is *verified node-count reduction at equal total construction + checking budget*, not a lower graph score alone.
+
+
+## 18. QBF external solver interface audit — do not conflate decisions with strategies
+
+### CAQE as the practice-oriented baseline
+
+The SAT 2026 proof-theoretic analysis characterizes CAQE as the most successful practice-wise QBF algorithmic paradigm and says it clearly dominated recent QBF competitions. This is an important baseline to include; it is not a numerical QBFGallery 2026 score for Symthaea or a claim that the basic CAQE core and all optimized CAQE releases are equivalent.
+
+The public CAQE repository documents:
+- `caqe` for prenex-CNF QBF in QDIMACS;
+- `dcaqe` as a separate DQBF solver using DQDIMACS;
+- `--qdo` for QDIMACS output containing partial assignments.
+
+A partial assignment must not be automatically classified as a complete Skolem/Herbrand strategy. The benchmark adapter must independently establish completeness, dependency legality and matrix validity before promoting output into the strategy-extraction column.
+
+### Interface classes
+
+Every external result is assigned exactly one capability class per run:
+
+| Class | Meaning | Counts as verified strategy extraction? |
+|---|---|---|
+| Decision only | TRUE/FALSE decision | No |
+| Partial assignment | One or more partial QDIMACS assignments | No, until completed and independently checked |
+| Proof emitting | Proof/certificate is returned | No, until proof checking and extraction both succeed |
+| Complete strategy | Full Skolem or Herbrand functions in a recognized representation | Only after independent matrix/prefix verification |
+| Intermediate game values | Values for quantified subgames | Only after scope, recurrence and source binding checks |
+
+### Baseline protocol
+
+Pin solver commit/release, compiler/toolchain, command line, input digest and resource limits. Run PCNF QBF baselines in their supported interface modes; run DQBF baselines only on the separate DQBF corpus. The 2026 gallery separates PCNF main, crafted, random, 2QBF, prenex non-CNF and DQBF, and accepts QDIMACS, QCIR and DQDIMACS. Do not mix track totals or formats.
+
+For every solver, report separately:
+- decision coverage and time;
+- proof availability, proof bytes, proof-check outcome and time;
+- partial assignment availability and completion rate;
+- strategy extraction coverage and time;
+- time-to-independently-verified strategy;
+- strategy function/circuit/ROBDD size and checker cost.
+
+The 2026 proof-system synthesis result gives a second comparison path: compile a QBF proof in the supported proof system, extract Skolem/Herbrand functions and intermediate game values, then independently verify the resulting functions against the original matrix and prefix. Compare this to solver-native proof/strategy output rather than treating these as equivalent by assumption.
+
+### Promotion gate
+
+The selected QBFGallery corpus and result artifact must be pinned before publishing any numeric external target. No current numeric CAQE-vs-Symthaea score is claimed by this plan. CAQE's practice strength is a literature baseline; the numerical head-to-head remains future benchmark work.
