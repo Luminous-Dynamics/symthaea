@@ -202,7 +202,7 @@ impl ActiveInferenceVehicleAgent {
     /// 6. tau_ema           — current tau factor / 3.0 (normalized)
     /// 7. free_energy_trend — rising (>0.5) vs falling (<0.5)
     /// 8. control_effort    — mean |command| (already 0..1)
-    /// 9. mesh_brake_density— swarm brake fraction (0..1)
+    /// 9. mesh_brake_density— reserved neutral placeholder (raw aggregate excluded)
     /// 10. obs_stability    — EMA of observation delta (sensor health signal)
     fn build_observation(&self, state: &VehicleState, cmd: &VehicleCommand) -> Vec<f64> {
         // 0. Speed error (normalized by target)
