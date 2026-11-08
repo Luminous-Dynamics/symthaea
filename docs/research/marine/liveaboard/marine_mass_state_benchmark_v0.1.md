@@ -37,7 +37,7 @@ Each ledger binds:
 - exact vessel design/as-built configuration digest and mission/condition identity;
 - one named vessel datum and coordinate-frame revision;
 - axis sign convention: longitudinal, transverse, vertical; vertical positive upward;
-- each mass item identity, parent/child lineage, quantity and revision;
+- each mass item identity, parent/child lineage, quantity and revision; `aggregate_mass_kg` is the total mass for the declared `quantity_count`, not a per-unit value;
 - mass and uncertainty in kg; item CG coordinates in m in that same datum/frame, with uncertainty;
 - evidence class (synthetic, assumed, supplier-declared, engineering-estimate or measured) and source;
 - explicit counted-mass versus reference-only role;
@@ -98,6 +98,7 @@ A future Rust verifier must independently reconstruct mass totals and first mome
 
 Reject or mark indeterminate:
 - counted parent plus counted child;
+- any invalid/double-count or mixed-configuration condition must withhold aggregate mass, CG and weight-growth disposition; do not report a plausible-looking total from invalid inputs;
 - duplicate item IDs or duplicate tank state for one tank/condition;
 - wrong configuration/frame/datum;
 - stale/superseded item revision;
