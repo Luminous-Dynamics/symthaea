@@ -107,10 +107,10 @@
       "candidate_sources": [
         {
           "id": "afriswitch",
-          "status": "REVIEW_REQUIRED_RESTRICTED",
+          "status": "TEST_ONLY_SOURCE_AND_ACCESS_REVIEW_REQUIRED",
           "card_url": "https://huggingface.co/datasets/intronhealth/AfriSwitch",
           "paper_url": "https://arxiv.org/abs/2608.26434",
-          "note": "Paper and current card differ in duration, utterance count, languages and licence; exact artifact and permission unresolved."
+          "note": "Current HF README revision c247482 reports 54.41h / 16,602 / 73,486 / 14 configurations / one test split / CC BY-NC-SA 4.0. Current page exposes direct downloads and independent catalogue reports open access, differing from an earlier gated-status observation. Paper reports 61.36h / 18,861 / 78,333 / 16 varieties / CC BY 4.0. Preserve both snapshots; recheck current access and exact rights. Not a training set because only test split is released."
         },
         {
           "id": "sa_soap_opera_five_language",
@@ -122,6 +122,24 @@
           "status": "METADATA_AND_RIGHTS_REVIEW_REQUIRED",
           "paper_url": "https://arxiv.org/abs/2609.11786",
           "note": "The 2026 switch-aware study audits 8,181 audio-available rows / 9.54h from 9,966 AfriCodeSwitch validation metadata rows and uses a deterministic 2,000-utterance manifest. Its exact artifact, manifest, license, speaker split and permission must be pinned before use; no download or ingestion is authorized."
+        },
+        {
+          "id": "yecs_yoruba_english",
+          "status": "ACCESS_REQUEST_AND_NOODL_BENEFIT_SHARING_REVIEW",
+          "url": "https://mozilladatacollective.com/datasets/cmo09pqp300gbnx07xcl42los",
+          "note": "~120h / 99,930 validated audio-text pairs / 140 Nigerian bilingual speakers; word-level language tags; tone/sub-dot marked Yoruba; 16 domains. NOODL-1.0: commercial entities headquartered in developed/high-income nations require a benefit-sharing agreement; speaker identification and individual voice cloning prohibited; test audio-only with labels held by steward; access request. Potential training/validation only after exact terms, access, purpose and #10942 admission."
+        },
+        {
+          "id": "switchboard_tier_b",
+          "status": "SMALL_NONCOMMERCIAL_EVALUATION_ONLY_SOURCE_REVIEW",
+          "card_url": "https://huggingface.co/datasets/mosesdaudu/switchboard-tierb-codeswitch",
+          "note": "87 consented utterances / 8 speakers / 8.75min across four African-language-English pairs; word tags and gold intent/slot labels; CC BY-NC-SA 4.0. Card says too small to train or rank systems; read speech, headset-only, Hausa n=9 effectively one speaker; one flagged accidental real-person-name collision requires exclusion or source-owner re-record. Use as smoke test/qualitative slot probe only."
+        },
+        {
+          "id": "vocal_money",
+          "status": "NONCOMMERCIAL_REPRODUCTION_SUBSET_SOURCE_LINEAGE_REVIEW",
+          "card_url": "https://huggingface.co/datasets/Kimyayd/vocal-money-codeswitch-asr-benchmark",
+          "note": "210 Yoruba-English clips with references and outputs from five systems; CC BY-NC-SA 4.0; source rows identify AfriSwitch. Use for scorer/output reproduction only, not as an independent test cohort."
         }
       ],
       "required_outputs": [
@@ -173,6 +191,12 @@
           "status": "EVALUATION_ONLY_REVIEW_REQUIRED",
           "card_url": "https://huggingface.co/datasets/intronhealth/afrivox-v2",
           "note": "Entity/number flags are strata, not complete semantic gold; independently adjudicated audio-grounded references required."
+        },
+        {
+          "id": "switchboard_tier_b_intent_slots",
+          "status": "SMALL_QUALITATIVE_SMOKE_TEST_ONLY",
+          "card_url": "https://huggingface.co/datasets/mosesdaudu/switchboard-tierb-codeswitch",
+          "note": "Includes gold intent/slot labels and per-token language tags for 87 consented clips. Too small to rank systems and has documented speaker/device/read-speech limitations; one flagged accidental real-person-name collision needs source-owner resolution."
         }
       ]
     },
@@ -340,7 +364,15 @@
         "worst_group_quality",
         "prior_language_retention"
       ],
-      "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds."
+      "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds.",
+      "candidate_sources": [
+        {
+          "id": "yecs_yoruba_english",
+          "status": "ACCESS_REQUEST_AND_NOODL_BENEFIT_SHARING_REVIEW",
+          "url": "https://mozilladatacollective.com/datasets/cmo09pqp300gbnx07xcl42los",
+          "note": "Potential admitted Yoruba-English low-resource adaptation source (~120h / 99,930 pairs). NOODL-1.0 restrictions and benefit-sharing apply; public test is audio-only and steward labels are held back. Use train/validation only after rights and governance admission; do not claim the hidden test can be scored locally."
+        }
+      ]
     },
     {
       "id": "phonetic_supervision_provenance",
