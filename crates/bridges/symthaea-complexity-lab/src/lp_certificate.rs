@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_negative_or_inverted_primal_dual_gap_requests() {
+    fn rejects_negative_gap_and_invalid_dual_candidates() {
         let lp = RationalLp::new(
             vec![vec![q(1, 1)]],
             vec![q(2, 1)],
@@ -508,15 +508,13 @@ mod tests {
             Err(LpCertificateError::NegativeRequestedGap)
         );
 
-        // Both vectors are feasible, but this deliberately gives a dual
-        // objective below the primal objective, violating weak duality.
-        let inverted = PrimalDualCertificate {
+        let invalid_dual = PrimalDualCertificate {
             primal: vec![q(2, 1)],
             dual: vec![q(1, 2)],
         };
         assert_eq!(
-            verify_primal_dual_gap(&lp, &inverted, q(10, 1)),
-            Err(LpCertificateError::InvertedPrimalDualBounds)
+            verify_primal_dual_gap(&lp, &invalid_dual, q(10, 1)),
+            Err(LpCertificateError::DualConstraintViolation { column: 0 })
         );
     }
 
