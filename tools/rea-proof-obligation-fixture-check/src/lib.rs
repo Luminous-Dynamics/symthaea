@@ -1,0 +1,385 @@
+//! Structural and semantic-consistency checks for REA claim-obligation fixtures.
+//!
+//! This crate validates the authored research corpus. It does not adjudicate
+//! the world-state oracle, execute experiments, or evaluate a planning policy.
+
+use jsonschema::draft202012;
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
+
+const SCHEMA: &str = include_str!(
+    "../../../docs/research/rea-proof-obligation-acquisition-fixtures-v0.schema.json"
+);
+const FIXTURE: &str =
+    include_str!("../../../docs/research/rea-proof-obligation-acquisition-fixtures-v0.json");
+
+const EXPECTED_CASES: usize = 18;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixtureError(pub String);
+
+impl std::fmt::Display for FixtureError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for FixtureError {}
+
+fn string_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a str, FixtureError> {
+    let mut current = value;
+    for segment in path {
+        current = current
+            .get(*segment)
+            .ok_or_else(|| FixtureError(format!("missing JSON path segment: {segment}")))?;
+    }
+    current.as_str().ok_or_else(|| {
+        FixtureError(format!("JSON path is not a string: {}", path.join(".")))
+    })
+}
+
+fn bool_at(value: &Value, path: &[&str]) -> Result<bool, FixtureError> {
+    let mut current = value;
+    for segment in path {
+        current = current
+            .get(*segment)
+            .ok_or_else(|| FixtureError(format!("missing JSON path segment: {segment}")))?;
+    }
+    current
+        .as_bool()
+        .ok_or_else(|| FixtureError(format!("JSON path is not a boolean: {}", path.join("."))))
+}
+
+fn array_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Vec<Value>, FixtureError> {
+    let mut current = value;
+    for segment in path {
+        current = current
+            .get(*segment)
+            .ok_or_else(|| FixtureError(format!("missing JSON path segment: {segment}")))?;
+    }
+    current.as_array().ok_or_else(|| {
+        FixtureError(format!("JSON path is not an array: {}", path.join(".")))
+    })
+}
+
+/// Check semantic relationships that JSON Schema alone cannot express:
+/// unique identities, referential integrity, evidence admissibility, and
+/// hard authorization/reversibility gates.
+pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
+    if string_at(value, &["schema_version"])? != "0.1.0"
+        || string_at(value, &["dataset_id"])? != "rea-proof-obligation-acquisition"
+        || string_at(value, &["status"])? != "design_fixture_only"
+        || string_at(value, &["source_policy"])? != "original_synthetic_text_only"
+        || string_at(value, &["use"])? != "development_and_protocol_conformance"
+        || string_at(value, &["oracle_policy"])? != "grader_only_not_for_agent_input"
+        || value.get("not_human_adjudicated").and_then(Value::as_bool) != Some(true)
+    {
+        return Err(FixtureError(
+            "fixture must preserve its design-only, synthetic, non-adjudicated and grader-only oracle declarations".into(),
+        ));
+    }
+
+    let cases = array_at(value, &["cases"])?;
+    if cases.len() != EXPECTED_CASES {
+        return Err(FixtureError(format!(
+            "expected {EXPECTED_CASES} cases, found {}",
+            cases.len()
+        )));
+    }
+
+    let mut case_ids = BTreeSet::new();
+    for case in cases {
+        let case_id = string_at(case, &["case_id"])?;
+        if !case_ids.insert(case_id.to_owned()) {
+            return Err(FixtureError(format!("duplicate case_id: {case_id}")));
+        }
+
+        let obligations = array_at(case, &["obligations"])?;
+        let mut obligation_by_id = BTreeMap::<String, &Value>::new();
+        for obligation in obligations {
+            let id = string_at(obligation, &["obligation_id"])?;
+            if obligation_by_id.insert(id.to_owned(), obligation).is_some() {
+                return Err(FixtureError(format!(
+                    "duplicate obligation_id {id} in {case_id}"
+                )));
+            }
+            let admissible = array_at(obligation, &["admissible_evidence_classes"])?;
+            let mut classes = BTreeSet::new();
+            for class in admissible {
+                let name = class.as_str().ok_or_else(|| {
+                    FixtureError(format!(
+                        "admissible evidence class must be a string in {case_id}/{id}"
+                    ))
+                })?;
+                if !classes.insert(name.to_owned()) {
+                    return Err(FixtureError(format!(
+                        "duplicate admissible evidence class {name} in {case_id}/{id}"
+                    )));
+                }
+            }
+        }
+
+        let candidates = array_at(case, &["candidates"])?;
+        let mut candidate_by_id = BTreeMap::<String, &Value>::new();
+        for candidate in candidates {
+            let experiment_id = string_at(candidate, &["experiment_id"])?;
+            if candidate_by_id
+                .insert(experiment_id.to_owned(), candidate)
+                .is_some()
+            {
+                return Err(FixtureError(format!(
+                    "duplicate experiment_id {experiment_id} in {case_id}"
+                )));
+            }
+
+            let authorization = string_at(candidate, &["authorization"])?;
+            let reversible = bool_at(candidate, &["reversible"])?;
+            let destructive = bool_at(candidate, &["destructive"])?;
+            let cost = candidate
+                .get("cost_units")
+                .and_then(Value::as_f64)
+                .ok_or_else(|| {
+                    FixtureError(format!(
+                        "candidate cost_units must be numeric in {case_id}/{experiment_id}"
+                    ))
+                })?;
+            if !cost.is_finite() || cost <= 0.0 {
+                return Err(FixtureError(format!(
+                    "candidate cost_units must be finite and positive in {case_id}/{experiment_id}"
+                )));
+            }
+
+            let eligible = authorization == "authorized" && reversible && !destructive;
+            let outcomes: BTreeSet<String> = array_at(candidate, &["outcomes"])?
+                .iter()
+                .map(|outcome| {
+                    outcome.as_str().map(str::to_owned).ok_or_else(|| {
+                        FixtureError(format!(
+                            "outcome must be a string in {case_id}/{experiment_id}"
+                        ))
+                    })
+                })
+                .collect::<Result<_, _>>()?;
+
+            for effect in array_at(candidate, &["effects"])? {
+                let outcome = string_at(effect, &["outcome"])?;
+                if !outcomes.contains(outcome) {
+                    return Err(FixtureError(format!(
+                        "effect references undeclared outcome {outcome} in {case_id}/{experiment_id}"
+                    )));
+                }
+
+                let obligation_id = string_at(effect, &["obligation_id"])?;
+                let obligation = obligation_by_id.get(obligation_id).ok_or_else(|| {
+                    FixtureError(format!(
+                        "effect references undeclared obligation {obligation_id} in {case_id}/{experiment_id}"
+                    ))
+                })?;
+                let evidence_class = string_at(effect, &["evidence_class"])?;
+                let resulting_status = string_at(effect, &["resulting_status"])?;
+
+                let class_is_admissible = array_at(
+                    obligation,
+                    &["admissible_evidence_classes"],
+                )?
+                .iter()
+                .any(|class| class.as_str() == Some(evidence_class));
+
+                let initial_status = string_at(obligation, &["status"])?;
+
+                // An inadmissible observation may preserve the existing
+                // disposition or leave it unknown; it cannot change an
+                // obligation into a stronger/newly resolved state.
+                if !class_is_admissible
+                    && resulting_status != initial_status
+                    && resulting_status != "unknown"
+                {
+                    return Err(FixtureError(format!(
+                        "inadmissible evidence class {evidence_class} changes obligation {obligation_id} from {initial_status} to {resulting_status} in {case_id}/{experiment_id}"
+                    )));
+                }
+
+                // An unauthorized, irreversible or destructive proposal may
+                // be recorded as rejected, but may never satisfy an obligation.
+                if !eligible && resulting_status == "satisfied" {
+                    return Err(FixtureError(format!(
+                        "ineligible experiment {experiment_id} attempts to satisfy {obligation_id} in {case_id}"
+                    )));
+                }
+
+                if string_at(effect, &["source_family_id"])?.trim().is_empty() {
+                    return Err(FixtureError(format!(
+                        "effect source_family_id is empty in {case_id}/{experiment_id}"
+                    )));
+                }
+            }
+        }
+
+        let preferred = string_at(case, &["expected_policy", "preferred_candidate_id"])?;
+        if preferred != "abstain" {
+            let candidate = candidate_by_id.get(preferred).ok_or_else(|| {
+                FixtureError(format!(
+                    "preferred candidate {preferred} is not declared in {case_id}"
+                ))
+            })?;
+            let eligible = string_at(candidate, &["authorization"])? == "authorized"
+                && bool_at(candidate, &["reversible"])?
+                && !bool_at(candidate, &["destructive"])?;
+            if !eligible {
+                return Err(FixtureError(format!(
+                    "preferred candidate {preferred} is not eligible in {case_id}"
+                )));
+            }
+        }
+
+        for blocking in array_at(case, &["expected_policy", "blocking_obligations"])? {
+            let id = blocking.as_str().ok_or_else(|| {
+                FixtureError(format!(
+                    "blocking obligation must be a string in {case_id}"
+                ))
+            })?;
+            if !obligation_by_id.contains_key(id) {
+                return Err(FixtureError(format!(
+                    "blocking obligation {id} is not declared in {case_id}"
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate the embedded Draft 2020-12 schema, its instance, and semantic
+/// cross-field invariants.
+pub fn validate_embedded_corpus() -> Result<(), FixtureError> {
+    let schema: Value = serde_json::from_str(SCHEMA)
+        .map_err(|error| FixtureError(format!("schema JSON parse failed: {error}")))?;
+    draft202012::meta::validate(&schema)
+        .map_err(|error| FixtureError(format!("Draft 2020-12 schema is invalid: {error}")))?;
+
+    let fixture: Value = serde_json::from_str(FIXTURE)
+        .map_err(|error| FixtureError(format!("fixture JSON parse failed: {error}")))?;
+    let validator = draft202012::options()
+        .build(&schema)
+        .map_err(|error| FixtureError(format!("schema compilation failed: {error}")))?;
+    let errors: Vec<String> = validator
+        .iter_errors(&fixture)
+        .map(|error| error.to_string())
+        .collect();
+    if !errors.is_empty() {
+        return Err(FixtureError(format!(
+            "fixture failed JSON Schema validation: {}",
+            errors.join("; ")
+        )));
+    }
+
+    validate_fixture(&fixture)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> Value {
+        serde_json::from_str(FIXTURE).expect("checked-in fixture must parse")
+    }
+
+    #[test]
+    fn draft_2020_12_schema_is_meta_valid_and_fixture_conforms() {
+        validate_embedded_corpus().unwrap();
+    }
+
+    #[test]
+    fn duplicate_case_id_is_rejected() {
+        let mut value = fixture();
+        let duplicate = value["cases"][0].clone();
+        value["cases"].as_array_mut().unwrap().push(duplicate);
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn dangling_effect_obligation_is_rejected() {
+        let mut value = fixture();
+        value["cases"][0]["candidates"][0]["effects"][0]["obligation_id"] =
+            Value::String("missing_obligation".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn undeclared_candidate_outcome_is_rejected() {
+        let mut value = fixture();
+        value["cases"][0]["candidates"][0]["effects"][0]["outcome"] =
+            Value::String("future_outcome_not_declared".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn inadmissible_evidence_cannot_upgrade_an_obligation() {
+        let mut value = fixture();
+        let case = value["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-008")
+            .unwrap();
+        let effect = &mut case["candidates"][0]["effects"][0];
+        effect["resulting_status"] = Value::String("satisfied".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn unauthorized_experiment_cannot_satisfy_an_obligation() {
+        let mut value = fixture();
+        let case = value["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-013")
+            .unwrap();
+        case["candidates"][0]["effects"] = serde_json::json!([{
+            "outcome":"recovered",
+            "obligation_id":"fault_reproduction",
+            "resulting_status":"satisfied",
+            "evidence_class":"authorized_controlled_reproduction",
+            "source_family_id":"synthetic:unauthorized-outcome"
+        }]);
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn hidden_oracle_policy_cannot_be_downgraded() {
+        let mut value = fixture();
+        value["oracle_policy"] = Value::String("agent_visible".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn preferred_candidate_must_exist_and_be_eligible() {
+        let mut value = fixture();
+        value["cases"][0]["expected_policy"]["preferred_candidate_id"] =
+            Value::String("missing_candidate".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn blocking_obligation_must_exist() {
+        let mut value = fixture();
+        value["cases"][0]["expected_policy"]["blocking_obligations"][0] =
+            Value::String("missing_obligation".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn zero_cost_candidate_is_rejected() {
+        let mut value = fixture();
+        value["cases"][0]["candidates"][0]["cost_units"] = serde_json::json!(0);
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn non_adjudicated_status_cannot_be_removed() {
+        let mut value = fixture();
+        value["not_human_adjudicated"] = Value::Bool(false);
+        assert!(validate_fixture(&value).is_err());
+    }
+}
