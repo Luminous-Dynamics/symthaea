@@ -72,6 +72,33 @@ explicitly does not apply the flat Myrheim–Meyer dimension law as a universal
 curved-spacetime dimension estimator. The QMC reference is deterministic
 finite-sample quadrature, not an exact integral or a continuum-limit proof.
 
+
+## Curved order-statistic inversion (new research prototype)
+
+The `curved_order_statistics` module adds a deterministic finite-QMC reference
+for the comparable-pair fraction under the declared volume-faithful 1+1D
+conformal-FRW sprinkling law. It uses normalized null coordinates and the
+dimensionless curvature
+
+    q = kappa * T^2
+
+because scale-free order statistics cannot identify `kappa` and diamond
+extent `T` independently. The O(P log P) weighted Fenwick calculation is
+differentially checked against an independent O(P^2) pair-loop reference.
+
+The inverse routine estimates q over a declared monotone calibration range;
+it does not return a sampling confidence interval, and it is not a general
+curved-spacetime dimension estimator.
+
+Run:
+
+    cargo run --locked -p symthaea-causal-set-lab --example curved_order_inversion
+
+The executable compares an empirical fixed-seed curved sprinkling with flat
+and curved QMC references, reports q-hat and its reconstructed order fraction,
+and displays the scale-rescaling degeneracy. The finite QMC reference error and
+the finite causal-set sampling error remain separate quantities.
+
 This is a curved-measure kinematics prototype. It does not yet implement a
 causal-set d'Alembertian, link propagator, AdS boundary conditions, or a
 continuum-limit analysis. See [CAUSAL-CURVED-001](../../../../issues/11053).
