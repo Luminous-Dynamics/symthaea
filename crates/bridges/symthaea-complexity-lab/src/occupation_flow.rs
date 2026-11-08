@@ -257,6 +257,52 @@ impl From<LpCertificateError> for OccupationFlowError {
     }
 }
 
+fn preflight_dimensions(
+    model: &StagewiseIntervalMarkovModel,
+    budget: OccupationFlowBudget,
+) -> Result<(OccupationFlowLayout, usize), OccupationFlowError> {
+    let periods = model.period_count();
+    let states = model.state_count();
+    let occupancy_count = periods.checked_mul(states)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let flow_count = model.transitions.len()
+        .checked_mul(states)
+        .and_then(|v| v.checked_mul(states))
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let variable_count = occupancy_count.checked_add(flow_count)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let constraint_count = states.checked_mul(2)
+        .and_then(|initial_rows| {
+            let per_stage = states.checked_mul(4)?
+                .checked_add(states.checked_mul(states)?.checked_mul(2)?)?;
+            model.transitions.len().checked_mul(per_stage)?
+                .checked_add(initial_rows)
+        })
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let matrix_entries = constraint_count.checked_mul(variable_count)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+
+    for (resource, required, limit) in [
+        ("variables", variable_count, budget.max_variables),
+        ("constraints", constraint_count, budget.max_constraints),
+        ("dense matrix entries", matrix_entries, budget.max_matrix_entries),
+    ] {
+        if required > limit {
+            return Err(OccupationFlowError::BudgetExceeded { resource, required, limit });
+        }
+    }
+
+    Ok((
+        OccupationFlowLayout {
+            periods,
+            states,
+            flow_start: occupancy_count,
+            variable_count,
+        },
+        constraint_count,
+    ))
+}
+
 /// Build an LP for the worst-case regret of one action against a comparator.
 ///
 /// The objective is U_comparator(omega) - U_selected(omega), optimized over
@@ -288,6 +334,9 @@ pub fn build_pairwise_worst_case_regret_lp(
             }
         }
     }
+
+    // Reject an over-budget LP before constructing the temporary score-difference grid.
+    let _ = preflight_dimensions(model, budget)?;
 
     let mut regret_scores = Vec::new();
     regret_scores.try_reserve_exact(periods).map_err(|_| {
@@ -355,41 +404,7 @@ pub fn build_occupation_flow_lp(
         }
     }
 
-    let occupancy_count = periods.checked_mul(states)
-        .ok_or(OccupationFlowError::DimensionOverflow)?;
-    let flow_count = model.transitions.len()
-        .checked_mul(states)
-        .and_then(|v| v.checked_mul(states))
-        .ok_or(OccupationFlowError::DimensionOverflow)?;
-    let variable_count = occupancy_count.checked_add(flow_count)
-        .ok_or(OccupationFlowError::DimensionOverflow)?;
-    let constraint_count = states.checked_mul(2)
-        .and_then(|initial_rows| {
-            let per_stage = states.checked_mul(4)?
-                .checked_add(states.checked_mul(states)?.checked_mul(2)?)?;
-            model.transitions.len().checked_mul(per_stage)?
-                .checked_add(initial_rows)
-        })
-        .ok_or(OccupationFlowError::DimensionOverflow)?;
-    let matrix_entries = constraint_count.checked_mul(variable_count)
-        .ok_or(OccupationFlowError::DimensionOverflow)?;
-
-    for (resource, required, limit) in [
-        ("variables", variable_count, budget.max_variables),
-        ("constraints", constraint_count, budget.max_constraints),
-        ("dense matrix entries", matrix_entries, budget.max_matrix_entries),
-    ] {
-        if required > limit {
-            return Err(OccupationFlowError::BudgetExceeded { resource, required, limit });
-        }
-    }
-
-    let layout = OccupationFlowLayout {
-        periods,
-        states,
-        flow_start: occupancy_count,
-        variable_count,
-    };
+    let (layout, constraint_count) = preflight_dimensions(model, budget)?;
 
     let mut matrix: Vec<Vec<CheckedRational>> = Vec::new();
     matrix.try_reserve_exact(constraint_count).map_err(|_| {
