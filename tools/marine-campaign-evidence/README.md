@@ -1,6 +1,6 @@
 # Marine campaign evidence verifier
 
-This is a standalone Rust tool workspace. It consumes the marine campaign-binding JSON profile and checks cross-record evidence joins; it does not add a new observation, calibration, quantity/unit, clock or raw-data ontology.
+This is a standalone Rust tool workspace. It consumes the marine campaign-binding JSON profile and checks cross-record evidence joins, including method-declared minimum sample rate versus the actual channel sample rate; it does not add a new observation, calibration, quantity/unit, clock or raw-data ontology.
 
 ## Run
 
