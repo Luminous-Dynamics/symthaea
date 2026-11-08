@@ -1055,6 +1055,30 @@ mod tests {
         assert!((normalized_planner_cost(experiment(&agent, "controlled_reproduction"), point_base)
             - 0.733_333_333_333_333_4).abs() < 1.0e-12);
 
+        let grader = policy_grader();
+        let golden = &grader["golden_values"];
+        assert!((golden["static_probe_normalized_cost"].as_f64().unwrap()
+            - normalized_planner_cost(experiment(&agent, "static_function_probe"), point_base))
+            .abs() < 1.0e-12);
+        assert!((golden["manifest_normalized_cost"].as_f64().unwrap()
+            - normalized_planner_cost(experiment(&agent, "verify_deployment_manifest"), point_base))
+            .abs() < 1.0e-12);
+        assert!((golden["reproduction_normalized_cost"].as_f64().unwrap()
+            - normalized_planner_cost(experiment(&agent, "controlled_reproduction"), point_base))
+            .abs() < 1.0e-12);
+        assert!((golden["static_probe_point_planner_utility"].as_f64().unwrap()
+            - point_utility("static_function_probe"))
+            .abs() < 1.0e-12);
+        assert!((golden["reproduction_point_planner_utility"].as_f64().unwrap()
+            - point_utility("controlled_reproduction"))
+            .abs() < 1.0e-12);
+        assert!((golden["static_probe_robust_lower_tail_utility"].as_f64().unwrap()
+            - robust_utility("static_function_probe"))
+            .abs() < 1.0e-12);
+        assert!((golden["reproduction_robust_lower_tail_utility"].as_f64().unwrap()
+            - robust_utility("controlled_reproduction"))
+            .abs() < 1.0e-12);
+
         assert!((point_eig["static_function_probe"] - 0.531_004_406_410_718_9).abs() < 1.0e-12);
         assert!((point_eig["controlled_reproduction"] - 0.278_071_905_112_637_7).abs() < 1.0e-12);
         assert!((expected_scenario_eig["static_function_probe"] - 0.265_646_482_328_954_5).abs() < 1.0e-12);
