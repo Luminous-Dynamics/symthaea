@@ -479,3 +479,16 @@ For fair benchmarks, "exact" means deterministic agreement with the versioned ca
 HME exact-profile admission is finite f32 components in [-1, 1], equal dimensions and the matching score-contract ID. This range is not automatically guaranteed by every generic ContinuousHV constructor/operator; segment admission must validate it. Query receipt schemas now bind continuous_f32 + cosine to the versioned ID. Synthetic adversarial cases are in [hme_similarity_admission_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_similarity_admission_v0.json).
 
 The canonical score API and admission checks are source committed, but not yet cargo-built/tested or integrated into the read-only segment prototype. No exact retrieval result or benchmark pass is claimed.
+
+## 2026-11-08 addendum: exact group/page synopsis bounds
+
+A new, deliberately narrow workstream is open: [#11059 — HME-GROUP-BOUND-001](https://github.com/Luminous-Dynamics/symthaea/issues/11059).
+
+It investigates immutable group-level coordinate envelopes (per-coordinate minima/maxima plus canonical norm-squared intervals) that may prove every member of a page/group falls below the exact kth threshold. This is distinct from #10978's per-vector reconstruction/residual certificates and #11000's within-candidate block ordering. Existing VA-file, partitioning, R-tree/X-tree and metric-tree approaches are explicitly credited as prior art; HME is only testing whether block-aware, norm-aware grouping and page placement help at 16K–256K dimensions.
+
+- [HME group-level envelope protocol](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/HME_GROUP_LEVEL_ENVELOPES_2026-11-08.md)
+- [Synthetic group-envelope arithmetic fixture](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_group_bound_envelopes_v0.json)
+
+The fixture JSON was fetched and parsed. Its four cases were recomputed: positive numerator uses the lower norm denominator; negative numerator uses the upper norm denominator; a zero lower-norm bound disables positive pruning; and threshold equality continues. This is a real-arithmetic sanity check, not an outward-rounded f32 proof, runtime test or speed result.
+
+The group synopsis must be built against an immutable eligible generation. Mixed authorization/temporal/forgetting sets require a separately verified eligible-subset synopsis or item-level refinement; metadata grouping must not leak excluded records. Strict U_group < theta_k is required and stale/corrupt metadata falls back or fails closed.
