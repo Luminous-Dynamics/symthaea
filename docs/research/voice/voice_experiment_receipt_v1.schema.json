@@ -1097,7 +1097,9 @@
         "candidate_id_integrity_check",
         "selected_transcript_exact_copy_check",
         "source_interval_start_frame",
-        "source_interval_end_frame"
+        "source_interval_end_frame",
+        "target_language_supervised_training_hours",
+        "selector_output_sha256"
       ],
       "properties": {
         "mode": {
@@ -1305,6 +1307,31 @@
             "null"
           ],
           "minimum": 0
+        },
+        "target_language_supervised_training_hours": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "selector_output_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
         }
       },
       "allOf": [
