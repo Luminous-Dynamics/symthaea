@@ -1,0 +1,283 @@
+{
+  "schema_version": "0.1.0",
+  "status": "provisional_task_ontology_not_a_vessel_assessment",
+  "parent_issue": 10926,
+  "workstream_issue": 10966,
+  "units": "SI",
+  "architecture_location_rules": {
+    "monohull": [
+      "fore",
+      "midships",
+      "aft",
+      "centreline_or_offset",
+      "deck_level"
+    ],
+    "catamaran": [
+      "port_demi_hull",
+      "starboard_demi_hull",
+      "bridge_deck",
+      "cross_deck",
+      "forward_cross_structure",
+      "aft_cross_structure",
+      "deck_level"
+    ],
+    "trimaran": [
+      "main_hull",
+      "port_ama",
+      "starboard_ama",
+      "crossbeam_or_aka",
+      "deck_level"
+    ]
+  },
+  "posture_vocabulary": [
+    "lying_supine",
+    "lying_lateral",
+    "seated_supported",
+    "seated_unsupported",
+    "standing_braced",
+    "standing_unbraced",
+    "walking",
+    "reaching",
+    "lifting_or_carrying",
+    "manual_control",
+    "bending"
+  ],
+  "exposure_windows_seconds": [
+    600,
+    3600,
+    7200,
+    28800
+  ],
+  "operating_case_fields": [
+    "speed_mps",
+    "heading_relative_to_wave_deg",
+    "wave_spectrum_ref",
+    "significant_wave_height_m",
+    "peak_or_encounter_period_s",
+    "wind_speed_mps",
+    "current_mps",
+    "water_depth_m",
+    "loading_case_ref",
+    "draft_m",
+    "trim_m",
+    "occupant_adaptation_class"
+  ],
+  "tasks": [
+    {
+      "id": "sleep_rest",
+      "family": "rest",
+      "locations": [
+        "berth_fore",
+        "berth_midships",
+        "berth_aft"
+      ],
+      "postures": [
+        "lying_supine",
+        "lying_lateral"
+      ],
+      "effects": [
+        "MSI",
+        "sleep_disturbance",
+        "MII_during_access"
+      ],
+      "criticality": "essential_living_function"
+    },
+    {
+      "id": "eating_social",
+      "family": "domestic",
+      "locations": [
+        "saloon_dining"
+      ],
+      "postures": [
+        "seated_supported",
+        "standing_braced",
+        "walking"
+      ],
+      "effects": [
+        "MII",
+        "MSI",
+        "task_effectiveness"
+      ],
+      "criticality": "important_living_function"
+    },
+    {
+      "id": "cooking",
+      "family": "domestic",
+      "locations": [
+        "galley_worktop",
+        "galley_cooktop",
+        "galley_storage_access"
+      ],
+      "postures": [
+        "standing_braced",
+        "standing_unbraced",
+        "reaching",
+        "lifting_or_carrying"
+      ],
+      "effects": [
+        "MII",
+        "MIF",
+        "MSI",
+        "hot_liquid_or_tool_control"
+      ],
+      "criticality": "important_with_safety_subtasks"
+    },
+    {
+      "id": "personal_care",
+      "family": "domestic",
+      "locations": [
+        "head",
+        "shower",
+        "changing_space"
+      ],
+      "postures": [
+        "standing_braced",
+        "standing_unbraced",
+        "bending",
+        "walking"
+      ],
+      "effects": [
+        "MII",
+        "MSI",
+        "task_effectiveness"
+      ],
+      "criticality": "essential_living_function"
+    },
+    {
+      "id": "circulation",
+      "family": "movement",
+      "locations": [
+        "main_passage",
+        "companionway",
+        "cross_hull_transfer",
+        "cockpit_access"
+      ],
+      "postures": [
+        "walking",
+        "standing_braced",
+        "lifting_or_carrying"
+      ],
+      "effects": [
+        "MII",
+        "fall_or_trip",
+        "task_effectiveness"
+      ],
+      "criticality": "safety_critical_routes"
+    },
+    {
+      "id": "work_learning",
+      "family": "cognitive_fine_motor",
+      "locations": [
+        "workstation_seated",
+        "workbench"
+      ],
+      "postures": [
+        "seated_supported",
+        "seated_unsupported",
+        "manual_control"
+      ],
+      "effects": [
+        "MII",
+        "MIF",
+        "MSI",
+        "task_effectiveness"
+      ],
+      "criticality": "mission_dependent"
+    },
+    {
+      "id": "helm_navigation",
+      "family": "navigation",
+      "locations": [
+        "helm_seated",
+        "helm_standing"
+      ],
+      "postures": [
+        "seated_supported",
+        "standing_braced",
+        "manual_control"
+      ],
+      "effects": [
+        "MII",
+        "MIF",
+        "MSI",
+        "visual_task_performance",
+        "task_effectiveness"
+      ],
+      "criticality": "safety_critical"
+    },
+    {
+      "id": "workshop_maintenance",
+      "family": "maintenance",
+      "locations": [
+        "workshop_bench",
+        "machinery_access",
+        "technical_space"
+      ],
+      "postures": [
+        "standing_braced",
+        "reaching",
+        "lifting_or_carrying",
+        "manual_control"
+      ],
+      "effects": [
+        "MII",
+        "MIF",
+        "object_control",
+        "task_effectiveness"
+      ],
+      "criticality": "maintenance_and_safety"
+    },
+    {
+      "id": "deck_emergency",
+      "family": "deck_operations",
+      "locations": [
+        "foredeck",
+        "aft_deck",
+        "cockpit",
+        "boarding_point",
+        "muster_and_egress_route"
+      ],
+      "postures": [
+        "standing_braced",
+        "walking",
+        "lifting_or_carrying",
+        "manual_control"
+      ],
+      "effects": [
+        "MII",
+        "fall_or_trip",
+        "line_handling_performance",
+        "egress_time"
+      ],
+      "criticality": "safety_critical_separate_gate"
+    }
+  ],
+  "required_observation_fields": [
+    "task_id",
+    "design_revision",
+    "architecture",
+    "location_id",
+    "location_frame_and_coordinates",
+    "posture",
+    "exposure_start_end",
+    "operating_case_id",
+    "condition_digest",
+    "motion_source_ref",
+    "solver_or_instrument_revision",
+    "sensor_calibration_ref_if_measured",
+    "evidence_class",
+    "validation_domain",
+    "uncertainty",
+    "task_outcome_method_ref",
+    "disposition"
+  ],
+  "rules": [
+    "Do not infer a local occupant response from an unqualified global scalar.",
+    "Do not infer MSI, MII or MIF from motion metrics unless the model/method is valid for the exact frequency, posture, exposure and population.",
+    "No location, task, failed trial or unknown may be silently dropped.",
+    "Emergency egress and safety-critical deck tasks use separate hard approval gates; comfort never substitutes.",
+    "A human self-report is an evidence source with protocol/uncertainty, not a calibrated physical measurement.",
+    "The ontology is a proposal for benchmark construction, not a comfort or habitability pass."
+  ],
+  "exposure_window_semantics": "These are candidate scenario windows for test design (10 min, 1 h, 2 h, 8 h), not published comfort limits or mandatory exposure periods. Select exact durations for each task and validate against the chosen method and human-factors review."
+}
