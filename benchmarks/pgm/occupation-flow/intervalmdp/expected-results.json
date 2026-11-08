@@ -1,0 +1,26 @@
+{
+  "schema": "symthaea.pgm.occupation-flow.intervalmdp-expected.v1",
+  "status": "oracle-values-only-julia-not-executed",
+  "competitor": "Zinoex/IntervalMDP.jl",
+  "competitor_version": "0.7.0",
+  "julia_compat": "1.11",
+  "arithmetic": "Rational{BigInt}",
+  "algorithms": ["OMaximization", "VertexEnumeration"],
+  "state_count": 8,
+  "finite_reward_horizon": 3,
+  "expected": {
+    "action_a_min": "9/25",
+    "action_a_max": "32/25",
+    "action_b_min": "2/5",
+    "action_b_max": "4/5",
+    "regret_a_max": "11/25",
+    "regret_b_max": "22/25"
+  },
+  "qualification": {
+    "julia_executed": false,
+    "exact_output_comparison": "required",
+    "compare_omax_to_vertex_enumeration": true,
+    "symthaea_primal_dual_certificates_required": true,
+    "performance_claim": false
+  }
+}
