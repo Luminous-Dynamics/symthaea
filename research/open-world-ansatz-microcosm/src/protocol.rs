@@ -980,6 +980,7 @@ mod tests {
                 &log,
                 crate::StructureAccess::Withheld,
             ).unwrap();
+            assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_hypotheses, evaluated, "truth={truth:?}");
         }
     }
@@ -995,6 +996,7 @@ mod tests {
                 &log,
                 numeric::StructureAccess::Withheld,
             );
+            assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_models, evaluated, "truth={truth:?}");
         }
     }
@@ -1012,6 +1014,7 @@ mod tests {
                 &log,
                 interaction::StructureAccess::Withheld,
             );
+            assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_models, evaluated, "truth={truth:?}");
         }
     }
