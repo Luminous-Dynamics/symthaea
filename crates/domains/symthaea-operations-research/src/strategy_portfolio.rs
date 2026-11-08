@@ -518,7 +518,8 @@ pub fn decode_qbf_game_proof(
             high_child,
         } = &kind
         {
-            if *variable >= variable_count || *low_child >= node_index || *high_child >= node_index {
+            if *variable >= variable_count || *low_child >= node_index || *high_child >= node_index
+            {
                 return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: tag_offset });
             }
         }
