@@ -728,8 +728,7 @@ fn validate_canonical_residual(
 
         let mut polarity_by_variable = BTreeMap::new();
         for literal in clause {
-            if let Some(previous) =
-                polarity_by_variable.insert(literal.variable, literal.positive)
+            if let Some(previous) = polarity_by_variable.insert(literal.variable, literal.positive)
             {
                 if previous != literal.positive {
                     return Err(QbfGameDagError::NonCanonicalResidual { node: node_id });
