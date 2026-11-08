@@ -1311,9 +1311,7 @@ mod tests {
 
         let nominal = rank_sensor_placements(&existing, centre, &candidates).unwrap();
         assert_eq!(nominal[0].sensor_id, "candidate-high");
-        assert!(
-            (nominal[0].log_determinant_information - 29.464_907_952_6).abs() < 1.0e-8
-        );
+        assert!((nominal[0].log_determinant_information - 29.464_907_952_6).abs() < 1.0e-8);
 
         let hypotheses = vec![
             TargetHypothesis {
@@ -1337,11 +1335,7 @@ mod tests {
                 weight: 0.2,
             },
             TargetHypothesis {
-                target_ecef_m: Vector3::new(
-                    34.747_607_036_8,
-                    102.310_880_109_4,
-                    510.187_425_811_8,
-                ),
+                target_ecef_m: Vector3::new(34.747_607_036_8, 102.310_880_109_4, 510.187_425_811_8),
                 weight: 0.2,
             },
         ];
@@ -1349,9 +1343,7 @@ mod tests {
             rank_sensor_placements_over_target_region(&existing, &hypotheses, &candidates).unwrap();
 
         assert_eq!(robust[0].sensor_id, "candidate-up-far");
-        assert!(
-            (robust[0].expected_log_determinant_information - 26.409_045_866_2).abs() < 1.0e-8
-        );
+        assert!((robust[0].expected_log_determinant_information - 26.409_045_866_2).abs() < 1.0e-8);
         assert!(
             (robust[0].worst_case_log_determinant_information - 23.747_323_846_5).abs() < 1.0e-8
         );
