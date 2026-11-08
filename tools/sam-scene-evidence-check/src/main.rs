@@ -26,7 +26,7 @@ fn main() {
     let result = match (traffic_schema, traffic_fixture) {
         (Some(traffic_schema), Some(traffic_fixture)) => {
             validate_bundle_files(&schema, &fixture, &traffic_schema, &traffic_fixture)
-        },
+        }
         (None, None) => validate_files(&schema, &fixture),
         _ => unreachable!("argument pairing checked above"),
     };
