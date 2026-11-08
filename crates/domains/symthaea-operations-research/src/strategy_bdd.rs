@@ -1171,9 +1171,10 @@ pub fn strategy_anf_interaction_hypergraph(
             continue;
         }
         let rank = mask.count_ones() as usize;
+        // Hypergraph vertex IDs are positions in the semantic dependency
+        // scope, matching the local indices accepted by BDD orderings.
         let support: Vec<usize> = (0..dependency_count)
             .filter(|variable| (mask & (1usize << variable)) != 0)
-            .map(|index| function.dependencies[index])
             .collect();
         if rank == 1 {
             linear_variables.extend(support);
@@ -2791,12 +2792,12 @@ mod tests {
         // survive as a rank-three hyperedge, not be flattened away.
         let source = function(
             &[10, 11, 12],
-            &[false, true, true, true, true, false, false, false],
+            &[false, true, true, false, true, false, false, false],
         );
         let report = strategy_anf_interaction_hypergraph(&source, budget()).unwrap();
-        assert!(report.hyperedges.contains(&vec![10, 11, 12]));
+        assert!(report.hyperedges.contains(&vec![0, 1, 2]));
         assert_eq!(report.max_hyperedge_rank, 3);
-        assert_eq!(report.linear_variables, vec![10, 11, 12]);
+        assert_eq!(report.linear_variables, vec![0, 1, 2]);
         assert_eq!(report.transform_checks, 12);
     }
 
