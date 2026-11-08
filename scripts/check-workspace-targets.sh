@@ -57,7 +57,7 @@ default-members = ["."]
 [workspace.package]
 edition = "2024"
 EOF
-  expected="$(printf '%s\\n' 'crates/core/example-only' 'crates/domains/deferred')"
+  expected="$(printf '%s\n' 'crates/core/example-only' 'crates/domains/deferred')"
   actual="$(workspace_exclusions_from_manifest "$tmp")"
   rm -f "$tmp"
   if [[ "$actual" != "$expected" ]]; then
