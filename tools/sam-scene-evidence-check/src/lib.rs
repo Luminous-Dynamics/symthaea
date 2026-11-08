@@ -80,6 +80,56 @@ pub fn validate_bundle_values(
             "scene snapshot traffic_convention_profile_id {:?} does not resolve in the traffic profile registry",
             scene_profile_id
         ));
+    } else {
+        let profile = traffic_fixture
+            .get("profiles")
+            .and_then(Value::as_array)
+            .and_then(|profiles| {
+                profiles.iter().find(|profile| {
+                    profile.get("profile_id").and_then(Value::as_str) == scene_profile_id
+                })
+            });
+        let profile_frame_id = profile
+            .and_then(|profile| profile.get("travel_frame_id"))
+            .and_then(Value::as_str);
+        let snapshot = scene_fixture.get("snapshot");
+        let frame = snapshot
+            .and_then(|snapshot| snapshot.get("reference_frames"))
+            .and_then(Value::as_array)
+            .and_then(|frames| {
+                frames.iter().find(|frame| {
+                    frame.get("frame_id").and_then(Value::as_str) == profile_frame_id
+                })
+            });
+        if frame.is_none() {
+            errors.push(format!(
+                "traffic profile {:?} travel_frame_id {:?} does not resolve in the scene reference-frame registry",
+                scene_profile_id, profile_frame_id
+            ));
+        } else if frame
+            .and_then(|frame| frame.get("kind"))
+            .and_then(Value::as_str)
+            != Some("local_road")
+        {
+            errors.push(format!(
+                "traffic profile {:?} travel_frame_id {:?} is not a local_road frame",
+                scene_profile_id, profile_frame_id
+            ));
+        }
+        let ego_frame = snapshot
+            .and_then(|snapshot| snapshot.get("ego_state"))
+            .and_then(|ego| ego.get("reference_frame_id"))
+            .and_then(Value::as_str);
+        let road_frame = snapshot
+            .and_then(|snapshot| snapshot.get("road_geometry"))
+            .and_then(|road| road.get("reference_frame_id"))
+            .and_then(Value::as_str);
+        if profile_frame_id != ego_frame || profile_frame_id != road_frame {
+            errors.push(format!(
+                "traffic profile {:?} travel frame {:?} must match both ego frame {:?} and road frame {:?}",
+                scene_profile_id, profile_frame_id, ego_frame, road_frame
+            ));
+        }
     }
 
     if errors.is_empty() {
@@ -1006,6 +1056,40 @@ mod tests {
         let (traffic_schema, _, traffic_fixture) = load_traffic_fixtures();
         scene_fixture["snapshot"]["traffic_convention_profile_id"] =
             Value::String("missing-traffic-profile".into());
+        assert!(
+            validate_bundle_values(
+                &scene_schema,
+                &scene_fixture,
+                &traffic_schema,
+                &traffic_fixture,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_scene_traffic_profile_frame_missing_from_scene_registry() {
+        let (scene_schema, scene_fixture) = load_fixture();
+        let (traffic_schema, _, mut traffic_fixture) = load_traffic_fixtures();
+        traffic_fixture["profiles"][0]["travel_frame_id"] =
+            Value::String("unregistered-road-frame".into());
+        assert!(
+            validate_bundle_values(
+                &scene_schema,
+                &scene_fixture,
+                &traffic_schema,
+                &traffic_fixture,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_traffic_profile_bound_to_non_road_frame() {
+        let (scene_schema, scene_fixture) = load_fixture();
+        let (traffic_schema, _, mut traffic_fixture) = load_traffic_fixtures();
+        traffic_fixture["profiles"][0]["travel_frame_id"] =
+            Value::String("front-camera-image-01".into());
         assert!(
             validate_bundle_values(
                 &scene_schema,
