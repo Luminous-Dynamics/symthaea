@@ -16,11 +16,11 @@ This is a nested Cargo workspace and is intentionally not part of the root works
 
 ## Validation layers
 
-1. Full JSON Schema Draft 2020-12 meta-schema and instance validation using the pinned `jsonschema` crate.
+1. JSON Schema Draft 2020-12 meta-schema and instance validation using the exact-pinned `jsonschema` crate.
 2. Offline schema compilation: this contract uses local `$defs` references only; unexpected remote reference retrieval is disabled.
 3. SAM semantic checks that JSON Schema alone cannot express:
    - source, frame and track references must resolve;
-   - source IDs and active track-lineage IDs must be unique;
+   - source IDs and hypothesis IDs must be unique; alternate hypotheses may share a track-lineage ID;
    - snapshot event/receive/processing ticks must be ordered;
    - diagonal covariance dimensions must match state ordering and units;
    - diagonal covariance entries must be finite and non-negative;
@@ -38,7 +38,7 @@ Unit tests mutate the canonical fixture to test rejection of:
 - unknown source references;
 - covariance dimension mismatch;
 - observed-free regions without source evidence;
-- duplicate active track lineage;
+- duplicate hypothesis identity (while allowing multiple hypotheses on one track lineage);
 - predictions referring to unknown tracks;
 - out-of-order snapshot clock fields.
 
