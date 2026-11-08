@@ -675,8 +675,11 @@ mod tests {
         assert_eq!(result.phone_error_rate, 1.0);
         assert_eq!(result.timing.onset_mae_ms, None);
         assert_eq!(result.timing.onset_median_ms, None);
+        assert_eq!(result.timing.onset_within_20ms_fraction, None);
         assert_eq!(result.timing.onset_within_50ms_fraction, None);
+        assert_eq!(result.timing.vowel_onset_within_50ms_fraction, None);
         assert_eq!(result.timing.onset_within_100ms_fraction, None);
+        assert_eq!(result.timing.duration_ratio, None);
         assert_eq!(result.prediction_exact_precision, None);
     }
 
