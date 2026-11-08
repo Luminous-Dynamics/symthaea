@@ -367,15 +367,19 @@ pub fn phonological_feature_error_rates(
 
         if i > 0 && close(dp[i][j], dp[i - 1][j] + config.gap_penalty) {
             let segment = &reference[i - 1];
-            let tone_active = segment.has_active_value(config.tone_dimensions.iter().copied());
+            let active_feature_dimensions =
+                segment.values.iter().filter(|&&value| value != 0).count();
+            let active_tone_dimensions = config.tone_dimensions.iter()
+                .filter(|&&index| segment.values[index] != 0)
+                .count();
             reverse_columns.push(FeatureAlignmentColumn {
                 reference_index: Some(i - 1),
                 hypothesis_index: None,
                 operation: FeatureAlignmentOp::Deletion,
-                feature_cost: config.gap_penalty,
-                tone_cost: if tone_active { config.gap_penalty } else { 0.0 },
-                active_feature_dimensions: config.dimension_count,
-                active_tone_dimensions: usize::from(tone_active),
+                feature_cost: if active_feature_dimensions > 0 { config.gap_penalty } else { 0.0 },
+                tone_cost: if active_tone_dimensions > 0 { config.gap_penalty } else { 0.0 },
+                active_feature_dimensions,
+                active_tone_dimensions,
             });
             i -= 1;
             continue;
@@ -383,15 +387,19 @@ pub fn phonological_feature_error_rates(
 
         if j > 0 && close(dp[i][j], dp[i][j - 1] + config.gap_penalty) {
             let segment = &hypothesis[j - 1];
-            let tone_active = segment.has_active_value(config.tone_dimensions.iter().copied());
+            let active_feature_dimensions =
+                segment.values.iter().filter(|&&value| value != 0).count();
+            let active_tone_dimensions = config.tone_dimensions.iter()
+                .filter(|&&index| segment.values[index] != 0)
+                .count();
             reverse_columns.push(FeatureAlignmentColumn {
                 reference_index: None,
                 hypothesis_index: Some(j - 1),
                 operation: FeatureAlignmentOp::Insertion,
-                feature_cost: config.gap_penalty,
-                tone_cost: if tone_active { config.gap_penalty } else { 0.0 },
-                active_feature_dimensions: config.dimension_count,
-                active_tone_dimensions: usize::from(tone_active),
+                feature_cost: if active_feature_dimensions > 0 { config.gap_penalty } else { 0.0 },
+                tone_cost: if active_tone_dimensions > 0 { config.gap_penalty } else { 0.0 },
+                active_feature_dimensions,
+                active_tone_dimensions,
             });
             j -= 1;
             continue;
@@ -638,6 +646,19 @@ mod tests {
         ).unwrap();
         assert_eq!(r.insertions, 1);
         assert_eq!(r.fer.unwrap().value, 1.5);
+    }
+
+    #[test]
+    fn all_na_gap_segment_does_not_add_feature_or_tone_cost() {
+        let r = phonological_feature_error_rates(
+            &[v(&[1, 0, 0, 0])],
+            &[v(&[1, 0, 0, 0]), v(&[0, 0, 0, 0])],
+            &cfg(vec![1], 1.0)
+        ).unwrap();
+        assert_eq!(r.insertions, 1);
+        assert_eq!(r.fer.unwrap().value, 0.0);
+        assert_eq!(r.ter, None);
+        assert_eq!(r.alignment.last().unwrap().active_feature_dimensions, 0);
     }
 
     #[test]
