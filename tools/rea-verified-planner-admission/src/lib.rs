@@ -9,9 +9,8 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use symthaea_rea_compat::{EvidenceError, canonical_jcs_bytes, sha256_hex, verify_evidence_json};
 use symthaea_rea_investigator::{
-    Authorization, CostWeights, EvidenceOrigin, EvidenceProvenance, ExperimentProposal,
-    Hypothesis, InvestigationPlan, PlannerConfig, PlannerError, TargetImpact,
-    plan_next_experiment,
+    Authorization, EvidenceOrigin, EvidenceProvenance, ExperimentProposal, Hypothesis,
+    InvestigationPlan, PlannerConfig, PlannerError, TargetImpact, plan_next_experiment,
 };
 
 const LINEAGE_SCHEMA: &str = "luminous.rea.planner-lineage-declaration.v0";
@@ -365,7 +364,7 @@ impl VerifiedEvidenceCatalog {
     }
 
 
-    fn planner_request_digest(
+    pub fn planner_request_digest(
         &self,
         hypotheses: &[Hypothesis],
         experiments: &[ExperimentProposal],
@@ -625,7 +624,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use symthaea_rea_compat::compute_evidence_id;
-    use symthaea_rea_investigator::AbstentionReason;
+    use symthaea_rea_investigator::{AbstentionReason, CostWeights};
 
     fn golden_id() -> String {
         verify_evidence_json(GOLDEN_EVIDENCE).unwrap().evidence_id
@@ -934,7 +933,12 @@ mod tests {
             supporting_evidence_ids: vec![first_id, second_id],
             contradicting_evidence_ids: Vec::new(),
         };
-        let result = catalog.validate_hypothesis_source_family_independence(&[hypothesis]);
+        let result = plan_next_experiment_from_verified_evidence(
+            &catalog,
+            &[hypothesis],
+            &[],
+            PlannerConfig::default(),
+        );
         assert_eq!(
             result.unwrap_err().kind,
             AdmissionErrorKind::CommonModeIndependentRoot
