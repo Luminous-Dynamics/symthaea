@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 //! Marine test-campaign evidence binding verifier.
 //!
 //! This crate validates cross-record evidence relationships over the canonical
