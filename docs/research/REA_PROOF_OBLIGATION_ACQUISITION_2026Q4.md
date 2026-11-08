@@ -368,6 +368,31 @@ Targets, not achieved results:
 
 A numeric percentage gain in cost or coverage must be set only after a pilot establishes human agreement, task difficulty, baseline variance and statistical power. Do not pick an arbitrary improvement threshold and treat it as a scientific result.
 
+## 6.0.1 False-ready statistical power and independence
+
+The zero-false-ready target has two distinct meanings:
+
+1. **Deterministic controls:** zero false-ready accepts on all known-answer negative controls. This is a software/release gate.
+2. **Population claim:** an estimated false-ready rate with an uncertainty interval on independent, human-adjudicated cases. This requires an adequately sized held-out sample.
+
+With zero observed false-ready events in n independent ready decisions, the exact one-sided 95% binomial upper bound is:
+
+```
+p_upper = 1 - 0.05^(1/n)
+```
+
+For n=300, this is approximately 0.995%; the familiar rule-of-three approximation gives 3/n. Thus a claim of below 1% false-ready at 95% confidence needs roughly 300 independent ready-decision units with zero events under an IID binomial model. The actual study must use a cluster-aware interval if cases share artifacts, source families, issuers, acquisition sessions or programs.
+
+Denominator rules:
+- The denominator is claims actually marked ready, not all attempted claims.
+- If a policy never marks anything ready, false-ready rate is undefined (null), and useful coverage is zero; it does not pass.
+- Repeated prompts, model retries, candidate outcomes and multiple findings from one artifact are not independent population units.
+- Use artifact/program/source-family clusters as bootstrap or hierarchical-model units; report within-cluster repeats separately.
+- Publish the number of independent clusters and ready decisions; never use a narrow binomial interval that assumes independence when cases share a source.
+- Keep deterministic mutation/control counts separate from adjudicated field-case counts.
+
+Use preregistered cluster bootstrap or beta-binomial/mixed-effects analysis for broader populations. Set final sample size through a pilot estimating inter-rater agreement, case difficulty and cluster correlation. The 18 synthetic development cases in v0 are nowhere near sufficient for a population false-ready claim.
+
 ## 6.1 External benchmark baselines and denominator discipline
 
 Use external benchmarks as separate reference tracks; never pool their scores.
