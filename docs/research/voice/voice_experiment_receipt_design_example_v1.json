@@ -231,6 +231,10 @@
     "ground_truth_revision": null,
     "evidence_annotation_revision": null,
     "output_manifest_sha256": null,
-    "privacy_review_ref": null
+    "privacy_review_ref": null,
+    "trial_manifest_sha256": null,
+    "scorer_revision": null,
+    "claim_label_ontology_revision": null,
+    "conflict_axis_annotation_revision": null
   }
 }
