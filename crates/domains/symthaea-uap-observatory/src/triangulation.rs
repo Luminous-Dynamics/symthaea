@@ -375,6 +375,21 @@ pub fn bearing_position_clock_jacobian(
         horizontal * inverse_range_squared,
     ];
 
+    // The spatial gradients above are expressed in sensor-body axes. Rotate
+    // them back to ECEF because the target-state parameter columns are ECEF.
+    // The clock-offset derivative is invariant under this frame change when
+    // computed as the body-gradient dot the body-frame relative velocity.
+    let azimuth_gradient_ecef = candidate.sensor_to_ecef.rotate_vector(Vector3::new(
+        azimuth_gradient[0],
+        azimuth_gradient[1],
+        azimuth_gradient[2],
+    ))?;
+    let elevation_gradient_ecef = candidate.sensor_to_ecef.rotate_vector(Vector3::new(
+        elevation_gradient[0],
+        elevation_gradient[1],
+        elevation_gradient[2],
+    ))?;
+
     let azimuth_time_derivative = azimuth_gradient[0] * relative_velocity.x
         + azimuth_gradient[1] * relative_velocity.y
         + azimuth_gradient[2] * relative_velocity.z;
@@ -385,15 +400,15 @@ pub fn bearing_position_clock_jacobian(
     let azimuth_sigma = candidate.sigma_azimuth_rad;
     let elevation_sigma = candidate.sigma_elevation_rad;
     let azimuth_row = [
-        azimuth_gradient[0] / azimuth_sigma,
-        azimuth_gradient[1] / azimuth_sigma,
-        azimuth_gradient[2] / azimuth_sigma,
+        azimuth_gradient_ecef.x / azimuth_sigma,
+        azimuth_gradient_ecef.y / azimuth_sigma,
+        azimuth_gradient_ecef.z / azimuth_sigma,
         azimuth_time_derivative / azimuth_sigma,
     ];
     let elevation_row = [
-        elevation_gradient[0] / elevation_sigma,
-        elevation_gradient[1] / elevation_sigma,
-        elevation_gradient[2] / elevation_sigma,
+        elevation_gradient_ecef.x / elevation_sigma,
+        elevation_gradient_ecef.y / elevation_sigma,
+        elevation_gradient_ecef.z / elevation_sigma,
         elevation_time_derivative / elevation_sigma,
     ];
 
