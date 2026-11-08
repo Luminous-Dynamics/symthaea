@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/aegis-attempt-v0.schema.json",
+  "title": "PITB Aegis prover attempt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "attempt_id",
+    "specification_id",
+    "program_id",
+    "prover_id",
+    "prover_version",
+    "model_checkpoint_sha256",
+    "wall_budget_seconds",
+    "elapsed_seconds",
+    "input_tokens",
+    "output_tokens",
+    "api_cost_microusd",
+    "outcome",
+    "theorem_statement_sha256",
+    "frozen_prefix_sha256",
+    "target_unchanged",
+    "kernel_check_passed",
+    "axiom_policy_passed",
+    "no_sorry",
+    "proof_artifact_sha256",
+    "solution_patch_sha256",
+    "comparator_receipt_sha256",
+    "diagnostic_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.aegis-attempt.v0"
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prover_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prover_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "wall_budget_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "elapsed_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "api_cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "outcome": {
+      "enum": [
+        "proved_statement",
+        "proved_negation",
+        "unresolved",
+        "resource_exhausted",
+        "harness_error"
+      ]
+    },
+    "theorem_statement_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "frozen_prefix_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "target_unchanged": {
+      "type": "boolean"
+    },
+    "kernel_check_passed": {
+      "type": "boolean"
+    },
+    "axiom_policy_passed": {
+      "type": "boolean"
+    },
+    "no_sorry": {
+      "type": "boolean"
+    },
+    "proof_artifact_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "solution_patch_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "comparator_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "diagnostic_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "proved_statement",
+              "proved_negation"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target_unchanged": {
+            "const": true
+          },
+          "kernel_check_passed": {
+            "const": true
+          },
+          "axiom_policy_passed": {
+            "const": true
+          },
+          "no_sorry": {
+            "const": true
+          },
+          "proof_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "solution_patch_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "comparator_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

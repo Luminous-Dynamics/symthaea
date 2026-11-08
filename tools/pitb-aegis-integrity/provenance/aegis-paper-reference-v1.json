@@ -1,0 +1,32 @@
+{
+  "schema_version": "pitb.aegis-snapshot.v0",
+  "benchmark_id": "Aegis",
+  "benchmark_version": "paper-v1-2026-10-28",
+  "paper_arxiv_id": "2610.38174",
+  "paper_version": "v1",
+  "paper_submitted_date": "2026-10-28",
+  "snapshot_id": "aegis-paper-2610.38174-v1-provenance-only",
+  "dataset_artifact_status": "not_located",
+  "dataset_artifact_url": null,
+  "dataset_archive_sha256": null,
+  "dataset_license_status": "not_confirmed",
+  "dataset_license_identifier": null,
+  "program_pair_count": null,
+  "candidate_specification_count": null,
+  "sample_entry_count": null,
+  "paper_reference": {
+    "attempted_source_problems": 2356,
+    "validated_rust_lean_program_pairs": 2045,
+    "candidate_specifications": 11533,
+    "evaluation_sample_size": 2000,
+    "evaluation_program_count": 1257,
+    "evaluation_attempted_count": 1997,
+    "evaluation_statement_proofs": 1054,
+    "evaluation_unresolved_count": 943,
+    "per_statement_budget_seconds": 1800
+  },
+  "task_manifest_sha256": null,
+  "sample_manifest_sha256": null,
+  "environment_policy_sha256": null,
+  "sample_protocol": "paper_v1_hold_only"
+}

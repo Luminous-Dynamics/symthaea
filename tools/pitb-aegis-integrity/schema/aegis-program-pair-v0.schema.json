@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/aegis-program-pair-v0.schema.json",
+  "title": "PITB Aegis Rust-Lean program pair v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program_id",
+    "source_problem_id",
+    "implementation_kind",
+    "rust_source_sha256",
+    "rust_toolchain_sha256",
+    "rust_compiler_version",
+    "reference_case_count",
+    "rust_reference_tests_passed",
+    "rust_test_receipt_sha256",
+    "charon_version",
+    "charon_source_commit",
+    "charon_config_sha256",
+    "charon_extraction_receipt_sha256",
+    "aeneas_version",
+    "aeneas_source_commit",
+    "aeneas_config_sha256",
+    "aeneas_translation_receipt_sha256",
+    "lean_toolchain",
+    "lean_environment_sha256",
+    "lean_program_sha256",
+    "lean_elaboration_receipt_sha256",
+    "differential_case_count",
+    "differential_cases_matched",
+    "differential_receipt_sha256",
+    "validation_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.aegis-program-pair.v0"
+    },
+    "program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_problem_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_kind": {
+      "const": "safe_rust_pure_function"
+    },
+    "rust_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "rust_toolchain_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "rust_compiler_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_case_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rust_reference_tests_passed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rust_test_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "charon_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "charon_source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "charon_config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "charon_extraction_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "aeneas_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aeneas_source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "aeneas_config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "aeneas_translation_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lean_toolchain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lean_environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lean_program_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lean_elaboration_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "differential_case_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "differential_cases_matched": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "differential_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "validation_status": {
+      "enum": [
+        "validated",
+        "rejected"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "validated"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rust_reference_tests_passed": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "differential_case_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "differential_cases_matched": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ]
+}

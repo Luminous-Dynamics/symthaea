@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/aegis-specification-v0.schema.json",
+  "title": "PITB Aegis specification v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "specification_id",
+    "program_id",
+    "theorem_name",
+    "statement_sha256",
+    "frozen_prefix_sha256",
+    "natural_language_description_sha256",
+    "requested_polarity",
+    "category",
+    "difficulty",
+    "plausible_screen_status",
+    "specification_status",
+    "specification_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.aegis-specification.v0"
+    },
+    "specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "theorem_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "statement_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "frozen_prefix_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "natural_language_description_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "requested_polarity": {
+      "enum": [
+        "hold",
+        "fail"
+      ]
+    },
+    "category": {
+      "enum": [
+        "edge_case",
+        "explicit_contract",
+        "functional_correctness",
+        "totality",
+        "output_bound",
+        "output_shape",
+        "relational",
+        "other"
+      ]
+    },
+    "difficulty": {
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "unknown"
+      ]
+    },
+    "plausible_screen_status": {
+      "enum": [
+        "counterexample_found",
+        "no_counterexample_found",
+        "not_testable",
+        "not_run"
+      ]
+    },
+    "specification_status": {
+      "enum": [
+        "retained",
+        "excluded_duplicate",
+        "excluded_trivial",
+        "excluded_vacuous",
+        "elaboration_error"
+      ]
+    },
+    "specification_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

@@ -1,0 +1,131 @@
+name: PITB Aegis Integrity Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/pitb-aegis-integrity/**"
+      - ".github/workflows/pitb-aegis-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aegis-integrity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-aegis-venv"
+          "$RUNNER_TEMP/pitb-aegis-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated Rust validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-aegis-integrity"
+          mkdir -p "$staged/src"
+          cp tools/pitb-aegis-integrity/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-aegis-integrity/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-aegis-integrity/src/main.rs "$staged/src/main.rs"
+          echo "PITB_AEGIS_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_AEGIS_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test Aegis validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_AEGIS_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_AEGIS_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_AEGIS_MANIFEST"
+          cargo run --locked --manifest-path "$PITB_AEGIS_MANIFEST" -- --self-test
+
+      - name: Generate synthetic integrity fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_AEGIS_MANIFEST" -- \
+            --self-test-fixture-dir "$RUNNER_TEMP/pitb-aegis-fixture"
+
+      - name: Validate provenance, row and report schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-aegis-venv/bin/python" - "$RUNNER_TEMP/pitb-aegis-fixture" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("tools/pitb-aegis-integrity/schema")
+          fixture = Path(sys.argv[1])
+          names = {
+              "snapshot.json": "aegis-snapshot-v0.schema.json",
+              "programs.jsonl": "aegis-program-pair-v0.schema.json",
+              "specifications.jsonl": "aegis-specification-v0.schema.json",
+              "sample.jsonl": "aegis-sample-entry-v0.schema.json",
+              "attempts.jsonl": "aegis-attempt-v0.schema.json",
+              "report.json": "aegis-integrity-report-v0.schema.json",
+          }
+          for data_name, schema_name in names.items():
+              schema = json.loads((root / schema_name).read_text())
+              Draft202012Validator.check_schema(schema)
+              if data_name.endswith(".jsonl"):
+                  rows = [json.loads(line) for line in (fixture / data_name).read_text().splitlines() if line.strip()]
+                  errors = [error for row in rows for error in Draft202012Validator(schema).iter_errors(row)]
+              else:
+                  data = json.loads((fixture / data_name).read_text())
+                  errors = list(Draft202012Validator(schema).iter_errors(data))
+              if errors:
+                  raise SystemExit(f"{data_name} schema errors: " + "; ".join(e.message for e in errors))
+          report = json.loads((fixture / "report.json").read_text())
+          counts = report["outcome_summary"]
+          if report["snapshot_mode"] != "synthetic_fixture":
+              raise SystemExit("synthetic evidence must remain labeled synthetic")
+          if counts["proved_statement_count"] != 1 or counts["proved_negation_count"] != 1:
+              raise SystemExit("proof and refutation outcome controls changed")
+          if counts["requested_polarity_correct_count"] != 1 or counts["requested_polarity_opposite_count"] != 1:
+              raise SystemExit("requested-polarity score was conflated with prover resolution")
+          if counts["resolution_rate_over_selected"] != 1.0:
+              raise SystemExit("synthetic resolution score changed")
+          print("PITB_AEGIS_INTEGRITY_SCHEMAS_AND_POLARITY_SCORE_PASS")
+          PY
+
+      - name: Validate paper-only provenance fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-aegis-venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          schema = json.loads(Path("tools/pitb-aegis-integrity/schema/aegis-snapshot-v0.schema.json").read_text())
+          snapshot = json.loads(Path("tools/pitb-aegis-integrity/provenance/aegis-paper-reference-v1.json").read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(snapshot))
+          if errors:
+              raise SystemExit("provenance schema errors: " + "; ".join(e.message for e in errors))
+          if snapshot["dataset_artifact_status"] != "not_located" or snapshot["dataset_license_status"] != "not_confirmed":
+              raise SystemExit("unavailable Aegis artifact or unknown license was promoted")
+          print("PITB_AEGIS_PAPER_PROVENANCE_ONLY_PASS")
+          PY
+
+      - name: Retain synthetic Aegis contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-aegis-integrity-synthetic
+          path: ${{ runner.temp }}/pitb-aegis-fixture
+          if-no-files-found: warn
+          retention-days: 30
