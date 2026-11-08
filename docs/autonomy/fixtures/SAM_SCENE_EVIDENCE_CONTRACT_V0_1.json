@@ -40,7 +40,9 @@
           "v": "down_pixels"
         },
         "length_unit": "px",
-        "transform_id": "camera-optical-frame-v1"
+        "transform_id": "camera-optical-frame-v1",
+        "handedness": "not_applicable",
+        "angle_unit": "not_applicable"
       }
     ],
     "sources": [
