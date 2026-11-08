@@ -1,0 +1,160 @@
+{
+  "fixture_schema": "luminous.sam.traffic-convention-metamorphic",
+  "fixture_version": "0.1.0",
+  "claim_ceiling": "paired_synthetic_metamorphic_conformance_only",
+  "profile_registry_ref": "SAM_TRAFFIC_CONVENTION_PROFILE_FIXTURE_V0_1.json",
+  "coordinate_contract": {
+    "frame": "right_handed_local_road",
+    "x_axis": "ego_travel_forward",
+    "y_axis": "left_when_looking_in_positive_x_direction",
+    "z_axis": "up",
+    "units": "SI",
+    "reflection": "x_prime=x; y_prime=-y; z_prime=z"
+  },
+  "paired_scenes": [
+    {
+      "scene_id": "synthetic-crossing-lht",
+      "pair_id": "synthetic-crossing-mirror-pair-01",
+      "traffic_convention_profile_id": "synthetic-lht-rhd-v1",
+      "map_profile_id": "synthetic-map-lht-v1",
+      "scenario_family": "crossing_actor",
+      "ego_state": {
+        "position_m": [
+          0,
+          1.75,
+          0
+        ],
+        "heading_rad": 0,
+        "velocity_mps": [
+          8,
+          0.2,
+          0
+        ],
+        "yaw_rate_rad_s": 0.05,
+        "lateral_offset_m": 0.2,
+        "curvature_per_m": 0.01,
+        "steering_angle_rad": 0.1
+      },
+      "candidate_command": {
+        "steering": 0.2,
+        "throttle": 0.3,
+        "brake": 0
+      },
+      "lanes": [
+        {
+          "lane_id": "ego-lane",
+          "role": "ego_travel_lane",
+          "center_lateral_m": 1.75,
+          "relative_lateral_sign": 1
+        },
+        {
+          "lane_id": "oncoming-lane",
+          "role": "oncoming_lane",
+          "center_lateral_m": -1.75,
+          "relative_lateral_sign": -1
+        }
+      ],
+      "declared_passing_side_sign": -1
+    },
+    {
+      "scene_id": "synthetic-crossing-rht",
+      "pair_id": "synthetic-crossing-mirror-pair-01",
+      "traffic_convention_profile_id": "synthetic-rht-lhd-v1",
+      "map_profile_id": "synthetic-map-rht-v1",
+      "scenario_family": "crossing_actor",
+      "ego_state": {
+        "position_m": [
+          0,
+          -1.75,
+          0
+        ],
+        "heading_rad": 0,
+        "velocity_mps": [
+          8,
+          -0.2,
+          0
+        ],
+        "yaw_rate_rad_s": -0.05,
+        "lateral_offset_m": -0.2,
+        "curvature_per_m": -0.01,
+        "steering_angle_rad": -0.1
+      },
+      "candidate_command": {
+        "steering": -0.2,
+        "throttle": 0.3,
+        "brake": 0
+      },
+      "lanes": [
+        {
+          "lane_id": "ego-lane",
+          "role": "ego_travel_lane",
+          "center_lateral_m": -1.75,
+          "relative_lateral_sign": -1
+        },
+        {
+          "lane_id": "oncoming-lane",
+          "role": "oncoming_lane",
+          "center_lateral_m": 1.75,
+          "relative_lateral_sign": 1
+        }
+      ],
+      "declared_passing_side_sign": 1
+    }
+  ],
+  "expected_equivariance": {
+    "same_pair_id": true,
+    "same_scenario_family": true,
+    "longitudinal_position_equal": true,
+    "absolute_lateral_position_equal": true,
+    "absolute_speed_equal": true,
+    "absolute_curvature_equal": true,
+    "absolute_yaw_rate_equal": true,
+    "absolute_steering_equal": true,
+    "throttle_equal": true,
+    "brake_equal": true,
+    "lateral_position_sign_flips": true,
+    "lateral_velocity_sign_flips": true,
+    "heading_sign_flips": true,
+    "yaw_rate_sign_flips": true,
+    "lateral_offset_sign_flips": true,
+    "curvature_sign_flips": true,
+    "steering_sign_flips": true,
+    "lane_role_identity_preserved": true,
+    "lane_side_sign_flips": true,
+    "traffic_side_flips": true,
+    "passing_side_sign_flips": true,
+    "steering_wheel_position_is_independent": true
+  },
+  "negative_controls": [
+    {
+      "id": "mismatch-lht-geometry-rht-profile",
+      "mutate": "set left traffic scene profile to synthetic-rht-lhd-v1",
+      "expected": "reject_or_unresolved"
+    },
+    {
+      "id": "mismatch-rht-geometry-lht-profile",
+      "mutate": "set right traffic scene profile to synthetic-lht-rhd-v1",
+      "expected": "reject_or_unresolved"
+    },
+    {
+      "id": "untransformed-steering",
+      "mutate": "reflect road geometry but keep steering angle and command signs unchanged",
+      "expected": "reject"
+    },
+    {
+      "id": "steering-wheel-layout-only",
+      "mutate": "change steering_wheel_position while leaving traffic_side and road-local signs unchanged",
+      "expected": "accept_with_same_road_semantics"
+    },
+    {
+      "id": "missing-passing-rule",
+      "mutate": "remove passing_rule_profile_id or version",
+      "expected": "reject_or_unresolved"
+    },
+    {
+      "id": "unknown-traffic-side",
+      "mutate": "set traffic_side to unknown and attempt a rule-sensitive passing decision",
+      "expected": "unresolved_no_rule_authority"
+    }
+  ]
+}
