@@ -810,6 +810,47 @@ physical fidelity only count after matched benchmarks.
   waves, stable neutron stars and binary neutron stars.
   https://docs.einsteintoolkit.org/et-docs/Release_Details
 
+## 2026-11-08 research and execution update
+
+### New Observatory measurement primitives
+
+The UAP Observatory now contains two separate measurement layers:
+
+- `observability::analyze_jacobian`: column-scaled, data-only numerical-rank diagnostics. The implementation now uses a direct one-sided Jacobi SVD instead of forming `J^T J`, avoiding condition-number squaring. It returns singular values, nullity, condition number and weak right-singular directions. It accepts no prior matrix, so a prior cannot hide a data-only null direction. It remains a small dense kernel capped at 64 parameter columns; it is not a factor-graph solver or a global-identifiability proof.
+- `frequency_locking::assess_frequency_locking`: finite-sweep spectral peak and contiguous detuning-lock diagnostics. It reports both FFT grid spacing and observation-limited resolution. A trace cannot be marked locked when the requested tolerance is narrower than the observation duration supports. This remains a signal-level test, not a DTC phase classifier.
+
+### Robust sensor placement: make the test discriminating
+
+The sensor-placement example now includes a four-hypothesis target region and a deliberately chosen rank-reversal fixture. The nominal single-point D-optimal winner is `candidate-high`, whereas the prior-weighted finite-region expected-logdet winner is `candidate-up-far`. The expected-logdet ranking is not directly numerically comparable to the single-point logdet because it aggregates a different objective; the meaningful result is the changed winner.
+
+This is still a finite collection of local Fisher-information calculations. It does not include continuous-region guarantees, platform pose/calibration covariance, occlusion, cost, correlated sensor errors or time-varying target dynamics. Those omissions motivate the active-design workstream rather than a stronger claim.
+
+### New active experimental-design workstream
+
+[UAP-OED-001 #11050](https://github.com/Luminous-Dynamics/symthaea/issues/11050) defines budgeted multifidelity experiment design under observability constraints. It is grounded in active prior art:
+- Ramon et al., *Multifidelity Sensor Placement in Bayesian State Estimation Problems*, Applied Mathematics for Modern Challenges (2026-07-15), DOI: 10.3934/ammc.2026006 / arXiv:2602.07269. It uses budget-constrained D-optimal design, fidelity/cost tradeoffs, marginal-gain-per-cost greedy selection and rank-one updates.
+- Maio et al., *Multi-type Sensor Placement for PDE-based Bayesian Inverse Problems*, arXiv:2607.08074 (2026-07-09), uses expected information gain with multiple sensor types and knapsack constraints.
+- Wu et al., *Sensor calibration for autonomous driving: A survey*, Measurement (2026), DOI: 10.1016/j.measurement.2026.122492, reviews spatiotemporal calibration, online adaptation and V2X cooperative calibration.
+- Wang et al., *Bio-Inspired Observability Enhancement Method for UAV Target Localization and Sensor Bias Estimation with Bearing-Only Measurement*, Biomimetics (2025), DOI: 10.3390/biomimetics10050336, and Pérez & Jauffret, *Observability in Target Motion Analysis with Biased Bearings*, JAIF (2025), make observer excitation and measurement-bias identifiability central.
+
+The differentiating Symthaea hypothesis is not that greedy sensor placement is new. It is whether finite-region robustness, calibration nuisance variables, data-only rank/abstention, multifidelity cost, active platform maneuvers and reproducible evidence can be evaluated in one matched benchmark. Small cases must be checked against exhaustive subset enumeration; no general approximation guarantee is assumed for worst-case or nonlinear scenario objectives.
+
+### Chain Theory differential reproduction
+
+The Chain Theory audit now vendors the author's record CSV from the author's repository commit `a28db8998bce5bd5ef11195c05f13c86cd9dac5c`, including Apache-2.0 provenance, and the CTGP workflow runs the independent Rust example and diffs all 172 record rows against the pinned source. This moves the work from testing counts and internal classification bands to byte-for-byte reproduction of the published record census. It still reproduces the stated calculation only; it does not validate the photon conjecture or a physical derivation of QED.
+
+### Time-crystal comparison target
+
+The current research target should be the 2D anisotropic-Heisenberg experimental benchmark, not just 1D kicked-Ising period doubling:
+- Switzer et al., *Realization of two-dimensional discrete time crystals with anisotropic Heisenberg coupling*, Nature Communications 17, 605 (2026-01-28), DOI: 10.1038/s41467-025-67787-1. The work combines IBM quantum hardware and tensor-network methods, explores a 2D anisotropic model, maps ergodic/localized/time-crystalline regimes, and studies initial-state, interaction-anisotropy and drive dependence.
+- *Discrete time crystals enabled by Floquet strong Hilbert space fragmentation*, Physical Review B 113, 214303 (2026-06-01), DOI: 10.1103/338m-mvsg, studies disorder-free fragmentation, multiple-period beating in small systems, lifetime scaling and finite-size diagnostics.
+
+The frequency-locking primitive deliberately cannot promote a spectral peak to a phase claim. The next DTC increment should add an independent exact small-system Heisenberg comparator, more initial-state families, a predeclared frequency-locking phase map, finite-size lifetime predictions and convergence-controlled MPS/TEBD comparison. Hardware-sized fidelity claims remain out of scope for exact state vectors capped at 20 spins.
+
+### Exact-head validation boundary
+
+The full CTGP matrix and lockfile checks passed on `03dce1aab380b7493bf91d0a46cd5da076c84d92`: all seven focused packages passed formatting, library tests and example compilation; the UAP placement example and anisotropic-Heisenberg sweep also ran; the committed lockfile passed `cargo metadata --locked` and all six focused library tests. Later commits add the direct SVD, frequency-resolution guard, rank-reversal fixture, author CSV differential check and active-design documentation. Those later changes require a new exact-head matrix; older success does not qualify them.
+
 ## Scientific non-claims
 
 This programme does not claim that:
