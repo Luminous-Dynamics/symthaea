@@ -70,20 +70,29 @@ manifest.
 | Action A maximum | Optimistic | 32/25 |
 | Action B minimum | Pessimistic | 2/5 |
 | Action B maximum | Optimistic | 4/5 |
-| Regret of A maximum | Optimistic | 11/25 |
-| Regret of B maximum | Optimistic | 22/25 |
+| Action C minimum | Pessimistic | 29/50 |
+| Action C maximum | Optimistic | 21/25 |
+| Regret A vs B | Optimistic | 11/25 |
+| Regret A vs C | Optimistic | 11/50 |
+| Regret B vs A | Optimistic | 22/25 |
+| Regret B vs C | Optimistic | 11/25 |
+| Regret C vs A | Optimistic | 11/25 |
+| Regret C vs B | Optimistic | 11/50 |
 
-Regret scores are signed pairwise differences over the same uncertain
-transition process:
+Action C is the pointwise midpoint of the A and B state-score vectors.
+Its exact robust utility interval is [29/50, 21/25].
 
-- Regret(A) = U_B - U_A
-- Regret(B) = U_A - U_B
+Regret is evaluated for every ordered pair using one shared transition
+process: regret(a,b) = max_M [U_b(M) - U_a(M)]. The six values are:
+A-vs-B 11/25, A-vs-C 11/50, B-vs-A 22/25, B-vs-C 11/25,
+C-vs-A 11/25, C-vs-B 11/50. Therefore the complete minimax-regret
+solution is a tie: actions A and C both attain 11/25; B attains 22/25.
 
-IntervalMDP's own finite-horizon reward tests include signed reward vectors,
-so this comparator uses no artificial path reward shift. The two regret
-queries are not a general MDP regret problem where each action changes the
-transition kernel; they compare state-score functions under shared
-dynamics, matching the current Symthaea occupation-flow API.
+IntervalMDP's finite-horizon reward support accepts signed reward vectors,
+so no artificial path reward shift is needed. This is not a general MDP
+regret problem where each action changes the transition kernel; the
+comparison uses distinct state-score vectors under shared dynamics, matching
+the current Symthaea occupation-flow API.
 
 ## Fair comparison
 
@@ -103,7 +112,7 @@ Record:
 - peak memory and allocations;
 - state count, horizon, interval support sizes and rational bit widths.
 
-The 8-state fixture is a correctness test, not a performance claim. Scaling
+The 8-state fixture is a correctness test, not a performance claim. The three-action extension tests complete pairwise coverage and tied minimax-regret decisions, not only a two-action special case. Scaling
 experiments should vary state count, horizon, support density and rational
 bit-width. Compare LP construction/solver/checker time against Bellman
 iterations, and include the one-time compilation cost for Julia.
