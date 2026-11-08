@@ -280,7 +280,9 @@ pub struct DiscoveryReport {
     pub compatible_sensors: Vec<SensorMap>,
     pub structure_identified: bool,
     pub coefficients_identified: bool,
+    pub initial_state_identified: bool,
     pub measurement_identified: bool,
+    pub model_identified: bool,
     pub disposition: DiscoveryDisposition,
 }
 
@@ -332,12 +334,24 @@ pub fn discover(
     let structure_identified =
         !compatible_models.is_empty() && compatible_structures.len() == 1;
     let coefficients_identified = compatible_models.len() == 1;
+    let coefficient_tuples: BTreeSet<(i64, Option<i64>)> = compatible_models
+        .iter()
+        .map(|model| (model.gain, model.decay))
+        .collect();
+    let coefficients_identified =
+        !compatible_models.is_empty() && coefficient_tuples.len() == 1;
+    let initial_state_identified = compatible_models.iter().all(|model| {
+        model.mechanism == Mechanism::DirectResponse
+    }) || compatible_initial_states.len() == 1;
     let measurement_identified =
         !compatible_models.is_empty() && compatible_sensors.len() == 1;
-    let disposition = match (compatible_models.len(), structure_identified) {
-        (0, _) => DiscoveryDisposition::NoCompatibleModel,
-        (1, true) => DiscoveryDisposition::UniqueModel,
-        (_, true) => DiscoveryDisposition::StructureIdentifiedParametersAmbiguous,
+    let model_identified = compatible_models.len() == 1;
+    let disposition = match (model_identified, structure_identified) {
+        (false, false) if compatible_models.is_empty() => {
+            DiscoveryDisposition::NoCompatibleModel
+        }
+        (true, true) => DiscoveryDisposition::UniqueModel,
+        (false, true) => DiscoveryDisposition::StructureIdentifiedParametersAmbiguous,
         _ => DiscoveryDisposition::StructureAmbiguous,
     };
 
@@ -351,7 +365,9 @@ pub fn discover(
         compatible_sensors,
         structure_identified,
         coefficients_identified,
+        initial_state_identified,
         measurement_identified,
+        model_identified,
         disposition,
     })
 }
@@ -724,6 +740,26 @@ mod tests {
         assert!(!classes.iter().any(|class| {
             class.members.contains(&direct) && class.members.contains(&memory)
         }));
+    }
+
+    #[test]
+    fn closed_form_oracle_matches_simulator_for_every_model_and_input_sequence() {
+        let horizon = 4;
+        let sequence_count = 3usize.pow(horizon as u32);
+        for model in candidate_models(StructureAccess::Withheld) {
+            let signature = closed_form_signature(&model, horizon, sequence_count).unwrap();
+            let mut offset = 0;
+            for code in 0..sequence_count {
+                let inputs = decode_sequence(code, horizon);
+                let predicted = model.predict(&inputs).unwrap();
+                assert_eq!(
+                    &signature[offset..offset + horizon],
+                    predicted.as_slice(),
+                    "oracle mismatch for model {model:?} and inputs {inputs:?}"
+                );
+                offset += horizon;
+            }
+        }
     }
 
     #[test]
