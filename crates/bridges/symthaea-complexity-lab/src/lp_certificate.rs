@@ -141,7 +141,6 @@ pub enum LpCertificateError {
     },
     FarkasDoesNotContradict,
     ArithmeticOverflow,
-    ComparisonOverflow,
 }
 
 impl fmt::Display for LpCertificateError {
@@ -192,9 +191,6 @@ impl fmt::Display for LpCertificateError {
             }
             Self::ArithmeticOverflow => {
                 write!(f, "checked rational arithmetic overflow during certificate replay")
-            }
-            Self::ComparisonOverflow => {
-                write!(f, "checked rational comparison overflow during certificate replay")
             }
         }
     }
@@ -390,19 +386,63 @@ fn subtract_rational(
         .map_err(|_| LpCertificateError::ArithmeticOverflow)
 }
 
+fn compare_nonnegative_rationals(
+    mut left_numerator: u128,
+    mut left_denominator: u128,
+    mut right_numerator: u128,
+    mut right_denominator: u128,
+) -> Ordering {
+    let mut reversed = false;
+    loop {
+        let left_integer = left_numerator / left_denominator;
+        let right_integer = right_numerator / right_denominator;
+        if left_integer != right_integer {
+            let order = left_integer.cmp(&right_integer);
+            return if reversed { order.reverse() } else { order };
+        }
+
+        let left_remainder = left_numerator % left_denominator;
+        let right_remainder = right_numerator % right_denominator;
+        match (left_remainder == 0, right_remainder == 0) {
+            (true, true) => return Ordering::Equal,
+            (true, false) => {
+                return if reversed { Ordering::Greater } else { Ordering::Less };
+            }
+            (false, true) => {
+                return if reversed { Ordering::Less } else { Ordering::Greater };
+            }
+            (false, false) => {
+                left_numerator = left_denominator;
+                left_denominator = left_remainder;
+                right_numerator = right_denominator;
+                right_denominator = right_remainder;
+                reversed = !reversed;
+            }
+        }
+    }
+}
+
+/// Signed rational comparison without cross-multiplication overflow.
 fn compare_rational(
     left: CheckedRational,
     right: CheckedRational,
 ) -> Result<Ordering, LpCertificateError> {
-    // Checked cross-products preserve signed rational ordering; overflow is a
-    // verifier failure, never a floating-point fallback.
-    let lhs = left.numerator()
-        .checked_mul(right.denominator())
-        .ok_or(LpCertificateError::ComparisonOverflow)?;
-    let rhs = right.numerator()
-        .checked_mul(left.denominator())
-        .ok_or(LpCertificateError::ComparisonOverflow)?;
-    Ok(lhs.cmp(&rhs))
+    match (left.is_negative(), right.is_negative()) {
+        (true, false) => Ok(Ordering::Less),
+        (false, true) => Ok(Ordering::Greater),
+        (false, false) => Ok(compare_nonnegative_rationals(
+            left.numerator() as u128,
+            left.denominator() as u128,
+            right.numerator() as u128,
+            right.denominator() as u128,
+        )),
+        (true, true) => Ok(compare_nonnegative_rationals(
+            left.numerator().unsigned_abs(),
+            left.denominator() as u128,
+            right.numerator().unsigned_abs(),
+            right.denominator() as u128,
+        ).reverse()),
+    }
 }
 
 #[cfg(test)]
@@ -411,6 +451,27 @@ mod tests {
 
     fn q(numerator: i128, denominator: i128) -> CheckedRational {
         CheckedRational::new(numerator, denominator).unwrap()
+    }
+
+    #[test]
+    fn compares_signed_large_rationals_without_cross_product_overflow() {
+        let max = i128::MAX;
+        assert_eq!(
+            compare_rational(q(max, max - 1), q(max - 1, max - 2)),
+            Ok(Ordering::Less)
+        );
+        assert_eq!(
+            compare_rational(q(-1, 2), q(-2, 3)),
+            Ok(Ordering::Greater)
+        );
+        assert_eq!(
+            compare_rational(q(-max, max - 1), q(-1, 1)),
+            Ok(Ordering::Less)
+        );
+        assert_eq!(
+            compare_rational(q(0, 1), q(0, 7)),
+            Ok(Ordering::Equal)
+        );
     }
 
     #[test]
