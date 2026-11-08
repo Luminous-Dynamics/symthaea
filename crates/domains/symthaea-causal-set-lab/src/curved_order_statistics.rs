@@ -179,7 +179,8 @@ pub fn estimate_dimensionless_curvature(
     quadrature_points: usize,
     iterations: usize,
 ) -> Result<DimensionlessCurvatureEstimate, CurvedOrderStatisticsError> {
-    if !observed_ordering_fraction.is_finite() || !(0.0..=1.0).contains(&observed_ordering_fraction) {
+    if !observed_ordering_fraction.is_finite() || !(0.0..=1.0).contains(&observed_ordering_fraction)
+    {
         return Err(CurvedOrderStatisticsError::InvalidObservedFraction);
     }
     if !maximum_dimensionless_curvature.is_finite()
