@@ -84,7 +84,7 @@ A finite grammar can have many syntactic parameterizations of one functional mec
 - **Structural family:** mechanism, relevant variables, latent-state and interaction structure.
 - **Measurement process:** sensor transform, delay, censoring, missingness and calibration state.
 
-Do not use uniform probability over raw syntax as a scientific prior without an explicit justification. A grammar with 100 equivalent expressions must not gain 100 times the prior mass of a one-expression family. Use #8669's class-level posterior and prior-splitting controls when integrating probabilities.
+Do not use uniform probability over raw syntax as a scientific prior without an explicit justification. A grammar with 100 equivalent expressions must not gain 100 times the prior mass of a one-expression family. Use #8669's class-level posterior and prior-splitting controls when integrating probabilities. The microcosm now includes a structure-balanced one-step information-gain control: equal prior over the surviving structural families, with a uniform conditional distribution over the surviving parameterizations in each family. It is a transparent ablation, not a replacement for #8669's calibrated class-level posterior.
 
 Information gain is not decision value. For each decision-focused probe, pre-register:
 - current public evidence-prefix digest;
