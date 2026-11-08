@@ -2048,6 +2048,148 @@ mod tests {
     }
 
     #[test]
+    fn action_mask_cluster_preflight_rejects_bad_indices_and_work_caps() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let mask = FiniteUmdpPolicyActionMask::new(
+            &family, vec![vec![vec![true, true]]],
+        ).unwrap();
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[], q(1,2), &mask, policy_mask_budget(),
+            ),
+            Err(PolicyPortfolioError::EmptyModelCluster)
+        );
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[2], q(1,2), &mask, policy_mask_budget(),
+            ),
+            Err(PolicyPortfolioError::PolicyMaskModelIndexOutOfBounds {
+                model_index: 2,
+                model_count: 2,
+            })
+        );
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[0,0], q(1,2), &mask, policy_mask_budget(),
+            ),
+            Err(PolicyPortfolioError::DuplicatePolicyMaskModelIndex { model_index: 0 })
+        );
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[1,0], q(1,2), &mask, policy_mask_budget(),
+            ),
+            Err(PolicyPortfolioError::PolicyMaskModelIndicesNotIncreasing {
+                previous: 1,
+                current: 0,
+            })
+        );
+        let mut operation_tight = policy_mask_budget();
+        operation_tight.max_dp_multiply_adds = 15;
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[0,1], q(1,2), &mask, operation_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask Bellman multiply-add work",
+                required: 16,
+                limit: 15,
+            })
+        );
+        let mut mask_tight = policy_mask_budget();
+        mask_tight.max_mask_entries = 1;
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[0,1], q(1,2), &mask, mask_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask entries",
+                required: 2,
+                limit: 1,
+            })
+        );
+        let mut memory_tight = policy_mask_budget();
+        memory_tight.max_output_memory_bytes = 1;
+        assert!(matches!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[0,1], q(1,2), &mask, memory_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "action-mask lower-bound output bytes",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn action_mask_generated_rational_width_and_leaf_splits_fail_closed() {
+        let model = FiniteHorizonUmdpModel::new(
+            vec![q(1,1)],
+            vec![
+                vec![vec![q(0,1)]],
+                vec![vec![q(0,1)]],
+                vec![vec![q(1,1)]],
+            ],
+            vec![
+                vec![vec![vec![q(1,1)]]],
+                vec![vec![vec![q(1,1)]]],
+            ],
+        ).unwrap();
+        let family = FiniteUmdpModelFamily::new(vec![model]).unwrap();
+        let mask = FiniteUmdpPolicyActionMask::new(
+            &family,
+            vec![
+                vec![vec![true]],
+                vec![vec![true]],
+                vec![vec![true]],
+            ],
+        ).unwrap();
+        let mut width_tight = policy_mask_budget();
+        width_tight.max_rational_bit_width = 2;
+        assert_eq!(
+            compute_policy_mask_cluster_lower_bound(
+                &family, &[0], q(1,2), &mask, width_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "rational bit width",
+                required: 3,
+                limit: 2,
+            })
+        );
+
+        assert_eq!(
+            mask.split_on_action(&family, 0, 0, 0, policy_mask_budget()),
+            Err(PolicyPortfolioError::PolicyMaskCannotSplit { time: 0, state: 0 })
+        );
+        assert_eq!(
+            mask.split_on_action(&family, 3, 0, 0, policy_mask_budget()),
+            Err(PolicyPortfolioError::PolicyMaskSlotIndexOutOfBounds {
+                time: 3,
+                state: 0,
+                horizon: 3,
+                state_count: 1,
+            })
+        );
+
+        let two_actions = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+        ]).unwrap();
+        let fixed = FiniteUmdpPolicyActionMask::new(
+            &two_actions, vec![vec![vec![true, false]]],
+        ).unwrap();
+        assert_eq!(
+            fixed.split_on_action(&two_actions, 0, 0, 1, policy_mask_budget()),
+            Err(PolicyPortfolioError::PolicyMaskActionNotAllowed {
+                time: 0,
+                state: 0,
+                action: 1,
+            })
+        );
+    }
+
+    #[test]
     fn invalid_initial_and_transition_probabilities_are_rejected() {
         let invalid_initial = FiniteHorizonUmdpModel::new(
             vec![q(-1, 2), q(3, 2)],
