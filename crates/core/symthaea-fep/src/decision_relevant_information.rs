@@ -78,6 +78,9 @@ pub struct DiagnosticActionEvaluation {
     pub expected_posterior_bayes_risk: f64,
     pub expected_value_of_sample_information: f64,
     pub model_information_gain_nats: f64,
+    /// Information gain about the identity of the optimal downstream decision.
+    /// This is targeted decision information, not expected utility improvement.
+    pub decision_information_gain_nats: f64,
     pub observation_cost: f64,
     pub safety_risk: f64,
     pub eligible: bool,
@@ -193,6 +196,8 @@ pub fn evaluate_decision_focused_diagnostics(
         .map(|hypothesis| hypothesis.prior_probability)
         .collect();
     let prior_bayes_risk = bayes_risk(&prior, hypotheses, decision_count)?;
+    let prior_optimal_decision = optimal_decision_distribution(&prior, hypotheses, decision_count);
+    let prior_decision_entropy = categorical_entropy(&prior_optimal_decision);
     let mut best_score = prior_bayes_risk;
     let mut selected_action_index = None;
     let mut evaluations = Vec::with_capacity(actions.len());
@@ -238,6 +243,25 @@ pub fn evaluate_decision_focused_diagnostics(
         }
         let expected_value_of_sample_information =
             (prior_bayes_risk - expected_posterior_bayes_risk).max(0.0);
+        let expected_posterior_decision_entropy = action_information
+            .outcome_probabilities
+            .iter()
+            .enumerate()
+            .filter(|(_, probability)| **probability > 0.0)
+            .map(|(outcome_index, probability)| {
+                let posterior = posterior_for_observation(
+                    hypotheses,
+                    action_index,
+                    outcome_index,
+                    *probability,
+                );
+                let decision_distribution =
+                    optimal_decision_distribution(&posterior, hypotheses, decision_count);
+                probability * categorical_entropy(&decision_distribution)
+            })
+            .sum::<f64>();
+        let decision_information_gain_nats =
+            (prior_decision_entropy - expected_posterior_decision_entropy).max(0.0);
         let eligible = action.safety_risk <= config.maximum_safety_risk;
         let total_score = if eligible {
             let score = expected_posterior_bayes_risk
@@ -266,6 +290,7 @@ pub fn evaluate_decision_focused_diagnostics(
             expected_posterior_bayes_risk,
             expected_value_of_sample_information,
             model_information_gain_nats: action_information.model_information_gain_nats,
+            decision_information_gain_nats,
             observation_cost: action.observation_cost,
             safety_risk: action.safety_risk,
             eligible,
@@ -418,6 +443,32 @@ fn posterior_for_observation(
                 / evidence_probability
         })
         .collect()
+}
+
+fn optimal_decision_distribution(
+    model_probabilities: &[f64],
+    hypotheses: &[DecisionHypothesis],
+    decision_count: usize,
+) -> Vec<f64> {
+    let mut distribution = vec![0.0; decision_count];
+    for (hypothesis, probability) in hypotheses.iter().zip(model_probabilities) {
+        let best = (0..decision_count)
+            .min_by(|left, right| {
+                hypothesis.loss_by_final_decision[*left]
+                    .total_cmp(&hypothesis.loss_by_final_decision[*right])
+            })
+            .unwrap_or(0);
+        distribution[best] += probability;
+    }
+    distribution
+}
+
+fn categorical_entropy(probabilities: &[f64]) -> f64 {
+    -probabilities
+        .iter()
+        .filter(|probability| **probability > 0.0)
+        .map(|probability| probability * probability.ln())
+        .sum::<f64>()
 }
 
 fn bayes_risk(
