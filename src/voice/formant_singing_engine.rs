@@ -284,8 +284,7 @@ fn apply_phrase_expression(frames: &mut [FormantFrame], performance: &VocalPerfo
                 frame.source_type,
                 SourceType::Vowel | SourceType::Liquid | SourceType::Nasal
             ) {
-                frame.voicing =
-                    (frame.voicing * (1.0 - 0.25 * breathiness)).clamp(0.0, 1.0);
+                frame.voicing = (frame.voicing * (1.0 - 0.25 * breathiness)).clamp(0.0, 1.0);
             }
             let breath_bandwidth = 1.0 + 0.08 * breathiness;
             let tension_bandwidth = 1.2 - 0.4 * tension;
