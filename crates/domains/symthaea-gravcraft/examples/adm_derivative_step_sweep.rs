@@ -21,15 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     let coordinates = [0.0, 15.0, 0.5, 0.25];
     let steps_m = [
-        1.0e-1_f64,
-        5.0e-2,
-        2.5e-2,
-        1.25e-2,
-        6.25e-3,
-        3.125e-3,
-        1.5625e-3,
-        7.8125e-4,
-        3.90625e-4,
+        1.0e-1_f64, 5.0e-2, 2.5e-2, 1.25e-2, 6.25e-3, 3.125e-3, 1.5625e-3, 7.8125e-4, 3.90625e-4,
     ];
 
     println!("Symthaea GravCraft ADM finite-difference convergence sweep");
