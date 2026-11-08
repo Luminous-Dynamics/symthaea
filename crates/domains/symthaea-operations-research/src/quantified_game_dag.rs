@@ -292,10 +292,7 @@ fn ordered_prefix(prefix: &ValidatedQuantifierPrefix) -> Vec<(Quantifier, usize)
         .collect()
 }
 
-fn variable_positions(
-    variable_count: usize,
-    order: &[(Quantifier, usize)],
-) -> Vec<usize> {
+fn variable_positions(variable_count: usize, order: &[(Quantifier, usize)]) -> Vec<usize> {
     let mut positions = vec![usize::MAX; variable_count];
     for (position, &(_, variable)) in order.iter().enumerate() {
         positions[variable] = position;
@@ -524,15 +521,19 @@ impl BuilderState {
         // The memo key and output proof node each own a residual copy.
         let next_literals = self
             .stored_literals
-            .checked_add(literals.checked_mul(2).ok_or(
-                QbfGameDagError::ResourceAccountingOverflow,
-            )?)
+            .checked_add(
+                literals
+                    .checked_mul(2)
+                    .ok_or(QbfGameDagError::ResourceAccountingOverflow)?,
+            )
             .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
         let next_clauses = self
             .stored_clauses
-            .checked_add(clauses.checked_mul(2).ok_or(
-                QbfGameDagError::ResourceAccountingOverflow,
-            )?)
+            .checked_add(
+                clauses
+                    .checked_mul(2)
+                    .ok_or(QbfGameDagError::ResourceAccountingOverflow)?,
+            )
             .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
         if next_literals > budget.max_stored_residual_literals {
             return Err(QbfGameDagError::StoredResidualLiteralBudgetExceeded {
@@ -1195,21 +1196,14 @@ mod tests {
     ) -> (QbfGameProofDag, QbfGameDagBuildReport) {
         let (dag, built) = build_qbf_game_proof_dag(problem, prefix, budget()).unwrap();
         let checked = verify_qbf_game_proof_dag(problem, prefix, &dag, budget()).unwrap();
-        let (tree, _) = build_qbf_game_proof(
-            problem,
-            prefix,
-            QuantifiedProofBudget::default(),
-        )
-        .unwrap();
+        let (tree, _) =
+            build_qbf_game_proof(problem, prefix, QuantifiedProofBudget::default()).unwrap();
         let tree_verified =
             verify_qbf_game_proof(problem, prefix, &tree, QuantifiedProofBudget::default())
                 .unwrap();
-        let strategy = evaluate_qbf_with_strategy(
-            problem,
-            prefix,
-            QuantifiedEvaluationBudget::default(),
-        )
-        .unwrap();
+        let strategy =
+            evaluate_qbf_with_strategy(problem, prefix, QuantifiedEvaluationBudget::default())
+                .unwrap();
         assert_eq!(built.root_value, checked.root_value);
         assert_eq!(built.root_value, tree_verified.root_value);
         assert_eq!(built.root_value, strategy.value);
@@ -1482,13 +1476,11 @@ mod tests {
                         verify_qbf_game_proof_dag(&problem, &prefix, &dag, budget()).unwrap();
                     let expected = direct_game_oracle(&problem, &prefix);
                     assert_eq!(
-                        built.root_value,
-                        expected,
+                        built.root_value, expected,
                         "builder formula {formula_index}, order {order:?}, mask {quantifier_mask}"
                     );
                     assert_eq!(
-                        verified.root_value,
-                        expected,
+                        verified.root_value, expected,
                         "verifier formula {formula_index}, order {order:?}, mask {quantifier_mask}"
                     );
                 }
@@ -1546,11 +1538,7 @@ mod tests {
 
     fn direct_game_oracle(problem: &CnfProblem, prefix: &ValidatedQuantifierPrefix) -> bool {
         let order = ordered_prefix(prefix);
-        fn visit(
-            position: usize,
-            order: &[(Quantifier, usize)],
-            residual: &ResidualCnf,
-        ) -> bool {
+        fn visit(position: usize, order: &[(Quantifier, usize)], residual: &ResidualCnf) -> bool {
             if residual.is_empty() {
                 return true;
             }
@@ -1626,7 +1614,8 @@ mod tests {
                         })
                         .collect();
                     let prefix = prefix(2, blocks);
-                    let (dag, built) = build_qbf_game_proof_dag(problem, &prefix, budget()).unwrap();
+                    let (dag, built) =
+                        build_qbf_game_proof_dag(problem, &prefix, budget()).unwrap();
                     let verified =
                         verify_qbf_game_proof_dag(problem, &prefix, &dag, budget()).unwrap();
                     let direct = direct_game_oracle(problem, &prefix);
