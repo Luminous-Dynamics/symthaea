@@ -175,8 +175,8 @@ pub use generative_model::GenerativeModel;
 
 pub use gaussian_model_information_gain::{
     GaussianModelInformationGain, GaussianModelInformationGainConfig,
-    GaussianModelInformationGainError, GaussianObservationAction,
-    GaussianObservationHypothesis, evaluate_gaussian_model_information_gains,
+    GaussianModelInformationGainError, GaussianObservationAction, GaussianObservationHypothesis,
+    evaluate_gaussian_model_information_gains,
 };
 
 pub use dirichlet_model_reduction::{
