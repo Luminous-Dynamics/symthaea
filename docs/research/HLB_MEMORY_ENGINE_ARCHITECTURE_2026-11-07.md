@@ -725,3 +725,30 @@ The compression programme also now evaluates query-weighted block bit allocation
 minimize sum_b w_b epsilon_b(m_b), subject to a fixed code budget, where each epsilon_b is independently verified as a worst-case residual certificate. Workload weights influence storage allocation, never query-time correctness. Distribution shift may reduce efficiency but cannot invalidate a true worst-case certificate.
 
 No HME production segment selector, quantizer, f32 outward-rounding proof, PQR/Recast reproduction or SOTA result is claimed by these research additions. The #10918 full-resolution scalar score API and profile validators are present in source, but Cargo formatting/build/tests and SIMD differential qualification have not been confirmed in this tranche.
+
+
+## 2026-11-08 canonical f32 score intervals
+
+A first source prototype now exists at `crates/core/symthaea-core/src/hdc/continuous_hv_interval.rs`, exported through `hdc::continuous_hv_interval`. It adds:
+
+`ContinuousHV::similarity_interval_full_resolution_for_l2_residual(reconstruction, residual_l2_upper)`
+
+The reference implementation relaxes a verified L2 residual ball to per-coordinate boxes and propagates conservative binary32 intervals through the #10918 group-of-eight / ordered-tail score reduction, candidate norm, norm product, square root, near-zero denominator branch, division and clamp. It returns the uninformative [-1,1] interval whenever numeric ambiguity prevents safe tightening. Zero residual returns a point at the canonical scalar score.
+
+This is a numeric reference, not yet a production HME segment selector. The caller must independently establish the residual inequality and pin the score profile, payload generation, transform and codebook. A digest is not proof of a residual bound. The implementation relies on the default IEEE-754 binary32 environment; cross-platform/compiler qualification and Rust tests remain outstanding. See [HME_CANONICAL_F32_INTERVAL_KERNEL_2026-11-08.md](HME_CANONICAL_F32_INTERVAL_KERNEL_2026-11-08.md).
+
+The coordinate-box relaxation deliberately ignores the joint L2 budget and can be loose. Future blockwise/query-energy refinements must remain conservative and be differentially compared with the source reference and the full original-payload score. No throughput or ExactComplete claim is made.
+
+## 2026-11-08 decision-preserving compression and external baselines
+
+The updated benchmark crosswalk now includes PQR-Search (per-fixed-query probabilistic recall), Recast (refinement-centered storage), QBAT (query-specific search-budget prediction), VIBE / VectorDBBench (modern ID/OOD index and database evaluation), and the 2026 decision-level quantization analysis in arXiv:2609.09854.
+
+The compression objective should be retrieval-decision preservation, not low reconstruction MSE alone. Measure exact kth-boundary margins, rank/pruning flips by margin stratum and residual dependence between candidates. The existing `hme_quantized_decision_margins_v0.json` remains a synthetic arithmetic control; the paper is external prior art, not an HME result.
+
+Do not conflate:
+- ExactCertified: deterministic result under complete, valid interval coverage;
+- ApproximatePerQuery: explicitly probabilistic, with a named fixed-query guarantee and failure variable;
+- EmpiricalSelective: benchmarked recall without a mathematical per-query promise;
+- IncompleteOrUncertified: no completed top-k claim.
+
+The updated system crosswalk is [HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md](HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md). No SOTA win or external benchmark score is claimed by adding these protocols.
