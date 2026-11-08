@@ -90,6 +90,8 @@
 //! - Friston, K., Parr, T. & de Vries, B. (2017). The Graphical Brain: Belief
 //!   Propagation and Active Inference. *Network Neuroscience*, 1(4).
 
+pub mod exact_map;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
