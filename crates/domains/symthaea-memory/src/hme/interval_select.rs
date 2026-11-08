@@ -338,6 +338,8 @@ pub enum VerifiedMemberResidualError {
     ReconstructionDigestMismatch,
     /// The transform/codebook profile differs from the admitted profile.
     TransformProfileMismatch,
+    /// The generated interval failed its structural invariant.
+    InvalidIntervalShape,
     /// The canonical score interval could not be computed.
     ScoreInterval(ContinuousHVIntervalError),
 }
@@ -560,9 +562,7 @@ impl GroupMemberScoreIntervalRecord {
             })?;
         if !interval.is_well_formed() {
             return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
-                VerifiedMemberResidualError::ScoreInterval(
-                    ContinuousHVIntervalError::InvalidResidualBound,
-                ),
+                VerifiedMemberResidualError::InvalidIntervalShape,
             ));
         }
         Ok(Self {
