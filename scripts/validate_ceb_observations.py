@@ -385,6 +385,71 @@ def semantic_errors(payload: dict) -> list[str]:
         if "no production ci runs were skipped" not in caveats:
             errors.append("DiffCI must retain no-production-skip caveat")
 
+    # Provenance, research-reporting and repository-evolution studies are
+    # methodology comparators, not direct code-review performance rows.
+    required_provenance_comparators = {
+        "agent-evidence-tracing-provenance-survey": ("CEB-REVIEW", "agent-evidence-tracing-survey-2026", "not_reported", None),
+        "llm-se-empirical-reproducibility-guidelines": ("CEB-REVIEW", "llm-se-empirical-guidelines-2026", "not_reported", None),
+        "pr-change-impact-callgraph-history": ("CEB-REVIEW", "pr-change-impact-analysis-2025", "not_reported", None),
+        "microservice-evolution-formal-verification-slr": ("CEB-CONTINUITY", "microservice-evolution-verification-slr-2026", "reported", 18),
+    }
+    for comparator_id, expected in required_provenance_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing provenance/evolution comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        denominator = comparator["sample_denominator"]
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        if denominator["status"] != denominator_status or denominator["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_provenance_observations = {
+        "agent-trace-provenance-taxonomy-dimensions": ("agent-evidence-tracing-provenance-survey", "provenance_taxonomy_dimension_count", 6),
+        "agent-trace-open-challenge-categories": ("agent-evidence-tracing-provenance-survey", "open_challenge_category_count", 6),
+        "llm-se-guidelines-contributor-count": ("llm-se-empirical-reproducibility-guidelines", "contributor_count", 22),
+        "llm-se-guidelines-study-type-count": ("llm-se-empirical-reproducibility-guidelines", "study_type_taxonomy_count", 7),
+        "llm-se-guidelines-recommendation-count": ("llm-se-empirical-reproducibility-guidelines", "reporting_guideline_count", 8),
+        "pr-impact-analysis-time-min": ("pr-change-impact-callgraph-history", "analysis_time_lower_bound", 7.4),
+        "pr-impact-analysis-time-max": ("pr-change-impact-callgraph-history", "analysis_time_upper_bound", 22.43),
+        "pr-impact-focus-group-enhancement-rating": ("pr-change-impact-callgraph-history", "review_enhancement_rating", 3.66),
+        "pr-impact-risk-score-perceived-accuracy": ("pr-change-impact-callgraph-history", "risk_score_perceived_accuracy_rating", 3.2),
+        "pr-impact-metric-agreement": ("pr-change-impact-callgraph-history", "selected_metric_agreement", 71),
+        "microservice-evolution-initial-records-screened": ("microservice-evolution-formal-verification-slr", "records_screened", 1187),
+        "microservice-evolution-primary-studies": ("microservice-evolution-formal-verification-slr", "primary_study_count", 13),
+        "microservice-evolution-total-included-studies": ("microservice-evolution-formal-verification-slr", "included_study_count", 18),
+    }
+    for observation_id, expected in required_provenance_observations.items():
+        observation = next((row for row in observations if row["observation_id"] == observation_id), None)
+        if observation is None:
+            errors.append(f"missing provenance/evolution observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            observation["comparator_id"] != comparator_id
+            or observation["metric"]["metric_id"] != metric_id
+            or observation["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    if "agent-evidence-tracing-provenance-survey" in comparators:
+        caveats = " ".join(comparators["agent-evidence-tracing-provenance-survey"]["caveats"]).lower()
+        if "not a software code-review benchmark" not in caveats or "private chain-of-thought" not in caveats:
+            errors.append("agent provenance survey must retain scope and private-reasoning boundary")
+    if "llm-se-empirical-reproducibility-guidelines" in comparators:
+        caveats = " ".join(comparators["llm-se-empirical-reproducibility-guidelines"]["caveats"]).lower()
+        if "not a code-review system" not in caveats or "reporting checklist" not in caveats:
+            errors.append("LLM-SE guidelines must retain methodological-only scope")
+    if "pr-change-impact-callgraph-history" in comparators:
+        caveats = " ".join(comparators["pr-change-impact-callgraph-history"]["caveats"]).lower()
+        if "not a large-scale code-review accuracy benchmark" not in caveats or "not proof of semantic claim-support completeness" not in caveats:
+            errors.append("PR change-impact study must retain scope and graph-completeness caveats")
+    if "microservice-evolution-formal-verification-slr" in comparators:
+        caveats = " ".join(comparators["microservice-evolution-formal-verification-slr"]["caveats"]).lower()
+        if "not a software-agent benchmark" not in caveats or "few shared datasets" not in caveats:
+            errors.append("microservice SLR must retain review-scope and literature-gap caveats")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -643,6 +708,23 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "diffci-change-aware-test-selection-2026")
     comparator["caveats"] = [x for x in comparator["caveats"] if "not a reliability estimate" not in x]
     must_reject(mutant, "DiffCI mutation caveat removed")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "agent-trace-provenance-taxonomy-dimensions"
+    ]
+    must_reject(mutant, "agent provenance taxonomy observation removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "pr-impact-analysis-time-max")
+    row["metric"]["value"] = 7.4
+    must_reject(mutant, "PR impact analysis runtime upper/lower bounds conflated")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "microservice-evolution-formal-verification-slr")
+    comparator["sample_denominator"]["value"] = 1187
+    must_reject(mutant, "systematic review search yield conflated with included-study denominator")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
