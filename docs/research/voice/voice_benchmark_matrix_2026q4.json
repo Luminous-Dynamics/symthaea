@@ -93,7 +93,13 @@
         "truncation_rate",
         "degenerate_repetition_rate",
         "length_expansion_rate",
-        "prompt_leakage_rate"
+        "prompt_leakage_rate",
+        "pooled_micro_PIER",
+        "utterance_macro_PIER",
+        "pooled_micro_SETER",
+        "utterance_macro_SETER",
+        "pooled_micro_SPER",
+        "utterance_macro_SPER"
       ],
       "complexity_axes": [
         "CMI",
@@ -144,7 +150,11 @@
       ],
       "required_outputs": [
         "output_quality_flags"
-      ]
+      ],
+      "implementation_issue": 11056,
+      "switch_metrics_issue": 11075,
+      "corpus_aggregation_issue": 11103,
+      "metric_vectors_issue": 11082
     },
     {
       "id": "speech_grounded_semantics",
@@ -183,7 +193,10 @@
       "system_arms": [
         "ASR_then_Broca",
         "speech_native_model",
-        "hybrid_audio_transcript_semantic"
+        "hybrid_audio_transcript_semantic",
+        "SAMA_style_semantic_anchor",
+        "acoustic_veto_hybrid",
+        "modular_ASR_Broca"
       ],
       "candidate_sources": [
         {
@@ -198,7 +211,8 @@
           "card_url": "https://huggingface.co/datasets/mosesdaudu/switchboard-tierb-codeswitch",
           "note": "Includes gold intent/slot labels and per-token language tags for 87 consented clips. Too small to rank systems and has documented speaker/device/read-speech limitations; one flagged accidental real-person-name collision needs source-owner resolution."
         }
-      ]
+      ],
+      "semantic_anchor_issue": 11104
     },
     {
       "id": "namibian_click_phonetics",
@@ -476,7 +490,9 @@
         "SPER_count_exactness_by_radius",
         "micro_macro_aggregation_exactness",
         "non_estimable_state_exactness",
-        "alignment_policy_conformance"
+        "alignment_policy_conformance",
+        "micro_macro_weighting_consistency",
+        "fixture_schema_conformance"
       ],
       "required_outputs": [
         "metric_vector_id",
@@ -493,6 +509,11 @@
           "status": "SYNTHETIC_ONLY_NO_LANGUAGE_EVIDENCE",
           "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.json",
           "note": "Ten hand-computed synthetic vectors for WER, PIER, SETER, SPER@k and per-language masked error; schema at voice_metric_vectors_v1.schema.json. Current custom formula/alignment audit passes; this is not Rust execution or cross-implementation differential qualification."
+        },
+        {
+          "id": "voice_metric_vectors_v1_schema",
+          "status": "SYNTHETIC_ONLY_SCHEMA",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.schema.json"
         }
       ],
       "note": "All scorer implementations should consume identical frozen vectors. Validate metric counts and denominators separately from floating-point presentation; real-corpus results require additional independent evidence."
