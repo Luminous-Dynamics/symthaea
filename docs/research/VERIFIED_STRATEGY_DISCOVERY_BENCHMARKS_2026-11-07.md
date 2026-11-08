@@ -612,3 +612,36 @@ The 2026 proof-system synthesis result gives a second comparison path: compile a
 ### Promotion gate
 
 The selected QBFGallery corpus and result artifact must be pinned before publishing any numeric external target. No current numeric CAQE-vs-Symthaea score is claimed by this plan. CAQE's practice strength is a literature baseline; the numerical head-to-head remains future benchmark work.
+
+
+## 19. Multi-representation strategy compilation — ROBDD and AIG
+
+Strategy functions should not be tied permanently to a single circuit representation. The implementation now has two bounded compilation paths from the same finite Boolean source table:
+
+- **ROBDD:** reduced ordered decision DAG, whose size depends on decision order and whose canonicality is relative to a fixed order.
+- **AIG:** AND nodes with complemented edges, compiled by Shannon decomposition and structural hashing. Its graph is not a canonical representation across all decomposition orders.
+
+### Fair size and cost comparison
+
+Do not compare BDD node count directly with AIG AND-node count as if these were the same unit. For each representation record:
+- input count, internal node count and edge/reference count;
+- exact deterministic serialized byte length under a pinned encoding;
+- construction time and peak node/byte count;
+- evaluation time over the same assignments;
+- independent checker time and checker memory;
+- search/order optimization cost and whether the search was complete;
+- original and minimized semantic support.
+
+### Representation trust boundary
+
+The AIG/ROBDD checker validates only that the compiled circuit is equivalent to its source strategy function. The original QBF matrix/prefix verifier remains a separate gate and must run before a circuit is promoted as a winning strategy. An AIG is not a QBF proof certificate.
+
+### Required finite and application evaluation
+
+- Exhaust all 256 three-input Boolean functions and compare both circuit outputs with the same source truth tables.
+- Include constant, identity, negation, parity, multiplexer, majority, comparator and carry-like function families.
+- For small functions, use exact ROBDD variable-order search as a reference, but do not treat an exact BDD size as a lower bound for AIGs or vice versa.
+- Evaluate both AIG decomposition orders and ROBDD decision orders under the same aggregate compilation budget.
+- On application-derived QBF strategies, report strategy extraction time separately from AIG/ROBDD compilation and checking.
+
+The promotion objective is a lower verified serialized artifact cost at equal total construction plus verification budget, with held-out families and unchanged semantic acceptance. A smaller representation is useful only when it remains independently equivalent and the original strategy remains a winning strategy.
