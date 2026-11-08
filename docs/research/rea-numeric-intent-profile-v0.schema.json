@@ -318,6 +318,9 @@
         "signedness",
         "scale",
         "max_integer_digits",
+        "min_value",
+        "max_value",
+        "decimal_grammar",
         "scale_policy",
         "exponent_policy",
         "rounding_policy",
@@ -351,6 +354,17 @@
         },
         "negative_zero_policy": {
           "const": "reject"
+        },
+        "min_value": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        },
+        "max_value": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        },
+        "decimal_grammar": {
+          "const": "base10_fixed_point_exact_scale"
         }
       }
     },
