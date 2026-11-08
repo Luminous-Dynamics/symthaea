@@ -1,6 +1,6 @@
 # VCEB-001 — Vocal Control, Fidelity and Evaluation Benchmark
 
-**Date:** 7 November 2026  
+**Date:** 8 November 2026  
 **Status:** benchmark specification; targets below are proposed qualification gates, not achieved results.
 
 ## Purpose
@@ -176,6 +176,23 @@ A public task aggregator also lists heterogeneous SVS metrics across distinct da
 | Kokoro singing adaptation | Speech-to-singing adapted baseline | Measure degradation from speech-domain transformation |
 | Symthaea FormantSingingEngine | Existing Muse G2P + formant-frame renderer + source-filter FormantVocoder | Third integrated renderer; declared capabilities make fixed vibrato, English G2P, and unavailable expression controls explicit |
 | Symthaea physical vocal tract (planned; not currently integrated) | Intended interpretable articulatory and physical acoustic realization | Keep as a research track until issue #10860 is closed and exact-head examples compile |
+
+### Industry snapshot — 8 November 2026
+
+The current Artificial Analysis AA-Music-Vocal v1.1 page reports Suno v6 at 1,144 ±18 Elo (3,063 samples), Suno v6-mini at 1,132 ±18 (3,175), Mureka V9.5 at 1,101 ±18 (3,141), and Lyria 3.5 at 1,050 ±18 (3,203). This is a strong commercial whole-song preference reference, but it does not establish exact note/phone compliance on a supplied score.
+
+A separate SOTA2 singing benchmark page lists an "In-house SVS" entry at 4.45 quality score, with reported SingMOS 4.148, Sheet-SSQA 2.534, WER 0.118, clarity 4.64, naturalness 4.46 and expressiveness 4.55; it also lists VITA-QinYu 8B/4B and Doubao Soul Singer. The page does not expose enough task/data/annotation detail to make it a fully reproducible head-to-head comparator. Treat it as an external reported frontier signal, not a verified target or a result directly comparable to AA Elo.
+
+| External reference | Published snapshot | Interpretation |
+|---|---|---|
+| AA-Music-Vocal v1.1 | Suno v6 1,144 ±18 Elo; 3,063 samples | Commercial blind-preference ceiling for prompt-to-song |
+| SOTA2 "Singing Voice Synthesis on Singing" | In-house SVS 4.45 quality; WER 0.118; naturalness 4.46 | Useful multi-metric signal; task and methodology need independent reproduction |
+| SoulX-Singer | 42,000+ hours; score/MIDI and melody conditioning; 50 unseen singers in its zero-shot set | Closest identified open score-conditioned baseline |
+
+Sources:
+- AA-Music-Vocal live snapshot: https://artificialanalysis.ai/embed/music-generation-leaderboard/leaderboard/vocals
+- SOTA2 Singing Voice Synthesis evaluation set: https://www.sota2.com/research/sota/singing-voice-synthesis-on-singing-evaluation-set
+- SoulX-Singer paper: https://arxiv.org/abs/2602.07803
 
 SoulX-Singer reports training on more than 42,000 hours of vocal data and support for Mandarin, English and Cantonese. That is a very different scale from Muse's current hand-tuned G2P and local worker. We should not imply that a small local prototype can beat that system on raw naturalness by changing architectures alone. The feasible path is to first reproduce it as a reference baseline, then target a better control/evidence/compute frontier with exact score compliance, local edits, provenance and a deployable hybrid design.
 
