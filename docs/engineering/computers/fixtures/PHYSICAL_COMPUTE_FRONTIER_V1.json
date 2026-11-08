@@ -1,0 +1,377 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "physical-compute-frontier-v1",
+  "as_of_date": "2026-11-07",
+  "status": "evidence_map_not_leaderboard",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9236",
+  "child_issues": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10932",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10933",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10906"
+  ],
+  "studies": [
+    {
+      "id": "FLARE_2026",
+      "family": "integrated_photonic_memory",
+      "reference": "Zhou, Wu & Fang, Nature Sensors 1, 998-1010 (2026)",
+      "publication_date": "2026-08-27",
+      "doi": "10.1038/s44460-026-00123-2",
+      "url": "https://www.nature.com/articles/s44460-026-00123-2",
+      "paper_reported": {
+        "neurons": 7378,
+        "long_term_memory_retention_seconds": 7.45,
+        "short_term_dynamics": "GHz-scale",
+        "multilayer_cores": 10,
+        "architecture_layers": 4,
+        "reported_energy_attojoules_per_operation": 61.87,
+        "controller_board_dac_channels": 256,
+        "controller_board_fpga": true,
+        "calibration_controller_channels": 72
+      },
+      "demonstrated_application": "autonomous racing-drone navigation, sensing, exploration and adaptation",
+      "evidence_class": "peer_reviewed_physical_chip_and_system_paper_report",
+      "caveats": [
+        "Operation denominator and exact energy boundary must be extracted from methods/supplement.",
+        "7.45-second state retention is not durable digital storage.",
+        "Neuron count is not general-purpose operation throughput.",
+        "System has optical coupling and electronic control; do not assume all control/laser/conversion costs are included in 61.87 aJ/op."
+      ],
+      "source_data": "paper states source data are provided",
+      "code": "no reusable public source code identified in the current source audit"
+    },
+    {
+      "id": "FAST_ONN_2026",
+      "family": "free_space_optical_in_memory_matrix_engine",
+      "reference": "Liang et al., Light: Science & Applications 15, 115 (2026)",
+      "publication_date": "2026-02-13",
+      "doi": "10.1038/s41377-026-02206-8",
+      "url": "https://www.nature.com/articles/s41377-026-02206-8",
+      "paper_reported": {
+        "experimental": {
+          "vcsel_arrays": 8,
+          "vcsel_devices_per_array": 25,
+          "described_input_vcsel_configuration": "3x3",
+          "output_kernels": 9,
+          "balanced_photodetector_channels": 9,
+          "fpga_daq_channels": 9,
+          "vcsel_data_rate_samples_per_second": 100000000,
+          "arithmetic_throughput_gops": 45,
+          "random_signed_mvm_mean_error_std_percent": 3.27,
+          "precision_description": "over 6 bits (5 numerical bits plus sign)",
+          "mnist_accuracy_percent": 93.75,
+          "mnist_digital_reference_percent": 95.75,
+          "fashion_mnist_accuracy_percent": 80.75,
+          "fashion_mnist_digital_reference_percent": 84.88,
+          "yolo_convolution_feature_extraction_report": "100 million frames/s headline; not equivalent to complete end-to-end object-detection decisions/s",
+          "small_cnn_input_to_decision_latency_us": 1.4,
+          "estimated_electrical_system_energy_fj_per_operation": 370,
+          "estimated_electrical_system_efficiency_tops_per_watt": 3,
+          "included_energy_components": [
+            "VCSEL bias/laser drivers",
+            "DAC drivers",
+            "SLM weighting power",
+            "photodetector/TIA/ADC readout electronics"
+          ],
+          "evidence_class": "paper_reported_experimental_configuration_and_author_system_energy_estimate"
+        },
+        "projected_scale_up": {
+          "vcsel_array": "32x32",
+          "spatial_fanout": "32x32",
+          "vcsel_rate_samples_per_second": 25000000000,
+          "optical_budget_watts_approx": 1,
+          "projected_energy_fj_per_operation": 2,
+          "projected_efficiency_tops_per_watt": 500,
+          "projected_throughput_tops": 50000,
+          "evidence_class": "authors_projection_not_demonstrated",
+          "use_restriction": "Do not report as achieved prototype performance."
+        }
+      },
+      "architecture": [
+        "VCSEL arrays",
+        "spatial light modulators",
+        "photodetectors",
+        "optoelectronic conversion"
+      ],
+      "evidence_class": "peer_reviewed_physical_optical_system_paper_report",
+      "caveats": [
+        "Prototype 100 MS/s / 45 GOPS and projected 25 GS/s / >50,000 TOPS are different operating points.",
+        "The 100 MFPS YOLO feature-extraction headline is not 100 million complete end-to-end decisions per second.",
+        "The ~370 fJ/op / ~3 TOPS/W value is the authors' system estimate with their stated included electronics; it is not automatically equivalent to wall-input joules per accepted task.",
+        "The ~2 fJ/op / 500 TOPS/W, 32x32 arrays/fanout, and 25 GS/s figures are projected scale-up values, not measured hardware results.",
+        "Include host classification, model/weight programming, SLM updates, calibration, optical coupling, sync and full platform wall power in any independent Luminous comparison."
+      ],
+      "code": "not established by the source audit",
+      "experimental_vs_projection_audit_source": "https://www.nature.com/articles/s41377-026-02206-8"
+    },
+    {
+      "id": "MEMRISTIVE_HDC_2026",
+      "family": "memristive_analog_compute_in_memory_hdc",
+      "reference": "Huang et al., Nature Communications 17, 9162 (2026)",
+      "publication_date": "2026-07-28",
+      "doi": "10.1038/s41467-026-76067-5",
+      "url": "https://www.nature.com/articles/s41467-026-76067-5",
+      "paper_reported": {
+        "language_classes": 21,
+        "hypervector_dimensions": 1024,
+        "simulated_accuracy_percent": 98.87,
+        "physical_soc_accuracy_percent": 95.24,
+        "reported_tops_per_watt": 2.58,
+        "reported_latency_microseconds": 302.5,
+        "soc_cores": 10,
+        "crossbar_rows": 248,
+        "crossbar_columns": 256,
+        "crossbar_cell": "1T1R",
+        "train_corpus": "Wortschatz",
+        "test_corpus": "Europarl"
+      },
+      "evidence_class": "peer_reviewed_physical_memristive_soc_paper_report",
+      "caveats": [
+        "Language classification is not exact 16K BinaryHV top-1 retrieval.",
+        "The published dimensionality and algorithm are not the canonical Symthaea binary representation.",
+        "TOPS/W and latency are task/system-specific; audit full energy and latency boundaries before cross-paper comparison.",
+        "Two authors disclose TetraMem co-founder and paid-consultant relationships."
+      ],
+      "rights": {
+        "article_license": "CC BY-NC-ND 4.0",
+        "article_url": "https://www.nature.com/articles/s41467-026-76067-5",
+        "code_and_dataset_rights": "separate; must be audited before reuse"
+      }
+    },
+    {
+      "id": "FAULT_ADAPTIVE_ANALOG_2026",
+      "family": "fault_adaptive_analog_matrix_representation",
+      "reference": "Xu et al., Nature Electronics 9, 811-824 (2026)",
+      "publication_date": "2026-06-12",
+      "doi": "10.1038/s41928-026-01638-9",
+      "url": "https://www.nature.com/articles/s41928-026-01638-9",
+      "paper_reported": {
+        "dft_matrix_cosine_similarity_percent": 99.999,
+        "stuck_fault_rate_percent": 39,
+        "wireless_bit_error_rate_reduction_factor": 56,
+        "cross_domain_density_improvement_percent": 194,
+        "cross_domain_energy_efficiency_improvement_percent": 164
+      },
+      "evidence_class": "peer_reviewed_physical_memristive_system_paper_report",
+      "caveats": [
+        "Fault rate and fidelity are specific to the tested matrix/circuit and defect model.",
+        "Target matrix rank, latent dimension, conditioning and device count must be matched.",
+        "Density and energy comparisons are paper-specific; require full peripheral/compensation boundary."
+      ],
+      "source_data": "https://doi.org/10.6084/m9.figshare.31813117",
+      "author_code": "https://github.com/ZCXU0421/Fault_free_analog_computing",
+      "author_code_license": "AGPLv3 plus Commons Clause per repository LICENSE",
+      "commercial_reuse": "Do not copy/adapt into commercial Luminous product without explicit additional permission and legal review; patent/FTO review is separate.",
+      "later_repository_addition": {
+        "name": "Variation-Enhanced Training (VET)",
+        "repository_readme_date": "2026-08-11",
+        "status": "optional training feature in author repository; not to be conflated with the original physical paper result"
+      }
+    }
+  ],
+  "benchmark_axes": [
+    "target_matrix_rank_and_singular_spectrum",
+    "matrix_sparsity_locality_and_conditioning",
+    "fault_rate_and_fault_topology",
+    "stuck_off_and_stuck_on",
+    "write_programming_error_and_per_read_noise_separately",
+    "drift_retention_endurance_and_temperature",
+    "precision_and_task_quality",
+    "latency_distribution_and_useful_throughput",
+    "peripheral_inclusive_energy_and_wall_input_energy",
+    "device_count_active_area_and_package",
+    "calibration_update_and_recovery_cost",
+    "repairability_and_supply_chain"
+  ],
+  "comparison_tracks": [
+    "same_algorithm_same_representation_same_task_different_substrate",
+    "best_competent_algorithm_plus_substrate_codesign_under_matched_budget"
+  ],
+  "no_cross_metric_leaderboard": true,
+  "prohibited_unqualified_comparisons": [
+    "aJ_per_op_vs_TOPS_per_W",
+    "neuron_count_vs_vector_dimension",
+    "optical_samples_per_second_vs_end_to_end_inference_fps",
+    "paper_specific_classification_accuracy_vs_exact_retrieval_accuracy",
+    "array_core_energy_vs_wall_input_system_energy"
+  ],
+  "timescale_to_substrate_hypotheses": [
+    {
+      "state_horizon": "sub-ns_to_ns_optical_transient",
+      "candidate_substrates": [
+        "integrated_photonic",
+        "electro_optic"
+      ],
+      "role": "fast transient transforms and selected temporal/reservoir computation",
+      "required_measurements": [
+        "optical_loss",
+        "coupling",
+        "laser_and_driver_energy",
+        "phase_stability",
+        "conversion_overhead",
+        "calibration_drift"
+      ]
+    },
+    {
+      "state_horizon": "ns_to_us_exact_local_state",
+      "candidate_substrates": [
+        "SRAM",
+        "FPGA_BRAM_URAM",
+        "register_file"
+      ],
+      "role": "deterministic pipeline buffers, control, exact HDC reducers",
+      "required_measurements": [
+        "capacity_and_ports",
+        "timing_closure",
+        "leakage_and_clock_power",
+        "ECC_and_upset_behavior"
+      ]
+    },
+    {
+      "state_horizon": "us_to_ms_event_window",
+      "candidate_substrates": [
+        "SRAM",
+        "DRAM",
+        "event_driven_compute"
+      ],
+      "role": "sensor fusion, sparse events, burst processing",
+      "required_measurements": [
+        "burst_buffering",
+        "p99_queue_latency",
+        "timestamp_fidelity",
+        "scheduler_and_host_overhead"
+      ]
+    },
+    {
+      "state_horizon": "ms_to_seconds_adaptive_temporal_state",
+      "candidate_substrates": [
+        "photonic_transient_memory",
+        "mixed_signal",
+        "memristive_state",
+        "digital_recurrent_state"
+      ],
+      "role": "CfC-like dynamics, short-term context and adaptive state",
+      "required_measurements": [
+        "retention_curve",
+        "state_decay",
+        "read_disturb",
+        "temperature_drift",
+        "calibration_cost",
+        "update_energy"
+      ]
+    },
+    {
+      "state_horizon": "minutes_to_hours_working_set",
+      "candidate_substrates": [
+        "DDR",
+        "LPDDR",
+        "HBM",
+        "CXL_if_real_compatible_device"
+      ],
+      "role": "large models, codebooks, shared accelerator working memory",
+      "required_measurements": [
+        "bandwidth",
+        "latency",
+        "NUMA",
+        "refresh",
+        "transfer_cost",
+        "capacity",
+        "energy"
+      ]
+    },
+    {
+      "state_horizon": "power_cycle_persistent_configuration_and_journal",
+      "candidate_substrates": [
+        "MRAM",
+        "qualified_embedded_nonvolatile_memory"
+      ],
+      "role": "recovery metadata, configuration and small write-intensive journals",
+      "required_measurements": [
+        "endurance",
+        "retention",
+        "read_write_latency",
+        "density",
+        "part_qualification",
+        "cost"
+      ]
+    },
+    {
+      "state_horizon": "long_lived_exact_records_and_large_corpora",
+      "candidate_substrates": [
+        "NVMe_NAND",
+        "managed_persistent_storage"
+      ],
+      "role": "durable HDC stores, immutable segments, datasets and audit records",
+      "required_measurements": [
+        "flush_durability",
+        "wear",
+        "power_loss_behavior",
+        "recovery",
+        "write_amplification",
+        "provenance"
+      ]
+    }
+  ],
+  "temporal_memory_contract_metrics": [
+    "required_hold_time_and_update_frequency",
+    "probability_of_correct_read_vs_elapsed_time",
+    "error_vs_read_count_and_write_count",
+    "drift_vs_temperature_and_supply",
+    "write_read_refresh_calibration_and_recovery_energy",
+    "latency_distribution_and_concurrent_access_throughput",
+    "read_disturb_or_destructive_read_semantics",
+    "power_loss_and_reset_persistence",
+    "remapping_retraining_and_aging_cost"
+  ],
+  "placement_rules": [
+    "Match physical retention to required state horizon; photonic seconds-scale state is not durable storage.",
+    "Keep exact identity, provenance, cryptographic integrity, deterministic ties and durable commit state digital unless an exact physical guarantee is separately established.",
+    "Use analog/photonic dynamics only where task precision and noise contracts allow it.",
+    "Co-locate hot state with consuming compute and measure data movement before changing memory technology.",
+    "Include refresh, calibration, migration, write/erase and recovery in lifecycle energy.",
+    "Require explicit conversion and verification boundaries when Symthaea spans multiple substrates."
+  ],
+  "external_benchmarks": [
+    {
+      "id": "THOR_NEUROBENCH_OPENBMI_EEG_MI_2026",
+      "family": "neuromorphic_temporal_classification",
+      "results_announcement_date": "2026-10-20",
+      "task": "continuous OpenBMI EEG motor imagery decoding",
+      "sources": [
+        "https://neuromorphiccommons.com/news/thor-x-neurobench-challenge-2026-results/",
+        "https://neuromorphiccommons.com/events/thor-neurobench-2026/",
+        "https://www.nature.com/articles/s41467-025-56739-4"
+      ],
+      "separate_tracks": {
+        "absolute_accuracy": {
+          "winner": "EdgeSynapse AI",
+          "accuracy_percent": 73.38,
+          "scoring": "highest verified test accuracy across the declared cross-validation splits"
+        },
+        "efficiency": {
+          "winner": "PHC Lab",
+          "accuracy_percent": 69.73,
+          "synops": 60540,
+          "model_and_state_footprint_bytes": 672,
+          "scoring": [
+            "NeuroEfficiency Score (NES)",
+            "Normalized Balanced Score (NBS)"
+          ]
+        }
+      },
+      "other_reference_submission": {
+        "team": "Synaptic",
+        "accuracy_percent": 68.4,
+        "synops": 23650,
+        "model_and_state_footprint_bytes": 1050
+      },
+      "evidence_class": "published_competition_results",
+      "interpretation_caveats": [
+        "Specific to OpenBMI EEG motor-imagery task and competition evaluation protocol.",
+        "SynOps plus memory footprint is an efficiency proxy and is not a direct wall-input energy measurement.",
+        "Do not compare these accuracy figures directly with Symthaea's HDC language classification or exact retrieval tasks.",
+        "Reuse NeuroBench algorithm and system tracks; add whole-system energy and latency measurement for any hardware deployment."
+      ],
+      "suggested_luminous_use": "Optional BCI/temporal-classification benchmark lane using exact official data splits and scoring where licensed; separately measure sensor/DAQ, host, memory traffic, accelerator, wall energy and p99 decision latency."
+    }
+  ]
+}
