@@ -486,7 +486,12 @@ mod tests {
         )
         .unwrap();
 
-        assert!(report.points.iter().all(|point| !point.frequency_resolution_sufficient));
+        assert!(
+            report
+                .points
+                .iter()
+                .all(|point| !point.frequency_resolution_sufficient)
+        );
         assert!(report.points.iter().all(|point| !point.is_locked));
         assert!(!report.frequency_locking_detected);
     }
