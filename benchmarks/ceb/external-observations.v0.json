@@ -1786,9 +1786,9 @@
       "benchmark_version": "Journal of Systems and Software; 2023 publication record",
       "split": "Five maintained projects; 5,032 project versions; 40 mined propagation-channel types",
       "sample_denominator": {
-        "status": "reported",
-        "value": 5032,
-        "unit": "project versions across five maintained projects"
+        "status": "not_reported",
+        "value": null,
+        "unit": "task denominator not reported; project-version count is a separate dataset descriptor"
       },
       "source_id": "history-change-propagation-channels",
       "supporting_source_ids": [],
