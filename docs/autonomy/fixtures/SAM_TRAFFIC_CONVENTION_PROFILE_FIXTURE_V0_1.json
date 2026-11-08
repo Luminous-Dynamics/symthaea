@@ -8,7 +8,7 @@
       "jurisdiction_profile_id": "synthetic-left-traffic-demo",
       "traffic_side": "left",
       "steering_wheel_position": "right",
-      "travel_frame_id": "road-local-lht-v1",
+      "travel_frame_id": "road-local-01",
       "keep_side_sign": 1,
       "kerbside_sign": 1,
       "median_side_sign": -1,
