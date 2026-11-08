@@ -16,6 +16,8 @@ pub enum MatrixError {
     NotPositiveDefinite,
     Breakdown,
     InvalidTolerance,
+    TooLarge,
+    AllocationFailed,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -25,11 +27,17 @@ pub struct DenseMatrix {
 }
 
 impl DenseMatrix {
+    /// Maximum dense reference size; larger systems need an explicitly sparse solver.
+    pub const MAX_ELEMENTS: usize = 16 * 1024 * 1024;
+
     pub fn new(n: usize, values: Vec<f64>) -> Result<Self, MatrixError> {
         if n == 0 {
             return Err(MatrixError::Empty);
         }
         let expected = n.checked_mul(n).ok_or(MatrixError::InvalidParameter)?;
+        if expected > Self::MAX_ELEMENTS {
+            return Err(MatrixError::TooLarge);
+        }
         if values.len() != expected {
             return Err(MatrixError::DimensionMismatch);
         }
@@ -72,7 +80,7 @@ impl DenseMatrix {
     }
 
     pub fn frobenius_norm(&self) -> f64 {
-        self.values.iter().map(|v| v * v).sum::<f64>().sqrt()
+        self.values.iter().fold(0.0_f64, |norm, value| norm.hypot(*value))
     }
 
     pub fn is_symmetric(&self, relative_tolerance: f64) -> bool {
@@ -109,7 +117,7 @@ pub fn dot(a: &[f64], b: &[f64]) -> Result<f64, MatrixError> {
 }
 
 pub fn norm2(x: &[f64]) -> f64 {
-    x.iter().map(|v| v * v).sum::<f64>().sqrt()
+    x.iter().fold(0.0_f64, |norm, value| norm.hypot(*value))
 }
 
 /// A reproducible SPD family with a known spectrum:
@@ -134,7 +142,13 @@ pub fn rank_one_spd_known_solution(
         return Err(MatrixError::NonFinite);
     }
 
-    let mut values = vec![alpha; n.checked_mul(n).ok_or(MatrixError::InvalidParameter)?];
+    let elements = n.checked_mul(n).ok_or(MatrixError::InvalidParameter)?;
+    if elements > DenseMatrix::MAX_ELEMENTS {
+        return Err(MatrixError::TooLarge);
+    }
+    let mut values = Vec::new();
+    values.try_reserve_exact(elements).map_err(|_| MatrixError::AllocationFailed)?;
+    values.resize(elements, alpha);
     for i in 0..n {
         values[i * n + i] += lambda;
     }
@@ -156,7 +170,10 @@ pub fn cholesky_solve(a: &DenseMatrix, b: &[f64]) -> Result<Vec<f64>, MatrixErro
         return Err(MatrixError::NotSymmetric);
     }
 
-    let mut lower = vec![0.0; n.checked_mul(n).ok_or(MatrixError::InvalidParameter)?];
+    let elements = n.checked_mul(n).ok_or(MatrixError::InvalidParameter)?;
+    let mut lower = Vec::new();
+    lower.try_reserve_exact(elements).map_err(|_| MatrixError::AllocationFailed)?;
+    lower.resize(elements, 0.0);
     for row in 0..n {
         for col in 0..=row {
             let mut sum = a.values[row * n + col];
@@ -326,6 +343,9 @@ pub fn error_metrics(
     if b.len() != a.n || x.len() != a.n || x_truth.len() != a.n {
         return Err(MatrixError::DimensionMismatch);
     }
+    if b.iter().chain(x.iter()).chain(x_truth.iter()).any(|v| !v.is_finite()) {
+        return Err(MatrixError::NonFinite);
+    }
     let ax = a.mat_vec(x)?;
     let residual: Vec<f64> = ax.iter().zip(b).map(|(lhs, rhs)| lhs - rhs).collect();
     let residual_norm = norm2(&residual);
@@ -418,6 +438,19 @@ mod tests {
 
         let nonsymmetric = DenseMatrix::new(2, vec![1.0, 2.0, 0.0, 1.0]).unwrap();
         assert_eq!(cholesky_solve(&nonsymmetric, &[1.0, 1.0]), Err(MatrixError::NotSymmetric));
+    }
+
+    #[test]
+    fn dense_allocation_limit_is_checked_before_solver_work() {
+        assert_eq!(DenseMatrix::new(4097, vec![]), Err(MatrixError::TooLarge));
+        assert_eq!(rank_one_spd_known_solution(1.0, 0.0, &vec![1.0; 4097]), Err(MatrixError::TooLarge));
+    }
+
+    #[test]
+    fn non_finite_evaluator_inputs_are_rejected() {
+        let a = DenseMatrix::new(1, vec![1.0]).unwrap();
+        assert_eq!(error_metrics(&a, &[f64::NAN], &[1.0], &[1.0]), Err(MatrixError::NonFinite));
+        assert_eq!(error_metrics(&a, &[1.0], &[1.0], &[f64::INFINITY]), Err(MatrixError::NonFinite));
     }
 
     #[test]
