@@ -374,6 +374,13 @@ mod tests {
     }
 
     #[test]
+    fn butterfly_parameter_count_is_linearithmic_not_quadratic() {
+        assert_eq!(HdcButterflyMixer::parameter_count_for_dimension(16_384), 114_688);
+        assert_eq!(HdcButterflyMixer::parameter_count_for_dimension(1_024), 5_120);
+        assert_eq!(HdcButterflyMixer::parameter_count_for_dimension(12), 0);
+    }
+
+    #[test]
     fn parameterized_butterfly_is_orthogonal_and_invertible() {
         for dimension in [2, 8, 64, 256, 16_384] {
             let parameter_count =
