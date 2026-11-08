@@ -610,6 +610,40 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "query": {
+            "properties": {
+              "representation": {
+                "const": "continuous_f32"
+              },
+              "metric": {
+                "const": "cosine"
+              }
+            },
+            "required": [
+              "representation",
+              "metric"
+            ]
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "then": {
+        "properties": {
+          "query": {
+            "properties": {
+              "score_contract_id": {
+                "const": "continuous_hv_cosine_full_f32_group8_v1"
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "x-semantic-invariants": [
@@ -627,6 +661,8 @@
     "ExactComplete and ApproximateComplete require a consistent pinned eligibility snapshot; stale or unavailable policy generations fail closed.",
     "payload_reads_for_excluded_count must be zero; filtering by scope, valid/known time, revocation, tombstone and retention happens before payload access.",
     "Excluded item identities/reasons are not exposed to principals lacking permission to inspect them; exclusion_set_sha256 is not a proof of policy correctness.",
-    "Query exclusion, logical forgetting, physical purge and cryptographic erasure are distinct lifecycle states."
+    "Query exclusion, logical forgetting, physical purge and cryptographic erasure are distinct lifecycle states.",
+    "For continuous_f32 + cosine, query.score_contract_id must be continuous_hv_cosine_full_f32_group8_v1; the identifier pins full-coordinate f32 group-of-eight accumulation and the declared near-zero denominator rule.",
+    "ContinuousHV payload and query admission for this score contract rejects non-finite components and components outside the closed interval [-1, 1] before score evaluation; invalid vectors are unavailable/invalid, not silently sanitized."
   ]
 }
