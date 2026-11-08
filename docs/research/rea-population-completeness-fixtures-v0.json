@@ -1,0 +1,319 @@
+{
+  "schema": "luminous.rea.population-completeness-fixture-matrix.v0",
+  "status": "design_fixture_only",
+  "cases": [
+    {
+      "id": "declared-query-complete-issuer-unknown",
+      "population_definition": "qualified",
+      "enumeration": "complete_stable_snapshot",
+      "acquisition": "all_items_accounted",
+      "processing": "all_items_accounted",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "CompleteWithinDeclaredQuery",
+        "IssuerParticipationUnknown"
+      ],
+      "forbidden": [
+        "CompleteIssuerHistory"
+      ]
+    },
+    {
+      "id": "first-page-only",
+      "population_definition": "qualified",
+      "enumeration": "missing_terminal_cursor",
+      "acquisition": "partial",
+      "processing": "partial",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "IncompleteOrGapped"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "skipped-cursor-terminal-seen",
+      "population_definition": "qualified",
+      "enumeration": "sequence_gap_with_terminal_marker",
+      "acquisition": "partial",
+      "processing": "partial",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "IncompleteOrGapped"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "duplicate-page-inflates-count",
+      "population_definition": "qualified",
+      "enumeration": "duplicate_page_and_count_mismatch",
+      "acquisition": "duplicate_records",
+      "processing": "partial",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "ConflictedCompleteness"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "count-drift-unstable-snapshot",
+      "population_definition": "qualified",
+      "enumeration": "count_changed_between_pages",
+      "acquisition": "ambiguous_snapshot",
+      "processing": "unknown",
+      "issuer_participation": "unknown",
+      "temporal": "unstable",
+      "expected": [
+        "IncompleteOrGapped",
+        "ConflictedCompleteness"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "undocumented-hidden-filter",
+      "population_definition": "unverified_filter",
+      "enumeration": "pages_complete_for_filtered_query",
+      "acquisition": "complete_for_selected_items",
+      "processing": "complete_for_selected_items",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "PopulationDefinitionUnverified",
+        "ObservedSubset"
+      ],
+      "forbidden": [
+        "CompleteRealWorldPopulation"
+      ]
+    },
+    {
+      "id": "partial-acquisition",
+      "population_definition": "qualified",
+      "enumeration": "complete",
+      "acquisition": "items_failed_or_unavailable",
+      "processing": "partial",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "IncompleteOrGapped"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "processing-failures-dropped",
+      "population_definition": "qualified",
+      "enumeration": "complete",
+      "acquisition": "complete",
+      "processing": "parser_failed_items_omitted",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "IncompleteOrGapped"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "captured-archive-enumerated",
+      "population_definition": "exact_captured_archive",
+      "enumeration": "complete_archive_directory",
+      "acquisition": "all_member_bytes_accounted",
+      "processing": "all_members_processed",
+      "issuer_participation": "not_applicable_to_archive_scope",
+      "temporal": "snapshot_bound",
+      "expected": [
+        "CompleteWithinCapturedArtifact"
+      ],
+      "forbidden": [
+        "ProducerAuthenticity",
+        "WholeWorldCompleteness"
+      ]
+    },
+    {
+      "id": "registered-transparency-view-only",
+      "population_definition": "named_subject_and_tree",
+      "enumeration": "complete_checkpoint_view",
+      "acquisition": "all_registered_statements_fetched",
+      "processing": "all_fetched_statements_verified",
+      "issuer_participation": "unknown",
+      "temporal": "checkpoint_bound",
+      "expected": [
+        "CompleteWithinRegisteredTransparencyView",
+        "IssuerParticipationUnknown"
+      ],
+      "forbidden": [
+        "CompleteIssuerHistory"
+      ]
+    },
+    {
+      "id": "issuer-withheld-before-registration",
+      "population_definition": "issuer_statement_history",
+      "enumeration": "all_registered_entries_seen",
+      "acquisition": "all_registered_entries_acquired",
+      "processing": "all_registered_entries_processed",
+      "issuer_participation": "selective_submission_possible",
+      "temporal": "bounded",
+      "expected": [
+        "CompleteWithinRegisteredTransparencyView",
+        "IssuerParticipationUnknown"
+      ],
+      "forbidden": [
+        "CompleteIssuerHistory"
+      ]
+    },
+    {
+      "id": "inclusion-without-consistency-monitoring",
+      "population_definition": "named_tree_view",
+      "enumeration": "inclusion_proof_only",
+      "acquisition": "one_entry",
+      "processing": "one_entry_verified",
+      "issuer_participation": "unknown",
+      "temporal": "checkpoint_unqualified",
+      "expected": [
+        "ObservedSubset",
+        "UnsupportedCompleteness"
+      ],
+      "forbidden": [
+        "CompleteWithinRegisteredTransparencyView"
+      ]
+    },
+    {
+      "id": "superseded-statement-history",
+      "population_definition": "historical_registered_view",
+      "enumeration": "complete_historical_tree",
+      "acquisition": "all_entries_acquired",
+      "processing": "supersession_not_evaluated",
+      "issuer_participation": "unknown",
+      "temporal": "historically_complete_currentness_unknown",
+      "expected": [
+        "CompleteWithinRegisteredTransparencyView",
+        "current_selection_undetermined"
+      ],
+      "forbidden": [
+        "CurrentIssuerStateComplete"
+      ]
+    },
+    {
+      "id": "retention-interval-gap",
+      "population_definition": "declared_interval",
+      "enumeration": "retention_gap",
+      "acquisition": "partial_history",
+      "processing": "partial",
+      "issuer_participation": "unknown",
+      "temporal": "gap",
+      "expected": [
+        "IncompleteOrGapped"
+      ],
+      "forbidden": [
+        "CompleteForInterval"
+      ]
+    },
+    {
+      "id": "independent-manifests-disagree",
+      "population_definition": "two_qualified_expectations",
+      "enumeration": "manifest_count_conflict",
+      "acquisition": "unknown",
+      "processing": "unknown",
+      "issuer_participation": "unknown",
+      "temporal": "same_snapshot",
+      "expected": [
+        "ConflictedCompleteness"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery"
+      ]
+    },
+    {
+      "id": "self-reported-all-pages-and-all-issued",
+      "population_definition": "provider_self_asserted",
+      "enumeration": "provider_claims_all_pages_seen",
+      "acquisition": "provider_claims_all_items_acquired",
+      "processing": "provider_claims_all_processed",
+      "issuer_participation": "issuer_self_claims_all_issued_submitted",
+      "temporal": "provider_timestamp_only",
+      "expected": [
+        "PopulationDefinitionUnverified",
+        "IssuerParticipationUnknown"
+      ],
+      "forbidden": [
+        "CompleteWithinDeclaredQuery",
+        "CompleteIssuerHistory"
+      ]
+    },
+    {
+      "id": "provider-name-diversity-shared-feed",
+      "population_definition": "shared_upstream_query",
+      "enumeration": "same_missing_page",
+      "acquisition": "same_upstream_subset",
+      "processing": "same_downstream_parser",
+      "issuer_participation": "unknown",
+      "temporal": "same_snapshot",
+      "expected": [
+        "ObservedSubset",
+        "IssuerParticipationUnknown"
+      ],
+      "forbidden": [
+        "IndependentCompletenessCorroboration"
+      ]
+    },
+    {
+      "id": "zero-observations-no-expectation",
+      "population_definition": "unknown",
+      "enumeration": "no_records_returned",
+      "acquisition": "none",
+      "processing": "none",
+      "issuer_participation": "unknown",
+      "temporal": "unknown",
+      "expected": [
+        "ObservedSubset",
+        "PopulationDefinitionUnverified"
+      ],
+      "forbidden": [
+        "ProofOfAbsence"
+      ]
+    },
+    {
+      "id": "complete-source-incomplete-downstream-parser",
+      "population_definition": "qualified_source_snapshot",
+      "enumeration": "complete",
+      "acquisition": "complete",
+      "processing": "unsupported_item_silently_dropped",
+      "issuer_participation": "unknown",
+      "temporal": "snapshot_bound",
+      "expected": [
+        "IncompleteOrGapped"
+      ],
+      "forbidden": [
+        "CompleteProcessedPopulation"
+      ]
+    },
+    {
+      "id": "unrelated-item-outside-claim-dependency",
+      "population_definition": "qualified",
+      "enumeration": "one_unrelated_item_missing",
+      "acquisition": "claim_scope_items_complete",
+      "processing": "claim_scope_items_complete",
+      "issuer_participation": "unknown",
+      "temporal": "bounded",
+      "expected": [
+        "selective_claim_validity_preserved",
+        "population_claim_not_complete"
+      ],
+      "forbidden": [
+        "global_invalidation_of_unrelated_claims"
+      ]
+    }
+  ]
+}
