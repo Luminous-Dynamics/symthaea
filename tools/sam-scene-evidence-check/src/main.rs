@@ -9,12 +9,9 @@ fn main() {
         .next()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("docs/autonomy/SAM_SCENE_EVIDENCE_SCHEMA_V0_1.json"));
-    let fixture = args
-        .next()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from("docs/autonomy/fixtures/SAM_SCENE_EVIDENCE_CONTRACT_V0_1.json")
-        });
+    let fixture = args.next().map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from("docs/autonomy/fixtures/SAM_SCENE_EVIDENCE_CONTRACT_V0_1.json")
+    });
     let traffic_schema = args.next().map(PathBuf::from);
     let traffic_fixture = args.next().map(PathBuf::from);
 
@@ -43,7 +40,10 @@ fn main() {
             for error in &errors {
                 eprintln!("ERROR: {error}");
             }
-            eprintln!("FAIL: {} traffic convention validation error(s)", errors.len());
+            eprintln!(
+                "FAIL: {} traffic convention validation error(s)",
+                errors.len()
+            );
             std::process::exit(1);
         }
         println!(
