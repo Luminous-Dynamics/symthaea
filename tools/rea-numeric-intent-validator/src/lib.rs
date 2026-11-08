@@ -1216,4 +1216,63 @@ mod tests {
         assert_eq!(protocol_only.len(), 5, "all protocol-boundary cases must be accounted for");
     }
 
+
+    #[test]
+    fn rfc_8785_appendix_b_binary64_number_vectors_match_expected_serialization() {
+        // JSON representations from RFC 8785 Appendix B. These are known
+        // ECMAScript binary64 serialization outputs, not domain-intent rules.
+        let vectors = [
+            ("0", "0"),
+            ("-0", "0"),
+            ("5e-324", "5e-324"),
+            ("-5e-324", "-5e-324"),
+            ("1.7976931348623157e+308", "1.7976931348623157e+308"),
+            ("-1.7976931348623157e+308", "-1.7976931348623157e+308"),
+            ("9007199254740992", "9007199254740992"),
+            ("-9007199254740992", "-9007199254740992"),
+            ("295147905179352830000", "295147905179352830000"),
+            ("9.999999999999997e+22", "9.999999999999997e+22"),
+            ("1e+23", "1e+23"),
+            ("1.0000000000000001e+23", "1.0000000000000001e+23"),
+            ("999999999999999700000", "999999999999999700000"),
+            ("999999999999999900000", "999999999999999900000"),
+            ("1e+21", "1e+21"),
+            ("9.999999999999997e-7", "9.999999999999997e-7"),
+            ("0.000001", "0.000001"),
+            ("333333333.3333332", "333333333.3333332"),
+            ("333333333.33333325", "333333333.33333325"),
+            ("333333333.3333333", "333333333.3333333"),
+            ("333333333.3333334", "333333333.3333334"),
+            ("333333333.33333343", "333333333.33333343"),
+            ("-0.0000033333333333333333", "-0.0000033333333333333333"),
+            ("1424953923781206.2", "1424953923781206.2"),
+        ];
+
+        for (input, expected) in vectors {
+            let value: Value = serde_json::from_str(input)
+                .unwrap_or_else(|error| panic!("RFC 8785 vector {input} must parse: {error}"));
+            let actual = serde_json_canonicalizer::to_string(&value)
+                .unwrap_or_else(|error| panic!("RFC 8785 vector {input} must canonicalize: {error}"));
+            assert_eq!(actual, expected, "RFC 8785 Appendix B vector {input}");
+        }
+    }
+
+    #[test]
+    fn rfc_8785_binary64_overflow_is_rejected() {
+        let (profile, schema) = profile_and_schema();
+        let document = br#"{
+            "counter": 1,
+            "account_id": "1",
+            "price": "0.10",
+            "reading": 1e400,
+            "vendor_metric": 1
+        }"#;
+        let result = validate_inputs(&profile, &schema, document);
+        assert_eq!(
+            result.unwrap_err().kind,
+            "binary64_canonicalization",
+            "a syntactically valid JSON number outside finite binary64 must not be accepted as JCS"
+        );
+    }
+
 }
