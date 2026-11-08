@@ -17,11 +17,16 @@
     "license_file_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
     "code_license_declared": "Apache-2.0",
     "dataset_repository": "https://huggingface.co/datasets/yangzhou99/DrivingGen",
-    "dataset_revision": "unresolved",
-    "dataset_revision_note": "Freeze a commit SHA or immutable revision before any reproduction. The current card was inspected on 2026-11-08, but its commit SHA was not pinned in this manifest.",
+    "dataset_revision": "935e0a40cd489305a206abe89f31d8854495098b",
+    "dataset_revision_note": "Pinned to the immutable HF commit whose README card declares 222 eval examples in each of open_domain and ego_condition. The dataset page separately displays 22,866 rows; these may represent image/frame rows rather than clips. The paper reports 200 evaluation samples per track. Keep the count discrepancy open until the revision's actual files are enumerated and mapped to unique video/clip IDs.",
     "dataset_license_declared": "Apache-2.0",
     "third_party_provenance_review": "required",
-    "third_party_provenance_note": "Open-domain samples are internet-sourced; ego-conditioned samples aggregate multiple source datasets. Review source-video redistribution and commercial-use rights separately from repository/card license metadata."
+    "third_party_provenance_note": "Open-domain samples are internet-sourced; ego-conditioned samples aggregate multiple source datasets. Review source-video redistribution and commercial-use rights separately from repository/card license metadata.",
+    "code_commit": "48ed35695855ef17d7a7cbd4adc0e8bd5fcc8223",
+    "code_commit_url": "https://github.com/youngzhou1999/DrivingGen/commit/48ed35695855ef17d7a7cbd4adc0e8bd5fcc8223",
+    "code_commit_date": "2026-03-12T17:33:49Z",
+    "dataset_revision_type": "immutable_hugging_face_dataset_commit",
+    "dataset_revision_url": "https://huggingface.co/datasets/yangzhou99/DrivingGen/commit/935e0a40cd489305a206abe89f31d8854495098b"
   },
   "protocol": {
     "tracks": {
@@ -63,7 +68,8 @@
         "enumerate exact video/sample IDs per track",
         "record row-to-video grouping",
         "reconcile paper sample IDs vs hosted dataset card IDs",
-        "retain missing/extra IDs as typed outcomes"
+        "retain missing/extra IDs as typed outcomes",
+        "compare exact files and parent commit for pinned HF revision 935e0a40cd489305a206abe89f31d8854495098b"
       ]
     },
     "generation_example": {
