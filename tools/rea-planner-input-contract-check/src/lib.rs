@@ -501,4 +501,52 @@ mod tests {
             .clear();
         assert!(validate_contract(&value).is_err());
     }
+
+    fn binary_entropy(probability: f64) -> f64 {
+        [probability, 1.0 - probability]
+            .into_iter()
+            .filter(|p| *p > 0.0)
+            .map(|p| -p * p.log2())
+            .sum()
+    }
+
+    fn best_expected_utility(probability_vulnerable: f64) -> f64 {
+        let mitigate = probability_vulnerable * 3.0
+            + (1.0 - probability_vulnerable) * -6.0;
+        let no_action = probability_vulnerable * -20.0;
+        mitigate.max(no_action)
+    }
+
+    #[test]
+    fn synthetic_math_example_matches_hand_derived_eig_and_evsi() {
+        let prior_vulnerable = 0.5;
+        let prior_entropy = binary_entropy(prior_vulnerable);
+        assert!((prior_entropy - 1.0).abs() < 1.0e-12);
+
+        let nominal_eig =
+            prior_entropy - 0.5 * binary_entropy(0.9) - 0.5 * binary_entropy(0.1);
+        let conservative_eig =
+            prior_entropy - 0.5 * binary_entropy(0.75) - 0.5 * binary_entropy(0.25);
+        assert!((nominal_eig - 0.531_004_406_410_718_8).abs() < 1.0e-12);
+        assert!((conservative_eig - 0.188_721_875_540_867_17).abs() < 1.0e-12);
+        assert!(
+            ((nominal_eig + conservative_eig) / 2.0 - 0.359_863_140_975_793).abs() < 1.0e-12
+        );
+
+        let prior_best_utility = best_expected_utility(prior_vulnerable);
+        assert!((prior_best_utility - -1.5).abs() < 1.0e-12);
+
+        let nominal_posterior_best =
+            0.5 * best_expected_utility(0.9) + 0.5 * best_expected_utility(0.1);
+        let conservative_posterior_best =
+            0.5 * best_expected_utility(0.75) + 0.5 * best_expected_utility(0.25);
+
+        let nominal_evsi = nominal_posterior_best - prior_best_utility;
+        let conservative_evsi = conservative_posterior_best - prior_best_utility;
+        assert!((nominal_evsi - 1.55).abs() < 1.0e-12);
+        assert!(conservative_evsi.abs() < 1.0e-12);
+        assert!(((nominal_evsi + conservative_evsi) / 2.0 - 0.775).abs() < 1.0e-12);
+    }
+
+
 }
