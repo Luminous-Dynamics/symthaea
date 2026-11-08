@@ -8,8 +8,8 @@
 //! cardinalities conditional on comparable endpoint pairs and (b) the
 //! fraction of incomparable endpoint pairs.
 
-use crate::causal_set_nd::CausalSetNd;
 use crate::CausalSet2D;
+use crate::causal_set_nd::CausalSetNd;
 use std::error::Error;
 use std::fmt;
 
@@ -62,7 +62,10 @@ impl fmt::Display for IntervalProfileError {
                 "histogram contains {related_pairs} related pairs; only {total_pairs} pairs exist"
             ),
             Self::NoPairSamples => {
-                write!(f, "at least two events are required for a normalized pair profile")
+                write!(
+                    f,
+                    "at least two events are required for a normalized pair profile"
+                )
             }
             Self::ZeroProfileBins => write!(f, "normalized profile requires at least one bin"),
             Self::TooManyProfileBins { requested, maximum } => write!(
@@ -115,9 +118,9 @@ impl IntervalAbundanceProfile {
         let total_pairs = if event_count < 2 {
             0
         } else {
-            let product = event_count.checked_mul(event_count - 1).ok_or(
-                IntervalProfileError::PairCountOverflow { event_count },
-            )?;
+            let product = event_count
+                .checked_mul(event_count - 1)
+                .ok_or(IntervalProfileError::PairCountOverflow { event_count })?;
             u64::try_from(product / 2)
                 .map_err(|_| IntervalProfileError::PairCountOverflow { event_count })?
         };
@@ -143,16 +146,12 @@ impl IntervalAbundanceProfile {
     }
 
     /// Build a profile from the crate's exact 1+1D causal-set implementation.
-    pub fn from_causal_set_1p1(
-        causet: &CausalSet2D,
-    ) -> Result<Self, IntervalProfileError> {
+    pub fn from_causal_set_1p1(causet: &CausalSet2D) -> Result<Self, IntervalProfileError> {
         Self::from_histogram(causet.len(), causet.interval_size_histogram())
     }
 
     /// Build a profile from the dimension-generic 2+1D or 3+1D implementation.
-    pub fn from_causal_set_nd(
-        causet: &CausalSetNd,
-    ) -> Result<Self, IntervalProfileError> {
+    pub fn from_causal_set_nd(causet: &CausalSetNd) -> Result<Self, IntervalProfileError> {
         Self::from_histogram(causet.len(), causet.interval_size_histogram())
     }
 
@@ -173,8 +172,7 @@ impl IntervalAbundanceProfile {
     }
 
     pub fn related_pair_fraction(&self) -> Option<f64> {
-        (self.total_pairs > 0)
-            .then_some(self.related_pairs as f64 / self.total_pairs as f64)
+        (self.total_pairs > 0).then_some(self.related_pairs as f64 / self.total_pairs as f64)
     }
 
     pub fn histogram(&self) -> &[u64] {
@@ -235,8 +233,7 @@ impl IntervalAbundanceProfile {
             }
         }
 
-        probabilities[profile_bin_count] =
-            self.incomparable_pairs as f64 / denominator;
+        probabilities[profile_bin_count] = self.incomparable_pairs as f64 / denominator;
         Ok(probabilities)
     }
 
