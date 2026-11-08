@@ -198,16 +198,26 @@ impl NumericWorld {
                     .gain
                     .checked_mul(*input)
                     .ok_or(NumericError::ArithmeticOverflow)?,
-                Mechanism::LeakyMemory => self.state.ok_or(NumericError::InvalidParameterBinding)?,
+                Mechanism::LeakyMemory => {
+                    self.state.ok_or(NumericError::InvalidParameterBinding)?
+                }
             };
             measurements.push(self.truth.sensor.apply(latent));
 
             if self.truth.mechanism == Mechanism::LeakyMemory {
-                let decay = self.truth.decay.ok_or(NumericError::InvalidParameterBinding)?;
+                let decay = self
+                    .truth
+                    .decay
+                    .ok_or(NumericError::InvalidParameterBinding)?;
                 self.state = Some(
                     decay
                         .checked_mul(self.state.ok_or(NumericError::InvalidParameterBinding)?)
-                        .and_then(|value| self.truth.gain.checked_mul(*input).and_then(|drive| value.checked_add(drive)))
+                        .and_then(|value| {
+                            self.truth
+                                .gain
+                                .checked_mul(*input)
+                                .and_then(|drive| value.checked_add(drive))
+                        })
                         .ok_or(NumericError::ArithmeticOverflow)?,
                 );
             }
@@ -339,8 +349,7 @@ pub fn discover(
         .into_iter()
         .collect();
 
-    let structure_identified =
-        !compatible_models.is_empty() && compatible_structures.len() == 1;
+    let structure_identified = !compatible_models.is_empty() && compatible_structures.len() == 1;
     let coefficient_tuples: BTreeSet<(i64, Option<i64>)> = compatible_models
         .iter()
         .map(|model| (model.gain, model.decay))
@@ -352,13 +361,10 @@ pub fn discover(
             .iter()
             .all(|model| model.mechanism == Mechanism::DirectResponse)
             || compatible_initial_states.len() == 1);
-    let measurement_identified =
-        !compatible_models.is_empty() && compatible_sensors.len() == 1;
+    let measurement_identified = !compatible_models.is_empty() && compatible_sensors.len() == 1;
     let model_identified = compatible_models.len() == 1;
     let disposition = match (model_identified, structure_identified) {
-        (false, false) if compatible_models.is_empty() => {
-            DiscoveryDisposition::NoCompatibleModel
-        }
+        (false, false) if compatible_models.is_empty() => DiscoveryDisposition::NoCompatibleModel,
         (true, true) => DiscoveryDisposition::UniqueModel,
         (false, true) => DiscoveryDisposition::StructureIdentifiedParametersAmbiguous,
         _ => DiscoveryDisposition::StructureAmbiguous,
@@ -508,8 +514,7 @@ pub fn recommend_discriminating_probe(
             let interventions = decode_sequence(code, horizon);
             let mut partitions: BTreeMap<Vec<i64>, usize> = BTreeMap::new();
             for model in &report.compatible_models {
-                let prediction =
-                    model.predict_continuation(&log.interventions, &interventions)?;
+                let prediction = model.predict_continuation(&log.interventions, &interventions)?;
                 *partitions.entry(prediction).or_insert(0) += 1;
             }
             let partition_count = partitions.len();
@@ -617,11 +622,7 @@ mod tests {
     fn a0_recovers_numeric_coefficients_when_structure_is_supplied() {
         let mut world = NumericWorld::new(leaky_truth()).unwrap();
         let log = world.run(&[1, -1, 1, 0]).unwrap();
-        let report = discover(
-            &log,
-            StructureAccess::Supplied(Mechanism::LeakyMemory),
-        )
-        .unwrap();
+        let report = discover(&log, StructureAccess::Supplied(Mechanism::LeakyMemory)).unwrap();
 
         assert_eq!(report.disposition, DiscoveryDisposition::UniqueModel);
         assert!(report.coefficients_identified);
@@ -722,8 +723,7 @@ mod tests {
         };
 
         assert!(classes.iter().any(|class| {
-            class.members.contains(&identity_gain_two)
-                && class.members.contains(&double_gain_one)
+            class.members.contains(&identity_gain_two) && class.members.contains(&double_gain_one)
         }));
     }
 
@@ -746,9 +746,11 @@ mod tests {
         };
         assert!(classes.iter().any(|class| class.members.contains(&direct)));
         assert!(classes.iter().any(|class| class.members.contains(&memory)));
-        assert!(!classes.iter().any(|class| {
-            class.members.contains(&direct) && class.members.contains(&memory)
-        }));
+        assert!(
+            !classes.iter().any(|class| {
+                class.members.contains(&direct) && class.members.contains(&memory)
+            })
+        );
     }
 
     #[test]
@@ -773,17 +775,23 @@ mod tests {
 
     #[test]
     fn invalid_inputs_and_parameter_bindings_fail_closed() {
-        assert!(NumericWorld::new(ModelHypothesis {
-            gain: 0,
-            ..leaky_truth()
-        }).is_err());
-        assert!(NumericWorld::new(ModelHypothesis {
-            mechanism: Mechanism::DirectResponse,
-            gain: 1,
-            decay: Some(1),
-            initial_state: None,
-            sensor: SensorMap::Identity,
-        }).is_err());
+        assert!(
+            NumericWorld::new(ModelHypothesis {
+                gain: 0,
+                ..leaky_truth()
+            })
+            .is_err()
+        );
+        assert!(
+            NumericWorld::new(ModelHypothesis {
+                mechanism: Mechanism::DirectResponse,
+                gain: 1,
+                decay: Some(1),
+                initial_state: None,
+                sensor: SensorMap::Identity,
+            })
+            .is_err()
+        );
         let mut world = NumericWorld::new(leaky_truth()).unwrap();
         assert!(world.run(&[2]).is_err());
     }
@@ -797,9 +805,11 @@ mod tests {
         let report = discover(&log, StructureAccess::Withheld).unwrap();
         assert_eq!(report.disposition, DiscoveryDisposition::NoCompatibleModel);
         assert!(report.compatible_models.is_empty());
-        assert!(recommend_discriminating_probe(&log, &report, 2)
-            .unwrap()
-            .is_none());
+        assert!(
+            recommend_discriminating_probe(&log, &report, 2)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
