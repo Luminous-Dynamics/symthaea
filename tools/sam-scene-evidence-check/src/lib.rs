@@ -956,12 +956,12 @@ fn check_source_role_ref(
     let Some(id) = reference.and_then(Value::as_str) else {
         return;
     };
-    if let Some(role) = roles.get(id) {
-        if !allowed.contains(&role.as_str()) {
-            errors.push(format!(
-                "{label}: source {id} has role {role}, which is not allowed here"
-            ));
-        }
+    if let Some(role) = roles.get(id)
+        && !allowed.contains(&role.as_str())
+    {
+        errors.push(format!(
+            "{label}: source {id} has role {role}, which is not allowed here"
+        ));
     }
 }
 
