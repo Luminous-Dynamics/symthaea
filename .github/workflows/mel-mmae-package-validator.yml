@@ -1,0 +1,69 @@
+name: MMAE submission package validator
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-mmae-package-validator/**"
+      - ".github/workflows/mel-mmae-package-validator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Stage isolated crate outside repository workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-mmae-package-validator"
+          mkdir -p "$staged/src"
+          cp tools/mel-mmae-package-validator/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-mmae-package-validator/Cargo.lock "$staged/Cargo.lock"
+          cp tools/mel-mmae-package-validator/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-mmae-package-validator/src/main.rs "$staged/src/main.rs"
+          echo "MMAE_VALIDATOR_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Format
+        run: cargo +1.96.0 fmt --check --manifest-path "$MMAE_VALIDATOR_MANIFEST"
+      - name: Unit tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MMAE_VALIDATOR_MANIFEST"
+      - name: End-to-end reference package preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$RUNNER_TEMP/mmae-reference-package"
+          mkdir -p "$package/audio"
+          printf 'sample-001\nsample-002\n' > "$RUNNER_TEMP/mmae-expected-ids.txt"
+          # 16-bit mono PCM WAVE, 8 kHz, two non-empty sample bytes.
+          for id in sample-001 sample-002; do
+            printf '%b' 'RIFF\046\000\000\000WAVEfmt \020\000\000\000\001\000\001\000\100\037\000\000\200\076\000\000\002\000\020\000data\002\000\000\000\000\000' > "$package/audio/$id.wav"
+          done
+          printf '{"id":"sample-001","audio_path":"audio/sample-001.wav"}\n{"id":"sample-002","audio_path":"audio/sample-002.wav"}\n' > "$package/submission.jsonl"
+          cargo +1.96.0 run --locked --manifest-path "$MMAE_VALIDATOR_MANIFEST" -- validate --root "$package" --expected-ids "$RUNNER_TEMP/mmae-expected-ids.txt" --expected-count 2 --report "$RUNNER_TEMP/mmae-package-report.json" > "$RUNNER_TEMP/mmae-package-stdout.json"
+          grep -q '"valid": true' "$RUNNER_TEMP/mmae-package-report.json"
+      - name: Upload package preflight report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmae-package-validator-report
+          path: ${{ runner.temp }}/mmae-package-report.json
+          if-no-files-found: error
+          retention-days: 30
