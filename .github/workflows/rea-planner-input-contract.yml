@@ -1,0 +1,58 @@
+name: REA Planner Input Contract Validation
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/REA_PLANNER_INPUT_CONTRACT_V0_1_2026Q4.md"
+      - "docs/research/rea-planner-input-contract-v0-1.schema.json"
+      - "docs/research/rea-planner-input-contract-v0-1-example-math-only.json"
+      - "tools/rea-planner-input-contract-check/**"
+      - ".github/workflows/rea-planner-input-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-planner-input-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUSTUP_TOOLCHAIN: "1.99.1"
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.99.1"
+          components: rustfmt, clippy
+
+      - name: Generate isolated checker lockfile
+        run: cargo generate-lockfile --manifest-path tools/rea-planner-input-contract-check/Cargo.toml
+
+      - name: Verify exact revision and toolchain
+        run: |
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          rustc --version --verbose
+          cargo --version
+          sha256sum tools/rea-planner-input-contract-check/Cargo.lock
+
+      - name: Rust formatting
+        run: cargo fmt --manifest-path tools/rea-planner-input-contract-check/Cargo.toml -- --check
+
+      - name: Schema, probability and utility contract tests
+        run: cargo test --manifest-path tools/rea-planner-input-contract-check/Cargo.toml --locked
+
+      - name: Warnings-denied Clippy
+        run: cargo clippy --manifest-path tools/rea-planner-input-contract-check/Cargo.toml --all-targets --locked -- -D warnings
