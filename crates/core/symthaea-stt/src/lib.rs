@@ -88,6 +88,7 @@ pub mod liquid;
 pub mod liquid_hdc;
 pub mod liquid_projection;
 pub mod lm;
+pub mod phonological_eval;
 pub mod ltc;
 #[cfg(feature = "gpu")]
 pub mod ltc_gpu;
