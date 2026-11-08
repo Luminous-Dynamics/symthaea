@@ -1,0 +1,43 @@
+name: SYM-WASM-000A qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/action/mod.rs'
+      - 'scripts/qualify-sym-wasm-000a.py'
+      - '.github/workflows/sym-wasm-000a.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Attest exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'head=%s\ntree=%s\n' "$actual" "$(git rev-parse HEAD^{tree})" | tee /tmp/sym-wasm-000a-subject.txt
+
+      - name: Run SYM-WASM-000A static qualification
+        run: python3 scripts/qualify-sym-wasm-000a.py
+
+      - name: Source immutability postflight
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
