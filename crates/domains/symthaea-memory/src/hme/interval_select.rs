@@ -39,6 +39,8 @@ pub enum ScoreIntervalBuildError {
     ResidualCertificate(ResidualCertificateError),
     /// The canonical score interval could not be computed safely.
     ScoreInterval(ContinuousHVIntervalError),
+    /// The computed interval failed its structural invariant.
+    InvalidIntervalShape,
 }
 
 impl std::fmt::Display for ScoreIntervalBuildError {
@@ -46,6 +48,7 @@ impl std::fmt::Display for ScoreIntervalBuildError {
         match self {
             Self::ResidualCertificate(error) => write!(f, "residual certificate invalid: {error}"),
             Self::ScoreInterval(error) => write!(f, "score interval invalid: {error}"),
+            Self::InvalidIntervalShape => write!(f, "score interval failed its structural invariant"),
         }
     }
 }
@@ -82,9 +85,7 @@ impl<Id> ScoreIntervalRecord<Id> {
             )
             .map_err(ScoreIntervalBuildError::ScoreInterval)?;
         if !interval.is_well_formed() {
-            return Err(ScoreIntervalBuildError::ScoreInterval(
-                ContinuousHVIntervalError::InvalidResidualBound,
-            ));
+            return Err(ScoreIntervalBuildError::InvalidIntervalShape);
         }
         Ok(Self {
             id,
