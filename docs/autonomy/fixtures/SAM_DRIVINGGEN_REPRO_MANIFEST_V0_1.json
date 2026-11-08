@@ -156,7 +156,7 @@
     },
     "open_domain_city_sample_audit": {
       "pinned_dataset_revision": "935e0a40cd489305a206abe89f31d8854495098b",
-      "audit_status": "two_city_labelled_files_confirmed_from_immutable_tree; visual content not inspected",
+      "audit_status": "two_city_labelled_image_caption_pairs_confirmed_from_immutable_tree; caption text reviewed; image pixels not visually inspected",
       "examples": [
         {
           "file": "open_domain/imgs/cape_town.png",
@@ -180,14 +180,15 @@
         }
       ],
       "interpretation": {
-        "confirmed": "The pinned open_domain tree includes two Cape Town-labelled image/caption pairs.",
+        "confirmed": "The pinned open_domain tree contains two matching Cape Town-labelled image/caption file pairs; the caption text was reviewed but image pixels were not visually inspected.",
         "not_confirmed": [
           "exact GPS position",
           "South African LHT rule profile",
           "steering-wheel position",
           "lawful passing side",
           "lane-direction ground truth",
-          "Johannesburg or other South African city coverage"
+          "Johannesburg or other South African city coverage",
+          "that the images visibly show a left-hand-traffic scene"
         ],
         "use": "A small qualitative South African scene-audit seed only. Do not treat filenames or captions as jurisdiction labels or a statistically representative LHT sample."
       }
