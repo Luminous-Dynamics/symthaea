@@ -234,9 +234,9 @@ pub fn validate_inputs(
 
 fn profile_body_without_digest(profile: &Value) -> Result<Value> {
     let mut body = profile.clone();
-    let object = body.as_object_mut().ok_or_else(|| {
-        ValidationError::new("profile_shape", "profile root must be an object")
-    })?;
+    let object = body
+        .as_object_mut()
+        .ok_or_else(|| ValidationError::new("profile_shape", "profile root must be an object"))?;
     if object.remove("profile_sha256").is_none() {
         return Err(ValidationError::new(
             "profile_shape",
@@ -272,7 +272,9 @@ fn reject_external_references(value: &Value) -> Result<()> {
                     if !reference.starts_with('#') {
                         return Err(ValidationError::new(
                             "external_schema_reference_forbidden",
-                            format!("external schema reference is not permitted in v0: {reference}"),
+                            format!(
+                                "external schema reference is not permitted in v0: {reference}"
+                            ),
                         ));
                     }
                 }
@@ -301,7 +303,10 @@ fn validate_profile_semantics(paths: &[NumericPath]) -> Result<()> {
         if !seen.insert(path.json_pointer.clone()) {
             return Err(ValidationError::new(
                 "duplicate_profile_pointer",
-                format!("numeric path is declared more than once: {}", path.json_pointer),
+                format!(
+                    "numeric path is declared more than once: {}",
+                    path.json_pointer
+                ),
             ));
         }
 
@@ -336,15 +341,12 @@ fn validate_profile_semantics(paths: &[NumericPath]) -> Result<()> {
 }
 
 fn contract_string<'a>(contract: &'a Value, key: &str, pointer: &str) -> Result<&'a str> {
-    contract
-        .get(key)
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            ValidationError::new(
-                "invalid_numeric_contract",
-                format!("{pointer}: contract.{key} must be a string"),
-            )
-        })
+    contract.get(key).and_then(Value::as_str).ok_or_else(|| {
+        ValidationError::new(
+            "invalid_numeric_contract",
+            format!("{pointer}: contract.{key} must be a string"),
+        )
+    })
 }
 
 fn validate_safe_integer_contract(contract: &Value, pointer: &str) -> Result<()> {
@@ -446,12 +448,12 @@ fn validate_fixed_decimal_contract(contract: &Value, pointer: &str) -> Result<()
             )
         })? as usize;
 
-    let minimum = parse_fixed_decimal(minimum, scale, max_integer_digits, signedness)
-        .map_err(|message| {
+    let minimum =
+        parse_fixed_decimal(minimum, scale, max_integer_digits, signedness).map_err(|message| {
             ValidationError::new("invalid_numeric_contract", format!("{pointer}: {message}"))
         })?;
-    let maximum = parse_fixed_decimal(maximum, scale, max_integer_digits, signedness)
-        .map_err(|message| {
+    let maximum =
+        parse_fixed_decimal(maximum, scale, max_integer_digits, signedness).map_err(|message| {
             ValidationError::new("invalid_numeric_contract", format!("{pointer}: {message}"))
         })?;
     if compare_signed_decimal(&minimum, &maximum) == std::cmp::Ordering::Greater {
@@ -536,13 +538,12 @@ fn evaluate_path(
         },
     };
 
-    let unit_quantity_reference_status = if path.quantity_kind_ref.is_some()
-        && path.unit_code_ref.is_some()
-    {
-        Some("unresolved_authority_reference_not_validated".to_owned())
-    } else {
-        None
-    };
+    let unit_quantity_reference_status =
+        if path.quantity_kind_ref.is_some() && path.unit_code_ref.is_some() {
+            Some("unresolved_authority_reference_not_validated".to_owned())
+        } else {
+            None
+        };
 
     Ok(NumericPathResult {
         json_pointer: path.json_pointer.clone(),
@@ -570,10 +571,20 @@ fn validate_integer_value(
     contract: &Value,
     reject_negative_zero: bool,
 ) -> std::result::Result<(), &'static str> {
-    let signedness = contract.get("signedness").and_then(Value::as_str).unwrap_or("");
-    let minimum = contract.get("min_value").and_then(Value::as_str).unwrap_or("");
-    let maximum = contract.get("max_value").and_then(Value::as_str).unwrap_or("");
-    let parsed = parse_integer(value, reject_negative_zero).map_err(|_| "invalid_integer_grammar")?;
+    let signedness = contract
+        .get("signedness")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let minimum = contract
+        .get("min_value")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let maximum = contract
+        .get("max_value")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let parsed =
+        parse_integer(value, reject_negative_zero).map_err(|_| "invalid_integer_grammar")?;
     let min = parse_integer(minimum, false).map_err(|_| "invalid_numeric_contract")?;
     let max = parse_integer(maximum, false).map_err(|_| "invalid_numeric_contract")?;
     if signedness == "unsigned" && parsed.starts_with('-') {
@@ -591,7 +602,10 @@ fn validate_exact_integer_value(
     value: &str,
     contract: &Value,
 ) -> std::result::Result<(), &'static str> {
-    let max_digits = contract.get("max_digits").and_then(Value::as_u64).unwrap_or(0) as usize;
+    let max_digits = contract
+        .get("max_digits")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as usize;
     if digit_count(value) > max_digits {
         return Err("digit_limit_exceeded");
     }
@@ -602,14 +616,23 @@ fn validate_fixed_decimal_value(
     value: &str,
     contract: &Value,
 ) -> std::result::Result<(), &'static str> {
-    let signedness = contract.get("signedness").and_then(Value::as_str).unwrap_or("");
+    let signedness = contract
+        .get("signedness")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     let scale = contract.get("scale").and_then(Value::as_u64).unwrap_or(0) as usize;
     let max_integer_digits = contract
         .get("max_integer_digits")
         .and_then(Value::as_u64)
         .unwrap_or(0) as usize;
-    let minimum = contract.get("min_value").and_then(Value::as_str).unwrap_or("");
-    let maximum = contract.get("max_value").and_then(Value::as_str).unwrap_or("");
+    let minimum = contract
+        .get("min_value")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let maximum = contract
+        .get("max_value")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     let parsed = parse_fixed_decimal(value, scale, max_integer_digits, signedness)
         .map_err(|_| "invalid_decimal_grammar")?;
     let min = parse_fixed_decimal(minimum, scale, max_integer_digits, signedness)
@@ -727,9 +750,7 @@ fn compare_signed_decimal(left: &str, right: &str) -> std::cmp::Ordering {
 }
 
 fn compare_unsigned_decimal(left: &str, right: &str) -> std::cmp::Ordering {
-    left.len()
-        .cmp(&right.len())
-        .then_with(|| left.cmp(right))
+    left.len().cmp(&right.len()).then_with(|| left.cmp(right))
 }
 
 fn is_valid_non_root_json_pointer(pointer: &str) -> bool {
@@ -754,9 +775,8 @@ fn is_valid_non_root_json_pointer(pointer: &str) -> bool {
 }
 
 fn jcs_sha256(value: &Value) -> Result<String> {
-    let bytes = serde_json_canonicalizer::to_vec(value).map_err(|e| {
-        ValidationError::new("jcs_canonicalization", e.to_string())
-    })?;
+    let bytes = serde_json_canonicalizer::to_vec(value)
+        .map_err(|e| ValidationError::new("jcs_canonicalization", e.to_string()))?;
     let digest = Sha256::digest(bytes);
     let mut output = String::with_capacity(64);
     for byte in digest {
@@ -884,7 +904,10 @@ mod tests {
         assert_eq!(report.path_results[0].status, "valid_safe_integer");
         assert_eq!(report.path_results[1].status, "valid_exact_integer_string");
         assert_eq!(report.path_results[2].status, "valid_fixed_decimal_string");
-        assert_eq!(report.path_results[3].canonical_binary64.as_deref(), Some("42"));
+        assert_eq!(
+            report.path_results[3].canonical_binary64.as_deref(),
+            Some("42")
+        );
         assert_eq!(
             report.path_results[4].status,
             "opaque_preserved_arithmetic_forbidden"
@@ -967,10 +990,9 @@ mod tests {
 
     #[test]
     fn numeric_intent_design_fixture_is_well_formed_and_unique() {
-        let fixture: Value = serde_json::from_str(include_str!(
-            "../tests/fixtures/rea-numeric-intent-v0.json"
-        ))
-        .unwrap();
+        let fixture: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/rea-numeric-intent-v0.json"))
+                .unwrap();
         let cases = fixture["cases"].as_array().unwrap();
         assert_eq!(cases.len(), 23);
         let ids: HashSet<String> = cases

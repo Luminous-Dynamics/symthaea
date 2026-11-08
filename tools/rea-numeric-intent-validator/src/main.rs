@@ -24,7 +24,11 @@ fn run() -> Result<i32, String> {
     let profile_path = args.next().map(PathBuf::from);
     let schema_path = args.next().map(PathBuf::from);
     let document_path = args.next().map(PathBuf::from);
-    if args.next().is_some() || profile_path.is_none() || schema_path.is_none() || document_path.is_none() {
+    if args.next().is_some()
+        || profile_path.is_none()
+        || schema_path.is_none()
+        || document_path.is_none()
+    {
         return Err(
             "usage: rea-numeric-intent-validate <profile.json> <value-schema.json> <document.json>"
                 .to_owned(),
@@ -34,14 +38,17 @@ fn run() -> Result<i32, String> {
     let profile = read_bounded(&profile_path.unwrap(), "profile")?;
     let value_schema = read_bounded(&schema_path.unwrap(), "value schema")?;
     let document = read_bounded(&document_path.unwrap(), "document")?;
-    let report = validate_inputs(&profile, &value_schema, &document)
-        .map_err(|e| e.to_string())?;
+    let report = validate_inputs(&profile, &value_schema, &document).map_err(|e| e.to_string())?;
 
     let stdout = std::io::stdout();
     let mut output = stdout.lock();
     serde_json::to_writer_pretty(&mut output, &report).map_err(|e| e.to_string())?;
     output.write_all(b"\n").map_err(|e| e.to_string())?;
-    Ok(if report.overall_status == "conformant" { 0 } else { 1 })
+    Ok(if report.overall_status == "conformant" {
+        0
+    } else {
+        1
+    })
 }
 
 fn main() {
