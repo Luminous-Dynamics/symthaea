@@ -3,14 +3,71 @@
 
 use std::error::Error;
 use symthaea_uap_observatory::{
-    BudgetedDesignConfig, DesignScenario, ExperimentOption, exhaustive_budgeted_design,
-    greedy_budgeted_design,
+    BudgetedDesignConfig, DesignScenario, EcefVector3, ExperimentOption,
+    SensorPlacementCandidate, SensorToEcefQuaternion, bearing_position_clock_jacobian,
+    exhaustive_budgeted_design, greedy_budgeted_design,
 };
 
+#[derive(Clone, Copy)]
+struct TargetScenario {
+    position_ecef_m: EcefVector3,
+    velocity_ecef_mps: EcefVector3,
+}
+
+fn bearing_option(
+    option_id: &str,
+    cost: f64,
+    exclusive_group: Option<&str>,
+    sensor: SensorPlacementCandidate,
+    sensor_velocity_by_scenario: &[EcefVector3],
+    targets: &[TargetScenario],
+) -> Result<ExperimentOption, Box<dyn Error>> {
+    if sensor_velocity_by_scenario.len() != targets.len() {
+        return Err("sensor and target scenario counts differ".into());
+    }
+
+    let mut jacobian_rows_by_scenario = Vec::with_capacity(targets.len());
+    for (target, sensor_velocity) in targets.iter().zip(sensor_velocity_by_scenario) {
+        let relative_velocity = target.velocity_ecef_mps.subtract(*sensor_velocity);
+        let jacobian = bearing_position_clock_jacobian(
+            &sensor,
+            target.position_ecef_m,
+            relative_velocity,
+        )?;
+        jacobian_rows_by_scenario.push(vec![
+            jacobian.azimuth_row.to_vec(),
+            jacobian.elevation_row.to_vec(),
+        ]);
+    }
+
+    Ok(ExperimentOption {
+        option_id: option_id.to_string(),
+        cost,
+        exclusive_group: exclusive_group.map(str::to_string),
+        jacobian_rows_by_scenario,
+    })
+}
+
+fn sensor(
+    id: &str,
+    origin: EcefVector3,
+    sigma_azimuth_rad: f64,
+    sigma_elevation_rad: f64,
+) -> SensorPlacementCandidate {
+    SensorPlacementCandidate {
+        sensor_id: id.to_string(),
+        origin_ecef_m: origin,
+        sensor_to_ecef: SensorToEcefQuaternion::IDENTITY,
+        sigma_azimuth_rad,
+        sigma_elevation_rad,
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    // Synthetic whitened linearized Jacobians for target XYZ plus a sensor
-    // clock-offset nuisance parameter. These rows are a benchmark fixture,
-    // not measurements from a real observatory.
+    // Linearization variables: target ECEF XYZ plus an additive sensor-clock
+    // offset. The observation rows below are generated from the actual bearing
+    // geometry, declared noise and relative target/sensor velocities. This is
+    // synthetic design data, not a real Observatory deployment.
     let scenarios = vec![
         DesignScenario {
             scenario_id: "nominal-target-region".to_string(),
@@ -33,66 +90,100 @@ fn main() -> Result<(), Box<dyn Error>> {
             ],
         },
     ];
+    let targets = [
+        TargetScenario {
+            position_ecef_m: EcefVector3::new(150.0, 80.0, 220.0),
+            velocity_ecef_mps: EcefVector3::new(14.0, -5.0, 1.0),
+        },
+        TargetScenario {
+            position_ecef_m: EcefVector3::new(-80.0, 180.0, 420.0),
+            velocity_ecef_mps: EcefVector3::new(8.0, 6.0, -0.5),
+        },
+    ];
+
+    let station_a_low = sensor(
+        "station-a-low-fidelity",
+        EcefVector3::new(0.0, 0.0, 0.0),
+        0.010,
+        0.015,
+    );
+    let station_a_high = sensor(
+        "station-a-high-fidelity",
+        EcefVector3::new(0.0, 0.0, 0.0),
+        0.003,
+        0.004,
+    );
+    let station_b = sensor(
+        "station-b-baseline",
+        EcefVector3::new(220.0, -40.0, 15.0),
+        0.008,
+        0.010,
+    );
+    let manoeuvre_station = sensor(
+        "platform-excitation-manoeuvre",
+        EcefVector3::new(-120.0, 260.0, 125.0),
+        0.009,
+        0.012,
+    );
 
     let options = vec![
-        ExperimentOption {
-            option_id: "station-a-low-fidelity".to_string(),
-            cost: 1.0,
-            exclusive_group: Some("station-a".to_string()),
-            jacobian_rows_by_scenario: vec![
-                vec![vec![0.15, 1.20, 0.10, 0.02], vec![1.00, 0.10, 0.20, 0.00]],
-                vec![vec![0.10, 0.75, 0.55, 0.03], vec![0.85, 0.10, 0.25, 0.00]],
-            ],
-        },
-        ExperimentOption {
-            option_id: "station-a-high-fidelity".to_string(),
-            cost: 2.2,
-            exclusive_group: Some("station-a".to_string()),
-            jacobian_rows_by_scenario: vec![
-                vec![vec![0.22, 1.80, 0.15, 0.03], vec![1.50, 0.15, 0.30, 0.00]],
-                vec![vec![0.15, 1.10, 0.82, 0.04], vec![1.25, 0.15, 0.38, 0.00]],
-            ],
-        },
-        ExperimentOption {
-            option_id: "station-b-baseline".to_string(),
-            cost: 1.25,
-            exclusive_group: None,
-            jacobian_rows_by_scenario: vec![
-                vec![vec![0.20, 0.10, 1.35, 0.08], vec![0.90, 0.12, 0.10, 0.00]],
-                vec![vec![0.25, 0.18, 0.92, 0.12], vec![0.75, 0.20, 0.12, 0.02]],
-            ],
-        },
+        bearing_option(
+            "station-a-low-fidelity",
+            1.0,
+            Some("station-a"),
+            station_a_low,
+            &[EcefVector3::ZERO, EcefVector3::ZERO],
+            &targets,
+        )?,
+        bearing_option(
+            "station-a-high-fidelity",
+            2.2,
+            Some("station-a"),
+            station_a_high,
+            &[EcefVector3::ZERO, EcefVector3::ZERO],
+            &targets,
+        )?,
+        bearing_option(
+            "station-b-baseline",
+            1.25,
+            None,
+            station_b,
+            &[EcefVector3::ZERO, EcefVector3::ZERO],
+            &targets,
+        )?,
         ExperimentOption {
             option_id: "clock-calibration-pulse".to_string(),
             cost: 0.65,
             exclusive_group: Some("clock-reference".to_string()),
             jacobian_rows_by_scenario: vec![
-                vec![vec![0.01, 0.00, 0.00, 1.80]],
-                vec![vec![0.02, 0.00, 0.00, 1.60]],
+                vec![vec![0.0, 0.0, 0.0, 1.0 / 0.002]],
+                vec![vec![0.0, 0.0, 0.0, 1.0 / 0.002]],
             ],
         },
-        ExperimentOption {
-            option_id: "platform-excitation-maneuver".to_string(),
-            cost: 1.1,
-            exclusive_group: None,
-            jacobian_rows_by_scenario: vec![
-                vec![vec![0.25, 0.20, 0.15, 0.90], vec![0.45, 0.10, 0.20, 0.75]],
-                vec![vec![0.18, 0.25, 0.22, 1.10], vec![0.36, 0.15, 0.28, 0.88]],
+        bearing_option(
+            "platform-excitation-manoeuvre",
+            1.1,
+            None,
+            manoeuvre_station,
+            &[
+                EcefVector3::new(-24.0, 8.0, 0.5),
+                EcefVector3::new(-18.0, 5.0, -1.0),
             ],
-        },
+            &targets,
+        )?,
     ];
 
     let config = BudgetedDesignConfig {
         budget: 3.0,
-        // Metres for XYZ and milliseconds for the clock-offset state.
-        parameter_scales: vec![100.0, 100.0, 100.0, 1.0],
+        parameter_scales: vec![100.0, 100.0, 100.0, 0.01],
     };
 
     let greedy = greedy_budgeted_design(&scenarios, &options, &config)?;
     let exact = exhaustive_budgeted_design(&scenarios, &options, &config)?;
 
-    println!("epistemic_status=SYNTHETIC_LINEARIZED_BUDGETED_DESIGN_NOT_DEPLOYMENT_ADVICE");
-    println!("state=target_x,target_y,target_z,clock_offset");
+    println!("epistemic_status=SYNTHETIC_GEOMETRY_DERIVED_BUDGETED_DESIGN_NOT_DEPLOYMENT_ADVICE");
+    println!("state=target_x_m,target_y_m,target_z_m,clock_offset_s");
+    println!("jacobian_source=analytic_azimuth_elevation_geometry_whitened_by_sigma");
     println!("budget={:.6}", config.budget);
     println!("candidate_options={}", options.len());
     println!("exclusive_fidelity_groups=station-a,clock-reference");
@@ -141,7 +232,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
     println!(
-        "claim_boundary=linearized_whitened_independent_action_rows; shared_cross_sensor_covariance_not_included"
+        "claim_boundary=linearized_geometry_and_relative_velocity; shared_cross_sensor_covariance_not_included"
     );
     Ok(())
 }
