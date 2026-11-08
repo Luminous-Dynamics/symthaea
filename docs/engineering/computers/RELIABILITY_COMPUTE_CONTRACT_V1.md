@@ -43,7 +43,7 @@ The semantic validator is deliberately narrow: it checks referential integrity, 
 
 This is a first executable slice, not the complete nested dependency graph in #10993. It does not model subarray/die/wafer/lot hierarchies, realistic spatial stochastic fields, device I-V behavior, conductance mapping, differential pairs, ADC/DAC/readout, noise spectra, write physics, drift, endurance, thermal feedback, real task arithmetic, measured latency, physical energy, area, cost or yield.
 
-The evaluator-only ground-truth field must not be visible to the verifier being tested. A verifier that receives its own expected answer is not independent.
+The evaluator-only `EvaluatorLabel` is structurally separate from verifier-facing `Observation`; it is supplied separately only to the evaluator-side classifier. The caller must still enforce process/module isolation if a deployed verifier is introduced. A verifier that receives its own expected answer is not independent.
 
 ## Versioned scenario manifest
 
@@ -51,11 +51,12 @@ The machine-readable v1 contract and semantic validator are:
 
 - `research/physical_compute/scenario_manifest_v1.schema.json`
 - `research/physical_compute/scenarios/v1/common_cause_controller_outage.json`\n- `research/physical_compute/scenarios/v1/common_cause_shared_power_outage.json`
-- `research/physical_compute/manifest-validator/`: isolated Rust CLI and semantic validation library (uses `serde_json` and `sha2`; not a Symthaea workspace member).
+- `research/physical_compute/manifest-validator/`: isolated Rust CLI/library for semantic validation, canonical digesting and deterministic domain-outage preflight replay (uses `serde_json` and `sha2`; not a Symthaea workspace member).
+- `docs/engineering/computers/INDEPENDENT_VERIFICATION_V1.md`: verification benchmark families and independence contract.
 
 The examples are deterministic **negative-control fixtures**, not probability estimates. One injects a controller-domain outage; the other injects a shared power outage that affects the array, controller and verifier. Both declare that increasing healthy cell count must not make the workload executable or make a co-failed verifier independent.
 
-The JSON Schema validates structure and primitive types. A semantic validator is still required to check:
+The JSON Schema validates structure and primitive types. The semantic validator checks:
 - uniqueness of component and domain identifiers;
 - resolution of every parent, member, dependency and fault-injection target;
 - acyclic parent/dependency relations where required;
@@ -65,6 +66,8 @@ The JSON Schema validates structure and primitive types. A semantic validator is
 - disjoint training, validation and confirmatory seed sets;
 - independence claims against the actual dependency graph.
 
+The same Rust utility has a deliberately narrow domain-outage replay mode. It propagates a declared failed domain to child domains and to domains whose declared dependencies have failed, then computes whether all required candidate components and the verifier component remain available. Supported injections are only `domain_outage` with `parameters.state = "failed"`; all other mechanisms fail closed. The CLI labels the output `PREFLIGHT_ONLY`. It does not execute workload arithmetic, infer a correct result, model time-dependent device physics, estimate probabilities, or measure energy.
+
 Run the semantic pass after a Draft 2020-12 JSON Schema validator:
 
 ```sh
@@ -73,20 +76,20 @@ cargo run --manifest-path research/physical_compute/manifest-validator/Cargo.tom
   research/physical_compute/scenarios/v1/common_cause_controller_outage.json
 ```
 
-The CLI prints a canonical SHA-256 digest and `SEMANTIC_VALID` or `SEMANTIC_INVALID`. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both checked-in common-cause fixtures and canonical key ordering.
+The CLI prints a canonical SHA-256 digest, `SEMANTIC_VALID` or `SEMANTIC_INVALID`, the failed domain/component sets, candidate/verifier availability and a `preflight_classification`. It finishes with `PREFLIGHT_ONLY` to make the evidence boundary explicit. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both common-cause fixtures, candidate-path component resolution, failed controller/shared-power propagation, verifier co-failure and unsupported replay mechanisms.
 
 The crate and tests are authored but have not been compiled in this environment because `rustc` / `cargo` are unavailable. Until the JSON Schema and semantic passes have both executed on an exact head, a manifest is not a qualified scenario.
 
 ## Required next steps
 
-1. Add versioned scenario/result serialization and canonical digests.
-2. Add explicit component membership in nested domains and redundant independent power/clock/controller partitions.
+1. Compile and test the isolated Rust utility on an exact checked-out PR head; run Draft 2020-12 schema validation and semantic/preflight replay on both fixtures.
+2. Add adversarial parent/dependency topology tests and validate candidate + verifier cut sets, including a common host/input path and shared failover controller.
 3. Add spatial process and adversarial geometry generators; retain beta-binomial as an exchangeable-count baseline only.
 4. Add persistent write error, per-read noise, drift, temperature, retention and endurance.
-5. Add independent oracles for exact HDC, approximate transforms and temporal state.
-6. Compare direct mapping, independent-only redundancy, screening/remapping, fault-containment islands, adaptive representation, verification/fallback and combined policies.
-7. Preserve experimental clustering and use device/array/lot as the experimental unit where appropriate.
-8. Integrate into existing workload/evidence owners rather than creating a competing HDC algebra or benchmark engine.
+5. Integrate independent workload oracles for exact HDC, matrix/equation solving and temporal state.
+6. Add immutable result receipts with per-scheduled-trial outcomes, measurement boundary, source/configuration/scenario digests, and recovery metrics.
+7. Compare direct mapping, independent-only redundancy, screening/remapping, fault-containment islands, adaptive representation, ABFT/randomized checks, mixed-precision refinement and combined policies.
+8. Preserve experimental clustering and use device/array/lot as the experimental unit where appropriate; integrate with existing workload/evidence owners rather than creating a competing HDC algebra or benchmark engine.
 
 ## Claim ceiling
 
