@@ -1,0 +1,191 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-CONTINUOUS-SIMILARITY-ADMISSION-2026-11-08",
+  "status": "synthetic_contract_cases_not_rust_test_results",
+  "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+  "representation": "continuous_f32",
+  "metric": "cosine",
+  "admitted_component_interval": {
+    "lower_inclusive": -1,
+    "upper_inclusive": 1
+  },
+  "validation_order": [
+    "verify segment/query declared dimensions",
+    "verify exact profile identifier and metric",
+    "validate each component is finite",
+    "validate each component is within the admitted closed interval",
+    "only then execute full-coordinate score"
+  ],
+  "cases": [
+    {
+      "id": "boundary_values_admitted",
+      "query": [
+        -1,
+        0,
+        1
+      ],
+      "candidate": [
+        1,
+        0,
+        -1
+      ],
+      "expected": "admitted",
+      "notes": "Closed interval endpoints are valid."
+    },
+    {
+      "id": "negative_out_of_range",
+      "query": [
+        -1.000001
+      ],
+      "candidate": [
+        0
+      ],
+      "expected": "rejected_out_of_range_query_component"
+    },
+    {
+      "id": "positive_out_of_range",
+      "query": [
+        0
+      ],
+      "candidate": [
+        1.000001
+      ],
+      "expected": "rejected_out_of_range_candidate_component"
+    },
+    {
+      "id": "nan_query",
+      "query": [
+        "NaN"
+      ],
+      "candidate": [
+        0
+      ],
+      "expected": "rejected_non_finite_query_component"
+    },
+    {
+      "id": "positive_infinity_candidate",
+      "query": [
+        0
+      ],
+      "candidate": [
+        "Infinity"
+      ],
+      "expected": "rejected_non_finite_candidate_component"
+    },
+    {
+      "id": "negative_infinity_candidate",
+      "query": [
+        0
+      ],
+      "candidate": [
+        "-Infinity"
+      ],
+      "expected": "rejected_non_finite_candidate_component"
+    },
+    {
+      "id": "dimension_mismatch",
+      "query": [
+        0,
+        1
+      ],
+      "candidate": [
+        0
+      ],
+      "expected": "rejected_dimension_mismatch"
+    },
+    {
+      "id": "zero_query_vector",
+      "query": [
+        0,
+        0,
+        0
+      ],
+      "candidate": [
+        1,
+        0,
+        0
+      ],
+      "expected": "admitted_score_0_under_v1_near_zero_rule"
+    },
+    {
+      "id": "zero_candidate_vector",
+      "query": [
+        1,
+        0,
+        0
+      ],
+      "candidate": [
+        0,
+        0,
+        0
+      ],
+      "expected": "admitted_score_0_under_v1_near_zero_rule"
+    },
+    {
+      "id": "non_multiple_of_eight_tail",
+      "query": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "candidate": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "expected": "admitted_score_1"
+    },
+    {
+      "id": "localized_unsampled_coordinate",
+      "query": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "candidate": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "expected": "admitted_score_1_full_resolution"
+    },
+    {
+      "id": "equal_score_stable_tie",
+      "scores": [
+        {
+          "item_id": "mem-b",
+          "score": 0.5
+        },
+        {
+          "item_id": "mem-a",
+          "score": 0.5
+        }
+      ],
+      "expected_order": [
+        "mem-a",
+        "mem-b"
+      ],
+      "expected": "stable_id_ascending_after_score_descending"
+    }
+  ],
+  "nonclaims": [
+    "These cases are a machine-readable test plan, not executed unit-test results.",
+    "The admitted [-1,1] component range is an HME exact-profile requirement, not an invariant guaranteed by every generic ContinuousHV operation.",
+    "Exact means exact agreement with this versioned f32 score algorithm, not infinite-precision real arithmetic.",
+    "The score API and admission helper do not implement a persistent HME segment engine."
+  ]
+}
