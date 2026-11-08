@@ -128,8 +128,9 @@ pub struct OdeConfig {
     pub tolerance: f64,
     /// Maximum allowed step size (adaptive methods).
     pub max_step: f64,
-    /// Minimum allowed step size (adaptive methods). If the solver needs a
-    /// smaller step than this, it proceeds anyway and flags a warning.
+    /// Minimum allowed step size (adaptive methods). If Dormand-Prince cannot
+    /// satisfy tolerance at this step, the checked API returns
+    /// `MinimumStepToleranceUnmet`; it never force-accepts the step.
     pub min_step: f64,
     /// Maximum iterations for Newton/fixed-point solves (implicit methods).
     pub max_iterations: usize,
@@ -170,6 +171,63 @@ pub struct OdeResult {
 }
 
 // ---------------------------------------------------------------------------
+// Checked adaptive-solver outcomes
+// ---------------------------------------------------------------------------
+
+/// Resource limits for a checked Dormand-Prince integration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OdeSolveLimits {
+    /// Maximum attempted adaptive steps, including rejected steps.
+    pub max_attempts: usize,
+    /// Maximum accepted steps / stored trajectory intervals.
+    pub max_accepted_steps: usize,
+    /// Maximum total scalar values retained in the trajectory.
+    pub max_state_values: usize,
+}
+
+impl Default for OdeSolveLimits {
+    fn default() -> Self {
+        Self {
+            max_attempts: 1_000_000,
+            max_accepted_steps: 250_000,
+            max_state_values: 10_000_000,
+        }
+    }
+}
+
+/// Typed failure reasons for the checked Dormand-Prince path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OdeSolveFailureKind {
+    InvalidConfiguration,
+    InvalidLimits,
+    InvalidTimeSpan,
+    SystemDimensionMismatch,
+    InitialStateDimensionMismatch,
+    NonFiniteInitialState,
+    NonFiniteStage,
+    NonFiniteAcceptedState,
+    MinimumStepToleranceUnmet,
+    MaximumAttemptsExceeded,
+    MaximumAcceptedStepsExceeded,
+    TrajectoryBudgetExceeded,
+    TimeDidNotAdvance,
+    StepSizeStagnation,
+}
+
+/// A failed checked integration with the accepted prefix retained for diagnosis.
+///
+/// The partial trajectory is not a successful solution. Callers must inspect
+/// `kind` and must not use the prefix as a full-horizon rollout.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OdeSolveFailure {
+    pub kind: OdeSolveFailureKind,
+    pub current_time: Option<f64>,
+    pub attempted_steps: usize,
+    pub last_step_size: Option<f64>,
+    pub last_error_estimate: Option<f64>,
+    pub partial_result: Option<OdeResult>,
+}
+// ---------------------------------------------------------------------------
 // Solver engine
 // ---------------------------------------------------------------------------
 
@@ -199,9 +257,15 @@ impl OdeSolverEngine {
     ///
     /// Returns the full trajectory including initial and final states.
     ///
+    /// The Dormand-Prince branch is fail-closed: if it cannot meet tolerance
+    /// above the configured minimum step, it returns an explicit panic from
+    /// this compatibility API. Call `try_solve_dormand_prince` when the caller
+    /// needs to recover from numerical failure.
+    ///
     /// # Panics
     ///
-    /// Panics if `y0.len() != self.dim` or if `t_span.1 <= t_span.0`.
+    /// Panics if the input is invalid or the selected integrator cannot produce
+    /// a complete valid trajectory.
     pub fn solve(&self, system: &dyn OdeSystem, y0: &[f64], t_span: (f64, f64)) -> OdeResult {
         assert_eq!(y0.len(), self.dim, "Initial state dimension mismatch");
         assert!(
@@ -212,7 +276,11 @@ impl OdeSolverEngine {
         match self.config.solver {
             OdeSolver::Euler => self.solve_euler(system, y0, t_span),
             OdeSolver::RK4 => self.solve_rk4(system, y0, t_span),
-            OdeSolver::DormandPrince => self.solve_dormand_prince(system, y0, t_span),
+            OdeSolver::DormandPrince => self
+                .try_solve_dormand_prince(system, y0, t_span, OdeSolveLimits::default())
+                .unwrap_or_else(|failure| {
+                    panic!("Dormand-Prince integration failed: {:?}", failure.kind)
+                }),
             OdeSolver::ImplicitMidpoint => self.solve_implicit_midpoint(system, y0, t_span),
             OdeSolver::BackwardEuler => self.solve_backward_euler(system, y0, t_span),
             OdeSolver::Exponential => self.solve_exponential(system, y0, t_span),
@@ -494,11 +562,34 @@ impl OdeSolverEngine {
                     + B47 * k7_out[i]);
         }
 
-        // Error estimate: max-norm of |y5 - y4|
+        // Fail closed if any stage or embedded solution became non-finite.
+        // A NaN comparison in the max-norm loop below would otherwise be false
+        // and could leave `err == 0`, incorrectly accepting a corrupted step.
+        if k1
+            .iter()
+            .chain(k2.iter())
+            .chain(k3.iter())
+            .chain(k4.iter())
+            .chain(k5.iter())
+            .chain(k6.iter())
+            .chain(k7_out.iter())
+            .chain(y4_out.iter())
+            .chain(y5_out.iter())
+            .any(|value| !value.is_finite())
+        {
+            return f64::INFINITY;
+        }
+
+        // Error estimate: max-norm of |y5 - y4| with the legacy relative-ish
+        // scale. Absolute/relative component scaling is tracked separately in
+        // RK45-VERIFY-001; this patch does not silently change tolerance meaning.
         let mut err = 0.0_f64;
         for i in 0..n {
-            let scale = 1.0 + y[i].abs(); // relative-ish tolerance
+            let scale = 1.0 + y[i].abs();
             let ei = ((y5_out[i] - y4_out[i]) / scale).abs();
+            if !ei.is_finite() {
+                return f64::INFINITY;
+            }
             if ei > err {
                 err = ei;
             }
@@ -534,21 +625,124 @@ impl OdeSolverEngine {
         }
     }
 
-    fn solve_dormand_prince(
+    /// Checked Dormand-Prince integration with bounded retries and explicit failures.
+    ///
+    /// A rejected step at `min_step` returns `MinimumStepToleranceUnmet`; it is
+    /// never force-accepted and never retried forever. On failure, the error
+    /// retains the accepted trajectory prefix for diagnostics only.
+    pub fn try_solve_dormand_prince(
         &self,
         system: &dyn OdeSystem,
         y0: &[f64],
         t_span: (f64, f64),
-    ) -> OdeResult {
+        limits: OdeSolveLimits,
+    ) -> Result<OdeResult, OdeSolveFailure> {
+        let fail = |kind,
+                    current_time,
+                    attempted_steps,
+                    last_step_size,
+                    last_error_estimate,
+                    partial_result| OdeSolveFailure {
+            kind,
+            current_time,
+            attempted_steps,
+            last_step_size,
+            last_error_estimate,
+            partial_result,
+        };
+
+        if self.config.solver != OdeSolver::DormandPrince
+            || !self.config.dt.is_finite()
+            || self.config.dt <= 0.0
+            || !self.config.tolerance.is_finite()
+            || self.config.tolerance <= 0.0
+            || !self.config.min_step.is_finite()
+            || self.config.min_step <= 0.0
+            || !self.config.max_step.is_finite()
+            || self.config.max_step < self.config.min_step
+            || self.dim == 0
+        {
+            return Err(fail(
+                OdeSolveFailureKind::InvalidConfiguration,
+                None,
+                0,
+                None,
+                None,
+                None,
+            ));
+        }
+        if limits.max_attempts == 0
+            || limits.max_accepted_steps == 0
+            || limits.max_state_values < self.dim
+        {
+            return Err(fail(
+                OdeSolveFailureKind::InvalidLimits,
+                None,
+                0,
+                None,
+                None,
+                None,
+            ));
+        }
+        if y0.len() != self.dim {
+            return Err(fail(
+                OdeSolveFailureKind::InitialStateDimensionMismatch,
+                None,
+                0,
+                None,
+                None,
+                None,
+            ));
+        }
+        if system.dimension() != self.dim {
+            return Err(fail(
+                OdeSolveFailureKind::SystemDimensionMismatch,
+                None,
+                0,
+                None,
+                None,
+                None,
+            ));
+        }
+        if !t_span.0.is_finite()
+            || !t_span.1.is_finite()
+            || t_span.1 <= t_span.0
+            || !(t_span.1 - t_span.0).is_finite()
+        {
+            return Err(fail(
+                OdeSolveFailureKind::InvalidTimeSpan,
+                None,
+                0,
+                None,
+                None,
+                None,
+            ));
+        }
+        if y0.iter().any(|value| !value.is_finite()) {
+            return Err(fail(
+                OdeSolveFailureKind::NonFiniteInitialState,
+                Some(t_span.0),
+                0,
+                None,
+                None,
+                None,
+            ));
+        }
+
         let n = self.dim;
         let mut t = t_span.0;
         let mut y = y0.to_vec();
-        let mut h = self.config.dt.min(t_span.1 - t_span.0);
-
+        let mut h = self
+            .config
+            .dt
+            .max(self.config.min_step)
+            .min(self.config.max_step)
+            .min(t_span.1 - t_span.0);
         let mut y4 = vec![0.0; n];
         let mut y5 = vec![0.0; n];
         let mut k7 = vec![0.0; n];
         let mut fsal_k1: Option<Vec<f64>> = None;
+        let mut attempts = 0usize;
 
         let mut result = OdeResult {
             states: vec![y.clone()],
@@ -558,9 +752,40 @@ impl OdeSolverEngine {
             num_rejections: 0,
         };
 
-        while t < t_span.1 - 1e-14 {
-            h = h.min(t_span.1 - t);
+        while t < t_span.1 {
+            if attempts >= limits.max_attempts {
+                return Err(fail(
+                    OdeSolveFailureKind::MaximumAttemptsExceeded,
+                    Some(t),
+                    attempts,
+                    Some(h),
+                    None,
+                    Some(result),
+                ));
+            }
+            if result.step_sizes.len() >= limits.max_accepted_steps {
+                return Err(fail(
+                    OdeSolveFailureKind::MaximumAcceptedStepsExceeded,
+                    Some(t),
+                    attempts,
+                    Some(h),
+                    None,
+                    Some(result),
+                ));
+            }
+            if !h.is_finite() || h <= 0.0 || t + h <= t {
+                return Err(fail(
+                    OdeSolveFailureKind::TimeDidNotAdvance,
+                    Some(t),
+                    attempts,
+                    Some(h),
+                    None,
+                    Some(result),
+                ));
+            }
 
+            h = h.min(t_span.1 - t);
+            attempts += 1;
             let err = self.step_dormand_prince(
                 system,
                 t,
@@ -572,32 +797,101 @@ impl OdeSolverEngine {
                 &mut k7,
             );
 
+            if !err.is_finite() {
+                // The step routine intentionally returns a scalar error estimate,
+                // not a separate stage-status flag, so report the combined
+                // non-finite computation category without guessing which
+                // intermediate produced it.
+                return Err(fail(
+                    OdeSolveFailureKind::NonFiniteStageOrErrorEstimate,
+                    Some(t),
+                    attempts,
+                    Some(h),
+                    None,
+                    Some(result),
+                ));
+            }
+
             let (h_new, accepted) = self.adapt_step_size(h, err);
-
             if accepted {
-                t += h;
-                y.copy_from_slice(&y5);
-                fsal_k1 = Some(k7.clone()); // FSAL: k7 becomes k1 of next step
+                if y5.iter().any(|value| !value.is_finite()) {
+                    return Err(fail(
+                        OdeSolveFailureKind::NonFiniteAcceptedState,
+                        Some(t),
+                        attempts,
+                        Some(h),
+                        Some(err),
+                        Some(result),
+                    ));
+                }
 
+                let next_state_count = result.states.len().checked_add(1);
+                let next_scalar_count = next_state_count.and_then(|count| count.checked_mul(n));
+                if next_scalar_count.is_none_or(|count| count > limits.max_state_values) {
+                    return Err(fail(
+                        OdeSolveFailureKind::TrajectoryBudgetExceeded,
+                        Some(t),
+                        attempts,
+                        Some(h),
+                        Some(err),
+                        Some(result),
+                    ));
+                }
+
+                let next_t = if h >= t_span.1 - t { t_span.1 } else { t + h };
+                if !next_t.is_finite() || next_t <= t {
+                    return Err(fail(
+                        OdeSolveFailureKind::TimeDidNotAdvance,
+                        Some(t),
+                        attempts,
+                        Some(h),
+                        Some(err),
+                        Some(result),
+                    ));
+                }
+
+                t = next_t;
+                y.copy_from_slice(&y5);
+                fsal_k1 = Some(k7.clone());
                 result.states.push(y.clone());
                 result.times.push(t);
                 result.step_sizes.push(h);
                 result.error_estimates.push(err);
+
+                if t < t_span.1 {
+                    let remaining = t_span.1 - t;
+                    h = h_new.min(remaining);
+                }
             } else {
                 result.num_rejections += 1;
-                fsal_k1 = None; // FSAL invalidated on rejection
-            }
+                fsal_k1 = None;
 
-            h = h_new;
-
-            // Safety: prevent infinite loops from extremely stiff systems
-            if h < self.config.min_step * 0.5 {
-                // Force acceptance at min step
-                h = self.config.min_step;
+                let at_minimum = h <= self.config.min_step * (1.0 + 8.0 * f64::EPSILON);
+                if at_minimum {
+                    return Err(fail(
+                        OdeSolveFailureKind::MinimumStepToleranceUnmet,
+                        Some(t),
+                        attempts,
+                        Some(h),
+                        Some(err),
+                        Some(result),
+                    ));
+                }
+                if !h_new.is_finite() || h_new <= 0.0 || h_new >= h {
+                    return Err(fail(
+                        OdeSolveFailureKind::StepSizeStagnation,
+                        Some(t),
+                        attempts,
+                        Some(h),
+                        Some(err),
+                        Some(result),
+                    ));
+                }
+                h = h_new;
             }
         }
 
-        result
+        Ok(result)
     }
 
     // -----------------------------------------------------------------------
@@ -1164,6 +1458,214 @@ mod tests {
             error < 0.01,
             "Euler error too large: {} (expected < 0.01)",
             error
+        );
+    }
+
+    struct QuadraticGrowth;
+
+    impl OdeSystem for QuadraticGrowth {
+        fn dimension(&self) -> usize {
+            1
+        }
+        fn evaluate(&self, _t: f64, state: &[f64], derivative: &mut [f64]) {
+            derivative[0] = state[0] * state[0];
+        }
+    }
+
+    struct NonFiniteDerivative;
+
+    impl OdeSystem for NonFiniteDerivative {
+        fn dimension(&self) -> usize {
+            1
+        }
+        fn evaluate(&self, _t: f64, _state: &[f64], derivative: &mut [f64]) {
+            derivative[0] = f64::NAN;
+        }
+    }
+
+    fn dopri_config(dt: f64, min_step: f64, max_step: f64, tolerance: f64) -> OdeConfig {
+        OdeConfig {
+            solver: OdeSolver::DormandPrince,
+            dt,
+            tolerance,
+            min_step,
+            max_step,
+            max_iterations: 50,
+        }
+    }
+
+    #[test]
+    fn checked_dopri_reports_minimum_step_tolerance_failure() {
+        let engine = OdeSolverEngine::new(dopri_config(0.1, 0.1, 0.1, 1e-14), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits::default(),
+            )
+            .expect_err("minimum step must not be force-accepted");
+        assert_eq!(failure.kind, OdeSolveFailureKind::MinimumStepToleranceUnmet);
+        assert_eq!(failure.attempted_steps, 1);
+        let partial = failure.partial_result.expect("accepted prefix is retained");
+        assert_eq!(partial.times, vec![0.0]);
+        assert_eq!(partial.states, vec![vec![1.0]]);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_non_finite_derivative_stages() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &NonFiniteDerivative,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits::default(),
+            )
+            .expect_err("non-finite derivative must reject");
+        assert_eq!(
+            failure.kind,
+            OdeSolveFailureKind::NonFiniteStageOrErrorEstimate
+        );
+    }
+
+    #[test]
+    fn checked_dopri_bounds_attempted_steps() {
+        let engine = OdeSolverEngine::new(dopri_config(0.1, 1e-8, 0.1, 1e-14), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits {
+                    max_attempts: 1,
+                    max_accepted_steps: 100,
+                    max_state_values: 10_000,
+                },
+            )
+            .expect_err("attempt budget must bound adaptive retries");
+        assert_eq!(failure.kind, OdeSolveFailureKind::MaximumAttemptsExceeded);
+        assert_eq!(failure.attempted_steps, 1);
+    }
+
+    #[test]
+    fn checked_dopri_completes_analytic_oscillator_with_finite_states() {
+        let engine = OdeSolverEngine::new(dopri_config(0.05, 1e-9, 0.1, 1e-9), 2);
+        let result = engine
+            .try_solve_dormand_prince(
+                &HarmonicOscillator,
+                &[1.0, 0.0],
+                (0.0, 2.0),
+                OdeSolveLimits::default(),
+            )
+            .expect("smooth oscillator should complete");
+        assert!((result.times.last().copied().unwrap_or_default() - 2.0).abs() < 1e-12);
+        assert!(
+            result
+                .states
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
+        let expected = [2.0_f64.cos(), -2.0_f64.sin()];
+        let final_state = result.states.last().expect("final state");
+        assert!((final_state[0] - expected[0]).abs() < 1e-7);
+        assert!((final_state[1] - expected[1]).abs() < 1e-7);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_non_finite_initial_state() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[f64::NAN],
+                (0.0, 0.1),
+                OdeSolveLimits::default(),
+            )
+            .expect_err("non-finite initial state must reject");
+        assert_eq!(failure.kind, OdeSolveFailureKind::NonFiniteInitialState);
+        assert!(failure.partial_result.is_none());
+    }
+
+    #[test]
+    fn checked_dopri_rejects_system_dimension_mismatch() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 2);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[1.0, 1.0],
+                (0.0, 0.1),
+                OdeSolveLimits::default(),
+            )
+            .expect_err("system dimension must match engine dimension");
+        assert_eq!(failure.kind, OdeSolveFailureKind::SystemDimensionMismatch);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_invalid_limits() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits {
+                    max_attempts: 0,
+                    max_accepted_steps: 10,
+                    max_state_values: 100,
+                },
+            )
+            .expect_err("zero attempt budget must reject");
+        assert_eq!(failure.kind, OdeSolveFailureKind::InvalidLimits);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_trajectory_budget_exhaustion() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &ExponentialDecay,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits {
+                    max_attempts: 10,
+                    max_accepted_steps: 10,
+                    max_state_values: 1,
+                },
+            )
+            .expect_err("trajectory scalar budget must reject before push");
+        assert_eq!(failure.kind, OdeSolveFailureKind::TrajectoryBudgetExceeded);
+        let partial = failure.partial_result.expect("initial state retained");
+        assert_eq!(partial.times, vec![0.0]);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_accepted_step_budget_exhaustion() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &ExponentialDecay,
+                &[1.0],
+                (0.0, 0.2),
+                OdeSolveLimits {
+                    max_attempts: 20,
+                    max_accepted_steps: 1,
+                    max_state_values: 100,
+                },
+            )
+            .expect_err("accepted-step budget must stop later steps");
+        assert_eq!(
+            failure.kind,
+            OdeSolveFailureKind::MaximumAcceptedStepsExceeded
+        );
+        assert_eq!(
+            failure
+                .partial_result
+                .expect("accepted prefix")
+                .step_sizes
+                .len(),
+            1
         );
     }
 

@@ -306,7 +306,10 @@ pub use stability_analysis::{
 };
 
 // ODE solvers for continuous-time neural dynamics
-pub use ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem, newton_solve};
+pub use ode_solvers::{
+    OdeConfig, OdeResult, OdeSolveFailure, OdeSolveFailureKind, OdeSolveLimits, OdeSolver,
+    OdeSolverEngine, OdeSystem, newton_solve,
+};
 
 // Frequency-domain spectral analysis
 pub use spectral_analysis::{
