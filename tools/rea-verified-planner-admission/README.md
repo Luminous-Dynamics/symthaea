@@ -7,8 +7,9 @@ Standalone Rust adapter that composes the existing REA raw Evidence verifier wit
 - Callers provide exact raw Evidence JSON bytes. The adapter calls `symthaea-rea-compat::verify_evidence_json` and uses only the returned computed Evidence ID, semantic digest and raw-file digest.
 - Caller origin/lineage declarations are a separate sidecar. They do not change REA Evidence v1 bytes or semantic identity.
 - Parent IDs must resolve inside the same admitted catalog; duplicate parents, dangling references and cycles reject.
-- The resulting planner `EvidenceProvenance` projection preserves caller-declared origin classes verbatim. It does **not** authenticate those classifications.
-- The planner wrapper verifies that every hypothesis support/contradiction ID is present in the raw-byte-admitted catalog before invoking the existing planner.
+- The original caller-declared origin is retained in the admission report with `CallerDeclaredUnverified` qualification.
+- Because the existing planner has no unverified-origin state, v0 deliberately projects caller-declared `IndependentObservation` and `IndependentDerivation` records as `ExternalReference`. They cannot ground a production planner hypothesis until a separate acquisition-attestation policy is implemented.
+- The planner wrapper verifies every hypothesis support/contradiction ID is present in the raw-byte-admitted catalog and rejects common-mode root multiplicity within a hypothesis support closure before invoking the existing planner.
 - The returned claim ceiling explicitly leaves producer authentication, origin authentication, source independence, observation truth and issuer-history completeness unestablished.
 
 ## Run
