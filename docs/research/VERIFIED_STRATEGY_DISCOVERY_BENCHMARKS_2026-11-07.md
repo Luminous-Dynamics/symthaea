@@ -690,3 +690,85 @@ For the expansion comparison, report the full-tree bound and actual proof-tree c
 - A serialized proof is accepted only after bounded decode, source/prefix verification and deterministic re-encoding equality.
 - Report proof-check time separately from strategy-check time and BDD/AIG equivalence time.
 - Confirm results on QBFGallery 2026 instances after pinning its actual public benchmark archive, selected tracks, solver builds and licenses. The gallery advertises PCNF main, crafted, random, 2QBF, prenex non-CNF and DQBF tracks; no numeric external solved-count target is claimed here.
+
+
+## 21. Algebraic interaction hypergraphs and Pareto-qualified representation selection
+
+The BDD ordering pipeline now includes three distinct structural descriptions of a strategy function:
+
+1. **GF(2) pairwise interaction graph:** edges from nonzero mixed Boolean derivatives.
+2. **Arithmetic weighted pairwise graph:** integer mixed finite-difference magnitude. This can reveal coupling in XOR functions whose GF(2) pairwise graph is empty.
+3. **ANF interaction hypergraph:** Boolean Möbius transform recovers the full algebraic normal form. Each nonzero monomial of degree at least two becomes a hyperedge; linear terms and the constant term are retained separately.
+
+These are ordering heuristics, not semantic scope evidence. The exact support checker still determines which dependencies actually affect the function. Hyperedge vertices are positions in the ordered dependency scope, never global variable IDs. The ANF transform itself is tested by reconstructing every row of all 256 three-input Boolean functions.
+
+### Ordering ablation
+
+For each source-verified Boolean strategy function, compare:
+
+- natural and reverse dependency order;
+- GF(2) pairwise min-fill and reverse;
+- arithmetic weighted min-fill and reverse;
+- frontier-refined pairwise and weighted seeds;
+- ANF hypergraph min-fill and reverse;
+- bounded sifting from each seed;
+- exact minimum order for small scopes.
+
+Record seed collisions/deduplication, transform checks, pair-context checks, ANF hyperedge count/rank, frontier profile, order evaluations, whether the bounded search completed, final ROBDD nodes, and exact-optimum gap wherever exact search fits the budget.
+
+The key hypothesis is not that ANF always wins. It is that higher-order algebraic structure supplies an additional ordering signal when pairwise graphs are empty, weak, or misleading. Require held-out function families and source-derived QBF strategies before promoting an ordering method.
+
+### Multi-objective representation cost
+
+Each independently verified function now has both a canonical ROBDD and AIG candidate. Record a cost vector:
+
+| Dimension | Meaning |
+|---|---|
+| Encoded bytes | Actual canonical LD-ROBDD1 or LD-AIG-1 payload size |
+| Internal nodes | ROBDD decision nodes or AIG AND nodes |
+| Logic depth | Maximum source-to-terminal/output decision/gate depth |
+| Worst-case evaluation work | ROBDD decision visits; current AIG interpreter's complete stored-node passes |
+| Estimated verification work | Explicit structural work estimate plus exhaustive assignments times worst-case evaluation steps |
+| Measured runtime | Wall/CPU time on pinned hardware; do not substitute the estimate |
+| Peak memory / energy | Measured separately for construction, evaluation and checking |
+
+The compiler computes the nondominated (Pareto) set rather than assuming one representation dominates in every workload. The default selection is the smallest serialized member of that frontier; both encodings remain available so a caller can choose a different point under its storage, latency or checker constraints.
+
+**Important:** the current verification-work field is a deterministic structural estimate, not a measured instruction count, runtime or energy. The benchmark harness must report empirical construction, evaluation and checker timings before any performance claim.
+
+### External QBF comparison — match task and output contract
+
+QBFGallery 2026 exposes PCNF main, crafted, random, 2QBF, prenex non-CNF and DQBF tracks. Its documented command-line result convention is exit 10 for TRUE and 20 for FALSE; that is a decision interface, not by itself a complete Skolem/Herbrand function or independently checkable certificate. Keep DQBF separate because its explicit dependency semantics are not the prenex QBF prefix semantics used by this reference engine.
+
+CAQE is a necessary practice-oriented baseline; compare pinned CAQE, DepQBF and Qute configurations where runnable artifacts and compatible formats exist. Separate:
+- decision-only runs;
+- proof-logging runs;
+- partial-assignment / dependency-scheme outputs;
+- complete extracted strategy functions;
+- independently checked proof certificates;
+- intermediate game-value outputs.
+
+CAQE's QDIMACS partial assignment output is not automatically a complete strategy. A candidate receives strategy credit only after all controlled variables/functions are present, legal prefix dependencies are established, and the original matrix is checked for every opposing-player assignment.
+
+### Historical score anchor and target discipline
+
+The 2023 QBF Gallery report provides a reproducible historical anchor: CAQE-pre solved 231 PCNF main-track instances, while QuAbS-CAQE solved 286 PNCNF instances. They are different tracks and must not be presented as one ranking or directly compared. PAR-2 must also be reported; lower is better. These are historical figures, not 2026 SOTA.
+
+The 2026 public Gallery page identifies the 2026 tracks and benchmark collection, but this programme has not yet pinned a complete machine-readable 2026 score table, exact benchmark archive, solver artifact hashes and resource limits. Therefore no numerical 2026 "beat SOTA" solved-count target is claimed yet.
+
+### Promotion gates
+
+1. Exact finite correctness: complete reconstruction for all three-input Boolean functions; 0 false accepts under mutated BDD/AIG/strategy/proof controls.
+2. Ordering evidence: report exact-optimum gaps on small functions and held-out multi-input functions; no global-optimality claim from bounded sifting.
+3. Portfolio evidence: demonstrate Pareto tradeoffs with actual canonical byte lengths and measured target-hardware latency/checker cost.
+4. External reproduction: pin QBFGallery 2026 benchmark hashes and solver versions, reproduce the selected competition track and scoring protocol.
+5. Strategy comparison: report verified strategy extraction coverage and time-to-verified-strategy separately from decision count.
+6. Research claim: only claim improvement where the same instances, hardware, resource limits, task semantics and output obligations are used.
+
+### Literature and baselines
+
+- QBFGallery 2026 tracks and exit-code interface: https://qbf.pages.sai.jku.at/gallery26/
+- SAT 2026 proof system for extracting Skolem/Herbrand functions and intermediate game values in polynomial time from proofs in that system: https://doi.org/10.4230/LIPIcs.SAT.2026.3
+- CAQE proof-theoretic analysis, which describes CAQE as the strongest practice-wise QBF algorithmic paradigm and clearly dominating recent competitions: https://drops.dagstuhl.de/entities/volume/LIPIcs-volume-377
+- Historical 2023 QBFGallery results: https://qbf.pages.sai.jku.at/gallery23/
+- 2026 frontier-aware OBDD refinement on feature interaction graphs: https://www.nature.com/articles/s41598-026-74296-8. It is a CNF/feature-graph result; its numerical results are not transferable directly to QBF strategy functions.
