@@ -56,11 +56,10 @@ impl ContinuousHVScoreInterval {
 }
 
 
-/** Conservative interval for the real-arithmetic cosine over an L2 ball.
- *
- * This is a geometry research primitive, not a canonical f32 score interval.
- * It must not be passed to the exact HME selector or used to prune payloads.
- */
+/// Conservative interval for the real-arithmetic cosine over an L2 ball.
+///
+/// This is a geometry research primitive, not a canonical f32 score interval.
+/// It must not be passed to the exact HME selector or used to prune payloads.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ContinuousHVRealCosineInterval {
     /// Lower real-cosine endpoint in [-1, 1].
@@ -537,7 +536,7 @@ impl F64Interval {
         Some(Self { lo: f64_next_down(lo), hi: f64_next_up(hi) })
     }
 
-    fn square_nonnegative(self) -> Option<Self> {
+    fn square(self) -> Option<Self> {
         let min_abs = if self.lo <= 0.0 && self.hi >= 0.0 {
             0.0
         } else {
@@ -571,7 +570,7 @@ impl F64Interval {
     }
 
     fn one_minus_square(self) -> Option<Self> {
-        let squared = self.square_nonnegative()?;
+        let squared = self.square()?;
         let lo = f64_next_down(1.0 - squared.hi).max(0.0);
         let hi = f64_next_up(1.0 - squared.lo).min(1.0);
         (lo <= hi).then_some(Self { lo, hi })
@@ -599,7 +598,7 @@ impl ContinuousHV {
     /// canonical f32 score from similarity_full_resolution and is not
     /// prune-authorizing. A future canonical-score method must add and qualify
     /// a separate f32 reduction/denominator error envelope.
-    pub fn real_cosine_interval_full_resolution_for_l2_ball_center(
+    pub fn real_cosine_interval_for_l2_ball_center(
         &self,
         center: &Self,
         residual_l2_upper: f32,
@@ -1543,7 +1542,7 @@ mod tests {
                 verify_l2_residual_certificate(&actual, &center, radius).unwrap();
 
                 let interval = query
-                    .real_cosine_interval_full_resolution_for_l2_ball_center(&center, radius)
+                    .real_cosine_interval_for_l2_ball_center(&center, radius)
                     .unwrap();
                 let exact_real = exact_real_cosine(&query.values, &actual.values);
                 assert!(
@@ -1612,7 +1611,7 @@ mod tests {
                 verify_l2_residual_certificate(&actual, &center, radius).unwrap();
 
                 let interval = query
-                    .real_cosine_interval_full_resolution_for_l2_ball_center(&center, radius)
+                    .real_cosine_interval_for_l2_ball_center(&center, radius)
                     .unwrap();
                 let exact_real = exact_real_cosine(&query.values, &actual.values);
                 assert!(
@@ -1632,10 +1631,10 @@ mod tests {
         let antipodal = ContinuousHV::from_vec(vec![-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
         let upper = aligned
-            .real_cosine_interval_full_resolution_for_l2_ball_center(&center, 0.2)
+            .real_cosine_interval_for_l2_ball_center(&center, 0.2)
             .unwrap();
         let lower = antipodal
-            .real_cosine_interval_full_resolution_for_l2_ball_center(&center, 0.2)
+            .real_cosine_interval_for_l2_ball_center(&center, 0.2)
             .unwrap();
         assert_eq!(upper.upper, 1.0);
         assert_eq!(lower.lower, -1.0);
@@ -1648,7 +1647,7 @@ mod tests {
         let center = ContinuousHV::from_vec(vec![0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         let query = ContinuousHV::ones(8);
         let interval = query
-            .real_cosine_interval_full_resolution_for_l2_ball_center(&center, 0.2)
+            .real_cosine_interval_for_l2_ball_center(&center, 0.2)
             .unwrap();
         assert_eq!(interval, ContinuousHVRealCosineInterval::uninformative());
     }
