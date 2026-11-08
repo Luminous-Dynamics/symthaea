@@ -244,6 +244,28 @@
             "items": {
               "type": "string"
             }
+          },
+          "implementation_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selection_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prospective_gates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": true
