@@ -188,6 +188,23 @@ pub enum FeatureMetricNonEstimableReason {
     NoActiveReferenceToneFeatures,
 }
 
+/// Per-dimension disagreement diagnostics over aligned reference/hypothesis pairs.
+///
+/// Insertions and deletions remain in aggregate FER/TER and are not assigned
+/// to a paired-feature diagnostic. A dimension with no active aligned pairs
+/// has an absent error rate rather than a zero error rate.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FeatureDimensionDiagnostic {
+    /// Position in the versioned feature profile.
+    pub dimension_index: usize,
+    /// Aligned pairs where either side has a non-zero value for this dimension.
+    pub active_pairs: usize,
+    /// Active aligned pairs whose signed feature values differ.
+    pub mismatches: usize,
+    /// Mismatches divided by active pairs, or None when no pairs are active.
+    pub error_rate: Option<f64>,
+}
+
 /// Result from language-profiled phonological evaluation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhonologicalFeatureResult {
@@ -219,6 +236,8 @@ pub struct PhonologicalFeatureResult {
     pub active_reference_feature_segments: usize,
     /// Reference segments carrying at least one active tone feature.
     pub active_reference_tone_segments: usize,
+    /// Per-dimension disagreement over aligned pairs, in profile order.
+    pub feature_dimension_diagnostics: Vec<FeatureDimensionDiagnostic>,
     /// FER, or None with a reason when the reference has no active features.
     pub fer: Option<FeatureMetricValue>,
     /// FER non-estimability reason, if any.
@@ -444,6 +463,43 @@ pub fn phonological_feature_error_rates(
         }
     }
 
+    let mut dimension_active_pairs = vec![0usize; config.dimension_count];
+    let mut dimension_mismatches = vec![0usize; config.dimension_count];
+    for column in &reverse_columns {
+        if let (Some(reference_index), Some(hypothesis_index)) =
+            (column.reference_index, column.hypothesis_index)
+        {
+            let reference_segment = &reference[reference_index];
+            let hypothesis_segment = &hypothesis[hypothesis_index];
+            for dimension in 0..config.dimension_count {
+                let left = reference_segment.values[dimension];
+                let right = hypothesis_segment.values[dimension];
+                if left != 0 || right != 0 {
+                    dimension_active_pairs[dimension] += 1;
+                    if left != right {
+                        dimension_mismatches[dimension] += 1;
+                    }
+                }
+            }
+        }
+    }
+    let feature_dimension_diagnostics = (0..config.dimension_count)
+        .map(|dimension_index| {
+            let active_pairs = dimension_active_pairs[dimension_index];
+            let mismatches = dimension_mismatches[dimension_index];
+            FeatureDimensionDiagnostic {
+                dimension_index,
+                active_pairs,
+                mismatches,
+                error_rate: if active_pairs == 0 {
+                    None
+                } else {
+                    Some(mismatches as f64 / active_pairs as f64)
+                },
+            }
+        })
+        .collect();
+
     let active_reference_feature_segments = reference.iter()
         .filter(|segment| segment.values.iter().any(|&value| value != 0))
         .count();
@@ -488,6 +544,7 @@ pub fn phonological_feature_error_rates(
         unscorable_feature_pairs,
         active_reference_feature_segments,
         active_reference_tone_segments,
+        feature_dimension_diagnostics,
         fer,
         fer_non_estimable,
         ter,
@@ -575,6 +632,34 @@ mod tests {
             &[v(&[1, 1, -1, 1])], &[v(&[1, -1, -1, 1])], &cfg(vec![], 1.0)
         ).unwrap();
         assert!((r.fer.unwrap().value - 0.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn feature_dimension_diagnostics_identify_the_failing_dimension() {
+        let r = phonological_feature_error_rates(
+            &[v(&[1, 1, -1, 1])],
+            &[v(&[1, -1, -1, 1])],
+            &cfg(vec![], 1.0)
+        ).unwrap();
+        assert_eq!(r.feature_dimension_diagnostics[0].active_pairs, 1);
+        assert_eq!(r.feature_dimension_diagnostics[0].mismatches, 0);
+        assert_eq!(r.feature_dimension_diagnostics[1].active_pairs, 1);
+        assert_eq!(r.feature_dimension_diagnostics[1].mismatches, 1);
+        assert_eq!(r.feature_dimension_diagnostics[1].error_rate, Some(1.0));
+        assert_eq!(r.feature_dimension_diagnostics[2].error_rate, Some(0.0));
+    }
+
+    #[test]
+    fn dimension_diagnostics_keep_na_dimensions_non_estimable() {
+        let r = phonological_feature_error_rates(
+            &[v(&[1, 0, 0, -1])],
+            &[v(&[1, 0, 0, -1])],
+            &cfg(vec![], 1.0)
+        ).unwrap();
+        assert_eq!(r.feature_dimension_diagnostics[0].error_rate, Some(0.0));
+        assert_eq!(r.feature_dimension_diagnostics[1].error_rate, None);
+        assert_eq!(r.feature_dimension_diagnostics[2].error_rate, None);
+        assert_eq!(r.feature_dimension_diagnostics[3].error_rate, Some(0.0));
     }
 
     #[test]
