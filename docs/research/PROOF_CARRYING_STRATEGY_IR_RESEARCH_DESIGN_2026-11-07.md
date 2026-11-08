@@ -472,3 +472,20 @@ CAQE's public interface exposes prenex-CNF/QDIMACS decision solving, a `--qdo` p
 For each external run, bind solver version/configuration, input digest, track/format, command line, resource envelope, output capability class and checker identity. Separate decision, proof, extraction and independent validation times. This avoids overstating the external baseline and yields a fair time-to-verified-strategy metric.
 
 The long-term production route should study the SAT 2026 synthesis proof system as an independent extraction adapter. Its reported contribution is a sound/complete proof system with polynomial-time extraction of Skolem/Herbrand functions and intermediate game values for proofs in that system; that theoretical claim does not automatically transfer to arbitrary existing QBF proof formats.
+
+
+## 19. Representation portfolio: ROBDDs and AND-Inverter Graphs
+
+A Boolean strategy function should be allowed to have multiple compiled representations. The bounded compiler now includes:
+- an ROBDD path with support reduction, exact small-scope order search, bounded sifting and graph-derived seed orders;
+- an AIG path with Shannon decomposition, complemented edges, two-input AND nodes, structural hashing and caller-selected decomposition order.
+
+These representations have different strengths and their node counts are not directly comparable. A BDD's canonicality is conditional on variable order; an AIG is a structurally hashed Boolean circuit but is not globally canonical. AIG construction order can affect sharing and node count.
+
+Keep two independent checks:
+1. **Function equivalence:** the candidate graph evaluates to the exact source strategy table for every assignment to the declared support.
+2. **Game validity:** the original Skolem/Herbrand function is independently checked against the original CNF matrix and ordered quantifier prefix for every opposing-player assignment.
+
+The graph checker cannot stand in for the game checker. A compact AIG that computes an invalid strategy is still invalid.
+
+The next compilation selection step should use one pinned serialization and a multi-objective cost: serialized bytes, compile peak memory, construction work, evaluation time, independent checker time/memory, and support width. Do not minimize raw node count across representation types. Test candidate BDD decision orders and AIG Shannon decomposition orders under a shared aggregate compute budget, with explicit incomplete-search metadata.
