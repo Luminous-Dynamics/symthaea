@@ -155,7 +155,7 @@ def self_test() -> list[str]:
     protocol = "\n".join((
         "support closure closure completeness impact witness unaffectedness witness open-world remainder",
         "historical truth current decision-use event-to-claim impact",
-        "does not add a repository graph #10630 #10173 #9112 #10314 #10610 #10619 #10064 #10369 no new task schema not a sealed holdout",
+        "not a second evidence-continuity system #10630 #10173 #9112 #10314 #10610 #10619 #10064 #10369 no new task schema not a sealed holdout",
         *DISPOSITIONS,
         *EVENT_CLASSES,
         *CLAIM_KINDS,
