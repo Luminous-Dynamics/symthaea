@@ -1668,7 +1668,6 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
     };
 
     let mut log_posterior = vec![-(permutations.len() as f64).ln(); permutations.len()];
-    let mut existing_fit_squared_error = 0.0_f64;
     if !existing_probes.is_empty() {
         let source_signatures =
             cfc_hidden_unit_activation_signatures(source, layer_index, existing_probes)?;
@@ -1696,7 +1695,6 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
                 .iter()
                 .copied()
                 .fold(f64::INFINITY, f64::min);
-            existing_fit_squared_error += best_residual;
             for (log_weight, squared_error) in log_posterior.iter_mut().zip(residuals) {
                 *log_weight -= squared_error
                     / (2.0 * observation_std_dev * observation_std_dev);
@@ -3849,6 +3847,176 @@ mod tests {
                 .model_digest,
             initial_snapshot.model_digest
         );
+    }
+
+    #[test]
+    fn gaussian_permutation_eig_selects_a_receipt_bound_probe() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 3,
+            num_layers: 1,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 3,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-cfc-gaussian-permutation-eig-v1");
+        let source = CfCNetwork::from_genesis(config, &genesis, "gaussian-permutation-eig");
+        let candidate = source.clone();
+        let probes = vec![
+            CfCFunctionalProbe {
+                input: vec![0.2, -0.8],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9, 0.1],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.6, 0.5],
+                dt: 0.1,
+            },
+        ];
+
+        let receipt = select_cfc_disambiguating_probe_by_gaussian_eig(
+            &source,
+            &candidate,
+            0,
+            &[],
+            &probes,
+            0.05,
+            65,
+        )
+        .expect("small exact permutation EIG selection");
+
+        assert_eq!(receipt.format_version, 1);
+        assert_eq!(receipt.permutation_hypothesis_count, 6);
+        assert_eq!(receipt.candidate_scores.len(), probes.len());
+        assert_eq!(receipt.permutation_posterior.len(), 6);
+        assert!(receipt.current_permutation_entropy_nats > 0.0);
+        assert!(receipt.selected_model_information_gain_nats > 0.0);
+        assert!(
+            receipt.selected_expected_posterior_entropy_nats
+                < receipt.current_permutation_entropy_nats
+        );
+        assert_eq!(
+            receipt.selected_probe,
+            probes[receipt.selected_candidate_index]
+        );
+        assert_eq!(
+            receipt.selected_augmented_probe_digest,
+            cfc_probe_set_digest(0, &[receipt.selected_probe.clone()])
+        );
+        let posterior_mass = receipt
+            .permutation_posterior
+            .iter()
+            .map(|hypothesis| hypothesis.posterior_probability)
+            .sum::<f64>();
+        assert!((posterior_mass - 1.0).abs() < 1e-12);
+        assert_eq!(
+            source.fingerprint().expect("source digest").model_digest,
+            receipt.source_model_digest
+        );
+        assert_eq!(
+            candidate
+                .fingerprint()
+                .expect("candidate digest")
+                .model_digest,
+            receipt.candidate_model_digest
+        );
+    }
+
+    #[test]
+    fn gaussian_permutation_eig_updates_posterior_from_existing_probes() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 3,
+            num_layers: 1,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 3,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-cfc-gaussian-permutation-posterior-v1");
+        let source = CfCNetwork::from_genesis(config, &genesis, "gaussian-permutation-posterior");
+        let candidate = source.clone();
+        let existing = vec![
+            CfCFunctionalProbe {
+                input: vec![0.2, -0.8],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9, 0.1],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.6, 0.5],
+                dt: 0.1,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.1, -0.9],
+                dt: 0.15,
+            },
+        ];
+        let candidates = vec![
+            CfCFunctionalProbe {
+                input: vec![0.75, -0.25],
+                dt: 0.12,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.85, 0.3],
+                dt: 0.08,
+            },
+        ];
+
+        let receipt = select_cfc_disambiguating_probe_by_gaussian_eig(
+            &source,
+            &candidate,
+            0,
+            &existing,
+            &candidates,
+            0.05,
+            65,
+        )
+        .expect("posterior update and EIG selection");
+
+        assert!(receipt.existing_probe_digest.is_some());
+        assert!(
+            receipt.current_permutation_entropy_nats < (6.0_f64).ln(),
+            "observed probes should reduce the initially uniform permutation entropy"
+        );
+        let posterior_max = receipt
+            .permutation_posterior
+            .iter()
+            .map(|hypothesis| hypothesis.posterior_probability)
+            .fold(0.0_f64, f64::max);
+        assert!(posterior_max > 0.95);
+    }
+
+    #[test]
+    fn exact_permutation_eig_stops_before_factorial_allocation() {
+        assert_eq!(exact_permutation_count(3), Some(6));
+        assert_eq!(exact_permutation_count(5), Some(120));
+        assert_eq!(exact_permutation_count(6), Some(720));
+        assert_eq!(exact_permutation_count(0), None);
     }
 
     #[test]
