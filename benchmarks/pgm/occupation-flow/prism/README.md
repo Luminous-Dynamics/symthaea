@@ -40,31 +40,37 @@ benchmark inputs, not a claimed PRISM pass.
 The Rust occupation-flow model has:
 - Action A utility interval: [9/25, 32/25].
 - Action B utility interval: [2/5, 4/5].
-- Worst-case regret of A: 11/25.
-- Worst-case regret of B: 22/25.
+- Action C utility interval: [29/50, 21/25].
+- Pairwise worst-case regrets: A->B 11/25, A->C 11/50,
+  B->A 22/25, B->C 11/25, C->A 11/25, C->B 11/50.
+- Complete minimax-regret action set: {A, C}, with value 11/25.
 
-The PRISM reward structures action_a and action_b encode the same
-state-score functions. Compare Rmin and Rmax results to the exact
-rational values above. PRISM's numeric result is an external differential
-baseline; Symthaea's rational primal/dual certificate remains the proof
-object for its compiled LP.
+The PRISM reward structures action_a, action_b and action_c encode the
+same state-score functions. Compare all six Rmin/Rmax utility endpoints and
+all six Rmax pairwise-regret results to the exact rational values above.
+PRISM's numeric result is an external differential baseline; Symthaea's
+rational primal/dual certificates remain the proof objects for its
+compiled LPs.
 
 ## Pairwise regret encoding
 
-The raw state-score differences can be negative, while PRISM's total-reward
-queries require nonnegative rewards (except for instantaneous reward
-properties). The fixture uses path-constant shifts:
+Some raw score differences are negative, while this PRISM total-reward
+fixture uses nonnegative reward structures. Each directed pair therefore
+adds a path-constant offset and removes it after the maximum total reward:
 
-- Regret of selecting A: add 2 to the comparator-minus-selected state score
-  at each complete path (one unit at t=1 and one at t=2). The resulting
-  reward is nonnegative and its maximum is 2 + 11/25 = 61/25.
-- Regret of selecting B: add 1 on every complete path at t=1. The resulting
-  reward is nonnegative and its maximum is 1 + 22/25 = 47/25.
+| Selected -> comparator | Raw worst-case regret | Shift | PRISM shifted maximum |
+|---|---:|---:|---:|
+| A -> B | 11/25 | 2 | 61/25 |
+| A -> C | 11/50 | 1 | 61/50 |
+| B -> A | 22/25 | 1 | 47/25 |
+| B -> C | 11/25 | 1/2 | 47/50 |
+| C -> A | 11/25 | 1/2 | 47/50 |
+| C -> B | 11/50 | 1 | 61/50 |
 
-Subtract the corresponding path-constant after PRISM returns the maximum.
-Because each run includes exactly one reward-bearing state at each of t=1
-and t=2, the offsets are independent of the uncertain trajectory and do not
-change which transition realization maximizes regret.
+Each path visits exactly one state in each reward-bearing layer, so the
+offset is independent of the uncertain transition realization. The complete
+minimax-regret result is a tie between A and C at 11/25; B's worst-case
+regret is 22/25.
 
 This gives a valid shared-dynamics comparison; it does not solve general MDP
 regret when each action induces a different transition kernel.
