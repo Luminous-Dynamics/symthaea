@@ -15,6 +15,7 @@ pub mod active_sensing;
 pub mod active_sensing_simulator;
 pub mod harth_stream;
 pub mod harth_label_profile;
+pub mod candidate_protocol;
 pub mod edge_adapter;
 pub mod real_dataset_manifest;
 pub mod dms;
