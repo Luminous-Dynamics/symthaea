@@ -116,6 +116,19 @@ jobs:
             cat theory-prediction-coverage.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run model-discriminating experiment EIG reference
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example model_discrimination_reference | tee model-discrimination-eig.txt
+          grep -q 'epistemic_status=SYNTHETIC_MODEL_IDENTITY_EIG_NOT_PHYSICAL_THEORY_VALIDATION' model-discrimination-eig.txt
+          grep -q 'partial-prediction-control,NOT_COMPARABLE' model-discrimination-eig.txt
+          {
+            echo "## Synthetic model-discrimination EIG"
+            cat model-discrimination-eig.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run nominal and robust target-region sensor placement
         if: matrix.package == 'symthaea-uap-observatory'
         shell: bash
