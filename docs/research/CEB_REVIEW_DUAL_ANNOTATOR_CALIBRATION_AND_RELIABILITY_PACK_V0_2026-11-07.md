@@ -236,6 +236,31 @@ Adjudicate two questions separately: (1) are the candidate's alternative models 
 The third adjudicator preserves both first-pass model sets and dispositions, records the disagreement witness and accepted claim ceiling, and explains why the proposed evidence request is or is not discriminating. Do not overwrite first-pass labels with a consensus graph/model.
 
 
+
+### 6.3 Preservation-aware repair worksheet (PAR cases only)
+
+For the six paired variants in the [Preservation-Aware Repair Verification Challenge V0](CEB_REVIEW_PRESERVATION_AWARE_REPAIR_VERIFICATION_CHALLENGE_V0_2026-11-08.md), each reviewer independently records the canonical and mutant verdicts before viewing the public answer key.
+
+| Field | Reviewer response |
+|---|---|
+| Case ID | |
+| Frozen requirement and authority | |
+| Canonical verdict | conforms / violates / under-specified / unresolved |
+| Mutant verdict | conforms / violates / under-specified / unresolved |
+| Target witness | |
+| Nearest preservation witness | |
+| Minimal target oracle plan | |
+| Minimal preservation oracle plan | |
+| Proposed patch / no-patch rationale | |
+| Oracle independence and scope | |
+| Other invariants at risk | |
+| Claim kind and claim ceiling | |
+| Unresolved oracle coverage | |
+
+Adjudicate the two verdicts separately. A correct rejection of the mutant does not compensate for a false rejection of the canonical variant. Record whether each proposed test is independently derived from the frozen requirement, whether the target/preservation pair actually discriminates the variants, and which valid behavior the patch could damage.
+
+The model's proposed patch is not its own oracle. No candidate code, build or test is run by this annotation worksheet. Preserve each first-pass form and disagreements; do not overwrite them with a consensus patch.
+
 ## 7. Agreement analysis and interpretation
 
 The calibration exercise has two purposes: reveal unclear rules and train reviewers to apply the same distinctions. It does not create a new CEB performance metric.
