@@ -122,6 +122,13 @@ J_EVSI(a) = sum_o p(o | a) R(q(m | o, a))
 
 where lower is better, \(C(a)\) is observation/action cost, and \(R_{safety}(a)\) is a separately measured risk term. Pure model EIG and targeted decision EIG remain comparator policies and diagnostics, not substitutes for this utility calculation. This is a benchmark decision rule, not a claim that the equation alone is a complete expected-free-energy implementation. The full policy must declare preferences, horizon, model uncertainty, likelihood provenance, cost units, and action constraints.
 
+
+### Executable synthetic policy result
+
+The branch now includes `crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs`, a standalone 10,000-episode runner for the five fixed policies: no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, and always-inspect. It records the exact synthetic scenario, loss table, probe costs, safety limits, seed, source SHA, policy aggregates, and four paired EVSI-versus-baseline contrasts with explicitly labelled 95% normal-approximation intervals.
+
+The HLB workflow executes this runner on the exact checked-out PR head and validates a JSON schema/source binding before uploading `research-results/hlb-decision-diagnostic.json` and including it in the SHA-256 receipt. The output carries the status `synthetic_fixture_result_not_environment_result`: it is a reproducible controlled counterexample, **not** a production `ActiveInferenceAgent` result, trained-RL comparison, or field/deployment evaluation. The factorial profiles remain unexecuted until their adapters and task suites are implemented.
+
 **FEP acceptance condition:** an action must be preferred because its prospective observation distributions distinguish plausible hypotheses, and the selected observation must improve posterior calibration, realized diagnosis, or downstream task utility on held-out episodes. Novelty alone is not information gain.
 
 ### 2.2 WSP is not the same as weight-space learning
@@ -814,7 +821,8 @@ A single synthetic fixture, one seed, one successful PR workflow, or an aggregat
 - Build model hypothesis and diagnostic observation likelihood adapters.
 - Verify model-relative information gain against exact Bayesian calculation in small enumerable tasks.
 - Add healthy controls and negative controls.
-- Compare diagnostic information gain with realized information and regret.
+- Compare model EIG, optimal-decision information gain, and EVSI as separate objectives against no-probe, pure-EIG, targeted-decision-EIG, cost-aware EVSI, and always-inspect.
+- Emit a deterministic source-bound JSON result with paired episode seeds and paired policy contrasts; preserve the result artifact and hashes for independent reanalysis.
 
 ### Stage 2 — constrained WSP candidate API
 - Define the typed WeightProgram IR.
