@@ -16,7 +16,7 @@ For every case:
 6. Separate engineering-claim validity from benchmark rerun/regrade/reuse.
 7. State the uninspected/open-world remainder and claim ceiling.
 
-Do not infer semantic independence merely from different files. Do not turn missing dependency knowledge into retain. A static source claim and a runtime claim may have different support closures.
+Do not infer semantic independence merely from different files. Do not turn missing dependency knowledge into retain. A static source claim and a runtime claim may have different support closures. Include known counter-evidence, failed checks and material rejected alternatives; do not let mutually dependent claims stand as their own independent support.
 
 ## CCL-S01 — direct source-anchor edit with a derived claim
 
