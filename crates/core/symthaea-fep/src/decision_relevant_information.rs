@@ -159,6 +159,14 @@ pub enum DecisionDiagnosticError {
     NonMonotonicBayesRisk { prior_risk: f64, expected_risk: f64 },
     #[error("decision-risk calculation produced a non-finite value")]
     NonFiniteRisk,
+    #[error(
+        "decision information gain {decision_information_gain_nats} exceeds model information gain {model_information_gain_nats} for action {action_index}"
+    )]
+    DecisionInformationExceedsModelInformation {
+        action_index: usize,
+        decision_information_gain_nats: f64,
+        model_information_gain_nats: f64,
+    },
 }
 
 /// Evaluate all diagnostic probes and select only a probe with positive
@@ -260,8 +268,20 @@ pub fn evaluate_decision_focused_diagnostics(
                 probability * categorical_entropy(&decision_distribution)
             })
             .sum::<f64>();
-        let decision_information_gain_nats =
-            (prior_decision_entropy - expected_posterior_decision_entropy).max(0.0);
+        let raw_decision_information_gain =
+            prior_decision_entropy - expected_posterior_decision_entropy;
+        let decision_information_gain_nats = raw_decision_information_gain.max(0.0);
+        if decision_information_gain_nats
+            > action_information.model_information_gain_nats + RISK_TOLERANCE
+        {
+            return Err(DecisionDiagnosticError::DecisionInformationExceedsModelInformation {
+                action_index,
+                decision_information_gain_nats,
+                model_information_gain_nats: action_information.model_information_gain_nats,
+            });
+        }
+        let decision_information_gain_nats = decision_information_gain_nats
+            .min(action_information.model_information_gain_nats);
         let eligible = action.safety_risk <= config.maximum_safety_risk;
         let total_score = if eligible {
             let score = expected_posterior_bayes_risk
@@ -552,6 +572,10 @@ mod tests {
         assert!((result.actions[0].expected_value_of_sample_information - 0.5).abs() < 1e-12);
         assert!(
             (result.actions[0].model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10
+        );
+        assert!(
+            (result.actions[0].decision_information_gain_nats - std::f64::consts::LN_2).abs()
+                < 1e-10
         );
         assert_eq!(result.actions[1].expected_value_of_sample_information, 0.0);
     }
