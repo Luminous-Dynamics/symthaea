@@ -54,6 +54,12 @@ The score is evaluator-side and must not be returned to the agent before submiss
 
 The evaluator uses separate trace-filter implementations and does not call the agent-facing `discover()` or `predict()` functions. It shares the typed candidate-family definitions, but independently recomputes which members fit the observed trace. Differential tests compare evaluator and inference results over every candidate model in all three finite worlds; negative controls verify that omitted or incompatible claimed models do not pass exact-set scoring. This is implementation-level independence, not a fully independent benchmark implementation or external oracle.
 
+## Process-facing JSONL adapter
+
+The standalone `open_world_agent` executable accepts one serialized `AgentView` per input line and emits one serialized `AgentAction` per output line. It supports the finite enumerator and the explicit probe-policy baselines via a fixed CLI strategy selector. It emits no human-readable output on stdout, checks the protocol version and open status, and bounds each input frame to 1 MiB.
+
+This closes the process-facing wire-format gap for the **reference baselines**. It does not yet connect the learned Symthaea research orchestrator, and it is not an OS sandbox. A real benchmark runner must execute the agent under a separate restricted identity/container and deny access to evaluator state, hidden ledgers, host filesystem, network, parent process memory and pre-submission scores.
+
 ## Executable coverage
 
 The protocol module covers the boolean hidden-lag world, numeric direct/leaky-memory world, and two-input interaction world. Tests cover:
