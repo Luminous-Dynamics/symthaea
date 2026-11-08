@@ -900,21 +900,32 @@ pub fn decode_qbf_game_proof_dag(
         if clause_count > dag_budget.max_clauses {
             return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
         }
+        let clause_count_u128 = u128::try_from(clause_count)
+            .map_err(|_| StrategyPortfolioError::ResourceAccountingOverflow)?;
         total_residual_clauses = total_residual_clauses
-            .checked_add(clause_count as u128)
+            .checked_add(clause_count_u128)
             .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
         if total_residual_clauses > dag_budget.max_stored_residual_clauses {
             return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
         }
 
         let mut residual = Vec::with_capacity(clause_count);
+        let mut node_residual_literals = 0u128;
         for _ in 0..clause_count {
             let literal_count = read_proof_usize(bytes, &mut offset)?;
             if literal_count > dag_budget.max_literals {
                 return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
             }
+            let literal_count_u128 = u128::try_from(literal_count)
+                .map_err(|_| StrategyPortfolioError::ResourceAccountingOverflow)?;
+            node_residual_literals = node_residual_literals
+                .checked_add(literal_count_u128)
+                .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+            if node_residual_literals > dag_budget.max_literals {
+                return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+            }
             total_residual_literals = total_residual_literals
-                .checked_add(literal_count as u128)
+                .checked_add(literal_count_u128)
                 .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
             if total_residual_literals > dag_budget.max_stored_residual_literals {
                 return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
