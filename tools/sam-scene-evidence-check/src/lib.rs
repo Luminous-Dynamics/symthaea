@@ -814,4 +814,88 @@ mod tests {
         fixture["snapshot"]["time"]["receive_tick_ns"] = Value::from(11_000_000_000u64);
         assert!(validate_values(&schema, &fixture).is_err());
     }
+
+    fn load_traffic_fixtures() -> (Value, Value, Value) {
+        let root = repo_root();
+        let schema: Value = serde_json::from_str(
+            &fs::read_to_string(
+                root.join("docs/autonomy/SAM_TRAFFIC_CONVENTION_PROFILE_SCHEMA_V0_1.json"),
+            )
+            .expect("traffic schema text"),
+        )
+        .expect("traffic schema JSON");
+        let profiles: Value = serde_json::from_str(
+            &fs::read_to_string(
+                root.join("docs/autonomy/fixtures/SAM_TRAFFIC_CONVENTION_PROFILE_FIXTURE_V0_1.json"),
+            )
+            .expect("traffic profile fixture text"),
+        )
+        .expect("traffic profile fixture JSON");
+        let mirrored: Value = serde_json::from_str(
+            &fs::read_to_string(
+                root.join("docs/autonomy/fixtures/SAM_TRAFFIC_CONVENTION_METAMORPHIC_V0_1.json"),
+            )
+            .expect("traffic metamorphic fixture text"),
+        )
+        .expect("traffic metamorphic fixture JSON");
+        (schema, profiles, mirrored)
+    }
+
+    #[test]
+    fn traffic_profile_registry_conforms_to_schema_and_sign_semantics() {
+        let (schema, profiles, _) = load_traffic_fixtures();
+        validate_traffic_values(&schema, &profiles)
+            .expect("traffic profile registry must conform");
+    }
+
+    #[test]
+    fn mirrored_left_right_scene_pair_is_equivariant() {
+        let (schema, _, mirrored) = load_traffic_fixtures();
+        validate_traffic_values(&schema, &mirrored)
+            .expect("paired LHT/RHT scenes must satisfy mirror invariants");
+    }
+
+    #[test]
+    fn rejects_scene_profile_that_conflicts_with_lane_geometry() {
+        let (schema, _, mut mirrored) = load_traffic_fixtures();
+        mirrored["paired_scenes"][0]["traffic_convention_profile_id"] =
+            Value::String("synthetic-rht-lhd-v1".into());
+        mirrored["paired_scenes"][0]["map_traffic_convention_profile_id"] =
+            Value::String("synthetic-rht-lhd-v1".into());
+        mirrored["paired_scenes"][0]["travel_frame_id"] =
+            Value::String("road-local-rht-v1".into());
+        assert!(validate_traffic_values(&schema, &mirrored).is_err());
+    }
+
+    #[test]
+    fn rejects_untransformed_steering_under_road_reflection() {
+        let (schema, _, mut mirrored) = load_traffic_fixtures();
+        mirrored["paired_scenes"][1]["ego_state"]["steering_angle_rad"] =
+            Value::from(0.1);
+        mirrored["paired_scenes"][1]["candidate_command"]["steering"] =
+            Value::from(0.2);
+        assert!(validate_traffic_values(&schema, &mirrored).is_err());
+    }
+
+    #[test]
+    fn steering_wheel_position_does_not_change_traffic_side_semantics() {
+        let (schema, _, mut mirrored) = load_traffic_fixtures();
+        mirrored["profiles"][0]["steering_wheel_position"] = Value::String("left".into());
+        assert!(validate_traffic_values(&schema, &mirrored).is_ok());
+    }
+
+    #[test]
+    fn rejects_scene_map_traffic_profile_mismatch() {
+        let (schema, _, mut mirrored) = load_traffic_fixtures();
+        mirrored["paired_scenes"][0]["map_traffic_convention_profile_id"] =
+            Value::String("synthetic-rht-lhd-v1".into());
+        assert!(validate_traffic_values(&schema, &mirrored).is_err());
+    }
+
+    #[test]
+    fn rejects_passing_side_without_matching_rule_profile() {
+        let (schema, _, mut mirrored) = load_traffic_fixtures();
+        mirrored["paired_scenes"][0]["declared_passing_side_sign"] = Value::from(1);
+        assert!(validate_traffic_values(&schema, &mirrored).is_err());
+    }
 }
