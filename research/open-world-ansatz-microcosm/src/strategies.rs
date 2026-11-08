@@ -248,13 +248,11 @@ where
             posterior_entropy -= posterior * posterior.log2();
         }
 
-        worst_case_remaining_structures =
-            worst_case_remaining_structures.max(compatible_families);
+        worst_case_remaining_structures = worst_case_remaining_structures.max(compatible_families);
         expected_posterior_entropy += probability * posterior_entropy;
     }
 
-    score.structure_information_gain_bits =
-        (prior_entropy - expected_posterior_entropy).max(0.0);
+    score.structure_information_gain_bits = (prior_entropy - expected_posterior_entropy).max(0.0);
     score.worst_case_remaining_structures = worst_case_remaining_structures;
     Ok(score)
 }
@@ -614,7 +612,9 @@ mod tests {
         .unwrap();
         let expanded_score = attach_structure_metrics(expanded, overparameterized).unwrap();
 
-        assert!((balanced_score.structure_information_gain_bits - 0.31127812445913283).abs() < 1e-12);
+        assert!(
+            (balanced_score.structure_information_gain_bits - 0.31127812445913283).abs() < 1e-12
+        );
         assert!(
             (balanced_score.structure_information_gain_bits
                 - expanded_score.structure_information_gain_bits)
@@ -623,22 +623,14 @@ mod tests {
         );
         assert_eq!(balanced_score.worst_case_remaining_structures, 2);
         assert_eq!(expanded_score.worst_case_remaining_structures, 2);
-        assert!(
-            expanded_score.structure_information_gain_bits
-                > expanded_score.entropy_bits
-        );
+        assert!(expanded_score.structure_information_gain_bits > expanded_score.entropy_bits);
     }
 
     #[test]
     fn structure_information_gain_is_zero_when_only_one_family_remains() {
-        let score = metrics(
-            AgentIntervention::Numeric(1),
-            [0_i64, 1, 1, 2],
-            4,
-        )
-        .unwrap();
-        let score = attach_structure_metrics(score, [(0_i64, 7_usize), (1, 7), (1, 7), (2, 7)])
-            .unwrap();
+        let score = metrics(AgentIntervention::Numeric(1), [0_i64, 1, 1, 2], 4).unwrap();
+        let score =
+            attach_structure_metrics(score, [(0_i64, 7_usize), (1, 7), (1, 7), (2, 7)]).unwrap();
         assert_eq!(score.structure_information_gain_bits, 0.0);
         assert_eq!(score.worst_case_remaining_structures, 1);
     }
