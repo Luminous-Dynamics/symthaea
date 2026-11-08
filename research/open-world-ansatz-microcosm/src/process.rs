@@ -79,10 +79,14 @@ pub struct ProcessActionRecord {
     pub resulting_status: EpisodeStatus,
 }
 
-struct ProcessActionExchange {
-    action: AgentAction,
-    agent_view_frame_sha256: String,
-    agent_action_frame_sha256: String,
+/// One exact request/response pair across the child-process JSONL boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessActionExchange {
+    pub action: AgentAction,
+    /// SHA-256 of the exact AgentView bytes sent, including its JSONL newline.
+    pub agent_view_frame_sha256: String,
+    /// SHA-256 of the exact AgentAction bytes received, including its JSONL newline.
+    pub agent_action_frame_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -464,6 +468,15 @@ impl std::error::Error for ProcessError {}
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn frame_digest_commits_to_jsonl_delimiter_bytes() {
+        assert_ne!(sha256_frame(b"{}"), sha256_frame(b"{}\n"));
+        assert_eq!(
+            sha256_frame(b"{}\n"),
+            format!("sha256:{:x}", Sha256::digest(b"{}\n"))
+        );
+    }
 
     #[test]
     fn bounded_reader_accepts_exactly_limited_line() {
