@@ -637,6 +637,20 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         })
         .collect();
 
+    let source_records: BTreeMap<String, Value> = snapshot
+        .get("sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|source| {
+            Some((
+                source.get("source_id")?.as_str()?.to_owned(),
+                source.clone(),
+            ))
+        })
+        .collect();
+
+
     let frame_ids: BTreeSet<String> = snapshot
         .get("reference_frames")
         .and_then(Value::as_array)
@@ -894,8 +908,231 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         &source_roles,
         &["simulator_oracle"],
     );
+    validate_follow_target_context(
+        &mut errors,
+        snapshot,
+        &source_records,
+        &frame_ids,
+    );
 
     errors
+}
+
+fn validate_follow_target_context(
+    errors: &mut Vec<String>,
+    snapshot: &Value,
+    source_records: &BTreeMap<String, Value>,
+    frame_ids: &BTreeSet<String>,
+) {
+    let Some(context) = snapshot.get("follow_target_context") else {
+        errors.push("follow_target_context: missing typed follow evidence context".into());
+        return;
+    };
+    let profile = context
+        .get("consumer_profile")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let status = context
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+
+    if status != "available" {
+        let unresolved_fields = [
+            "evidence_source_ref",
+            "scenario_id",
+            "actor_id",
+            "coordinate_frame_id",
+            "observation_tick_ns",
+            "gap_m",
+            "relative_speed_mps",
+            "distance_uncertainty_m",
+        ];
+        for field in unresolved_fields {
+            if context.get(field).is_some_and(|value| !value.is_null()) {
+                errors.push(format!(
+                    "follow_target_context: {status} status cannot retain {field}; no oracle or remote fallback is permitted"
+                ));
+            }
+        }
+        return;
+    }
+
+    let source_id = context
+        .get("evidence_source_ref")
+        .and_then(Value::as_str);
+    let Some(source_id) = source_id else {
+        errors.push("follow_target_context: available target requires evidence_source_ref".into());
+        return;
+    };
+    let Some(source) = source_records.get(source_id) else {
+        errors.push(format!(
+            "follow_target_context: unknown evidence source {source_id}"
+        ));
+        return;
+    };
+
+    let role = source
+        .get("source_role")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let expected_role = match profile {
+        "simulation_benchmark" => "simulator_oracle",
+        "local_perception" | "deployment" => "local_sensor_observation",
+        _ => {
+            errors.push(format!(
+                "follow_target_context: unsupported consumer profile {profile}"
+            ));
+            return;
+        }
+    };
+    if role != expected_role {
+        errors.push(format!(
+            "follow_target_context: {profile} requires source role {expected_role}, not {role}; remote cooperative claims never substitute for a local lead track"
+        ));
+    }
+
+    let source_modality = source
+        .get("modality")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let evidence_kind = source
+        .get("evidence_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let currentness = source
+        .get("currentness")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let sensor_modality = matches!(
+        source_modality,
+        "rgb_camera"
+            | "stereo_camera"
+            | "lidar"
+            | "radar"
+            | "ultrasonic"
+            | "imu"
+            | "gnss"
+            | "wheel_odometry"
+    );
+
+    match profile {
+        "simulation_benchmark" => {
+            if source_modality != "synthetic" || evidence_kind != "synthetic_observation" {
+                errors.push(
+                    "follow_target_context: simulation benchmark oracle must be a synthetic observation"
+                        .into(),
+                );
+            }
+            if !matches!(currentness, "current" | "current_for_fixture") {
+                errors.push(
+                    "follow_target_context: stale or unknown simulator oracle cannot drive Follow"
+                        .into(),
+                );
+            }
+            let scenario = context.get("scenario_id").and_then(Value::as_str);
+            let snapshot_scenario = snapshot.get("scenario_id").and_then(Value::as_str);
+            if scenario != snapshot_scenario {
+                errors.push(
+                    "follow_target_context: simulator oracle scenario_id must match the exact scene scenario"
+                        .into(),
+                );
+            }
+        }
+        "local_perception" | "deployment" => {
+            if !sensor_modality || evidence_kind != "measurement" || currentness != "current" {
+                errors.push(
+                    "follow_target_context: local/deployment Follow requires a current local sensor measurement"
+                        .into(),
+                );
+            }
+            if source_modality == "synthetic" {
+                errors.push(
+                    "follow_target_context: synthetic simulator truth is not a local sensor measurement"
+                        .into(),
+                );
+            }
+        }
+        _ => {}
+    }
+
+    let context_frame = context
+        .get("coordinate_frame_id")
+        .and_then(Value::as_str);
+    let source_frame = source
+        .get("reference_frame_id")
+        .and_then(Value::as_str);
+    if context_frame != source_frame
+        || context_frame.is_none_or(|frame| !frame_ids.contains(frame))
+    {
+        errors.push(
+            "follow_target_context: evidence source frame must resolve and match the follow-target frame"
+                .into(),
+        );
+    }
+
+    let event_tick = snapshot
+        .get("time")
+        .and_then(|time| time.get("event_tick_ns"))
+        .and_then(Value::as_u64);
+    let source_tick = source
+        .get("acquisition_tick_ns")
+        .and_then(Value::as_u64);
+    let observation_tick = context
+        .get("observation_tick_ns")
+        .and_then(Value::as_u64);
+    let max_age = context
+        .get("max_age_ns")
+        .and_then(Value::as_u64);
+    let source_clock = source
+        .get("clock_domain_id")
+        .and_then(Value::as_str);
+    let scene_clock = snapshot
+        .get("time")
+        .and_then(|time| time.get("clock_domain_id"))
+        .and_then(Value::as_str);
+    let source_transform = source
+        .get("clock_transform_id")
+        .and_then(Value::as_str);
+    let scene_transform = snapshot
+        .get("time")
+        .and_then(|time| time.get("clock_transform_id"))
+        .and_then(Value::as_str);
+
+    if source_tick != observation_tick
+        || source_clock != scene_clock
+        || source_transform != scene_transform
+    {
+        errors.push(
+            "follow_target_context: observation time must be normalized under the exact scene clock/transform"
+                .into(),
+        );
+    }
+    match (event_tick, observation_tick, max_age) {
+        (Some(now), Some(observed), Some(maximum))
+            if observed <= now && now - observed <= maximum => {}
+        _ => errors.push(
+            "follow_target_context: missing, future, or stale observation exceeds the declared maximum age"
+                .into(),
+        ),
+    }
+
+    let gap = context.get("gap_m").and_then(Value::as_f64);
+    let relative_speed = context
+        .get("relative_speed_mps")
+        .and_then(Value::as_f64);
+    let uncertainty = context
+        .get("distance_uncertainty_m")
+        .and_then(Value::as_f64);
+    if gap.is_none_or(|value| !value.is_finite() || value < 0.0)
+        || relative_speed.is_none_or(|value| !value.is_finite())
+        || uncertainty.is_none_or(|value| !value.is_finite() || value < 0.0)
+    {
+        errors.push(
+            "follow_target_context: gap, relative speed and uncertainty must be finite; distance and uncertainty must be non-negative"
+                .into(),
+        );
+    }
 }
 
 fn validate_source_role(errors: &mut Vec<String>, source: &Value) {
