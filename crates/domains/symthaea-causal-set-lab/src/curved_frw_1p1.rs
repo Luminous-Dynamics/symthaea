@@ -333,7 +333,7 @@ mod tests {
         let metric = ConformalFrw1p1::new(0.0, 2.0).unwrap();
         assert!((metric.total_volume() - 2.0).abs() < 1.0e-12);
         assert!((metric.ricci_scalar(0.0).unwrap()).abs() < 1.0e-14);
-        assert!((metric.expected_eta_squared() - (2.0 / 4.0) / 6.0).abs() < 1.0e-3);
+        assert!((metric.expected_eta_squared() - 1.0 / 6.0).abs() < 1.0e-3);
     }
 
     #[test]
