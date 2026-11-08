@@ -832,6 +832,6 @@ pub mod global_identifiability;
 
 pub use global_identifiability::{
     AmbiguousSolutionPair, CandidateFit, CandidateSolution, GlobalIdentifiabilityConfig,
-    GlobalIdentifiabilityError, GlobalIdentifiabilityReport,
-    MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES, screen_global_ambiguities,
+    GlobalIdentifiabilityError, GlobalIdentifiabilityReport, MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES,
+    screen_global_ambiguities,
 };
