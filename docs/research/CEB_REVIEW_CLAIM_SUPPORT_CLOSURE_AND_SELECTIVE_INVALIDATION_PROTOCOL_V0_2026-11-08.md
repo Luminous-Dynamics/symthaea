@@ -15,7 +15,7 @@ This extension makes the dependency closure behind each claim inspectable. Its q
 
 > Given a versioned claim, the evidence and assumptions supporting it, and an intervening change event, can the reviewer show exactly which support dependencies were affected—and why every retained claim remains inside the validity scope of its evidence?
 
-This is a refinement of #10630's evaluation adapter, not a second evidence-continuity system. It creates no new metric lane, no candidate code execution, and no new run receipt.
+This is a refinement of #10630's evaluation adapter, not a second evidence-continuity system. It creates no new metric lane, no candidate code execution, and no new run receipt. Its six-case public challenge is not a sealed holdout.
 
 ## 2. Paradigm shift: from citations to claim-support closure
 
