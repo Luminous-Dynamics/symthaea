@@ -1,0 +1,542 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "LOS18_TRANSIENT_CONTRACT_SYNTHETIC_V0_1",
+  "status": "synthetic_contract_data_not_equipment_ratings",
+  "mission_binding": {
+    "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+    "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "explicit_warning": "All amplitude and timing values are synthetic fixture values for schema and replay testing. They are not equipment ratings, bus limits, protection settings, cable sizes or design recommendations. Every event acceptance status is unqualified.",
+  "events": [
+    {
+      "schema_version": "0.1.0",
+      "event_id": "watermaker_pump_start",
+      "event_class": "motor_start",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "watermaker",
+        "equipment_ref": "synthetic_ro_hp_pump",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "ac"
+      },
+      "event_timing": {
+        "duration_ms": 5000,
+        "rise_time_ms": 20,
+        "fall_time_ms": 80,
+        "repeat_interval_ms": null,
+        "coincidence_group": "watermaker_only"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 1,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 250,
+            "delta_power_kw": 1.2
+          },
+          {
+            "start_ms": 250,
+            "end_ms": 500,
+            "delta_power_kw": 0.2
+          }
+        ],
+        "requested_sample_rate_hz": 10000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic event amplitude only; no OEM inrush trace",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "compressor_start",
+      "event_class": "motor_start",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "refrigeration",
+        "equipment_ref": "synthetic_compressor",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "ac"
+      },
+      "event_timing": {
+        "duration_ms": 3000,
+        "rise_time_ms": 10,
+        "fall_time_ms": 60,
+        "repeat_interval_ms": 60000,
+        "coincidence_group": "thermal_services"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 0.4,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 120,
+            "delta_power_kw": 0.8
+          },
+          {
+            "start_ms": 120,
+            "end_ms": 300,
+            "delta_power_kw": 0.15
+          }
+        ],
+        "requested_sample_rate_hz": 20000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic compressor event; not a vendor rating",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "induction_cooktop_step",
+      "event_class": "constant_power_step",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "galley",
+        "equipment_ref": "synthetic_induction_load",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "ac"
+      },
+      "event_timing": {
+        "duration_ms": 1800000,
+        "rise_time_ms": 5,
+        "fall_time_ms": 100,
+        "repeat_interval_ms": null,
+        "coincidence_group": "domestic_peak"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 0.3,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 50,
+            "delta_power_kw": 2
+          },
+          {
+            "start_ms": 50,
+            "end_ms": 1800000,
+            "delta_power_kw": 2
+          }
+        ],
+        "requested_sample_rate_hz": 2000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic load step; excludes actual cooktop waveform and power factor",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "bow_thruster_pulse",
+      "event_class": "thruster_pulse",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "propulsion_auxiliary",
+        "equipment_ref": "synthetic_thruster",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "dc"
+      },
+      "event_timing": {
+        "duration_ms": 8100,
+        "rise_time_ms": 10,
+        "fall_time_ms": 30,
+        "repeat_interval_ms": null,
+        "coincidence_group": "maneuvering"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 0.8,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 50,
+            "delta_power_kw": 12
+          },
+          {
+            "start_ms": 50,
+            "end_ms": 8000,
+            "delta_power_kw": 12
+          },
+          {
+            "start_ms": 8000,
+            "end_ms": 8100,
+            "delta_power_kw": 0
+          }
+        ],
+        "requested_sample_rate_hz": 20000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic pulse for schema tests only; no vessel rating",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "propulsion_inverter_step",
+      "event_class": "propulsion_inverter_step",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "propulsion",
+        "equipment_ref": "synthetic_propulsion_inverter",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "dc"
+      },
+      "event_timing": {
+        "duration_ms": 10000,
+        "rise_time_ms": 20,
+        "fall_time_ms": 200,
+        "repeat_interval_ms": null,
+        "coincidence_group": "underway_load_step"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 4,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 100,
+            "delta_power_kw": 3
+          },
+          {
+            "start_ms": 100,
+            "end_ms": 10000,
+            "delta_power_kw": 3
+          }
+        ],
+        "requested_sample_rate_hz": 20000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic propulsion demand increment; fixed route-owner operating case not optimized",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "generator_loss",
+      "event_class": "source_trip",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "generation",
+        "equipment_ref": "synthetic_generator",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "hybrid_ac_dc"
+      },
+      "event_timing": {
+        "duration_ms": 5000,
+        "rise_time_ms": 5,
+        "fall_time_ms": 50,
+        "repeat_interval_ms": null,
+        "coincidence_group": "source_contingency"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 6,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 20,
+            "delta_power_kw": -6
+          },
+          {
+            "start_ms": 20,
+            "end_ms": 5000,
+            "delta_power_kw": -6
+          }
+        ],
+        "requested_sample_rate_hz": 50000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic source-loss event; protective response intentionally unqualified",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "shore_power_loss",
+      "event_class": "shore_power_loss",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "shore_interface",
+        "equipment_ref": "synthetic_shore_source",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "hybrid_ac_dc"
+      },
+      "event_timing": {
+        "duration_ms": 4000,
+        "rise_time_ms": 2,
+        "fall_time_ms": 20,
+        "repeat_interval_ms": null,
+        "coincidence_group": "port_source_transfer"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 3,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 10,
+            "delta_power_kw": -3
+          },
+          {
+            "start_ms": 10,
+            "end_ms": 4000,
+            "delta_power_kw": -3
+          }
+        ],
+        "requested_sample_rate_hz": 50000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "connected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic port disconnect event; no transfer limits asserted",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "event_id": "coincident_service_starts",
+      "event_class": "coincident_load_start",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_ANCHOR_CASE_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "equipment": {
+        "owner_id": "resource_scheduler",
+        "equipment_ref": "synthetic_multiple_services",
+        "revision": "synthetic-not-an-oem-part",
+        "power_system_kind": "hybrid_ac_dc"
+      },
+      "event_timing": {
+        "duration_ms": 3000,
+        "rise_time_ms": 5,
+        "fall_time_ms": 100,
+        "repeat_interval_ms": null,
+        "coincidence_group": "coincident_water_hvac_galley"
+      },
+      "waveform": {
+        "kind": "piecewise_constant_synthetic",
+        "baseline_power_kw": 1.7,
+        "segments": [
+          {
+            "start_ms": 0,
+            "end_ms": 25,
+            "delta_power_kw": 1.2
+          },
+          {
+            "start_ms": 25,
+            "end_ms": 50,
+            "delta_power_kw": 0.8
+          },
+          {
+            "start_ms": 50,
+            "end_ms": 100,
+            "delta_power_kw": 2
+          },
+          {
+            "start_ms": 100,
+            "end_ms": 3000,
+            "delta_power_kw": 2
+          }
+        ],
+        "requested_sample_rate_hz": 50000
+      },
+      "initial_state": {
+        "battery_soc_fraction": 0.65,
+        "battery_soh_fraction": 0.98,
+        "battery_temperature_c": 25,
+        "generator_state": "online",
+        "shore_power_state": "disconnected"
+      },
+      "acceptance": {
+        "status": "unqualified",
+        "limit_owner_ref": null,
+        "voltage_limits_pu": null,
+        "max_excursion_duration_ms": null,
+        "local_fallback_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic coincidence event; no claim of actual aggregate load",
+        "measurement_status": "not_measured",
+        "time_sync_uncertainty_us": null,
+        "missing_sample_count": 0,
+        "calibration_ref": null
+      }
+    }
+  ]
+}
