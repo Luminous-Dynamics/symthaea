@@ -76,7 +76,7 @@ pub struct ModelRecoveryReport {
 pub enum ModelRecoveryError {
     #[error(transparent)]
     InvalidDiscriminationDesign(#[from] ModelDiscriminationError),
-    #[error("model-recovery sample count must be in 1..={MAX_MODEL_RECOVERY_TRIALS}")]
+    #[error("model-recovery sample count must be in 1..=1000000")]
     InvalidSampleCount,
     #[error("model-recovery total trial count exceeds {MAX_MODEL_RECOVERY_TRIALS}")]
     TooManyTrials,
@@ -211,8 +211,10 @@ pub fn evaluate_model_recovery(
     let mut model_ids = Vec::with_capacity(hypotheses.len());
     let mut expected_model_ids = BTreeSet::new();
     for hypothesis in hypotheses {
-        if hypothesis.model_id.trim().is_empty()
-            || hypothesis.model_id == OTHER_UNRESOLVED_MODEL_ID
+        if hypothesis.model_id.trim().is_empty() {
+            return Err(ModelDiscriminationError::EmptyHypothesisId(model_ids.len()).into());
+        }
+        if hypothesis.model_id == OTHER_UNRESOLVED_MODEL_ID
             || !expected_model_ids.insert(hypothesis.model_id.as_str())
         {
             return Err(ModelDiscriminationError::DuplicateHypothesisId(
