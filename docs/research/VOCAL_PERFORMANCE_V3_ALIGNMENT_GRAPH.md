@@ -1,7 +1,7 @@
 # VocalPerformance v3 — explicit lyric / phone / score alignment graph
 
 **Date:** 7 November 2026  
-**Status:** architecture proposal; v2 remains the production contract. No v3 implementation or benchmark result is claimed.
+**Status:** research contract plus first resolved-plan renderer adapter; v2 remains the trait-compatible production contract. The adapter is build/test work, not a benchmark victory or a human-naturalness claim.
 
 ## 1. Why a new representation is needed
 
@@ -34,7 +34,7 @@ A renderer receives a validated alignment graph. It must not silently re-run G2P
 
 ## 3. Proposed top-level v3 shape
 
-The names below remain conceptual, not a frozen production wire schema. A first research-only Rust contract now exists in `tools/pronunciation-plan/src/lib.rs`; it uses `ScoreEventSpan` intervals relative to each note/rest event rather than bare note-index ownership.
+The names below remain conceptual, not a frozen production wire schema. The Rust contract exists in `tools/pronunciation-plan/src/lib.rs`; it uses `ScoreEventSpan` intervals relative to each note/rest event rather than bare note-index ownership. The root `singing` feature now depends on that isolated crate and `FormantSingingEngine` has opt-in `render_resolved_plan` and `render_beat_domain_plan` methods. These methods consume selected phones and explicit score/alignment data directly without rerunning Muse G2P.
 
 ```text
 VocalPerformanceGraph
@@ -108,7 +108,7 @@ An `AlignmentEdge` links one phoneme or syllable event to one or more score even
 - hard/soft constraint class;
 - confidence/evidence and optional solver rationale.
 
-The research prototype now has an additive `BeatDomainScore` source timeline with quarter-note beat coordinates and a piecewise-constant tempo map. It integrates tempo segments into seconds, including tempo changes inside a note, and materializes canonical seconds-domain events for existing validators/renderers. The original beat events and tempo map remain separately serializable for provenance. The prototype does not yet encode time signatures, tuplets as typed events, ties, grace notes or tempo ramps; those remain explicit v3 extensions.
+The research contract has an additive `BeatDomainScore` source timeline with quarter-note beat coordinates and a piecewise-constant tempo map. It integrates tempo segments into seconds, including tempo changes inside a note, and materializes canonical seconds-domain events; the new formant adapter now consumes this path through `render_beat_domain_plan`. The original beat events and tempo map remain separately serializable for provenance. The prototype does not yet encode time signatures, tuplets as typed events, ties, grace notes or tempo ramps; those remain explicit v3 extensions.
 
 The research prototype supports both important directions at the symbolic score-event interval layer:
 
@@ -150,7 +150,30 @@ Hard constraints:
 
 The solver should emit a machine-readable explanation for each alignment decision. A human correction can override an edge and retain the original edge and evidence for audit.
 
-## 5. v2 compatibility
+## 5. First renderer integration: resolved-plan formant adapter
+
+The first actual renderer boundary now exists in `src/voice/formant_singing_engine.rs`:
+
+- `render_resolved_plan(plan, alignment)` requires `PronunciationPlan::validate_renderable` and `VocalScoreAlignment::validate_against`. It resolves only the explicit selected candidate; it does not call Muse G2P or silently choose another pronunciation.
+- `render_beat_domain_plan(plan, beat_score, bindings, phrases)` materializes the explicit piecewise-constant tempo map into seconds-domain score events at the renderer boundary, then uses the same validated path.
+- Each score span is divided into ordered phone intervals. Consonants receive a short 45 ms baseline budget and the remaining interval is assigned to vowel/syllabic nuclei, with a minimum nucleus floor and explicit failure when a span is too short.
+- Subsequent spans of a multi-note melisma render only the designated vowel phone.
+- Rests remain silent frames on the 200 Hz formant timeline.
+- Phone symbols must belong to an explicit allowlist of the legacy formant table. Composite strings such as `ks` are rejected as one phone; unsupported IPA cannot take the formant table's generic vowel fallback.
+
+This is an opt-in method on the formant-vocoder backend, not yet part of the generic `SingingVoiceEngine::render(VocalPerformance)` trait. It is an honest first integration point, not the final renderer architecture.
+
+### Current limits of this adapter
+
+- The source-filter formant table is English-oriented; this is not multilingual or African-language singing support.
+- Phone durations use a fixed consonant heuristic and distribute the remaining span among nuclei. It does not yet use language-specific duration priors, consonant anticipation, diphthong trajectories or learned coarticulation.
+- F0 is the score note frequency for each span; this adapter does not yet consume arbitrary continuous pitch curves, vibrato, portamento or expression curves.
+- Phrase breath durations are validated metadata, not synthesized inhalation/noise events.
+- No speaker identity conditioning, neural residual model, local edit API, or human preference result is claimed.
+
+The exact tests now cover a selected pronunciation rendered without a G2P rerun, explicit-rest silence, two syllables subdividing one long note, a multi-note melisma that sustains only its designated vowel, beat-domain tempo integration and strict rejection of unsupported/composite phone tokens.
+
+## 6. v2 compatibility
 
 Keep `VocalPerformance` v2 frozen until v3 exists and is tested. Build an explicit adapter:
 
@@ -161,7 +184,7 @@ Keep `VocalPerformance` v2 frozen until v3 exists and is tested. Build an explic
 
 The reverse v3-to-v2 adapter must declare its lossiness. Multi-syllable-per-note, complex ornaments, time-signature maps or richer pronunciation variants cannot be silently flattened into v2.
 
-## 6. Benchmark plan
+## 7. Benchmark plan
 
 Use synthetic cases with known exact alignments first, then a stratified human-reviewed score/lyric corpus.
 
@@ -188,7 +211,7 @@ Hold out complete singers, songs, score patterns, meters, tempos, lyric words an
 ### Revision locality
 Change one word, phone, note, phrase arc or breath. Measure target-region success, unaffected-region identity, collateral-change rate and deterministic replay. Preserve exact cached audio only where the renderer guarantees deterministic locality; otherwise measure aligned acoustic/perceptual deltas.
 
-## 7. External comparisons
+## 8. External comparisons
 
 - **DiffSinger:** useful baseline for phoneme/duration/F0 conditioning, but compare the same supplied alignment inputs.
 - **SoulX-Singer:** useful modern score/MIDI/F0-conditioned reference for naturalness, melody fidelity and zero-shot identity. Its output must be assessed under the same score/lyric cases.
@@ -197,7 +220,7 @@ Change one word, phone, note, phrase arc or breath. Measure target-region succes
 
 A competitive advantage would be higher exact score/lyric compliance, interpretable local edits and reproducible evidence at comparable perceptual quality—not a claim that symbolic controllability alone beats a commercial song generator in naturalness.
 
-## 8. Implementation order and dependencies
+## 9. Implementation order and dependencies
 
 1. Complete the G2P replacement evaluation in issue #10869.
 2. Define a versioned v3 JSON schema and invariants without changing the v2 production path.
