@@ -100,6 +100,14 @@ CLI scenario arguments identify the hidden evaluator-side world. They are for an
 
 For the matched A0 control, use the same world and intervention sequence, changing only the final argument to a0.
 
+## Experiment-selection controls
+
+`strategies::ProbeStrategy` supplies six comparable one-step policies: maximum partition count, minimax worst-case survivors, maximum entropy, minimum expected remaining candidates under a uniform prior, fixed grid, and seeded random. Each action is scored over the candidates still compatible with the public evidence. The score exposes partition count, worst-case survivors, exact expected-survivor numerator/denominator, entropy and action cost.
+
+These are deliberately different objectives. Maximum entropy and expected survivors assume a uniform prior over the surviving finite grammar; they are not calibrated Bayesian posteriors or decision-focused EVSI. The random arm is seeded and reproducible. Independent two-input probes already used in the episode are excluded; repeat inputs remain available in stateful Boolean/numeric worlds.
+
+`policy::StrategyEnumeratorBaseline` combines each strategy with the same exact finite inference/submission logic, enabling per-strategy matched A0/A2 episodes. No comparative performance ranking is claimed until the exact-head Rust campaign runs and its full per-world metrics are recorded.
+
 ## Finite enumerator agent baseline v0
 
 `policy::FiniteEnumeratorBaseline` consumes only an `AgentView` and emits a probe or terminal submission. It maintains the exact finite compatible-model set and uses the existing partition-maximizing probe heuristic in a receding-horizon loop. It is a transparent algorithmic reference, not a trained research policy. Paired A0/A2 tests use the same hidden model and action budget; the external harness still needs to preregister and randomize task seeds and ensure agent/evaluator process isolation.
@@ -114,7 +122,7 @@ Important boundary: this Rust API is not an OS security sandbox. The agent must 
 
 ## Authored tests
 
-Fifty-three Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions and exact version-space scoring.
+Fifty-eight Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions and exact version-space scoring.
 
 The previous exact-head focused runs covered 34 tests on commit 58128d025bdb24995c31822a86cd3afcaec28413. The additional protocol tests and wire contract must be qualified on the new exact branch head before this expanded branch is called green.
 
