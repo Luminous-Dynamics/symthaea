@@ -373,6 +373,8 @@ symthaea-spore = { path = "crates/domains/symthaea-spore", optional = true, defa
 
 # Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
 symthaea-muse = { path = "crates/domains/symthaea-muse", optional = true }
+# Evidence-bearing pronunciation and score-alignment contract consumed by the resolved-plan singing adapter.
+symthaea-pronunciation-plan = { path = "tools/pronunciation-plan", optional = true }
 
 # Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
 symthaea-geodesic = { path = "crates/domains/symthaea-geodesic", optional = true }
@@ -665,7 +667,7 @@ neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI m
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 muse = ["dep:symthaea-muse"]                             # Consciousness-driven music synthesis in cognitive loop (streaming PCM)
 muse-live = ["muse", "symthaea-muse/muse-live"]          # Real-time speaker output for muse streaming (cpal + ringbuf); gates MuseManager::live_output. NOTE: cpal needs ALSA — build inside `nix develop` (same constraint as live-voice)
-singing = ["muse", "vocal-tract", "symthaea-muse/voice", "symthaea-muse/theory"]  # Bridges symthaea-muse::singing_bridge (lyrics + melody -> FormantFrame) into the root crate's FormantVocoder — Phase 3.1 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md. `theory` added 2026-07-18 (SYMTHAEA_SINGING_PLAN Phase 1) so /sing can call compose_and_perform_melody instead of a hardcoded arc.
+singing = ["muse", "vocal-tract", "symthaea-muse/voice", "symthaea-muse/theory", "dep:symthaea-pronunciation-plan"]  # Bridges symthaea-muse::singing_bridge (lyrics + melody -> FormantFrame) into the root crate's FormantVocoder — Phase 3.1 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md. `theory` added 2026-07-18 (SYMTHAEA_SINGING_PLAN Phase 1) so /sing can call compose_and_perform_melody instead of a hardcoded arc.
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
