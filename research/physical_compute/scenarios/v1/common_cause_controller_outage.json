@@ -107,6 +107,27 @@
       "component_id": "verifier-0",
       "kind": "verifier",
       "attributes": {}
+    },
+    {
+      "component_id": "verifier-power-0",
+      "kind": "power_rail",
+      "attributes": {
+        "isolation": "separate_from_candidate"
+      }
+    },
+    {
+      "component_id": "verifier-clock-0",
+      "kind": "clock_source",
+      "attributes": {
+        "isolation": "separate_from_candidate"
+      }
+    },
+    {
+      "component_id": "verifier-controller-0",
+      "kind": "controller",
+      "attributes": {
+        "isolation": "separate_from_candidate"
+      }
     }
   ],
   "fault_domains": [
@@ -163,10 +184,25 @@
       "member_component_ids": [
         "array-0",
         "controller-0",
-        "verifier-0"
+        "clock-0",
+        "power-0"
       ],
       "failure_probability": null,
       "failure_model": "common_cause",
+      "evidence_status": "synthetic"
+    },
+    {
+      "domain_id": "verifier-island-domain-0",
+      "kind": "board",
+      "parent_domain_id": "system-0",
+      "member_component_ids": [
+        "verifier-0",
+        "verifier-power-0",
+        "verifier-clock-0",
+        "verifier-controller-0"
+      ],
+      "failure_probability": null,
+      "failure_model": "unknown",
       "evidence_status": "synthetic"
     }
   ],
@@ -201,7 +237,9 @@
     "verifier_component_id": "verifier-0",
     "fallback_component_id": null,
     "notes": [
-      "Negative control: a failed shared controller must prevent task execution regardless of the number of healthy cells."
+      "Negative control: a failed candidate controller must prevent task execution regardless of the number of healthy cells.",
+      "The verifier is placed in a separate synthetic power/clock/controller island, so it remains available under this controller-only fault.",
+      "The verifier is not independent of system-0; system/host common-cause failure remains an explicit shared dependency and is not tested by this fixture."
     ]
   },
   "experiment": {
