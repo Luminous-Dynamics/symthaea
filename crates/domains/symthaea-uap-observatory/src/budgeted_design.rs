@@ -17,9 +17,7 @@
 //! - Data-only observability is reported separately from prior-regularized
 //!   Bayesian D-optimal utility.
 
-use crate::observability::{
-    MAX_OBSERVABILITY_PARAMETERS, ObservabilityError, analyze_jacobian,
-};
+use crate::observability::{MAX_OBSERVABILITY_PARAMETERS, ObservabilityError, analyze_jacobian};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
@@ -98,16 +96,32 @@ pub enum BudgetedDesignError {
     NoScenarios,
     NoOptions,
     InvalidBudget,
-    InvalidScenarioId { index: usize },
+    InvalidScenarioId {
+        index: usize,
+    },
     DuplicateScenarioId(String),
-    InvalidScenarioWeight { scenario_id: String },
-    InvalidPriorShape { scenario_id: String },
-    InvalidPriorSymmetry { scenario_id: String },
-    PriorNotPositiveDefinite { scenario_id: String },
-    InvalidOptionId { index: usize },
+    InvalidScenarioWeight {
+        scenario_id: String,
+    },
+    InvalidPriorShape {
+        scenario_id: String,
+    },
+    InvalidPriorSymmetry {
+        scenario_id: String,
+    },
+    PriorNotPositiveDefinite {
+        scenario_id: String,
+    },
+    InvalidOptionId {
+        index: usize,
+    },
     DuplicateOptionId(String),
-    InvalidOptionCost { option_id: String },
-    EmptyExclusiveGroup { option_id: String },
+    InvalidOptionCost {
+        option_id: String,
+    },
+    EmptyExclusiveGroup {
+        option_id: String,
+    },
     ScenarioCountMismatch {
         option_id: String,
         expected: usize,
@@ -134,7 +148,9 @@ pub enum BudgetedDesignError {
         count: usize,
         maximum: usize,
     },
-    InvalidParameterScale { column: usize },
+    InvalidParameterScale {
+        column: usize,
+    },
     TooManyOptionsForExhaustive {
         count: usize,
         maximum: usize,
@@ -155,16 +171,28 @@ impl fmt::Display for BudgetedDesignError {
             }
             Self::DuplicateScenarioId(id) => write!(f, "duplicate scenario ID {id}"),
             Self::InvalidScenarioWeight { scenario_id } => {
-                write!(f, "scenario {scenario_id} must have a finite positive weight")
+                write!(
+                    f,
+                    "scenario {scenario_id} must have a finite positive weight"
+                )
             }
             Self::InvalidPriorShape { scenario_id } => {
-                write!(f, "prior precision for scenario {scenario_id} is not square")
+                write!(
+                    f,
+                    "prior precision for scenario {scenario_id} is not square"
+                )
             }
             Self::InvalidPriorSymmetry { scenario_id } => {
-                write!(f, "prior precision for scenario {scenario_id} is not symmetric")
+                write!(
+                    f,
+                    "prior precision for scenario {scenario_id} is not symmetric"
+                )
             }
             Self::PriorNotPositiveDefinite { scenario_id } => {
-                write!(f, "prior precision for scenario {scenario_id} is not positive definite")
+                write!(
+                    f,
+                    "prior precision for scenario {scenario_id} is not positive definite"
+                )
             }
             Self::InvalidOptionId { index } => {
                 write!(f, "option ID at index {index} must not be empty")
@@ -207,10 +235,16 @@ impl fmt::Display for BudgetedDesignError {
                 write!(f, "received {actual} parameter scales; expected {expected}")
             }
             Self::InvalidParameterScale { column } => {
-                write!(f, "parameter scale at column {column} is not finite and positive")
+                write!(
+                    f,
+                    "parameter scale at column {column} is not finite and positive"
+                )
             }
             Self::TooManyParameters { count, maximum } => {
-                write!(f, "design has {count} parameters; maximum supported is {maximum}")
+                write!(
+                    f,
+                    "design has {count} parameters; maximum supported is {maximum}"
+                )
             }
             Self::TooManyOptionsForExhaustive { count, maximum } => write!(
                 f,
@@ -423,9 +457,7 @@ pub fn exhaustive_budgeted_design(
             .collect();
         ids.sort();
 
-        if gain > best_gain + 1.0e-12
-            || ((gain - best_gain).abs() <= 1.0e-12 && ids < best_ids)
-        {
+        if gain > best_gain + 1.0e-12 || ((gain - best_gain).abs() <= 1.0e-12 && ids < best_ids) {
             best_selection = selected;
             best_cost = cost;
             best_scores = scores;
@@ -436,9 +468,7 @@ pub fn exhaustive_budgeted_design(
 
     // The exhaustive subset is reported in sorted option-ID order, not in the
     // subset mask's input order.
-    best_selection.sort_by(|left, right| {
-        options[*left].option_id.cmp(&options[*right].option_id)
-    });
+    best_selection.sort_by(|left, right| options[*left].option_id.cmp(&options[*right].option_id));
     report_from_selection(
         options,
         config,
@@ -526,8 +556,7 @@ fn validate_inputs(
             .fold(1.0_f64, |maximum, value| maximum.max(value.abs()));
         for row in 0..dimension {
             for column in 0..dimension {
-                if (scenario.prior_precision[row][column]
-                    - scenario.prior_precision[column][row])
+                if (scenario.prior_precision[row][column] - scenario.prior_precision[column][row])
                     .abs()
                     > 1.0e-12 * scale
                 {
@@ -649,25 +678,30 @@ fn evaluate_selection(
             }
         }
 
-        let posterior_logdet =
-            cholesky_log_determinant(&information).map_err(|_| BudgetedDesignError::CholeskyFailure)?;
-        let prior_logdet = cholesky_log_determinant(&scenario.prior_precision)
-            .map_err(|_| BudgetedDesignError::PriorNotPositiveDefinite {
+        let posterior_logdet = cholesky_log_determinant(&information)
+            .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
+        let prior_logdet = cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
+            BudgetedDesignError::PriorNotPositiveDefinite {
                 scenario_id: scenario.scenario_id.clone(),
-            })?;
+            }
+        })?;
 
-        let (data_only_rank, data_only_nullity, data_only_singular_values, data_only_condition_number) =
-            if data_rows.is_empty() {
-                (0, dimension, vec![0.0; dimension], None)
-            } else {
-                let report = analyze_jacobian(&data_rows, parameter_scales, 1.0e-10)?;
-                (
-                    report.numerical_rank,
-                    report.nullity,
-                    report.singular_values,
-                    report.condition_number,
-                )
-            };
+        let (
+            data_only_rank,
+            data_only_nullity,
+            data_only_singular_values,
+            data_only_condition_number,
+        ) = if data_rows.is_empty() {
+            (0, dimension, vec![0.0; dimension], None)
+        } else {
+            let report = analyze_jacobian(&data_rows, parameter_scales, 1.0e-10)?;
+            (
+                report.numerical_rank,
+                report.nullity,
+                report.singular_values,
+                report.condition_number,
+            )
+        };
 
         scores.push(ScenarioDesignScore {
             scenario_id: scenario.scenario_id.clone(),
@@ -819,7 +853,12 @@ mod tests {
         assert!(greedy.expected_information_gain_nats > 0.0);
         assert!(greedy.worst_case_information_gain_nats > 0.0);
         assert_eq!(greedy.scenario_scores.len(), 2);
-        assert!(greedy.scenario_scores.iter().all(|score| score.data_only_rank == 2));
+        assert!(
+            greedy
+                .scenario_scores
+                .iter()
+                .all(|score| score.data_only_rank == 2)
+        );
     }
 
     #[test]
@@ -859,12 +898,7 @@ mod tests {
     #[test]
     fn prior_regularization_does_not_hide_data_only_null_directions() {
         let scenarios = vec![scenario("nominal", 1.0)];
-        let options = vec![option(
-            "x-only",
-            1.0,
-            None,
-            vec![vec![vec![1.0, 0.0]]],
-        )];
+        let options = vec![option("x-only", 1.0, None, vec![vec![vec![1.0, 0.0]]])];
 
         let report = greedy_budgeted_design(&scenarios, &options, &config(1.0)).unwrap();
         assert_eq!(report.scenario_scores[0].data_only_rank, 1);
@@ -895,14 +929,9 @@ mod tests {
         let scenarios = vec![scenario("single", 1.0)];
         let x = option("alpha", 1.0, None, vec![vec![vec![1.0, 0.0]]]);
         let y = option("beta", 1.0, None, vec![vec![vec![0.0, 1.0]]]);
-        let first = greedy_budgeted_design(
-            &scenarios,
-            &[x.clone(), y.clone()],
-            &config(1.0),
-        )
-        .unwrap();
-        let second =
-            greedy_budgeted_design(&scenarios, &[y, x], &config(1.0)).unwrap();
+        let first =
+            greedy_budgeted_design(&scenarios, &[x.clone(), y.clone()], &config(1.0)).unwrap();
+        let second = greedy_budgeted_design(&scenarios, &[y, x], &config(1.0)).unwrap();
 
         assert_eq!(first.selected_option_ids, vec!["alpha"]);
         assert_eq!(first.selected_option_ids, second.selected_option_ids);
