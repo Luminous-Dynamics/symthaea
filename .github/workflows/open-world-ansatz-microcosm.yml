@@ -38,3 +38,29 @@ jobs:
 
       - name: Run tests
         run: cargo test --manifest-path research/open-world-ansatz-microcosm/Cargo.toml
+
+      - name: Run exhaustive finite A0/A2 policy census
+        run: |
+          report="$RUNNER_TEMP/open-world-finite-policy-census.json"
+          cargo run --quiet --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin finite_policy_campaign -- --budget 4 > "$report"
+          jq -e '
+            .campaign_kind == "exhaustive_generating_model_census" and
+            .candidate_truth_count == 393 and
+            .policy_count == 7 and
+            .pair_count == 2751 and
+            .episode_count == 5502 and
+            (.results | length) == 21 and
+            all(.results[];
+              .a0.episodes == .generating_model_count and
+              .a2.episodes == .generating_model_count and
+              .a0.exact_version_space_matches == .a0.episodes and
+              .a2.exact_version_space_matches == .a2.episodes and
+              .a0.generating_model_retained == .a0.episodes and
+              .a2.generating_model_retained == .a2.episodes and
+              .a0.evidence_references_valid == .a0.episodes and
+              .a2.evidence_references_valid == .a2.episodes and
+              .a0.false_unique_structure_claims == 0 and
+              .a2.false_unique_structure_claims == 0
+            )
+          ' "$report"
+          cat "$report"
