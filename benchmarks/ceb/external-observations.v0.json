@@ -7918,7 +7918,7 @@
         "configuration": "Positive variation subset"
       },
       "metric": {
-        "metric_id": "alternate-positive_case_count",
+        "metric_id": "alternate_positive_case_count",
         "label": "Alternative positive cases",
         "definition": "Number of Alt. cases, combining cosmetic variations and valid alternative solutions, which remain PASS.",
         "value": 1344,
@@ -7933,7 +7933,7 @@
           "margin": null,
           "confidence_level": "not_stated",
           "method": "reported as benchmark population descriptor",
-          "applies_to_metric_id": "alternate-positive_case_count",
+          "applies_to_metric_id": "alternate_positive_case_count",
           "applies_to_task_count": 222
         }
       },
