@@ -9,7 +9,7 @@ pub enum Cell { Healthy, StuckOff, StuckOn }
 pub enum Domain { Power, Clock, Reset, Controller, Interconnect }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Error { Empty, Overflow, AllocationFailed, OutOfRange, InvalidRate, InvalidRectangle }
+pub enum Error { Empty, Overflow, TooLarge, AllocationFailed, OutOfRange, InvalidRate, InvalidRectangle }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Infrastructure {
@@ -52,9 +52,13 @@ pub struct FaultMap {
 }
 
 impl FaultMap {
+    /// Hard ceiling for synthetic fixtures; measured arrays must use explicit device records.
+    pub const MAX_SYNTHETIC_CELLS: usize = 16 * 1024 * 1024;
+
     pub fn new(rows: usize, cols: usize) -> Result<Self, Error> {
         if rows == 0 || cols == 0 { return Err(Error::Empty); }
         let n = rows.checked_mul(cols).ok_or(Error::Overflow)?;
+        if n > Self::MAX_SYNTHETIC_CELLS { return Err(Error::TooLarge); }
         // Fallible reservations avoid an unconditional allocator panic for a
         // non-overflowing but unreasonable synthetic map.
         let mut cells = Vec::new();
@@ -331,6 +335,7 @@ mod tests {
     fn dimensions_and_rate_inputs_are_checked() {
         assert_eq!(FaultMap::new(0, 1), Err(Error::Empty));
         assert_eq!(FaultMap::new(usize::MAX, 2), Err(Error::Overflow));
+        assert_eq!(FaultMap::new(4097, 4097), Err(Error::TooLarge));
         let mut m = FaultMap::new(2, 2).unwrap();
         assert_eq!(m.inject_independent(800, 300, 1), Err(Error::InvalidRate));
     }
