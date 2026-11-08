@@ -799,8 +799,12 @@ pub struct CfCGaussianPermutationEIGSelection {
     pub selected_candidate_index: usize,
     pub selected_probe: CfCFunctionalProbe,
     pub selected_augmented_probe_digest: String,
+    pub noise_calibration_digest: String,
+    pub noise_calibration_method: CfCProjectionNoiseCalibrationMethod,
+    pub noise_calibration_sample_count: usize,
     pub observation_std_dev: f64,
     pub quadrature_points: usize,
+    pub quadrature_tail_sigma: f64,
     pub permutation_hypothesis_count: usize,
     pub current_permutation_entropy_nats: f64,
     pub selected_expected_posterior_entropy_nats: f64,
@@ -1932,7 +1936,7 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
     layer_index: usize,
     existing_probes: &[CfCFunctionalProbe],
     candidate_probes: &[CfCFunctionalProbe],
-    observation_std_dev: f64,
+    noise_calibration: &CfCProjectionNoiseCalibration,
     quadrature_points: usize,
 ) -> Result<CfCGaussianPermutationEIGSelection, CfCPermutationAlignmentError> {
     if candidate_probes.is_empty() {
@@ -1946,13 +1950,6 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
             },
         );
     }
-    if !observation_std_dev.is_finite() || observation_std_dev <= 0.0 {
-        return Err(GaussianModelInformationGainError::InvalidObservationStdDev(
-            observation_std_dev,
-        )
-        .into());
-    }
-
     let source_fingerprint = source
         .fingerprint()
         .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
@@ -1993,6 +1990,16 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
         hidden_dim,
     );
     let projection_digest = digest_projection(&projection);
+    validate_cfc_projection_noise_calibration(
+        noise_calibration,
+        &source_fingerprint.model_digest,
+        &candidate_fingerprint.model_digest,
+        &source_fingerprint.architecture_digest,
+        &source_fingerprint.manifest_digest,
+        layer_index,
+        &projection_digest,
+    )?;
+    let observation_std_dev = noise_calibration.observation_std_dev;
     let existing_probe_digest = if existing_probes.is_empty() {
         None
     } else {
@@ -2129,8 +2136,12 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
         selected_candidate_index: selected_index,
         selected_probe: candidate_probes[selected_index].clone(),
         selected_augmented_probe_digest: augmented_probe_digests[selected_index].clone(),
+        noise_calibration_digest: noise_calibration.calibration_digest.clone(),
+        noise_calibration_method: noise_calibration.method,
+        noise_calibration_sample_count: noise_calibration.sample_count,
         observation_std_dev,
         quadrature_points,
+        quadrature_tail_sigma: 8.0,
         permutation_hypothesis_count: permutations.len(),
         current_permutation_entropy_nats: current_entropy,
         selected_expected_posterior_entropy_nats: selected_gain
