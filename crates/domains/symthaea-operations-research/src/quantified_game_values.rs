@@ -187,12 +187,10 @@ fn profile_entry_bound(variable_count: usize) -> Result<u128, GameValueProfileEr
     let one_function_family = final_layer
         .checked_sub(1)
         .ok_or(GameValueProfileError::ResourceAccountingOverflow)?;
+    // Exactly one full-history function is emitted for each quantified
+    // variable, regardless of whether it is existential or universal.
     layers
-        .checked_add(
-            one_function_family
-                .checked_mul(2)
-                .ok_or(GameValueProfileError::ResourceAccountingOverflow)?,
-        )
+        .checked_add(one_function_family)
         .ok_or(GameValueProfileError::ResourceAccountingOverflow)
 }
 
@@ -1092,7 +1090,7 @@ mod tests {
         );
         let (dag, _) = build_qbf_game_proof_dag(&problem, &prefix, dag_budget()).unwrap();
         let tight = GameValueProfileBudget {
-            max_total_truth_table_entries: 10,
+            max_total_truth_table_entries: 9,
             ..profile_budget()
         };
         assert!(matches!(
@@ -1251,6 +1249,12 @@ mod tests {
                 variable_count: 1,
             }
         );
+    }
+
+    #[test]
+    fn profile_entry_bound_counts_one_function_per_prefix_variable() {
+        // n=2: layers have 1+2+4 entries, functions have 1+2 entries.
+        assert_eq!(profile_entry_bound(2).unwrap(), 10);
     }
 
     #[test]
