@@ -167,6 +167,19 @@ pub fn replay_domain_outages(value: &Value) -> Result<PreflightReplay, String> {
 
     let mut failed_domains = BTreeSet::new();
     let mut failed_components = BTreeSet::new();
+    let mut component_ids = BTreeSet::new();
+    if let Some(components) = array_at(value, "components") {
+        for component in components {
+            let id = string_at(component, "component_id")
+                .ok_or_else(|| "component is missing component_id".to_owned())?;
+            if !component_ids.insert(id.to_owned()) {
+                return Err(format!("duplicate component id {id}"));
+            }
+        }
+    } else {
+        return Err("components must be an array".to_owned());
+    }
+
     for injection in injections {
         let mechanism = string_at(injection, "mechanism")
             .ok_or_else(|| "fault injection is missing mechanism".to_owned())?;
@@ -183,8 +196,12 @@ pub fn replay_domain_outages(value: &Value) -> Result<PreflightReplay, String> {
             .ok_or_else(|| "fault injection is missing target_id".to_owned())?;
         if domain_ids.contains(target) {
             failed_domains.insert(target.to_owned());
+        } else if component_ids.contains(target) {
+            return Err(format!(
+                "domain_outage target {target} is a component; target a fault domain instead"
+            ));
         } else {
-            failed_components.insert(target.to_owned());
+            return Err(format!("unresolved domain_outage target {target}"));
         }
     }
 
@@ -633,6 +650,13 @@ mod tests {
         assert_eq!(replay.classification, "hardware_unavailable");
         assert!(replay.failed_component_ids.iter().any(|id| id == "array-0"));
         assert!(replay.failed_component_ids.iter().any(|id| id == "verifier-0"));
+    }
+
+    #[test]
+    fn domain_outage_cannot_target_a_component_directly() {
+        let mut value = fixture_value();
+        value["fault_injections"][0]["target_id"] = Value::String("controller-0".into());
+        assert!(replay_domain_outages(&value).unwrap_err().contains("target a fault domain"));
     }
 
     #[test]
