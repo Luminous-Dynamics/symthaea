@@ -112,6 +112,7 @@ impl FormantSingingEngine {
         pronunciation: &PronunciationPlan,
         alignment: &VocalScoreAlignment,
     ) -> Result<Vec<FormantFrame>> {
+        validate_formant_language(&pronunciation.language)?;
         pronunciation
             .validate_renderable()
             .map_err(anyhow::Error::msg)?;
@@ -440,6 +441,16 @@ impl FormantSingingEngine {
         }
         Ok(aligned)
     }
+}
+
+
+fn validate_formant_language(language: &str) -> Result<()> {
+    if language != "en" {
+        bail!(
+            "FormantSingingEngine resolved-plan renderer currently supports language='en' only; got {language:?}"
+        );
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -1748,4 +1759,12 @@ mod tests {
         let error = engine.render(&performance).unwrap_err().to_string();
         assert!(error.contains("overlaps"), "{error}");
     }
+    #[test]
+    fn resolved_plan_renderer_rejects_unqualified_non_english_profiles() {
+        assert!(validate_formant_language("en").is_ok());
+        let error = validate_formant_language("xh-ZA").unwrap_err().to_string();
+        assert!(error.contains("language='en' only"), "{error}");
+    }
+
+
 }
