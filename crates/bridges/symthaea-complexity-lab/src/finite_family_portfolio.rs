@@ -1451,6 +1451,39 @@ pub struct VerifiedPolicyMaskClusterLowerBound {
     pub certificate_sha256: [u8; 32],
 }
 
+/// Resource limits for exact single-cluster action-mask branch-and-bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExactClusterPolicySearchBudget {
+    pub per_node: PolicyActionMaskBudget,
+    pub max_search_nodes: usize,
+    pub max_total_dp_multiply_adds: usize,
+    pub max_frontier_masks: usize,
+    pub max_frontier_memory_bytes: usize,
+    /// Peak estimate includes the active mask, queued masks, one masked-DP
+    /// evaluation's scratch, and the returned certificate vectors.
+    pub max_total_memory_bytes: usize,
+}
+
+/// Exact minimax-regret policy for one model cluster. Equal-regret policies
+/// resolve to the lexicographically least time-major/state-major action vector.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedClusterPolicyOptimum {
+    pub model_family_sha256: [u8; 32],
+    pub discount: CheckedRational,
+    pub cluster_model_indices: Vec<usize>,
+    pub policy_actions: Vec<usize>,
+    pub policy_index: usize,
+    pub model_optimal_values: Vec<CheckedRational>,
+    pub model_policy_values: Vec<CheckedRational>,
+    pub model_regrets: Vec<CheckedRational>,
+    pub worst_case_model_indices: Vec<usize>,
+    pub minimax_regret: CheckedRational,
+    pub search_nodes: usize,
+    pub pruned_nodes: usize,
+    pub dp_multiply_adds: usize,
+    pub certificate_sha256: [u8; 32],
+}
+
 /// Evaluate one model under a per-time/state allowed-action mask using exact
 /// finite-horizon backward dynamic programming.
 fn masked_optimal_value(
@@ -1772,6 +1805,204 @@ pub fn compute_policy_mask_cluster_lower_bound(
         dp_multiply_adds,
         certificate_sha256,
     })
+}
+
+fn policy_action_mask_structural_bytes(
+    horizon: usize,
+    states: usize,
+    actions: usize,
+) -> Result<usize, PolicyPortfolioError> {
+    let entries = horizon.checked_mul(states)
+        .and_then(|value| value.checked_mul(actions))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    entries.checked_mul(std::mem::size_of::<bool>())
+        .and_then(|value| value.checked_add(horizon.checked_mul(std::mem::size_of::<Vec<Vec<bool>>>())?))
+        .and_then(|value| value.checked_add(horizon.checked_mul(states)?.checked_mul(std::mem::size_of::<Vec<bool>>())?))
+        .and_then(|value| value.checked_add(std::mem::size_of::<FiniteUmdpPolicyActionMask>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)
+}
+
+fn full_policy_action_mask(
+    family: &FiniteUmdpModelFamily,
+    budget: PolicyActionMaskBudget,
+) -> Result<FiniteUmdpPolicyActionMask, PolicyPortfolioError> {
+    let horizon = family.horizon();
+    let states = family.state_count();
+    let actions = family.action_count();
+    let entries = horizon.checked_mul(states)
+        .and_then(|value| value.checked_mul(actions))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if entries > budget.max_mask_entries {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "action-mask entries",
+            required: entries,
+            limit: budget.max_mask_entries,
+        });
+    }
+    let bytes = policy_action_mask_structural_bytes(horizon, states, actions)?;
+    if bytes > budget.max_output_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "full action-mask bytes",
+            required: bytes,
+            limit: budget.max_output_memory_bytes,
+        });
+    }
+
+    let mut layers = Vec::new();
+    layers.try_reserve_exact(horizon).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "full action-mask layers",
+            entries: horizon,
+        }
+    })?;
+    for _ in 0..horizon {
+        let mut layer = Vec::new();
+        layer.try_reserve_exact(states).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "full action-mask state rows",
+                entries: states,
+            }
+        })?;
+        for _ in 0..states {
+            let mut row = Vec::new();
+            row.try_reserve_exact(actions).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed {
+                    resource: "full action-mask action entries",
+                    entries: actions,
+                }
+            })?;
+            row.resize(actions, true);
+            layer.push(row);
+        }
+        layers.push(layer);
+    }
+    FiniteUmdpPolicyActionMask::new(family, layers)
+}
+
+fn policy_mask_is_leaf(mask: &FiniteUmdpPolicyActionMask) -> bool {
+    (0..mask.horizon()).all(|time| {
+        (0..mask.state_count()).all(|state| {
+            mask.allowed[time][state].iter().filter(|allowed| **allowed).count() == 1
+        })
+    })
+}
+
+fn decode_leaf_policy_mask(
+    mask: &FiniteUmdpPolicyActionMask,
+) -> Result<Vec<usize>, PolicyPortfolioError> {
+    let entries = mask.horizon().checked_mul(mask.state_count())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let mut actions = Vec::new();
+    actions.try_reserve_exact(entries).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "leaf action-mask policy",
+            entries,
+        }
+    })?;
+    for time in 0..mask.horizon() {
+        for state in 0..mask.state_count() {
+            let row = &mask.allowed[time][state];
+            let action = row.iter().position(|allowed| *allowed)
+                .ok_or(PolicyPortfolioError::PolicyMaskEmptyActionSet { time, state })?;
+            actions.push(action);
+        }
+    }
+    Ok(actions)
+}
+
+fn policy_index_from_actions(
+    actions: &[usize],
+    action_count: usize,
+) -> Result<usize, PolicyPortfolioError> {
+    let mut index = 0usize;
+    for &action in actions {
+        if action >= action_count {
+            return Err(PolicyPortfolioError::DimensionOverflow);
+        }
+        index = index.checked_mul(action_count)
+            .and_then(|value| value.checked_add(action))
+            .ok_or(PolicyPortfolioError::PolicySpaceOverflow)?;
+    }
+    Ok(index)
+}
+
+fn evaluate_cluster_policy(
+    family: &FiniteUmdpModelFamily,
+    cluster_model_indices: &[usize],
+    discount: CheckedRational,
+    policy_actions: &[usize],
+    model_optimal_values: &[CheckedRational],
+    max_rational_bit_width: usize,
+) -> Result<(Vec<CheckedRational>, Vec<CheckedRational>, Vec<usize>, CheckedRational), PolicyPortfolioError> {
+    let mut values = Vec::new();
+    values.try_reserve_exact(cluster_model_indices.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "cluster incumbent policy values",
+            entries: cluster_model_indices.len(),
+        }
+    })?;
+    let mut regrets = Vec::new();
+    regrets.try_reserve_exact(cluster_model_indices.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "cluster incumbent model regrets",
+            entries: cluster_model_indices.len(),
+        }
+    })?;
+    let mut worst_models = Vec::new();
+    worst_models.try_reserve_exact(cluster_model_indices.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "cluster incumbent worst-model indices",
+            entries: cluster_model_indices.len(),
+        }
+    })?;
+
+    let states = family.state_count();
+    let mut worst_regret = CheckedRational::zero();
+    for (position, &model_index) in cluster_model_indices.iter().enumerate() {
+        let mut current = Vec::new();
+        current.try_reserve_exact(states).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "cluster incumbent DP current vector",
+                entries: states,
+            }
+        })?;
+        current.resize(states, CheckedRational::zero());
+        let mut next = Vec::new();
+        next.try_reserve_exact(states).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "cluster incumbent DP next vector",
+                entries: states,
+            }
+        })?;
+        next.resize(states, CheckedRational::zero());
+
+        let value = evaluate_policy(
+            &family.models[model_index],
+            discount,
+            policy_actions,
+            &mut current,
+            &mut next,
+            max_rational_bit_width,
+        )?;
+        let regret = sub_bounded(
+            model_optimal_values[position],
+            value,
+            max_rational_bit_width,
+        )?;
+        if regret.is_negative() {
+            return Err(PolicyPortfolioError::NegativeRegret { model: model_index });
+        }
+        if compare_signed(regret, worst_regret) == Ordering::Greater {
+            worst_regret = regret;
+            worst_models.clear();
+            worst_models.push(model_index);
+        } else if regret == worst_regret {
+            worst_models.push(model_index);
+        }
+        values.push(value);
+        regrets.push(regret);
+    }
+    Ok((values, regrets, worst_models, worst_regret))
 }
 
 fn canonical_policy_mask_bound_sha256(
