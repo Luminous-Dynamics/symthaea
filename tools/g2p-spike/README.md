@@ -35,6 +35,22 @@ Piper Plus G2P 0.5.3 is a Rust crate released 26 October 2026. Its project docum
 
 That is a useful implementation candidate, not evidence of pronunciation quality. The English backend is still a finite rule/dictionary system and may mishandle accents, heteronyms, OOV names, contractions, and contextual pronunciations. Its output must be measured, never assumed correct.
 
+
+## Output normalization boundary
+
+Piper Plus 0.5.3's English implementation emits each IPA Unicode character as an individual token. It emits primary/secondary stress markers as separate tokens and a parallel `ProsodyInfo` vector. For English, A2 encodes stress (0 none, 1 secondary, 2 primary); A3 carries a word-level count. The isolated adapter in `src/normalize.rs` reconstructs word-level raw IPA and preserves stress-marker offsets and A1/A2/A3 evidence.
+
+It deliberately does **not**:
+- claim that each character token is one phoneme;
+- merge affricates, diphthongs or combining diacritics into canonical phone units;
+- infer syllable boundaries from stress alone;
+- resolve contextual heteronyms such as *read* or *lead*;
+- infer OOV status from whether a G2P hypothesis was returned.
+
+Every normalized word is marked `needs_review`, with `syllable_boundaries: null` and `oov_status: not_assessed`. A later language-specific canonicalizer must use a reviewed phone inventory and independently supported syllabification before constructing a renderable `PronunciationPlan`.
+
+This boundary is important: it is better to preserve a raw, inspectable pronunciation hypothesis than to convert a string of characters into apparently authoritative phone and syllable structure.
+
 ## Evaluation protocol
 
 For each text case, compare:
