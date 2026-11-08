@@ -143,3 +143,26 @@ Primary HME differentiators to measure:
 - rights-filtered and temporal-query payload reads (excluded rows must remain unread).
 
 The initial project target remains at least 50% cold-payload bytes avoided on one named HDC workload after total fast-tier overhead, with 100% canonical top-k agreement and zero false pruning. It is a target, not a result or industry standard.
+
+
+## 9. Current source extension: residual verification and joint group bounds
+
+The source has progressed beyond the coordinate-box reference described in the original sections above. The following APIs now exist in crates/core/symthaea-core/src/hdc/continuous_hv_interval.rs:
+
+- verify_l2_residual_certificate(original, reconstruction, epsilon) checks the actual original/reconstruction payload pair with outward f64 accumulation and rejects under-reported bounds. Its returned structure is an admission check, not a signed or persistent proof receipt.
+- similarity_interval_full_resolution_for_l2_ball_center(center, radius) retains the joint L2 residual constraint. It bounds the real dot product using Cauchy–Schwarz, the candidate norm using the reverse triangle inequality, and then adds a conservative f32 reduction-error envelope for the canonical scorer.
+- similarity_interval_full_resolution_for_component_bounds(lower, upper) propagates exact group-eight/tail f32 score intervals through caller-supplied coordinate bounds. It validates numeric shape, not group membership or synopsis provenance.
+- similarity_interval_full_resolution_for_l2_residual(reconstruction, radius) remains the simpler per-coordinate box relaxation for one reconstructed candidate.
+
+The in-memory group builder is at crates/domains/symthaea-memory/src/hme/group_envelope.rs. It scans original members, derives extrema and a deterministic f32 centroid, verifies every member's centroid residual, binds member IDs/payload bits/generations into content digests, then intersects the component-box and joint-ball score intervals. Only a strict group upper bound below the exact kth threshold is eligible for pruning. Persistent segment headers, reopen validation and binding to authoritative eligibility remain with #10917; this in-memory type is not an ExactComplete receipt.
+
+The joint-ball routine uses an operation-count error envelope. Its assumptions and target-specific qualification remain explicit: round-to-nearest binary32 operations, gradual underflow, and no transformations that change the canonical reduction sequence. The code does not establish that every target/compiler/runtime is configured this way. Cross-platform qualification must inspect the actual compiler flags and emitted instructions for the canonical scorer, test supported CPUs (including x86_64 and aarch64), and fail closed where assumptions cannot be established.
+
+## 10. New high-dimensional differential tests authored on 2026-11-08
+
+Two additional Rust tests were added:
+
+- l2_ball_interval_contains_high_dimensional_adversarial_payloads tests dimensions 8, 9, 257 and 16,384 with aligned, anti-aligned, sparse and small-magnitude query profiles. Each generated original payload is first checked against its residual certificate, then its canonical full-resolution score must be enclosed by the joint-ball interval.
+- high_dimensional_group_envelope_contains_every_original_score constructs a four-member 16,384D group, builds both synopsis types, intersects their intervals and checks every original member score remains enclosed.
+
+These tests complement, but do not replace, property-based generation of arbitrary residual directions, near-threshold/small-norm adversaries, compiler-target qualification and persisted-segment corruption/reopen tests. They have been authored but NOT executed. No Rust formatting, compilation, test, benchmark or CI pass is claimed.
