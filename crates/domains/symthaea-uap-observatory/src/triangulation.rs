@@ -1144,6 +1144,109 @@ mod tests {
         }
     }
 
+    fn wrap_angle_difference(value: f64) -> f64 {
+        (value + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI)
+            - std::f64::consts::PI
+    }
+
+    #[test]
+    fn bearing_position_clock_jacobian_matches_central_finite_differences() {
+        let candidate = SensorPlacementCandidate {
+            sensor_id: "moving-bearing-sensor".to_string(),
+            origin_ecef_m: Vector3::new(100.0, -20.0, 5.0),
+            sensor_to_ecef: Quaternion {
+                w: 0.98_f64.cos(),
+                x: 0.0,
+                y: 0.0,
+                z: 0.98_f64.sin(),
+            },
+            sigma_azimuth_rad: 0.002,
+            sigma_elevation_rad: 0.004,
+        };
+        let target = Vector3::new(140.0, 80.0, 70.0);
+        let relative_velocity = Vector3::new(12.0, -4.0, 1.5);
+        let analytic =
+            bearing_position_clock_jacobian(&candidate, target, relative_velocity).unwrap();
+
+        let angles = |position: Vector3| {
+            let displacement = candidate
+                .sensor_to_ecef
+                .inverse_rotate_vector(position.subtract(candidate.origin_ecef_m))
+                .unwrap();
+            let horizontal = displacement.x.hypot(displacement.y);
+            (
+                displacement.y.atan2(displacement.x),
+                displacement.z.atan2(horizontal),
+            )
+        };
+        let epsilon_position = 1.0e-4;
+        for column in 0..3 {
+            let mut plus = target;
+            let mut minus = target;
+            match column {
+                0 => {
+                    plus.x += epsilon_position;
+                    minus.x -= epsilon_position;
+                }
+                1 => {
+                    plus.y += epsilon_position;
+                    minus.y -= epsilon_position;
+                }
+                _ => {
+                    plus.z += epsilon_position;
+                    minus.z -= epsilon_position;
+                }
+            }
+            let (az_plus, el_plus) = angles(plus);
+            let (az_minus, el_minus) = angles(minus);
+            let numeric_az = wrap_angle_difference(az_plus - az_minus)
+                / (2.0 * epsilon_position * candidate.sigma_azimuth_rad);
+            let numeric_el = (el_plus - el_minus)
+                / (2.0 * epsilon_position * candidate.sigma_elevation_rad);
+            assert!(
+                (analytic.azimuth_row[column] - numeric_az).abs() < 1.0e-6,
+                "azimuth column={column}, analytic={}, numeric={numeric_az}",
+                analytic.azimuth_row[column]
+            );
+            assert!(
+                (analytic.elevation_row[column] - numeric_el).abs() < 1.0e-6,
+                "elevation column={column}, analytic={}, numeric={numeric_el}",
+                analytic.elevation_row[column]
+            );
+        }
+
+        let epsilon_time = 1.0e-4;
+        let plus = target.add(relative_velocity.scale(epsilon_time));
+        let minus = target.subtract(relative_velocity.scale(epsilon_time));
+        let (az_plus, el_plus) = angles(plus);
+        let (az_minus, el_minus) = angles(minus);
+        let numeric_az_time = wrap_angle_difference(az_plus - az_minus)
+            / (2.0 * epsilon_time * candidate.sigma_azimuth_rad);
+        let numeric_el_time = (el_plus - el_minus)
+            / (2.0 * epsilon_time * candidate.sigma_elevation_rad);
+        assert!((analytic.azimuth_row[3] - numeric_az_time).abs() < 1.0e-6);
+        assert!((analytic.elevation_row[3] - numeric_el_time).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn bearing_position_clock_jacobian_rejects_vertical_azimuth_singularity() {
+        let candidate = SensorPlacementCandidate {
+            sensor_id: "vertical-sensor".to_string(),
+            origin_ecef_m: Vector3::ZERO,
+            sensor_to_ecef: Quaternion::IDENTITY,
+            sigma_azimuth_rad: 0.01,
+            sigma_elevation_rad: 0.01,
+        };
+        assert_eq!(
+            bearing_position_clock_jacobian(
+                &candidate,
+                Vector3::new(0.0, 0.0, 100.0),
+                Vector3::ZERO
+            ),
+            Err(TriangulationError::AzimuthSingularity)
+        );
+    }
+
     #[test]
     fn three_sensor_bearing_triangulation_recovers_known_ecef_target() {
         let target = Vector3::new(50.0, 40.0, 200.0);
