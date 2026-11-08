@@ -3,7 +3,7 @@
 **Status:** Public research design and preregistration template. No candidate evaluation, task admission, sealed holdout or model-performance result is claimed.  
 **Program owner:** Existing CEB-REVIEW / CEB-HUMAN / causal-diagnosis work; [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723), [#10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419), [#10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367).  
 **Primary CEB contract:** 14 measurement lanes / 56 primary metrics. CEB-REVIEW remains exactly three primary measures: `defect_recall_at_5`, `actionable_precision`, `reviewer_burden`.  
-**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), and [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md).
+**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md), and [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) with its [six-case public development challenge](CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md), plus [causal-identifiability protocol](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md) and its [six-case public development challenge](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md). The [preservation-aware repair-verification protocol](CEB_REVIEW_PRESERVATION_AWARE_REPAIR_VERIFICATION_PROTOCOL_V0_2026-11-08.md) adds a paired target/preservation witness requirement and six public synthetic cases.
 
 ## 1. Research question
 
@@ -332,6 +332,52 @@ Use [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHO
 - Score each output using its existing lane-specific CEB measures; do not construct a composite score from review recall, repair resolution, repository discovery and clarification quality.
 
 This adds no metric, task schema, receipt or execution permission and does not change the existing Phase A/B/C preregistered primary hypotheses.
+
+## 12.5 Causal-topology extension
+
+Use [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) and its six-case public development challenge to test whether reviewers can reconstruct alternative sufficient paths, conjunctive conditions, temporal ordering, multi-factor interactions and residual routes after repair. This is a source-only development ablation between the existing five-link diagnosis and a typed causal-topology representation; it does not change the existing Phase A/B/C primary hypotheses, add a metric lane, or authorize execution. The six challenge anchors and 36 P/I/F/N/M/IRR variants are public and are not independent task samples or sealed holdouts. Use the [dual-annotator calibration pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md) for independent first-pass labels and disagreement adjudication.
+
+## 12.6 Causal-identifiability extension
+
+Use [CEB Review Causal-Identifiability Protocol V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md) and its six-case public development challenge to test whether reviewers distinguish identified, partially identified, non-identifiable, contradicted and unresolved causal claims. Require material evidence-compatible alternatives, a disagreement witness, and a minimum safe evidence request that actually separates those alternatives.
+
+Compose an exploratory I0/I1/I2 development contrast: I0 unstructured diagnosis; I1 causal topology; I2 topology plus identifiability, claim ceilings and discriminating evidence requests. This does not add or replace a confirmatory Phase A/B/C arm, primary metric, task schema, receipt, oracle authority, scheduler or execution permission. The six public anchors are development cases, not an independent statistical sample or sealed holdout. Use the dual-annotator addendum to preserve each first-pass compatible-model set, disposition and evidence request.
+
+
+## 12.7 Preservation-aware repair verification extension
+
+Use [CEB Review Preservation-Aware Repair Verification Protocol V0](CEB_REVIEW_PRESERVATION_AWARE_REPAIR_VERIFICATION_PROTOCOL_V0_2026-11-08.md) and its six-case public development challenge to distinguish target-defect evidence from evidence that a proposed correction preserves valid neighboring behavior.
+
+This is an exploratory P0/P1/P2 development contrast: P0 verdict only; P1 verdict plus rationale and proposed patch; P2 verdict plus target witness, preservation witness and independently grounded target/preservation oracle plans. It adds no confirmatory Phase A/B/C arm, no primary metric, task schema, receipt, oracle authority or execution permission. The six paired examples are public development anchors, not independent statistical samples or sealed holdout tasks.
+
+Use the dual-annotator addendum to lock canonical/mutant verdicts, both witnesses, oracle independence and claim ceilings separately. If the contract is ambiguous or the preservation boundary is not qualified, the repair remains unverified even when a target failure is plausible. Candidate-controlled executable validation remains gated by #10064 and independent pristine regrade by #10369.
+
+
+## 12.8 Risk-controlled selective claim acceptance
+
+Use [CEB Review Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md) as an exploratory design for acceptance, evidence routing, human escalation and abstention. It distinguishes false-discovery risk among accepted claims from false-positive rate among false claims, and requires disjoint development, calibration and confirmatory data roles.
+
+The protocol's four development policy arms (S0 accept-all, S1 verbal-confidence threshold, S2 disagreement/evidence route, S3 calibrated selective policy) compose with the existing sequential evidence policy and human escalation. They add no scheduler, primary metric, task schema, receipt or oracle authority. Report risk/coverage with absolute counts, one-sided bounds, claim-kind/severity strata, and the exchangeability/cluster assumptions. Where calibration is inadequate, automatic acceptance remains uncertified and claims are escalated.
+
+This is a design proposal, not a current CEB risk guarantee or a registered confirmatory Phase A/B/C hypothesis. It is complemented by the [Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), an extension to #10630 that makes each claim's evidence, assumptions, authority, environment and evaluator dependencies explicit. It introduces no second evidence ledger or repository graph. The example sample sizes (59 for a 5% bound and 299 for a 1% bound with zero errors at one-sided 95% confidence) are planning illustrations under independent/exchangeable Bernoulli assumptions; do not apply them to correlated prompt variants or clustered defects without a valid analysis.
+
+
+## 12.9 Claim-support closure extension to CEB-CONTINUITY
+
+Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its [eight-case public challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and [separate public key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) as an evaluation extension to existing CEB-CONTINUITY-001 (#10630). Do not create another continuity lane, evidence graph, receipt or task schema.
+
+The extension asks whether every consequential claim has a complete enough support closure to justify selective retain/revalidate/invalidate/supersede/unresolved decisions after a change event. It requires an impact witness for affected claims and an unaffectedness witness for retained claims, with the open-world remainder explicit. The static validator checks only document structure; it does not implement a repository graph or prove real claim invalidation.
+
+The eight public cases compose source edits, shared dependencies, feature/build transitions, verifier-only changes, authority-root revocation, incomplete closure under metadata-only change, circular claim support and omitted contradictory evidence. They remain public development cases, not admitted sequences or sealed holdout tasks. Any C0/C1/C2 comparisons are exploratory and must reuse #10630's evaluation unit and existing CEB-CONTINUITY primary metrics registered under #10632. Compare C0 path-overlap, C1 the existing continuity process, and C2 support-closure-aware impact analysis against a sampled clean full-recomputation oracle. Charge full closure construction, evidence ingestion, update cost and peak memory; do not report marginal update time alone. C2 should reduce stale retention without increasing false invalidation, preserve sequence-complete rate and the existing ≥20% revalidation-cost aspiration versus reset-and-recheck. The latter target is not a new metric and must be evaluated under #10630's paired, cluster-aware design.
+
+
+## 12.9 Claim-support closure and selective invalidation
+
+Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its six-case [development challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and separate [public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) as an extension of CEB-CONTINUITY-001 (#10630).
+
+The extension asks reviewers to make selective invalidation auditable by recording a typed claim-support closure and, for each event, an impact witness or unaffectedness witness. The existing #10630 dispositions and #10610 rerun/regrade/reuse rules remain authoritative. It adds no CEB metric, task schema, receipt, DSSE envelope, repository graph or generic dependency engine.
+
+Compare C0 path heuristic, C1 the existing continuity baseline and C2 support-closure reasoning on identical public development sequences. This is exploratory; the six public cases are not independent statistical samples or sealed holdout material. Missing closure dependencies must not be converted into retain. No executable repository graph evaluation is authorized by this addition; #10064 and #10369 gates remain unchanged.
 
 ## 13. Claim boundary
 

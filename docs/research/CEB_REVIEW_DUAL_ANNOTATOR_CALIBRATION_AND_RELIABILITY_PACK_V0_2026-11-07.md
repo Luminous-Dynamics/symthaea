@@ -72,11 +72,12 @@ Each reviewer annotates all assigned variants separately. For every variant:
 1. classify the source state or select unresolved;
 2. decide whether the target mechanism is live, absent or indeterminate;
 3. assess each causal link independently;
-4. distinguish the target from the nearest alternative mechanism;
-5. assess the candidate's counterfactual prediction, where one is supplied;
-6. identify evidence authority and freshness;
-7. assign a disposition, confidence and elapsed annotation time;
-8. cite the smallest source/evidence anchors that support the decision.
+4. for CTG cases, add the topology worksheet in Section 6.1: typed nodes/edges, AND/OR gates, temporal constraints, sufficient paths and residual-path predictions;
+5. distinguish the target from the nearest alternative mechanism;
+6. assess the candidate's counterfactual prediction, where one is supplied;
+7. identify evidence authority and freshness;
+8. assign a disposition, confidence and elapsed annotation time;
+9. cite the smallest source/evidence anchors that support the decision.
 
 Reviewers must record uncertainty rather than infer missing evidence. A reviewer may use the existing evidence classes only: source_declared, syntax_derived, compiler_resolved, runtime_observed, intervention_observed, and inferred/unresolved. The first-pass exercise is source-only; it cannot create runtime or intervention observations.
 
@@ -181,6 +182,156 @@ Create one row per anonymous variant, per reviewer. Use the following columns wi
 | blinding_deviation | none / possible / confirmed, with explanation |
 
 The coordinator-only mapping is not part of the reviewer-facing export. Retain missing values as missing; do not silently convert them to a negative label.
+
+
+### 6.1 Causal-topology addendum (CTG cases only)
+
+Use this addendum only for the six cases in [Causal-Topology Development Challenge V0](CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md). It extends the annotation of the mechanism; it does not create a new task schema, receipt, evaluator or primary metric.
+
+| Field | Reviewer 1 / Reviewer 2 entry |
+|---|---|
+| Target outcome and frozen invariant | |
+| Node inventory (ID, kind, semantic statement, source anchor) | |
+| Edge inventory (from, to, type, condition, source anchor, authority class) | |
+| AND gates and jointly required conditions | |
+| OR gates and alternative sufficient paths | |
+| Temporal partial order / concurrency / unknown ordering | |
+| Minimal sufficient path or condition sets | |
+| Nearest alternative mechanism | |
+| Qualified intervention set(s) | |
+| Residual target paths after each intervention | |
+| Declared context boundary and unobserved remainder | |
+| Topology disposition | correct / wrong / incomplete / unresolved |
+| Main topology disagreement cause | missing path / wrong gate / wrong order / unsupported edge / residual path / scope / other |
+
+Do not require the same node names or an identical drawing. Reviewers must identify semantic equivalence, not reproduce a canonical diagram. A call-graph or shared-file edge is not causal evidence by itself. If the source package does not bound all relevant callers/configurations, mark the open-world remainder unknown.
+
+For CTG calibration, compare first-pass graphs before either reviewer sees the other or the key. Preserve the independent graphs and edge-level rationale; never replace them with a consensus graph. The third adjudicator records the accepted semantic path/gate set and the evidence that resolves each disagreement.
+
+
+### 6.2 Causal-identifiability addendum (CID cases only)
+
+Use this addendum for the six cases in [Causal-Identifiability Development Challenge V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md). Each reviewer must lock their own compatible-model set and disposition before viewing the other reviewer's work or the public key.
+
+| Field | Reviewer response |
+|---|---|
+| Exact claim/query | |
+| Claim kind | source possibility / build selection / execution realization / actual-cause attribution / interventional-effect identifiability / incident attribution |
+| Evidence and authority class | |
+| Explicit assumptions / scope boundary | |
+| Candidate model | |
+| Material evidence-compatible alternatives | |
+| Disagreement witness (query/intervention) | |
+| Each model's predicted outcome | |
+| Claim disposition | identified / partially_identified / non_identifiable / contradicted / unresolved |
+| Minimum discriminating evidence request | |
+| Evidence-request authority/safety/cost | |
+| Current claim ceiling | |
+| Unresolved remainder | |
+
+The canonical disposition token is `non_identifiable`; “non-identifiable” is its prose spelling and must remain distinct from `unresolved`.
+
+Adjudicate two questions separately: (1) are the candidate's alternative models genuinely compatible with the supplied evidence, and (2) does the requested evidence actually distinguish at least one material pair? “Ask for more tests” is not a valid evidence request unless the alternatives predict different outcomes for those tests. Do not use reviewer confidence as a substitute for identifiability.
+
+The third adjudicator preserves both first-pass model sets and dispositions, records the disagreement witness and accepted claim ceiling, and explains why the proposed evidence request is or is not discriminating. Do not overwrite first-pass labels with a consensus graph/model.
+
+
+
+### 6.3 Preservation-aware repair worksheet (PAR cases only)
+
+For the six paired variants in the [Preservation-Aware Repair Verification Challenge V0](CEB_REVIEW_PRESERVATION_AWARE_REPAIR_VERIFICATION_CHALLENGE_V0_2026-11-08.md), each reviewer independently records the canonical and mutant verdicts before viewing the public answer key.
+
+| Field | Reviewer response |
+|---|---|
+| Case ID | |
+| Frozen requirement and authority | |
+| Canonical verdict | conforms / violates / under-specified / unresolved |
+| Mutant verdict | conforms / violates / under-specified / unresolved |
+| Target witness | |
+| Nearest preservation witness | |
+| Minimal target oracle plan | |
+| Minimal preservation oracle plan | |
+| Proposed patch / no-patch rationale | |
+| Oracle independence and scope | |
+| Other invariants at risk | |
+| Claim kind and claim ceiling | |
+| Unresolved oracle coverage | |
+
+Adjudicate the two verdicts separately. A correct rejection of the mutant does not compensate for a false rejection of the canonical variant. Record whether each proposed test is independently derived from the frozen requirement, whether the target/preservation pair actually discriminates the variants, and which valid behavior the patch could damage.
+
+The model's proposed patch is not its own oracle. No candidate code, build or test is run by this annotation worksheet. Preserve each first-pass form and disagreements; do not overwrite them with a consensus patch.
+
+
+### 6.4 Selective-risk adjudication worksheet
+
+For any development study of the [Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md), reviewers independently adjudicate accepted claims before the policy threshold is certified.
+
+| Field | Reviewer response |
+|---|---|
+| Claim ID / source revision | |
+| Claim kind and severity | |
+| Evidence authority and scope | |
+| Adjudicated truth | true / false / unresolved |
+| Accepted by frozen policy? | yes / no / routed / escalated |
+| Target and preservation witness status | |
+| Material alternative model(s) | |
+| Reviewer disagreement | |
+| Repository/defect-family cluster | |
+| Human adjudication minutes | |
+| Reason for unresolved / escalation | |
+
+Keep the threshold-selection set separate from the risk-certification set. Do not tune the threshold after observing the certification labels. Repeated prompts or model retries on one defect are not independent calibration units. If the error/coverage profile differs materially by claim kind or severity, record separate strata and do not pool away a risky group.
+
+The two reviewers adjudicate claim truth and evidence authority; they do not certify the policy's statistical guarantee. The statistical owner verifies calibration splits, multiplicity, cluster assumptions and the one-sided risk bound before any policy claim is published.
+
+
+### 6.5 Claim-support closure worksheet (CCL cases only)
+
+Use the eight public [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) cases to independently annotate each claim's dependency closure and event impact before viewing the public key.
+
+| Field | Reviewer response |
+|---|---|
+| Case / claim ID | |
+| Claim proposition, kind, time and decision-use scope | |
+| Terminal evidence nodes and exact identities | |
+| Source/caller/contract dependencies | |
+| Assumptions and open-world remainder | |
+| Environment/build/dependency nodes | |
+| Policy/authority root | |
+| Evaluator/oracle/method identity | |
+| Typed dependency paths | |
+| Closure completeness argument | |
+| Event and changed node(s) | |
+| Impact witness or unaffectedness witness | |
+| #10630 disposition | retain / revalidate / invalidate / supersede / unresolved |
+| #10610 treatment | rerun / regrade / reuse / assurance re-evaluation / not applicable |
+| Independent adjudication / disagreement | |
+
+Adjudicate closure completeness separately from event-impact correctness. A reviewer can identify the correct changed dependency but still miss another dependency needed by the claim. A retain answer without an unaffectedness witness is incomplete. Keep historical truth separate from current decision-use admissibility and preserve unresolved closure gaps.
+
+
+### 6.5 Claim-support closure worksheet (CCL cases only)
+
+For each public case in the [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md), reviewers independently lock one worksheet per claim/event pair.
+
+| Field | Reviewer response |
+|---|---|
+| Case / claim ID | |
+| Claim proposition and decision-use scope | |
+| Claim kind | source possibility / build selection / execution realization / actual cause / interventional effect / incident attribution |
+| Support-closure nodes | source / evidence / assumption / contract-policy / environment / authority / evaluator-method / upstream claim |
+| Typed dependency edges | supports / derived_from / assumes / scoped_by / authorized_by / measured_under / produced_under / contradicts |
+| Closure-completeness argument | |
+| Open-world remainder | |
+| Change event and changed nodes | |
+| Impact witness | |
+| Unaffectedness witness | |
+| #10630 disposition | retain / revalidate / invalidate / supersede / unresolved |
+| #10610 treatment | rerun / regrade / reuse / assurance re-evaluation / not applicable |
+| Historical truth versus current decision-use status | |
+| Claim ceiling | |
+
+Adjudicate closure completeness independently of the proposed disposition. A claim with an incomplete closure cannot be retained merely because no impact edge was found. Keep reviewer disagreement about hidden dependencies visible and preserve the unresolved disposition until an independent adjudicator closes the scope gap.
 
 ## 7. Agreement analysis and interpretation
 

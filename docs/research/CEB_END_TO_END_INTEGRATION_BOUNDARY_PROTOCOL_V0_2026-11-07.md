@@ -195,7 +195,7 @@ Map evidence to existing registered CEB metrics:
 - CEB-HUMAN: correct escalation, handoff and human review cost;
 - existing cost/resource measures: full model/tool/runner/test/human cost.
 
-The boundary level is a scope descriptor. It does not become an independent score. Never compute a weighted "E2E pass" by averaging local and operational checks; report exact boundary, required checks, denominator and terminal disposition.
+The boundary level is a scope descriptor. It does not become an independent score. No receipt format, receipt authority or receipt lifecycle is introduced by this protocol. Never compute a weighted "E2E pass" by averaging local and operational checks; report exact boundary, required checks, denominator and terminal disposition.
 
 ## 8. Statistical and resource controls
 

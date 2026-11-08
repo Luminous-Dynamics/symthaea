@@ -37,6 +37,8 @@ The benchmark's scoring pipeline uses a Claude Sonnet 5 classifier to label cand
 
 **CEB use:** adopt the *principle* of multi-source candidate discovery, semantic deduplication, common rubric and independent expert audit. Keep a strict known-gold comparison and a separate discovery channel for valid findings absent from the original gold set. Do not automatically add unmatched model findings to gold truth. Version the rubric, matcher, judge, dataset and expert-audit scope.
 
+**Second live capture — November 7, 2026, 20:14 SAST:** a later retrieval of the same high-severity grounded-F1 view showed 16 rows and listed intent-review-agent at **82.2 F1 / 92.0 precision / 74.4 recall** (October 20 run) as the top row. The earlier 83.0 OhMyBug entry above is retained as the earlier same-day snapshot, not silently overwritten. For comparisons made after this capture, use the live board's contemporaneous ranking and record the exact filter, capture time, dataset/judge/matcher version and model run date. A mutable leaderboard row is not a permanent SOTA constant. [Live leaderboard capture](https://review-bench.ai/).
+
 ### 2.2 SecPRBench — correct causal diagnosis matters more than pointing at the right file
 
 The October 24, 2026 preprint introduces **265 real-world vulnerability-review tasks** from nine widely deployed systems projects, including Firefox, V8 and OpenSSL, in C, C++ and Rust. For each task the paper validates the pre-introduction tree, introducing tree and repaired tree; it replays the same PoC/invocation and requires the target failure to be absent, present and absent respectively. Of 265 cases, 217 pass mechanical checks; 48 require human adjudication of source and execution evidence. [Y. Yang et al., SecPRBench (arXiv:2610.33509)](https://arxiv.org/abs/2610.33509).
@@ -107,6 +109,61 @@ Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Appro
 
 The [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) defines the six framing conditions, source/defect anchors, leakage controls and paired analysis. It is a design proposal, not a task set or performance result.
 
+### 2.11 Causal software root-cause analysis — SDRCA and UniVal
+
+Causal fault-localization work is a necessary adjacent comparator: CEB should not present causal graphs and interventions as if no software-engineering literature had explored them.
+
+**SDRCA (Journal of Systems and Software, October 2026)** is a runtime defect root-cause framework. Its reported method combines information-theoretic anomaly scoring across heterogeneous monitoring signals, causal graphs, in-distribution counterfactual interventions and Shapley-style allocation of multiple-variable contributions. It is evaluated on PetShop, RE1 and RE3 and reports Recall@1 / Recall@3 improvements over correlation and causal baselines. Its domain is runtime anomaly localization with monitored signals, not source-only pre-merge review. A Shapley value allocates modeled contribution under a specified coalition game; it does not, by itself, prove causal identification or replace intervention validity. [Sun et al., SDRCA](https://doi.org/10.1016/j.jss.2026.112931).
+
+**UniVal (ICSE 2021 Distinguished Paper)** combines predicate outcomes and variable-value profiles in a causal statistical fault-localization method intended to reduce confounding in spectrum-based localization. The paper reports evaluation over 835 Defects4J program versions containing real faults. It is an execution-profile fault-localization comparator, not an agentic PR-review benchmark and not a source-counterfactual diagnosis evaluation. [Paper](https://arxiv.org/abs/2102.06292) · [ICSE distinguished paper record](https://2021.icse-conferences.org/details/icse-2021-papers/72/Improving-Fault-Localization-by-Integrating-Valueand-Predicate-Based-Causal-Inference-Techniques).
+
+**CEB implication:** evaluate source-level mechanism diagnosis separately from runtime root-cause localization. The new [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) tests AND/OR path structure, partial temporal order, interaction conditions and residual paths. Compare with SDRCA/UniVal only on an explicitly matched runtime evidence slice if their data and intervention contracts permit it; never compare their Recall@1/3 directly to CEB Recall@5.
+
+### 2.13 Causality-Based Fault Localization / SoftReX — actual causality under execution
+
+Navaratnarajah et al.'s **Causality-Based Fault Localization** preprint (October 31, 2026; tool: SoftReX) frames fault localization using actual-causality / causal-responsibility semantics rather than only suspiciousness correlations. It models code elements as variables and mutations as interventions, and explicitly discusses overdetermination, pre-emption and masked faults. On Defects4J, its main comparison evaluates 827 bugs across 17 Java projects after excluding 27 OOM/timeout cases. It reports 103 Top-1 and 301 Top-10 localizations, with MRR 0.349, versus BLMu's 89 Top-1, 270 Top-10 and MRR 0.301. Its guided search reports about 2.6× fewer mutants than Major in its matched subset while retaining competitive localization accuracy. [Paper](https://arxiv.org/abs/2611.01292).
+
+**Scope and limitations:** this is execution-grounded fault localization on Java test suites and mutant sets. It does not evaluate source-only PR comments, human-actionability, repository-context ambiguity or reviewer burden. The paper's main experimental result depends on the supplied test suite and mutation semantics; its structural model does not yet integrate runtime data-flow/value state in the same way as a complete dynamic causal model. The Defects4J exclusions, task split, mutant budget and ranking metrics must remain attached to every result.
+
+**CEB implication:** use SoftReX as the closest current actual-causality localization method, and include its problem classes—overdetermination, pre-emption and masking—in the synthetic diagnosis corpus. Do not equate its Top-1/Top-10 localization counts with CEB defect Recall@5. CEB's identifiability work asks the additional question: when does the available evidence distinguish the candidate causal models at all?
+
+### 2.14 CausalRepair — minimal causal context through dual slicing
+
+Wu et al.'s **CausalRepair** (PACMSE / ISSTA 2026) combines test-semantic static slicing with runtime trace-based dynamic slicing to construct a compact causal context for automated repair. The paper reports 313 correct fixes on Defects4J across V1.2 and V2.0, compared with 236 for its second-ranked ReinFix baseline, and 289 on Defects4J-Trans. It reports two experienced Java researchers independently review patch semantics, with a third reviewer resolving disagreements. The authors also evaluate a more realistic fault-localization setting, where CausalRepair fixes 232 bugs with noisy initial localization. [Paper](https://arxiv.org/abs/2608.10613) · [artifact](https://doi.org/10.5281/zenodo.20953899).
+
+**Scope and limitations:** CausalRepair is automated repair, not pre-merge code review. Its strongest context contains actual execution traces and a failure-triggering test. It uses Defects4J Java projects and one principal backbone configuration; its success count is not an all-language or production prevalence estimate. Patch equivalence is independently reviewed, but remains tied to the paper's evaluation contract.
+
+**CEB implication:** compose source topology with a minimal causal-context discipline. Where execution is allowed, a dynamic slice may remove static over-approximation; where execution is unavailable or unauthorized, preserve possible paths and mark which are merely source-possible. A compact context is useful only if it does not delete an alternative sufficient path or hide an unobserved caller.
+
+### 2.15 Partially Observed Structural Causal Models — identifiability under latent context
+
+Orujlu et al.'s **Partially Observed Structural Causal Models** (UAI 2026, PMLR 337) formalizes settings where unobserved upstream context co-determines both the interaction structure and downstream mechanisms. It defines intervention hierarchies over node-level and edge-local mechanisms and gives identifiability results for which interventions can separate structure formation from mechanism behavior. Its experiments demonstrate non-identifiability under latent context and structure–mechanism confounding under latent edges. [Paper](https://proceedings.mlr.press/v337/orujlu26a.html).
+
+**Scope and limitations:** this is a general causal-modeling theory and simulator evaluation, not a code-review benchmark or software RCA leaderboard. Its identifiability results depend on its formal assumptions and intervention family; CEB must not claim to implement POSCMs merely by adding a latent-node annotation.
+
+**CEB implication:** this is the theoretical basis for the new [Causal-Identifiability Protocol V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md). A code reviewer should preserve material evidence-compatible models, identify a query on which they disagree, and request the minimum safe observation that distinguishes them. If no admissible discriminating evidence exists, the correct output is a bounded or non-identifiable claim—not an invented consensus graph.
+
+### 2.12A Causal claim types — source possibility is not incident attribution
+
+The current literature spans different causal targets. CEB should label the target claim before comparing methods:
+
+| Claim type | What the method can establish under its contract | Key limitation |
+|---|---|---|
+| Source structural possibility | A source path can reach a state under stated conditions | Does not show that the build selects it or a run executes it |
+| Build-world selection | Which feature/target-conditioned implementation is in an exact artifact | Does not show that the path was exercised |
+| Execution realization | A qualified trace/slice records a path in a particular run | Does not establish that the path was the actual cause |
+| Actual-cause attribution | A realized factor is a cause under a declared context-specific causal model/semantics | Depends on model, actual context and counterfactual criterion |
+| Interventional-effect identifiability | All admissible evidence-compatible models agree on the effect of a specified intervention | Does not establish that a historical incident occurred |
+| Incident attribution | Source/artifact/event identity and causal evidence bind the mechanism to a named incident | Does not automatically generalize beyond that incident's scope |
+
+This distinction matters for the three nearby research strands: SoftReX's actual-causality/responsibility ranking is an execution-/mutation-grounded localization target; CausalRepair's dynamic slice is an executed dependency context for a failing test; POSCMs' identifiability theory asks when interventional claims are uniquely determined across compatible partially observed models. They are complementary, not interchangeable. Do not rank their metrics together or claim that a source-only reviewer has established an incident cause merely because it produced a plausible topology.
+
+### 2.12 AACR-Bench — holistic repository context
+
+AACR-Bench reports **200 real PRs from 50 active projects across 10 languages**, with full repository context and an AI-assisted, expert-verified annotation pipeline. The authors report a 285% increase in annotated defect coverage relative to their prior comparison baseline; that is a dataset-coverage claim, not evidence that a model improved by 285%. It is especially relevant to multi-file reasoning, caller discovery, cross-file tracking and the impact of context granularity/retrieval. The benchmark does not itself establish causal intervention prediction or residual-path correctness. [Paper](https://arxiv.org/abs/2601.19494) · [benchmark repository](https://github.com/alibaba/aacr-bench).
+
+**CEB implication:** AACR-Bench motivates repository-level context and multilingual/cross-file stratification, while SecPRBench motivates mechanism correctness and the causal-topology extension tests whether reviewers can represent the missing path/interactions. Do not infer causal diagnosis from a repository-context score.
+
 ### 2.10 Kodus State of AI Code Review 2026 — suggestion implementation is not correctness
 
 Kodus separately publishes platform-level analytics from its production code-review pipeline, distinct from its 30-PR CodeReviewBench replay above. The report analyzes **22,743 AI-authored PRs** and **180,739 review suggestions** across its supported GitHub/GitLab/Bitbucket/Azure DevOps pipeline, with a data window beginning September 1, 2025 and a snapshot ending June 8, 2026. It reports **33% implemented/adapted** overall, rising from 25% to 48% by PR-created month across the cited eight-month window; the newest months are right-censored and June is partial. Bugs have a reported 34.5% implementation/adaptation rate; security 31.2%. It also reports that **71.8% of 13,609 flagged merged PRs had at least one open flag**, while 60% of security flags and 64% of critical flags were unaddressed. The report explicitly states the open-flag result includes false positives and accepted risk. [Kodus State of AI Code Review 2026](https://kodus.io/data), methodology and snapshot disclosed in the report.
@@ -114,6 +171,131 @@ Kodus separately publishes platform-level analytics from its production code-rev
 **Composition and attribution caveats:** the report warns that platform-wide adoption/merge trends are heavily compositional. Its fixed 24-team panel shows that platform-wide PR size and merge-time trends largely disappear when comparing the same teams at both ends. Its “implemented” rule is based on later changes to flagged lines; that does not prove the review comment caused the edit or that the edit corrected the defect. Silent ignores count in the implementation outcome. These are descriptive analyses from Kodus' own commercial review pipeline, not a randomized intervention or independent adjudication of every suggestion.
 
 **CEB implication:** use these data to motivate a separate uptake/outcome protocol, not as correctness evidence. The production-impact experiment must freeze truth/actionability before exposure; distinguish accepted, adapted, rejected, deferred, independently reproduced and no-response; verify repairs and regressions separately; control team composition and censoring; and never treat a later diff as causal proof. See [CEB Review Production-Impact Protocol V0](CEB_REVIEW_PRODUCTION_IMPACT_PROTOCOL_V0_2026-11-07.md). Uptake stays contextual under existing CEB-HUMAN/CEB-CONTINUITY ownership; no new metric lane or acceptance score is created.
+
+
+### 2.17 CGARF — causality-guided repair pipeline
+
+Yuan et al.'s **CGARF** (Empirical Software Engineering; published August 22, 2026) composes three components: Causal Graph-Augmented Multi-Agent Debate for location re-ranking, Self-Reflection Consistency Distillation for more stable patch generation, and Two-Stage Patch Filtering using functional tests, causal matching and group-similarity selection. It evaluates 12 configurations across three localization methods (Agentless, OrcaLoca and CoSIL) and four models on SWE-bench Lite and Verified. The paper reports **2–4 percentage-point repair-success gains** and about **3 percentage points average patch-applicability gain** across the evaluated configurations. [Paper and results](https://doi.org/10.1007/s10664-026-10940-1).
+
+**Scope and limitations:** CGARF evaluates repair, not source-only PR-review comments. The reported gains are aggregated across configurations with different localizers/models; task denominators, exact per-configuration intervals and effect heterogeneity must be retrieved from the full paper before quantitative replication. Its causal graph debate and filtering pipeline motivate a useful I1/I2 ablation, but a higher patch-success rate does not prove that the model correctly identified which cause was identifiable from the evidence or that its explanation was accurate.
+
+**CEB implication:** borrow the separation of localization, causal argument, patch generation and patch verification. Evaluate each stage with its own outcome and provenance; do not let a correct patch retroactively validate an unsupported diagnosis. The three primary CEB-REVIEW metrics remain distinct from repair pass rate and patch applicability.
+
+### 2.18 SecRepoBench — repository-level secure code completion
+
+**SecRepoBench** contains **318 code-completion tasks** from 27 C/C++ repositories covering 15 CWEs. A model or agent completes a masked region with full-repository context; correctness is checked with developer tests and security with OSS-Fuzz-derived PoCs. The visible leaderboard snapshot accessed November 7, 2026 lists an ImageCodex + GPT-5.1-Codex-Max review setup at **60.1 secure-pass@1** and **76.4 pass@1**. [Benchmark and leaderboard](https://secrepobench.github.io/) · [Google Research summary](https://research.google/pubs/secrepobench-benchmarking-code-agents-for-secure-code-completion-in-real-world-repositories/).
+
+**Scope and limitations:** this is secure code completion, not review of a vulnerability-introducing pull request, causal diagnosis, or reviewer burden. Its test/PoC contract and denominator must remain attached to each score. “Secure completion” is not automatically equivalent to CEB's joint secure-functional pass or a review agent's security finding precision.
+
+**CEB implication:** use it as a downstream secure-code generation comparator and possible cross-lane robustness context, not a direct code-review SOTA row. A future matched experiment could compare whether diagnoses from CEB produce safer repairs, but only after freezing the same source snapshot, security contract, tests/PoCs, model/harness, budget and independent oracle.
+
+
+
+### 2.19 Requirement-conformance over-correction and Fix-guided Verification Filter
+
+Jin and Chen's **Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement** (Automated Software Engineering, published June 26, 2026) constructs paired canonical/buggy implementations from HumanEval, MBPP and QuixBugs: over 700 tasks and over 1,400 instances. It evaluates five models under Direct, Direct+Explain and Full (verdict, rationale, proposed fix) prompting. It reports that richer explanation/repair prompts can substantially increase false rejection of correct implementations. For GPT-4o, FNR rises from 26.2% to 73.2% on HumanEval and 35.9% to 87.9% on MBPP when moving from Direct to Full prompting. Across models under Full prompting, the Fix-guided Verification Filter reduces average FNR from 54.8% to 16.3% on HumanEval, 69.0% to 28.9% on MBPP, and 51.0% to 24.0% on QuixBugs. [Paper](https://doi.org/10.1007/s10515-026-00638-5).
+
+The filter checks the original and proposed fixed implementation against benchmark and specification-constrained tests. Its four outcomes distinguish: both pass/equivalent (the fix was unnecessary), both fail (oracle augmentation or repair remains unresolved), original passes but patch fails (over-repair/regression), and original fails while patch passes (repair-supported). The authors report small FPR increases in some settings; QuixBugs' shallower tests limit the filter's discriminative power. They explicitly acknowledge that canonical solutions and benchmark tests may not fully define the natural-language specification, and prompt semantics can alter the implied review rubric. These caveats matter: an executable patch is a hypothesis, not an independent oracle.
+
+**CEB extension:** require a target witness and a preservation witness for repair-bearing findings, with an independently frozen contract/oracle. Test both false rejection of canonical behavior and false acceptance of mutant behavior. A patch cannot be called verified solely because it passes tests generated from its own rationale.
+
+### 2.20 ReviewGrounder — draft then ground, but in academic peer review
+
+Li et al.'s **ReviewGrounder** (ACL 2026) separates review drafting from an evidence-grounding stage, using explicit paper-specific rubrics and targeted evidence consolidation. Its reported framework uses a Phi-4-14B-based drafter and GPT-OSS-120B-based grounding stage, and outperforms larger backbone baselines on human-judgment alignment and rubric-based review quality across eight dimensions on an academic-paper review benchmark. [ACL Anthology](https://aclanthology.org/2026.acl-long.1477/).
+
+**Scope and limitation:** this is academic peer review, not source-code pull-request review, and its eight rubric dimensions are not CEB metrics. It supports a transferable *pipeline* principle—draft, ground each claim, then adjudicate—not a claim of software-review SOTA.
+
+**CEB extension:** make the grounding stage bind every finding to exact source revision, contract clause, causal claim kind and independent oracle. Keep grounding evidence distinct from the model's own rationale and patch.
+
+### 2.21 Selective conformal judging — calibrate accepted claims, not verbal confidence
+
+The SCOPE work summarized by the HyperMatrix Research Lab uses bidirectional preference entropy (querying both pairwise response orders) and conformal calibration to control the error rate among non-abstained LLM judgments under exchangeability. Its summary reports empirical FDR around 0.097–0.099 at a target alpha of 0.10 and up to 2.4× as many accepted judgments as vanilla baselines. [Research summary](https://hypermatrix.cs.dal.ca/selective-prediction/).
+
+**Scope and limitation:** SCOPE concerns pairwise LLM judging, not code review or causal diagnosis. Its risk guarantee depends on the calibration assumptions and task population; it cannot be imported unaltered across repositories, languages, severities or claim kinds.
+
+**CEB extension:** calibrate acceptance/abstention separately by claim type and severity on a repository-/defect-family-disjoint calibration set. Measure selective risk versus coverage and report group-wise gaps. A judge's confidence, consensus or stable rationale is not itself a finite-sample guarantee. See [Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md) for disjoint development/calibration/confirmatory roles, a one-sided Clopper–Pearson risk bound, sample-size illustrations and escalation rules. It makes no current CEB risk guarantee.
+
+
+
+### 2.22 Incremental build graphs — Bazel Skyframe
+
+Bazel's **Skyframe** documents a dependency graph in which outputs are functions of their declared inputs. A changed input invalidates the reverse transitive closure of dependent nodes. Its incremental algorithm also supports *change pruning*: after recomputation, if an invalidated node's value is unchanged, dependents can be resurrected rather than rebuilt. The documentation explicitly describes the trade-off between bottom-up invalidation and top-down checking, and the difficulty of proving an incremental mutation equivalent to a clean rebuild. [Skyframe reference](https://bazel.googlesource.com/bazel/+/refs/heads/master/site/en/reference/skyframe.md).
+
+**Scope and limit:** Skyframe is an incremental build-engine dependency model for deterministic derived values. It is not a general claim-validity or causal-inference system. A source file's output may be unchanged while a policy, contract, trust root, verifier or incident attribution changes the decision-use validity of an engineering claim.
+
+**CEB implication:** reuse the reverse-dependency and change-pruning intuition, but do not assume all engineering claims behave like deterministic build nodes. A retained claim requires an unaffectedness witness and a complete declared support closure. Where equivalence cannot be established, revalidate or leave unresolved; do not resurrect solely because a diff looks irrelevant.
+
+### 2.23 Artifact provenance — SLSA v1.2 and in-toto attestations
+
+The current **SLSA v1.2** provenance guidance binds produced artifacts to a builder identity, build definition, external parameters, resolved dependencies and output subjects. It recommends recording dependencies that can affect the build and verifying provenance against expected builder/source/build-type/parameter values. It also makes the builder's trust boundary explicit. [SLSA v1.2](https://slsa.dev/spec/v1.2/) · [Provenance](https://slsa.dev/spec/v1.2/provenance) · [Artifact verification](https://slsa.dev/spec/v1.2/verifying-artifacts).
+
+The **in-toto Attestation Framework v1.2** separates predicate, statement, envelope and bundle, with the statement binding a typed predicate to one or more subject artifacts. [Specification](https://github.com/in-toto/attestation/blob/main/spec/README.md).
+
+**Scope and limit:** SLSA/in-toto answer provenance and artifact-authenticity questions; a valid attestation does not by itself establish that a code-review claim is true, that a repair preserves behavior, or that an old approval remains authorized after policy revocation. Nor does a provenance record prove completeness of every semantic dependency unless the builder/format guarantees that scope.
+
+**CEB implication:** bind support-closure leaves to exact digests and existing receipt/attestation subjects where available. Keep signer identity, builder identity, trust roots and current authorization as separate dependencies. Do not create a parallel CEB receipt or replace #10314/#10370; use their canonical identity and trust contracts.
+
+
+
+### 2.24 Incremental Program Analysis in the Wild — empirical dependency-reuse limits
+
+Wang et al.'s ASE 2025 study constructs a real-world Java program-change benchmark from **4,084 commits across 20 open-source projects** and evaluates two representative incremental program analysis tools. The authors report that incremental analysis can substantially improve efficiency over exhaustive analysis, but the evaluated tools exhibit inconsistencies and markedly higher peak-memory use. They identify gaps in standardized real-world program-change benchmarks and in balanced evaluation metrics. [IEEE publication](https://doi.org/10.1109/ASE63991.2025.00194) · [ASE research-program entry](https://conf.researchr.org/details/ase-2025/ase-2025-papers/211/Incremental-Program-Analysis-in-the-Wild-An-Empirical-Study-on-Real-World-Program-Ch).
+
+**Scope and limitation:** this is incremental program analysis, not engineering-claim validity or CEB-CONTINUITY. Its population is Java; its measured outcomes concern analysis result maintenance, efficiency, consistency and memory. Do not map incremental-analysis efficiency onto stale-evidence safety or claim-disposition accuracy.
+
+**CEB implication:** include consistency and resource costs when studying support-closure updates. An incremental closure implementation must be compared against a clean full recomputation on sampled sequences; a fast update that misses a dependency is worse than an expensive rebuild. Report peak memory and worst-case closure growth, not only mean update time.
+
+### 2.25 DiffCI Open Evidence Study 2026 — change-aware test selection against a cheap path rule
+
+DiffCI's public open study reports a pre-registered historical replay of **2,000 commit deltas across 20 repositories**. Only 29.8% of deltas offered a selective-test opportunity; across the full corpus, the reported test reduction against a path-rule baseline was **4.2%**. The study reports **96.4% versus 70.7% job-level recall** of 280 historical CI failures for DiffCI versus a path rule. Its repository-clustered 95% interval for aggregate reduction was **−4.8% to +47.9%**, crossing zero; the report explicitly says the sample cannot rule out a null population effect. In measurable mutation cases it reports 32/32 detections but states this is not a reliability estimate. It also reports that only three of seven attempted repositories passed canonical suite-green qualification. [Open study and data](https://diffci.com/research/diffci-open-evidence-2026).
+
+**Scope and limitation:** this is a self-published change-aware test-selection study, not an independent CEB benchmark. Historical test/job selection recall is not evidence-disposition recall, claim invalidation precision, or correct selective retain. Its 4.2% whole-corpus reduction is more informative economically than the 94.3% win rate within the 29.8% opportunity bucket. The repository-clustered interval and limited reach must accompany any quoted result.
+
+**CEB implication:** use a cheap path/change heuristic as a required baseline for support-closure computation. C2 must demonstrate that typed semantic dependencies improve *claim validity decisions* over C0 path overlap and C1 continuity dispositions, not simply produce a larger graph or a higher within-opportunity win rate. Include full recomputation as a correctness oracle on a sampled subset; measure incremental cost net of graph construction and evidence retrieval. The comparison is C0 path heuristic, C1 existing #10630 continuity, C2 support-closure extension; measure closure build/update, evidence ingestion, retrieval, peak memory and revalidation action cost. Charge the full cost and compare C2 with a sampled clean full-recomputation oracle before claiming safe incrementality.
+
+
+
+### 2.26 Evidence tracing and execution provenance for LLM agents
+
+Wang et al.'s survey **From Agent Traces to Trust: Evidence Tracing and Execution Provenance in LLM Agents** (June 3, 2026) organizes provenance across retrieval evidence, tool outputs, memory, environment observations, intermediate claims, actions and final answers. It distinguishes evidence/execution units, provenance relations, tracing granularity/timing, representations and trust functions. Its open challenges include unified trace representations, claim-level semantic provenance, provenance-aware safety, realistic execution-trace benchmarks, recovery-oriented evaluation and privacy-aware audit. [Survey](https://arxiv.org/abs/2606.04990).
+
+**Scope and limitation:** this is a survey/taxonomy, not a code-review accuracy benchmark or a claim-support completeness result.
+
+**CEB implication:** treat a review finding as a claim whose support includes not only source citations but also retrieval/tool/evaluator provenance and decision lineage. Preserve provenance for why a tool action was taken, what evidence it returned, which claim consumed that evidence, and what changed after a later event. Do not expose or score private chain-of-thought; the auditable object is the external evidence/action/claim relation.
+
+### 2.27 Empirical reporting standards for LLM software-engineering studies
+
+Baltes et al.'s community-authored **Guidelines for empirical studies in software engineering involving large language models** (published November 3, 2026) involves 22 researchers and presents a taxonomy of seven study types plus eight reporting guidelines. It calls for explicit model/tool versions and configuration, system/prompt/harness details, representative session/runtime traces, suitable benchmarks and metrics, open-model baselines, human validation and limitations. The paper notes that model non-determinism, prompt/configuration sensitivity and evolving proprietary models threaten reproducibility. [Paper](https://link.springer.com/article/10.1007/s10664-026-10922-3).
+
+**Scope and limitation:** this is empirical-method guidance, not a software-review system or benchmark score.
+
+**CEB implication:** include model/harness/prompt/tool and evaluator version in the study lineage; preserve representative interaction and evidence-action traces; make the independent-human validation and reporting checklist part of the frozen experiment pack. This strengthens reproducibility of the CEB comparison without turning agent-private reasoning into benchmark evidence.
+
+### 2.28 Pull-request change-impact analysis
+
+Göçmen, Cezayir and Tüzün's **Enhanced code reviews using pull request based change impact analysis** (Empirical Software Engineering, February 12, 2025) combines call-graph dependency analysis with software-history mining to identify potentially impacted functions at PR granularity. The authors report computational feasibility across three open-source projects, with analysis times from **7.4 to 22.43 seconds**; focus-group participants rated usefulness for enhancing review at **3.66/5**, while the current impact-risk score averaged **3.2/5** for perceived accuracy with **71% agreement** on selected metrics. [Paper](https://doi.org/10.1007/s10664-024-10600-2).
+
+**Scope and limitation:** the evidence is a small user-study/feasibility evaluation, not a large-scale code-review accuracy benchmark, nor a semantic proof that an unmodified file cannot be impacted.
+
+**CEB implication:** PR-level change impact is a useful C0/C1 context, but file/function reachability must be distinguished from claim-support closure. Add the contract, policy, build, evaluator and authority dependencies that ordinary call graphs do not model; require independent closure completeness before a retain decision.
+
+### 2.29 Formal verification under software evolution — synthesis of the research gap
+
+Gómez et al.'s 2026 systematic review of **Formal Verification Under Evolution in Microservice-Based Systems** screened **1,187 records** and retained **18 studies** (13 primary and five background). It identifies five complementary clusters—actor-based model checking, TLA+ control-plane verification, static analysis, continuous certification and runtime/self-adaptive testing—and reports that empirical work is dominated by small academic case studies, with relatively few end-to-end CI/CD integrations or shared datasets. [Review](https://www.mdpi.com/2674-113x/5/3/32).
+
+**Scope and limitation:** microservice evolution/formal verification is adjacent to repository claim continuity, not code-review agent performance.
+
+**CEB implication:** test claim-support closure across code, API contracts, configuration, runtime and authorization/policy changes. A source-only call graph cannot establish all of those dependencies. The opportunity is not another static analyzer; it is a traceable evaluation of whether engineering claims stay valid as their supporting system evolves.
+
+
+### 2.30 SWE-CI — long-horizon continuous-integration maintenance
+
+Chen et al.'s **SWE-CI** benchmark contains **100 repository-maintenance tasks**, each representing an evolution history averaging **233 days and 71 consecutive commits**. It frames software engineering as repeated CI-guided maintenance rather than one-shot issue repair. [Paper](https://arxiv.org/abs/2603.03823).
+
+**Scope and limitation:** this benchmark measures continuous maintenance/CI task performance, not the correctness of claim-support closure, evidence-disposition macro-F1, false-retain rate or decision-use validity. Its task horizon is contextual, not an interchangeable CEB metric denominator.
+
+**CEB implication:** use SWE-CI as a long-horizon stress comparator alongside SWE-Milestone. CEB's differentiator is to preserve the validity and provenance of earlier engineering claims across those changes, while charging the cost of selective revalidation against the existing CEB-CONTINUITY metrics.
+
 
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
@@ -207,7 +389,7 @@ To establish a meaningful industry improvement, require paired, same-task compar
 - Alternatively, show **at least 20% lower total review cost** at non-inferior Recall@5 and actionable precision.
 - On a matched SecPRBench-style security subset, target **≥85% causal target diagnosis recall**, with no critical-severity false accept in the evaluated sample; this is an application-specific prospective research gate, not a new CEB primary metric.
 - On a CR-Bench-v2-style known-target subset, target **≥45% KDDR** while maintaining **≥90% comment usefulness** under the same frozen judge protocol and separately human-audited matcher; report cost/latency.
-- On ReviewBench, any matched replication must beat the contemporaneous **83.0 grounded-F1 / 92.0 precision / 75.6 recall** top row on its exact high-severity slice, or demonstrate a favorable Pareto trade-off. This external target is meaningful only under its own dataset/judge/matcher version and is not itself the CEB target.
+- On ReviewBench, any matched replication must beat the contemporaneous high-severity grounded-F1 leader captured at evaluation time. The latest 20:14 SAST capture on November 7 lists intent-review-agent at **82.2 F1 / 92.0 precision / 74.4 recall**; the earlier 83.0 OhMyBug row remains a prior same-day observation. Re-capture the board immediately before comparison and freeze the exact filter, run, dataset, judge and matcher versions. This external target is meaningful only on that benchmark's own slice and is not itself the CEB target.
 
 These are prospective aspirations, not achievements. Do not pick thresholds after inspecting a holdout. The ≥85% security-diagnosis, ≥45% KDDR and ≥5-point gains require preregistration, power analysis, paired confidence intervals and an independent evaluation sample.
 
@@ -226,11 +408,45 @@ These are prospective aspirations, not achievements. Do not pick thresholds afte
 
 Move from **“Did the model point at the bug?”** to **“Can the reviewer discover, explain, evidence, challenge and communicate the defect accurately at the right cost?”** This is a more meaningful engineering standard than optimizing comment count, lexical overlap, pass rate or a single composite leaderboard score.
 
+A further step is to ask **“Which causal conclusions are identifiable from the evidence actually available?”** A third extension asks **“Can every claim be selectively retained only when its full support closure remains valid?”** Bind each claim to supporting and counter-evidence, assumptions, contract/policy, source/configuration, method/oracle and authority dependencies. A retain decision needs an unaffectedness witness; missing edges, shared dependencies or circular support cannot be silently treated as proof of non-impact. Require a compatible-model set, claim-specific identifiability disposition and minimum discriminating evidence request. This prevents a coherent but underdetermined graph from being rewarded as a proven cause. The three development levels are I0 unstructured diagnosis, I1 causal topology, and I2 topology plus identifiability. I2 is exploratory and does not change the registered Phase A/B/C hypotheses. Also record the claim kind: source structural possibility, build-world selection, execution realization, actual-cause attribution, interventional-effect identifiability, or incident attribution. These distinctions prevent one evidence type from silently proving a stronger claim. A further extension asks whether the proposed repair preserves canonical behavior. Require both a target witness and a preservation witness, and compare the original and proposed patch against an independently frozen requirement/oracle. This addresses documented over-rejection of correct code under richer prompts; do not treat the candidate's own generated tests as an independent oracle.
+
+### Preservation-aware repair verification
+
+A review finding must not only identify a target violation; a proposed correction must preserve the nearest valid neighboring behavior. Require a **target witness** and a **preservation witness**, both grounded in the same frozen requirement, plus independent target and preservation oracle plans. Compare three development conditions: P0 verdict only, P1 verdict plus rationale/patch, and P2 dual-witness review. The public six-case preservation challenge is design-only; no candidate code is executed. A patch that passes only the target oracle is not a verified repair, and a correct canonical implementation must not be rejected simply because an agent can imagine a stricter alternative contract.
+
+### Calibrated acceptance and abstention
+
+Use disjoint calibration material to estimate selective risk among accepted claims, then measure risk versus coverage by claim type and severity. Calibrate repository-/defect-family groups separately or report when the exchangeability assumption is implausible. An uncalibrated confidence number, agent consensus, or persuasive explanation is not a guarantee. The SCOPE results are a methodological reference for selective judging, not evidence that its FDR bounds transfer directly to code review.
+
+### Causal topology as the next research extension
+
+A five-link chain remains the minimum explanation. For multi-path, stateful and concurrent defects, compare that baseline with a typed graph that represents AND-gated interactions, OR alternative routes, temporal partial orders and residual path reachability after intervention. The graph is a falsifiable mechanism contract, not a decorative dependency map. See [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) and its six public synthetic development cases.
+
+
+### Prospective CEB benchmark targets — not achieved results
+
+Use these as a staged target ladder. They are aspirations for future preregistered, matched studies, not present Symthaea performance or safety claims.
+
+| Capability | Prospective target | Correct industry comparison | Qualification condition |
+|---|---|---|---|
+| **CEB-REVIEW core** | defect Recall@5 ≥ 0.85; actionable precision ≥ 0.80; reviewer burden ≥ 20% lower at non-inferior recall | ReviewBench grounded high-severity F1/precision/recall, plus CR-Bench-v2 KDDR and Usefulness Rate on separate matched subsets | Preserve the three existing CEB primary measures; common tasks, denominators, model/harness/tool budgets and independent adjudication |
+| **Matched industry improvement** | +5 percentage points on a compatible quality measure at equal all-in cost, or ≥20% lower all-in cost at non-inferior quality | ReviewBench/CR-Bench-v2/SecPRBench, only on genuinely compatible task slices | Paired repository-clustered inference; do not translate unmatched benchmark scores |
+| **Security causal diagnosis** | ≥85% correct target-mechanism diagnosis on a matched security slice | SecPRBench direct-review top reported recall 78.1% (265 tasks); its 68% wrong-mechanism/file-localization result is the diagnostic target | Same introduction-state, source evidence, judge protocol, failure denominator and budget; 85% is an aspiration, not a claimed result |
+| **Known-defect detection + comment utility** | KDDR ≥45% while usefulness ≥90% on a matched CR-Bench-style slice | CR-Bench-v2 verified slice: best reported KDDR ≈33.7%, usefulness ≈72.6% for GPT-5-mini Reflexion in the cited comparison | Preserve the single-known-defect denominator and use independent judge/human audit; KDDR is not defect Recall@5 |
+| **Preservation-aware repair** | ≥95% canonical acceptance; ≥95% target-mutant detection; ≥90% of repair-bearing findings carry valid target and preservation witnesses; zero critical over-repair events in the adjudicated critical slice | Jin & Chen's paired canonical/buggy conformance study and Fix-guided Verification Filter | Diagnostic targets only, not new CEB primary metrics; independent contract/oracles and repository-/defect-family-disjoint cases |
+| **Risk-controlled acceptance** | one-sided 95% upper FDR bound ≤5% for ordinary accepted claims and ≤1% for critical claims; ≥70% coverage on eligible non-critical claims after risk qualification | SCOPE as selective-judging methodology only; no direct code-review score equivalence | Disjoint development/calibration/confirmatory sets, cluster/exchangeability checks, absolute counts; at zero observed errors the planning examples require 59 and 299 independent accepted calibration claims respectively |
+| **CEB-CONTINUITY** | ≥20% lower revalidation cost than reset-and-recheck at non-inferior sequence correctness; zero stale-evidence use on the predeclared high-severity controls | SWE-Milestone, SWE-CI, ASE incremental program analysis, DiffCI change-aware test selection and Bazel/Skyframe | Use the existing seven CEB-CONTINUITY primary measures; full-cost accounting, clean-recomputation oracle and sequence/repository clustering |
+| **Claim-support closure** | C2 (typed support closure) beats both C0 path overlap and C1 existing continuity dispositions on false-retain/stale-evidence safety without increasing false invalidation; incremental updates agree with clean recomputation on sampled sequences | Bazel reverse-transitive invalidation/change pruning, ASE IPA and DiffCI as contextual analogues | Do not add a metric lane; score with existing CEB-CONTINUITY metrics and secondary closure/witness annotations |
+
+**Interpretation:** CEB should aim to beat the strongest compatible baseline, not the largest number visible on any nearby leaderboard. A 90% source-only diagnosis rate cannot be compared with 78.1% execution-validated security review; 95% canonical acceptance cannot be averaged with KDDR; and FDR/coverage cannot be folded into reviewer precision. Publish a Pareto view across quality, safety, coverage, cost, latency and human burden, plus every failed/unresolved denominator.
+
+
 ## 8. Reuse and integration boundaries
 
 - #10419 continues to own the CEB-REVIEW capability/task profile and primary metric contract.
 - #10723 owns disconfirm-first, human-agent complementarity, and the review comparison experiment.
 - #10367 owns the causal debugging ledger and broader causal-diagnosis integration.
+- Draft #10987 operationalizes dual-reviewer annotation; the causal-topology development tranche is stacked on that reviewer-calibration work and does not introduce a second annotation/receipt system.
 - #9431 owns dependence-aware judge ensembles/correlated error.
 - #10680/#10681 own verifier-of-verifiers qualification.
 - #10619/#10624 own statistical claim qualification.
@@ -250,7 +466,7 @@ No new metric lane, task schema, receipt, oracle authority, generic scheduler, j
 6. Audit public dataset reuse/licensing and contamination risk before any import.
 7. Reconcile the prospective target language with the CEB matrix owner before registering any new metric.
 
-No public scenario here is a sealed holdout task. No candidate-controlled code is run. No hidden labels, reference patches, executable graders or SOTA result are created.
+No public scenario here is a sealed holdout task. No candidate-controlled code is run. No hidden labels, reference patches, executable graders or SOTA result are created. The new identifiability protocol and six public synthetic cases are development-only; they do not demonstrate calibrated abstention or causal identification.
 
 ## 10. Sources — current snapshot 2026-11-07
 
@@ -265,5 +481,32 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [method/limitations post](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), data generated 2026-09-11; accessed November 7, 2026.
 - Martian, [Code Review Benchmark production-adoption dashboard](https://www.codereviewbenchmark.com/), accessed November 7, 2026.
 - Kodus, [State of AI Code Review 2026](https://kodus.io/data), production pipeline snapshot through June 8, 2026; accessed November 7, 2026.
+
+- Sun et al., [SDRCA: software defect root-cause analysis with causal graphs and interventions](https://doi.org/10.1016/j.jss.2026.112931), Journal of Systems and Software, 2026.
+- UniVal authors, [Improving Fault Localization by Integrating Value- and Predicate-Based Causal Inference Techniques](https://arxiv.org/abs/2102.06292), ICSE 2021 Distinguished Paper.
+- Alibaba, [AACR-Bench](https://arxiv.org/abs/2601.19494) and [benchmark artifacts](https://github.com/alibaba/aacr-bench), 2026.
+- Navaratnarajah et al., [Causality-Based Fault Localization / SoftReX](https://arxiv.org/abs/2611.01292), submitted October 31, 2026.
+- Wu et al., [CausalRepair: Bridging the Causality Gap in LLM-Based APR via Dual-Slicing](https://arxiv.org/abs/2608.10613), submitted August 11, 2026; [ISSTA 2026 research-program entry](https://conf.researchr.org/details/issta-2026/issta-2026-research-papers/134/CausalRepair-Bridging-the-Causality-Gap-in-Large-Language-Model-based-Automated-Prog).
+- Orujlu et al., [Partially Observed Structural Causal Models](https://proceedings.mlr.press/v337/orujlu26a.html), UAI 2026, PMLR 337.
+- Yuan et al., [CGARF: a causality-guided framework for reliable automated program repair](https://doi.org/10.1007/s10664-026-10940-1), published August 22, 2026.
+- Shen et al., [SecRepoBench](https://research.google/pubs/secrepobench-benchmarking-code-agents-for-secure-code-completion-in-real-world-repositories/), 2025; [leaderboard and methodology](https://secrepobench.github.io/), accessed November 7, 2026.
+- Chen et al., [SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration](https://arxiv.org/abs/2603.03823), March 4, 2026.
+
+- Jin and Chen, [Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement](https://doi.org/10.1007/s10515-026-00638-5), Automated Software Engineering 33, article 90 (June 26, 2026).
+- Li et al., [ReviewGrounder: Improving Review Substantiveness with Rubric-Guided, Tool-Integrated Agents](https://aclanthology.org/2026.acl-long.1477/), ACL 2026.
+- Badshah, Emami and Sajjad, [SCOPE: Selective Conformal Optimized Pairwise LLM Judging](https://hypermatrix.cs.dal.ca/selective-prediction/), ACL 2026; research summary accessed November 8, 2026.
+- Ashby, Nguyen and Luo, [Uncertainty-aware large language models: a scoping review of conformal prediction methods](https://doi.org/10.1098/rsta.2026.0061), Philosophical Transactions of the Royal Society A (August 27, 2026).
+
+- Bazel team, [Skyframe: Incremental build evaluation](https://bazel.googlesource.com/bazel/+/refs/heads/master/site/en/reference/skyframe.md), accessed November 8, 2026.
+- SLSA, [v1.1 specification](https://slsa.dev/spec/v1.1/), including [provenance](https://slsa.dev/spec/v1.1/provenance) and [artifact verification](https://slsa.dev/spec/v1.1/verifying-artifacts), accessed November 8, 2026.
+- in-toto, [Attestation Framework Specification v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md), accessed November 8, 2026.
+
+- Wang et al., [Incremental Program Analysis in the Wild: An Empirical Study on Real-World Program Changes](https://doi.org/10.1109/ASE63991.2025.00194), ASE 2025.
+
+- Wang et al., [From Agent Traces to Trust: Evidence Tracing and Execution Provenance in LLM Agents](https://arxiv.org/abs/2606.04990), June 3, 2026.
+- Baltes et al., [Guidelines for empirical studies in software engineering involving large language models](https://link.springer.com/article/10.1007/s10664-026-10922-3), published November 3, 2026.
+- Göçmen, Cezayir and Tüzün, [Enhanced code reviews using pull request based change impact analysis](https://doi.org/10.1007/s10664-024-10600-2), Empirical Software Engineering, February 12, 2025.
+- Gómez et al., [Formal Verification Under Evolution in Microservice-Based Systems: A Systematic Literature Review](https://www.mdpi.com/2674-113x/5/3/32), Software 5(3), 32 (July 15, 2026).
+- DiffCI, [DiffCI Open Evidence Study 2026](https://diffci.com/research/diffci-open-evidence-2026), published September 3, updated September 25, 2026; self-published open study, accessed November 8, 2026.
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
