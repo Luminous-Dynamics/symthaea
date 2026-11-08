@@ -1030,6 +1030,46 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_max_times_map_supports_mixed_cardinalities() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 3],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![
+                max_times(1, 1),
+                max_times(0, 1),
+                max_times(2, 1),
+                max_times(3, 1),
+                max_times(3, 1),
+                max_times(2, 1),
+            ],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, 6).unwrap();
+        assert_eq!(result.optimum_score, rational(3, 1));
+        assert_eq!(
+            result.optimal_assignments.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
+            vec![vec![1, 0], vec![1, 1]]
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_rejects_assignment_space_overflow_before_enumeration() {
+        let graph = ExactFactorGraph::new(
+            vec![usize::MAX, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        assert_eq!(
+            exhaustive_max_times_map_bounded(&graph, usize::MAX),
+            Err(BoundedMapError::AssignmentSpaceOverflow)
+        );
+    }
+
+    #[test]
     fn exhaustive_max_times_map_is_factor_insertion_order_invariant() {
         let mut left = ExactFactorGraph::new(
             vec![2, 2],
