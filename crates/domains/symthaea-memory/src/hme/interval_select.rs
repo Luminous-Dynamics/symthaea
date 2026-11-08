@@ -1395,14 +1395,31 @@ mod tests {
         // for members of surviving groups. The low group's original payloads
         // are never presented to the member selector.
         let mut member_records = Vec::new();
+        let transform_digest = [0x5Au8; 32];
         for (group_index, members) in [(0usize, &high_members), (1usize, &middle_members)] {
             for (id, original) in members {
-                member_records.push(build_member_record(
+                // Original payloads are consumed at admission time to create
+                // an opaque residual receipt. The query-time interval builder
+                // receives only the compact reconstruction plus that receipt.
+                let receipt = VerifiedMemberResidualCertificate::verify_at_ingest(
                     &group_records[group_index],
-                    id,
+                    id.clone(),
                     original,
-                    &query,
-                ));
+                    original,
+                    0.0,
+                    transform_digest,
+                )
+                .unwrap();
+                member_records.push(
+                    GroupMemberScoreIntervalRecord::from_verified_certificate(
+                        &group_records[group_index],
+                        &query,
+                        original,
+                        &receipt,
+                        transform_digest,
+                    )
+                    .unwrap(),
+                );
             }
         }
 
@@ -1503,6 +1520,68 @@ mod tests {
         ));
 
         assert_eq!(group_plan.excluded_groups, vec![groups[2].identity]);
+    }
+
+    #[test]
+    fn query_time_member_interval_uses_receipt_without_original_payload() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let id = "receipt-member";
+        let original = unit_vector_with_first_component(0.95);
+        let reconstruction = unit_vector_with_first_component(0.949);
+        let members = vec![(id.to_owned(), original.clone())];
+        let envelope = ContinuousHVGroupEnvelope::from_original_members(30, 8, &members).unwrap();
+        let group = build_group_record(&envelope, &query);
+        let transform_digest = [0xA7u8; 32];
+        let receipt = VerifiedMemberResidualCertificate::verify_at_ingest(
+            &group,
+            id.to_owned(),
+            &original,
+            &reconstruction,
+            0.002,
+            transform_digest,
+        )
+        .unwrap();
+
+        // There is intentionally no original-payload argument in this query
+        // operation. It checks the group/original digest binding and the
+        // supplied compact reconstruction digest before producing the score
+        // interval.
+        let interval_record = GroupMemberScoreIntervalRecord::from_verified_certificate(
+            &group,
+            &query,
+            &reconstruction,
+            &receipt,
+            transform_digest,
+        )
+        .unwrap();
+        let exact = query.similarity_full_resolution(&original);
+        assert!(interval_record.interval().contains(exact));
+        assert_eq!(interval_record.id(), id);
+
+        assert!(matches!(
+            GroupMemberScoreIntervalRecord::from_verified_certificate(
+                &group,
+                &query,
+                &original,
+                &receipt,
+                transform_digest,
+            ),
+            Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::ReconstructionDigestMismatch
+            ))
+        ));
+        assert!(matches!(
+            GroupMemberScoreIntervalRecord::from_verified_certificate(
+                &group,
+                &query,
+                &reconstruction,
+                &receipt,
+                [0u8; 32],
+            ),
+            Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::TransformProfileMismatch
+            ))
+        ));
     }
 
     #[test]
