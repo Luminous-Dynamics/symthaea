@@ -9,12 +9,9 @@ fn main() {
         .next()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("docs/autonomy/SAM_SCENE_EVIDENCE_SCHEMA_V0_1.json"));
-    let fixture = args
-        .next()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from("docs/autonomy/fixtures/SAM_SCENE_EVIDENCE_CONTRACT_V0_1.json")
-        });
+    let fixture = args.next().map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from("docs/autonomy/fixtures/SAM_SCENE_EVIDENCE_CONTRACT_V0_1.json")
+    });
 
     if args.next().is_some() {
         eprintln!("usage: sam-scene-evidence-check [SCHEMA.json] [FIXTURE.json]");
