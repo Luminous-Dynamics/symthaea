@@ -369,7 +369,7 @@ impl LinearOperator for Poisson1d {
     fn frobenius_norm(&self) -> f64 {
         // There are n diagonal entries of magnitude 2 and 2(n-1)
         // off-diagonal entries of magnitude 1.
-        ((4.0 * self.n as f64) + (2.0 * self.n.saturating_sub(1) as f64)).sqrt()
+        ((4.0 * self.n as f64) + (2.0 * (self.n.saturating_sub(1) as f64))).sqrt()
     }
 
     fn is_symmetric(&self, relative_tolerance: f64) -> bool {
