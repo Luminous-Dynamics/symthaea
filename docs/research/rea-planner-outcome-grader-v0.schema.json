@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-planner-outcome-grader-v0.schema.json",
+  "title": "REA held-out planner outcome grader v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "access_policy",
+    "not_human_adjudicated",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-planner-outcome-grader"
+    },
+    "status": {
+      "const": "synthetic_development_only"
+    },
+    "access_policy": {
+      "const": "grader_only_not_for_planner_input"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "held_out_dgp_id",
+        "held_out_dgp_not_supplied_to_planner",
+        "hidden_likelihoods",
+        "realized_hypothesis_id",
+        "outcome_oracle_policy"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^REA-POA-[0-9]{3}$"
+        },
+        "held_out_dgp_id": {
+          "type": "string",
+          "minLength": 5
+        },
+        "held_out_dgp_not_supplied_to_planner": {
+          "const": true
+        },
+        "hidden_likelihoods": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "experiment_id",
+              "likelihoods"
+            ],
+            "properties": {
+              "experiment_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "likelihoods": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "hypothesis_id",
+                    "outcome_probabilities"
+                  ],
+                  "properties": {
+                    "hypothesis_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "outcome_probabilities": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "realized_hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_oracle_policy": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    }
+  }
+}
