@@ -403,27 +403,27 @@ impl BlindEpisode {
 
         match (&submission.claim, self.manifest.structure_access) {
             (AgentClaim::Boolean { compatible_models, disposition }, StructureAccess::BooleanWithheld) => {
-                validate_models(compatible_models, &crate::candidate_hypotheses(crate::StructureAccess::Withheld))?;
+                validate_models(compatible_models, &reference_boolean_candidates(crate::StructureAccess::Withheld)?)?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             (AgentClaim::Boolean { compatible_models, disposition }, StructureAccess::BooleanSupplied(mechanism)) => {
-                validate_models(compatible_models, &crate::candidate_hypotheses(crate::StructureAccess::Supplied(mechanism)))?;
+                validate_models(compatible_models, &reference_boolean_candidates(crate::StructureAccess::Supplied(mechanism))?)?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             (AgentClaim::Numeric { compatible_models, disposition }, StructureAccess::NumericWithheld) => {
-                validate_models(compatible_models, &numeric::candidate_models(numeric::StructureAccess::Withheld))?;
+                validate_models(compatible_models, &reference_numeric_candidates(numeric::StructureAccess::Withheld))?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             (AgentClaim::Numeric { compatible_models, disposition }, StructureAccess::NumericSupplied(mechanism)) => {
-                validate_models(compatible_models, &numeric::candidate_models(numeric::StructureAccess::Supplied(mechanism)))?;
+                validate_models(compatible_models, &reference_numeric_candidates(numeric::StructureAccess::Supplied(mechanism)))?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             (AgentClaim::Interaction { compatible_models, disposition }, StructureAccess::InteractionWithheld) => {
-                validate_models(compatible_models, &interaction::candidate_models(interaction::StructureAccess::Withheld))?;
+                validate_models(compatible_models, &reference_interaction_candidates(interaction::StructureAccess::Withheld))?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             (AgentClaim::Interaction { compatible_models, disposition }, StructureAccess::InteractionSupplied(structure)) => {
-                validate_models(compatible_models, &interaction::candidate_models(interaction::StructureAccess::Supplied(structure)))?;
+                validate_models(compatible_models, &reference_interaction_candidates(interaction::StructureAccess::Supplied(structure)))?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             _ => Err(ProtocolError::ClaimFamilyMismatch),
@@ -526,6 +526,170 @@ impl BlindEpisode {
     }
 }
 
+/// Evaluator-owned candidate enumeration. The arrays and loops are
+/// intentionally local to the evaluator module rather than calling the
+/// agent-facing candidate_models/candidate_hypotheses generators.
+fn reference_boolean_candidates(
+    access: crate::StructureAccess,
+) -> Result<Vec<Hypothesis>, ProtocolError> {
+    let mechanisms = match access {
+        crate::StructureAccess::Withheld => vec![Mechanism::Direct, Mechanism::HiddenLag],
+        crate::StructureAccess::Supplied(mechanism) => vec![mechanism],
+    };
+    let sensors = [
+        MeasurementMap::Identity,
+        MeasurementMap::Invert,
+        MeasurementMap::ConstantZero,
+    ];
+    let mut models = Vec::new();
+    for mechanism in mechanisms {
+        for sensor in sensors {
+            match mechanism {
+                Mechanism::Direct => models.push(Hypothesis {
+                    mechanism,
+                    measurement_map: sensor,
+                    initial_hidden_state: None,
+                }),
+                Mechanism::HiddenLag => {
+                    for initial in [false, true] {
+                        models.push(Hypothesis {
+                            mechanism,
+                            measurement_map: sensor,
+                            initial_hidden_state: Some(initial),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    models.sort();
+    Ok(models)
+}
+
+fn reference_numeric_candidates(
+    access: numeric::StructureAccess,
+) -> Vec<numeric::ModelHypothesis> {
+    let mechanisms = match access {
+        numeric::StructureAccess::Withheld => vec![
+            numeric::Mechanism::DirectResponse,
+            numeric::Mechanism::LeakyMemory,
+        ],
+        numeric::StructureAccess::Supplied(mechanism) => vec![mechanism],
+    };
+    let sensors = [
+        numeric::SensorMap::Identity,
+        numeric::SensorMap::Negate,
+        numeric::SensorMap::Double,
+        numeric::SensorMap::ConstantZero,
+    ];
+    let mut models = Vec::new();
+    for mechanism in mechanisms {
+        for gain in [1_i64, 2, 3] {
+            for sensor in sensors {
+                match mechanism {
+                    numeric::Mechanism::DirectResponse => models.push(
+                        numeric::ModelHypothesis {
+                            mechanism,
+                            gain,
+                            decay: None,
+                            initial_state: None,
+                            sensor,
+                        },
+                    ),
+                    numeric::Mechanism::LeakyMemory => {
+                        for decay in [0_i64, 1, 2] {
+                            for initial_state in [-1_i64, 0, 1] {
+                                models.push(numeric::ModelHypothesis {
+                                    mechanism,
+                                    gain,
+                                    decay: Some(decay),
+                                    initial_state: Some(initial_state),
+                                    sensor,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    models.sort();
+    models
+}
+
+fn reference_interaction_candidates(
+    access: interaction::StructureAccess,
+) -> Vec<interaction::ModelHypothesis> {
+    let structures = match access {
+        interaction::StructureAccess::Withheld => vec![
+            interaction::Structure::SingleInputU,
+            interaction::Structure::SingleInputV,
+            interaction::Structure::AdditiveTwoInput,
+            interaction::Structure::BilinearInteraction,
+        ],
+        interaction::StructureAccess::Supplied(structure) => vec![structure],
+    };
+    let mut models = Vec::new();
+    for structure in structures {
+        for bias in [-1_i64, 0, 1] {
+            match structure {
+                interaction::Structure::SingleInputU => {
+                    for weight_u in [-2_i64, -1, 1, 2] {
+                        models.push(interaction::ModelHypothesis {
+                            structure,
+                            bias,
+                            weight_u,
+                            weight_v: 0,
+                            interaction_weight: 0,
+                        });
+                    }
+                }
+                interaction::Structure::SingleInputV => {
+                    for weight_v in [-2_i64, -1, 1, 2] {
+                        models.push(interaction::ModelHypothesis {
+                            structure,
+                            bias,
+                            weight_u: 0,
+                            weight_v,
+                            interaction_weight: 0,
+                        });
+                    }
+                }
+                interaction::Structure::AdditiveTwoInput => {
+                    for weight_u in [-2_i64, -1, 1, 2] {
+                        for weight_v in [-2_i64, -1, 1, 2] {
+                            models.push(interaction::ModelHypothesis {
+                                structure,
+                                bias,
+                                weight_u,
+                                weight_v,
+                                interaction_weight: 0,
+                            });
+                        }
+                    }
+                }
+                interaction::Structure::BilinearInteraction => {
+                    for weight_u in [-2_i64, -1, 1, 2] {
+                        for weight_v in [-2_i64, -1, 1, 2] {
+                            for interaction_weight in [-2_i64, -1, 1, 2] {
+                                models.push(interaction::ModelHypothesis {
+                                    structure,
+                                    bias,
+                                    weight_u,
+                                    weight_v,
+                                    interaction_weight,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    models.sort();
+    models
+}
+
 /// Independent evaluator-side trace filters. These deliberately do not call
 /// the agent-facing discovery or prediction implementations. They share
 /// declared candidate types/families, but use separate transition logic.
@@ -537,7 +701,7 @@ fn reference_boolean_version_space(
         return Err(ProtocolError::InvalidEvaluatorTrace);
     }
     let mut compatible = Vec::new();
-    for hypothesis in crate::candidate_hypotheses(access) {
+    for hypothesis in reference_boolean_candidates(access)? {
         let mut latent_state = hypothesis.initial_hidden_state;
         let mut matches = true;
         for (&input, &measurement) in log.interventions.iter().zip(&log.measurements) {
@@ -577,7 +741,7 @@ fn reference_numeric_version_space(
     access: numeric::StructureAccess,
 ) -> Vec<numeric::ModelHypothesis> {
     let mut compatible = Vec::new();
-    for model in numeric::candidate_models(access) {
+    for model in reference_numeric_candidates(access) {
         let mut state = model.initial_state;
         let mut matches = true;
         for (&input, &observed) in log.interventions.iter().zip(&log.measurements) {
@@ -627,7 +791,7 @@ fn reference_interaction_version_space(
     access: interaction::StructureAccess,
 ) -> Vec<interaction::ModelHypothesis> {
     let mut compatible = Vec::new();
-    for model in interaction::candidate_models(access) {
+    for model in reference_interaction_candidates(access) {
         let mut matches = true;
         for (input, &observed) in log.interventions.iter().zip(&log.measurements) {
             let [u, v] = *input;
