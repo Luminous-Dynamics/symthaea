@@ -94,7 +94,11 @@ pub struct ArmAggregate {
     pub decision_correct: usize,
     pub evidence_references_valid: usize,
     pub oracle_singleton_model_cases: usize,
+    pub claimed_singleton_model_cases: usize,
     pub oracle_identified_structure_cases: usize,
+    pub claimed_identified_structure_cases: usize,
+    pub correct_identified_structure_cases: usize,
+    pub missed_identifiable_structure_cases: usize,
     pub false_unique_structure_claims: usize,
     pub abstentions: usize,
     pub safe_abstentions: usize,
@@ -118,7 +122,11 @@ impl ArmAggregate {
             decision_correct: 0,
             evidence_references_valid: 0,
             oracle_singleton_model_cases: 0,
+            claimed_singleton_model_cases: 0,
             oracle_identified_structure_cases: 0,
+            claimed_identified_structure_cases: 0,
+            correct_identified_structure_cases: 0,
+            missed_identifiable_structure_cases: 0,
             false_unique_structure_claims: 0,
             abstentions: 0,
             safe_abstentions: 0,
@@ -138,8 +146,20 @@ impl ArmAggregate {
         self.decision_correct += bool_count(score.decision_correct);
         self.evidence_references_valid += bool_count(score.evidence_references_valid);
         self.oracle_singleton_model_cases += bool_count(score.set_score.oracle_model_count == 1);
+        self.claimed_singleton_model_cases += bool_count(score.set_score.claimed_model_count == 1);
         self.oracle_identified_structure_cases +=
             bool_count(score.structure_score.oracle_structure_identified);
+        self.claimed_identified_structure_cases +=
+            bool_count(score.structure_score.claimed_structure_identified);
+        self.correct_identified_structure_cases += bool_count(
+            score.structure_score.oracle_structure_identified
+                && score.structure_score.claimed_structure_identified
+                && score.structure_score.exact_structure_set_match,
+        );
+        self.missed_identifiable_structure_cases += bool_count(
+            score.structure_score.oracle_structure_identified
+                && !score.structure_score.claimed_structure_identified,
+        );
         self.false_unique_structure_claims += bool_count(
             !score.structure_score.oracle_structure_identified
                 && score.structure_score.claimed_structure_identified,
@@ -487,6 +507,73 @@ mod tests {
             first.strategy,
             strategy_for_pair(policy, WorldFamily::TwoInputResponse, 0).strategy
         );
+    }
+
+    #[test]
+    fn arm_aggregate_separates_identified_missed_and_false_unique_structures() {
+        use crate::protocol::{SetScore, StructureScore};
+
+        let mut aggregate = ArmAggregate::new();
+        let false_unique = EvaluatorScore {
+            evidence_prefix_sha256: "sha256:".to_owned(),
+            generating_model_in_version_space: true,
+            set_score: SetScore {
+                claimed_model_count: 2,
+                oracle_model_count: 2,
+                correct_model_count: 2,
+                exact_version_space_match: true,
+            },
+            structure_score: StructureScore {
+                claimed_structure_count: 1,
+                oracle_structure_count: 2,
+                correct_structure_count: 1,
+                exact_structure_set_match: false,
+                claimed_structure_identified: true,
+                oracle_structure_identified: false,
+            },
+            safe_abstention: false,
+            unnecessary_abstention: false,
+            decision_correct: false,
+            abstained: false,
+            evidence_references_valid: true,
+            cited_evidence_count: 1,
+            observed_evidence_count: 1,
+            probe_count: 1,
+        };
+        aggregate.record(&false_unique);
+
+        let missed = EvaluatorScore {
+            structure_score: StructureScore {
+                claimed_structure_count: 2,
+                oracle_structure_count: 1,
+                correct_structure_count: 1,
+                exact_structure_set_match: false,
+                claimed_structure_identified: false,
+                oracle_structure_identified: true,
+            },
+            ..false_unique.clone()
+        };
+        aggregate.record(&missed);
+
+        let correct = EvaluatorScore {
+            structure_score: StructureScore {
+                claimed_structure_count: 1,
+                oracle_structure_count: 1,
+                correct_structure_count: 1,
+                exact_structure_set_match: true,
+                claimed_structure_identified: true,
+                oracle_structure_identified: true,
+            },
+            ..false_unique
+        };
+        aggregate.record(&correct);
+
+        assert_eq!(aggregate.claimed_singleton_model_cases, 2);
+        assert_eq!(aggregate.oracle_identified_structure_cases, 2);
+        assert_eq!(aggregate.claimed_identified_structure_cases, 2);
+        assert_eq!(aggregate.correct_identified_structure_cases, 1);
+        assert_eq!(aggregate.missed_identifiable_structure_cases, 1);
+        assert_eq!(aggregate.false_unique_structure_claims, 1);
     }
 
     #[test]
