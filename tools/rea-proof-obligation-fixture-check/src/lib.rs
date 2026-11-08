@@ -119,10 +119,19 @@ pub enum ClaimReadiness {
 /// Predicted candidate outcomes are not inputs to this function.
 pub fn evaluate_claim_readiness(case: &Value) -> Result<ClaimReadiness, FixtureError> {
     let obligations = array_at(case, &["obligations"])?;
+    let mut has_mandatory_obligation = false;
     for obligation in obligations {
-        if bool_at(obligation, &["required"])? && string_at(obligation, &["status"])? != "satisfied" {
-            return Ok(ClaimReadiness::NotReady);
+        if bool_at(obligation, &["required"])? {
+            has_mandatory_obligation = true;
+            if string_at(obligation, &["status"])? != "satisfied" {
+                return Ok(ClaimReadiness::NotReady);
+            }
         }
+    }
+    // Fail closed on vacuous proof: without a declared mandatory evidence
+    // burden, the evaluator cannot promote the claim to Ready.
+    if !has_mandatory_obligation {
+        return Ok(ClaimReadiness::NotReady);
     }
     Ok(ClaimReadiness::Ready)
 }
@@ -251,6 +260,16 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
         }
 
         let obligations = array_at(case, &["obligations"])?;
+        if !obligations.iter().any(|obligation| {
+            obligation
+                .get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        }) {
+            return Err(FixtureError(format!(
+                "case {case_id} must declare at least one mandatory proof obligation"
+            )));
+        }
         let mut obligation_by_id = BTreeMap::<String, &Value>::new();
         for obligation in obligations {
             let id = string_at(obligation, &["obligation_id"])?;
@@ -914,6 +933,34 @@ mod tests {
         assert!(validate_fixture(&value).is_err());
     }
 
+
+    #[test]
+    fn readiness_without_mandatory_obligations_fails_closed() {
+        let mut case = fixture()["cases"][0].clone();
+        for obligation in case["obligations"].as_array_mut().unwrap() {
+            obligation["required"] = Value::Bool(false);
+            obligation["status"] = Value::String("satisfied".to_owned());
+        }
+        assert_eq!(
+            evaluate_claim_readiness(&case).unwrap(),
+            ClaimReadiness::NotReady
+        );
+
+        case["obligations"] = serde_json::json!([]);
+        assert_eq!(
+            evaluate_claim_readiness(&case).unwrap(),
+            ClaimReadiness::NotReady
+        );
+    }
+
+    #[test]
+    fn fixture_case_without_mandatory_obligation_is_rejected() {
+        let mut value = fixture();
+        for obligation in value["cases"][0]["obligations"].as_array_mut().unwrap() {
+            obligation["required"] = Value::Bool(false);
+        }
+        assert!(validate_fixture(&value).is_err());
+    }
 
     #[test]
     fn readiness_requires_every_mandatory_obligation_to_be_satisfied() {
