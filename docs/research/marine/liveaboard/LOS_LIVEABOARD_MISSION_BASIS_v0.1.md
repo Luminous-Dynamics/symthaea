@@ -173,3 +173,12 @@ Standards status is time-sensitive. The standards register must record the check
 ## 12. Claim ceiling
 
 This document is a research design basis only. It is not a construction package or professional design approval.
+
+
+### Instrumented demonstrator and measurement campaign
+
+[MARINE-TEST-EVIDENCE-001 #11064](https://github.com/Luminous-Dynamics/symthaea/issues/11064) defines a marine-specific campaign binding over ROB-INSTR #4866, ROB-EXP #4800, SE-OBS #3695, EXEC-ID calibration #4620, quantity/unit/frame #4861 and physical article/as-built #4859. It adds no second sensor, calibration, quantity, observation or telemetry ontology. The campaign must bind the exact test article and every channel's as-built configuration, instrument endpoint, calibration epoch, bandwidth/sampling review, source/DAQ/receive clocks, raw observation digest and analysis profile.
+
+For electric/hybrid propulsion, ISO 16315:2026 Edition 2 is published and within scope for small craft up to 24 m LH under its stated propulsion-system and voltage conditions. The 2026 revision clarifies overcurrent protection and revises isolated-DC fault monitoring. Applicability and clause-level mapping require the licensed standard and qualified marine electrical review; a campaign record or sensor trace is not compliance evidence by itself. Official source: https://www.iso.org/standard/84203.html
+
+For towing-tank/model resistance or propulsion experiments, select the current applicable ITTC procedure and uncertainty-analysis method. Do not invent universal sensor-rate or accuracy settings. Every campaign's sampling and timing adequacy must be assessed against the exact physical claim and measurement chain. ITTC register: https://ittc.info/downloads/quality-systems-manual/recommended-procedures-and-guidelines/
