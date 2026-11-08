@@ -343,21 +343,41 @@ fn release_accepted(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TASK_ID: &str = "replace_maker_A";
+    const REV_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const REV_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
     fn service() -> ServiceContract {
         ServiceContract { service_id:"water".into(), unit:"L/h".into(),
             minimum_rate:40.0, nominal_rate:80.0, initial_rate:80.0 }
     }
-    fn event(id:&str, t:u64, kind:EventKind, rate:f64) -> EvidenceEvent {
+    fn event_with_revision(
+        id:&str, t:u64, kind:EventKind, rate:f64, revision:&str,
+    ) -> EvidenceEvent {
         EvidenceEvent { event_id:id.into(), at_seconds:t, kind, service_id:"water".into(),
-            component_id:"maker_A".into(), component_revision_digest:"a".repeat(64),
+            component_id:"maker_A".into(), component_revision_digest:revision.into(),
             maintenance_task_id:None, delivered_rate_after:rate, evidence_ref:format!("fixture:{id}") }
     }
+    fn event(id:&str, t:u64, kind:EventKind, rate:f64) -> EvidenceEvent {
+        event_with_revision(id,t,kind,rate,REV_A)
+    }
+    fn task_event_with_revision(
+        id:&str, t:u64, kind:EventKind, rate:f64, revision:&str,
+    ) -> EvidenceEvent {
+        let mut e=event_with_revision(id,t,kind,rate,revision);
+        e.maintenance_task_id=Some(TASK_ID.into());
+        e
+    }
+    fn task_event(id:&str,t:u64,kind:EventKind,rate:f64) -> EvidenceEvent {
+        task_event_with_revision(id,t,kind,rate,REV_A)
+    }
     fn task() -> MaintenanceTask {
-        MaintenanceTask { task_id:"replace_maker_A".into(), service_id:"water".into(),
+        MaintenanceTask { task_id:TASK_ID.into(), service_id:"water".into(),
             component_id:"maker_A".into(), procedure_approved:true, qualified_personnel_present:true,
-            faulted_component_revision_digest:"a".repeat(64),
-            target_component_revision_digest:"a".repeat(64),
-            spare_component_revision_digest:Some("a".repeat(64)),
+            faulted_component_revision_digest:REV_A.into(),
+            target_component_revision_digest:REV_A.into(),
+            spare_component_revision_digest:Some(REV_A.into()),
             spare_state:SpareState::CompatibleOnboard, required_tests:vec!["flow_quality".into()],
             completed_tests:vec!["flow_quality".into()], configuration_updated:true, authorized_release:true }
     }
@@ -371,11 +391,11 @@ mod tests {
         let events=vec![
             event("failure",3600,EventKind::ComponentFailure,45.0),
             event("buffer",3600,EventKind::BufferSupplyActive,45.0),
-            { let mut e = event("repair_start",7200,EventKind::RepairStarted,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
-            { let mut e = event("repair_done",14400,EventKind::RepairCompleted,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
-            { let mut e = event("test",18000,EventKind::PostTestPassed,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
-            { let mut e = { let mut e = event("config",18600,EventKind::ConfigurationUpdated,45.0); e.maintenance_task_id = Some("replace_maker_A".into()); e }; e.maintenance_task_id = Some("replace_maker_A".into()); e },
-            { let mut e = { let mut e = event("release",19200,EventKind::AuthorizedRelease,80.0); e.maintenance_task_id = Some("replace_maker_A".into()); e }; e.maintenance_task_id = Some("replace_maker_A".into()); e }];
+            task_event("repair_start",7200,EventKind::RepairStarted,45.0),
+            task_event("repair_done",14400,EventKind::RepairCompleted,45.0),
+            task_event("test",18000,EventKind::PostTestPassed,45.0),
+            task_event("config",18600,EventKind::ConfigurationUpdated,45.0),
+            task_event("release",19200,EventKind::AuthorizedRelease,80.0)];
         let out=evaluate_service_continuity(&case(events,vec![task()],86400)).unwrap();
         let s=&out.services[0];
         assert_eq!(out.disposition,ContinuityDisposition::NoFloorBreach);
@@ -384,19 +404,22 @@ mod tests {
         assert_eq!(s.tasr_seconds,Some(15600));
         assert_eq!(s.time_below_floor_seconds,0);
     }
+
     #[test]
     fn exhausted_buffer_breaches_at_86400_and_does_not_restore() {
         let events=vec![
             event("failure",3600,EventKind::ComponentFailure,45.0),
             event("empty",86400,EventKind::ServiceUnavailable,0.0),
-            { let mut e = event("spare",108000,EventKind::SpareArrived,0.0); e.maintenance_task_id = Some("replace_maker_A".into()); e }];
-        let mut t=task(); t.spare_state=SpareState::CompatibleArrivesLater;
+            task_event("spare",108000,EventKind::SpareArrived,0.0)];
+        let mut t=task();
+        t.spare_state=SpareState::CompatibleArrivesLater;
         t.completed_tests.clear(); t.configuration_updated=false; t.authorized_release=false;
         let out=evaluate_service_continuity(&case(events,vec![t],172800)).unwrap();
         assert_eq!(out.services[0].first_floor_breach_seconds,Some(86400));
         assert_eq!(out.services[0].time_below_floor_seconds,86400);
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
     }
+
     #[test]
     fn common_dependency_failure_defeats_nominal_redundancy() {
         let out=evaluate_service_continuity(&case(
@@ -404,23 +427,67 @@ mod tests {
         assert_eq!(out.services[0].first_floor_breach_seconds,Some(1800));
         assert_eq!(out.services[0].time_below_floor_seconds,41400);
     }
+
     #[test]
-    fn failed_post_test_and_wrong_revision_reject_release() {
+    fn failed_post_test_rejects_release_even_if_a_release_is_attempted() {
         let events=vec![
             event("failure",1800,EventKind::ComponentFailure,0.0),
-            { let mut e = event("repair",3600,EventKind::RepairCompleted,0.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
-            { let mut e = event("test_fail",5400,EventKind::PostTestFailed,0.0); e.maintenance_task_id = Some("replace_maker_A".into()); e },
-            event("config",6000,EventKind::ConfigurationUpdated,0.0),
-            event("release",7200,EventKind::AuthorizedRelease,80.0)];
-        let mut t=task(); t.completed_tests.clear(); t.configuration_updated=false; t.authorized_release=false;
-        let out=evaluate_service_continuity(&case(events.clone(),vec![t],86400)).unwrap();
+            task_event("repair",3600,EventKind::RepairCompleted,0.0),
+            task_event("test_fail",5400,EventKind::PostTestFailed,0.0),
+            task_event("config",6000,EventKind::ConfigurationUpdated,0.0),
+            task_event("release",7200,EventKind::AuthorizedRelease,80.0)];
+        let mut t=task();
+        t.completed_tests.clear(); t.configuration_updated=false; t.authorized_release=false;
+        let out=evaluate_service_continuity(&case(events,vec![t],86400)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
-        let mut wrong=task(); wrong.spare_state=SpareState::WrongRevision;
-        wrong.spare_component_revision_digest=Some("b".repeat(64));
-        let mut passing=events; passing[2]=event("test_pass",5400,EventKind::PostTestPassed,0.0);
-        let out=evaluate_service_continuity(&case(passing,vec![wrong],86400)).unwrap();
+        assert_eq!(out.services[0].rejected_release_attempts,1);
+    }
+
+    #[test]
+    fn wrong_revision_spare_is_rejected() {
+        let events=vec![
+            event("failure",1800,EventKind::ComponentFailure,0.0),
+            task_event("repair",3600,EventKind::RepairCompleted,0.0),
+            task_event("test",5400,EventKind::PostTestPassed,0.0),
+            task_event("config",6000,EventKind::ConfigurationUpdated,0.0),
+            task_event("release",7200,EventKind::AuthorizedRelease,80.0)];
+        let mut t=task();
+        t.spare_state=SpareState::WrongRevision;
+        t.spare_component_revision_digest=Some(REV_B.into());
+        let out=evaluate_service_continuity(&case(events,vec![t],86400)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds,None);
+        assert_eq!(out.services[0].rejected_release_attempts,1);
+    }
+
+    #[test]
+    fn release_is_bound_to_exact_target_revision_not_only_component_name() {
+        let mut t=task();
+        t.target_component_revision_digest=REV_B.into();
+        t.spare_component_revision_digest=Some(REV_B.into());
+        let events=vec![
+            event_with_revision("failure",1800,EventKind::ComponentFailure,0.0,REV_A),
+            task_event_with_revision("repair",3600,EventKind::RepairCompleted,0.0,REV_B),
+            task_event_with_revision("test",5400,EventKind::PostTestPassed,0.0,REV_B),
+            task_event_with_revision("config",6000,EventKind::ConfigurationUpdated,0.0,REV_B),
+            task_event_with_revision("release",7200,EventKind::AuthorizedRelease,80.0,REV_B)];
+        let out=evaluate_service_continuity(&case(events,vec![t],86400)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds,Some(7200));
+    }
+
+    #[test]
+    fn mismatched_spare_digest_is_rejected_even_when_spare_state_claims_compatible() {
+        let events=vec![
+            event("failure",1800,EventKind::ComponentFailure,0.0),
+            task_event("repair",3600,EventKind::RepairCompleted,0.0),
+            task_event("test",5400,EventKind::PostTestPassed,0.0),
+            task_event("config",6000,EventKind::ConfigurationUpdated,0.0),
+            task_event("release",7200,EventKind::AuthorizedRelease,80.0)];
+        let mut t=task();
+        t.spare_component_revision_digest=Some(REV_B.into());
+        let out=evaluate_service_continuity(&case(events,vec![t],86400)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
     }
+
     #[test]
     fn safety_gate_is_not_misreported_as_a_flow_breach() {
         let out=evaluate_service_continuity(&case(
@@ -428,19 +495,21 @@ mod tests {
         assert_eq!(out.disposition,ContinuityDisposition::UnsafeNotAuthorized);
         assert_eq!(out.service_floor_breach_count,0);
     }
+
     #[test]
     fn permutation_does_not_change_results() {
         let mut events=vec![
             event("failure",3600,EventKind::ComponentFailure,45.0),
-            event("repair",14400,EventKind::RepairCompleted,45.0),
-            event("test",18000,EventKind::PostTestPassed,45.0),
-            event("config",18600,EventKind::ConfigurationUpdated,45.0),
-            event("release",19200,EventKind::AuthorizedRelease,80.0)];
+            task_event("repair",14400,EventKind::RepairCompleted,45.0),
+            task_event("test",18000,EventKind::PostTestPassed,45.0),
+            task_event("config",18600,EventKind::ConfigurationUpdated,45.0),
+            task_event("release",19200,EventKind::AuthorizedRelease,80.0)];
         let a=evaluate_service_continuity(&case(events.clone(),vec![task()],86400)).unwrap();
         events.reverse();
         let b=evaluate_service_continuity(&case(events,vec![task()],86400)).unwrap();
         assert_eq!(a,b);
     }
+
     #[test]
     fn conflicting_same_time_rates_and_orphans_fail_closed() {
         let err=evaluate_service_continuity(&case(vec![
@@ -453,68 +522,74 @@ mod tests {
         assert_eq!(evaluate_service_continuity(&case(vec![orphan],vec![],100)).unwrap_err(),
             EvaluationError::UnknownEventService("missing".into()));
     }
+
     #[test]
     fn out_of_window_event_and_release_without_task_are_rejected() {
         let late=event("late",101,EventKind::ComponentFailure,0.0);
         assert_eq!(evaluate_service_continuity(&case(vec![late],vec![],100)).unwrap_err(),
             EvaluationError::EventOutsideTimeline("late".into()));
         let events=vec![
-            event("repair",10,EventKind::RepairCompleted,0.0),
-            event("test",20,EventKind::PostTestPassed,0.0),
-            event("config",30,EventKind::ConfigurationUpdated,0.0),
+            task_event("repair",10,EventKind::RepairCompleted,0.0),
+            task_event("test",20,EventKind::PostTestPassed,0.0),
+            task_event("config",30,EventKind::ConfigurationUpdated,0.0),
             event("release",40,EventKind::AuthorizedRelease,80.0)];
-        let out=evaluate_service_continuity(&case(events,vec![],100)).unwrap();
+        // Event has no task id, so a claim of release cannot be linked to a work order.
+        let mut t=task();
+        let out=evaluate_service_continuity(&case(events,vec![t],100)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
         assert_eq!(out.services[0].rejected_release_attempts,1);
     }
 
     #[test]
     fn surplus_in_one_service_cannot_compensate_for_another_service_breach() {
-        let mut input = case(vec![
-            event("power_failure", 10, EventKind::CommonDependencyFailure, 0.0)
-        ], vec![], 3_610);
+        let mut input=case(vec![
+            event("power_failure",10,EventKind::CommonDependencyFailure,0.0)
+        ],vec![],3610);
         input.services.push(ServiceContract {
-            service_id: "electrical_distribution".into(),
-            unit: "kW".into(),
-            minimum_rate: 2.0,
-            nominal_rate: 5.0,
-            initial_rate: 5.0,
+            service_id:"electrical_distribution".into(), unit:"kW".into(),
+            minimum_rate:2.0, nominal_rate:5.0, initial_rate:5.0,
         });
-        input.events[0].service_id = "electrical_distribution".into();
-        input.events[0].component_id = "dc_controller".into();
-        let out = evaluate_service_continuity(&input).unwrap();
-        assert_eq!(out.disposition, ContinuityDisposition::FloorBreach);
-        assert_eq!(out.services[0].time_below_floor_seconds, 0);
-        assert_eq!(out.services[1].time_below_floor_seconds, 3_600);
-        assert!((out.services[1].shortfall_rate_hours - 2.0).abs() < 1e-12);
+        input.events[0].service_id="electrical_distribution".into();
+        input.events[0].component_id="dc_controller".into();
+        let out=evaluate_service_continuity(&input).unwrap();
+        assert_eq!(out.disposition,ContinuityDisposition::FloorBreach);
+        assert_eq!(out.services[0].time_below_floor_seconds,0);
+        assert_eq!(out.services[1].time_below_floor_seconds,3600);
+        assert!((out.services[1].shortfall_rate_hours-2.0).abs()<1e-12);
     }
 
     #[test]
-    fn procedure_and_personnel_gates_block_release() {
-        let events = vec![
-            event("failure", 10, EventKind::ComponentFailure, 0.0),
-            event("repair", 20, EventKind::RepairCompleted, 0.0),
-            event("test", 30, EventKind::PostTestPassed, 0.0),
-            event("config", 40, EventKind::ConfigurationUpdated, 0.0),
-            event("release", 50, EventKind::AuthorizedRelease, 80.0),
-        ];
-        let mut unapproved = task();
-        unapproved.procedure_approved = false;
-        let out = evaluate_service_continuity(&case(events.clone(), vec![unapproved], 100)).unwrap();
-        assert_eq!(out.services[0].accepted_restoration_seconds, None);
-        let mut unqualified = task();
-        unqualified.qualified_personnel_present = false;
-        let out = evaluate_service_continuity(&case(events, vec![unqualified], 100)).unwrap();
-        assert_eq!(out.services[0].accepted_restoration_seconds, None);
+    fn procedure_and_personnel_gates_are_independently_enforced() {
+        let events=vec![
+            event("failure",10,EventKind::ComponentFailure,0.0),
+            task_event("repair",20,EventKind::RepairCompleted,0.0),
+            task_event("test",30,EventKind::PostTestPassed,0.0),
+            task_event("config",40,EventKind::ConfigurationUpdated,0.0),
+            task_event("release",50,EventKind::AuthorizedRelease,80.0)];
+        let mut unapproved=task();
+        unapproved.procedure_approved=false;
+        let out=evaluate_service_continuity(&case(events.clone(),vec![unapproved],100)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds,None);
+        let mut unqualified=task();
+        unqualified.qualified_personnel_present=false;
+        let out=evaluate_service_continuity(&case(events,vec![unqualified],100)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds,None);
     }
 
     #[test]
     fn duplicate_event_ids_are_rejected() {
-        let err = evaluate_service_continuity(&case(vec![
-            event("same", 10, EventKind::ComponentFailure, 0.0),
-            event("same", 20, EventKind::ServiceUnavailable, 0.0),
-        ], vec![], 100)).unwrap_err();
-        assert_eq!(err, EvaluationError::DuplicateEventId("same".into()));
+        let err=evaluate_service_continuity(&case(vec![
+            event("same",10,EventKind::ComponentFailure,0.0),
+            event("same",20,EventKind::ServiceUnavailable,0.0),
+        ],vec![],100)).unwrap_err();
+        assert_eq!(err,EvaluationError::DuplicateEventId("same".into()));
     }
 
+    #[test]
+    fn malformed_revision_digest_fails_closed() {
+        let mut bad=event("bad_digest",10,EventKind::ComponentFailure,0.0);
+        bad.component_revision_digest="not-a-digest".into();
+        assert_eq!(evaluate_service_continuity(&case(vec![bad],vec![],100)).unwrap_err(),
+            EvaluationError::InvalidRevisionDigest("bad_digest".into()));
+    }
 }
