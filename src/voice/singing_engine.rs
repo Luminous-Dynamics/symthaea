@@ -623,6 +623,71 @@ impl VocalPerformance {
         }
         Ok(())
     }
+    /// Evaluate the canonical score-conditioned pitch target at an absolute time.
+    ///
+    /// Portamento is interpolated in log-frequency (uniform cents), resets
+    /// after an explicit score rest, and vibrato uses the frozen per-syllable
+    /// onset/rate/depth controls. Renderers apply their own attack/release
+    /// envelopes around this shared musical target; evaluators use the same
+    /// target so control adherence is not scored against a different curve.
+    pub fn target_pitch_at(&self, time_s: f32) -> Option<f32> {
+        if !time_s.is_finite() || time_s < 0.0 {
+            return None;
+        }
+        const REST_EPSILON_S: f32 = 0.000_01;
+        const VIBRATO_ONSET_RAMP_S: f32 = 0.05;
+        let mut previous_frequency: Option<f32> = None;
+        let mut previous_end_s = 0.0f32;
+
+        for syllable in &self.syllables {
+            for note in syllable.notes() {
+                let note_start = note.start_time;
+                let note_end = note_start + note.duration;
+                if time_s >= note_start && time_s < note_end {
+                    let gap_before = note_start - previous_end_s;
+                    let from_frequency = if gap_before > REST_EPSILON_S {
+                        note.frequency
+                    } else {
+                        previous_frequency.unwrap_or(note.frequency)
+                    };
+                    let elapsed = (time_s - note_start).max(0.0);
+                    let transition_s = note.duration * syllable.portamento;
+                    let transition = if transition_s > f32::EPSILON {
+                        (elapsed / transition_s).clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    };
+                    let center_frequency = if from_frequency > 0.0 && note.frequency > 0.0 {
+                        from_frequency
+                            * (note.frequency / from_frequency).powf(transition)
+                    } else {
+                        note.frequency
+                    };
+                    if syllable.vibrato_depth_cents <= 0.0
+                        || syllable.vibrato_rate_hz <= 0.0
+                    {
+                        return Some(center_frequency);
+                    }
+                    let vibrato_start =
+                        note_start + note.duration * syllable.vibrato_onset.clamp(0.0, 1.0);
+                    if time_s < vibrato_start {
+                        return Some(center_frequency);
+                    }
+                    let onset_gate =
+                        ((time_s - vibrato_start) / VIBRATO_ONSET_RAMP_S).clamp(0.0, 1.0);
+                    let phase = std::f32::consts::TAU
+                        * syllable.vibrato_rate_hz
+                        * (time_s - vibrato_start).max(0.0);
+                    let cents = syllable.vibrato_depth_cents * phase.sin() * onset_gate;
+                    return Some(center_frequency * 2.0f32.powf(cents / 1200.0));
+                }
+                previous_frequency = Some(note.frequency);
+                previous_end_s = note_end;
+            }
+        }
+        None
+    }
+
     pub fn duration_s(&self) -> f32 {
         self.syllables
             .iter()
@@ -1254,6 +1319,75 @@ mod tests {
         assert_eq!(performance.syllables[0].melisma_notes.len(), 2);
         assert!((performance.duration_s() - 0.7).abs() < 1e-4);
     }
+    #[test]
+    fn shared_pitch_target_applies_log_portamento_and_performance_vibrato() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 440.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let mut performance =
+            VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        performance.syllables[0].vibrato_depth_cents = 0.0;
+        performance.syllables[1].portamento = 0.5;
+        performance.syllables[1].vibrato_onset = 0.5;
+        performance.syllables[1].vibrato_rate_hz = 5.0;
+        performance.syllables[1].vibrato_depth_cents = 20.0;
+
+        let at_glide = performance.target_pitch_at(0.6).unwrap();
+        let expected_glide = 220.0 * 2.0f32.powf(0.4);
+        assert!(
+            (at_glide - expected_glide).abs() < 0.01,
+            "expected log-frequency glide {expected_glide}, got {at_glide}"
+        );
+        assert!(
+            (performance.target_pitch_at(0.75).unwrap() - 440.0).abs() < 0.01,
+            "portamento must reach target before vibrato onset"
+        );
+        let at_vibrato_onset = performance.target_pitch_at(0.75).unwrap();
+        let after_onset = performance.target_pitch_at(0.80).unwrap();
+        assert!(
+            (after_onset - at_vibrato_onset).abs() > 0.1,
+            "per-syllable vibrato must alter the shared score target after onset"
+        );
+        assert_eq!(performance.target_pitch_at(1.0), None);
+        assert_eq!(performance.target_pitch_at(f32::NAN), None);
+    }
+
+    #[test]
+    fn shared_pitch_target_resets_portamento_across_explicit_rest() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 440.0,
+                start_time: 0.8,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let mut performance =
+            VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        performance.syllables[1].portamento = 1.0;
+        assert!(
+            (performance.target_pitch_at(0.81).unwrap() - 440.0).abs() < 0.01,
+            "a score rest must reset the preceding pitch for portamento"
+        );
+    }
+
     #[test]
     fn from_melody_supports_explicit_multiple_phrase_boundaries() {
         let notes = [
