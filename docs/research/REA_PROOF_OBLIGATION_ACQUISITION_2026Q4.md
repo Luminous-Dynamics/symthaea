@@ -742,3 +742,18 @@ All-minimal-proof enumeration is potentially exponential in the number of candid
 The public synthetic corpus is not the hidden benchmark. Before capability comparisons, use source-family-disjoint held-out cases, independently adjudicated gold minimal proof sets, fixed context/observation budgets, repeated attempts where stochastic systems are involved, and paired confidence intervals.
 
 No evidence-minimality, duplicate-resistance, or cost-optimality result is claimed by the existing 18-case fixture workflow. This section defines a composed follow-on evaluation, not a new retrieval engine or justification graph.
+
+
+### Pre-generation evidence-sufficiency gate
+
+Chen et al., *Relevance Is Not Sufficient Evidence: Detecting Evidence Gaps Before Generation in RAG* (September 2026 preprint, RINSE), studies whether evidence is sufficient before an answer is generated. Its abstract reports that 12 tested generators still answered 40.0–99.3% of insufficient-evidence questions despite abstention instructions. RINSE evaluates evidence sufficiency from the question and retrieved passages before generation; on six datasets it reports a 0.837 sufficient-vs-insufficient ranking score, compared with 0.746 for the best of ten prior methods and 0.784 for a frontier API model in that paper's protocol. This is a preprint result, not an REA measurement. https://arxiv.org/abs/2609.37469
+
+REA should make this a first-class gate:
+
+1. Resolve the requested claim and its mandatory obligations before generating an answer.
+2. Test whether the currently available evidence can satisfy each obligation under the source, scope, temporal, numeric and population rules.
+3. Distinguish **Supported**, **Refuted**, **Insufficient/Unknown**, and **Conflicted**; missing evidence is not a negative fact.
+4. Only then permit claim generation, constrained to the strongest wording supported by the verified proof packet.
+5. Independently replay the output claim against the packet; a pre-generation gate is necessary but not sufficient for final verification.
+
+Measure pre-generation false-ready rate and answer-on-insufficient rate separately. Do not reward a gate that suppresses every answer: pair safety with useful coverage on sufficient cases. This is an evidence-before-generation architecture, not a confidence prompt or a second LLM judge.
