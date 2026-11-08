@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-marine-campaign-evidence"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Fail-closed verifier for marine test-campaign evidence bindings"
+
+[workspace]
+
+[dependencies]
+serde_json = "=1.0.150"
