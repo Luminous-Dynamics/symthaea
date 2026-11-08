@@ -175,7 +175,9 @@ pub enum QuantifiedProofError {
         child: usize,
         parents: usize,
     },
-    UnreachableNode { node: usize },
+    UnreachableNode {
+        node: usize,
+    },
     VerifierVisitBudgetExceeded {
         required: u128,
         limit: u128,
@@ -723,13 +725,25 @@ fn verify_node(
                 .ok_or(QuantifiedProofError::ResourceAccountingOverflow)?;
             assignment[*variable] = Some(false);
             let low = verify_node(
-                *low_child, expected_position + 1, order, problem, proof,
-                assignment, budget, state,
+                *low_child,
+                expected_position + 1,
+                order,
+                problem,
+                proof,
+                assignment,
+                budget,
+                state,
             )?;
             assignment[*variable] = Some(true);
             let high = verify_node(
-                *high_child, expected_position + 1, order, problem, proof,
-                assignment, budget, state,
+                *high_child,
+                expected_position + 1,
+                order,
+                problem,
+                proof,
+                assignment,
+                budget,
+                state,
             )?;
             assignment[*variable] = None;
             low && high
