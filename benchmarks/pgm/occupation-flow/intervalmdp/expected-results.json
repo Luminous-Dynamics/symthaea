@@ -1,0 +1,38 @@
+{
+  "schema": "symthaea.pgm.occupation-flow.intervalmdp-expected.v2",
+  "status": "oracle-values-only-julia-not-executed",
+  "competitor": "Zinoex/IntervalMDP.jl",
+  "source_model_sha256": "b1fb89c3775613d7b9aeb20857e6eb1a15b4133419e6fa3a307ddec6c906c466",
+  
+  "competitor_version": "0.7.0",
+  "julia_compat": "1.11",
+  "arithmetic": "Rational{BigInt}",
+  "algorithms": ["OMaximization", "VertexEnumeration"],
+  "state_count": 8,
+  "finite_reward_horizon": 3,
+  "expected": {
+    "action_a_min": "9/25",
+    "action_a_max": "32/25",
+    "action_b_min": "2/5",
+    "action_b_max": "4/5",
+    "action_c_min": "29/50",
+    "action_c_max": "21/25",
+    "regret_a_b_max": "11/25",
+    "regret_a_c_max": "11/50",
+    "regret_b_a_max": "22/25",
+    "regret_b_c_max": "11/25",
+    "regret_c_a_max": "11/25",
+    "regret_c_b_max": "11/50",
+    "minimax_regret_actions": ["A", "C"],
+    "minimax_regret_value": "11/25"
+  },
+  "qualification": {
+    "julia_executed": false,
+    "exact_output_comparison": "required",
+    "directed_pairwise_comparisons_required": 6,
+    "complete_minimax_regret_tie_set_required": ["A", "C"],
+    "compare_omax_to_vertex_enumeration": true,
+    "symthaea_primal_dual_certificates_required": true,
+    "performance_claim": false
+  }
+}

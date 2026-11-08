@@ -1,0 +1,121 @@
+using IntervalMDP
+
+# The exact reference uses arbitrary-precision rationals end to end.
+const Q = Rational{BigInt}
+q(n::Integer, d::Integer = 1) = BigInt(n) // BigInt(d)
+
+# IntervalMDP stores target states in rows and source-state ambiguity sets
+# in columns. The clock-expanded state layout is:
+#   t=0: states 1,2
+#   t=1: states 3,4
+#   t=2: states 5,6
+#   t=3: terminal states 7,8
+const N_STATES = 8
+lower = fill(q(0), N_STATES, N_STATES)
+upper = fill(q(0), N_STATES, N_STATES)
+
+function set_interval!(source, destination, lo, hi)
+    lower[destination, source] = q(lo[1], lo[2])
+    upper[destination, source] = q(hi[1], hi[2])
+end
+
+# Stage 0.
+set_interval!(1, 3, (2, 5), (4, 5))
+set_interval!(1, 4, (1, 5), (3, 5))
+set_interval!(2, 3, (3, 10), (7, 10))
+set_interval!(2, 4, (3, 10), (7, 10))
+
+# Stage 1.
+set_interval!(3, 5, (1, 2), (9, 10))
+set_interval!(3, 6, (1, 10), (1, 2))
+set_interval!(4, 5, (1, 5), (3, 5))
+set_interval!(4, 6, (2, 5), (4, 5))
+
+# Stage 2: deterministic transition into the zero-reward terminal layer.
+set_interval!(5, 7, (1, 1), (1, 1))
+set_interval!(6, 8, (1, 1), (1, 1))
+
+# Terminal states are absorbing.
+set_interval!(7, 7, (1, 1), (1, 1))
+set_interval!(8, 8, (1, 1), (1, 1))
+
+ambiguity = IntervalAmbiguitySets(; lower, upper)
+model = IntervalMarkovChain(ambiguity, [1])
+
+# Rewards at t=0, t=1, t=2, t=3 respectively. The terminal reward is zero.
+const ACTION_A = Q[q(0), q(0), q(0), q(1), q(0), q(1), q(0), q(0)]
+const ACTION_B = Q[q(0), q(0), q(1), q(0), q(0), q(0), q(0), q(0)]
+const ACTION_C = (ACTION_A .+ ACTION_B) ./ q(2)
+
+# Pairwise regret uses one shared transition process:
+#   regret(a,b) = max_M [ U_b(M) - U_a(M) ].
+# All six directed comparisons are evaluated; independently optimized
+# utility intervals are never subtracted.
+const REGRET_A_B = ACTION_B .- ACTION_A
+const REGRET_A_C = ACTION_C .- ACTION_A
+const REGRET_B_A = ACTION_A .- ACTION_B
+const REGRET_B_C = ACTION_C .- ACTION_B
+const REGRET_C_A = ACTION_A .- ACTION_C
+const REGRET_C_B = ACTION_B .- ACTION_C
+
+function solve_reward(scores::Vector{Q}, mode, bellman_algorithm)
+    property = FiniteTimeReward(scores, q(1), 3)
+    specification = Specification(property, mode)
+    problem = VerificationProblem(model, specification)
+    solution = solve(problem, RobustValueIteration(bellman_algorithm))
+    return (
+        value = value_function(solution)[1],
+        iterations = num_iterations(solution),
+        residual = residual(solution)[1],
+    )
+end
+
+# Pessimistic = minimum over admissible transition rows.
+# Optimistic = maximum over admissible transition rows.
+const QUERIES = [
+    ("action_a_min", ACTION_A, Pessimistic, q(9, 25)),
+    ("action_a_max", ACTION_A, Optimistic, q(32, 25)),
+    ("action_b_min", ACTION_B, Pessimistic, q(2, 5)),
+    ("action_b_max", ACTION_B, Optimistic, q(4, 5)),
+    ("action_c_min", ACTION_C, Pessimistic, q(29, 50)),
+    ("action_c_max", ACTION_C, Optimistic, q(21, 25)),
+    ("regret_a_b_max", REGRET_A_B, Optimistic, q(11, 25)),
+    ("regret_a_c_max", REGRET_A_C, Optimistic, q(11, 50)),
+    ("regret_b_a_max", REGRET_B_A, Optimistic, q(22, 25)),
+    ("regret_b_c_max", REGRET_B_C, Optimistic, q(11, 25)),
+    ("regret_c_a_max", REGRET_C_A, Optimistic, q(11, 25)),
+    ("regret_c_b_max", REGRET_C_B, Optimistic, q(11, 50)),
+]
+
+# Compare two independent IntervalMDP Bellman algorithms:
+# - OMaximization: specialised exact interval-row optimiser.
+# - VertexEnumeration: explicit exact local-polytope vertex reference.
+const ALGORITHMS = [
+    ("omax", OMaximization()),
+    ("vertex_enumeration", VertexEnumeration()),
+]
+
+println("IntervalMDP version: ", Base.pkgversion(IntervalMDP))
+println("Arithmetic: Rational{BigInt}")
+println("States: ", N_STATES, "; finite reward horizon: 3")
+println()
+
+for (algorithm_name, algorithm) in ALGORITHMS
+    println("algorithm=", algorithm_name)
+    for (query_name, scores, mode, expected) in QUERIES
+        result = solve_reward(scores, mode, algorithm)
+        if result.value != expected
+            error("$algorithm_name / $query_name: got $(result.value), expected $expected")
+        end
+        println(
+            query_name,
+            " value=", result.value,
+            " iterations=", result.iterations,
+            " residual=", result.residual,
+        )
+    end
+end
+
+println()
+println("PASS: exact rational values match all 12 preregistered utility and directed-regret queries.")
+println("Minimax-regret actions: A and C (both 11/25); action B has regret 22/25.")

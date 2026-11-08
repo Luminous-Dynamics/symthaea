@@ -5,6 +5,7 @@
 pub mod design;
 pub mod lp_certificate;
 pub mod matrix;
+pub mod occupation_flow;
 pub mod permutation_polynomial;
 pub mod profile;
 pub mod rational_probability;

@@ -1,0 +1,17 @@
+// IDTMC robust total-reward utility endpoints.
+R{"action_a"}min=? [ C ]
+R{"action_a"}max=? [ C ]
+R{"action_b"}min=? [ C ]
+R{"action_b"}max=? [ C ]
+R{"action_c"}min=? [ C ]
+R{"action_c"}max=? [ C ]
+
+// Pairwise regret differences are shifted by a path-constant so all rewards
+// are nonnegative. Subtract the listed offset from each maximum:
+// A->B: 2; A->C: 1; B->A: 1; B->C: 1/2; C->A: 1/2; C->B: 1.
+R{"regret_a_b_shifted"}max=? [ C ]
+R{"regret_a_c_shifted"}max=? [ C ]
+R{"regret_b_a_shifted"}max=? [ C ]
+R{"regret_b_c_shifted"}max=? [ C ]
+R{"regret_c_a_shifted"}max=? [ C ]
+R{"regret_c_b_shifted"}max=? [ C ]

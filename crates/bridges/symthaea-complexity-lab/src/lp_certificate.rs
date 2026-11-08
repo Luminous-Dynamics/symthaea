@@ -69,6 +69,100 @@ impl RationalLp {
     }
 }
 
+/// Canonical sparse rational LP in standard-form maximization convention:
+/// maximize c^T x subject to A x <= b and x >= 0.
+///
+/// Each row stores strictly increasing (column, coefficient) pairs. Explicit
+/// zero coefficients and duplicate/out-of-order columns are rejected. This
+/// representation stores O(nnz + rows + columns) values rather than rows*cols.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SparseRationalLp {
+    rows: Vec<Vec<(usize, CheckedRational)>>,
+    b: Vec<CheckedRational>,
+    c: Vec<CheckedRational>,
+    nonzero_count: usize,
+}
+
+impl SparseRationalLp {
+    pub fn new(
+        rows: Vec<Vec<(usize, CheckedRational)>>,
+        b: Vec<CheckedRational>,
+        c: Vec<CheckedRational>,
+    ) -> Result<Self, LpCertificateError> {
+        if rows.len() != b.len() {
+            return Err(LpCertificateError::RowCountMismatch {
+                matrix_rows: rows.len(),
+                rhs_rows: b.len(),
+            });
+        }
+        let columns = c.len();
+        let mut nonzero_count = 0usize;
+        for (row_index, row) in rows.iter().enumerate() {
+            let mut previous = None;
+            for (column, coefficient) in row {
+                if *column >= columns {
+                    return Err(LpCertificateError::SparseColumnOutOfBounds {
+                        row: row_index,
+                        column: *column,
+                        column_count: columns,
+                    });
+                }
+                if previous.is_some_and(|prior| prior >= *column) {
+                    return Err(LpCertificateError::SparseColumnOrderViolation {
+                        row: row_index,
+                        column: *column,
+                    });
+                }
+                if coefficient.is_zero() {
+                    return Err(LpCertificateError::SparseExplicitZero {
+                        row: row_index,
+                        column: *column,
+                    });
+                }
+                previous = Some(*column);
+                nonzero_count = nonzero_count.checked_add(1)
+                    .ok_or(LpCertificateError::ArithmeticOverflow)?;
+            }
+        }
+        Ok(Self { rows, b, c, nonzero_count })
+    }
+
+    pub fn row_count(&self) -> usize { self.b.len() }
+    pub fn column_count(&self) -> usize { self.c.len() }
+    pub fn nonzero_count(&self) -> usize { self.nonzero_count }
+    pub fn rows(&self) -> &[Vec<(usize, CheckedRational)>] { &self.rows }
+    pub fn rhs(&self) -> &[CheckedRational] { &self.b }
+    pub fn objective(&self) -> &[CheckedRational] { &self.c }
+
+    /// Convert a dense exact LP to canonical sparse row storage. Useful for
+    /// differential tests and small dense reference instances.
+    pub fn from_dense(lp: &RationalLp) -> Result<Self, LpCertificateError> {
+        let mut rows = Vec::new();
+        rows.try_reserve_exact(lp.row_count()).map_err(|_| {
+            LpCertificateError::AllocationFailed {
+                resource: "sparse LP rows",
+                entries: lp.row_count(),
+            }
+        })?;
+        for dense_row in lp.matrix() {
+            let mut row = Vec::new();
+            row.try_reserve_exact(dense_row.len()).map_err(|_| {
+                LpCertificateError::AllocationFailed {
+                    resource: "sparse LP row coefficients",
+                    entries: dense_row.len(),
+                }
+            })?;
+            for (column, coefficient) in dense_row.iter().enumerate() {
+                if !coefficient.is_zero() {
+                    row.push((column, *coefficient));
+                }
+            }
+            rows.push(row);
+        }
+        Self::new(rows, lp.rhs().to_vec(), lp.objective().to_vec())
+    }
+}
+
 /// Exact primal and dual candidate for a standard-form maximization LP.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrimalDualCertificate {
@@ -112,6 +206,23 @@ pub enum LpCertificateError {
         expected: usize,
         actual: usize,
     },
+    SparseColumnOutOfBounds {
+        row: usize,
+        column: usize,
+        column_count: usize,
+    },
+    SparseColumnOrderViolation {
+        row: usize,
+        column: usize,
+    },
+    SparseExplicitZero {
+        row: usize,
+        column: usize,
+    },
+    AllocationFailed {
+        resource: &'static str,
+        entries: usize,
+    },
     VectorLengthMismatch {
         vector: &'static str,
         expected: usize,
@@ -153,6 +264,22 @@ impl fmt::Display for LpCertificateError {
             Self::MatrixRowWidthMismatch { row, expected, actual } => write!(
                 f,
                 "LP matrix row {row} has {actual} columns; expected {expected}"
+            ),
+            Self::SparseColumnOutOfBounds { row, column, column_count } => write!(
+                f,
+                "sparse LP row {row} references column {column}, but has {column_count} columns"
+            ),
+            Self::SparseColumnOrderViolation { row, column } => write!(
+                f,
+                "sparse LP row {row} has duplicate or non-increasing column index {column}"
+            ),
+            Self::SparseExplicitZero { row, column } => write!(
+                f,
+                "sparse LP row {row} stores an explicit zero at column {column}"
+            ),
+            Self::AllocationFailed { resource, entries } => write!(
+                f,
+                "unable to reserve {resource} capacity for {entries} entries"
             ),
             Self::VectorLengthMismatch { vector, expected, actual } => write!(
                 f,
@@ -307,6 +434,175 @@ fn verify_primal_dual_feasibility(
     Ok((primal_objective, dual_objective))
 }
 
+/// Verify exact primal/dual optimality for a canonical sparse rational LP.
+///
+/// The checker visits each stored coefficient once for primal feasibility and
+/// once for the dual transpose accumulation. Work is O(nnz + rows + columns).
+pub fn verify_sparse_primal_dual_optimality(
+    lp: &SparseRationalLp,
+    certificate: &PrimalDualCertificate,
+) -> Result<VerifiedLpOptimum, LpCertificateError> {
+    let (primal_objective, dual_objective) =
+        verify_sparse_primal_dual_feasibility(lp, certificate)?;
+    if primal_objective != dual_objective {
+        return Err(LpCertificateError::PrimalDualObjectiveMismatch);
+    }
+    Ok(VerifiedLpOptimum {
+        objective: primal_objective,
+    })
+}
+
+/// Verify an exact rational primal/dual gap for a sparse LP.
+pub fn verify_sparse_primal_dual_gap(
+    lp: &SparseRationalLp,
+    certificate: &PrimalDualCertificate,
+    requested_gap: CheckedRational,
+) -> Result<VerifiedLpGap, LpCertificateError> {
+    if requested_gap.is_negative() {
+        return Err(LpCertificateError::NegativeRequestedGap);
+    }
+    let (lower_bound, upper_bound) =
+        verify_sparse_primal_dual_feasibility(lp, certificate)?;
+    if compare_rational(upper_bound, lower_bound)? == Ordering::Less {
+        return Err(LpCertificateError::InvertedPrimalDualBounds);
+    }
+    let absolute_gap = subtract_rational(upper_bound, lower_bound)?;
+    if compare_rational(absolute_gap, requested_gap)? == Ordering::Greater {
+        return Err(LpCertificateError::GapExceedsRequested {
+            actual: absolute_gap,
+            requested: requested_gap,
+        });
+    }
+    Ok(VerifiedLpGap {
+        lower_bound,
+        upper_bound,
+        absolute_gap,
+    })
+}
+
+fn verify_sparse_primal_dual_feasibility(
+    lp: &SparseRationalLp,
+    certificate: &PrimalDualCertificate,
+) -> Result<(CheckedRational, CheckedRational), LpCertificateError> {
+    let rows = lp.row_count();
+    let columns = lp.column_count();
+    if certificate.primal.len() != columns {
+        return Err(LpCertificateError::VectorLengthMismatch {
+            vector: "primal",
+            expected: columns,
+            actual: certificate.primal.len(),
+        });
+    }
+    if certificate.dual.len() != rows {
+        return Err(LpCertificateError::VectorLengthMismatch {
+            vector: "dual",
+            expected: rows,
+            actual: certificate.dual.len(),
+        });
+    }
+
+    for (column, value) in certificate.primal.iter().enumerate() {
+        if value.is_negative() {
+            return Err(LpCertificateError::NegativePrimalVariable { column });
+        }
+    }
+    for (row, value) in certificate.dual.iter().enumerate() {
+        if value.is_negative() {
+            return Err(LpCertificateError::NegativeDualMultiplier { row });
+        }
+    }
+
+    let mut dual_lhs = Vec::new();
+    dual_lhs.try_reserve_exact(columns).map_err(|_| {
+        LpCertificateError::AllocationFailed {
+            resource: "sparse dual-column accumulator",
+            entries: columns,
+        }
+    })?;
+    dual_lhs.resize(columns, CheckedRational::zero());
+
+    for row_index in 0..rows {
+        let mut primal_lhs = CheckedRational::zero();
+        for &(column, coefficient) in &lp.rows[row_index] {
+            let primal_term = coefficient
+                .checked_mul(certificate.primal[column])
+                .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+            primal_lhs = primal_lhs.checked_add(primal_term)
+                .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+
+            let dual_term = coefficient
+                .checked_mul(certificate.dual[row_index])
+                .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+            dual_lhs[column] = dual_lhs[column].checked_add(dual_term)
+                .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+        }
+        if compare_rational(primal_lhs, lp.b[row_index])? == Ordering::Greater {
+            return Err(LpCertificateError::PrimalConstraintViolation { row: row_index });
+        }
+    }
+
+    for column in 0..columns {
+        if compare_rational(dual_lhs[column], lp.c[column])? == Ordering::Less {
+            return Err(LpCertificateError::DualConstraintViolation { column });
+        }
+    }
+
+    let primal_objective = dot(&lp.c, &certificate.primal)?;
+    let dual_objective = dot(&lp.b, &certificate.dual)?;
+    Ok((primal_objective, dual_objective))
+}
+
+/// Verify a sparse Farkas witness for infeasibility of A x <= b, x >= 0.
+pub fn verify_sparse_farkas_infeasibility(
+    lp: &SparseRationalLp,
+    certificate: &FarkasCertificate,
+) -> Result<(), LpCertificateError> {
+    let rows = lp.row_count();
+    let columns = lp.column_count();
+    if certificate.multipliers.len() != rows {
+        return Err(LpCertificateError::VectorLengthMismatch {
+            vector: "Farkas",
+            expected: rows,
+            actual: certificate.multipliers.len(),
+        });
+    }
+    for (row, multiplier) in certificate.multipliers.iter().enumerate() {
+        if multiplier.is_negative() {
+            return Err(LpCertificateError::NegativeFarkasMultiplier { row });
+        }
+    }
+
+    let mut dual_lhs = Vec::new();
+    dual_lhs.try_reserve_exact(columns).map_err(|_| {
+        LpCertificateError::AllocationFailed {
+            resource: "sparse Farkas column accumulator",
+            entries: columns,
+        }
+    })?;
+    dual_lhs.resize(columns, CheckedRational::zero());
+
+    for row_index in 0..rows {
+        for &(column, coefficient) in &lp.rows[row_index] {
+            let term = coefficient
+                .checked_mul(certificate.multipliers[row_index])
+                .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+            dual_lhs[column] = dual_lhs[column].checked_add(term)
+                .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+        }
+    }
+    for value in dual_lhs {
+        if compare_rational(value, CheckedRational::zero())? == Ordering::Less {
+            return Err(LpCertificateError::FarkasDoesNotContradict);
+        }
+    }
+
+    let contradiction = dot(&lp.b, &certificate.multipliers)?;
+    if compare_rational(contradiction, CheckedRational::zero())? != Ordering::Less {
+        return Err(LpCertificateError::FarkasDoesNotContradict);
+    }
+    Ok(())
+}
+
 /// Verify a Farkas witness for infeasibility of A x <= b, x >= 0.
 ///
 /// A valid y satisfies y >= 0, A^T y >= 0, and b^T y < 0. Any feasible
@@ -451,6 +747,96 @@ mod tests {
 
     fn q(numerator: i128, denominator: i128) -> CheckedRational {
         CheckedRational::new(numerator, denominator).unwrap()
+    }
+
+
+    #[test]
+    fn sparse_lp_exact_primal_dual_gap_and_farkas_match_dense_reference() {
+        let dense = RationalLp::new(
+            vec![
+                vec![q(1, 1), q(1, 1)],
+                vec![q(1, 1), q(0, 1)],
+                vec![q(0, 1), q(1, 1)],
+            ],
+            vec![q(4, 1), q(2, 1), q(3, 1)],
+            vec![q(3, 1), q(2, 1)],
+        ).unwrap();
+        let sparse = SparseRationalLp::from_dense(&dense).unwrap();
+        assert_eq!(sparse.row_count(), 3);
+        assert_eq!(sparse.column_count(), 2);
+        assert_eq!(sparse.nonzero_count(), 4);
+
+        let optimum = PrimalDualCertificate {
+            primal: vec![q(2, 1), q(2, 1)],
+            dual: vec![q(2, 1), q(1, 1), q(0, 1)],
+        };
+        assert_eq!(
+            verify_sparse_primal_dual_optimality(&sparse, &optimum).unwrap().objective,
+            verify_primal_dual_optimality(&dense, &optimum).unwrap().objective
+        );
+
+        let gap = PrimalDualCertificate {
+            primal: vec![q(2, 1), q(1, 1)],
+            dual: vec![q(2, 1), q(1, 1), q(0, 1)],
+        };
+        assert_eq!(
+            verify_sparse_primal_dual_gap(&sparse, &gap, q(2, 1)).unwrap(),
+            verify_primal_dual_gap(&dense, &gap, q(2, 1)).unwrap()
+        );
+
+        let infeasible_dense = RationalLp::new(
+            vec![vec![q(1, 1)], vec![q(-1, 1)]],
+            vec![q(0, 1), q(-1, 1)],
+            vec![q(0, 1)],
+        ).unwrap();
+        let infeasible_sparse = SparseRationalLp::from_dense(&infeasible_dense).unwrap();
+        let farkas = FarkasCertificate {
+            multipliers: vec![q(1, 1), q(1, 1)],
+        };
+        assert_eq!(
+            verify_sparse_farkas_infeasibility(&infeasible_sparse, &farkas),
+            verify_farkas_infeasibility(&infeasible_dense, &farkas)
+        );
+    }
+
+    #[test]
+    fn sparse_lp_rejects_noncanonical_rows_and_explicit_zeros() {
+        assert_eq!(
+            SparseRationalLp::new(
+                vec![vec![(1, q(1, 1)), (0, q(1, 1))]],
+                vec![q(2, 1)],
+                vec![q(1, 1), q(1, 1)],
+            ),
+            Err(LpCertificateError::SparseColumnOrderViolation { row: 0, column: 0 })
+        );
+        assert_eq!(
+            SparseRationalLp::new(
+                vec![vec![(0, q(1, 1)), (0, q(2, 1))]],
+                vec![q(2, 1)],
+                vec![q(1, 1)],
+            ),
+            Err(LpCertificateError::SparseColumnOrderViolation { row: 0, column: 0 })
+        );
+        assert_eq!(
+            SparseRationalLp::new(
+                vec![vec![(1, q(0, 1))]],
+                vec![q(2, 1)],
+                vec![q(1, 1), q(1, 1)],
+            ),
+            Err(LpCertificateError::SparseExplicitZero { row: 0, column: 1 })
+        );
+        assert_eq!(
+            SparseRationalLp::new(
+                vec![vec![(2, q(1, 1))]],
+                vec![q(2, 1)],
+                vec![q(1, 1), q(1, 1)],
+            ),
+            Err(LpCertificateError::SparseColumnOutOfBounds {
+                row: 0,
+                column: 2,
+                column_count: 2,
+            })
+        );
     }
 
     #[test]
