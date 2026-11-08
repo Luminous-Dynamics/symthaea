@@ -1755,7 +1755,11 @@
         "ground_truth_revision",
         "evidence_annotation_revision",
         "output_manifest_sha256",
-        "privacy_review_ref"
+        "privacy_review_ref",
+        "trial_manifest_sha256",
+        "scorer_revision",
+        "claim_label_ontology_revision",
+        "conflict_axis_annotation_revision"
       ],
       "properties": {
         "mode": {
@@ -1905,6 +1909,42 @@
             "string",
             "null"
           ]
+        },
+        "trial_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "scorer_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "claim_label_ontology_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_axis_annotation_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "allOf": [
@@ -1952,6 +1992,18 @@
                 "type": "null"
               },
               "privacy_review_ref": {
+                "type": "null"
+              },
+              "trial_manifest_sha256": {
+                "type": "null"
+              },
+              "scorer_revision": {
+                "type": "null"
+              },
+              "claim_label_ontology_revision": {
+                "type": "null"
+              },
+              "conflict_axis_annotation_revision": {
                 "type": "null"
               }
             }
@@ -2002,6 +2054,21 @@
               },
               "output_manifest_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "trial_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "scorer_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claim_label_ontology_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_axis_annotation_revision": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
