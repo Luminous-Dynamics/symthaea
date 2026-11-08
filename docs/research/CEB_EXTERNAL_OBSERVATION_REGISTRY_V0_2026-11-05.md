@@ -71,6 +71,31 @@ The combined HiL comparator retains the 300-task population. Two additional comp
 ASK-F1 is the harmonic mean of Question Precision and Blocker Recall. Pass@3 is task success in at least one of three independent assisted runs. These are distinct measures. The consolidated Muse Wonder 1.0 score of 79.67 ± 4.17 remains unlabeled and cannot be assigned either metric. Source: https://labs.scale.com/leaderboard/hil
 
 
+
+## CEB-CONTINUITY adjacent method comparators (2026-11-08)
+
+Two additional sources are registered as continuity-adjacent context. Neither is an equivalent CEB claim-disposition score.
+
+### Incremental Program Analysis in the Wild — ASE 2025
+
+The ASE study curates **4,084 real-world Java program changes across 20 open-source projects** and evaluates two representative incremental program-analysis tools. It reports efficiency gains relative to exhaustive analysis alongside inconsistencies and markedly higher peak memory in the evaluated incremental tools.
+
+**CEB interpretation:** use this to motivate measuring both the correctness of selective revalidation and resource burden (including peak memory). The study does not measure retain/revalidate/invalidate/supersede/unresolved dispositions, and its Java-only scope does not establish transfer to Rust or multi-language workspaces.
+
+Source: https://doi.org/10.1109/ase63991.2025.00194
+
+### DiffCI Open Evidence Study 2026 — change-aware test selection
+
+DiffCI's self-published evidence study replays **2,000 historical commit deltas across 20 repositories**. It reports 29.8% of deltas as offering a genuine selective-test opportunity and 4.2% weighted whole-corpus test reduction versus path selection. For 280 historical CI failures, reported job-level recall is 96.4% for its graph selector versus 70.7% for a changed-path rule.
+
+The limits must remain attached to these figures: the aggregate test-reduction confidence interval crosses zero (-4.8% to +47.9%); the study says the population effect may be null; its 32/32 measurable mutation detections are explicitly not a reliability estimate; it reports no production CI runs were skipped, cancelled or blocked; and only 3 of 7 attempted repositories passed canonical suite-green qualification.
+
+**CEB interpretation:** job-level recall here is historical CI-failure test-selection recall, not claim invalidation recall. Test-count reduction is not revalidation-cost-per-accepted-sequence. Use the study as a contextual comparison for C0 path heuristic vs selective test selection, not as a direct CEB-CONTINUITY leaderboard score.
+
+Source: https://diffci.com/research/diffci-open-evidence-2026
+
+The structured registry now contains **44 sources, 49 comparator records and 143 atomic observations**. The 56-row metric correspondence crosswalk is unchanged; the new observations are not mapped as direct equivalents to CEB-CONTINUITY primary metrics.
+
 ## SWE-Milestone v1.0.2 normalized observations (2026-11-05)
 
 The CEB-CONTINUITY lane now carries an atomic contextual snapshot from the official live leaderboard for the top listed GLM-5.3 + Claude Code row:
@@ -87,4 +112,4 @@ Sources:
 - Official leaderboard: https://swe-milestone.com/
 - ICML 2026 paper: https://proceedings.mlr.press/v306/deng26d.html
 
-The external-observation registry now contains 17 external sources, 19 comparator records and 41 atomic observations. All remain contextual references; no direct CEB superiority claim is enabled.
+The latest structured external-observation registry snapshot contains 44 external sources, 49 comparator records and 143 atomic observations. The figures in earlier dated sections above are preserved as historical captures; the current machine-readable snapshot is authoritative for registry totals. All remain contextual references; no direct CEB superiority claim is enabled.
