@@ -18,15 +18,95 @@
 
 use std::collections::BTreeMap;
 
-use symthaea_core::hdc::continuous_hv_interval::ContinuousHVScoreInterval;
+use symthaea_core::hdc::continuous_hv_interval::{
+    ContinuousHVIntervalError, ContinuousHVScoreInterval, ResidualCertificateError,
+    ResidualCertificateVerification, verify_l2_residual_certificate,
+};
+use symthaea_core::hdc::ContinuousHV;
 
 /// One eligible record and its conservative canonical similarity interval.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoreIntervalRecord<Id> {
-    /// Stable record identifier used for deterministic output ordering.
-    pub id: Id,
-    /// Conservative interval for the canonical full-resolution score.
-    pub interval: ContinuousHVScoreInterval,
+    id: Id,
+    interval: ContinuousHVScoreInterval,
+    certificate_check: ResidualCertificateVerification,
+}
+
+/// Construction failure for a score interval backed by a checked residual.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScoreIntervalBuildError {
+    /// The original/reconstruction pair did not satisfy its residual claim.
+    ResidualCertificate(ResidualCertificateError),
+    /// The canonical score interval could not be computed safely.
+    ScoreInterval(ContinuousHVIntervalError),
+}
+
+impl std::fmt::Display for ScoreIntervalBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ResidualCertificate(error) => write!(f, "residual certificate invalid: {error}"),
+            Self::ScoreInterval(error) => write!(f, "score interval invalid: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for ScoreIntervalBuildError {}
+
+impl<Id> ScoreIntervalRecord<Id> {
+    /// Construct a prune-authorizing record only after checking the residual
+    /// against the original payload and propagating it through the canonical
+    /// f32 score interval kernel.
+    ///
+    /// This is a build/admission-time operation: the original payload must be
+    /// available for residual verification. Persisted interval metadata must
+    /// be bound to the exact payload, reconstruction, codebook and generation;
+    /// this type deliberately has no unchecked public constructor or mutable
+    /// interval field.
+    pub fn from_verified_l2_residual(
+        id: Id,
+        query: &ContinuousHV,
+        original: &ContinuousHV,
+        reconstruction: &ContinuousHV,
+        residual_l2_upper: f32,
+    ) -> Result<Self, ScoreIntervalBuildError> {
+        let certificate_check = verify_l2_residual_certificate(
+            original,
+            reconstruction,
+            residual_l2_upper,
+        )
+        .map_err(ScoreIntervalBuildError::ResidualCertificate)?;
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_residual(
+                reconstruction,
+                residual_l2_upper,
+            )
+            .map_err(ScoreIntervalBuildError::ScoreInterval)?;
+        if !interval.is_well_formed() {
+            return Err(ScoreIntervalBuildError::ScoreInterval(
+                ContinuousHVIntervalError::InvalidResidualBound,
+            ));
+        }
+        Ok(Self {
+            id,
+            interval,
+            certificate_check,
+        })
+    }
+
+    /// Stable ID for deterministic reranking.
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+
+    /// Conservative canonical-score interval.
+    pub fn interval(&self) -> ContinuousHVScoreInterval {
+        self.interval
+    }
+
+    /// Result of independent source-payload residual verification.
+    pub fn certificate_check(&self) -> ResidualCertificateVerification {
+        self.certificate_check
+    }
 }
 
 /// Counts supplied by the caller for a pinned eligible-corpus snapshot.
@@ -293,9 +373,16 @@ mod tests {
     use super::*;
 
     fn record(id: &str, lower: f32, upper: f32) -> ScoreIntervalRecord<String> {
+        // Synthetic fixtures are built inside this test module only. Production
+        // callers cannot construct a record from arbitrary interval endpoints.
         ScoreIntervalRecord {
             id: id.to_owned(),
             interval: ContinuousHVScoreInterval { lower, upper },
+            certificate_check: ResidualCertificateVerification {
+                residual_norm_squared_upper: 0.0,
+                certified_norm_squared: 0.0,
+                changed_coordinates: 0,
+            },
         }
     }
 
@@ -305,6 +392,38 @@ mod tests {
             interval_records: count,
             unbounded_unopened_partitions: 0,
         }
+    }
+
+    #[test]
+    fn public_record_constructor_requires_a_verified_residual() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.5, -0.25, 0.75]);
+        let original = ContinuousHV::from_vec(vec![0.5, -0.5, 0.25, 1.0]);
+        let reconstruction = ContinuousHV::from_vec(vec![0.51, -0.49, 0.25, 1.0]);
+        let record = ScoreIntervalRecord::from_verified_l2_residual(
+            "memory-1".to_owned(),
+            &query,
+            &original,
+            &reconstruction,
+            0.015,
+        )
+        .unwrap();
+        assert_eq!(record.id(), "memory-1");
+        assert!(record.interval().is_well_formed());
+        assert_eq!(record.certificate_check().changed_coordinates, 2);
+
+        let underreported = ScoreIntervalRecord::from_verified_l2_residual(
+            "memory-2".to_owned(),
+            &query,
+            &original,
+            &reconstruction,
+            0.001,
+        );
+        assert!(matches!(
+            underreported,
+            Err(ScoreIntervalBuildError::ResidualCertificate(
+                ResidualCertificateError::Underreported { .. }
+            ))
+        ));
     }
 
     #[test]
