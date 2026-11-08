@@ -104,7 +104,7 @@ pub fn evaluate_service_continuity(
             .then_with(|| a.kind.cmp(&b.kind)).then_with(|| a.event_id.cmp(&b.event_id)));
         let tasks: Vec<&MaintenanceTask> = case.maintenance_tasks.iter()
             .filter(|t| t.service_id == contract.service_id).collect();
-        services.push(evaluate_service(contract, &events, &tasks, case.timeline_seconds, safety_failed));
+        services.push(evaluate_service(contract, &events, &tasks, case.timeline_seconds));
     }
     let breaches: u32 = services.iter().map(|s| s.floor_breach_episodes).sum();
     let first_breach = services.iter().filter_map(|s| s.first_floor_breach_seconds).min();
@@ -240,7 +240,7 @@ fn integrate(
 }
 fn evaluate_service(
     c: &ServiceContract, events: &[&EvidenceEvent], tasks: &[&MaintenanceTask],
-    timeline: u64, safety_failed: bool,
+    timeline: u64,
 ) -> ServiceEvaluation {
     let first_fault = events.iter().filter(|e| matches!(e.kind, EventKind::ComponentFailure
         | EventKind::ServiceUnavailable | EventKind::CommonDependencyFailure))
@@ -267,7 +267,7 @@ fn evaluate_service(
             match e.kind {
                 EventKind::SafetyGateFailed => {}, // global gate, not a flow observation
                 EventKind::AuthorizedRelease => {
-                    if !safety_failed && e.delivered_rate_after >= c.minimum_rate
+                    if e.delivered_rate_after >= c.minimum_rate
                         && release_accepted(e, events, tasks) {
                         rate = e.delivered_rate_after; restoration.get_or_insert(t);
                     } else { rejected = rejected.saturating_add(1); }
@@ -312,6 +312,13 @@ fn evaluate_service(
 fn release_accepted(
     release: &EvidenceEvent, events: &[&EvidenceEvent], tasks: &[&MaintenanceTask],
 ) -> bool {
+    // Authorization is evaluated against the evidence prefix available at this release.
+    // A later safety-gate failure changes the final/current disposition, but must not
+    // retroactively rewrite whether this earlier release was accepted.
+    if events.iter().any(|event| event.kind == EventKind::SafetyGateFailed
+        && event.at_seconds <= release.at_seconds) {
+        return false;
+    }
     let Some(task_id) = release.maintenance_task_id.as_deref() else { return false; };
     let Some(task) = tasks.iter().copied().find(|t| t.task_id == task_id
         && t.service_id == release.service_id && t.component_id == release.component_id) else {
@@ -508,6 +515,33 @@ mod tests {
         t.spare_component_revision_digest=Some(REV_B.into());
         let out=evaluate_service_continuity(&case(events,vec![t],86400)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
+    }
+
+    #[test]
+    fn later_safety_gate_does_not_retroactively_veto_earlier_accepted_release() {
+        let mut events = vec![
+            event("failure", 10, EventKind::ComponentFailure, 0.0),
+            task_event("repair", 20, EventKind::RepairCompleted, 0.0),
+            task_event("test", 30, EventKind::PostTestPassed, 0.0),
+            task_event("config", 40, EventKind::ConfigurationUpdated, 0.0),
+            task_event("release", 50, EventKind::AuthorizedRelease, 80.0),
+            event("later_safety_gate", 80, EventKind::SafetyGateFailed, 80.0),
+        ];
+        let out = evaluate_service_continuity(&case(events.clone(), vec![task()], 100)).unwrap();
+
+        assert_eq!(out.disposition, ContinuityDisposition::UnsafeNotAuthorized);
+        assert!(out.safety_gate_failed);
+        assert_eq!(out.services[0].accepted_restoration_seconds, Some(50));
+        assert_eq!(out.services[0].tasr_seconds, Some(40));
+        assert_eq!(out.services[0].rejected_release_attempts, 0);
+
+        // The same gate, moved before release, must reject that release.
+        events.retain(|event| event.event_id != "later_safety_gate");
+        events.push(event("prior_safety_gate", 45, EventKind::SafetyGateFailed, 0.0));
+        let prior = evaluate_service_continuity(&case(events, vec![task()], 100)).unwrap();
+        assert_eq!(prior.disposition, ContinuityDisposition::UnsafeNotAuthorized);
+        assert_eq!(prior.services[0].accepted_restoration_seconds, None);
+        assert_eq!(prior.services[0].rejected_release_attempts, 1);
     }
 
     #[test]
