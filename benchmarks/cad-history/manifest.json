@@ -1,0 +1,363 @@
+{
+  "benchmark_id": "CAD-HISTORY-001",
+  "version": "0.1.0",
+  "updated_at": "2026-11-05",
+  "status": "public_blueprint_specification_only",
+  "task_count": 11,
+  "task_families": [
+    {
+      "id": "parametric-edit",
+      "name": "History-less geometry to editable parametric design",
+      "case_ids": [
+        "CADH-P01",
+        "CADH-P02",
+        "CADH-P03",
+        "CADH-P04",
+        "CADH-P05",
+        "CADH-P06"
+      ]
+    },
+    {
+      "id": "scan-metrology",
+      "name": "Measured scan to editable model",
+      "case_ids": [
+        "CADH-P07"
+      ]
+    },
+    {
+      "id": "ambiguity-adversarial",
+      "name": "Ambiguity, invalid geometry and unsupported edits",
+      "case_ids": [
+        "CADH-N01",
+        "CADH-N02",
+        "CADH-N03",
+        "CADH-N04"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "CADH-P01",
+      "family_id": "parametric-edit",
+      "title": "Patterned mounting plate",
+      "candidate_visible_scenario": "Recover an editable 120x80x8 mm plate with four Ø8 holes at 15 mm end margins and 20 mm row offsets; increase length to 140 mm while preserving margins and symmetry.",
+      "changed_subjects": [
+        "native_geometry",
+        "feature_history",
+        "hole_pattern",
+        "datum_relations"
+      ],
+      "evaluation_axes": [
+        "rebuild_validity",
+        "geometry_equivalence",
+        "semantic_edit_success",
+        "interface_preservation"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-P02",
+      "family_id": "parametric-edit",
+      "title": "Stepped shaft",
+      "candidate_visible_scenario": "Recover a coaxial Ø20x20 / Ø30x60 / Ø20x20 mm shaft; extend the central journal to 70 mm while preserving both 20 mm end journals.",
+      "changed_subjects": [
+        "revolve_or_pad_history",
+        "coaxiality",
+        "journal_parameters"
+      ],
+      "evaluation_axes": [
+        "rebuild_validity",
+        "geometry_equivalence",
+        "axis_alignment",
+        "semantic_edit_success"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-P03",
+      "family_id": "parametric-edit",
+      "title": "Thin-wall enclosure",
+      "candidate_visible_scenario": "Recover a 100x60x40 mm open-top enclosure with 2 mm walls and 2 mm floor; increase walls to 2.5 mm while holding outer envelope and floor thickness.",
+      "changed_subjects": [
+        "shell_or_cavity_history",
+        "wall_thickness",
+        "floor_thickness",
+        "open_top"
+      ],
+      "evaluation_axes": [
+        "rebuild_validity",
+        "wall_measurement",
+        "cavity_topology",
+        "semantic_edit_success"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-P04",
+      "family_id": "parametric-edit",
+      "title": "Rounded rectangular plate",
+      "candidate_visible_scenario": "Recover an 80x40x6 mm plate with four equal 5 mm vertical corner radii; edit radius to 8 mm without changing envelope or adding top/bottom fillets.",
+      "changed_subjects": [
+        "sketch_or_fillet_history",
+        "shared_radius_parameter",
+        "tangent_edges"
+      ],
+      "evaluation_axes": [
+        "rebuild_validity",
+        "radius_accuracy",
+        "envelope_preservation",
+        "semantic_edit_success"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-P05",
+      "family_id": "parametric-edit",
+      "title": "Equally spaced slot array",
+      "candidate_visible_scenario": "Recover a 90x40x8 mm plate with three 6x20 mm through-slots at x=15,45,75; edit to four slots at x=15,35,55,75.",
+      "changed_subjects": [
+        "slot_pattern",
+        "count_parameter",
+        "spacing_parameter",
+        "end_margins"
+      ],
+      "evaluation_axes": [
+        "rebuild_validity",
+        "exact_slot_count",
+        "spacing_constraints",
+        "semantic_edit_success"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-P06",
+      "family_id": "parametric-edit",
+      "title": "Right-angle mounting bracket",
+      "candidate_visible_scenario": "Recover an 80x50 mm right-angle bracket with 6 mm flanges and four Ø6 holes; change horizontal flange width to 90 mm while preserving datum plane, vertical flange and hole edge margins.",
+      "changed_subjects": [
+        "orthogonal_flanges",
+        "mounting_datums",
+        "hole_parameters",
+        "shared_thickness"
+      ],
+      "evaluation_axes": [
+        "rebuild_validity",
+        "perpendicularity",
+        "mounting_interface",
+        "semantic_edit_success"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-P07",
+      "family_id": "scan-metrology",
+      "title": "Scanned stepped shaft",
+      "candidate_visible_scenario": "Infer an editable stepped shaft from multi-view point clouds with scanner calibration, registration covariance, occlusion and wear; distinguish measured as-built replication from nominal-design inference; perform a central-journal edit.",
+      "changed_subjects": [
+        "scanner_identity",
+        "calibration_currentness",
+        "registration_covariance",
+        "coverage",
+        "occlusion",
+        "wear_state",
+        "target_profile"
+      ],
+      "evaluation_axes": [
+        "dimensional_traceability",
+        "surface_residual_distribution",
+        "uncertainty_coverage",
+        "unknown_region_handling",
+        "native_editability"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-N01",
+      "family_id": "ambiguity-adversarial",
+      "title": "Unit and scale ambiguity",
+      "candidate_visible_scenario": "Given a unitless solid and an unqualified drawing dimension '100' with no unit/scale note, require clarification or indeterminate disposition.",
+      "changed_subjects": [
+        "units",
+        "coordinate_frame",
+        "drawing_provenance"
+      ],
+      "evaluation_axes": [
+        "ambiguity_detection",
+        "abstention_quality",
+        "false_certainty"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-N02",
+      "family_id": "ambiguity-adversarial",
+      "title": "Invalid boundary representation",
+      "candidate_visible_scenario": "Provide an open, non-manifold, self-intersecting or invalid shell; any repair must be separately identified and compared to the raw source.",
+      "changed_subjects": [
+        "raw_brep_digest",
+        "topology_health",
+        "repair_policy"
+      ],
+      "evaluation_axes": [
+        "invalid_geometry_rejection",
+        "repair_provenance",
+        "false_pass_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-N03",
+      "family_id": "ambiguity-adversarial",
+      "title": "Conflicting reference dimensions",
+      "candidate_visible_scenario": "STEP geometry implies 100 mm between datums while drawing specifies 105 mm without authority/revision precedence; require clarification and preserve both sources.",
+      "changed_subjects": [
+        "source_revision",
+        "drawing_authority",
+        "datum_dimension"
+      ],
+      "evaluation_axes": [
+        "conflict_detection",
+        "provenance",
+        "clarification_quality"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    },
+    {
+      "id": "CADH-N04",
+      "family_id": "ambiguity-adversarial",
+      "title": "Unsupported or infeasible edit",
+      "candidate_visible_scenario": "Request an edit outside the supported feature/kernel profile or mutually inconsistent constraints (e.g. larger cavity with fixed envelope and minimum wall thickness).",
+      "changed_subjects": [
+        "feature_support_profile",
+        "hard_constraints",
+        "edit_request"
+      ],
+      "evaluation_axes": [
+        "infeasibility_detection",
+        "unsupported_disposition",
+        "no_silent_constraint_relaxation"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_artifact_feature_and_edit"
+    }
+  ],
+  "terminal_dispositions": [
+    "AcceptedWithinDeclaredEditContract",
+    "Rejected",
+    "UnknownNeedsEvidence",
+    "Unsupported",
+    "Infeasible",
+    "EvidenceIncomplete",
+    "AmbiguousCandidateSet"
+  ],
+  "score_dimensions": [
+    "native_rebuild_validity",
+    "geometric_equivalence",
+    "semantic_parameter_recovery",
+    "edit_success",
+    "intent_invariant_preservation",
+    "topological_robustness",
+    "ambiguity_calibration",
+    "metrology_traceability",
+    "efficiency",
+    "integrity"
+  ],
+  "hard_gates": [
+    "every_accepted_model_rebuilds_in_pinned_kernel",
+    "zero_false_pass_on_invalid_or_impossible_controls",
+    "all_required_semantic_edits_succeed_or_return_explicit_non_success",
+    "zero_unjustified_unique_history_or_scan_measurement_claims"
+  ],
+  "external_comparator": {
+    "id": "parametric-cad-bench-v3",
+    "official_suite_task_count": 100,
+    "official_tasks": {
+      "create": 30,
+      "create_and_edit": 30,
+      "image_to_cad": 40
+    },
+    "harness": "Harbor 0.23.0",
+    "cad_kernel": "FreeCAD 1.1.0",
+    "verifier": "gnucleus-freecad-validator 0.6.0",
+    "task_schema": "1.3",
+    "attempts_per_case": 1,
+    "concurrency": 4,
+    "retries": 0,
+    "time_limit_seconds": 9000,
+    "official_dataset_digest_captured": false,
+    "redistribution_training_terms_verified": false
+  },
+  "ownership": {
+    "geometry_identity": "https://github.com/Luminous-Dynamics/symthaea/issues/4927",
+    "tolerance_metrology": "https://github.com/Luminous-Dynamics/symthaea/issues/4883",
+    "as_built_realization": "https://github.com/Luminous-Dynamics/symthaea/issues/4859",
+    "change_delta_semantics": "https://github.com/Luminous-Dynamics/symthaea/issues/6117",
+    "engineering_change_qualification": "https://github.com/Luminous-Dynamics/symthaea/issues/10543"
+  },
+  "custody": {
+    "public_blueprints_visible": true,
+    "gold_labels_adjudicated": false,
+    "sealed_holdout_created": false,
+    "native_cad_files_materialized": false,
+    "point_clouds_materialized": false,
+    "commercial_tools_run": false,
+    "external_task_data_downloaded": false,
+    "execution_authorized": false,
+    "physical_testing_authorized": false
+  },
+  "claim_ceiling": "Public blueprint specifications only. No CAD kernel result, geometry equivalence score, edit-preservation score, scan metrology result, manufacturing feasibility, structural adequacy or physical validation is established."
+}
