@@ -334,7 +334,7 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
         let bv = b_state
             .and_then(|state| state.get(field))
             .and_then(Value::as_f64);
-        if !approx_eq(bv, av.map(|value| value * sign), 0.0) {
+        if !approx_eq(bv, av.map(|value| value * sign)) {
             errors.push(format!("pair {pair_id}: {field} violates mirror invariant"));
         }
     }
@@ -347,7 +347,7 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
         let bv = b_command
             .and_then(|command| command.get(field))
             .and_then(Value::as_f64);
-        if !approx_eq(bv, av.map(|value| value * sign), 0.0) {
+        if !approx_eq(bv, av.map(|value| value * sign)) {
             errors.push(format!(
                 "pair {pair_id}: command.{field} violates mirror invariant"
             ));
