@@ -132,12 +132,12 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
     );
 
     if let Some(objects) = snapshot.get("object_hypotheses").and_then(Value::as_array) {
-        let mut seen_tracks = BTreeSet::new();
+        let mut seen_hypotheses = BTreeSet::new();
         for (index, object) in objects.iter().enumerate() {
             let prefix = format!("object_hypotheses[{index}]");
-            if let Some(track_id) = object.get("track_lineage_id").and_then(Value::as_str) {
-                if !seen_tracks.insert(track_id.to_owned()) {
-                    errors.push(format!("{prefix}: duplicate active track_lineage_id {track_id}"));
+            if let Some(hypothesis_id) = object.get("hypothesis_id").and_then(Value::as_str) {
+                if !seen_hypotheses.insert(hypothesis_id.to_owned()) {
+                    errors.push(format!("{prefix}: duplicate hypothesis_id {hypothesis_id}"));
                 }
             }
             check_ref(
@@ -406,10 +406,18 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_track_lineage() {
+    fn allows_multiple_hypotheses_for_one_track_lineage() {
         let (schema, mut fixture) = load_fixture();
         fixture["snapshot"]["object_hypotheses"][1]["track_lineage_id"] =
             Value::String("track-42".into());
+        assert!(validate_values(&schema, &fixture).is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_hypothesis_identity() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["object_hypotheses"][1]["hypothesis_id"] =
+            fixture["snapshot"]["object_hypotheses"][0]["hypothesis_id"].clone();
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
