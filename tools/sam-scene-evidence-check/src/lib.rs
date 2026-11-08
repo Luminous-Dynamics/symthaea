@@ -944,6 +944,7 @@ fn validate_follow_target_context(
             "actor_id",
             "coordinate_frame_id",
             "observation_tick_ns",
+            "max_age_ns",
             "gap_m",
             "relative_speed_mps",
             "distance_uncertainty_m",
@@ -956,6 +957,26 @@ fn validate_follow_target_context(
             }
         }
         return;
+    }
+
+    for field in ["scenario_id", "actor_id", "coordinate_frame_id"] {
+        if context
+            .get(field)
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            errors.push(format!(
+                "follow_target_context: available target requires a non-empty {field}"
+            ));
+        }
+    }
+
+    let scenario = context.get("scenario_id").and_then(Value::as_str);
+    let snapshot_scenario = snapshot.get("scenario_id").and_then(Value::as_str);
+    if scenario != snapshot_scenario {
+        errors.push(
+            "follow_target_context: scenario_id must match the exact scene scenario".into(),
+        );
     }
 
     let source_id = context
@@ -1027,14 +1048,6 @@ fn validate_follow_target_context(
             if !matches!(currentness, "current" | "current_for_fixture") {
                 errors.push(
                     "follow_target_context: stale or unknown simulator oracle cannot drive Follow"
-                        .into(),
-                );
-            }
-            let scenario = context.get("scenario_id").and_then(Value::as_str);
-            let snapshot_scenario = snapshot.get("scenario_id").and_then(Value::as_str);
-            if scenario != snapshot_scenario {
-                errors.push(
-                    "follow_target_context: simulator oracle scenario_id must match the exact scene scenario"
                         .into(),
                 );
             }
@@ -1493,8 +1506,8 @@ mod tests {
     #[test]
     fn unknown_follow_target_cannot_retain_oracle_or_remote_fallback() {
         let (schema, mut fixture) = load_fixture();
-        let context = &mut fixture["snapshot"]["follow_target_context"];
-        context["status"] = Value::String("unknown".into());
+        fixture["snapshot"]["follow_target_context"]["status"] =
+            Value::String("unknown".into());
         for key in [
             "evidence_source_ref",
             "scenario_id",
@@ -1506,12 +1519,13 @@ mod tests {
             "relative_speed_mps",
             "distance_uncertainty_m",
         ] {
-            context[key] = Value::Null;
+            fixture["snapshot"]["follow_target_context"][key] = Value::Null;
         }
         validate_values(&schema, &fixture)
             .expect("unknown target must be explicit and contain no fallback evidence");
 
-        context["evidence_source_ref"] = Value::String("simulator-oracle-truth-01".into());
+        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
+            Value::String("simulator-oracle-truth-01".into());
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
