@@ -361,6 +361,62 @@ mod tests {
     }
 
     #[test]
+    fn test_nearest_follow_target_is_scenario_bound_simulator_oracle() {
+        let mut config = SwarmConfig::convoy_straight(2);
+        config.mesh_latency = 0.5;
+        let mut swarm = SwarmSimulator::new(config);
+        let mut ego = VehicleState::cruising(13.4);
+        for _ in 0..20 {
+            swarm.step(0.005);
+        }
+
+        let target = swarm
+            .nearest_follow_target(&ego, "crossing-scenario-01")
+            .expect("a convoy peer ahead should produce a Follow target");
+        match target {
+            FollowTargetEvidence::SimulatorOracle {
+                scenario_id,
+                actor_id,
+                frame_id,
+                observation_age_s,
+                gap_m,
+                ..
+            } => {
+                assert_eq!(scenario_id, "crossing-scenario-01");
+                assert_eq!(actor_id, "1");
+                assert_eq!(frame_id, "ego_body");
+                assert!((observation_age_s - 0.1).abs() < 1e-6);
+                assert!((gap_m - 30.0).abs() < 0.1);
+            }
+            other => panic!("expected simulator-oracle Follow evidence, got {other:?}"),
+        }
+
+        ego.position_x = 1000.0;
+        assert!(
+            swarm.nearest_follow_target(&ego, "crossing-scenario-01").is_none(),
+            "Peers behind ego are not lead-follow targets"
+        );
+    }
+
+    #[test]
+    fn test_mesh_signal_reports_actual_sample_age_not_configured_latency() {
+        let mut config = SwarmConfig::convoy_straight(1);
+        config.mesh_latency = 0.5;
+        let mut swarm = SwarmSimulator::new(config);
+        let ego = VehicleState::cruising(13.4);
+        for _ in 0..20 {
+            swarm.step(0.005);
+        }
+        let signals = swarm.mesh_signals(&ego);
+        assert_eq!(signals.len(), 1);
+        assert!(
+            (signals[0].latency - 0.1).abs() < 1e-6,
+            "Startup signal age should reflect the actual selected sample, not configured latency: {}",
+            signals[0].latency
+        );
+    }
+
+    #[test]
     fn test_brake_density() {
         let config = SwarmConfig::convoy_straight(4);
         let mut swarm = SwarmSimulator::new(config);
