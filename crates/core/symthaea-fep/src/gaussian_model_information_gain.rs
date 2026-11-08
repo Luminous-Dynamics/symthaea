@@ -476,10 +476,16 @@ mod tests {
         ));
         assert!(matches!(
             evaluate_gaussian_model_information_gains(&models, &action, config(0.0)),
-            Err(GaussianModelInformationGainError::InvalidObservationStdDev(_))
+            Err(GaussianModelInformationGainError::InvalidObservationStdDev(
+                _
+            ))
         ));
         assert!(matches!(
-            evaluate_gaussian_model_information_gains(&models, &action, config(0.1).clone_with_quadrature(64)),
+            evaluate_gaussian_model_information_gains(
+                &models,
+                &action,
+                config(0.1).clone_with_quadrature(64)
+            ),
             Err(GaussianModelInformationGainError::InvalidQuadraturePointCount(64))
         ));
         assert!(matches!(
