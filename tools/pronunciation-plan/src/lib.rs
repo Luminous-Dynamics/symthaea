@@ -1614,12 +1614,10 @@ mod tests {
         assert!(score.validate().unwrap_err().contains("implicit gap"));
 
         score.events[1].start_beat = 1.0;
-        score.tempo_map = vec![
-            TempoChange {
-                start_beat: 1.0,
-                quarter_bpm: 120.0,
-            },
-        ];
+        score.tempo_map = vec![TempoChange {
+            start_beat: 1.0,
+            quarter_bpm: 120.0,
+        }];
         assert!(score.validate().unwrap_err().contains("begin at beat zero"));
 
         score.tempo_map = vec![
@@ -1632,7 +1630,12 @@ mod tests {
                 quarter_bpm: 90.0,
             },
         ];
-        assert!(score.validate().unwrap_err().contains("strictly increasing"));
+        assert!(
+            score
+                .validate()
+                .unwrap_err()
+                .contains("strictly increasing")
+        );
     }
 
     #[test]
