@@ -6,7 +6,10 @@
 //! ambiguity. The source-to-LP construction is exposed for independent
 //! primal/dual verification through `lp_certificate`.
 
-use crate::lp_certificate::{LpCertificateError, RationalLp};
+use crate::lp_certificate::{
+    verify_primal_dual_gap, verify_primal_dual_optimality, LpCertificateError,
+    PrimalDualCertificate, RationalLp, VerifiedLpGap, VerifiedLpOptimum,
+};
 use crate::semiring::CheckedRational;
 use std::error::Error;
 use std::fmt;
@@ -170,6 +173,25 @@ impl OccupationFlowLayout {
 ///
 /// For `Minimize`, the LP maximizes the negated utility. Convert the verified
 /// LP objective back to the original utility using `utility_from_lp_objective`.
+/// Verified utility optimum bound to both source and compiled LP identities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerifiedOccupationFlowOptimum {
+    pub source_model_sha256: [u8; 32],
+    pub compiled_lp_sha256: [u8; 32],
+    pub lp_objective: CheckedRational,
+    pub utility: CheckedRational,
+}
+
+/// Verified original-utility bracket for maximize or minimize queries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerifiedOccupationFlowGap {
+    pub source_model_sha256: [u8; 32],
+    pub compiled_lp_sha256: [u8; 32],
+    pub lower_utility: CheckedRational,
+    pub upper_utility: CheckedRational,
+    pub absolute_gap: CheckedRational,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OccupationFlowLp {
     lp: RationalLp,
@@ -188,6 +210,51 @@ impl OccupationFlowLp {
     /// SHA-256 of the versioned canonical compiled LP transcript, including
     /// the source model digest, direction, matrix, RHS and objective.
     pub fn compiled_lp_sha256(&self) -> [u8; 32] { self.compiled_lp_sha256 }
+
+    /// Verify exact primal/dual optimality and return a result bound to the
+    /// source-model and compiled-LP SHA-256 identities.
+    pub fn verify_primal_dual_optimality(
+        &self,
+        certificate: &PrimalDualCertificate,
+    ) -> Result<VerifiedOccupationFlowOptimum, OccupationFlowError> {
+        let VerifiedLpOptimum { objective } =
+            verify_primal_dual_optimality(&self.lp, certificate)?;
+        Ok(VerifiedOccupationFlowOptimum {
+            source_model_sha256: self.source_model_sha256,
+            compiled_lp_sha256: self.compiled_lp_sha256,
+            lp_objective: objective,
+            utility: self.utility_from_lp_objective(objective)?,
+        })
+    }
+
+    /// Verify a primal/dual delta bracket and transform it back to the
+    /// original utility orientation. For minimization, the LP maximizes -U,
+    /// so the utility interval reverses and changes sign.
+    pub fn verify_primal_dual_gap(
+        &self,
+        certificate: &PrimalDualCertificate,
+        requested_gap: CheckedRational,
+    ) -> Result<VerifiedOccupationFlowGap, OccupationFlowError> {
+        let VerifiedLpGap {
+            lower_bound,
+            upper_bound,
+            absolute_gap,
+        } = verify_primal_dual_gap(&self.lp, certificate, requested_gap)?;
+        let (lower_utility, upper_utility) = match self.direction {
+            UtilityDirection::Maximize => (lower_bound, upper_bound),
+            UtilityDirection::Minimize => (
+                negate_rational(upper_bound)?,
+                negate_rational(lower_bound)?,
+            ),
+        };
+        Ok(VerifiedOccupationFlowGap {
+            source_model_sha256: self.source_model_sha256,
+            compiled_lp_sha256: self.compiled_lp_sha256,
+            lower_utility,
+            upper_utility,
+            absolute_gap,
+        })
+    }
 
     pub fn utility_from_lp_objective(
         &self,
@@ -647,6 +714,13 @@ fn add_equality(
     matrix.push(negated);
     rhs.push(negative_value);
     Ok(())
+}
+
+fn negate_rational(value: CheckedRational) -> Result<CheckedRational, OccupationFlowError> {
+    let numerator = value.numerator().checked_neg()
+        .ok_or(OccupationFlowError::ArithmeticOverflow)?;
+    CheckedRational::new(numerator, value.denominator())
+        .map_err(|_| OccupationFlowError::ArithmeticOverflow)
 }
 
 fn checked_sum(values: &[CheckedRational]) -> Result<CheckedRational, OccupationFlowError> {
