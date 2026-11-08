@@ -418,8 +418,8 @@
         "lower_tail_probability": 0.25,
         "minimum_top1_stability": 0
       },
-      "ranking_policy": "minimax_regret",
-      "minimum_decision_stability": 0.5,
+      "ranking_policy": "expected_evsi",
+      "minimum_decision_stability": 0,
       "maximum_worst_case_regret": 2,
       "regret_penalty": 1,
       "minimum_selection_value": 0,
