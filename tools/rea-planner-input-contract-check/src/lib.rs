@@ -606,9 +606,10 @@ pub fn validate_policy_disagreement_fixture() -> Result<(), ContractError> {
         "expected_evsi_best",
         "obligation_closure_per_second_best",
     ] {
-        let id = string(rankings.get(key).ok_or_else(|| {
-            ContractError(format!("expected policy ranking {key} missing"))
-        })?, "id")?;
+        let id = rankings
+            .get(key)
+            .and_then(Value::as_str)
+            .ok_or_else(|| ContractError(format!("expected policy ranking {key} must be a string")))?;
         if !experiment_outcomes.contains_key(id) {
             return Err(ContractError(format!(
                 "policy ranking {key} references unknown candidate {id}"
@@ -892,4 +893,264 @@ mod tests {
             serde_json::json!(["not_reproduced", "reproduced"]);
         assert!(validate_contract(&value).is_err());
     }
+
+
+    fn policy_agent() -> Value {
+        serde_json::from_str(POLICY_AGENT).expect("policy agent input must parse")
+    }
+
+    fn policy_grader() -> Value {
+        serde_json::from_str(POLICY_GRADER).expect("policy grader input must parse")
+    }
+
+    fn experiment<'a>(agent: &'a Value, id: &str) -> &'a Value {
+        array(agent, "experiments")
+            .unwrap()
+            .iter()
+            .find(|item| item.get("id").and_then(Value::as_str) == Some(id))
+            .unwrap()
+    }
+
+    fn scenario_rows<'a>(scenario: &'a Value, experiment_id: &str) -> &'a [Value] {
+        let matrix = array(scenario, "experiments")
+            .unwrap()
+            .iter()
+            .find(|item| item.get("experiment_id").and_then(Value::as_str) == Some(experiment_id))
+            .unwrap();
+        array(matrix, "likelihoods").unwrap()
+    }
+
+    fn scenario_named<'a>(agent: &'a Value, id: &str) -> &'a Value {
+        array(agent, "likelihood_scenarios")
+            .unwrap()
+            .iter()
+            .find(|item| item.get("scenario_id").and_then(Value::as_str) == Some(id))
+            .unwrap()
+    }
+
+    #[test]
+    fn policy_disagreement_agent_and_grader_views_validate() {
+        validate_policy_disagreement_fixture().unwrap();
+    }
+
+    #[test]
+    fn policy_objectives_have_distinct_exact_known_answer_rankings() {
+        let agent = policy_agent();
+        let hypothesis_ids_and_priors = hypothesis_priors(&agent).unwrap();
+        let (hypothesis_ids, priors) = hypothesis_ids_and_priors;
+        let decisions = array(&agent, "terminal_decisions").unwrap();
+        let nominal = scenario_named(&agent, "nominal");
+        let conservative = scenario_named(&agent, "conservative");
+        let scenario_weights = [
+            number(nominal, "scenario_probability").unwrap(),
+            number(conservative, "scenario_probability").unwrap(),
+        ];
+
+        let mut point_eig = BTreeMap::new();
+        let mut expected_scenario_eig = BTreeMap::new();
+        let mut robust_lower_tail_eig = BTreeMap::new();
+        let mut expected_evsi = BTreeMap::new();
+
+        for item in array(&agent, "experiments").unwrap() {
+            let id = string(item, "id").unwrap().to_owned();
+            let point_rows = array(item, "point_likelihoods").unwrap();
+            point_eig.insert(
+                id.clone(),
+                eig_from_rows(&hypothesis_ids, &priors, point_rows).unwrap(),
+            );
+
+            let nominal_eig = eig_from_rows(
+                &hypothesis_ids,
+                &priors,
+                scenario_rows(nominal, &id),
+            )
+            .unwrap();
+            let conservative_eig = eig_from_rows(
+                &hypothesis_ids,
+                &priors,
+                scenario_rows(conservative, &id),
+            )
+            .unwrap();
+
+            expected_scenario_eig.insert(
+                id.clone(),
+                scenario_weights[0] * nominal_eig
+                    + scenario_weights[1] * conservative_eig,
+            );
+            robust_lower_tail_eig.insert(
+                id.clone(),
+                lower_tail_cvar(
+                    &[
+                        (nominal_eig, scenario_weights[0]),
+                        (conservative_eig, scenario_weights[1]),
+                    ],
+                    0.25,
+                ),
+            );
+
+            let nominal_evsi =
+                evsi_from_rows(&hypothesis_ids, &priors, scenario_rows(nominal, &id), decisions)
+                    .unwrap();
+            let conservative_evsi = evsi_from_rows(
+                &hypothesis_ids,
+                &priors,
+                scenario_rows(conservative, &id),
+                decisions,
+            )
+            .unwrap();
+            expected_evsi.insert(
+                id,
+                scenario_weights[0] * nominal_evsi
+                    + scenario_weights[1] * conservative_evsi,
+            );
+        }
+
+        let max_key = |values: &BTreeMap<String, f64>| {
+            values
+                .iter()
+                .max_by(|left, right| left.1.total_cmp(right.1))
+                .map(|(key, _)| key.as_str())
+                .unwrap()
+        };
+        assert_eq!(max_key(&point_eig), "static_function_probe");
+        assert_eq!(max_key(&expected_scenario_eig), "static_function_probe");
+        assert_eq!(max_key(&robust_lower_tail_eig), "controlled_reproduction");
+        assert_eq!(max_key(&expected_evsi), "static_function_probe");
+
+        assert!((point_eig["static_function_probe"] - 0.531_004_406_410_718_9).abs() < 1.0e-12);
+        assert!((point_eig["controlled_reproduction"] - 0.278_071_905_112_637_7).abs() < 1.0e-12);
+        assert!((expected_scenario_eig["static_function_probe"] - 0.265_646_482_328_954_5).abs() < 1.0e-12);
+        assert!((expected_scenario_eig["controlled_reproduction"] - 0.233_396_890_326_752_43).abs() < 1.0e-12);
+        assert!((robust_lower_tail_eig["static_function_probe"] - 0.000_288_558_247_190_096_04).abs() < 1.0e-12);
+        assert!((robust_lower_tail_eig["controlled_reproduction"] - 0.188_721_875_540_867_17).abs() < 1.0e-12);
+        assert!((expected_evsi["static_function_probe"] - 0.775).abs() < 1.0e-12);
+        assert!((expected_evsi["controlled_reproduction"] - 0.05).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn proof_obligation_closure_per_second_prefers_manifest_then_reproduction() {
+        let agent = policy_agent();
+        let grader = policy_grader();
+        let effects = array(&grader, "candidate_effects").unwrap();
+        let mut closure_rate = BTreeMap::new();
+
+        for candidate in effects {
+            let id = string(candidate, "experiment_id").unwrap();
+            let experiment = experiment(&agent, id);
+            let time = number(experiment, "estimated_time_seconds").unwrap();
+            let mut closes = BTreeSet::new();
+            for effect in array(candidate, "effects").unwrap() {
+                if string(effect, "resulting_status").unwrap() == "satisfied" {
+                    closes.insert(string(effect, "obligation_id").unwrap().to_owned());
+                }
+            }
+            closure_rate.insert(id.to_owned(), closes.len() as f64 / time);
+        }
+        let winner = closure_rate
+            .iter()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .unwrap()
+            .0;
+        assert_eq!(winner, "verify_deployment_manifest");
+        assert!((closure_rate["verify_deployment_manifest"] - 0.5).abs() < 1.0e-12);
+        assert!((closure_rate["controlled_reproduction"] - 0.125).abs() < 1.0e-12);
+        assert_eq!(
+            array(
+                grader.get("expected_policy_rankings").unwrap(),
+                "combined_gated_sequence"
+            )
+            .unwrap()
+            .iter()
+            .map(|item| item.as_str().unwrap())
+            .collect::<Vec<_>>(),
+            vec!["verify_deployment_manifest", "controlled_reproduction"]
+        );
+    }
+
+    #[test]
+    fn predicted_outcomes_do_not_make_claim_ready_but_observed_effects_can() {
+        let grader = policy_grader();
+        let mut states = BTreeMap::from([
+            ("deployment_binding".to_owned(), "unknown".to_owned()),
+            ("vulnerability_behavior".to_owned(), "unknown".to_owned()),
+        ]);
+
+        let ready = |states: &BTreeMap<String, String>| {
+            states.values().all(|status| status == "satisfied")
+        };
+        assert!(!ready(&states));
+
+        // Candidate rankings and predicted likelihoods are not observations.
+        assert!(!ready(&states));
+
+        let apply = |candidate_id: &str, outcome: &str, states: &mut BTreeMap<String, String>| {
+            let candidate = array(&grader, "candidate_effects")
+                .unwrap()
+                .iter()
+                .find(|item| item["experiment_id"].as_str() == Some(candidate_id))
+                .unwrap();
+            for effect in array(candidate, "effects").unwrap() {
+                if effect["outcome"].as_str() == Some(outcome) {
+                    let obligation = effect["obligation_id"].as_str().unwrap();
+                    let result = effect["resulting_status"].as_str().unwrap();
+                    states.insert(obligation.to_owned(), result.to_owned());
+                }
+            }
+        };
+
+        apply(
+            "verify_deployment_manifest",
+            "digest_match",
+            &mut states,
+        );
+        assert_eq!(states["deployment_binding"], "satisfied");
+        assert_eq!(states["vulnerability_behavior"], "unknown");
+        assert!(!ready(&states));
+
+        apply("controlled_reproduction", "reproduced", &mut states);
+        assert!(ready(&states));
+    }
+
+    #[test]
+    fn policy_agent_schema_rejects_grader_oracle_leakage() {
+        let schema: Value = serde_json::from_str(SCHEMA).unwrap();
+        let mut agent = policy_agent();
+        agent["expected_policy_rankings"] =
+            serde_json::json!({"point_eig_best":"static_function_probe"});
+        let validator = draft202012::options().build(&schema).unwrap();
+        assert!(validator.is_valid(&agent));
+        // The base planner contract permits no grader-only property.
+        agent["world_state_oracle"] = Value::String("vulnerable".to_owned());
+        assert!(!validator.is_valid(&agent));
+    }
+
+    #[test]
+    fn policy_grader_rejects_effects_for_undeclared_candidate_outcomes() {
+        let schema: Value = serde_json::from_str(POLICY_GRADER_SCHEMA).unwrap();
+        draft202012::meta::validate(&schema).unwrap();
+        let validator = draft202012::options().build(&schema).unwrap();
+        let mut grader = policy_grader();
+        grader["candidate_effects"][1]["effects"][0]["outcome"] =
+            Value::String("undeclared_outcome".to_owned());
+        assert!(!validator.is_valid(&grader));
+    }
+
+    #[test]
+    fn policy_input_rejects_same_length_outcome_reordering() {
+        let mut agent = policy_agent();
+        agent["experiments"][1]["point_likelihoods"][0]["outcome_order"] =
+            serde_json::json!(["digest_mismatch", "digest_match"]);
+        assert!(validate_contract(&agent).is_err());
+    }
+
+    #[test]
+    fn policy_grader_exact_golden_values_cannot_be_mutated() {
+        let schema: Value = serde_json::from_str(POLICY_GRADER_SCHEMA).unwrap();
+        let validator = draft202012::options().build(&schema).unwrap();
+        let mut grader = policy_grader();
+        grader["golden_values"]["static_probe_expected_evsi_units"] =
+            serde_json::json!(0.76);
+        assert!(!validator.is_valid(&grader));
+    }
+
 }
