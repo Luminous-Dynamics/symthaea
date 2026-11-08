@@ -749,7 +749,8 @@
         "phonological_feature_profile_review_status",
         "feature_dimension_order_and_applicability",
         "per_feature_dimension_diagnostics_in_profile_order",
-        "non_estimable_feature_dimension_flags"
+        "non_estimable_feature_dimension_flags",
+        "feature_dimension_diagnostics_manifest_sha256"
       ],
       "system_arms": [
         "strict_orthographic_WER_CER_baseline",
@@ -934,9 +935,12 @@
         "FER",
         "TER",
         "NA_masked_feature_cost",
-        "alignment_gap_cost"
+        "alignment_gap_cost",
+        "per_feature_active_pair_count",
+        "per_feature_mismatch_count",
+        "per_feature_error_rate"
       ],
-      "note": "Synthetic generic feature-profile vectors. A separate JavaScript implementation of the declared NA-aware Needleman-Wunsch policy recomputed all ten expected cases with no mismatches. No Rust tests or external-reference differential have been executed."
+      "note": "Ten synthetic generic feature-profile vectors. A separate JavaScript implementation recomputed FER/TER, NA-aware alignment, and all 40 per-dimension diagnostic rows with no mismatches. This is arithmetic fixture validation only; no Rust tests or external-reference differential have been executed."
     },
     {
       "id": "acoustic_faithfulness_golden_v0_1",
