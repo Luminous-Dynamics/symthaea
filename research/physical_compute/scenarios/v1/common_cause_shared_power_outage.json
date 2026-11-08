@@ -237,5 +237,12 @@
       "Expected result is a deterministic classification, not a probability estimate.",
       "Shared power loss must dominate healthy channel count and invalidate the verifier path that shares the rail."
     ]
+  },
+  "error_budget": {
+    "dependence_assumption": "unknown_or_correlated",
+    "dependence_evidence_sha256": null,
+    "task_sensitivity_bound": null,
+    "sensitivity_evidence_sha256": null,
+    "contributions": []
   }
 }
