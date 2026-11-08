@@ -182,3 +182,12 @@ This document is a research design basis only. It is not a construction package 
 For electric/hybrid propulsion, ISO 16315:2026 Edition 2 is published and within scope for small craft up to 24 m LH under its stated propulsion-system and voltage conditions. The 2026 revision clarifies overcurrent protection and revises isolated-DC fault monitoring. Applicability and clause-level mapping require the licensed standard and qualified marine electrical review; a campaign record or sensor trace is not compliance evidence by itself. Official source: https://www.iso.org/standard/84203.html
 
 For towing-tank/model resistance or propulsion experiments, select the current applicable ITTC procedure and uncertainty-analysis method. Do not invent universal sensor-rate or accuracy settings. Every campaign's sampling and timing adequacy must be assessed against the exact physical claim and measurement chain. ITTC register: https://ittc.info/downloads/quality-systems-manual/recommended-procedures-and-guidelines/
+
+
+### Mass-state and loading-condition implementation
+
+[MARINE-MASS-STATE-001 #11074](https://github.com/Luminous-Dynamics/symthaea/issues/11074) now defines the revision-bound mass-item, tank-fluid and loading-condition ledger required by the coupled mass/volume/energy section above. It consumes component/as-built identities from Symtropy #3331, DFM and service-removal changes from #2048/#11049, measured mass/CG/tank channels through #11064 and exact design/mission identity from this parent. It does not duplicate the hydrostatics/stability solver.
+
+The current ISO watch requires one clarification: ISO 12217-1:2022 Edition 4 remains published but ISO lists it at stage 90.92 (to be revised); ISO/DIS 12217-1.2 Edition 5 is currently in enquiry for non-sailing boats. ISO/DIS 12217-2.2 Edition 5 is the sailing-boat draft. Applicability must be determined from actual hull length, powered/sailing definition, use and operating jurisdiction; do not treat a catamaran as automatically in Part 2. Sources: https://www.iso.org/standard/79072.html ; https://www.iso.org/standard/88606.html
+
+The ITTC Inclining Tests Recommended Procedure 7.5-02-07-04.7 (Rev 01, effective 2024) is now an explicit method reference for physical displacement and CG determination from drafts, angles and hull geometry. It is not replaced by synthetic mass-ledger arithmetic. https://www.ittc.info/media/11946/75-02-07-047.pdf
