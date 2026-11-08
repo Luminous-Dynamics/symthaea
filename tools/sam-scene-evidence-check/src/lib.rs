@@ -87,10 +87,10 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
     let mut duplicate_sources = BTreeSet::new();
     if let Some(sources) = snapshot.get("sources").and_then(Value::as_array) {
         for source in sources {
-            if let Some(id) = source.get("source_id").and_then(Value::as_str) {
-                if !duplicate_sources.insert(id.to_owned()) {
-                    errors.push(format!("duplicate source_id: {id}"));
-                }
+            if let Some(id) = source.get("source_id").and_then(Value::as_str)
+                && !duplicate_sources.insert(id.to_owned())
+            {
+                errors.push(format!("duplicate source_id: {id}"));
             }
             check_ref(
                 &mut errors,
@@ -111,13 +111,13 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
     let processed = time
         .and_then(|value| value.get("processing_tick_ns"))
         .and_then(Value::as_u64);
-    if let (Some(event), Some(received), Some(processed)) = (event, received, processed) {
-        if !(event <= received && received <= processed) {
-            errors.push(
-                "snapshot clock order must satisfy event_tick_ns <= receive_tick_ns <= processing_tick_ns"
-                    .into(),
-            );
-        }
+    if let (Some(event), Some(received), Some(processed)) = (event, received, processed)
+        && !(event <= received && received <= processed)
+    {
+        errors.push(
+            "snapshot clock order must satisfy event_tick_ns <= receive_tick_ns <= processing_tick_ns"
+                .into(),
+        );
     }
 
     check_ref(
@@ -171,10 +171,10 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         let mut seen_hypotheses = BTreeSet::new();
         for (index, object) in objects.iter().enumerate() {
             let prefix = format!("object_hypotheses[{index}]");
-            if let Some(hypothesis_id) = object.get("hypothesis_id").and_then(Value::as_str) {
-                if !seen_hypotheses.insert(hypothesis_id.to_owned()) {
-                    errors.push(format!("{prefix}: duplicate hypothesis_id {hypothesis_id}"));
-                }
+            if let Some(hypothesis_id) = object.get("hypothesis_id").and_then(Value::as_str)
+                && !seen_hypotheses.insert(hypothesis_id.to_owned())
+            {
+                errors.push(format!("{prefix}: duplicate hypothesis_id {hypothesis_id}"));
             }
             check_ref(
                 &mut errors,
@@ -332,7 +332,7 @@ fn validate_uncertainty(errors: &mut Vec<String>, prefix: &str, uncertainty: Opt
 
     if order_len == 0
         || order_len != units_len
-        || diagonal.map_or(true, |values| values.len() != order_len)
+        || diagonal.is_none_or(|values| values.len() != order_len)
     {
         errors.push(format!(
             "{prefix}.uncertainty: diagonal covariance dimension must match state_order and units"
@@ -340,16 +340,16 @@ fn validate_uncertainty(errors: &mut Vec<String>, prefix: &str, uncertainty: Opt
         return;
     }
 
-    if let Some(values) = diagonal {
-        if values.iter().any(|value| {
+    if let Some(values) = diagonal
+        && values.iter().any(|value| {
             value
                 .as_f64()
                 .is_none_or(|number| !number.is_finite() || number < 0.0)
-        }) {
-            errors.push(format!(
-                "{prefix}.uncertainty: diagonal covariance entries must be finite and non-negative"
-            ));
-        }
+        })
+    {
+        errors.push(format!(
+            "{prefix}.uncertainty: diagonal covariance entries must be finite and non-negative"
+        ));
     }
 }
 
