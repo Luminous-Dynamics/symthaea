@@ -225,9 +225,9 @@ Bazel's **Skyframe** documents a dependency graph in which outputs are functions
 
 **CEB implication:** reuse the reverse-dependency and change-pruning intuition, but do not assume all engineering claims behave like deterministic build nodes. A retained claim requires an unaffectedness witness and a complete declared support closure. Where equivalence cannot be established, revalidate or leave unresolved; do not resurrect solely because a diff looks irrelevant.
 
-### 2.23 Artifact provenance — SLSA v1.1 and in-toto attestations
+### 2.23 Artifact provenance — SLSA v1.2 and in-toto attestations
 
-The current **SLSA v1.1** provenance guidance binds produced artifacts to a builder identity, build definition, external parameters, resolved dependencies and output subjects. It recommends recording dependencies that can affect the build and verifying provenance against expected builder/source/build-type/parameter values. It also makes the builder's trust boundary explicit. [SLSA v1.1](https://slsa.dev/spec/v1.1/) · [Provenance](https://slsa.dev/spec/v1.1/provenance) · [Artifact verification](https://slsa.dev/spec/v1.1/verifying-artifacts).
+The current **SLSA v1.2** provenance guidance binds produced artifacts to a builder identity, build definition, external parameters, resolved dependencies and output subjects. It recommends recording dependencies that can affect the build and verifying provenance against expected builder/source/build-type/parameter values. It also makes the builder's trust boundary explicit. [SLSA v1.2](https://slsa.dev/spec/v1.2/) · [Provenance](https://slsa.dev/spec/v1.2/provenance) · [Artifact verification](https://slsa.dev/spec/v1.2/verifying-artifacts).
 
 The **in-toto Attestation Framework v1.2** separates predicate, statement, envelope and bundle, with the statement binding a typed predicate to one or more subject artifacts. [Specification](https://github.com/in-toto/attestation/blob/main/spec/README.md).
 
@@ -253,6 +253,39 @@ DiffCI's public open study reports a pre-registered historical replay of **2,000
 
 **CEB implication:** use a cheap path/change heuristic as a required baseline for support-closure computation. C2 must demonstrate that typed semantic dependencies improve *claim validity decisions* over C0 path overlap and C1 continuity dispositions, not simply produce a larger graph or a higher within-opportunity win rate. Include full recomputation as a correctness oracle on a sampled subset; measure incremental cost net of graph construction and evidence retrieval. The comparison is C0 path heuristic, C1 existing #10630 continuity, C2 support-closure extension; measure closure build/update, evidence ingestion, retrieval, peak memory and revalidation action cost. Charge the full cost and compare C2 with a sampled clean full-recomputation oracle before claiming safe incrementality.
 
+
+
+### 2.26 Evidence tracing and execution provenance for LLM agents
+
+Wang et al.'s survey **From Agent Traces to Trust: Evidence Tracing and Execution Provenance in LLM Agents** (June 3, 2026) organizes provenance across retrieval evidence, tool outputs, memory, environment observations, intermediate claims, actions and final answers. It distinguishes evidence/execution units, provenance relations, tracing granularity/timing, representations and trust functions. Its open challenges include unified trace representations, claim-level semantic provenance, provenance-aware safety, realistic execution-trace benchmarks, recovery-oriented evaluation and privacy-aware audit. [Survey](https://arxiv.org/abs/2606.04990).
+
+**Scope and limitation:** this is a survey/taxonomy, not a code-review accuracy benchmark or a claim-support completeness result.
+
+**CEB implication:** treat a review finding as a claim whose support includes not only source citations but also retrieval/tool/evaluator provenance and decision lineage. Preserve provenance for why a tool action was taken, what evidence it returned, which claim consumed that evidence, and what changed after a later event. Do not expose or score private chain-of-thought; the auditable object is the external evidence/action/claim relation.
+
+### 2.27 Empirical reporting standards for LLM software-engineering studies
+
+Baltes et al.'s community-authored **Guidelines for empirical studies in software engineering involving large language models** (published November 3, 2026) involves 22 researchers and presents a taxonomy of seven study types plus eight reporting guidelines. It calls for explicit model/tool versions and configuration, system/prompt/harness details, representative session/runtime traces, suitable benchmarks and metrics, open-model baselines, human validation and limitations. The paper notes that model non-determinism, prompt/configuration sensitivity and evolving proprietary models threaten reproducibility. [Paper](https://link.springer.com/article/10.1007/s10664-026-10922-3).
+
+**Scope and limitation:** this is empirical-method guidance, not a software-review system or benchmark score.
+
+**CEB implication:** include model/harness/prompt/tool and evaluator version in the study lineage; preserve representative interaction and evidence-action traces; make the independent-human validation and reporting checklist part of the frozen experiment pack. This strengthens reproducibility of the CEB comparison without turning agent-private reasoning into benchmark evidence.
+
+### 2.28 Pull-request change-impact analysis
+
+Göçmen, Cezayir and Tüzün's **Enhanced code reviews using pull request based change impact analysis** (Empirical Software Engineering, February 12, 2025) combines call-graph dependency analysis with software-history mining to identify potentially impacted functions at PR granularity. The authors report computational feasibility across three open-source projects, with analysis times from **7.4 to 22.43 seconds**; focus-group participants rated usefulness for enhancing review at **3.66/5**, while the current impact-risk score averaged **3.2/5** for perceived accuracy with **71% agreement** on selected metrics. [Paper](https://doi.org/10.1007/s10664-024-10600-2).
+
+**Scope and limitation:** the evidence is a small user-study/feasibility evaluation, not a large-scale code-review accuracy benchmark, nor a semantic proof that an unmodified file cannot be impacted.
+
+**CEB implication:** PR-level change impact is a useful C0/C1 context, but file/function reachability must be distinguished from claim-support closure. Add the contract, policy, build, evaluator and authority dependencies that ordinary call graphs do not model; require independent closure completeness before a retain decision.
+
+### 2.29 Formal verification under software evolution — synthesis of the research gap
+
+Gómez et al.'s 2026 systematic review of **Formal Verification Under Evolution in Microservice-Based Systems** screened **1,187 records** and retained **18 studies** (13 primary and five background). It identifies five complementary clusters—actor-based model checking, TLA+ control-plane verification, static analysis, continuous certification and runtime/self-adaptive testing—and reports that empirical work is dominated by small academic case studies, with relatively few end-to-end CI/CD integrations or shared datasets. [Review](https://www.mdpi.com/2674-113x/5/3/32).
+
+**Scope and limitation:** microservice evolution/formal verification is adjacent to repository claim continuity, not code-review agent performance.
+
+**CEB implication:** test claim-support closure across code, API contracts, configuration, runtime and authorization/policy changes. A source-only call graph cannot establish all of those dependencies. The opportunity is not another static analyzer; it is a traceable evaluation of whether engineering claims stay valid as their supporting system evolves.
 
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
@@ -458,6 +491,11 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - in-toto, [Attestation Framework Specification v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md), accessed November 8, 2026.
 
 - Wang et al., [Incremental Program Analysis in the Wild: An Empirical Study on Real-World Program Changes](https://doi.org/10.1109/ASE63991.2025.00194), ASE 2025.
+
+- Wang et al., [From Agent Traces to Trust: Evidence Tracing and Execution Provenance in LLM Agents](https://arxiv.org/abs/2606.04990), June 3, 2026.
+- Baltes et al., [Guidelines for empirical studies in software engineering involving large language models](https://link.springer.com/article/10.1007/s10664-026-10922-3), published November 3, 2026.
+- Göçmen, Cezayir and Tüzün, [Enhanced code reviews using pull request based change impact analysis](https://doi.org/10.1007/s10664-024-10600-2), Empirical Software Engineering, February 12, 2025.
+- Gómez et al., [Formal Verification Under Evolution in Microservice-Based Systems: A Systematic Literature Review](https://www.mdpi.com/2674-113x/5/3/32), Software 5(3), 32 (July 15, 2026).
 - DiffCI, [DiffCI Open Evidence Study 2026](https://diffci.com/research/diffci-open-evidence-2026), published September 3, updated September 25, 2026; self-published open study, accessed November 8, 2026.
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
