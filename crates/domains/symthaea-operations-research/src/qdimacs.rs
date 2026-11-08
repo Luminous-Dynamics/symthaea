@@ -48,6 +48,9 @@ pub struct QdimacsSourceStats {
     pub parsed_clauses: usize,
     pub parsed_literals: usize,
     pub quantifier_blocks: usize,
+    /// Variables omitted from the explicit prefix and existentially closed
+    /// at the innermost position, as required by QDIMACS semantics.
+    pub implicitly_existential_variables: usize,
     /// Largest 1-based variable ID in a matrix literal; zero if none.
     pub max_literal_variable_id: usize,
 }
@@ -86,7 +89,6 @@ pub enum QdimacsError {
         variable_count: usize,
     },
     DuplicateQuantifiedVariable { line: usize, variable: usize },
-    MissingQuantifierVariable { variable: usize },
     QuantifierAfterMatrix { line: usize },
     UnsupportedDependencyLine { line: usize, marker: String },
     InvalidLiteral { line: usize, token: String },
@@ -123,17 +125,29 @@ fn parse_header(line_number: usize, tokens: &[&str]) -> Result<Header, QdimacsEr
         });
     }
     let variables = tokens[2]
-        .parse::<usize>()
+        .parse::<i32>()
         .map_err(|_| QdimacsError::InvalidHeaderVariableCount {
             line: line_number,
             token: tokens[2].to_owned(),
         })?;
     let clauses = tokens[3]
-        .parse::<usize>()
+        .parse::<i32>()
         .map_err(|_| QdimacsError::InvalidHeaderClauseCount {
             line: line_number,
             token: tokens[3].to_owned(),
         })?;
+    let variables = usize::try_from(variables).map_err(|_| {
+        QdimacsError::InvalidHeaderVariableCount {
+            line: line_number,
+            token: tokens[2].to_owned(),
+        }
+    })?;
+    let clauses = usize::try_from(clauses).map_err(|_| {
+        QdimacsError::InvalidHeaderClauseCount {
+            line: line_number,
+            token: tokens[3].to_owned(),
+        }
+    })?;
     Ok(Header { variables, clauses })
 }
 
@@ -164,19 +178,24 @@ fn parse_quantifier_line(
 
     for token in &tokens[1..tokens.len() - 1] {
         let variable = token
-            .parse::<usize>()
+            .parse::<i32>()
             .map_err(|_| QdimacsError::InvalidQuantifierVariable {
                 line: line_number,
                 token: (*token).to_owned(),
             })?;
-        if variable == 0 || variable > header.variables {
+        if variable <= 0 || usize::try_from(variable).unwrap_or(usize::MAX) > header.variables {
             return Err(QdimacsError::QuantifierVariableOutOfRange {
                 line: line_number,
                 variable,
                 variable_count: header.variables,
             });
         }
-        let index = variable - 1;
+        let index = usize::try_from(variable - 1).map_err(|_| {
+            QdimacsError::InvalidQuantifierVariable {
+                line: line_number,
+                token: (*token).to_owned(),
+            }
+        })?;
         if seen_variables[index] {
             return Err(QdimacsError::DuplicateQuantifiedVariable {
                 line: line_number,
@@ -226,7 +245,7 @@ fn parse_clause_token(
     variable_count: usize,
 ) -> Result<Literal, QdimacsError> {
     let signed = token
-        .parse::<i64>()
+        .parse::<i32>()
         .map_err(|_| QdimacsError::InvalidLiteral {
             line: line_number,
             token: token.to_owned(),
@@ -428,10 +447,47 @@ pub fn parse_qdimacs(
             actual: clauses.len(),
         });
     }
-    for (index, seen) in seen_variables.iter().enumerate() {
-        if !seen {
-            return Err(QdimacsError::MissingQuantifierVariable {
-                variable: index + 1,
+    let implicit_variables: Vec<usize> = seen_variables
+        .iter()
+        .enumerate()
+        .filter_map(|(index, seen)| (!seen).then_some(index))
+        .collect();
+    let total_prefix_occurrences = prefix_occurrences
+        .checked_add(implicit_variables.len())
+        .ok_or(QdimacsError::ResourceAccountingOverflow)?;
+    if total_prefix_occurrences > budget.prefix.max_variable_occurrences {
+        return Err(QdimacsError::PrefixVariableOccurrenceBudgetExceeded {
+            required: total_prefix_occurrences,
+            limit: budget.prefix.max_variable_occurrences,
+        });
+    }
+
+    // QDIMACS assigns existential semantics to variables omitted from the
+    // explicit prefix. Existential closure places them after the stated prefix.
+    if !implicit_variables.is_empty() {
+        if blocks
+            .last()
+            .is_some_and(|last| last.quantifier == Quantifier::Exists)
+        {
+            blocks
+                .last_mut()
+                .expect("last block was checked")
+                .variables
+                .extend(implicit_variables.iter().copied());
+        } else {
+            let required = blocks
+                .len()
+                .checked_add(1)
+                .ok_or(QdimacsError::ResourceAccountingOverflow)?;
+            if required > budget.prefix.max_blocks {
+                return Err(QdimacsError::PrefixBlockBudgetExceeded {
+                    required,
+                    limit: budget.prefix.max_blocks,
+                });
+            }
+            blocks.push(QuantifierBlock {
+                quantifier: Quantifier::Exists,
+                variables: implicit_variables.clone(),
             });
         }
     }
@@ -458,6 +514,7 @@ pub fn parse_qdimacs(
         parsed_clauses: clauses_len(&problem),
         parsed_literals: literal_count,
         quantifier_blocks: prefix.blocks().len(),
+        implicitly_existential_variables: implicit_variables.len(),
         max_literal_variable_id,
     };
 
@@ -636,10 +693,21 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_implicit_or_free_prefix_variables() {
+    fn unquantified_variables_receive_innermost_existential_semantics() {
+        let parsed = parse_qdimacs("p cnf 3 0\na 1 0\n", budget()).unwrap();
+        assert_eq!(parsed.stats.implicitly_existential_variables, 2);
         assert_eq!(
-            parse_qdimacs("p cnf 2 0\ne 1 0\n", budget()).unwrap_err(),
-            QdimacsError::MissingQuantifierVariable { variable: 2 }
+            parsed.prefix.blocks(),
+            &[
+                QuantifierBlock {
+                    quantifier: Quantifier::ForAll,
+                    variables: vec![0],
+                },
+                QuantifierBlock {
+                    quantifier: Quantifier::Exists,
+                    variables: vec![1, 2],
+                },
+            ]
         );
     }
 
@@ -689,7 +757,7 @@ mod tests {
             }
         );
         assert!(matches!(
-            parse_qdimacs("p cnf 1 1\ne 1 0\n-9223372036854775808 0\n", budget()),
+            parse_qdimacs("p cnf 1 1\ne 1 0\n-2147483648 0\n", budget()),
             Err(QdimacsError::InvalidLiteral { .. })
         ));
     }
