@@ -17,7 +17,8 @@
     "acceptance_invariants",
     "numerical_tolerance",
     "data_status",
-    "limitations"
+    "limitations",
+    "unknown_dependence_control"
   ],
   "properties": {
     "schema_version": {
@@ -314,6 +315,53 @@
       "minItems": 1,
       "items": {
         "type": "string"
+      }
+    },
+    "unknown_dependence_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mycelix_profile_schema",
+        "mycelix_profile_id",
+        "assertion_id",
+        "assessment",
+        "independent_product_permitted",
+        "joint_likelihood_available",
+        "numeric_evsi",
+        "required_behavior",
+        "rationale"
+      ],
+      "properties": {
+        "mycelix_profile_schema": {
+          "const": "mycelix.neo_evidence.source_correlation_profile.v0.1"
+        },
+        "mycelix_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertion_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assessment": {
+          "const": "unknown"
+        },
+        "independent_product_permitted": {
+          "const": false
+        },
+        "joint_likelihood_available": {
+          "const": false
+        },
+        "numeric_evsi": {
+          "type": "null"
+        },
+        "required_behavior": {
+          "const": "ABSTAIN_DEPENDENCE_UNRESOLVED"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   },
