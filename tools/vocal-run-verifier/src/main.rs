@@ -65,6 +65,7 @@ struct CaseReceipt {
 }
 
 #[derive(Debug, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 struct NoteReceipt {
     frequency: f32,
     start_time: f32,
@@ -178,6 +179,42 @@ fn safe_audio_file(blind_root: &Path, relative: &str) -> Result<PathBuf, String>
         )));
     }
     Ok(joined)
+}
+
+fn validate_directory_layout(
+    directory: &Path,
+    allowed_files: &BTreeSet<String>,
+    label: &str,
+) -> Result<(), String> {
+    let children = fs::read_dir(directory)
+        .map_err(|error| fail(format!("cannot enumerate {label} directory: {error}")))?;
+    for child in children {
+        let child = child.map_err(|error| fail(format!("cannot read {label} entry: {error}")))?;
+        let name = child
+            .file_name()
+            .into_string()
+            .map_err(|_| fail(format!("{label} directory contains a non-UTF8 filename")))?;
+        let metadata = fs::symlink_metadata(child.path())
+            .map_err(|error| fail(format!("cannot stat {label} entry {name:?}: {error}")))?;
+        if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
+            return Err(fail(format!(
+                "{label} directory contains a symlink or non-regular entry {name:?}"
+            )));
+        }
+        if !allowed_files.contains(&name) {
+            return Err(fail(format!(
+                "unexpected file {name:?} in {label} directory; possible blind/private data leak"
+            )));
+        }
+    }
+    for required in allowed_files {
+        if !directory.join(required).is_file() {
+            return Err(fail(format!(
+                "required {label} file {required:?} is missing"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn file_blake3(path: &Path) -> Result<String, String> {
@@ -371,6 +408,29 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
             )));
         }
     }
+    let mut blind_allowed = BTreeSet::new();
+    blind_allowed.insert("blind_manifest.json".to_string());
+    blind_allowed.insert("ratings.template.json".to_string());
+    blind_allowed.extend(audio_names.iter().map(|name| name.to_string()));
+    validate_directory_layout(&blind_root, &blind_allowed, "blind")?;
+
+    let mut private_allowed = BTreeSet::from([
+        "run_manifest.json".to_string(),
+        "private_backend_key.json".to_string(),
+        "objective_report.json".to_string(),
+        "human_reference_receipts.json".to_string(),
+        "release_status.json".to_string(),
+    ]);
+    validate_directory_layout(&private_root, &private_allowed, "private")?;
+    let release_status: Value = read_json(&private_root.join("release_status.json"))?;
+    for field in ["objective_pass", "human_complete", "release_pass"] {
+        if !release_status.get(field).and_then(Value::as_bool).is_some() {
+            return Err(fail(format!(
+                "release_status.json is missing boolean field {field:?}"
+            )));
+        }
+    }
+
 
     let mut key_by_id = BTreeMap::new();
     let mut backend_names = BTreeSet::new();
@@ -440,9 +500,12 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         }
     }
 
-    for clip_id in clip_by_id.keys() {
-        if !key_by_id.contains_key(clip_id) {
-            return Err(fail(format!("blind clip {clip_id} has no private backend-key entry")));
+    for clip in &clips {
+        if !key_by_id.contains_key(clip.clip_id.as_str()) {
+            return Err(fail(format!(
+                "blind clip {} has no private backend-key entry",
+                clip.clip_id
+            )));
         }
     }
 
@@ -752,6 +815,15 @@ mod tests {
             "private/human_reference_receipts.json",
             &reference_receipts,
         );
+        bundle.write_json(
+            "private/release_status.json",
+            &serde_json::json!({
+                "objective_pass": true,
+                "human_complete": include_human,
+                "release_pass": false
+            }),
+        );
+        bundle.write_json("blind/ratings.template.json", &serde_json::json!([]));
         bundle
     }
 
@@ -774,6 +846,45 @@ mod tests {
         let report = verify(&blind, &private).unwrap();
         assert_eq!(report.human_reference_count, 1);
         assert_eq!(report.audio_files_verified, 2);
+    }
+
+    #[test]
+    fn rejects_backend_leak_in_blind_directory() {
+        let bundle = build_fixture(false);
+        let (blind, private) = bundle.roots();
+        fs::write(blind.join("private_backend_key.json"), b"leak").unwrap();
+        assert!(
+            verify(&blind, &private).unwrap_err().contains("possible blind/private data leak")
+        );
+    }
+
+    #[test]
+    fn rejects_unexpected_private_directory_entries() {
+        let bundle = build_fixture(false);
+        let (blind, private) = bundle.roots();
+        fs::write(private.join("shared-listener-copy.wav"), b"private").unwrap();
+        assert!(
+            verify(&blind, &private).unwrap_err().contains("possible blind/private data leak")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_audio() {
+        use std::os::unix::fs::symlink;
+        let bundle = build_fixture(false);
+        let (blind, private) = bundle.roots();
+        let audio = fs::read_dir(&blind)
+            .unwrap()
+            .filter_map(Result::ok)
+            .find(|entry| entry.path().extension().is_some_and(|extension| extension == "wav"))
+            .unwrap()
+            .path();
+        let target = private.join("outside.wav");
+        fs::write(&target, b"external").unwrap();
+        fs::remove_file(&audio).unwrap();
+        symlink(&target, &audio).unwrap();
+        assert!(verify(&blind, &private).unwrap_err().contains("non-symlink"));
     }
 
     #[test]
