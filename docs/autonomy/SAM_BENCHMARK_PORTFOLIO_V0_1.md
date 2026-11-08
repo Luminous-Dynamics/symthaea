@@ -276,7 +276,7 @@ The targets are prospective objectives. No current Symthaea or Symtropy measurem
 ### Waymo Safety Impact (data through June 2026)
 
 - **Evidence class:** company-reported operational outcome comparison, not an open dataset benchmark or SAM reproduction.
-- **Exposure:** Waymo's September 24, 2026 update says its analysis covers more than 270 million fully autonomous miles through the end of June 2026 across five metropolitan service areas.
+- **Exposure:** Waymo's September 24, 2026 release says the analysis covers more than 270 million fully autonomous miles through June 2026 across five metro areas; the current Safety Impact data hub separately displays 271.3 million rider-only miles through June 2026. Preserve the source-specific definitions and snapshots; do not assume the rounded release number and live dashboard mileage are identical measures.
 - **Serious-injury-or-worse crash rates:** the current Safety Impact page reports 0.01 incidents per million miles for Waymo versus 0.21 for the human comparison benchmark in the all-locations display. Per-city estimates and 95% confidence intervals are shown separately.
 - **Any-injury-reported crash rates:** the same page reports 0.67 versus 3.77 incidents per million miles in the all-locations display.
 - **Additional reported count:** Waymo's September post estimates 841 fewer injury-causing crashes than the human benchmark across its analysis window.
