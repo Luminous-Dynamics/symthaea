@@ -69,14 +69,12 @@ pub fn strategy_representation_pareto_frontier(
             && left.internal_nodes <= right.internal_nodes
             && left.logic_depth <= right.logic_depth
             && left.worst_case_evaluation_steps <= right.worst_case_evaluation_steps
-            && left.estimated_verification_work_units
-                <= right.estimated_verification_work_units;
+            && left.estimated_verification_work_units <= right.estimated_verification_work_units;
         let strictly_better = left.encoded_bytes < right.encoded_bytes
             || left.internal_nodes < right.internal_nodes
             || left.logic_depth < right.logic_depth
             || left.worst_case_evaluation_steps < right.worst_case_evaluation_steps
-            || left.estimated_verification_work_units
-                < right.estimated_verification_work_units;
+            || left.estimated_verification_work_units < right.estimated_verification_work_units;
         no_worse && strictly_better
     }
 
@@ -128,7 +126,6 @@ fn select_smallest_pareto_encoding(
     }
     (selected, selected_cost)
 }
-
 
 /// Explicit limits on canonical artifact encoding and aggregate output size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1158,10 +1155,14 @@ mod tests {
             portfolio.total_selected_estimated_verification_work,
             match portfolio.functions[0].selected {
                 SelectedStrategyRepresentation::Robdd => {
-                    portfolio.functions[0].bdd_cost.estimated_verification_work_units
+                    portfolio.functions[0]
+                        .bdd_cost
+                        .estimated_verification_work_units
                 }
                 SelectedStrategyRepresentation::Aig => {
-                    portfolio.functions[0].aig_cost.estimated_verification_work_units
+                    portfolio.functions[0]
+                        .aig_cost
+                        .estimated_verification_work_units
                 }
             }
         );
