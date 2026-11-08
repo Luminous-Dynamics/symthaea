@@ -1123,7 +1123,12 @@
       "expected_information_gain_about_permutation_nats",
       "probe_cost_to_accepted_alignment",
       "permutation_probe_expected_information_gain_nats",
-      "permutation_probe_expected_posterior_entropy_nats"
+      "permutation_probe_expected_posterior_entropy_nats",
+      "expected_value_of_sample_information",
+      "prior_bayes_risk",
+      "expected_posterior_bayes_risk",
+      "decision_focused_diagnostic_regret",
+      "diagnostic_total_cost"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1209,7 +1214,14 @@
       "exact_permutation_width_limit_violation_rate",
       "permutation_posterior_brier_score",
       "gaussian_observation_noise_calibration_error",
-      "permutation_probe_realized_entropy_reduction_nats"
+      "permutation_probe_realized_entropy_reduction_nats",
+      "high_eig_zero_evsi_selection_error",
+      "lower_eig_higher_evsi_selection_error",
+      "model_misspecification_brier_increase",
+      "truth_outside_model_support_acceptance_rate",
+      "paired_policy_hidden_hypothesis_mismatch_rate",
+      "safety_threshold_violation_rate",
+      "nonpositive_net_evsi_probe_selection_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1228,7 +1240,11 @@
       "canonicalization_changed_parameter_count",
       "canonicalization_candidate_evaluations",
       "edit_program_reuse_rate",
-      "llm_editor_call_count"
+      "llm_editor_call_count",
+      "diagnostic_probes_taken",
+      "diagnostic_observation_cost",
+      "decision_value_per_probe_cost",
+      "diagnostic_policy_selection_runtime_ns"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -1325,7 +1341,14 @@
     "Bayesian expected information gain over hidden-unit permutations is claimed only when an explicit observation/measurement-noise likelihood is independently calibrated from repeat-run, device/precision, or stochastic-model variation; a deterministic margin heuristic is labelled as such and is not called EIG.",
     "Exact finite-permutation enumeration is restricted to declared small-width oracle fixtures and must report factorial scaling; larger-width methods report approximation residuals, calibration, ambiguity abstention, and compute.",
     "Gaussian permutation EIG may be reported as calibrated diagnostic efficiency only when the scalar observation-noise standard deviation is estimated from a preregistered repeated-probe/device/stochasticity protocol on development data and then frozen for held-out evaluation; arbitrary noise insertion solely to increase EIG is prohibited.",
-    "Exact permutation EIG is limited to at most 120 hypotheses (five hidden units) and 32 candidate probes per call; larger layers must use a separately benchmarked approximate posterior/assignment method and cannot be labelled exact."
+    "Exact permutation EIG is limited to at most 120 hypotheses (five hidden units) and 32 candidate probes per call; larger layers must use a separately benchmarked approximate posterior/assignment method and cannot be labelled exact.",
+    "Model expected information gain and expected value of sample information are distinct registered quantities; the benchmark must report both and must not use EIG as a proxy for downstream decision value.",
+    "A high-EIG diagnostic with zero EVSI and nonzero cost or risk must not be selected; a lower-EIG diagnostic with positive net EVSI must be selectable.",
+    "A no-probe option is always evaluated and must win whenever all eligible probes have non-positive net decision value.",
+    "Agent belief likelihoods and evaluator truth-side outcome distributions are separately represented; model-misspecification arms must report task regret and posterior calibration rather than sampling from the agent's own predictions.",
+    "Paired policy comparisons derive the same hidden-hypothesis draw from a domain-separated per-episode seed independent of the number of random draws consumed by a policy.",
+    "All action selectors enforce the preregistered hard safety-risk threshold; information gain or decision value cannot override an ineligible action.",
+    "Impossible observations, truth probability outside the agent likelihood support, malformed probability mass, non-finite losses, and invalid costs fail closed."
   ],
   "research_references": [
     {
@@ -1395,6 +1418,30 @@
     {
       "id": "active_inference_artificial_reasoning_nature_2026",
       "url": "https://doi.org/10.1038/s41467-026-77209-5"
+    },
+    {
+      "id": "ibm_jair_vsa_capacity_2026",
+      "url": "https://research.ibm.com/publications/capacity-analysis-of-vector-symbolic-architectures"
+    },
+    {
+      "id": "date_2026_ghrr_vector_space_acceleration",
+      "url": "https://doi.org/10.23919/DATE69613.2026.11539261"
+    },
+    {
+      "id": "symbolar_softwarex_2026",
+      "url": "https://doi.org/10.1016/j.softx.2026.102914"
+    },
+    {
+      "id": "oxicuda_hdc_0_5_5",
+      "url": "https://docs.rs/crate/oxicuda-hdc/0.5.5"
+    },
+    {
+      "id": "symthaea_hlb_decision_evsi_integration_issue_11122",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/11122"
+    },
+    {
+      "id": "symthaea_hlb_hdc_capacity_issue_11145",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/11145"
     }
   ]
 }
