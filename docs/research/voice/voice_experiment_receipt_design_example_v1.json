@@ -176,5 +176,30 @@
     "logs_sha256": null,
     "scorer_output_sha256": null,
     "artifact_refs": []
+  },
+  "candidate_selection": {
+    "mode": "NOT_USED",
+    "candidate_set_manifest_sha256": null,
+    "candidate_count": 0,
+    "candidate_generator_manifest_sha256": null,
+    "selector_provider": null,
+    "selector_model_id": null,
+    "selector_model_revision": null,
+    "selector_checkpoint_sha256": null,
+    "selector_prompt_sha256": null,
+    "demonstrations_manifest_sha256": null,
+    "demonstration_count": 0,
+    "demonstration_selection_policy": "NOT_APPLICABLE",
+    "target_language_demonstration_count": 0,
+    "target_language_supervised_training_used": false,
+    "decision_type": "NOT_APPLICABLE",
+    "selected_candidate_id": null,
+    "abstention_reason": null,
+    "rewrite_allowed": false,
+    "rewrite_count": 0,
+    "candidate_id_integrity_check": "NOT_APPLICABLE",
+    "selected_transcript_exact_copy_check": "NOT_APPLICABLE",
+    "source_interval_start_frame": null,
+    "source_interval_end_frame": null
   }
 }
