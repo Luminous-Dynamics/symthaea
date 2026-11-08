@@ -618,3 +618,119 @@ These are qualification targets, not achieved results:
 - report coverage and abstention with error; an always-abstain system does not qualify.
 
 A lower WER that results from contextually replacing acoustically clear words fails the evidence contract. Report paired source/speaker-clustered intervals and leave undersampled cells non-estimable.
+
+
+## 17. Phonological feature-aware evaluation: FER and TER
+
+### 17.1 Research basis
+
+Chen, Adeleke & Downey, AfricaNLP 2026, “Linguistically Informed Evaluation of Multilingual ASR for African Languages”:
+- https://aclanthology.org/2026.africanlp-main.14/
+- https://aclanthology.org/2026.africanlp-main.14.pdf
+
+The paper makes a strong case that WER alone can conceal meaningful phonological progress. Its mHuBERT-147 + Transformer Yoruba result reports WER 0.788, CER 0.305, FER 0.151 and TER 0.372. Its Uneme result reports WER 0.997, CER 0.461, FER 0.267 and TER 0.402. These are author-reported results on their data and model—not Symthaea results and not South African baselines.
+
+The paper's method:
+- uses sparse {-1, 0, +1} phonological feature vectors;
+- interprets zero as not applicable/unspecified;
+- computes NA-masked normalized feature distance;
+- aligns sequences with Needleman–Wunsch;
+- calculates FER from alignment costs normalized by reference segment count;
+- computes TER from tone dimensions.
+
+Important limitation: its 24-dimensional inventory was designed around Edoid/Yoruboid phonology. The inventory must not be reused for other languages without native/expert authority.
+
+### 17.2 Symthaea implementation
+
+- [#11137 — VOICE-PHON-FER-001](https://github.com/Luminous-Dynamics/symthaea/issues/11137) owns the scorer contract.
+- [Draft PR #11139](https://github.com/Luminous-Dynamics/symthaea/pull/11139) adds `phonological_eval.rs`, a generic language-profiled Rust scorer.
+- Eighteen synthetic test functions are authored but not executed.
+- The scorer accepts feature-profile ID/revision, signed feature vectors, explicit tone-dimension indices and a declared gap penalty.
+- It returns FER/TER numerators, reference denominators, alignment columns and explicit non-estimability states.
+- It performs no G2P, tokenization, Unicode normalization or inventory construction.
+
+### 17.3 Evaluation requirements
+
+Every score must bind:
+- exact feature profile and revision;
+- feature definitions and dimension order;
+- tone-dimension subset;
+- native/expert annotation authority or G2P rule tier;
+- source-lineage and reference revision;
+- alignment gap penalty and tie policy.
+
+WER/CER, PER, FER and TER are complementary; do not collapse them into one leaderboard score. Non-tonal profiles must report TER as not applicable/non-estimable, not zero. A feature absent on both sides is NA, not an error. Donor-derived G2P is not expert acoustic ground truth.
+
+The benchmark matrix now includes a separate feature-aware African phonological evaluation track.
+
+## 18. Acoustic faithfulness under text and prompt conflict
+
+### 18.1 New external research
+
+**DEAF — Diagnostic Evaluation of Acoustic Faithfulness** (Findings IJCNLP-AACL 2026):
+https://aclanthology.org/2026.findings-aacl.165/
+
+The paper introduces over 2,700 conflict stimuli across emotional prosody, background sounds and speaker identity. It progressively increases textual influence through semantic conflict and misleading prompts. Its seven-model evaluation reports a pattern of text dominance over acoustic evidence.
+
+**HalluAudio** (ACL 2026):
+https://aclanthology.org/2026.acl-long.1797/
+
+HalluAudio includes over 5,000 human-verified audio QA pairs across speech, environmental sound and music. It evaluates hallucination, yes/no bias, error types and refusal behavior.
+
+**Attention-map hallucination detection** (Findings ACL 2026):
+https://aclanthology.org/2026.findings-acl.2147/
+
+This work examines AudioRatio, AudioConsistency, AudioEntropy and TextEntropy as inference-time features for hallucination detection. Its reported performance is model/task dependent, and attention access is not available from every provider. Treat these as candidate diagnostics, not universal calibrated confidence.
+
+### 18.2 Relationship to existing work
+
+- #11104 remains the semantic-anchor/acoustic-veto experiment.
+- #11119 remains MICL closed-set candidate selection.
+- #10890 owns acoustic-faithful prosody and vocal-event understanding.
+- [#11138 — VOICE-ACOUSTIC-FAITHFULNESS-001](https://github.com/Luminous-Dynamics/symthaea/issues/11138) owns the cross-system acoustic-faithfulness diagnostic protocol.
+
+Do not collapse semantic anchoring, candidate selection and general audio hallucination into one system arm.
+
+### 18.3 Proposed paired counterfactuals
+
+Start with synthetic controls:
+1. audio clearly says B while context strongly predicts A;
+2. the number, unit or date in text conflicts with the audio;
+3. context flips negation or participant roles;
+4. a semantically unusual code-switch insertion is acoustically clear;
+5. a prompt instructs the model to ignore audio and repeat a supplied sentence;
+6. the audio is silent, incomplete, mixed or genuinely ambiguous.
+
+For every pair, preserve the exact base recording hash and document which acoustic or prompt variable changed.
+
+### 18.4 Metrics and gates
+
+Report separately:
+- acoustic evidence adherence;
+- context-induced override rate;
+- prompt-induced override rate;
+- unsupported-claim and hallucination rate;
+- yes/no response bias;
+- abstention/refusal precision and recall;
+- evidence-span localization;
+- counterfactual audio sensitivity.
+
+Prospective targets:
+- zero context-only substitutions on unambiguous audio controls;
+- zero supported-as-fact answers on unanswerable controls;
+- 100% of factual answer slots linked to audio evidence or explicitly marked UNKNOWN/CONTEXT_ONLY;
+- separate context-override and prompt-override rates.
+
+Real-speaker identity and sensitive-attribute inference are outside this programme's permission. Any real speech requires provenance, consent, purpose limitation and privacy review.
+
+## 19. Updated benchmark registry
+
+The machine-readable matrix now contains **14 tracks** and 33 candidate-source records. The two newly added tracks are:
+13. African phonological feature evaluation (FER/TER).
+14. Acoustic faithfulness and hallucination diagnostics.
+
+Files:
+- `voice_benchmark_matrix_2026q4.json`
+- `voice_benchmark_matrix_2026q4.schema.json`
+
+The new track schemas distinguish external paper comparators, language-profile authority, counterfactual controls, source evidence and prospective qualification. Registry structure does not establish dataset rights, model capability or benchmark PASS.
