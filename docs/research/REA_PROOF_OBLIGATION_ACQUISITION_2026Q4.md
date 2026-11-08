@@ -452,6 +452,40 @@ D. Full REA + Symthaea: source lineage, independent replay, proof-obligation gap
 
 Report tool-native output quality and the added REA layer separately. The goal is to outperform the best tool-only and agent-only baselines on source-grounded, reproducible conclusions and investigation efficiency—not to claim that REA itself disassembles better than Ghidra or IDA.
 
+## 6.3 Additional benchmark tracks: behavior reconstruction and trajectory diagnosis
+
+### Behavior2Code — black-box functional equivalence
+
+Turing Frontier Research Lab's Behavior2Code (September 23, 2026) evaluates reconstructing command-line programs without source. Its strongest reported model passed 19 of 60 programs across three attempts (31.7% pass@3); 35 programs remained unsolved by all six tested models. Its protocol validates that the original executable passes every generated test, that requirements can be satisfied together, and that tested behavior is discoverable from documentation or execution. It highlights exit-status and error-boundary mismatches even when most normal outputs are correct. https://www.turing.com/blog/new-behavior2code-benchmark
+
+REA alignment:
+- Use functional-equivalence tasks as a separate behavioral-oracle track, not as REA claim entailment score.
+- Bind every observed input/output/exit status/file effect to the exact original executable digest, invocation, environment and test vector.
+- Reward only reproduction of declared behavior; partial test coverage remains a separate diagnostic.
+- Include invalid input, boundary cases, error outputs, exit codes, filesystem side effects, determinism and dependency-isolation controls.
+- The original executable is a behavioral oracle for its observed interface, not proof of source intent, safety or absence of untested behavior.
+
+### AgentRx — first unrecoverable failure localization
+
+Microsoft Research's AgentRx (March 12, 2026) reports a benchmark of 115 manually annotated failed agent trajectories across τ-bench, Flash and Magentic-One. The framework normalizes heterogeneous traces, synthesizes guarded executable constraints from tool schemas/domain policies, logs evidence-backed violations, then uses a judge to identify the first critical failure. The paper/blog reports +23.6% failure localization and +22.9% root-cause attribution over prompting baselines. https://www.microsoft.com/en-us/research/blog/systematic-debugging-for-ai-agents-introducing-the-agentrx-framework/
+
+REA alignment:
+- Add first-unrecoverable-step accuracy as a separate trace-quality metric.
+- Require each failure annotation to point to the exact tool call, request/response, scope, and violated obligation/constraint.
+- Separate deterministic executable constraint violations from judge-classified root causes; report both.
+- Measure detection latency, missed earlier failures, false critical failures, root-cause category and evidence traceability.
+- A later successful action must not erase an earlier irreversible/unauthorized/unsupported state transition.
+
+### TRACE — dependency-aware evidence decomposition
+
+TRACE (EMNLP 2026) treats multi-table claims as dependency-aware semantic trees: decompose claim nodes, retrieve local evidence for each node, and compose evidence bottom-up. It reports improvements over strong baselines across TabFact, OTT-FV and Hybrid-FV under gold- and open-evidence settings. https://aclanthology.org/2026.emnlp-main.968/
+
+REA implication:
+- Keep v0 as flat conjunctions for executable simplicity and adjudication.
+- Design a future claim-local proof graph with typed AND/OR dependencies, explicit alternative admissible paths, shared-premise reuse, and defeater nodes.
+- A proof graph is claim-local semantics, not a duplicate general evidence graph. Every leaf remains tied to immutable Evidence IDs and exact source spans.
+- Score correctness of the decomposition separately from retrieval, extraction, warrant and source admissibility.
+
 ## 7. Industry boundary
 
 REA composes rather than replaces:
