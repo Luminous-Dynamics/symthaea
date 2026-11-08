@@ -131,7 +131,7 @@ The values are synthetic and deliberately not vessel design limits or sensor spe
 
 ## 9. Executable semantic verifier
 
-The branch now includes `crates/domains/symthaea-marine-campaign-evidence`, a small Rust verifier over `serde_json::Value`. It consumes the reference-only campaign record and checks cross-record semantics that JSON Schema alone cannot establish:
+The branch now includes the standalone tool workspace `tools/marine-campaign-evidence`, a small Rust verifier over `serde_json::Value`. It consumes the reference-only campaign record and checks cross-record semantics that JSON Schema alone cannot establish:
 - exact article ↔ mission ↔ per-channel as-built configuration binding;
 - prospective protocol frozen before the run;
 - run start/end ordering and run disposition / abort consistency;
@@ -145,7 +145,7 @@ The branch now includes `crates/domains/symthaea-marine-campaign-evidence`, a sm
 
 Disposition is fail-closed: `Invalid`, `NotAdmissible`, `Indeterminate`, `SyntheticOnly` or `EligibleForIndependentReview`. The last state is not an engineering or regulatory pass.
 
-Ten Rust unit tests are authored, including the five frozen campaign fixtures plus negative mutations for article/channel mismatch, stale calibration, missing sampling review, clock-budget breach, missing samples, unfrozen protocol, weak instrument identity, safety-aborted run and reversed measurement range. The root workspace dependency lock has an entry for the new crate. **These tests have not been executed** because Cargo/Rust is unavailable in the current execution environment; exact-head CI remains the required compilation/test evidence.
+Ten Rust unit tests are authored, including the five frozen campaign fixtures plus negative mutations for article/channel mismatch, stale calibration, missing sampling review, clock-budget breach, missing samples, unfrozen protocol, weak instrument identity, safety-aborted run and reversed measurement range. The tool is intentionally isolated from the root Symthaea workspace and its Cargo lock, avoiding unrelated root-workspace checks; it pins `serde_json` and generates its own tool-local lock on first invocation. That lock must be committed after a real Rust run before reproducibility is claimed. **These tests have not been executed** because Cargo/Rust is unavailable in the current execution environment; exact-head CI remains the required compilation/test evidence.
 
 ## 10. Benchmarks — targets, not results
 
