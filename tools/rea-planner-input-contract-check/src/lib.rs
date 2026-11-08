@@ -71,7 +71,6 @@ fn string_set(values: &[Value], context: &str) -> Result<BTreeSet<String>, Contr
     Ok(result)
 }
 
-
 fn string_vec(values: &[Value], context: &str) -> Result<Vec<String>, ContractError> {
     let mut result = Vec::with_capacity(values.len());
     let mut seen = BTreeSet::new();
@@ -80,7 +79,9 @@ fn string_vec(values: &[Value], context: &str) -> Result<Vec<String>, ContractEr
             .as_str()
             .ok_or_else(|| ContractError(format!("{context} must contain only strings")))?;
         if !seen.insert(value.to_owned()) {
-            return Err(ContractError(format!("{context} contains duplicate {value}")));
+            return Err(ContractError(format!(
+                "{context} contains duplicate {value}"
+            )));
         }
         result.push(value.to_owned());
     }
@@ -366,7 +367,9 @@ pub fn validate_contract(value: &Value) -> Result<(), ContractError> {
                 )));
             }
             let outcome_order = outcome_map.get(experiment_id).ok_or_else(|| {
-                ContractError(format!("experiment {experiment_id} has no outcome ordering"))
+                ContractError(format!(
+                    "experiment {experiment_id} has no outcome ordering"
+                ))
             })?;
             normalized_probability_rows(
                 array(matrix, "likelihoods")?,
@@ -539,8 +542,7 @@ mod tests {
     }
 
     fn best_expected_utility(probability_vulnerable: f64) -> f64 {
-        let mitigate = probability_vulnerable * 3.0
-            + (1.0 - probability_vulnerable) * -6.0;
+        let mitigate = probability_vulnerable * 3.0 + (1.0 - probability_vulnerable) * -6.0;
         let no_action = probability_vulnerable * -20.0;
         mitigate.max(no_action)
     }
@@ -551,15 +553,12 @@ mod tests {
         let prior_entropy = binary_entropy(prior_vulnerable);
         assert!((prior_entropy - 1.0).abs() < 1.0e-12);
 
-        let nominal_eig =
-            prior_entropy - 0.5 * binary_entropy(0.9) - 0.5 * binary_entropy(0.1);
+        let nominal_eig = prior_entropy - 0.5 * binary_entropy(0.9) - 0.5 * binary_entropy(0.1);
         let conservative_eig =
             prior_entropy - 0.5 * binary_entropy(0.75) - 0.5 * binary_entropy(0.25);
         assert!((nominal_eig - 0.531_004_406_410_718_8).abs() < 1.0e-12);
         assert!((conservative_eig - 0.188_721_875_540_867_17).abs() < 1.0e-12);
-        assert!(
-            ((nominal_eig + conservative_eig) / 2.0 - 0.359_863_140_975_793).abs() < 1.0e-12
-        );
+        assert!(((nominal_eig + conservative_eig) / 2.0 - 0.359_863_140_975_793).abs() < 1.0e-12);
 
         let prior_best_utility = best_expected_utility(prior_vulnerable);
         assert!((prior_best_utility - -1.5).abs() < 1.0e-12);
