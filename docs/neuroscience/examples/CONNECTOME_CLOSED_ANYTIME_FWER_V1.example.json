@@ -21,7 +21,27 @@
         "20"
       ],
       "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
+      "component_input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "e_process_path_sha256": "4767ca5ab32c75eda326bbe14738b15f2d2885f9bc3b46110965c19fc18f7a95",
+      "filtration_admission": {
+        "campaign_id": "synthetic-closed-phase-response-campaign",
+        "process_id": "H1-local-reset",
+        "null_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_process_sha256": "4767ca5ab32c75eda326bbe14738b15f2d2885f9bc3b46110965c19fc18f7a95",
+        "source_filtration_id": "connectome-global-v1",
+        "source_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "target_filtration_id": "connectome-global-v1",
+        "target_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "observed_event_ids": [
+          "S1"
+        ],
+        "process_output_sequence": 2,
+        "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+        "proof_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "assumption_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "adjuster": null
+      }
     },
     {
       "claim_id": "H2-off-diagonal-transfer",
@@ -34,7 +54,27 @@
         "15"
       ],
       "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
+      "component_input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "e_process_path_sha256": "5a66e743cdd3661fdb887286fa7017d6f8960872a572009f40463401db6b0486",
+      "filtration_admission": {
+        "campaign_id": "synthetic-closed-phase-response-campaign",
+        "process_id": "H2-off-diagonal-transfer",
+        "null_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_process_sha256": "5a66e743cdd3661fdb887286fa7017d6f8960872a572009f40463401db6b0486",
+        "source_filtration_id": "connectome-global-v1",
+        "source_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "target_filtration_id": "connectome-global-v1",
+        "target_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "observed_event_ids": [
+          "S1"
+        ],
+        "process_output_sequence": 2,
+        "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+        "proof_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "assumption_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "adjuster": null
+      }
     },
     {
       "claim_id": "H3-contact-modulation",
@@ -47,7 +87,27 @@
         "2"
       ],
       "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
+      "component_input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "e_process_path_sha256": "7b846bebd31980c521f88340af0075690fa6ffffc28dd503afb8db57b1f61765",
+      "filtration_admission": {
+        "campaign_id": "synthetic-closed-phase-response-campaign",
+        "process_id": "H3-contact-modulation",
+        "null_spec_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_process_sha256": "7b846bebd31980c521f88340af0075690fa6ffffc28dd503afb8db57b1f61765",
+        "source_filtration_id": "connectome-global-v1",
+        "source_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "target_filtration_id": "connectome-global-v1",
+        "target_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "observed_event_ids": [
+          "S1"
+        ],
+        "process_output_sequence": 2,
+        "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+        "proof_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "assumption_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "adjuster": null
+      }
     }
   ],
   "oracle_expectations": {
@@ -117,5 +177,53 @@
       }
     ],
     "family_fwer_bound": "1/5"
+  },
+  "campaign_id": "synthetic-closed-phase-response-campaign",
+  "global_ledger": {
+    "campaign_id": "synthetic-closed-phase-response-campaign",
+    "global_filtration_id": "connectome-global-v1",
+    "global_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "entries": [
+      {
+        "sequence": 1,
+        "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "kind": "EVIDENCE",
+        "payload": {
+          "event_id": "S1",
+          "evidence_family_id": "structural-revision-s1",
+          "source_stream": "structural-em",
+          "source_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "revision": 0,
+          "supersedes_event_id": null,
+          "event_time_ms": 100,
+          "acquired_at_ms": 101,
+          "annotated_at_ms": 102,
+          "qc_at_ms": 103,
+          "availability_state": "APPROVED",
+          "split": "FIT",
+          "confirmatory_family_id": null
+        }
+      },
+      {
+        "sequence": 2,
+        "entry_commitment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "kind": "EVIDENCE",
+        "payload": {
+          "event_id": "T7",
+          "evidence_family_id": "behaviour-trial-7",
+          "source_stream": "behaviour-kinematics",
+          "source_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": 0,
+          "supersedes_event_id": null,
+          "event_time_ms": 90,
+          "acquired_at_ms": 91,
+          "annotated_at_ms": 110,
+          "qc_at_ms": 111,
+          "availability_state": "APPROVED",
+          "split": "EXPLORATION",
+          "confirmatory_family_id": null
+        }
+      }
+    ]
   }
 }
