@@ -631,10 +631,24 @@ fn reference_interaction_version_space(
         let mut matches = true;
         for (input, &observed) in log.interventions.iter().zip(&log.measurements) {
             let [u, v] = *input;
-            let response = model.bias
-                .checked_add(model.weight_u.checked_mul(u).unwrap_or(i64::MAX))
-                .and_then(|value| value.checked_add(model.weight_v.checked_mul(v)?))
-                .and_then(|value| value.checked_add(model.interaction_weight.checked_mul(u)?.checked_mul(v)?));
+            let response = model
+                .weight_u
+                .checked_mul(u)
+                .and_then(|u_term| {
+                    model.weight_v.checked_mul(v).and_then(|v_term| {
+                        model
+                            .interaction_weight
+                            .checked_mul(u)
+                            .and_then(|term| term.checked_mul(v))
+                            .and_then(|interaction_term| {
+                                model
+                                    .bias
+                                    .checked_add(u_term)
+                                    .and_then(|value| value.checked_add(v_term))
+                                    .and_then(|value| value.checked_add(interaction_term))
+                            })
+                    })
+                });
             if response != Some(observed) {
                 matches = false;
                 break;
@@ -751,6 +765,57 @@ mod tests {
             0 => ClaimDisposition::NoCompatibleModel,
             1 => ClaimDisposition::Identified,
             _ => ClaimDisposition::Ambiguous,
+        }
+    }
+
+    #[test]
+    fn independent_boolean_evaluator_agrees_with_inference_for_every_candidate() {
+        let inputs = [true, false, true, false];
+        for truth in crate::candidate_hypotheses(crate::StructureAccess::Withheld) {
+            let mut world = HiddenWorld::new(
+                truth.mechanism,
+                truth.measurement_map,
+                truth.initial_hidden_state,
+            ).unwrap();
+            let log = world.run(&inputs);
+            let inferred = crate::discover(&log, crate::StructureAccess::Withheld).unwrap();
+            let evaluated = reference_boolean_version_space(
+                &log,
+                crate::StructureAccess::Withheld,
+            ).unwrap();
+            assert_eq!(inferred.compatible_hypotheses, evaluated, "truth={truth:?}");
+        }
+    }
+
+    #[test]
+    fn independent_numeric_evaluator_agrees_with_inference_for_every_candidate() {
+        let inputs = [1, -1, 1, 0];
+        for truth in numeric::candidate_models(numeric::StructureAccess::Withheld) {
+            let mut world = numeric::NumericWorld::new(truth).unwrap();
+            let log = world.run(&inputs).unwrap();
+            let inferred = numeric::discover(&log, numeric::StructureAccess::Withheld).unwrap();
+            let evaluated = reference_numeric_version_space(
+                &log,
+                numeric::StructureAccess::Withheld,
+            );
+            assert_eq!(inferred.compatible_models, evaluated, "truth={truth:?}");
+        }
+    }
+
+    #[test]
+    fn independent_interaction_evaluator_agrees_with_inference_for_every_candidate() {
+        for truth in interaction::candidate_models(interaction::StructureAccess::Withheld) {
+            let world = interaction::InteractionWorld::new(truth).unwrap();
+            let log = world.run(&interaction::FACTORIAL_DESIGN).unwrap();
+            let inferred = interaction::discover(
+                &log,
+                interaction::StructureAccess::Withheld,
+            ).unwrap();
+            let evaluated = reference_interaction_version_space(
+                &log,
+                interaction::StructureAccess::Withheld,
+            );
+            assert_eq!(inferred.compatible_models, evaluated, "truth={truth:?}");
         }
     }
 
