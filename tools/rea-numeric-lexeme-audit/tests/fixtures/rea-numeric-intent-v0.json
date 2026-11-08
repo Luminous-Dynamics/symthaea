@@ -175,7 +175,10 @@
         "scale_policy": "exact",
         "exponent_policy": "reject",
         "rounding_policy": "reject_excess_scale",
-        "negative_zero_policy": "reject"
+        "negative_zero_policy": "reject",
+        "decimal_grammar": "base10_fixed_point_exact_scale",
+        "min_value": "0.00",
+        "max_value": "999999999999.99"
       },
       "expected": "valid_fixed_decimal",
       "expected_preserved_value": "0.10"
@@ -192,7 +195,10 @@
         "scale_policy": "exact",
         "exponent_policy": "reject",
         "rounding_policy": "reject_excess_scale",
-        "negative_zero_policy": "reject"
+        "negative_zero_policy": "reject",
+        "decimal_grammar": "base10_fixed_point_exact_scale",
+        "min_value": "0.00",
+        "max_value": "999999999999.99"
       },
       "expected": "scale_mismatch"
     },
@@ -208,7 +214,10 @@
         "scale_policy": "exact",
         "exponent_policy": "reject",
         "rounding_policy": "reject_excess_scale",
-        "negative_zero_policy": "reject"
+        "negative_zero_policy": "reject",
+        "decimal_grammar": "base10_fixed_point_exact_scale",
+        "min_value": "0.00",
+        "max_value": "999999999999.99"
       },
       "expected": "exponent_not_allowed"
     },
