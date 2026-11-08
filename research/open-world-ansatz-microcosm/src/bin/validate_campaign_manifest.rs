@@ -17,8 +17,8 @@ fn run() -> Result<(), String> {
         return Err("campaign manifest exceeds 1 MiB".to_owned());
     }
 
-    let manifest: CampaignManifest =
-        serde_json::from_slice(&bytes).map_err(|error| format!("invalid manifest JSON: {error}"))?;
+    let manifest: CampaignManifest = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("invalid manifest JSON: {error}"))?;
     manifest
         .validate()
         .map_err(|error| format!("campaign manifest validation failed: {error}"))?;
