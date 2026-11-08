@@ -331,7 +331,8 @@ A profile is not qualified by a language label or by successful tokenization. It
 ### South African profile pilot
 
 The first language pilot should be annotation-first rather than model-first. Candidate resources have different task and rights scopes:
-- The **CSIR SAMA speech corpus** is described as transcribed speech across South African languages with a CC BY 3.0 licence. Use it for speech/orthography pipeline smoke tests after verifying the exact collection and per-file terms; it is not singing data or a phoneme-level singing gold set.
+- The **CSIR SAMA Speech Corpus Manual Datasets** contains orthographically transcribed broadband speech in Afrikaans, isiXhosa, isiZulu, Sepedi, Sesotho and Tshivenḓa, with speech harvested from podcasts and segment transcriptions in XML. The repository record lists **CC BY 4.0**, not CC BY 3.0. It can support speech/orthography pipeline smoke tests after checking the collection and per-file terms; it is not singing data or a phoneme-level singing gold set.
+- The separate **NCHLT Speech Corpus** covers all 11 official languages and is described as approximately 10 minutes of speech per language; the published corpus/dictionaries are associated with **CC BY 3.0**. This is useful for low-volume language-profile smoke tests and dictionary/phone-set inspection, but its small per-language speech quantity is not enough to claim robust G2P or singing quality.
 - The **Corpus of spoken isiXhosa** provides transcribed and linguistically annotated Eastern Cape recordings, including morpheme-level glosses, POS tags and English translations. This can support lexical segmentation and contextual analysis; it does not by itself provide a singing score/phone alignment corpus.
 - The **isiZulu Second Language Learner Speech Corpus** is described as containing teacher reference recordings and learner recordings annotated by isiZulu teachers for phonemic and tonal pronunciation errors, under CC BY-SA 4.0. It may support a separate speech pronunciation-feedback evaluation track after checking the data card, consent and share-alike implications. It is not a singer-cloning or singing-synthesis dataset.
 - **African Next Voices** covers seven South African languages and over 3,000 hours of speech, but its published terms prohibit text-to-speech, voice cloning and voice-synthesis use. Keep it outside singing synthesis training, speaker identity modelling and any synthetic voice generation. Do not repurpose its audio for those prohibited tasks.
@@ -359,7 +360,8 @@ Initial dataset targets are proposed, not achieved: at least 500 independently a
 - SoulX-Singer inference: https://github.com/Soul-AILab/SoulX-Singer
 - GTSinger dataset: https://huggingface.co/datasets/GTSinger/GTSinger
 - GTSinger licence: https://huggingface.co/datasets/GTSinger/GTSinger/blob/main/dataset_license.md
-- CSIR SAMA speech corpus: https://repo.sadilar.org/items/e44a1b0c-34c5-4957-9560-4266ca17c7d2
+- CSIR SAMA Speech Corpus Manual Datasets (CC BY 4.0): https://repo.sadilar.org/items/e44a1b0c-34c5-4957-9560-4266ca17c7d2
+- NCHLT Speech Corpus (11 languages; CC BY 3.0): https://sites.google.com/site/nchltspeechcorpus
 - Corpus of spoken isiXhosa: https://sprakbanken.se/en/resources/xhosa
 - isiZulu learner pronunciation corpus: https://mozilladatacollective.com/datasets/cmo1y8vrv006ol207lc86hc13
 - African Next Voices terms: https://capstone.aims.ac.za/datasets/african-next-voices/
