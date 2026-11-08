@@ -4,6 +4,7 @@
 //! is generic over a semiring; its cost is exponential in induced width.
 
 use crate::profile::{ProfileError, WeightProfile};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
@@ -161,6 +162,111 @@ impl ExactSemiring for CheckedRational {
     }
     fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
         (*self).checked_mul(*other).map_err(|error| SemiringError::Domain(error.to_string()))
+    }
+}
+
+/// Exact max-times algebra over nonnegative rational values.
+///
+/// Addition is maximum and multiplication is ordinary rational multiplication.
+/// The constructor rejects negative values so this type cannot accidentally be
+/// used as a probability-potential semiring with signed coefficients. This wrapper
+/// validates the coefficient sign domain only; it does not establish CPT row
+/// normalization or that a complete graph is a calibrated probability model.
+/// Exact zero remains a first-class impossible-support value; no log floor is
+/// introduced.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct MaxTimesRational(CheckedRational);
+
+impl MaxTimesRational {
+    pub fn new(value: CheckedRational) -> Result<Self, SemiringError> {
+        if value.is_negative() {
+            return Err(SemiringError::Domain(
+                "max-times probability potentials must be nonnegative".to_owned(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub const fn zero() -> Self {
+        Self(CheckedRational::zero())
+    }
+
+    pub const fn one() -> Self {
+        Self(CheckedRational::one())
+    }
+
+    pub const fn value(self) -> CheckedRational {
+        self.0
+    }
+
+    fn compare(self, other: Self) -> std::cmp::Ordering {
+        compare_nonnegative_rationals(self.0, other.0)
+    }
+}
+
+/// Compare nonnegative rationals without cross-multiplication overflow.
+///
+/// Continued-fraction comparison uses only integer division and remainder.
+/// The comparison direction reverses after each reciprocal step.
+fn compare_nonnegative_rationals(
+    left: CheckedRational,
+    right: CheckedRational,
+) -> std::cmp::Ordering {
+    let mut left_numerator = left.numerator() as u128;
+    let mut left_denominator = left.denominator() as u128;
+    let mut right_numerator = right.numerator() as u128;
+    let mut right_denominator = right.denominator() as u128;
+    let mut reversed = false;
+
+    loop {
+        let left_integer = left_numerator / left_denominator;
+        let right_integer = right_numerator / right_denominator;
+        if left_integer != right_integer {
+            let order = left_integer.cmp(&right_integer);
+            return if reversed { order.reverse() } else { order };
+        }
+
+        let left_remainder = left_numerator % left_denominator;
+        let right_remainder = right_numerator % right_denominator;
+        match (left_remainder == 0, right_remainder == 0) {
+            (true, true) => return std::cmp::Ordering::Equal,
+            (true, false) => {
+                return if reversed {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Less
+                };
+            }
+            (false, true) => {
+                return if reversed {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                };
+            }
+            (false, false) => {
+                left_numerator = left_denominator;
+                left_denominator = left_remainder;
+                right_numerator = right_denominator;
+                right_denominator = right_remainder;
+                reversed = !reversed;
+            }
+        }
+    }
+}
+
+impl ExactSemiring for MaxTimesRational {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        match (*self).compare(*other) {
+            std::cmp::Ordering::Less => Ok(*other),
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Ok(*self),
+        }
+    }
+
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        let product = self.0.checked_mul(other.0)
+            .map_err(|error| SemiringError::Domain(error.to_string()))?;
+        Ok(Self(product))
     }
 }
 
@@ -498,6 +604,228 @@ fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignm
 }
 
 
+/// Whether the factor graph has any positive-weight complete assignment.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExactMapSupportStatus {
+    PositiveSupport,
+    NoPositiveSupport,
+}
+
+/// One complete assignment attaining the global full-MAP score.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExactMapAssignment {
+    pub assignment: Vec<usize>,
+    pub score: CheckedRational,
+}
+
+/// Bounded exhaustive full-MAP result. The optimum set is complete because
+/// every complete assignment was evaluated under the declared hard limit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundedExactMapResult {
+    pub optimum_score: CheckedRational,
+    /// Every tied optimum, in canonical mixed-radix assignment order.
+    pub optimal_assignments: Vec<ExactMapAssignment>,
+    pub support_status: ExactMapSupportStatus,
+    pub evaluated_assignments: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BoundedMapBudget {
+    pub max_full_assignments: usize,
+    pub max_optimal_assignments: usize,
+    /// Sum of all stored variable values across the complete tie set.
+    pub max_tie_assignment_values: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BoundedMapError {
+    AssignmentSpaceOverflow,
+    AssignmentLimitExceeded { required: usize, limit: usize },
+    TieOutputLimitExceeded { maximum_possible: usize, limit: usize },
+    TieStorageLimitExceeded { maximum_values: usize, limit: usize },
+    AllocationFailed { resource: &'static str, entries: usize },
+    ArithmeticOverflow,
+}
+
+impl fmt::Display for BoundedMapError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AssignmentSpaceOverflow => write!(f, "full MAP assignment space overflowed usize"),
+            Self::AssignmentLimitExceeded { required, limit } => write!(
+                f,
+                "exact MAP requires {required} assignments; configured limit is {limit}"
+            ),
+            Self::TieOutputLimitExceeded { maximum_possible, limit } => write!(
+                f,
+                "complete MAP tie set may contain {maximum_possible} assignments; configured output limit is {limit}"
+            ),
+            Self::TieStorageLimitExceeded { maximum_values, limit } => write!(
+                f,
+                "complete MAP tie set may store {maximum_values} assignment values; configured limit is {limit}"
+            ),
+            Self::AllocationFailed { resource, entries } => write!(
+                f,
+                "unable to reserve {resource} capacity for {entries} entries"
+            ),
+            Self::ArithmeticOverflow => write!(f, "checked rational overflow during exact MAP scoring"),
+        }
+    }
+}
+
+impl Error for BoundedMapError {}
+
+fn store_map_optimum(
+    output: &mut Vec<ExactMapAssignment>,
+    assignment: &[usize],
+    score: CheckedRational,
+) -> Result<(), BoundedMapError> {
+    output.try_reserve(1).map_err(|_| BoundedMapError::AllocationFailed {
+        resource: "optimal assignment records",
+        entries: 1,
+    })?;
+    let mut stored_assignment = Vec::new();
+    stored_assignment.try_reserve_exact(assignment.len()).map_err(|_| {
+        BoundedMapError::AllocationFailed {
+            resource: "stored assignment values",
+            entries: assignment.len(),
+        }
+    })?;
+    stored_assignment.extend_from_slice(assignment);
+    output.push(ExactMapAssignment {
+        assignment: stored_assignment,
+        score,
+    });
+    Ok(())
+}
+
+/// Exact bounded exhaustive full MAP for nonnegative rational factor graphs.
+///
+/// This is a small-instance oracle, not a scalable MAP solver. It evaluates
+/// every complete assignment, directly multiplies the original factor values,
+/// and returns the complete optimum tie set. The hard cap is checked before
+/// enumeration. Factor multiplication order is canonicalized to make results
+/// invariant to factor insertion order under the same bounded rational domain.
+///
+/// This routine does not sum hidden variables: every variable is assigned.
+/// It also does not establish CPT normalization or empirical calibration.
+pub fn exhaustive_max_times_map_bounded(
+    graph: &ExactFactorGraph<MaxTimesRational>,
+    budget: BoundedMapBudget,
+) -> Result<BoundedExactMapResult, BoundedMapError> {
+    let assignment_count = graph.cardinalities.iter().try_fold(1usize, |count, &cardinality| {
+        count.checked_mul(cardinality)
+    }).ok_or(BoundedMapError::AssignmentSpaceOverflow)?;
+
+    if assignment_count > budget.max_full_assignments {
+        return Err(BoundedMapError::AssignmentLimitExceeded {
+            required: assignment_count,
+            limit: budget.max_full_assignments,
+        });
+    }
+    if assignment_count > budget.max_optimal_assignments {
+        return Err(BoundedMapError::TieOutputLimitExceeded {
+            maximum_possible: assignment_count,
+            limit: budget.max_optimal_assignments,
+        });
+    }
+    let maximum_tie_values = assignment_count.checked_mul(graph.cardinalities.len())
+        .ok_or(BoundedMapError::AssignmentSpaceOverflow)?;
+    if maximum_tie_values > budget.max_tie_assignment_values {
+        return Err(BoundedMapError::TieStorageLimitExceeded {
+            maximum_values: maximum_tie_values,
+            limit: budget.max_tie_assignment_values,
+        });
+    }
+
+    let mut ordered_factors = Vec::new();
+    ordered_factors.try_reserve_exact(graph.factors.len()).map_err(|_| {
+        BoundedMapError::AllocationFailed {
+            resource: "factor references",
+            entries: graph.factors.len(),
+        }
+    })?;
+    ordered_factors.extend(graph.factors.iter());
+    ordered_factors.sort_unstable_by(|left, right| {
+        let scope_order = left.scope.cmp(&right.scope);
+        if scope_order != Ordering::Equal {
+            return scope_order;
+        }
+        for (left_value, right_value) in left.values.iter().zip(&right.values) {
+            let value_order = left_value.compare(*right_value);
+            if value_order != Ordering::Equal {
+                return value_order;
+            }
+        }
+        left.values.len().cmp(&right.values.len())
+    });
+
+    let mut best_score: Option<CheckedRational> = None;
+    let mut optimal_assignments = Vec::new();
+    let mut assignment = Vec::new();
+    assignment.try_reserve_exact(graph.cardinalities.len()).map_err(|_| {
+        BoundedMapError::AllocationFailed {
+            resource: "full assignment buffer",
+            entries: graph.cardinalities.len(),
+        }
+    })?;
+    assignment.resize(graph.cardinalities.len(), 0usize);
+
+    for full_index in 0..assignment_count {
+        let mut remaining_index = full_index;
+        for variable in (0..graph.cardinalities.len()).rev() {
+            assignment[variable] = remaining_index % graph.cardinalities[variable];
+            remaining_index /= graph.cardinalities[variable];
+        }
+
+        let mut score = CheckedRational::one();
+        for factor in &ordered_factors {
+            let table_index = factor.table_index(&assignment, &graph.cardinalities);
+            score = score.checked_mul(factor.values[table_index].value())
+                .map_err(|_| BoundedMapError::ArithmeticOverflow)?;
+            if score.is_zero() {
+                break;
+            }
+        }
+
+        match best_score {
+            None => {
+                best_score = Some(score);
+                store_map_optimum(&mut optimal_assignments, &assignment, score)?;
+            }
+            Some(current) => match compare_nonnegative_rationals(
+                score.numerator() as u128,
+                score.denominator() as u128,
+                current.numerator() as u128,
+                current.denominator() as u128,
+            ) {
+                Ordering::Greater => {
+                    best_score = Some(score);
+                    optimal_assignments.clear();
+                    store_map_optimum(&mut optimal_assignments, &assignment, score)?;
+                }
+                Ordering::Equal => {
+                    store_map_optimum(&mut optimal_assignments, &assignment, score)?;
+                }
+                Ordering::Less => {}
+            },
+        }
+    }
+
+    let optimum_score = best_score.unwrap_or_else(CheckedRational::zero);
+    let support_status = if optimum_score.is_zero() {
+        ExactMapSupportStatus::NoPositiveSupport
+    } else {
+        ExactMapSupportStatus::PositiveSupport
+    };
+
+    Ok(BoundedExactMapResult {
+        optimum_score,
+        optimal_assignments,
+        support_status,
+        evaluated_assignments: assignment_count,
+    })
+}
+
 /// Declared algebraic capabilities of an exact coefficient domain.
 ///
 /// This is a planner contract, not a proof that the laws hold. Each concrete
@@ -677,6 +1005,260 @@ mod tests {
         }
         let (value, _) = g.evaluate(&[2,1,0]).unwrap();
         assert!(value);
+    }
+
+    fn rational(numerator: i128, denominator: i128) -> CheckedRational {
+        CheckedRational::new(numerator, denominator).unwrap()
+    }
+
+    fn max_times(numerator: i128, denominator: i128) -> MaxTimesRational {
+        MaxTimesRational::new(rational(numerator, denominator)).unwrap()
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_returns_exact_assignment_and_score() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![
+                max_times(1, 10),
+                max_times(3, 10),
+                max_times(2, 5),
+                max_times(1, 5),
+            ],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 4, max_optimal_assignments: 4, max_tie_assignment_values: 8 }).unwrap();
+        assert_eq!(result.optimum_score, rational(2, 5));
+        assert_eq!(result.support_status, ExactMapSupportStatus::PositiveSupport);
+        assert_eq!(result.evaluated_assignments, 4);
+        assert_eq!(result.optimal_assignments.len(), 1);
+        assert_eq!(result.optimal_assignments[0].assignment, vec![1, 0]);
+        assert_eq!(result.optimal_assignments[0].score, rational(2, 5));
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_reports_all_tied_assignments() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0],
+            vec![max_times(1, 1), max_times(1, 1)],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 2, max_optimal_assignments: 2, max_tie_assignment_values: 2 }).unwrap();
+        assert_eq!(result.optimum_score, rational(1, 1));
+        assert_eq!(
+            result.optimal_assignments.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
+            vec![vec![0], vec![1]]
+        );
+        assert!(result.optimal_assignments.iter().all(|item| item.score == rational(1, 1)));
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_distinguishes_zero_support() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0],
+            vec![MaxTimesRational::zero(), MaxTimesRational::zero()],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 2, max_optimal_assignments: 2, max_tie_assignment_values: 2 }).unwrap();
+        assert_eq!(result.optimum_score, rational(0, 1));
+        assert_eq!(result.support_status, ExactMapSupportStatus::NoPositiveSupport);
+        assert_eq!(result.optimal_assignments.len(), 2);
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_enforces_full_assignment_limit() {
+        let graph = ExactFactorGraph::new(
+            vec![2, 2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        assert_eq!(
+            exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 7, max_optimal_assignments: 8, max_tie_assignment_values: 24 }),
+            Err(BoundedMapError::AssignmentLimitExceeded { required: 8, limit: 7 })
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_supports_mixed_cardinalities() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 3],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![
+                max_times(1, 1),
+                max_times(0, 1),
+                max_times(2, 1),
+                max_times(3, 1),
+                max_times(3, 1),
+                max_times(2, 1),
+            ],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 6, max_optimal_assignments: 6, max_tie_assignment_values: 12 }).unwrap();
+        assert_eq!(result.optimum_score, rational(3, 1));
+        assert_eq!(
+            result.optimal_assignments.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
+            vec![vec![1, 0], vec![1, 1]]
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_rejects_assignment_space_overflow_before_enumeration() {
+        let graph = ExactFactorGraph::new(
+            vec![usize::MAX, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        assert_eq!(
+            exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: usize::MAX, max_optimal_assignments: usize::MAX, max_tie_assignment_values: usize::MAX }),
+            Err(BoundedMapError::AssignmentSpaceOverflow)
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_enforces_tie_output_and_storage_budgets() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![max_times(1, 1); 4],
+        ).unwrap();
+
+        assert_eq!(
+            exhaustive_max_times_map_bounded(
+                &graph,
+                BoundedMapBudget {
+                    max_full_assignments: 4,
+                    max_optimal_assignments: 3,
+                    max_tie_assignment_values: 8,
+                },
+            ),
+            Err(BoundedMapError::TieOutputLimitExceeded {
+                maximum_possible: 4,
+                limit: 3,
+            })
+        );
+        assert_eq!(
+            exhaustive_max_times_map_bounded(
+                &graph,
+                BoundedMapBudget {
+                    max_full_assignments: 4,
+                    max_optimal_assignments: 4,
+                    max_tie_assignment_values: 7,
+                },
+            ),
+            Err(BoundedMapError::TieStorageLimitExceeded {
+                maximum_values: 8,
+                limit: 7,
+            })
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_is_factor_insertion_order_invariant() {
+        let mut left = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        left.add_factor(vec![0], vec![max_times(1, 2), max_times(1, 3)]).unwrap();
+        left.add_factor(
+            vec![0, 1],
+            vec![max_times(1, 4), max_times(1, 2), max_times(1, 1), max_times(1, 5)],
+        ).unwrap();
+
+        let mut right = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        right.add_factor(
+            vec![0, 1],
+            vec![max_times(1, 4), max_times(1, 2), max_times(1, 1), max_times(1, 5)],
+        ).unwrap();
+        right.add_factor(vec![0], vec![max_times(1, 2), max_times(1, 3)]).unwrap();
+
+        assert_eq!(
+            exhaustive_max_times_map_bounded(&left, BoundedMapBudget { max_full_assignments: 4, max_optimal_assignments: 4, max_tie_assignment_values: 8 }).unwrap(),
+            exhaustive_max_times_map_bounded(&right, BoundedMapBudget { max_full_assignments: 4, max_optimal_assignments: 4, max_tie_assignment_values: 8 }).unwrap()
+        );
+    }
+
+    #[test]
+    fn max_times_rational_obeys_exact_nonnegative_semiring_operations() {
+        let a = max_times(3, 5);
+        let b = max_times(2, 3);
+        let c = max_times(1, 4);
+        assert_eq!(a.checked_add(&b).unwrap(), b);
+        assert_eq!(a.checked_mul(&b).unwrap(), max_times(2, 5));
+        assert_eq!(a.checked_add(&MaxTimesRational::zero()).unwrap(), a);
+        assert_eq!(a.checked_mul(&MaxTimesRational::one()).unwrap(), a);
+        assert_eq!(
+            a.checked_mul(&b.checked_add(&c).unwrap()).unwrap(),
+            a.checked_mul(&b).unwrap().checked_add(&a.checked_mul(&c).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn max_times_rational_rejects_negative_potentials() {
+        assert!(MaxTimesRational::new(rational(-1, 2)).is_err());
+        assert_eq!(MaxTimesRational::new(rational(0, 1)).unwrap(), MaxTimesRational::zero());
+    }
+
+    #[test]
+    fn max_times_factor_graph_returns_exact_map_score() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![
+                max_times(1, 10),
+                max_times(3, 10),
+                max_times(2, 5),
+                max_times(1, 5),
+            ],
+        ).unwrap();
+        let (score, _) = graph.evaluate(&[0, 1]).unwrap();
+        assert_eq!(score, max_times(2, 5));
+    }
+
+    #[test]
+    fn max_times_comparison_handles_large_rationals_without_cross_product_overflow() {
+        let max = i128::MAX;
+        let a = MaxTimesRational::new(rational(max, max - 1)).unwrap();
+        let b = MaxTimesRational::new(rational(max - 1, max - 2)).unwrap();
+        assert_eq!(a.checked_add(&b).unwrap(), b);
+    }
+
+    #[test]
+    fn max_times_multiplication_overflow_is_an_explicit_failure() {
+        let large = max_times(i128::MAX, 1);
+        let two = max_times(2, 1);
+        assert!(large.checked_mul(&two).is_err());
     }
 
     #[test]
