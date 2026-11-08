@@ -43,6 +43,19 @@
         "transform_id": "camera-optical-frame-v1",
         "handedness": "not_applicable",
         "angle_unit": "not_applicable"
+      },
+      {
+        "frame_id": "remote-peer-frame-01",
+        "kind": "other",
+        "axes": {
+          "x": "unresolved",
+          "y": "unresolved",
+          "z": "unresolved"
+        },
+        "handedness": "not_applicable",
+        "length_unit": "unknown",
+        "angle_unit": "unknown",
+        "transform_id": "unresolved-peer-frame-transform"
       }
     ],
     "sources": [
@@ -60,7 +73,8 @@
         "extrinsic_profile_id": "synthetic-front-camera-extrinsics-v1",
         "reference_frame_id": "front-camera-image-01",
         "evidence_kind": "synthetic_observation",
-        "currentness": "current_for_fixture"
+        "currentness": "current_for_fixture",
+        "source_role": "synthetic_sensor_observation"
       },
       {
         "source_id": "front-lidar-01",
@@ -74,6 +88,41 @@
         "clock_transform_id": "sim-clock-01-to-scene-clock-v1",
         "calibration_profile_id": "synthetic-lidar-cal-v1",
         "extrinsic_profile_id": "synthetic-lidar-extrinsics-v1",
+        "reference_frame_id": "road-local-01",
+        "evidence_kind": "synthetic_observation",
+        "currentness": "current_for_fixture",
+        "source_role": "synthetic_sensor_observation"
+      },
+      {
+        "source_id": "cooperative-v2x-claim-01",
+        "modality": "v2x",
+        "source_role": "remote_cooperative_claim",
+        "failure_domain_id": "remote-peer-system-07",
+        "source_event_id": "remote-peer-event-0091",
+        "payload_reference": "synthetic-fixture://crossing-0001/v2x/claim-0091",
+        "acquisition_tick_ns": 11900000000,
+        "receive_tick_ns": 12040000000,
+        "clock_domain_id": "remote-peer-clock-07",
+        "clock_transform_id": "unresolved-remote-clock-transform",
+        "calibration_profile_id": "unverified-remote-calibration-claim",
+        "extrinsic_profile_id": "unresolved-remote-extrinsics",
+        "reference_frame_id": "remote-peer-frame-01",
+        "evidence_kind": "advisory",
+        "currentness": "unknown"
+      },
+      {
+        "source_id": "simulator-oracle-truth-01",
+        "modality": "synthetic",
+        "source_role": "simulator_oracle",
+        "failure_domain_id": "simulator-world-oracle",
+        "source_event_id": "simulator-world-frame-0012",
+        "payload_reference": "synthetic-fixture://crossing-0001/oracle/frame-0012",
+        "acquisition_tick_ns": 12000000000,
+        "receive_tick_ns": 12000000000,
+        "clock_domain_id": "sim-clock-01",
+        "clock_transform_id": "sim-clock-01-to-scene-clock-v1",
+        "calibration_profile_id": "simulator-physics-profile-v1",
+        "extrinsic_profile_id": "simulator-world-to-road-local-v1",
         "reference_frame_id": "road-local-01",
         "evidence_kind": "synthetic_observation",
         "currentness": "current_for_fixture"
@@ -576,8 +625,16 @@
       "Source independence has not been established by this fixture.",
       "The occluded and unobserved regions are not clear free space.",
       "Vision HDC proposals do not supply metric or semantic authority.",
-      "All measurements and predictions are synthetic."
+      "All measurements and predictions are synthetic.",
+      "The remote V2X claim is retained as a cooperative advisory only; its clock/frame/currentness are unresolved and it is not a local object-track source.",
+      "The simulator oracle record is kept in simulator_truth_refs and is not local sensor evidence."
     ],
-    "traffic_convention_profile_id": "synthetic-lht-rhd-v1"
+    "traffic_convention_profile_id": "synthetic-lht-rhd-v1",
+    "cooperative_advisory_refs": [
+      "cooperative-v2x-claim-01"
+    ],
+    "simulator_truth_refs": [
+      "simulator-oracle-truth-01"
+    ]
   }
 }
