@@ -19,7 +19,7 @@
 //!
 //! This module is kinematics and sampling only. It does not implement a
 //! causal-set d'Alembertian, propagator, quantum measure or continuum-limit
-//! proof. The curvature sign convention gives R = 2 a'' / a^3.
+//! proof. The curvature sign convention gives R = 2 (ln a)'' / a^2.
 
 use crate::{CausalSet2D, CausalSetError, Event2D};
 use std::error::Error;
@@ -153,7 +153,7 @@ impl ConformalFrw1p1 {
         value.is_finite().then_some(value)
     }
 
-    /// Ricci scalar for the convention R = 2 a'' / a^3.
+    /// Ricci scalar for the convention R = 2 (ln a)'' / a^2.
     pub fn ricci_scalar(&self, eta: f64) -> Option<f64> {
         let scale = self.scale_factor(eta)?;
         let value = 2.0 * self.kappa / scale.powi(2);
