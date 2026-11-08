@@ -341,6 +341,181 @@ pub enum ScoreEventKind {
     Rest,
 }
 
+/// A piecewise-constant tempo change in quarter-note beats per minute.
+/// The first entry in a beat-domain score must begin at beat zero.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TempoChange {
+    pub start_beat: f64,
+    pub quarter_bpm: f64,
+}
+
+/// A score event expressed in musical beat coordinates rather than seconds.
+/// Seconds are materialized only at the renderer boundary from the tempo map.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BeatScoreEvent {
+    pub start_beat: f64,
+    pub duration_beats: f64,
+    pub kind: ScoreEventKind,
+}
+
+/// Source-of-truth score timeline with explicit tempo map and beat-domain events.
+/// This is additive to the seconds-domain score alignment: renderers still
+/// receive canonical seconds after conversion, while receipts can retain the
+/// original beats and tempo changes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BeatDomainScore {
+    pub schema_version: u32,
+    pub tempo_map: Vec<TempoChange>,
+    pub events: Vec<BeatScoreEvent>,
+}
+
+impl BeatDomainScore {
+    const BEAT_EPSILON: f64 = 1e-9;
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != 1 {
+            return Err(format!(
+                "unsupported beat-domain score schema version {}",
+                self.schema_version
+            ));
+        }
+        if self.tempo_map.is_empty() {
+            return Err("beat-domain score requires an explicit tempo map".into());
+        }
+        if self.tempo_map[0].start_beat.abs() > Self::BEAT_EPSILON {
+            return Err("tempo map must begin at beat zero".into());
+        }
+        let mut previous_beat = -f64::INFINITY;
+        for (index, change) in self.tempo_map.iter().enumerate() {
+            if !change.start_beat.is_finite()
+                || change.start_beat < 0.0
+                || !change.quarter_bpm.is_finite()
+                || !(10.0..=1000.0).contains(&change.quarter_bpm)
+                || change.start_beat <= previous_beat
+            {
+                return Err(format!(
+                    "tempo change {index} must have a strictly increasing finite beat and quarter BPM in [10, 1000]"
+                ));
+            }
+            previous_beat = change.start_beat;
+        }
+        if self.events.is_empty() {
+            return Err("beat-domain score requires at least one score event".into());
+        }
+
+        let mut previous_end = 0.0f64;
+        for (index, event) in self.events.iter().enumerate() {
+            if !event.start_beat.is_finite()
+                || event.start_beat < 0.0
+                || !event.duration_beats.is_finite()
+                || event.duration_beats <= 0.0
+            {
+                return Err(format!("beat score event {index} has invalid timing"));
+            }
+            if (event.start_beat - previous_end).abs() > Self::BEAT_EPSILON {
+                return Err(format!(
+                    "beat score event {index} is overlapping or has an implicit gap; represent gaps as explicit Rest events"
+                ));
+            }
+            let end = event.start_beat + event.duration_beats;
+            if !end.is_finite() || end <= event.start_beat {
+                return Err(format!("beat score event {index} has an invalid end beat"));
+            }
+            if let ScoreEventKind::SungNote {
+                frequency_hz,
+                velocity,
+            } = event.kind
+            {
+                if !frequency_hz.is_finite()
+                    || frequency_hz <= 0.0
+                    || !velocity.is_finite()
+                    || !(0.0..=1.0).contains(&velocity)
+                {
+                    return Err(format!(
+                        "beat score event {index} has invalid pitch/velocity"
+                    ));
+                }
+            }
+            previous_end = end;
+        }
+        let final_seconds = self.seconds_at_beat(previous_end)?;
+        if !final_seconds.is_finite() || final_seconds <= 0.0 {
+            return Err("beat-domain score produces an invalid final time".into());
+        }
+        Ok(())
+    }
+
+    /// Convert a musical beat position to absolute seconds by integrating the
+    /// piecewise-constant quarter-note tempo map. Tempo changes may occur
+    /// inside a note; the event's seconds duration then reflects both tempos.
+    pub fn seconds_at_beat(&self, beat: f64) -> Result<f64, String> {
+        if !beat.is_finite() || beat < 0.0 {
+            return Err("beat position must be finite and non-negative".into());
+        }
+        if self.tempo_map.is_empty() {
+            return Err("tempo map is empty".into());
+        }
+        if self.tempo_map[0].start_beat.abs() > Self::BEAT_EPSILON {
+            return Err("tempo map must begin at beat zero".into());
+        }
+
+        let mut seconds = 0.0f64;
+        for (index, change) in self.tempo_map.iter().enumerate() {
+            let segment_start = change.start_beat;
+            if beat <= segment_start {
+                break;
+            }
+            let segment_end = self
+                .tempo_map
+                .get(index + 1)
+                .map(|next| next.start_beat.min(beat))
+                .unwrap_or(beat);
+            if segment_end > segment_start {
+                if !change.quarter_bpm.is_finite() || change.quarter_bpm <= 0.0 {
+                    return Err(format!("tempo change {index} has invalid BPM"));
+                }
+                seconds += (segment_end - segment_start) * 60.0 / change.quarter_bpm;
+            }
+            if beat <= segment_end {
+                break;
+            }
+        }
+        if !seconds.is_finite() {
+            return Err("tempo map conversion overflowed".into());
+        }
+        Ok(seconds)
+    }
+
+    /// Materialize a renderer-compatible seconds timeline without mutating or
+    /// discarding the beat-domain source representation.
+    pub fn materialize_seconds(&self) -> Result<Vec<ScoreEvent>, String> {
+        self.validate()?;
+        self.events
+            .iter()
+            .enumerate()
+            .map(|(index, event)| {
+                let start_s = self.seconds_at_beat(event.start_beat)?;
+                let end_s = self.seconds_at_beat(event.start_beat + event.duration_beats)?;
+                let duration_s = end_s - start_s;
+                if !duration_s.is_finite() || duration_s <= 0.0 {
+                    return Err(format!(
+                        "beat score event {index} materializes to an invalid duration"
+                    ));
+                }
+                Ok(ScoreEvent {
+                    start_s: start_s as f32,
+                    duration_s: duration_s as f32,
+                    kind: event.kind,
+                })
+            })
+            .collect()
+    }
+}
+
+
 /// Ordered note-index assignment for one resolved pronunciation syllable.
 /// Multiple consecutive note indices represent a melisma over one explicitly
 /// designated vowel phone from the selected pronunciation candidate.
