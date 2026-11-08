@@ -61,13 +61,14 @@ The public Rust module interaction adds a static two-input world for discovering
 
 Its legal intervention pairs are the full factorial set {-1, 0, 1} × {-1, 0, 1}. Candidate structures are:
 
-- Single-input: y = bias + a*u. The second input is irrelevant.
+- U-only: y = bias + a*u. The second input is irrelevant.
+- V-only: y = bias + b*v. The first input is irrelevant.
 - Additive two-input: y = bias + a*u + b*v.
 - Bilinear interaction: y = bias + a*u + b*v + c*u*v.
 
 Bias and nonzero coefficient ranges are finite and explicitly enumerated. A0 supplies the structural family and fits coefficients; A2 receives the same observations and must discover the structural family as well.
 
-The important negative control is a collinear design with only (u,v)=(1,1) and (-1,-1). For a bilinear world, the interaction term is constant on these two points and can be absorbed into the bias. A single-input, additive and bilinear model all fit those two observations. The one-step probe selector searches all nine legal intervention pairs; the factorial oracle identifies candidate response functions over the complete domain.
+The important negative control is a collinear design with only (u,v)=(1,1) and (-1,-1). For a bilinear world, the interaction term is constant on these two points and can be absorbed into the bias. A single-input, additive and bilinear model all fit those two observations. The adaptive one-step selector searches all nine legal input pairs, excludes previously observed pairs and updates the candidate set after each result. In this expanded family, two adaptive probes are required for the supplied collinear example; the first alone does not guarantee uniqueness. The factorial oracle identifies candidate response functions over the complete domain.
 
 This module has no hidden state, stochastic noise or unknown sensor map. Those are covered separately by the other reference worlds. It is a controlled test of variable relevance, interaction discovery and experimental-design aliasing, not a general causal-discovery engine.
 
