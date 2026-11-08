@@ -656,3 +656,52 @@ These are explicit Luminous project targets, not published standards and not ach
 Do not place a PQR-Search per-fixed-query guarantee, Recast's high-probability refinement intervals, QBAT's query-specific searched-budget reduction, VIBE's ANN algorithm curve, and HME ExactCertified on one unqualified leaderboard. Compare only within matching correctness classes and report the complete system boundary.
 
 The current competitive facts are third-party author reports: PQR-Search claims a per-fixed-query `(tau, delta)` guarantee under transform-independence assumptions and evaluates up to 100M vectors; Recast reports 1.56–2.01x QPS at 0.99 recall under matched memory; QBAT reports up to 68.8% less searched budget in ScaNN consistency mode. These numbers are not HME results and are not directly cross-comparable.
+
+## 10. 2026-11-08: workload-adaptive retrieval cascades and current memory benchmarks
+
+A direct new comparator is Yuan, Zhang & Nazarian, **AgentIR: A Workload-Adaptive Cascade Retrieval Substrate for Long-Term Conversational Memory** (arXiv:2605.25092, 2026-05-24). The authors report:
+- On LongMemEval (500 questions), a BM25-margin-triggered cascade skips the dense channel on 63% of queries at parity LLM-judged accuracy under two judges, with 2.67x speedup; per-question-type thresholds report up to 5.76x under 5-fold cross-validation.
+- On LoCoMo (1,982 questions), the reported trigger selects a 100% dense-channel skip, with +0.089 Hit@5 and 132x speedup.
+- A time-partitioned index reports near-corpus-independent work in its asymptotic model and large scale-up gains on a 5M-record experiment.
+- The paper also documents relevance/ranking implementation pitfalls that can dramatically alter nDCG@10, so exact baseline conformance and score parity checks are mandatory.
+
+These are paper-reported results under AgentIR's workload, query channels, hardware and evaluator. They are not directly comparable to HME exact cosine top-k, and the claimed significance/quality parity must be read with the paper's own statistical details. Source: https://arxiv.org/abs/2605.25092
+
+### HME cascade hypothesis: cheap-first, proof-aware escalation
+
+The useful paradigm shift is not "learned routing replaces exact search." It is **query-specific work allocation over heterogeneous memory channels**:
+
+1. Apply authorization, bitemporal and forgetting eligibility from #11003 first.
+2. Run cheap channels first: metadata/source filters, exact lexical lookup where available, compact BinaryHV/HDC key search, cached segment synopsis and inexpensive recency/temporal constraints.
+3. Estimate whether additional dense ContinuousHV work is likely to improve evidence utility; the model may choose ordering or recommend stopping only in an explicitly empirical/approximate profile.
+4. In ExactCertified dense top-k mode, only a conservative bound over every eligible record/partition may stop further work. An AgentIR-style BM25 margin is not a mathematical upper bound on the dense cosine score.
+5. In downstream evidence retrieval, stop when a typed evidence-sufficiency contract is met only if the benchmark contract permits it; otherwise continue and report the observed task-quality trade-off.
+
+A channel skip is thus one of three things and must be labelled:
+- **Proof-skipped:** a conservative bound proves the channel cannot change the exact requested result.
+- **Policy-skipped:** the requested contract excludes the channel or no authorized content exists.
+- **Model-skipped:** a learned router predicts low utility; this is empirical selective retrieval, not deterministic exactness.
+
+Measure dense-channel invocation rate, answer correctness by query class, missed-evidence rate, latency tails, tokens, bytes and router calibration. Do not report average speedup without quality and failure distributions.
+
+### Current leaderboard signals; do not compare mixed protocols
+
+- The Agent Memory Leaderboard's official Cycle 1 results, published August 12, 2026, show separate Textual and Coding Memory divisions and separate commercial/open-source standings. The top textual commercial result is MemoraX 58.02 overall; top textual open-source is InvMem 45.06; top coding commercial is MemoraX 62.00% resolved; the open-source coding division reports AM-Link among methods achieving 52.67% resolved. The official page explicitly says the tracks and divisions are distinct. Cycle 2 official results remain expected mid-November 2026; as of November 8, do not claim a cycle-2 ranking or a Symthaea submission. Source: https://agentmemories.ai/results/cycle-1/
+- Supermemory's May 2026 report self-reports 97% LongMemEval-S Recall@20 across 500 questions and 100% Knowledge Update, using its own retrieval/aggregation and judge configuration. Treat as a vendor-published result, not an independent common-harness leaderboard. Source: https://supermemory.ai/research/longmembench/
+- A SOTA2 Research LongMemEval retrieval listing reports an RRF configuration at 92.9 Recall@5 and 24.8 strict LLM answer accuracy (with a 2026.05 reader/judge setup). This is a useful warning that retrieval recall and answer correctness diverge; it is not directly comparable to Supermemory's Recall@20. Source: https://www.sota2.com/research/sota/long-term-conversational-memory-retrieval-on-longmemeval
+
+### Updated downstream targets
+
+For a frozen LongMemEval-S retrieval protocol:
+- target Recall@20 >= 98% as a project stretch (against the reported 97% vendor reference), with per-category and per-query distributions;
+- preserve or improve strict answer accuracy against the strongest reproduced baseline within a preregistered 1 percentage-point non-inferiority margin at equal prompt/context budget;
+- improve Knowledge Update and Temporal Reasoning without increasing obsolete-fact reuse;
+- measure abstention/answerability and source attribution separately;
+- record storage bytes, tokens, CPU/GPU cost, p50/p95/p99 and background consolidation cost.
+
+For Agent Memory Leaderboard:
+- target separate textual and coding integrations, not one pooled score;
+- prioritize source attribution, temporal/event reasoning, memory governance and safe privacy, not only explicit fact recall;
+- keep the participant Add/Search API, durability and tenant isolation contract separate from HME kernel performance.
+
+The 98% value is a stretch project target, not a current result or a direct cross-paper comparison. Run the official split/evaluator and reproduce the vendor reader/judge settings before claiming an industry lead.
