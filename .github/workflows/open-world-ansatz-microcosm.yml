@@ -58,6 +58,10 @@ jobs:
             .a0.agent.arguments == .a2.agent.arguments and
             .a0.agent.environment_inherited == false and
             .a2.agent.environment_inherited == false and
+            .a0.agent.max_input_frame_bytes <= 16777216 and
+            .a0.agent.max_output_frame_bytes <= 16777216 and
+            .a2.agent.max_input_frame_bytes <= 16777216 and
+            .a2.agent.max_output_frame_bytes <= 16777216 and
             .a0.process_exit_code == 0 and
             .a2.process_exit_code == 0 and
             .a0.evaluator_score.generating_model_in_version_space and
