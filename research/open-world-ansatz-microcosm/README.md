@@ -100,11 +100,19 @@ CLI scenario arguments identify the hidden evaluator-side world. They are for an
 
 For the matched A0 control, use the same world and intervention sequence, changing only the final argument to a0.
 
+## Blind agent episode protocol v0
+
+The public Rust module protocol exposes a bounded, one-action-at-a-time interface over all three worlds. Agents receive a PublicTaskManifest, observations, remaining budget and an evidence-prefix SHA-256; they return typed probes or a terminal version-space submission. The submission must echo the current evidence-prefix digest and cite observation IDs that were actually returned.
+
+The protocol validates A0/A2 structure access, intervention family, action budget, terminal submission, model-family membership, duplicate hypotheses, disposition cardinality and evidence references. Evaluator scoring is available only after submission and reports exact version-space match, set counts, disposition correctness and evidence-reference validity. The wire schema is research/open-world-ansatz-microcosm/schemas/agent_episode_v0.schema.json; the full contract and process-isolation caveat are in docs/research/OPEN_WORLD_AGENT_EPISODE_PROTOCOL_V0_2026-11-08.md.
+
+Important boundary: this Rust API is not an OS security sandbox. The agent must run in a separate process and must never receive the evaluator handle or pre-submission score. The v0 digest is computed over this version's serde_json encoding; an agent should echo the digest rather than independently reserialize it in another language.
+
 ## Authored tests
 
-Thirty-four Rust tests cover the binary, numeric and two-input interaction worlds: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, partition probe selection, exhaustive oracle equivalence classes, distorted measurements, inconsistent evidence, invalid parameter bindings and horizon bounds.
+Forty-four Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions and exact version-space scoring.
 
-Tests are authored. The binary v1 implementation passed focused formatting, Clippy and tests on commit f40e2dd; the coefficient-bearing numeric extension passed those gates on commit 4d04c09. The expanded interaction module requires the current exact-head workflow result before the combined branch can be called green.
+The previous exact-head focused runs covered 34 tests on commit 58128d025bdb24995c31822a86cd3afcaec28413. The additional protocol tests and wire contract must be qualified on the new exact branch head before this expanded branch is called green.
 
 ## Claim boundaries
 
