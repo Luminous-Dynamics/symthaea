@@ -1680,7 +1680,7 @@
         "mass_accounting_state": "invalid",
         "expected_total_mass_kg": null,
         "expected_cg_m": null,
-        "weight_growth_state": "over_hard_max",
+        "weight_growth_state": "unknown",
         "expected_disposition": "invalid_double_count"
       }
     },
@@ -1877,7 +1877,7 @@
         "mass_accounting_state": "invalid",
         "expected_total_mass_kg": null,
         "expected_cg_m": null,
-        "weight_growth_state": "within_reserve",
+        "weight_growth_state": "unknown",
         "expected_disposition": "invalid_configuration"
       }
     },
