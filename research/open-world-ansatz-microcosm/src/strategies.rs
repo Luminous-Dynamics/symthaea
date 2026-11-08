@@ -3,10 +3,10 @@
 //! These are policy controls, not claims of optimality. Every strategy sees the
 //! same AgentView and scores only the interventions legal in the public task.
 
-use crate::{interaction, numeric};
 use crate::protocol::{
     AgentIntervention, AgentMeasurement, AgentView, EpisodeStatus, StructureAccess,
 };
+use crate::{interaction, numeric};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -44,8 +44,7 @@ impl ProbeMetrics {
         if self.expected_remaining_denominator == 0 {
             return 0.0;
         }
-        self.expected_remaining_numerator as f64
-            / self.expected_remaining_denominator as f64
+        self.expected_remaining_numerator as f64 / self.expected_remaining_denominator as f64
     }
 }
 
@@ -81,18 +80,16 @@ pub fn choose_probe(
             let index = (mix_seed(seed) as usize) % metrics.len();
             metrics.get(index)
         }
-        _ => metrics.iter().max_by(|left, right| compare_metrics(left, right, strategy)),
+        _ => metrics
+            .iter()
+            .max_by(|left, right| compare_metrics(left, right, strategy)),
     };
     selected
         .map(|value| value.intervention)
         .ok_or(StrategyError::NoLegalProbe)
 }
 
-fn compare_metrics(
-    left: &ProbeMetrics,
-    right: &ProbeMetrics,
-    strategy: ProbeStrategy,
-) -> Ordering {
+fn compare_metrics(left: &ProbeMetrics, right: &ProbeMetrics, strategy: ProbeStrategy) -> Ordering {
     let primary = match strategy {
         ProbeStrategy::MaximumPartition => left
             .outcome_partition_count
@@ -171,9 +168,7 @@ fn metrics<T: Ord>(
 fn score_boolean(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyError> {
     let access = match view.task.structure_access {
         StructureAccess::BooleanWithheld => crate::StructureAccess::Withheld,
-        StructureAccess::BooleanSupplied(mechanism) => {
-            crate::StructureAccess::Supplied(mechanism)
-        }
+        StructureAccess::BooleanSupplied(mechanism) => crate::StructureAccess::Supplied(mechanism),
         _ => return Err(StrategyError::ManifestFamilyMismatch),
     };
     let log = boolean_log(view)?;
@@ -198,11 +193,7 @@ fn score_boolean(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyError> {
                     .map_err(|error| StrategyError::PredictionFailure(error.to_string()))
             });
             let values = predictions.collect::<Result<Vec<_>, _>>()?;
-            metrics(
-                AgentIntervention::Boolean(input),
-                values,
-                hypotheses.len(),
-            )
+            metrics(AgentIntervention::Boolean(input), values, hypotheses.len())
         })
         .collect()
 }
@@ -237,11 +228,7 @@ fn score_numeric(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyError> {
                     .map_err(|error| StrategyError::PredictionFailure(error.to_string()))
             });
             let values = predictions.collect::<Result<Vec<_>, _>>()?;
-            metrics(
-                AgentIntervention::Numeric(input),
-                values,
-                hypotheses.len(),
-            )
+            metrics(AgentIntervention::Numeric(input), values, hypotheses.len())
         })
         .collect()
 }
@@ -277,11 +264,7 @@ fn score_interaction(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyErro
                     .map_err(|error| StrategyError::PredictionFailure(error.to_string()))
             });
             let values = predictions.collect::<Result<Vec<_>, _>>()?;
-            metrics(
-                AgentIntervention::Pair(input),
-                values,
-                hypotheses.len(),
-            )
+            metrics(AgentIntervention::Pair(input), values, hypotheses.len())
         })
         .collect()
 }
@@ -364,7 +347,7 @@ impl std::error::Error for StrategyError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{BlindEpisode, AgentAction};
+    use crate::protocol::{AgentAction, BlindEpisode};
 
     #[test]
     fn all_strategies_return_a_legal_probe_in_each_world_family() {
@@ -385,7 +368,8 @@ mod tests {
                 Some(false),
                 StructureAccess::BooleanWithheld,
                 4,
-            ).unwrap();
+            )
+            .unwrap();
             let view = boolean.view().unwrap();
             let intervention = choose_probe(&view, strategy).unwrap();
             let response = boolean.apply(AgentAction::Probe { intervention }).unwrap();
@@ -402,10 +386,13 @@ mod tests {
                 },
                 StructureAccess::NumericWithheld,
                 4,
-            ).unwrap();
+            )
+            .unwrap();
             let view = numeric_episode.view().unwrap();
             let intervention = choose_probe(&view, strategy).unwrap();
-            let response = numeric_episode.apply(AgentAction::Probe { intervention }).unwrap();
+            let response = numeric_episode
+                .apply(AgentAction::Probe { intervention })
+                .unwrap();
             assert_eq!(response.view.observations.len(), 1);
 
             let mut interaction_episode = BlindEpisode::new_interaction(
@@ -419,10 +406,13 @@ mod tests {
                 },
                 StructureAccess::InteractionWithheld,
                 4,
-            ).unwrap();
+            )
+            .unwrap();
             let view = interaction_episode.view().unwrap();
             let intervention = choose_probe(&view, strategy).unwrap();
-            let response = interaction_episode.apply(AgentAction::Probe { intervention }).unwrap();
+            let response = interaction_episode
+                .apply(AgentAction::Probe { intervention })
+                .unwrap();
             assert_eq!(response.view.observations.len(), 1);
         }
     }
@@ -440,10 +430,15 @@ mod tests {
             },
             StructureAccess::InteractionWithheld,
             9,
-        ).unwrap();
+        )
+        .unwrap();
         let first_view = episode.view().unwrap();
         let first = choose_probe(&first_view, ProbeStrategy::FixedGrid).unwrap();
-        episode.apply(AgentAction::Probe { intervention: first }).unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: first,
+            })
+            .unwrap();
         let second_view = episode.view().unwrap();
         let remaining = score_available_probes(&second_view).unwrap();
         assert_eq!(remaining.len(), 8);
@@ -452,11 +447,7 @@ mod tests {
 
     #[test]
     fn expected_remaining_count_is_exact_for_uniform_partition_weights() {
-        let result = metrics(
-            AgentIntervention::Numeric(0),
-            [0, 0, 1, 1, 1, 2],
-            6,
-        ).unwrap();
+        let result = metrics(AgentIntervention::Numeric(0), [0, 0, 1, 1, 1, 2], 6).unwrap();
         assert_eq!(result.outcome_partition_count, 3);
         assert_eq!(result.worst_case_remaining_models, 3);
         assert_eq!(result.expected_remaining_numerator, 14);
@@ -478,7 +469,8 @@ mod tests {
             },
             StructureAccess::InteractionWithheld,
             4,
-        ).unwrap();
+        )
+        .unwrap();
         let view = episode.view().unwrap();
         assert_eq!(
             choose_probe(&view, ProbeStrategy::FixedGrid).unwrap(),
