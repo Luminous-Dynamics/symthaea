@@ -1,7 +1,7 @@
 {
   "schema_id": "luminous.sam.traffic-convention-profiles",
   "schema_version": "0.1.0",
-  "claim_ceiling": "synthetic_convention_semantics_only",
+  "claim_ceiling": "profile_metadata_only_no_automatic_legal_authority",
   "profiles": [
     {
       "profile_id": "synthetic-lht-rhd-v1",
