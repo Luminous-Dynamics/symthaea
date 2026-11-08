@@ -559,9 +559,7 @@ mod tests {
                 > result.actions[1].model_information_gain_nats
         );
         assert!(result.actions[0].expected_value_of_sample_information.abs() < 1e-12);
-        assert!(
-            (result.actions[1].expected_value_of_sample_information - 0.2).abs() < 1e-12
-        );
+        assert!((result.actions[1].expected_value_of_sample_information - 0.2).abs() < 1e-12);
         assert_eq!(result.selected_action_index, Some(1));
     }
 
