@@ -610,7 +610,8 @@
         "paired_evsi_minus_baseline_task_loss_delta",
         "paired_evsi_minus_baseline_decision_regret_delta",
         "paired_evsi_minus_baseline_total_cost_delta",
-        "paired_normal_approximation_confidence_intervals"
+        "paired_normal_approximation_confidence_intervals",
+        "source_bound_diagnostic_result_digest"
       ],
       "negative_controls": [
         "high_eig_zero_evsi_irrelevant_probe",
@@ -626,7 +627,25 @@
         "paired_evsi_contrast_episode_seed_alignment",
         "paired_evsi_confidence_interval_source_data_preserved"
       ],
-      "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
+      "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study.",
+      "execution_artifact": {
+        "runner": "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs",
+        "output": "research-results/hlb-decision-diagnostic.json",
+        "schema_version": "hlb-decision-diagnostic-result-v1",
+        "status": "synthetic_fixture_only",
+        "episodes": 10000,
+        "seed": 24301,
+        "source_binding": "SYMTHAEA_SOURCE_SHA",
+        "required_policy_arms": [
+          "NoProbe",
+          "PureModelInformationGain",
+          "OptimalDecisionInformationGain",
+          "CostAwareEvsi",
+          "AlwaysInspect"
+        ],
+        "paired_evsi_contrasts": 4,
+        "confidence_interval_method": "paired_normal_approximation_95"
+      }
     },
     {
       "id": "packed_binaryhv_bundle_capacity_pilot",
@@ -1243,7 +1262,8 @@
       "decision_information_gain_nats",
       "mean_predicted_decision_eig_nats",
       "paired_evsi_regret_difference",
-      "paired_evsi_total_cost_difference"
+      "paired_evsi_total_cost_difference",
+      "source_bound_diagnostic_result_digest"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1504,7 +1524,8 @@
     "A zero-angle butterfly is the identity and invalid dimensions, angle counts, non-finite angles, and input dimensions must fail closed.",
     "Optimal-decision information gain is computed from a deterministic hypothesis-to-optimal-decision map and must not exceed model information gain beyond the preregistered numerical tolerance.",
     "The decision-diagnostic harness must run no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, and always-inspect on paired episode seeds; report paired EVSI-versus-baseline differences and identify the confidence-interval method.",
-    "WeightLoop comparisons must match endpoint/assay budget, candidate/forward-pass budget, parameter-edit budget, and editor-call/token budget; author-reported offline replay results must remain distinct from independent reproduction."
+    "WeightLoop comparisons must match endpoint/assay budget, candidate/forward-pass budget, parameter-edit budget, and editor-call/token budget; author-reported offline replay results must remain distinct from independent reproduction.",
+    "The standalone diagnostic runner must emit a JSON result bound to the exact 40-character source SHA, the declared scenario, fixed seed, and all five policies; four paired EVSI contrasts must be present, and the result must remain explicitly marked synthetic-only."
   ],
   "research_references": [
     {
