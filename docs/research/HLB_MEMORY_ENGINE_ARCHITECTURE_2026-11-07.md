@@ -739,6 +739,8 @@ This is a numeric reference, not yet a production HME segment selector. The call
 
 The coordinate-box relaxation deliberately ignores the joint L2 budget and can be loose. Future blockwise/query-energy refinements must remain conservative and be differentially compared with the source reference and the full original-payload score. No throughput or ExactComplete claim is made.
 
+The global interval selection and exact reranking algorithm now also has a pure reference implementation in `crates/domains/symthaea-memory/src/hme/interval_select.rs`, exported via `symthaea_memory::hme`. It rejects incomplete item coverage, unbounded unopened partitions, duplicate IDs, invalid intervals and invalid top-k values. `stable_exact_top_k` rejects non-finite/out-of-range scores and applies numeric score-descending / ID-ascending ties, including signed-zero equality. Its coverage counters are consistency checks only, not proof of a pinned manifest or eligibility snapshot. It produces a refinement plan, never an ExactComplete receipt. Rust tests are authored, including 4,096 generated theorem comparisons, but not yet executed.
+
 ## 2026-11-08 decision-preserving compression and external baselines
 
 The updated benchmark crosswalk now includes PQR-Search (per-fixed-query probabilistic recall), Recast (refinement-centered storage), QBAT (query-specific search-budget prediction), VIBE / VectorDBBench (modern ID/OOD index and database evaluation), and the 2026 decision-level quantization analysis in arXiv:2609.09854.
