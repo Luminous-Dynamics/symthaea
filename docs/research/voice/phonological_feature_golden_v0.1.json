@@ -341,7 +341,8 @@
           "value": null,
           "reason": "NO_TONE_DIMENSIONS_CONFIGURED"
         }
-      }
+      },
+      "tone_dimensions": []
     },
     {
       "id": "all_na_insertion_is_unscorable",
