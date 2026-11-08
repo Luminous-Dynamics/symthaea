@@ -1,0 +1,579 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "ENG-KNOW-QUAL-001",
+  "source_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10652",
+  "status": {
+    "corpus": "blueprint_only",
+    "gold_adjudication": "not_yet_adjudicated",
+    "scoring": "not_scored",
+    "candidate_execution_authorized": false,
+    "physical_testing_authorized": false
+  },
+  "canonical_owners": [
+    {
+      "id": "ENG-DESIGN-006",
+      "issue": 6124,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6124"
+    },
+    {
+      "id": "ENG-MEAS",
+      "issue": 4919,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/4919"
+    },
+    {
+      "id": "ENG-TOL",
+      "issue": 4883,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/4883"
+    },
+    {
+      "id": "ENG-REF",
+      "issue": 6121,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6121"
+    },
+    {
+      "id": "ETK",
+      "issue": 1738,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/1738"
+    }
+  ],
+  "fixture_sources": [
+    {
+      "id": "CADH-P01",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "CADH-P03",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "CADH-P04",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "CADH-P06",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "ASM-P01",
+      "programme": "HARDWARE-TOPOLOGY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10532"
+    },
+    {
+      "id": "ASM-P02",
+      "programme": "HARDWARE-TOPOLOGY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10532"
+    },
+    {
+      "id": "ECAD-P01",
+      "programme": "HARDWARE-TOPOLOGY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10532"
+    }
+  ],
+  "cases": [
+    {
+      "id": "KNOW-P01",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P01"
+      ],
+      "claim_family": "dimensional_and_geometric",
+      "intent": "Map hole diameter, centre location, datum offsets, pattern symmetry and plate thickness to feasible, distinct observation paths before and after the length intervention.",
+      "required_semantics": [
+        "exact feature and datum references",
+        "direct or derived measurand type",
+        "measurement access after assembly state",
+        "instrument/method family",
+        "calibration/reference artifact dependency",
+        "uncertainty relative to case-specific tolerance",
+        "requalification after edit"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "ISO 10360-2:2009",
+        "JCGM 100:2008/Amd.1:2026",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-P02",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P03"
+      ],
+      "claim_family": "enclosure_and_hidden_features",
+      "intent": "Distinguish measurements available before closure from those feasible after final assembly; propose inspection affordances or appropriately limited pre-closure evidence.",
+      "required_semantics": [
+        "lifecycle phase",
+        "cavity/wall/floor measurands",
+        "line-of-sight or probe access",
+        "pre-closure vs post-closure evidence scope",
+        "measurement back-action and access constraints"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-P03",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ASM-P01"
+      ],
+      "claim_family": "assembly_interfaces",
+      "intent": "Map declared frame/post/beam/tie/gusset interfaces to evidence paths that can actually be performed in the assembled state.",
+      "required_semantics": [
+        "exact component pair/interface",
+        "datum and mating frame",
+        "pre-assembly vs post-assembly method",
+        "access constraints",
+        "contact evidence vs physical conformity distinction"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "JCGM 106:2012",
+        "ISO 10303-242:2025 (AP242 Edition 4)"
+      ]
+    },
+    {
+      "id": "KNOW-P04",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ASM-P02"
+      ],
+      "claim_family": "remount_and_alignment",
+      "intent": "Identify the measurement path required to re-establish shaft/bearing alignment after a pedestal remount.",
+      "required_semantics": [
+        "article and fixture identity",
+        "remount registration reference",
+        "instrument calibration dependency",
+        "alignment measurand",
+        "measurement uncertainty",
+        "fresh evidence/currentness obligations"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 10360-2:2009",
+        "ISO 14253-1:2017",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-P05",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P01",
+        "ASM-P01"
+      ],
+      "claim_family": "independence_and_common_mode",
+      "intent": "Classify whether two observations provide independent corroboration when they share the same datum, calibration artifact, instrument or reference chain.",
+      "required_semantics": [
+        "measurement source graph",
+        "common-mode dependencies",
+        "independence claim scope",
+        "separate observations vs independent evidence",
+        "unknown where dependence cannot be resolved"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-P06",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P01",
+        "CADH-P04"
+      ],
+      "claim_family": "uncertainty_and_tolerance",
+      "intent": "Select a feasible measurement method whose uncertainty can resolve the exact case-specific tolerance/decision boundary, without assuming a universal uncertainty ratio.",
+      "required_semantics": [
+        "quantity kind and units",
+        "exact nominal/tolerance profile",
+        "measurement equation",
+        "uncertainty budget references",
+        "decision boundary",
+        "method resolution/capability profile"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026",
+        "JCGM 106:2012",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-P07",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ECAD-P01"
+      ],
+      "claim_family": "electrical_diagnostics",
+      "intent": "Distinguish declared logical-net correctness from a physically testable board; identify which claims require test points, probe access, powered tests or additional circuit observability.",
+      "required_semantics": [
+        "exact net/pin identity",
+        "logical vs physical claim class",
+        "test-point/access requirements",
+        "instrument range and isolation profile references",
+        "power state and safe test conditions",
+        "unknown when no routed board exists"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-P08",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ASM-P01",
+        "CADH-P06"
+      ],
+      "claim_family": "service_and_requalification",
+      "intent": "Propose a replacement/service path that retains article identity and registration or explicitly reopens datum, alignment and conformity evidence after replacement.",
+      "required_semantics": [
+        "replaceable component identity",
+        "service access",
+        "remount reference",
+        "article/configuration generation",
+        "reopened measurements and obligations",
+        "preserved vs stale evidence distinction"
+      ],
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 10360-2:2009",
+        "ISO 14253-1:2017",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-N01",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "CADH-P03"
+      ],
+      "claim_family": "inaccessible_claim",
+      "intent": "Reject a claimed post-closure cavity measurement path when no inspection opening, probe path or alternate justified method exists.",
+      "required_semantics": [
+        "final assembled state",
+        "access proof",
+        "admissible alternative or explicit Unknown",
+        "narrowed claim if needed"
+      ],
+      "seeded_fault": "Remove all post-closure inspection access while retaining a candidate claim that the hidden cavity was measured after closure.",
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-N02",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "ASM-P02"
+      ],
+      "claim_family": "calibration_currentness",
+      "intent": "Reject a numeric alignment/conformance conclusion when the calibration reference is stale, missing or bound to another instrument.",
+      "required_semantics": [
+        "exact instrument identity",
+        "calibration identity and validity",
+        "article/fixture binding",
+        "Unknown/stale disposition"
+      ],
+      "seeded_fault": "Substitute an expired calibration reference or another instrument identity without changing the displayed measurement.",
+      "standard_refs": [
+        "ISO 10360-2:2009",
+        "ISO 14253-1:2017",
+        "ISO 23952:2020 (QIF)"
+      ]
+    },
+    {
+      "id": "KNOW-N03",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "ECAD-P01"
+      ],
+      "claim_family": "non_identifiable_measurand",
+      "intent": "Return Unknown or request a new measurement where the available logical netlist does not establish physical observability or permit a unique fault diagnosis.",
+      "required_semantics": [
+        "logical/physical evidence separation",
+        "observable state set",
+        "competing hypotheses",
+        "missing sensor/test-point information",
+        "Unknown/needs-evidence disposition"
+      ],
+      "seeded_fault": "Ask for a physical board test result from a logical netlist-only fixture with no routed board, test points or instrument profile.",
+      "standard_refs": [
+        "ISO 10303-242:2025 (AP242 Edition 4)"
+      ]
+    },
+    {
+      "id": "KNOW-N04",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "CADH-P01"
+      ],
+      "claim_family": "measurement_back_action",
+      "intent": "Reject or qualify a proposed measurement whose contact force or setup disturbance changes the quantity being measured beyond the declared model envelope.",
+      "required_semantics": [
+        "measurement interaction model",
+        "back-action/displacement uncertainty",
+        "admissible measurement envelope",
+        "review/alternative method disposition"
+      ],
+      "seeded_fault": "Use a high-force contact measurement on a thin/compliant feature without modelling the induced deformation.",
+      "standard_refs": [
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026",
+        "ISO 23952:2020 (QIF)"
+      ]
+    }
+  ],
+  "limitations": [
+    "All cases are public authoring blueprints, not adjudicated gold fixtures or scored tasks.",
+    "The referenced CAD and assembly objects are synthetic development fixtures. Their materialization does not establish instrument or measurement-system capability.",
+    "ECAD-P01 is a logical netlist only, not a routed PCB; physical testability is intentionally Unknown without additional EDA and instrumentation artifacts.",
+    "No real article, calibration certificate, instrument, supplier or production record is included.",
+    "No measurement plan proposal is evidence admission, engineering approval, product qualification or physical execution authority.",
+    "ISO 10360-2:2009 is scoped to Cartesian CMMs using contacting discrete-point probing for linear dimensions; it is not a generic optical-scanner, laser tracker, CT or non-Cartesian instrument qualification rule.",
+    "ISO 14253-1:2017 decision rules apply to in-scope quantity-valued characteristics/specifications and take measurement uncertainty into account; no universal uncertainty-to-tolerance ratio is assumed.",
+    "JCGM guidance supports measurement-model and uncertainty reasoning but does not establish the capability, calibration, repeatability or fitness of any actual fixture/instrument."
+  ],
+  "standards": [
+    {
+      "id": "ISO 14253-1:2017",
+      "role": "Decision rules for conformity/nonconformity of quantity-valued workpiece and measuring-equipment characteristics, taking measurement uncertainty into account",
+      "scope_limit": "Not a general observability standard and not a universal uncertainty-to-tolerance ratio; apply only where the declared characteristic and specification are in scope",
+      "source_uri": "https://www.iso.org/standard/70137.html",
+      "status_note": "Last reviewed and confirmed in 2023; current at retrieval 2026-11-06"
+    },
+    {
+      "id": "ISO 10360-2:2009",
+      "role": "Acceptance and reverification performance tests for Cartesian CMMs using contacting discrete-point probing to measure linear dimensions",
+      "scope_limit": "Does not explicitly apply to optical probing or non-Cartesian CMMs; must not be used as a generic optical-scan or all-metrology calibration requirement",
+      "source_uri": "https://www.iso.org/standard/40954.html",
+      "status_note": "Last reviewed and confirmed in 2026; current at retrieval 2026-11-06"
+    },
+    {
+      "id": "JCGM 100:2008/Amd.1:2026",
+      "role": "GUM amendment addressing nonlinearity in measurement models",
+      "scope_limit": "Guidance for uncertainty evaluation; does not certify any instrument, fixture or measurement system",
+      "source_uri": "https://www.bipm.org/documents/20126/2071204/JCGM_100_Amd1_2026.pdf/",
+      "status_note": "Published 2026"
+    },
+    {
+      "id": "JCGM GUM-5:2026",
+      "role": "Worked examples for evaluating and reporting measurement uncertainty",
+      "scope_limit": "Illustrative examples, not a universal measurement procedure or proof of capability for the benchmark fixture",
+      "source_uri": "https://www.bipm.org/en/web/guest/publications/guides",
+      "status_note": "Published 2026"
+    },
+    {
+      "id": "JCGM 106:2012",
+      "role": "Role of measurement uncertainty in conformity assessment",
+      "scope_limit": "Use as guidance for uncertainty-aware conformity decisions, not as a replacement for the applicable product specification or decision rule",
+      "source_uri": "https://www.bipm.org/en/web/guest/publications/guides",
+      "status_note": "Listed in BIPM JCGM guides catalogue at retrieval 2026-11-06"
+    },
+    {
+      "id": "ISO 10303-242:2025 (AP242 Edition 4)",
+      "role": "Managed model-based 3D product-definition exchange, including product/assembly structures, electrical connectivity and engineering/verification information within the declared application-protocol scope",
+      "scope_limit": "A referenced subset or a parser acceptance is not full AP242 conformance. Every profile/entity/semantic association and lossy or unsupported mapping must be explicit; this benchmark does not qualify a translator.",
+      "source_uri": "https://www.iso.org/standard/84300.html",
+      "status_note": "Edition 4 published 2025-08-25; ISO catalogue status was 'to be revised' at retrieval 2026-11-06. Use exact edition/profile pins."
+    },
+    {
+      "id": "ISO 23952:2020 (QIF)",
+      "role": "Integrated model for manufacturing quality information and quality-workflow documents, including structured characteristic, inspection-plan and result information",
+      "scope_limit": "A schema-valid QIF document does not prove a result is bound to the correct design characteristic, physical article, instrument or calibration; semantic links and profile coverage must be independently checked.",
+      "source_uri": "https://www.iso.org/standard/77461.html",
+      "status_note": "Edition 1 published 2020-07-31 and reviewed/confirmed 2026-06-14; current at retrieval 2026-11-06."
+    }
+  ],
+  "external_benchmark_context": [
+    {
+      "id": "ple-2026-11-06",
+      "name": "Physical-Engineering's Last Exam",
+      "source_url": "https://ple-bench.com/leaderboard?set=all",
+      "captured_at": "2026-11-06",
+      "task_count": 85,
+      "scope": "all_85_tasks",
+      "run_protocol": "Three runs per model+harness pair; six-hour per-task limit; highest available reasoning effort; official Claude Opus 5.5 rubric judge.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Claude Code",
+          "score": 0.506,
+          "cost_per_task_usd": 17.18,
+          "median_duration_minutes": 63
+        },
+        {
+          "model": "GPT-6 Astra",
+          "harness": "Codex",
+          "score": 0.483,
+          "cost_per_task_usd": 9.15,
+          "median_duration_minutes": 25
+        }
+      ],
+      "comparability_boundary": "This all-85 run is distinct from the 29-task public development board, 56-task hidden board and competition artifact submission. Scores are complete model+harness systems and include LLM-graded rubric tasks."
+    },
+    {
+      "id": "ple-dev-2026-11-06",
+      "name": "Physical-Engineering's Last Exam — public development",
+      "source_url": "https://ple-bench.com/leaderboard?set=dev",
+      "captured_at": "2026-11-06",
+      "task_count": 29,
+      "scope": "public_development_29_tasks",
+      "run_protocol": "Three runs per model+harness pair; six-hour per-task limit; official development rubric.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Claude Code",
+          "score": 0.551,
+          "cost_per_task_usd": 17.3,
+          "median_duration_minutes": 63
+        },
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Codex",
+          "score": 0.549,
+          "cost_per_task_usd": 30.38,
+          "median_duration_minutes": 110
+        },
+        {
+          "model": "GPT-6 Astra",
+          "harness": "Codex",
+          "score": 0.53,
+          "cost_per_task_usd": 8.42,
+          "median_duration_minutes": 24
+        }
+      ],
+      "comparability_boundary": "Only compare against this same 29-task split and protocol. Not comparable to PLE 56-task hidden, all-85 or committed-artifact entry scores. Harness effects are material; preserve the exact model+harness pair."
+    },
+    {
+      "id": "parametric-cad-bench-v3-2026-11-06",
+      "name": "Parametric CAD Bench V3",
+      "source_url": "https://cadbench.ai/leaderboard",
+      "captured_at": "2026-11-06",
+      "task_count": 100,
+      "scope": "public_v3_100_task_cohort",
+      "run_protocol": "Harbor 0.23.0; FreeCAD 1.1.0; one attempt per task; four-way concurrency; zero retries; separate programmatic validator.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Claude Code",
+          "score": 0.6103,
+          "displayed_uncertainty_95": 0.0753,
+          "cost_per_task_usd": 5.7394,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "One complete public cohort with a continuous geometry/specification reward. The displayed CI is task-score uncertainty; this is not a manufacturability, metrology, requalification or physical-safety benchmark. Total run cost is USD 573.94/100 = USD 5.7394 per task."
+    },
+    {
+      "id": "benchcad-2.0-core-2026-10-12",
+      "name": "BenchCAD 2.0 Core",
+      "source_url": "https://benchcad.com/blog/benchcad-2",
+      "captured_at": "2026-11-06",
+      "task_count": 100,
+      "scope": "v2.0_core_held_out",
+      "run_protocol": "30 rounds per case; reasoning not carried between rounds; per-task sandbox; automatic geometry/topology/assembly-placement/ECAD-connectivity scoring.",
+      "entries": [
+        {
+          "model": "GPT-6 Astra",
+          "harness": "BenchCAD v2.0 harness",
+          "score": 0.59,
+          "cost_per_task_usd": 11,
+          "median_duration_minutes": 62
+        },
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "BenchCAD v2.0 harness",
+          "score": 0.57,
+          "cost_per_task_usd": 28,
+          "median_duration_minutes": 222
+        }
+      ],
+      "comparability_boundary": "Do not compare v2.0 with v2.1. The score covers CAD geometry/topology, assembly placement and board connectivity, not manufacturing readiness, uncertainty, inspection access, lifecycle requalification or physical performance."
+    },
+    {
+      "id": "cadworld-v0-60-task-release-2026-11-06",
+      "name": "CADWorld — released v0, 60-task coverage evaluation",
+      "source_url": "https://cad-world.github.io/",
+      "captured_at": "2026-11-06",
+      "task_count": 60,
+      "scope": "released_v0_60_task_coverage",
+      "run_protocol": "Seven agents evaluated across all 11 workflow categories; capped at 100 GUI steps per task. Task success requires all executable checks on saved FreeCAD and auxiliary artifacts. Expert reference is a single-trial pass, not a population estimate.",
+      "entries": [
+        {
+          "model": "GPT-5.4",
+          "harness": "CADWorld computer-use agent",
+          "score": 0.25,
+          "cost_per_task_usd": 1.4,
+          "median_duration_minutes": null
+        },
+        {
+          "model": "Human expert single-trial reference",
+          "harness": "CADWorld expert execution",
+          "score": 0.87,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "The benchmark universe contains 200 tasks, but the published v0 release and this result table cover 60 tasks. The 87.0% human figure is one expert reference pass, not a population benchmark. Do not treat this as a score on the full 200-task universe."
+    },
+    {
+      "id": "cadworld-extended-run-snapshot-2026-11-06",
+      "name": "CADWorld — extended-run result snapshot",
+      "source_url": "https://cad-world.github.io/",
+      "captured_at": "2026-11-06",
+      "task_count": 200,
+      "scope": "extended_run_result_denominator_not_confirmed",
+      "run_protocol": "The indexed extended-run display lists 14 evaluated agents and uses 100 GUI steps per task. The retrieved summary does not establish the exact task denominator for these extended-run scores; 200 is the benchmark task-universe count, not an assertion that every extended agent run covered all 200 tasks.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "CADWorld extended-run GUI agent",
+          "score": 0.415,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        },
+        {
+          "model": "Claude Sonnet 5.5",
+          "harness": "CADWorld extended-run GUI agent",
+          "score": 0.335,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        },
+        {
+          "model": "GPT-6 Astra",
+          "harness": "CADWorld extended-run GUI agent",
+          "score": 0.33,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "Separate from the released v0 60-task evaluation and the original paper snapshot. Exact extended-run task denominator and run repetition are not established in the retrieved result summary; do not compare this record directly to the v0 board or claim full-200-task completion."
+    }
+  ]
+}

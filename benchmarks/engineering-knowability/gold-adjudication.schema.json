@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-knowability/gold-adjudication.schema.json",
+  "title": "ENG-KNOW-QUAL-001 evaluator-only gold adjudication v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme_id",
+    "task_family_id",
+    "fixture_digest_set",
+    "candidate_visibility",
+    "assessments",
+    "adjudication",
+    "mutation_records",
+    "seal"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme_id": {
+      "const": "ENG-KNOW-QUAL-001"
+    },
+    "task_family_id": {
+      "enum": [
+        "KNOW-P01",
+        "KNOW-P02",
+        "KNOW-P03",
+        "KNOW-P04",
+        "KNOW-P05",
+        "KNOW-P06",
+        "KNOW-P07",
+        "KNOW-P08",
+        "KNOW-N01",
+        "KNOW-N02",
+        "KNOW-N03",
+        "KNOW-N04"
+      ]
+    },
+    "fixture_digest_set": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/digestRef"
+      }
+    },
+    "candidate_visibility": {
+      "const": "evaluator_only"
+    },
+    "assessments": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assessor_ref",
+          "independence_declaration",
+          "assessment_digest",
+          "claim_labels",
+          "submitted_at"
+        ],
+        "properties": {
+          "assessor_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "independence_declaration": {
+            "const": true
+          },
+          "assessment_digest": {
+            "$ref": "#/$defs/sha256"
+          },
+          "claim_labels": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/goldClaim"
+            }
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "resolved_claim_labels",
+        "disagreement_refs",
+        "adjudicator_ref"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "awaiting_review",
+            "independent_agreement",
+            "third_adjudicator_resolved",
+            "rejected_for_ambiguity"
+          ]
+        },
+        "resolved_claim_labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/goldClaim"
+          }
+        },
+        "disagreement_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "adjudicator_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "third_adjudicator_resolved"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "adjudicator_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "disagreement_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "independent_agreement"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "disagreement_refs": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mutation_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mutation_id",
+          "mutated_digest",
+          "expected_detection",
+          "critical",
+          "independent_oracle_ref"
+        ],
+        "properties": {
+          "mutation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutated_digest": {
+            "$ref": "#/$defs/sha256"
+          },
+          "expected_detection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "independent_oracle_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "seal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "gold_digest",
+        "sealed_at",
+        "custodian_ref",
+        "custody_record_ref"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unsealed",
+            "sealed",
+            "superseded"
+          ]
+        },
+        "gold_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sealed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "custodian_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "custody_record_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "sealed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sealed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "candidate_score": {
+      "not": {}
+    },
+    "hidden_gold_labels": {
+      "not": {}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "digestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "sha256"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "goldClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_ref",
+        "criticality",
+        "gold_disposition",
+        "required_path_refs",
+        "hard_failure_modes"
+      ],
+      "properties": {
+        "claim_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criticality": {
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ]
+        },
+        "gold_disposition": {
+          "enum": [
+            "admissible_path",
+            "needs_review",
+            "unknown",
+            "unsupported",
+            "not_claimed"
+          ]
+        },
+        "required_path_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "hard_failure_modes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "false_observability",
+              "false_calibration_currentness",
+              "false_independence",
+              "wrong_generation_binding",
+              "uncertainty_decision_invalid",
+              "measurement_back_action_unmodelled",
+              "physical_evidence_overclaim",
+              "stale_evidence_false_current"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
