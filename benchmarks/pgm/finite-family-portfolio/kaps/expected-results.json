@@ -1,0 +1,30 @@
+{
+  "schema": "symthaea.pgm.finite-family-portfolio.kaps-expected.v1",
+  "status": "oracle-values-only-kaps-not-executed",
+  "competitor": "SUMI-lab/KAPS",
+  "competitor_commit": "4d35eef6c442521139d1786e31c6d6fbf322788f",
+  "policy_class": "deterministic-memoryless",
+  "model_count": 2,
+  "state_count": 1,
+  "action_count": 2,
+  "horizon": 1,
+  "discount": "0",
+  "models": [
+    {"id": "M0", "initial": ["1"], "rewards": [["1", "0"]]},
+    {"id": "M1", "initial": ["1"], "rewards": [["0", "1"]]}
+  ],
+  "transition_semantics": "single state; every action returns to that state with probability 1",
+  "model_optimal_values": ["1", "1"],
+  "expected_by_k": {
+    "1": {"minimax_regret": "1", "optimal_portfolios": 2},
+    "2": {"minimax_regret": "0", "optimal_portfolios": 1}
+  },
+  "exhaustive_portfolios_evaluated": 3,
+  "qualification": {
+    "rust_reference": "exact_checked_rational",
+    "kaps_comparator": "float64",
+    "kaps_executed": false,
+    "runtime_comparison": false,
+    "general_kaps_policy_search_is_deterministic_memoryless": true
+  }
+}
