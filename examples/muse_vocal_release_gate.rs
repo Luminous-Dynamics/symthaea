@@ -120,6 +120,7 @@ struct CaseReceipt {
     transpose_semitones: f32,
     melody: Vec<symthaea_muse::Note>,
     score_blake3: String,
+    performance_canonical_json: String,
     performance_blake3: String,
 }
 
@@ -584,6 +585,7 @@ fn main() -> Result<()> {
             transpose_semitones: case.transpose_semitones,
             score_blake3: score_digest(&melody)?,
             melody: melody.clone(),
+            performance_canonical_json: serde_json::to_string(&performance)?,
             performance_blake3: performance_digest(&performance)?,
         });
         render_one(
@@ -774,7 +776,10 @@ mod rating_validation_tests {
             transpose_semitones: 0.0,
             score_blake3: score_digest(&melody).unwrap(),
             melody,
-            performance_blake3: "b".repeat(64),
+            performance_canonical_json: r#"{"synthetic_fixture":true}"#.to_string(),
+            performance_blake3: blake3::hash(br#"{"synthetic_fixture":true}"#)
+                .to_hex()
+                .to_string(),
         }
     }
 
