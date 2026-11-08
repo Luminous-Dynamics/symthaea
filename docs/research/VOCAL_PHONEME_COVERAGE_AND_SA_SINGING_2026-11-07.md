@@ -296,3 +296,27 @@ This document and patch establish stricter input handling and expose the existin
 ### Formant phrase-expression experiment
 
 The integrated FormantSingingEngine now interpolates phrase expression points over the frame timeline. It maps energy to a relative frame-energy scale, breathiness to reduced periodic voicing plus modest resonance widening, and tension to resonance-bandwidth narrowing. This is an intentionally approximate source-filter control mapping—not a calibrated vocal-fold biomechanical model. Tests assert the numerical transformation on a synthetic frame, while perceptual effects still require listening and acoustic evaluation. Phrase breath-before/after metadata is not rendered as an inhalation and remains unsupported.
+
+
+## Multilingual phonology and singing datasets — 8 November 2026
+
+A new EMNLP 2026 benchmark, **mPhonBench**, evaluates text-only and speech-augmented models across 10 phonological tasks, 58 languages and 19 scripts. Its authors report that mid-sized open models can match or exceed specialist G2P systems on some tasks, while underrepresented languages still incur a performance penalty. This changes the G2P strategy: compare dictionary/rule systems and multilingual models against a broad phonological task suite, not only a small English pronunciation test. The released benchmark's language manifest must be inspected before claiming isiZulu or isiXhosa coverage; the paper abstract alone does not verify either language.
+
+GTSinger is a valuable singing-alignment/control reference corpus: 80.59 hours, 20 singers, nine languages, six labelled techniques, manual phoneme-to-audio alignments, realistic music scores and 16.16 hours of paired speech. Its currently published language set is Chinese, English, Japanese, Korean, Russian, Spanish, French, German and Italian; it does not supply the South African language coverage required by this programme. Critically, its dataset licence is **CC BY-NC-SA 4.0**, not a commercially permissive licence. The dataset card also includes an additional agreement clause concerning responsibility/indemnity for M4Singer audio and representation of authority to accept the terms. Do not use this corpus to train or validate a commercial/proprietary model without separate legal review and an appropriate rights basis. It may be useful only for work that is genuinely compatible with the non-commercial/share-alike obligations and all additional terms.
+
+SoulX-Singer-Eval provides a more directly comparable zero-shot evaluation protocol: 100 singing segments from 50 distinct speakers (25 Mandarin, 25 English), with two segments per speaker and manually annotated melody. Its README describes academic-consent Mandarin data and English segments sourced from Mixing Secrets. This is a useful open baseline, but it does not cover South African languages and is not a substitute for rights-cleared commercial voice data.
+
+### Updated research implications
+
+1. **Use mPhonBench for broad phonological ability, not as a South African singing gold set.** It can test G2P, phonological reasoning, language/script generalization and word-level phone recognition; we still need language-community reviewed references and actual singing data.
+2. **Use GTSinger only inside its rights boundary.** It is exceptionally useful for studying phoneme timing, technique control, and score-to-audio alignment, but its non-commercial licence conflicts with unrestricted commercial deployment. Do not mix its training material into a commercial model by default.
+3. **Build a separately consented South African singing benchmark.** Start with English, Afrikaans, isiZulu, isiXhosa and Sesotho as separate profiles, but do not turn a language name into a coverage claim. For each language, specify dialect/region, orthography, phoneme inventory, tone/stress/prosody conventions, code-switching policy and a reviewer/adjudication plan.
+4. **Split by singer, song, lyric and pronunciation lemma.** A singer-held-out test alone is insufficient if lyrics, melody or recording sessions leak across splits. Maintain a separate held-out set of names, loanwords and code-switching cases.
+5. **Keep speech and singing labels distinct.** mPhonBench-style spoken word G2P is necessary but does not prove sung syllabification, consonant timing, melisma behavior, or score alignment.
+
+Sources:
+- mPhonBench, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.2456/
+- GTSinger dataset card: https://huggingface.co/datasets/GTSinger/GTSinger
+- GTSinger dataset licence: https://huggingface.co/datasets/GTSinger/GTSinger/blob/main/dataset_license.md
+- GTSinger NeurIPS 2024 paper: https://proceedings.neurips.cc/paper_files/paper/2024/hash/023d2c1a17cf35b11a0cbb43a0677c91-Abstract-Datasets_and_Benchmarks_Track.html
+- SoulX-Singer-Eval protocol: https://github.com/Soul-AILab/SoulX-Singer-Eval
