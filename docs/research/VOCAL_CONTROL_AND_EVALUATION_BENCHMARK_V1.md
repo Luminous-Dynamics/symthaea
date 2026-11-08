@@ -130,6 +130,8 @@ The shared comparison policy currently permits documented approximations and con
 
 This is **admission to a fair comparison**, not proof that approximated controls are equivalent to native controls or that either backend achieved good perceptual quality. Report capability support class alongside all benchmark scores.
 
+The Muse gate places listener-facing material in a dedicated `blind/` directory and private evaluator material in a sibling `private/` directory. The blind directory contains only clip WAVs, a backend-concealed manifest, and the rating template. Backend key/salt, objective metrics, run provenance, and release status go to the private directory. Share only `blind/` with listeners; never distribute the output root or `private/` as part of a blind study.
+
 ## Fair comparison protocol
 
 1. Freeze the exact lyrics, language, pronunciation, score, tempo, controls, voice reference, source commits, and dataset split before generating any candidate audio.
