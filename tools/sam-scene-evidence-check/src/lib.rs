@@ -933,9 +933,7 @@ fn validate_source_role(errors: &mut Vec<String>, source: &Value) {
             (sensor_modality || modality == "synthetic") && evidence == "synthetic_observation"
         }
         "remote_cooperative_claim" => modality == "v2x" && evidence == "advisory",
-        "simulator_oracle" => {
-            modality == "synthetic" && evidence == "synthetic_observation"
-        },
+        "simulator_oracle" => modality == "synthetic" && evidence == "synthetic_observation",
         "map_prior" => modality == "map" && evidence == "map_prior",
         "derived_estimate" => evidence == "estimate",
         "unknown" => true,
@@ -1179,8 +1177,7 @@ mod tests {
     #[test]
     fn rejects_local_sensor_in_simulator_truth_refs() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["simulator_truth_refs"][0] =
-            Value::String("front-camera-01".into());
+        fixture["snapshot"]["simulator_truth_refs"][0] = Value::String("front-camera-01".into());
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
