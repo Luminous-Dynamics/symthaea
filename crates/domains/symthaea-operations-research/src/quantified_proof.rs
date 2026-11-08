@@ -1113,6 +1113,144 @@ mod tests {
     }
 
     #[test]
+    fn verifier_rejects_early_true_when_one_clause_is_not_yet_satisfied() {
+        let problem = CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![vec![Literal::positive(0)]],
+        };
+        let prefix = make_prefix(
+            2,
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::ForAll, &[1]),
+            ],
+        );
+        let (proof, _) = build_qbf_game_proof(&problem, &prefix, budget()).unwrap();
+        let mut tampered = proof.clone();
+        let root = tampered.root;
+        let low_child = match &tampered.nodes[root].kind {
+            QbfProofNodeKind::ForAllDecision { low_child, .. } => *low_child,
+            _ => unreachable!(),
+        };
+        tampered.nodes[low_child].kind = QbfProofNodeKind::EarlyTrue;
+        tampered.nodes[low_child].value = true;
+        assert!(matches!(
+            verify_qbf_game_proof(&problem, &prefix, &tampered, budget()),
+            Err(QuantifiedProofError::EarlyTrueNotEstablished { .. })
+        ));
+    }
+
+    fn direct_game_oracle(
+        problem: &CnfProblem,
+        prefix: &ValidatedQuantifierPrefix,
+    ) -> bool {
+        let order = ordered_prefix(prefix);
+        fn visit(
+            position: usize,
+            order: &[(Quantifier, usize)],
+            problem: &CnfProblem,
+            assignment: &mut [Option<bool>],
+        ) -> bool {
+            if position == order.len() {
+                return problem.clauses.iter().all(|clause| {
+                    clause.iter().any(|literal| {
+                        assignment[literal.variable]
+                            .is_some_and(|value| value == literal.positive)
+                    })
+                });
+            }
+            let (quantifier, variable) = order[position];
+            assignment[variable] = Some(false);
+            let low = visit(position + 1, order, problem, assignment);
+            assignment[variable] = Some(true);
+            let high = visit(position + 1, order, problem, assignment);
+            assignment[variable] = None;
+            match quantifier {
+                Quantifier::Exists => low || high,
+                Quantifier::ForAll => low && high,
+            }
+        }
+        visit(
+            0,
+            &order,
+            problem,
+            &mut vec![None; problem.variables.len()],
+        )
+    }
+
+    #[test]
+    fn exhaustive_two_variable_proofs_match_direct_game_semantics() {
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+        ];
+        let mut formulas = vec![CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![],
+        }];
+        for left_mask in 0..16usize {
+            let left: Vec<_> = (0..4)
+                .filter(|index| ((left_mask >> index) & 1) != 0)
+                .map(|index| literals[index])
+                .collect();
+            formulas.push(CnfProblem {
+                variables: vec!["x".into(), "y".into()],
+                clauses: vec![left.clone()],
+            });
+            for right_mask in 0..16usize {
+                let right: Vec<_> = (0..4)
+                    .filter(|index| ((right_mask >> index) & 1) != 0)
+                    .map(|index| literals[index])
+                    .collect();
+                formulas.push(CnfProblem {
+                    variables: vec!["x".into(), "y".into()],
+                    clauses: vec![left.clone(), right],
+                });
+            }
+        }
+        assert_eq!(formulas.len(), 273);
+
+        for (formula_index, problem) in formulas.iter().enumerate() {
+            for order in [[0usize, 1usize], [1usize, 0usize]] {
+                for quantifier_mask in 0..4usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = make_prefix(2, blocks);
+                    let expected = direct_game_oracle(problem, &prefix);
+                    let (proof, built) =
+                        build_qbf_game_proof(problem, &prefix, budget()).unwrap();
+                    let checked =
+                        verify_qbf_game_proof(problem, &prefix, &proof, budget()).unwrap();
+                    assert_eq!(
+                        built.root_value,
+                        expected,
+                        "builder formula {formula_index}, order {order:?}, mask {quantifier_mask}"
+                    );
+                    assert_eq!(
+                        checked.root_value,
+                        expected,
+                        "checker formula {formula_index}, order {order:?}, mask {quantifier_mask}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn proof_node_budget_fails_closed() {
         let problem = equality_problem();
         let prefix = make_prefix(
