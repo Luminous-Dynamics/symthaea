@@ -627,3 +627,32 @@ HME can claim a differentiated result only after it shows, on at least one decla
 6. For ApproximatePerQuery, match or exceed a named PQR-style `(tau, delta)` target on fixed-query audits and OOD/update stress, while publishing the exact probability scope.
 
 These are project gates, not external standards or present results. Do not compare Recast's 0.99-recall QPS, PQR's per-query probability and HME ExactCertified throughput as if they were the same contract.
+
+
+## 9. HME promotion scorecard (2026-11-08)
+
+These are explicit Luminous project targets, not published standards and not achieved results.
+
+| Track | Promotion target | Required controls |
+|---|---|---|
+| ExactFull / ExactCertified | 100% canonical exact top-k agreement; 0 false prunes; complete eligible-record coverage | Full oracle, pinned manifest and rights snapshot, stable ID tie rule, stale/corrupt certificate negatives |
+| Exact efficiency | >=1.5x end-to-end throughput at identical output quality, or equivalent verified payload-byte reduction; stretch >=50% original cold-payload bytes avoided after all fast-tier overhead | Full scan and #10945 progressive exact baselines, p50/p95/p99, bytes/pages moved, index+codebook+interval+certificate memory |
+| ApproximatePerQuery standard | `tau >= 0.99`, `delta <= 0.01` for every fixed query under a reviewed probability model | Explicit probability space; independent transform trials; predeclared query panel; per-query upper confidence bound; updates/deletes/OOD; adaptive queries reported separately |
+| ApproximatePerQuery stretch | `tau >= 0.999`, `delta <= 0.001` | Same controls, with the required independent trial count and multiplicity correction; never infer from one aggregate recall average |
+| Query-cost model | Model inference overhead <=5% of the corresponding retrieval budget; exact mode remains 100% correct | QBAT/ANNiE-style baselines, cost underestimation tails, OOD and update calibration, fallback rate, full offline training and feature costs |
+| Downstream memory utility | Within 1 percentage point of the best fixed-reader baseline while reducing total steady-state + background cost by >=25%; alternatively, >=3 percentage-point paired quality gain at equal cost | LongMemEval/LoCoMo plus one additional official memory benchmark; same reader, prompt, context budget, evaluator and split; confidence intervals and obsolete-memory controls |
+| Governance and lifecycle | Zero unauthorized resurrection, zero cross-namespace reads, zero payload access for excluded records, explicit erasure semantics | MIRE mutation controls, revoked/stale IDs, valid-time/known-time, principal-scope, recovery and compaction |
+
+### Benchmark suite mapping
+
+- **VIBE:** use as a modern ANN algorithm baseline and for IN/OOD robustness. Its published dataset/embedding dimensions (hundreds to several thousand dimensions) do not match HME's 16K–256K HDC profile; run VIBE baselines faithfully, then a separate HDC-native profile with the same dimensions and canonical oracle. VIBE explicitly distinguishes algorithm benchmarking from vector-database benchmarking. <https://vector-index-bench.github.io/>
+- **VectorDBBench:** use for database-facing search, dataset ingestion and system behavior; its September 2026 release makes the 24 VIBE datasets and multimodal corpora available through its dataset registry. Keep its DB measurements separate from in-memory index algorithm comparisons. <https://github.com/zilliztech/VectorDBBench/blob/main/docs/release/2026-09-hugging-face-datasets.md>
+- **MLPerf Storage vector-database workload:** use its sustained-load / p99 / exact-ground-truth discipline for cold-storage comparison, but do not claim compliance unless the published configuration is followed exactly.
+- **LongMemEval, LoCoMo, MemoryAgentBench and Agent Memory Leaderboard:** use for agent-memory utility, with the reader fixed. A storage-only top-k win is not a downstream-answer win.
+- **HDC-native controlled suite:** use #7772 for fan-in, interference, query multiplicity and capacity; #10917/#10896 for bytes, locality, mmap, update and recovery; #11022 for reliability/guarantee classes; #11078 for exact interval selection.
+
+### SOTA comparison rule
+
+Do not place a PQR-Search per-fixed-query guarantee, Recast's high-probability refinement intervals, QBAT's query-specific searched-budget reduction, VIBE's ANN algorithm curve, and HME ExactCertified on one unqualified leaderboard. Compare only within matching correctness classes and report the complete system boundary.
+
+The current competitive facts are third-party author reports: PQR-Search claims a per-fixed-query `(tau, delta)` guarantee under transform-independence assumptions and evaluates up to 100M vectors; Recast reports 1.56–2.01x QPS at 0.99 recall under matched memory; QBAT reports up to 68.8% less searched budget in ScaNN consistency mode. These numbers are not HME results and are not directly cross-comparable.
