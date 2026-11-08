@@ -887,7 +887,7 @@ pub fn admit_follow_target(
                 return Err(FollowEvidenceError::ExcessiveDistanceErrorBound);
             }
             Ok(AdmittedFollowTarget {
-                gap_lower_bound_m: (gap_m - distance_error_bound_m).max(0.0),
+                gap_lower_bound_m: (*gap_m - *distance_error_bound_m).max(0.0),
                 relative_speed_mps: *relative_speed_mps,
             })
         }
