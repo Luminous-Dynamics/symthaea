@@ -291,7 +291,19 @@
           "minItems": 1,
           "items": {
             "$ref": "#/$defs/obligation"
-          }
+          },
+          "contains": {
+            "type": "object",
+            "required": [
+              "required"
+            ],
+            "properties": {
+              "required": {
+                "const": true
+              }
+            }
+          },
+          "minContains": 1
         },
         "candidates": {
           "type": "array",
