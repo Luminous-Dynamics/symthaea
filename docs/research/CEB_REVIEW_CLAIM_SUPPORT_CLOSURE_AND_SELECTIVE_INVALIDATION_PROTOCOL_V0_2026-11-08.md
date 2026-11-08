@@ -105,7 +105,7 @@ Never convert a dependency-unknown case into retain. Never treat a stale histori
 
 ## 4. Minimal impact witness and unaffectedness witness
 
-Every non-retain disposition must provide an **impact witness**: the changed dependency, event identity, path through Cl(C), and why the claim's use is affected.
+Every non-retain disposition must provide a decision witness. For **revalidate**, **invalidate** and **supersede**, this is an **impact witness**: the changed dependency, event identity, path through Cl(C), and why the claim's current use is affected. For **unresolved**, do not invent a path: provide a **closure-gap witness** naming the event, the missing dependency/edge class, the known adjacent support path (if any), why the gap blocks a safe disposition, and the smallest evidence request that could close it.
 
 Every retain disposition on a mixed-impact or decisive-change sequence must provide an **unaffectedness witness**:
 - the relevant closure of the retained claim;
