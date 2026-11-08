@@ -1937,6 +1937,35 @@ mod tests {
     }
 
     #[test]
+    fn spherical_cap_f32_interval_contains_cancellation_sensitive_canonical_score() {
+        let one = 1.0f32;
+        let a0 = one - f32::EPSILON / 2.0;
+        let b1 = one - f32::EPSILON;
+        let query = ContinuousHV::from_vec(vec![a0, one, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let center =
+            ContinuousHV::from_vec(vec![a0, -b1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+
+        // This exact cancellation is sensitive to accidental FMA contraction
+        // in the canonical group-of-eight dot reduction.
+        assert_eq!(a0 * a0, b1);
+        let exact = query.similarity_full_resolution(&center);
+        assert_eq!(exact, 0.0);
+
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(
+                &center,
+                0.01,
+            )
+            .unwrap();
+        assert!(
+            interval.contains(exact),
+            "canonical score {exact} escaped [{}, {}]",
+            interval.lower,
+            interval.upper
+        );
+    }
+
+    #[test]
     fn spherical_cap_f32_interval_handles_zero_radius_and_zero_query() {
         let query = ContinuousHV::from_vec(vec![0.5, -0.2, 0.7, 0.1, -0.8, 0.3, 0.9, -0.4]);
         let center = ContinuousHV::from_vec(vec![0.1, 0.2, -0.3, 0.4, 0.5, -0.6, 0.7, -0.8]);
