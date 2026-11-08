@@ -38,7 +38,7 @@
 
 **Expected dispositions:** C1 = retain if exact tree, contract P, configuration W and behavioral scope are independently shown equivalent; C2 = revalidate or supersede because the exact artifact/provenance claim is bound to commit C and no C-prime build provenance exists.
 
-**Reason:** Tree equivalence can preserve a source-behavior proposition without preserving commit- or artifact-identity propositions. A changed SHA alone is not proof of changed behavior; matching tree bytes alone is not proof of artifact provenance.
+**Reason:** The tree identity can remain unchanged and preserve a source-behavior proposition without preserving commit- or artifact-identity propositions. A changed SHA alone is not proof of changed behavior; matching tree bytes alone is not proof of artifact provenance.
 
 **Discriminating evidence:** Exact tree digest and scope comparison for C1; new artifact subject/build provenance and canonical receipt for C2.
 
