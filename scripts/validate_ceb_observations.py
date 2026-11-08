@@ -168,6 +168,80 @@ def semantic_errors(payload: dict) -> list[str]:
     if aacr and not any("not model performance" in note for note in aacr["notes"]):
         errors.append("AACR-Bench 285% annotation coverage must not be represented as model performance")
 
+    # Verifier generation and benchmark lifecycle integrity are distinct
+    # evaluation comparators, not CEB review-performance scores.
+    required_integrity_comparators = {
+        "verifierbench-executable-verifier-generation": ("CEB-EVAL", "verifierbench-arxiv-2610-28679", "reported", 222),
+        "benchmark-maintenance-pass-audit": ("CEB-EVAL", "unearned-pass-maintenance-arxiv-2609-34262", "reported", 3810),
+        "benchmark-maintenance-unearned-pass-rates": ("CEB-EVAL", "unearned-pass-maintenance-arxiv-2609-34262", "not_reported", None),
+    }
+    for comparator_id, expected in required_integrity_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing verifier/benchmark-integrity comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        denominator = comparator["sample_denominator"]
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        if denominator["status"] != denominator_status or denominator["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_integrity_observations = {
+        "verifierbench-task-count": ("verifierbench-executable-verifier-generation", "task_count", 222),
+        "verifierbench-hidden-case-count": ("verifierbench-executable-verifier-generation", "hidden_case_count", 4993),
+        "verifierbench-source-benchmark-count": ("verifierbench-executable-verifier-generation", "source_benchmark_count", 6),
+        "verifierbench-paper-common-harness-model-count": ("verifierbench-executable-verifier-generation", "common_harness_model_count", 19),
+        "verifierbench-project-model-harness-config-count": ("verifierbench-executable-verifier-generation", "model_harness_configuration_count", 36),
+        "verifierbench-project-source-defect-exclusions": ("verifierbench-executable-verifier-generation", "source_defect_exclusion_count", 45),
+        "verifierbench-attack-case-count": ("verifierbench-executable-verifier-generation", "attack_case_count", 798),
+        "verifierbench-v4v-check-count": ("verifierbench-executable-verifier-generation", "v4v_check_count", 6),
+        "benchmark-maintenance-audited-trajectory-count": ("benchmark-maintenance-pass-audit", "passing_trajectory_count", 3810),
+        "benchmark-maintenance-cohort-count": ("benchmark-maintenance-pass-audit", "model_benchmark_cohort_count", 29),
+        "benchmark-maintenance-opus47-unearned-pass-rate": ("benchmark-maintenance-unearned-pass-rates", "confirmed_unearned_pass_rate", 24),
+        "benchmark-maintenance-fable5-unearned-pass-rate": ("benchmark-maintenance-unearned-pass-rates", "confirmed_unearned_pass_rate", 73),
+        "benchmark-maintenance-fable51-unearned-pass-rate": ("benchmark-maintenance-unearned-pass-rates", "confirmed_unearned_pass_rate", 11),
+        "benchmark-maintenance-gpt6astra-unearned-pass-rate": ("benchmark-maintenance-unearned-pass-rates", "confirmed_unearned_pass_rate", 0),
+    }
+    for observation_id, expected in required_integrity_observations.items():
+        row = next((item for item in observations if item["observation_id"] == observation_id), None)
+        if row is None:
+            errors.append(f"missing verifier/benchmark-integrity observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            row["comparator_id"] != comparator_id
+            or row["metric"]["metric_id"] != metric_id
+            or row["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    verifier_asymmetry = next(
+        (row for row in observations if row["observation_id"] == "verifierbench-validity-asymmetry"),
+        None,
+    )
+    if verifier_asymmetry is None or (
+        verifier_asymmetry["metric"]["value_status"] != "qualitative"
+        or verifier_asymmetry["metric"]["metric_id"] != "verifier_lifecycle_policy"
+        or "10.6 to 62.1" not in verifier_asymmetry["metric"]["raw_display"]
+    ):
+        errors.append("VerifierBench balanced-accuracy range must remain a qualitative range, not a single-model score")
+
+    if "verifierbench-executable-verifier-generation" in comparators:
+        caveats = " ".join(comparators["verifierbench-executable-verifier-generation"]["caveats"]).lower()
+        if "not a pr-review" not in caveats or "36 model" not in caveats or "19 models" not in caveats:
+            errors.append("VerifierBench must retain task-scope and 19-vs-36 configuration caveats")
+        if "accept all valid alternatives" not in caveats:
+            errors.append("VerifierBench must retain positive-validity acceptance caveat")
+    if "benchmark-maintenance-pass-audit" in comparators:
+        caveats = " ".join(comparators["benchmark-maintenance-pass-audit"]["caveats"]).lower()
+        if "not independent tasks" not in caveats or "fresh-agent evaluation" not in caveats:
+            errors.append("unearned-pass audit must retain cohort dependence and fresh-agent replay caveats")
+    if "benchmark-maintenance-unearned-pass-rates" in comparators:
+        caveats = " ".join(comparators["benchmark-maintenance-unearned-pass-rates"]["caveats"]).lower()
+        if "not normalized" not in caveats or "not stated in the abstract" not in caveats:
+            errors.append("unearned-pass rates must retain descriptive and denominator caveats")
+
     # Guard the current actual-causality / repair / partial-identifiability comparators.
     required_method_comparators = {
         "cbfl-softrex-defects4j": ("CEB-DEBUG", "cbfl-softrex-paper", 827),
@@ -765,6 +839,28 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "swe-ci-long-horizon-maintenance")
     comparator["sample_denominator"]["value"] = 71
     must_reject(mutant, "SWE-CI commit-history depth conflated with task count")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "verifierbench-v4v-check-count"
+    ]
+    must_reject(mutant, "VerifierBench V4V audit-size observation removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "verifierbench-project-model-harness-config-count")
+    row["metric"]["value"] = 19
+    must_reject(mutant, "VerifierBench project configuration count conflated with paper common-harness model count")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "benchmark-maintenance-fable5-unearned-pass-rate")
+    row["metric"]["value"] = 24
+    must_reject(mutant, "unearned-pass model cohort rates conflated")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "benchmark-maintenance-pass-audit")
+    comparator["sample_denominator"]["value"] = 29
+    must_reject(mutant, "unearned-pass trajectory count conflated with cohort count")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
