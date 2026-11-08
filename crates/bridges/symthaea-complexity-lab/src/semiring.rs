@@ -629,10 +629,20 @@ pub struct BoundedExactMapResult {
     pub evaluated_assignments: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BoundedMapBudget {
+    pub max_full_assignments: usize,
+    pub max_optimal_assignments: usize,
+    /// Sum of all stored variable values across the complete tie set.
+    pub max_tie_assignment_values: usize,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BoundedMapError {
     AssignmentSpaceOverflow,
     AssignmentLimitExceeded { required: usize, limit: usize },
+    TieOutputLimitExceeded { maximum_possible: usize, limit: usize },
+    TieStorageLimitExceeded { maximum_values: usize, limit: usize },
     ArithmeticOverflow,
 }
 
@@ -643,6 +653,14 @@ impl fmt::Display for BoundedMapError {
             Self::AssignmentLimitExceeded { required, limit } => write!(
                 f,
                 "exact MAP requires {required} assignments; configured limit is {limit}"
+            ),
+            Self::TieOutputLimitExceeded { maximum_possible, limit } => write!(
+                f,
+                "complete MAP tie set may contain {maximum_possible} assignments; configured output limit is {limit}"
+            ),
+            Self::TieStorageLimitExceeded { maximum_values, limit } => write!(
+                f,
+                "complete MAP tie set may store {maximum_values} assignment values; configured limit is {limit}"
             ),
             Self::ArithmeticOverflow => write!(f, "checked rational overflow during exact MAP scoring"),
         }
@@ -663,16 +681,30 @@ impl Error for BoundedMapError {}
 /// It also does not establish CPT normalization or empirical calibration.
 pub fn exhaustive_max_times_map_bounded(
     graph: &ExactFactorGraph<MaxTimesRational>,
-    max_full_assignments: usize,
+    budget: BoundedMapBudget,
 ) -> Result<BoundedExactMapResult, BoundedMapError> {
     let assignment_count = graph.cardinalities.iter().try_fold(1usize, |count, &cardinality| {
         count.checked_mul(cardinality)
     }).ok_or(BoundedMapError::AssignmentSpaceOverflow)?;
 
-    if assignment_count > max_full_assignments {
+    if assignment_count > budget.max_full_assignments {
         return Err(BoundedMapError::AssignmentLimitExceeded {
             required: assignment_count,
-            limit: max_full_assignments,
+            limit: budget.max_full_assignments,
+        });
+    }
+    if assignment_count > budget.max_optimal_assignments {
+        return Err(BoundedMapError::TieOutputLimitExceeded {
+            maximum_possible: assignment_count,
+            limit: budget.max_optimal_assignments,
+        });
+    }
+    let maximum_tie_values = assignment_count.checked_mul(graph.cardinalities.len())
+        .ok_or(BoundedMapError::AssignmentSpaceOverflow)?;
+    if maximum_tie_values > budget.max_tie_assignment_values {
+        return Err(BoundedMapError::TieStorageLimitExceeded {
+            maximum_values: maximum_tie_values,
+            limit: budget.max_tie_assignment_values,
         });
     }
 
@@ -968,7 +1000,7 @@ mod tests {
             ],
         ).unwrap();
 
-        let result = exhaustive_max_times_map_bounded(&graph, 4).unwrap();
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 4, max_optimal_assignments: 4, max_tie_assignment_values: 8 }).unwrap();
         assert_eq!(result.optimum_score, rational(2, 5));
         assert_eq!(result.support_status, ExactMapSupportStatus::PositiveSupport);
         assert_eq!(result.evaluated_assignments, 4);
@@ -989,7 +1021,7 @@ mod tests {
             vec![max_times(1, 1), max_times(1, 1)],
         ).unwrap();
 
-        let result = exhaustive_max_times_map_bounded(&graph, 2).unwrap();
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 2, max_optimal_assignments: 2, max_tie_assignment_values: 2 }).unwrap();
         assert_eq!(result.optimum_score, rational(1, 1));
         assert_eq!(
             result.optimal_assignments.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
@@ -1024,7 +1056,7 @@ mod tests {
             MaxTimesRational::one(),
         ).unwrap();
         assert_eq!(
-            exhaustive_max_times_map_bounded(&graph, 7),
+            exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 7, max_optimal_assignments: 8, max_tie_assignment_values: 24 }),
             Err(BoundedMapError::AssignmentLimitExceeded { required: 8, limit: 7 })
         );
     }
@@ -1064,8 +1096,50 @@ mod tests {
             MaxTimesRational::one(),
         ).unwrap();
         assert_eq!(
-            exhaustive_max_times_map_bounded(&graph, usize::MAX),
+            exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: usize::MAX, max_optimal_assignments: usize::MAX, max_tie_assignment_values: usize::MAX }),
             Err(BoundedMapError::AssignmentSpaceOverflow)
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_enforces_tie_output_and_storage_budgets() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![max_times(1, 1); 4],
+        ).unwrap();
+
+        assert_eq!(
+            exhaustive_max_times_map_bounded(
+                &graph,
+                BoundedMapBudget {
+                    max_full_assignments: 4,
+                    max_optimal_assignments: 3,
+                    max_tie_assignment_values: 8,
+                },
+            ),
+            Err(BoundedMapError::TieOutputLimitExceeded {
+                maximum_possible: 4,
+                limit: 3,
+            })
+        );
+        assert_eq!(
+            exhaustive_max_times_map_bounded(
+                &graph,
+                BoundedMapBudget {
+                    max_full_assignments: 4,
+                    max_optimal_assignments: 4,
+                    max_tie_assignment_values: 7,
+                },
+            ),
+            Err(BoundedMapError::TieStorageLimitExceeded {
+                maximum_values: 8,
+                limit: 7,
+            })
         );
     }
 
@@ -1094,8 +1168,8 @@ mod tests {
         right.add_factor(vec![0], vec![max_times(1, 2), max_times(1, 3)]).unwrap();
 
         assert_eq!(
-            exhaustive_max_times_map_bounded(&left, 4).unwrap(),
-            exhaustive_max_times_map_bounded(&right, 4).unwrap()
+            exhaustive_max_times_map_bounded(&left, BoundedMapBudget { max_full_assignments: 4, max_optimal_assignments: 4, max_tie_assignment_values: 8 }).unwrap(),
+            exhaustive_max_times_map_bounded(&right, BoundedMapBudget { max_full_assignments: 4, max_optimal_assignments: 4, max_tie_assignment_values: 8 }).unwrap()
         );
     }
 
