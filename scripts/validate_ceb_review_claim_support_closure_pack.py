@@ -75,7 +75,15 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
         "peak memory",
         "at least 20% lower revalidation cost",
         "existing seven CEB-CONTINUITY measures",
-        "false-retain/stale-evidence use",
+        "false-retain/stale-evidence use Sequence-complete rate Evidence-disposition macro-F1 Stale-evidence use rate False-invalidation rate Revalidation cost per accepted sequence Repair survival rate Evidence-lineage completeness diagnostic annotations",
+        "Sequence-complete rate",
+        "Evidence-disposition macro-F1",
+        "Stale-evidence use rate",
+        "False-invalidation rate",
+        "Revalidation cost per accepted sequence",
+        "Repair survival rate",
+        "Evidence-lineage completeness",
+        "diagnostic annotations",
         "shared upstream dependency",
         "historical truth",
         "current decision-use",
@@ -180,6 +188,7 @@ def self_test() -> list[str]:
         ("execution boundary removed", challenge, key, protocol.replace("no candidate code", "candidate code run")),
         ("counter-evidence requirement removed", challenge, key, protocol.replace("counter-evidence", "supporting evidence")),
         ("clean recomputation oracle removed", challenge, key, protocol.replace("clean full-recomputation", "incremental only")),
+        ("continuity metric mapping removed", challenge, key, protocol.replace("Evidence-disposition macro-F1", "new composite score")),
     )
     for label, mutated_challenge, mutated_key, mutated_protocol in mutations:
         if not validate(mutated_protocol, mutated_challenge, mutated_key):
