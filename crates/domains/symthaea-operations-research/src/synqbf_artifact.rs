@@ -61,6 +61,7 @@ pub enum SynQbfArtifactError {
     },
     DuplicatePrefixVariable { variable: usize },
     DependencyCountMismatch { expected: usize, actual: usize },
+    AigDependencyBudgetExceeded { required: usize, limit: usize },
     DependencyOrderMismatch {
         position: usize,
         expected: usize,
@@ -426,9 +427,9 @@ pub fn decode_synqbf_proof(
         .checked_mul(2)
         .ok_or(SynQbfArtifactError::ResourceAccountingOverflow)?;
     if expected_inputs > budget.proof.aig.max_dependency_variables {
-        return Err(SynQbfArtifactError::DependencyCountMismatch {
-            expected: expected_inputs,
-            actual: budget.proof.aig.max_dependency_variables,
+        return Err(SynQbfArtifactError::AigDependencyBudgetExceeded {
+            required: expected_inputs,
+            limit: budget.proof.aig.max_dependency_variables,
         });
     }
 
@@ -469,6 +470,19 @@ pub fn decode_synqbf_proof(
         return Err(SynQbfArtifactError::AigNodeBudgetExceeded {
             required: node_count,
             limit: budget.max_aig_nodes,
+        });
+    }
+    // An AND node is the shortest possible record: one tag plus two
+    // one-byte constant literals. Reserve one byte for the output literal.
+    // Reject impossible node counts before Vec::with_capacity can allocate.
+    let minimum_node_bytes = node_count
+        .checked_mul(5)
+        .and_then(|bytes| bytes.checked_add(1))
+        .ok_or(SynQbfArtifactError::ResourceAccountingOverflow)?;
+    if minimum_node_bytes > reader.remaining() {
+        return Err(SynQbfArtifactError::TruncatedArtifact {
+            offset: reader.offset,
+            required: minimum_node_bytes,
         });
     }
     let mut nodes = Vec::with_capacity(node_count);
@@ -709,6 +723,19 @@ mod tests {
         assert!(matches!(
             decode_synqbf_proof(&bad_node, budget()),
             Err(SynQbfArtifactError::UnknownAigNodeTag { .. })
+        ));
+    }
+
+    #[test]
+    fn decoder_rejects_impossible_node_count_before_reserving_nodes() {
+        let (_, _, proof) = proof_and_source(Quantifier::Exists);
+        let mut bytes = encode_synqbf_proof(&proof, budget()).unwrap();
+        // The encoded node count starts at byte 84 in this one-variable
+        // fixture. Claim more minimum-size records than the artifact holds.
+        bytes[84..92].copy_from_slice(&1000u64.to_le_bytes());
+        assert!(matches!(
+            decode_synqbf_proof(&bytes, budget()),
+            Err(SynQbfArtifactError::TruncatedArtifact { .. })
         ));
     }
 
