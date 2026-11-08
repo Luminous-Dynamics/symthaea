@@ -2058,6 +2058,391 @@ pub fn verify_policy_mask_cluster_lower_bound(
     }
 }
 
+
+fn fixed_policy_dp_multiply_adds(
+    family: &FiniteUmdpModelFamily,
+    model_count: usize,
+) -> Result<usize, PolicyPortfolioError> {
+    let horizon = family.horizon();
+    let states = family.state_count();
+    let transition_dot = horizon.saturating_sub(1)
+        .checked_mul(states)
+        .and_then(|v| v.checked_mul(states))
+        .and_then(|v| v.checked_mul(2))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let step_ops = horizon.saturating_sub(1).checked_mul(states)
+        .and_then(|v| v.checked_add(horizon.checked_mul(states)?))
+        .and_then(|v| v.checked_add(states.checked_mul(2)?))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    transition_dot.checked_add(step_ops)
+        .and_then(|v| v.checked_mul(model_count))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)
+}
+
+/// Exact single-cluster minimax-regret branch-and-bound over action masks.
+/// Budget exhaustion is an error: no incomplete incumbent is returned as
+/// an optimum. Equal-regret policies resolve to the lexicographically least
+/// time-major/state-major action vector.
+pub fn solve_exact_cluster_policy_bnb(
+    family: &FiniteUmdpModelFamily,
+    cluster_model_indices: &[usize],
+    discount: CheckedRational,
+    budget: ExactClusterPolicySearchBudget,
+) -> Result<VerifiedClusterPolicyOptimum, PolicyPortfolioError> {
+    if discount.is_negative() || compare_signed(discount, CheckedRational::one()) == Ordering::Greater {
+        return Err(PolicyPortfolioError::InvalidDiscount);
+    }
+    if cluster_model_indices.is_empty() {
+        return Err(PolicyPortfolioError::EmptyModelCluster);
+    }
+    if cluster_model_indices.len() > budget.per_node.max_model_count {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "action-mask cluster model count",
+            required: cluster_model_indices.len(),
+            limit: budget.per_node.max_model_count,
+        });
+    }
+    for (position, &model_index) in cluster_model_indices.iter().enumerate() {
+        if model_index >= family.model_count() {
+            return Err(PolicyPortfolioError::PolicyMaskModelIndexOutOfBounds {
+                model_index,
+                model_count: family.model_count(),
+            });
+        }
+        if position > 0 {
+            let previous = cluster_model_indices[position - 1];
+            if model_index == previous {
+                return Err(PolicyPortfolioError::DuplicatePolicyMaskModelIndex { model_index });
+            }
+            if model_index < previous {
+                return Err(PolicyPortfolioError::PolicyMaskModelIndicesNotIncreasing { previous, current: model_index });
+            }
+        }
+    }
+
+    let _policy_count = checked_policy_count(family.state_count(), family.horizon(), family.action_count())?;
+    if budget.max_search_nodes == 0 {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "cluster B&B search nodes", required: 1, limit: 0,
+        });
+    }
+    if budget.max_frontier_masks == 0 {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "cluster B&B frontier masks", required: 1, limit: 0,
+        });
+    }
+
+    let horizon = family.horizon();
+    let states = family.state_count();
+    let actions = family.action_count();
+    let mask_bytes = policy_action_mask_structural_bytes(horizon, states, actions)?;
+    let policy_entries = horizon.checked_mul(states).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let result_bytes = policy_entries.checked_mul(std::mem::size_of::<usize>())
+        .and_then(|v| v.checked_add(cluster_model_indices.len().checked_mul(3 * std::mem::size_of::<CheckedRational>())?))
+        .and_then(|v| v.checked_add(cluster_model_indices.len().checked_mul(2 * std::mem::size_of::<usize>())?))
+        .and_then(|v| v.checked_add(6 * std::mem::size_of::<Vec<usize>>()))
+        .and_then(|v| v.checked_add(3 * std::mem::size_of::<Vec<CheckedRational>>()))
+        .and_then(|v| v.checked_add(std::mem::size_of::<VerifiedClusterPolicyOptimum>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let root_frontier_bytes = mask_bytes.checked_add(std::mem::size_of::<Vec<FiniteUmdpPolicyActionMask>>())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if root_frontier_bytes > budget.max_frontier_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "cluster B&B frontier memory bytes",
+            required: root_frontier_bytes,
+            limit: budget.max_frontier_memory_bytes,
+        });
+    }
+    let root_peak = root_frontier_bytes
+        .checked_add(budget.per_node.max_output_memory_bytes)
+        .and_then(|v| v.checked_add(result_bytes))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if root_peak > budget.max_total_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "cluster B&B root peak memory bytes",
+            required: root_peak,
+            limit: budget.max_total_memory_bytes,
+        });
+    }
+
+    let full_mask = full_policy_action_mask(family, budget.per_node)?;
+    let root_bound = compute_policy_mask_cluster_lower_bound(
+        family, cluster_model_indices, discount, &full_mask, budget.per_node,
+    )?;
+    let mut dp_multiply_adds = root_bound.dp_multiply_adds;
+    let incumbent_ops = fixed_policy_dp_multiply_adds(family, cluster_model_indices.len())?;
+    dp_multiply_adds = dp_multiply_adds.checked_add(incumbent_ops)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if dp_multiply_adds > budget.max_total_dp_multiply_adds {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "cluster B&B total DP multiply-add work",
+            required: dp_multiply_adds,
+            limit: budget.max_total_dp_multiply_adds,
+        });
+    }
+
+    let mut model_optimal_values = Vec::new();
+    model_optimal_values.try_reserve_exact(cluster_model_indices.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed { resource: "cluster B&B model-optimal values", entries: cluster_model_indices.len() }
+    })?;
+    model_optimal_values.extend(root_bound.per_model.iter().map(|w| w.unrestricted_optimal_value));
+
+    // Policy index zero (all first actions) is a valid incumbent and is also
+    // the lexicographically least policy, so equal-regret later leaves cannot
+    // improve the deterministic tie-break.
+    let mut policy_actions = Vec::new();
+    policy_actions.try_reserve_exact(policy_entries).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed { resource: "cluster B&B incumbent policy actions", entries: policy_entries }
+    })?;
+    policy_actions.resize(policy_entries, 0usize);
+    let (mut policy_values, mut model_regrets, mut worst_case_model_indices, mut minimax_regret) =
+        evaluate_cluster_policy(
+            family, cluster_model_indices, discount, &policy_actions,
+            &model_optimal_values, budget.per_node.max_rational_bit_width,
+        )?;
+    let mut policy_index = 0usize;
+
+    let mut frontier = Vec::new();
+    frontier.try_reserve_exact(1).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed { resource: "cluster B&B frontier", entries: 1 }
+    })?;
+    frontier.push(full_mask);
+    let mut pending_root_bound = Some(root_bound);
+    let mut search_nodes = 0usize;
+    let mut pruned_nodes = 0usize;
+
+    while let Some(mask) = frontier.pop() {
+        search_nodes = search_nodes.checked_add(1).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if search_nodes > budget.max_search_nodes {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B search nodes",
+                required: search_nodes,
+                limit: budget.max_search_nodes,
+            });
+        }
+
+        let active_masks = frontier.len().checked_add(1).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        let active_frontier_bytes = active_masks.checked_mul(mask_bytes)
+            .and_then(|v| v.checked_add(std::mem::size_of::<Vec<FiniteUmdpPolicyActionMask>>()))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if active_frontier_bytes > budget.max_frontier_memory_bytes {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B frontier memory bytes",
+                required: active_frontier_bytes,
+                limit: budget.max_frontier_memory_bytes,
+            });
+        }
+        let active_peak = active_frontier_bytes
+            .checked_add(budget.per_node.max_output_memory_bytes)
+            .and_then(|v| v.checked_add(result_bytes))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if active_peak > budget.max_total_memory_bytes {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B active peak memory bytes",
+                required: active_peak,
+                limit: budget.max_total_memory_bytes,
+            });
+        }
+
+        let node_bound = match pending_root_bound.take() {
+            Some(bound) => bound,
+            None => {
+                let node_work = policy_mask_dp_multiply_adds(family, cluster_model_indices.len())?;
+                let required_work = dp_multiply_adds.checked_add(node_work)
+                    .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+                if required_work > budget.max_total_dp_multiply_adds {
+                    return Err(PolicyPortfolioError::BudgetExceeded {
+                        resource: "cluster B&B total DP multiply-add work",
+                        required: required_work,
+                        limit: budget.max_total_dp_multiply_adds,
+                    });
+                }
+                let bound = compute_policy_mask_cluster_lower_bound(
+                    family, cluster_model_indices, discount, &mask, budget.per_node,
+                )?;
+                dp_multiply_adds = required_work;
+                bound
+            }
+        };
+
+        if compare_signed(node_bound.lower_bound, minimax_regret) != Ordering::Less {
+            pruned_nodes = pruned_nodes.checked_add(1).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+            continue;
+        }
+
+        if policy_mask_is_leaf(&mask) {
+            let leaf_policy = decode_leaf_policy_mask(&mask)?;
+            let leaf_index = policy_index_from_actions(&leaf_policy, actions)?;
+            let mut leaf_values = Vec::new();
+            leaf_values.try_reserve_exact(node_bound.per_model.len()).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed { resource: "cluster B&B leaf policy values", entries: node_bound.per_model.len() }
+            })?;
+            let mut leaf_regrets = Vec::new();
+            leaf_regrets.try_reserve_exact(node_bound.per_model.len()).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed { resource: "cluster B&B leaf policy regrets", entries: node_bound.per_model.len() }
+            })?;
+            let mut leaf_worst_models = Vec::new();
+            leaf_worst_models.try_reserve_exact(node_bound.per_model.len()).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed { resource: "cluster B&B leaf worst-model indices", entries: node_bound.per_model.len() }
+            })?;
+            for witness in &node_bound.per_model {
+                leaf_values.push(witness.masked_optimal_value);
+                leaf_regrets.push(witness.regret_gap_lower_bound);
+                if witness.regret_gap_lower_bound == node_bound.lower_bound {
+                    leaf_worst_models.push(witness.model_index);
+                }
+            }
+            if compare_signed(node_bound.lower_bound, minimax_regret) == Ordering::Less
+                || (node_bound.lower_bound == minimax_regret && leaf_index < policy_index)
+            {
+                minimax_regret = node_bound.lower_bound;
+                policy_index = leaf_index;
+                policy_actions = leaf_policy;
+                policy_values = leaf_values;
+                model_regrets = leaf_regrets;
+                worst_case_model_indices = leaf_worst_models;
+            }
+            continue;
+        }
+
+        let mut branch_slot = None;
+        for time in 0..mask.horizon() {
+            for state in 0..mask.state_count() {
+                if mask.allowed[time][state].iter().filter(|allowed| **allowed).count() > 1 {
+                    branch_slot = Some((time, state));
+                    break;
+                }
+            }
+            if branch_slot.is_some() { break; }
+        }
+        let (time, state) = branch_slot.ok_or(PolicyPortfolioError::PolicyMaskCertificateMismatch)?;
+        let action = mask.allowed[time][state].iter().position(|allowed| *allowed)
+            .ok_or(PolicyPortfolioError::PolicyMaskEmptyActionSet { time, state })?;
+
+        let next_count = frontier.len().checked_add(2).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if next_count > budget.max_frontier_masks {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B frontier masks",
+                required: next_count,
+                limit: budget.max_frontier_masks,
+            });
+        }
+        let split_mask_count = frontier.len().checked_add(3).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        let split_frontier_bytes = split_mask_count.checked_mul(mask_bytes)
+            .and_then(|v| v.checked_add(std::mem::size_of::<Vec<FiniteUmdpPolicyActionMask>>()))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if split_frontier_bytes > budget.max_frontier_memory_bytes {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B split frontier memory bytes",
+                required: split_frontier_bytes,
+                limit: budget.max_frontier_memory_bytes,
+            });
+        }
+        let split_peak = split_frontier_bytes
+            .checked_add(budget.per_node.max_output_memory_bytes)
+            .and_then(|v| v.checked_add(result_bytes))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if split_peak > budget.max_total_memory_bytes {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B split peak memory bytes",
+                required: split_peak,
+                limit: budget.max_total_memory_bytes,
+            });
+        }
+
+        let (forced, forbidden) = mask.split_on_action(
+            family, time, state, action, budget.per_node,
+        )?;
+        frontier.try_reserve(2).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed { resource: "cluster B&B child frontier", entries: 2 }
+        })?;
+        // LIFO: visit the force-action (lower-index) child first.
+        frontier.push(forbidden);
+        frontier.push(forced);
+    }
+
+    let model_family_sha256 = family.sha256();
+    let certificate_sha256 = canonical_cluster_policy_optimum_sha256(
+        model_family_sha256, discount, cluster_model_indices, &policy_actions, policy_index,
+        &model_optimal_values, &policy_values, &model_regrets, &worst_case_model_indices,
+        minimax_regret, search_nodes, pruned_nodes, dp_multiply_adds,
+    );
+    let mut stored_cluster_indices = Vec::new();
+    stored_cluster_indices.try_reserve_exact(cluster_model_indices.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed { resource: "stored cluster B&B model indices", entries: cluster_model_indices.len() }
+    })?;
+    stored_cluster_indices.extend_from_slice(cluster_model_indices);
+
+    Ok(VerifiedClusterPolicyOptimum {
+        model_family_sha256,
+        discount,
+        cluster_model_indices: stored_cluster_indices,
+        policy_actions,
+        policy_index,
+        model_optimal_values,
+        model_policy_values: policy_values,
+        model_regrets,
+        worst_case_model_indices,
+        minimax_regret,
+        search_nodes,
+        pruned_nodes,
+        dp_multiply_adds,
+        certificate_sha256,
+    })
+}
+
+fn canonical_cluster_policy_optimum_sha256(
+    family_sha256: [u8; 32],
+    discount: CheckedRational,
+    cluster_model_indices: &[usize],
+    policy_actions: &[usize],
+    policy_index: usize,
+    model_optimal_values: &[CheckedRational],
+    model_policy_values: &[CheckedRational],
+    model_regrets: &[CheckedRational],
+    worst_case_model_indices: &[usize],
+    minimax_regret: CheckedRational,
+    search_nodes: usize,
+    pruned_nodes: usize,
+    dp_multiply_adds: usize,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-FINITE-UMDP-CLUSTER-POLICY-BNB\0\x01");
+    hasher.update(family_sha256);
+    hash_rational(&mut hasher, discount);
+    for indices in [cluster_model_indices, policy_actions, worst_case_model_indices] {
+        hasher.update((indices.len() as u64).to_le_bytes());
+        for index in indices { hasher.update((*index as u64).to_le_bytes()); }
+    }
+    hasher.update((policy_index as u64).to_le_bytes());
+    for values in [model_optimal_values, model_policy_values, model_regrets] {
+        hasher.update((values.len() as u64).to_le_bytes());
+        for value in values { hash_rational(&mut hasher, *value); }
+    }
+    hash_rational(&mut hasher, minimax_regret);
+    for value in [search_nodes, pruned_nodes, dp_multiply_adds] {
+        hasher.update((value as u64).to_le_bytes());
+    }
+    hasher.finalize().into()
+}
+
+/// Replay the exact cluster solver and compare the complete policy, witnesses,
+/// search counters and source-bound certificate.
+pub fn verify_exact_cluster_policy_bnb(
+    family: &FiniteUmdpModelFamily,
+    budget: ExactClusterPolicySearchBudget,
+    claimed: &VerifiedClusterPolicyOptimum,
+) -> Result<(), PolicyPortfolioError> {
+    let replay = solve_exact_cluster_policy_bnb(
+        family, &claimed.cluster_model_indices, claimed.discount, budget,
+    )?;
+    if replay == *claimed {
+        Ok(())
+    } else {
+        Err(PolicyPortfolioError::PolicyMaskCertificateMismatch)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
