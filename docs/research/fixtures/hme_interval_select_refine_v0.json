@@ -6,7 +6,8 @@
     "name": "cosine_similarity",
     "polarity": "larger_is_better",
     "top_k": 2,
-    "tie_policy": "score_desc_item_id_asc"
+    "tie_policy": "score_desc_item_id_asc",
+    "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1"
   },
   "records": [
     {
@@ -132,5 +133,16 @@
     "No quantizer or residual certificate is implemented.",
     "No f32 outward interval proof is included.",
     "No performance or recall result is represented."
-  ]
+  ],
+  "corpus_coverage": {
+    "eligible_record_count": 7,
+    "records_with_intervals": 7,
+    "unbounded_unopened_partitions": 0,
+    "note": "Synthetic fixture assumes every eligible record has an interval; production must bind each interval to the pinned manifest and eligibility generation."
+  },
+  "interval_provenance": {
+    "kind": "synthetic_assumed_conservative_interval",
+    "residual_certificate_validation": "not_provided_by_fixture",
+    "canonical_f32_outward_rounding": "not_provided_by_fixture"
+  }
 }
