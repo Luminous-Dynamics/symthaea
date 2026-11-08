@@ -65,6 +65,9 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
     required_protocol = (
         "support closure",
         "Closure completeness is itself a claim",
+        "counter-evidence",
+        "non-circular support",
+        "support cycle",
         "impact witness",
         "unaffectedness witness",
         "shared upstream dependency",
@@ -128,7 +131,7 @@ def self_test() -> list[str]:
         "historical truth",
         "current decision-use",
         "#10630 #10173 #9112 #10610 #10619 #10314 #10064 #10369",
-        "no second repository graph not a new metric lane not a sealed holdout",
+        "no second repository graph not a new metric lane not a sealed holdout counter-evidence non-circular support support cycle",
         *DISPOSITIONS,
         *EDGE_KINDS,
         "no candidate code",
@@ -169,6 +172,7 @@ def self_test() -> list[str]:
         ("unaffectedness witness removed", challenge, key, protocol.replace("unaffectedness witness", "no unaffectedness proof")),
         ("disposition removed", challenge, key, protocol.replace("supersede", "missing")),
         ("execution boundary removed", challenge, key, protocol.replace("no candidate code", "candidate code run")),
+        ("counter-evidence requirement removed", challenge, key, protocol.replace("counter-evidence", "supporting evidence")),
     )
     for label, mutated_challenge, mutated_key, mutated_protocol in mutations:
         if not validate(mutated_protocol, mutated_challenge, mutated_key):
