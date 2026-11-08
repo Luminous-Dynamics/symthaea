@@ -81,6 +81,14 @@ A support path must terminate in evidence/authority whose identity and provenanc
 Version each support closure against the exact claim text/scope, source tree, evidence digests, contract/policy versions and relevant method/authority identities. A later edit to the dependency graph does not rewrite the historical closure; it creates a new event-bound assessment.
 
 
+
+### 2.4 Reuse existing artifact-provenance attestations
+
+For build-dependent claims, bind closure leaves to the exact artifact subject, source/material identity, builder identity, build definition/type, external parameters, resolved dependencies and environment using existing SLSA/in-toto attestations and the canonical CEB receipt where available. Do not copy an attestation into a parallel local receipt or infer fields the attestation does not guarantee.
+
+An authenticated provenance statement establishes artifact lineage under its builder and trust assumptions. It does **not** by itself prove that a review claim is semantically true, that every relevant dependency was declared, or that an approval remains currently authorized after a trust-root or policy revocation. Keep artifact identity, provenance authenticity, evidence completeness and current authorization as separate support dependencies. SLSA v1.2 and in-toto Attestation Framework v1.2 are external standards referenced by the triangulation; #10314/#10370 remain the canonical CEB receipt/evidence-convergence owners.
+
+
 ## 3. Event-to-claim impact analysis
 
 Given a change event E and claim C, evaluate impact against Cl(C), not only against file-path overlap.
