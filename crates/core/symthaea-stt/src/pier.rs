@@ -78,6 +78,134 @@ impl PierResult {
     }
 }
 
+/// Corpus-level PIER aggregation.
+///
+/// Both micro PIER (pooled edit counts) and macro PIER (arithmetic mean of
+/// estimable utterance-level PIER values) are reported. No-POI utterances are
+/// counted as non-estimable and excluded from both means; malformed inputs
+/// still return a typed error. This prevents silent denominator changes.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct PierCorpusResult {
+    /// Number of utterance triples supplied.
+    pub utterances: usize,
+    /// Utterances with at least one POI reference token.
+    pub estimable_utterances: usize,
+    /// Utterances whose reference contains no POI tokens.
+    pub non_estimable_utterances: usize,
+    /// Pooled reference/hypothesis and edit counts.
+    pub totals: PierResult,
+    /// Pooled PIER percentage; absent when no utterance is estimable.
+    pub micro_pier_percent: Option<f64>,
+    /// Unweighted mean of per-utterance PIER percentages.
+    pub macro_pier_percent: Option<f64>,
+}
+
+/// Invalid corpus-level PIER input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PierCorpusError {
+    /// The three corpus arrays must contain the same number of utterances.
+    UtteranceCountMismatch {
+        /// Number of references.
+        references: usize,
+        /// Number of hypotheses.
+        hypotheses: usize,
+        /// Number of POI-tag vectors.
+        tag_vectors: usize,
+    },
+    /// A malformed utterance was found at the indicated index.
+    InvalidUtterance {
+        /// Zero-based utterance index.
+        utterance_index: usize,
+        /// Underlying invalid utterance reason.
+        source: PierError,
+    },
+}
+
+impl fmt::Display for PierCorpusError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UtteranceCountMismatch {
+                references,
+                hypotheses,
+                tag_vectors,
+            } => write!(
+                f,
+                "corpus arrays differ in length: {references} references, {hypotheses} hypotheses, {tag_vectors} tag vectors"
+            ),
+            Self::InvalidUtterance {
+                utterance_index,
+                source,
+            } => write!(f, "invalid PIER input at utterance {utterance_index}: {source}"),
+        }
+    }
+}
+
+impl std::error::Error for PierCorpusError {}
+
+/// Aggregate PIER across a corpus without hiding the averaging convention.
+///
+/// No-POI utterances are counted and excluded from PIER denominators. Empty
+/// references and tag cardinality errors are not silently skipped; they return
+/// a typed corpus error. An empty corpus returns a valid result with both
+/// aggregate rates absent and zero counts.
+pub fn aggregate_point_of_interest_error_rates<T: PartialEq + Clone>(
+    references: &[Vec<T>],
+    hypotheses: &[Vec<T>],
+    poi_tags: &[Vec<bool>],
+) -> Result<PierCorpusResult, PierCorpusError> {
+    if references.len() != hypotheses.len() || references.len() != poi_tags.len() {
+        return Err(PierCorpusError::UtteranceCountMismatch {
+            references: references.len(),
+            hypotheses: hypotheses.len(),
+            tag_vectors: poi_tags.len(),
+        });
+    }
+
+    let mut result = PierCorpusResult {
+        utterances: references.len(),
+        ..PierCorpusResult::default()
+    };
+    let mut macro_total = 0.0f64;
+
+    for (index, ((reference, hypothesis), tags)) in references
+        .iter()
+        .zip(hypotheses.iter())
+        .zip(poi_tags.iter())
+        .enumerate()
+    {
+        match point_of_interest_error_rate(reference, hypothesis, tags) {
+            Ok(utterance) => {
+                result.estimable_utterances += 1;
+                macro_total += utterance.pier_percent();
+                result.totals.reference_tokens += utterance.reference_tokens;
+                result.totals.hypothesis_tokens += utterance.hypothesis_tokens;
+                result.totals.poi_reference_tokens += utterance.poi_reference_tokens;
+                result.totals.hits += utterance.hits;
+                result.totals.substitutions += utterance.substitutions;
+                result.totals.deletions += utterance.deletions;
+                result.totals.insertions += utterance.insertions;
+            }
+            Err(PierError::NoPointsOfInterest) => {
+                result.non_estimable_utterances += 1;
+            }
+            Err(source) => {
+                return Err(PierCorpusError::InvalidUtterance {
+                    utterance_index: index,
+                    source,
+                });
+            }
+        }
+    }
+
+    if result.estimable_utterances > 0 {
+        result.micro_pier_percent = Some(result.totals.pier_percent());
+        result.macro_pier_percent =
+            Some(macro_total / result.estimable_utterances as f64);
+    }
+
+    Ok(result)
+}
+
 /// Invalid PIER input.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PierError {
@@ -371,6 +499,101 @@ mod tests {
             Err(PierError::TagLengthMismatch {
                 reference_tokens: 2,
                 tag_count: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn corpus_pier_reports_micro_and_macro_separately() {
+        let result = super::aggregate_point_of_interest_error_rates(
+            &[
+                vec!["a", "poi1"],
+                vec!["b", "poi2", "poi3"],
+            ],
+            &[
+                vec!["a", "wrong"],
+                vec!["b", "poi2", "poi3"],
+            ],
+            &[
+                vec![false, true],
+                vec![false, true, true],
+            ],
+        ).expect("valid corpus");
+        assert_eq!(result.utterances, 2);
+        assert_eq!(result.estimable_utterances, 2);
+        assert_eq!(result.non_estimable_utterances, 0);
+        assert_eq!(result.totals.hits, 2);
+        assert_eq!(result.totals.substitutions, 1);
+        assert_eq!(result.micro_pier_percent, Some(100.0 / 3.0));
+        assert_eq!(result.macro_pier_percent, Some(50.0));
+    }
+
+    #[test]
+    fn corpus_pier_counts_non_estimable_utterances_without_scoring_them_as_zero() {
+        let result = super::aggregate_point_of_interest_error_rates(
+            &[
+                vec!["a", "poi"],
+                vec!["b", "c"],
+            ],
+            &[
+                vec!["a", "poi"],
+                vec!["b", "c"],
+            ],
+            &[
+                vec![false, true],
+                vec![false, false],
+            ],
+        ).expect("valid corpus");
+        assert_eq!(result.estimable_utterances, 1);
+        assert_eq!(result.non_estimable_utterances, 1);
+        assert_eq!(result.micro_pier_percent, Some(0.0));
+        assert_eq!(result.macro_pier_percent, Some(0.0));
+    }
+
+    #[test]
+    fn empty_corpus_has_absent_aggregate_rates() {
+        let result = super::aggregate_point_of_interest_error_rates::<&str>(
+            &[],
+            &[],
+            &[],
+        ).expect("empty corpus is structurally valid");
+        assert_eq!(result.utterances, 0);
+        assert_eq!(result.micro_pier_percent, None);
+        assert_eq!(result.macro_pier_percent, None);
+    }
+
+    #[test]
+    fn corpus_rejects_mismatched_utterance_counts() {
+        let error = super::aggregate_point_of_interest_error_rates(
+            &[vec!["a"]],
+            &[],
+            &[vec![true]],
+        );
+        assert_eq!(
+            error,
+            Err(super::PierCorpusError::UtteranceCountMismatch {
+                references: 1,
+                hypotheses: 0,
+                tag_vectors: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn corpus_rejects_malformed_utterance_with_index() {
+        let error = super::aggregate_point_of_interest_error_rates(
+            &[vec!["a"], vec!["b", "c"]],
+            &[vec!["a"], vec!["b", "c"]],
+            &[vec![true], vec![true]],
+        );
+        assert_eq!(
+            error,
+            Err(super::PierCorpusError::InvalidUtterance {
+                utterance_index: 1,
+                source: PierError::TagLengthMismatch {
+                    reference_tokens: 2,
+                    tag_count: 1,
+                },
             })
         );
     }
