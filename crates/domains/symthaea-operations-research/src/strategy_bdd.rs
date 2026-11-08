@@ -1093,9 +1093,7 @@ pub fn strategy_interaction_graph(
 }
 
 /// Validate a symmetric, non-negative, zero-diagonal weighted interaction matrix.
-fn validate_weighted_interaction_matrix(
-    weights: &[Vec<u128>],
-) -> Result<(), StrategyBddError> {
+fn validate_weighted_interaction_matrix(weights: &[Vec<u128>]) -> Result<(), StrategyBddError> {
     let variable_count = weights.len();
     for (vertex, row) in weights.iter().enumerate() {
         if row.len() != variable_count {
@@ -1151,18 +1149,19 @@ pub fn strategy_arithmetic_weighted_interaction_graph(
                     .checked_add(1)
                     .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
                 if contexts_checked > budget.max_weighted_interaction_checks {
-                    return Err(StrategyBddError::WeightedInteractionGraphCheckBudgetExceeded {
-                        required: contexts_checked,
-                        limit: budget.max_weighted_interaction_checks,
-                    });
+                    return Err(
+                        StrategyBddError::WeightedInteractionGraphCheckBudgetExceeded {
+                            required: contexts_checked,
+                            limit: budget.max_weighted_interaction_checks,
+                        },
+                    );
                 }
 
                 let base = expand_context_mask(context as usize, first, second);
                 let f00 = i16::from(values[base]);
                 let f01 = i16::from(values[base | (1usize << second)]);
                 let f10 = i16::from(values[base | (1usize << first)]);
-                let f11 =
-                    i16::from(values[base | (1usize << first) | (1usize << second)]);
+                let f11 = i16::from(values[base | (1usize << first) | (1usize << second)]);
                 let magnitude = (f00 - f01 - f10 + f11).abs() as u128;
                 pair_weight = pair_weight
                     .checked_add(magnitude)
@@ -1511,11 +1510,8 @@ pub fn multi_start_sift_strategy_function_robdd(
         refine_interaction_order_by_frontier(&weighted_graph, &weighted_min_fill, budget)?;
     let weighted_min_fill_profile =
         interaction_graph_frontier_profile(&weighted_graph, &weighted_min_fill)?;
-    let weighted_min_fill_max_frontier = weighted_min_fill_profile
-        .iter()
-        .copied()
-        .max()
-        .unwrap_or(0);
+    let weighted_min_fill_max_frontier =
+        weighted_min_fill_profile.iter().copied().max().unwrap_or(0);
     let weighted_refined_max_frontier = weighted_frontier_report
         .refined_frontier_profile
         .iter()
@@ -2659,8 +2655,7 @@ mod tests {
                         expected += (f00 - f01 - f10 + f11).abs() as u128;
                     }
                     assert_eq!(
-                        report.weights[first][second],
-                        expected,
+                        report.weights[first][second], expected,
                         "function mask {function_mask}, pair ({first}, {second})"
                     );
                 }
@@ -2673,10 +2668,8 @@ mod tests {
         let source = function(
             &[0, 1, 2, 3],
             &[
-                true, true, false, true,
-                true, true, true, true,
-                true, false, false, true,
-                false, false, true, false,
+                true, true, false, true, true, true, true, true, true, false, false, true, false,
+                false, true, false,
             ],
         );
         let weighted = strategy_arithmetic_weighted_interaction_graph(&source, budget()).unwrap();
@@ -2704,17 +2697,22 @@ mod tests {
 
     #[test]
     fn weighted_interaction_budget_is_fail_closed() {
-        let source = function(&[0, 1, 2], &[false, true, true, false, true, false, false, true]);
+        let source = function(
+            &[0, 1, 2],
+            &[false, true, true, false, true, false, false, true],
+        );
         let tight = StrategyBddBudget {
             max_weighted_interaction_checks: 0,
             ..budget()
         };
         assert!(matches!(
             strategy_arithmetic_weighted_interaction_graph(&source, tight),
-            Err(StrategyBddError::WeightedInteractionGraphCheckBudgetExceeded {
-                required: 1,
-                limit: 0
-            })
+            Err(
+                StrategyBddError::WeightedInteractionGraphCheckBudgetExceeded {
+                    required: 1,
+                    limit: 0
+                }
+            )
         ));
     }
 
