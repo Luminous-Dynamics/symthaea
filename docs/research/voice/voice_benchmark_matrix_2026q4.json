@@ -888,7 +888,7 @@
         11057,
         5352
       ],
-      "implementation_pr": null,
+      "implementation_pr": 11157,
       "candidate_sources": [
         {
           "id": "aha_counterfactual_hard_negatives",
@@ -958,7 +958,8 @@
         "CONDITION_MANIFEST_SCHEMA",
         "CLAIM_ONTOLOGY_REVISION",
         "SOURCE_LINEAGE_REVISION"
-      ]
+      ],
+      "implementation_branch": "feat/voice-counterfactual-pair-scorer-v0.1"
     }
   ],
   "promotion_gates": [
@@ -1055,7 +1056,7 @@
       "schema_path": "docs/research/voice/acoustic_counterfactual_pair_golden_v0.1.schema.json",
       "cases": 8,
       "linked_issue": 11156,
-      "linked_pr": null,
+      "linked_pr": 11157,
       "metrics": [
         "text_nuisance_response_invariance",
         "text_nuisance_joint_correct",
