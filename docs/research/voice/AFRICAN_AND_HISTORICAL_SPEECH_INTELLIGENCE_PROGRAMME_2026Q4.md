@@ -414,9 +414,9 @@ The repository now contains:
 - [`voice_metric_vectors_v1.json`](./voice_metric_vectors_v1.json): ten synthetic-only, hand-specified WER/PIER/SETER/SPER vectors.
 - [`voice_metric_vectors_v1.schema.json`](./voice_metric_vectors_v1.schema.json): JSON Schema Draft 2020-12 contract.
 
-The vectors cover perfect recognition, embedded-span deletion and substitution, insertion attribution at and outside POI boundaries, trailing insertion after a final POI, all-POI references, no-POI references, overlapping switch windows and no-switch utterances.
+The vectors cover perfect recognition, embedded-span deletion and substitution, insertion attribution at and outside POI boundaries, trailing insertion after a final POI, all-POI references, no-POI references, overlapping switch windows, no-switch utterances, and corpus-level micro/macro divergence with no-switch/non-estimable utterances.
 
-A custom independent formula audit recomputed the expected WER, PIER, switch-entry positions, SETER, SPER radii and per-language masked rates from the declared alignment operations. All ten vectors matched their declared counts and rates. This is a check of the authored fixture mathematics; it is **not** Rust execution, schema meta-validation, RapidFuzz differential testing or real-corpus evidence.
+A custom independent formula audit recomputed the expected WER, PIER, switch-entry positions, SETER, SPER radii, per-language masked rates, and three corpus aggregation vectors (micro, macro, non-estimable counts). All 13 vectors matched their declared counts and rates. This is a check of the authored fixture mathematics; it is **not** Rust execution, schema meta-validation, RapidFuzz differential testing or real-corpus evidence.
 
 See [#11082 — VOICE-METRIC-VECTORS-001](https://github.com/Luminous-Dynamics/symthaea/issues/11082).
 
@@ -443,7 +443,7 @@ The stacked switch-metrics PR adds corpus aggregation with:
 
 This avoids the common but serious reporting ambiguity where one result is utterance-averaged, another token-pooled, and no-switch utterances are implicitly scored as perfect.
 
-The contract is [#11103 — VOICE-SWITCH-AGG-001](https://github.com/Luminous-Dynamics/symthaea/issues/11103). Corpus implementation is in stacked [draft PR #11081](https://github.com/Luminous-Dynamics/symthaea/pull/11081), based on [PIER PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058). The source contains 22 authored switch-metric unit tests, including six corpus aggregation cases; these have not been executed.
+The contract is [#11103 — VOICE-SWITCH-AGG-001](https://github.com/Luminous-Dynamics/symthaea/issues/11103). Corpus implementation is in stacked [draft PR #11081](https://github.com/Luminous-Dynamics/symthaea/pull/11081), based on [PIER PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058). The source contains 34 authored switch-metric unit tests: 16 for SETER/SPER/per-language, 12 for exact boundary F1, and six for corpus aggregation; none have been executed.
 
 ### 16.4 Semantic anchors require an acoustic veto
 
