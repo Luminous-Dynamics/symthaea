@@ -90,6 +90,19 @@ jobs:
       - name: Compile package examples on locked dependency graph
         run: cargo check --locked -p ${{ matrix.package }} --examples
 
+      - name: Run budgeted multifidelity experiment-design benchmark
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example budgeted_experiment_design | tee budgeted-experiment-design.csv
+          {
+            echo "## Budgeted multifidelity experimental design"
+            echo "- Greedy expected-EIG/cost selection compared with exhaustive subset oracle"
+            echo "- Data-only rank and prior-regularized information gain reported separately"
+            echo "- Synthetic whitened Jacobians only; no field/deployment claim"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run nominal and robust target-region sensor placement
         if: matrix.package == 'symthaea-uap-observatory'
         shell: bash
