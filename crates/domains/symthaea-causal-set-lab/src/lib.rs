@@ -14,6 +14,7 @@
 
 pub mod causal_set_nd;
 pub mod curved_frw_1p1;
+pub mod link_matrix;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -21,6 +22,10 @@ use std::f64::consts::PI;
 use std::fmt;
 
 pub use curved_frw_1p1::{ConformalFrw1p1, CurvedFrwError};
+pub use link_matrix::{
+    LinkMatrix, LinkMatrixError, MAX_LINK_MATRIX_BYTES, MAX_LINK_MATRIX_EVENTS,
+    MAX_LINK_ORACLE_EVENTS,
+};
 
 /// Count the number of order intervals containing k interior events.
 ///
