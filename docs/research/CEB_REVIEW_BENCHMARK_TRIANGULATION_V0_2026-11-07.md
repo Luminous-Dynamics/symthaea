@@ -216,6 +216,26 @@ The SCOPE work summarized by the HyperMatrix Research Lab uses bidirectional pre
 **CEB extension:** calibrate acceptance/abstention separately by claim type and severity on a repository-/defect-family-disjoint calibration set. Measure selective risk versus coverage and report group-wise gaps. A judge's confidence, consensus or stable rationale is not itself a finite-sample guarantee. See [Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md) for disjoint development/calibration/confirmatory roles, a one-sided Clopper–Pearson risk bound, sample-size illustrations and escalation rules. It makes no current CEB risk guarantee.
 
 
+
+### 2.22 Incremental build graphs — Bazel Skyframe
+
+Bazel's **Skyframe** documents a dependency graph in which outputs are functions of their declared inputs. A changed input invalidates the reverse transitive closure of dependent nodes. Its incremental algorithm also supports *change pruning*: after recomputation, if an invalidated node's value is unchanged, dependents can be resurrected rather than rebuilt. The documentation explicitly describes the trade-off between bottom-up invalidation and top-down checking, and the difficulty of proving an incremental mutation equivalent to a clean rebuild. [Skyframe reference](https://bazel.googlesource.com/bazel/+/refs/heads/master/site/en/reference/skyframe.md).
+
+**Scope and limit:** Skyframe is an incremental build-engine dependency model for deterministic derived values. It is not a general claim-validity or causal-inference system. A source file's output may be unchanged while a policy, contract, trust root, verifier or incident attribution changes the decision-use validity of an engineering claim.
+
+**CEB implication:** reuse the reverse-dependency and change-pruning intuition, but do not assume all engineering claims behave like deterministic build nodes. A retained claim requires an unaffectedness witness and a complete declared support closure. Where equivalence cannot be established, revalidate or leave unresolved; do not resurrect solely because a diff looks irrelevant.
+
+### 2.23 Artifact provenance — SLSA v1.1 and in-toto attestations
+
+The current **SLSA v1.1** provenance guidance binds produced artifacts to a builder identity, build definition, external parameters, resolved dependencies and output subjects. It recommends recording dependencies that can affect the build and verifying provenance against expected builder/source/build-type/parameter values. It also makes the builder's trust boundary explicit. [SLSA v1.1](https://slsa.dev/spec/v1.1/) · [Provenance](https://slsa.dev/spec/v1.1/provenance) · [Artifact verification](https://slsa.dev/spec/v1.1/verifying-artifacts).
+
+The **in-toto Attestation Framework v1.2** separates predicate, statement, envelope and bundle, with the statement binding a typed predicate to one or more subject artifacts. [Specification](https://github.com/in-toto/attestation/blob/main/spec/README.md).
+
+**Scope and limit:** SLSA/in-toto answer provenance and artifact-authenticity questions; a valid attestation does not by itself establish that a code-review claim is true, that a repair preserves behavior, or that an old approval remains authorized after policy revocation. Nor does a provenance record prove completeness of every semantic dependency unless the builder/format guarantees that scope.
+
+**CEB implication:** bind support-closure leaves to exact digests and existing receipt/attestation subjects where available. Keep signer identity, builder identity, trust roots and current authorization as separate dependencies. Do not create a parallel CEB receipt or replace #10314/#10370; use their canonical identity and trust contracts.
+
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -395,5 +415,9 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Li et al., [ReviewGrounder: Improving Review Substantiveness with Rubric-Guided, Tool-Integrated Agents](https://aclanthology.org/2026.acl-long.1477/), ACL 2026.
 - Badshah, Emami and Sajjad, [SCOPE: Selective Conformal Optimized Pairwise LLM Judging](https://hypermatrix.cs.dal.ca/selective-prediction/), ACL 2026; research summary accessed November 8, 2026.
 - Ashby, Nguyen and Luo, [Uncertainty-aware large language models: a scoping review of conformal prediction methods](https://doi.org/10.1098/rsta.2026.0061), Philosophical Transactions of the Royal Society A (August 27, 2026).
+
+- Bazel team, [Skyframe: Incremental build evaluation](https://bazel.googlesource.com/bazel/+/refs/heads/master/site/en/reference/skyframe.md), accessed November 8, 2026.
+- SLSA, [v1.1 specification](https://slsa.dev/spec/v1.1/), including [provenance](https://slsa.dev/spec/v1.1/provenance) and [artifact verification](https://slsa.dev/spec/v1.1/verifying-artifacts), accessed November 8, 2026.
+- in-toto, [Attestation Framework Specification v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md), accessed November 8, 2026.
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
