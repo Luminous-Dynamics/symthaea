@@ -697,4 +697,53 @@ mod tests {
             Err(GroupEnvelopeError::InvalidMemberProfile { .. })
         ));
     }
+
+    #[test]
+    fn high_dimensional_group_envelope_contains_every_original_score() {
+        let dimension = 16_384usize;
+        let base: Vec<f32> = (0..dimension)
+            .map(|index| ((index as f32) * 0.007).sin() * 0.7)
+            .collect();
+        let members: Vec<(String, ContinuousHV)> = [0.0f32, 0.0002, -0.0003, 0.0004]
+            .iter()
+            .enumerate()
+            .map(|(member_index, offset)| {
+                let values = base
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        (*value + *offset * ((index as f32) * 0.031).cos())
+                            .clamp(-1.0, 1.0)
+                    })
+                    .collect();
+                (format!("member-{member_index}"), ContinuousHV::from_vec(values))
+            })
+            .collect();
+        let envelope =
+            ContinuousHVGroupEnvelope::from_original_members(19, 7, &members).unwrap();
+        let query = ContinuousHV::from_vec(
+            (0..dimension)
+                .map(|index| ((index as f32) * 0.011).cos() * 0.75)
+                .collect(),
+        );
+        let interval = envelope
+            .score_interval_for_snapshot(
+                &query,
+                19,
+                7,
+                envelope.member_set_digest(),
+                envelope.content_digest(),
+            )
+            .unwrap();
+        for (id, member) in &members {
+            let exact = query.similarity_full_resolution(member);
+            assert!(
+                interval.contains(exact),
+                "{id} score {exact} escaped [{}, {}]",
+                interval.lower,
+                interval.upper
+            );
+        }
+    }
+
 }
