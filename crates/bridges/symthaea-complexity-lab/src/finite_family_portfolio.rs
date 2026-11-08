@@ -173,12 +173,13 @@ impl FiniteUmdpModelFamily {
         model_digests.try_reserve_exact(models.len()).map_err(|_| {
             PolicyPortfolioError::AllocationFailed { resource: "model digest list", entries: models.len() }
         })?;
-        for model in &models {
-            let digest = model.sha256();
-            if model_digests.contains(&digest) {
+        for (index, model) in models.iter().enumerate() {
+            // Exact structural equality, not digest equality, defines duplicates.
+            // The digest remains the compact external identity of each model.
+            if models[..index].iter().any(|previous| previous == model) {
                 return Err(PolicyPortfolioError::DuplicateModelIdentity);
             }
-            model_digests.push(digest);
+            model_digests.push(model.sha256());
         }
         let mut hasher = Sha256::new();
         hasher.update(b"SYMPGM-FINITE-UMDP-FAMILY\0\x01");
@@ -206,6 +207,8 @@ pub struct PolicyPortfolioBudget {
     pub max_model_policy_value_entries: usize,
     pub max_dp_multiply_adds: usize,
     pub max_portfolio_candidates: usize,
+    /// Total model-by-portfolio-member comparisons across all enumerated subsets.
+    pub max_portfolio_member_comparisons: usize,
     pub max_optimal_portfolios: usize,
     pub max_stored_policy_indices: usize,
     pub max_stored_model_witnesses: usize,
@@ -642,6 +645,22 @@ pub fn solve_finite_family_policy_portfolio(
             resource: "portfolio candidates", required: candidate_count, limit: budget.max_portfolio_candidates,
         });
     }
+    let mut portfolio_member_comparisons = 0usize;
+    for size in 1..=k {
+        let combinations = binomial(policy_count, size)?;
+        let comparisons = models.checked_mul(size)
+            .and_then(|value| value.checked_mul(combinations))
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        portfolio_member_comparisons = portfolio_member_comparisons.checked_add(comparisons)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    }
+    if portfolio_member_comparisons > budget.max_portfolio_member_comparisons {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "portfolio member comparisons",
+            required: portfolio_member_comparisons,
+            limit: budget.max_portfolio_member_comparisons,
+        });
+    }
 
     for model in family.models() {
         for value in model.initial.iter()
@@ -675,14 +694,37 @@ pub fn solve_finite_family_policy_portfolio(
         });
     }
 
-    let policy_ops = horizon.checked_mul(states).and_then(|v| v.checked_mul(2))
-        .and_then(|v| v.checked_add(horizon.saturating_sub(1).checked_mul(states)?.checked_mul(states)?.checked_mul(2)?))
+    let transition_stages = horizon.saturating_sub(1);
+    // Exact upper counts of rational multiply/add operations in each policy
+    // replay: transition dot products, discounting, reward addition, and the
+    // initial-distribution dot product.
+    let policy_transition_ops = transition_stages.checked_mul(states)
+        .and_then(|value| value.checked_mul(states))
+        .and_then(|value| value.checked_mul(2))
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    let optimal_ops = horizon.checked_mul(states).and_then(|v| v.checked_mul(actions)).and_then(|v| v.checked_mul(2))
-        .and_then(|v| v.checked_add(horizon.saturating_sub(1).checked_mul(states)?.checked_mul(actions)?.checked_mul(states)?.checked_mul(2)?))
+    let policy_step_ops = horizon.checked_mul(states)
+        .and_then(|value| value.checked_add(transition_stages.checked_mul(states)?))
+        .and_then(|value| value.checked_add(states.checked_mul(2)?))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let policy_ops = policy_transition_ops.checked_add(policy_step_ops)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+
+    // Bellman optimum replay considers every action at every (time,state)
+    // pair; max comparisons are additional work but not rational multiply/adds.
+    let optimal_transition_ops = transition_stages.checked_mul(states)
+        .and_then(|value| value.checked_mul(actions))
+        .and_then(|value| value.checked_mul(states))
+        .and_then(|value| value.checked_mul(2))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let optimal_step_ops = horizon.checked_mul(states)
+        .and_then(|value| value.checked_mul(actions))
+        .and_then(|value| value.checked_add(transition_stages.checked_mul(states)?.checked_mul(actions)?))
+        .and_then(|value| value.checked_add(states.checked_mul(2)?))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let optimal_ops = optimal_transition_ops.checked_add(optimal_step_ops)
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     let total_ops = evaluations.checked_mul(policy_ops)
-        .and_then(|v| v.checked_add(models.checked_mul(optimal_ops)?))
+        .and_then(|value| value.checked_add(models.checked_mul(optimal_ops)?))
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     if total_ops > budget.max_dp_multiply_adds {
         return Err(PolicyPortfolioError::BudgetExceeded {
@@ -1104,6 +1146,7 @@ mod tests {
             max_model_policy_value_entries: 10_000,
             max_dp_multiply_adds: 1_000_000,
             max_portfolio_candidates: candidates,
+            max_portfolio_member_comparisons: 1_000_000,
             max_optimal_portfolios: 100,
             max_stored_policy_indices: 1_000,
             max_stored_model_witnesses: 1_000,
