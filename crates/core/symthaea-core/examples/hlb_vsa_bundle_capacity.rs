@@ -36,16 +36,8 @@ fn main() {
         let mean_member = mean(metrics.iter().map(|m| m.mean_member_cosine));
         let mean_nonmember = mean(metrics.iter().map(|m| m.mean_nonmember_cosine));
         let mean_auc = mean(metrics.iter().map(|m| m.auc));
-        let mean_tpr = mean(
-            metrics
-                .iter()
-                .map(|m| m.tpr_at_empirical_one_percent_fpr),
-        );
-        let mean_fpr = mean(
-            metrics
-                .iter()
-                .map(|m| m.empirical_false_positive_rate),
-        );
+        let mean_tpr = mean(metrics.iter().map(|m| m.tpr_at_empirical_one_percent_fpr));
+        let mean_fpr = mean(metrics.iter().map(|m| m.empirical_false_positive_rate));
         let theory_member = theoretical_member_cosine(load);
         let empirical_minus_theory = mean_member - theory_member;
         println!(
@@ -80,7 +72,9 @@ fn run_trial(load: usize, trial: usize) -> TrialMetrics {
     let mut sorted_calibration = calibration_nonmembers.clone();
     sorted_calibration.sort_by(f64::total_cmp);
     let threshold_rank = (sorted_calibration.len() * 99).div_ceil(100);
-    let threshold_index = threshold_rank.saturating_sub(1).min(sorted_calibration.len() - 1);
+    let threshold_index = threshold_rank
+        .saturating_sub(1)
+        .min(sorted_calibration.len() - 1);
     let threshold = sorted_calibration[threshold_index];
 
     // Fit the threshold on calibration negatives; report rates on the
@@ -109,11 +103,12 @@ fn run_trial(load: usize, trial: usize) -> TrialMetrics {
 /// independent majority bundle. For load N = 2m + 1 this is
 /// C(2m, m) / 4^m; the asymptotic approximation is sqrt(2 / (pi * N)).
 fn theoretical_member_cosine(load: usize) -> f64 {
-    assert!(load > 0 && load % 2 == 1, "majority-bundle load must be positive and odd");
+    assert!(
+        load > 0 && load % 2 == 1,
+        "majority-bundle load must be positive and odd"
+    );
     let pairs = (load - 1) / 2;
-    (1..=pairs).fold(1.0, |value, k| {
-        value * (2 * k - 1) as f64 / (2 * k) as f64
-    })
+    (1..=pairs).fold(1.0, |value, k| value * (2 * k - 1) as f64 / (2 * k) as f64)
 }
 
 fn pairwise_auc(positive: &[f64], negative: &[f64]) -> f64 {
