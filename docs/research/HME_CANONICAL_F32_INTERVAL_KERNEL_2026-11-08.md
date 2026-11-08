@@ -203,3 +203,36 @@ A separate Python f32 arithmetic simulation compared the candidate spherical-cap
 - spherical-cap interval narrower in all 900 cases.
 
 This is exploratory numerical evidence only. It is not proof, Rust test execution, cross-platform qualification, an HME benchmark, or evidence of physical payload I/O savings. No selector integration is authorized by this simulation.
+
+
+### Error-envelope equations and hard gates
+
+Let D be the vector dimension, u = 2^-24 the f32 unit roundoff, and μ = 2^-149 the least positive f32 subnormal. The reduction budget uses n = 2D operations per dot/norm accumulator:
+
+\[
+\nu = n u,\qquad \gamma_n = \frac{\nu}{1-\nu},\qquad
+\eta_n = \frac{n\mu}{1-\nu}.
+\]
+
+For real query/candidate norms Q = ||q||₂ and X = ||x||₂, the canonical f32 dot has absolute error bounded by:
+
+\[
+|\widehat{q\cdot x} - q\cdot x|
+\leq \gamma_n QX + \eta_n,
+\]
+
+using Cauchy–Schwarz to bound the sum of absolute coordinate products. The squared-norm reductions are bounded by relative factors:
+
+\[
+\frac{\widehat{Q^2}}{Q^2}
+\in \left[1-\gamma_n-\frac{\eta_n}{Q^2},
+           1+\gamma_n+\frac{\eta_n}{Q^2}\right]
+\]
+
+and analogously for X². For a candidate ball, the worst-case candidate relative error uses the minimum admissible candidate norm X_min.
+
+The denominator factor additionally includes one f32 rounding for the norm-product multiplication and one for square root. The final quotient includes one division-rounding factor plus an absolute μ allowance for a possible subnormal quotient. Every intermediate f64 bound is expanded outward, including nested error-ratio divisions and additions.
+
+The canonical near-zero branch is treated separately. If the entire possible denominator is strictly below 1e-10f32, every candidate score is exactly zero. If the denominator interval crosses that threshold, the candidate interval is [-1,1]. Only a strictly positive lower denominator separated from the threshold may proceed to quotient propagation.
+
+This derivation is still a research proof obligation, not a completed formal verification. It depends on the operation-count model enclosing the compiled canonical scorer, normal-range assumptions for denominator operations when the lower denominator exceeds the threshold, binary32 round-to-nearest, gradual underflow, and the absence of fast-math/FTZ transformations. Before selector integration, a reviewer must check the inequalities independently and inspect generated code for each supported compiler/target profile.
