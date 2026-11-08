@@ -845,3 +845,41 @@ Do not compare the QBF/strategy engine with SAT Main Track solved counts. For th
 - require improvement on a sealed held-out set and never use the 347 VBS score as the practical target.
 
 For QBF / #QBF, use QBFGallery 2026 and compatible #QBF corpora separately. The SAT score table is not a QBF benchmark.
+
+
+## 22. Full-history game-value synthesis is a distinct result from winning strategies
+
+The SAT 2026 paper *Proof Systems for QBF Synthesis: Extracting Skolem and Herbrand Functions* (Akshay et al., DOI: [10.4230/LIPIcs.SAT.2026.3](https://doi.org/10.4230/LIPIcs.SAT.2026.3)) makes a critical distinction:
+
+- An existential/universal **winning strategy** only has to win from the initial position of a true/false QBF.
+- A **Skolem/Herbrand function** is a full-history, win-whenever-possible function: it chooses correctly from every partial play where its player can still force the preferred result.
+- A game-value function (g_i) maps every assignment to the first (i) prefix moves to the truth value of the remaining quantified suffix.
+
+For a prefix variable (x_i), the paper derives the full-history function from the next game-value layer:
+- if (Q_i = \exists), (f_i(x_{<i}) = g_i(x_{<i}, x_i=1));
+- if (Q_i = \forall), (f_i(x_{<i}) = g_i(x_{<i}, x_i=0)).
+
+These functions depend on **all preceding prefix variables**, not merely the opposing player's preceding variables. This is a different type from the existing opponent-only WinningStrategy interface. Keep both types, validators and claims separate.
+
+### Current finite reference implementation
+
+The new `quantified_game_values.rs` module extracts all game-value layers from the independently verified residual-CNF proof DAG. It emits complete full-history Skolem and Herbrand tables for every quantified variable, including both function families regardless of whether the root QBF is true or false.
+
+Its independent verifier checks:
+1. the final layer against the original CNF for every complete assignment;
+2. every adjacent layer against the exact EXISTS/OR or FORALL/AND recurrence;
+3. every full-history function's exact ordered prefix scope and every table row against the corresponding next-layer restriction;
+4. the root layer against the declared truth value.
+
+This is a semantic game-value profile and finite table extractor. It is **not** a SynQBF proof object or a full implementation of the paper's CEGC proof-construction algorithm. The paper's CEGC algorithm assumes an AllSATRep subroutine that returns a circuit for all satisfying assignments; implementation of that subroutine is explicitly outside the paper's scope.
+
+### Required benchmarks
+
+- Complete layer coverage by prefix position and quantifier alternation depth.
+- Full-history function count, dependency width, truth-table bytes and ROBDD/AIG sizes.
+- Independent recurrence-check time and source-matrix-check time.
+- Proof-DAG nodes versus complete prefix-tree expansion and profile-table size.
+- Difference between initial winning-strategy size and full-history function size.
+- Held-out multi-variable formulas, quantified planning, synthesis and model-checking instances.
+
+Do not report a full-history synthesis pass merely because the root QBF truth value and its one winning strategy validate. Every game-value layer and both player function families must be checked.
