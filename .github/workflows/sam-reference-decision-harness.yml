@@ -1,0 +1,33 @@
+name: SAM Reference Decision Harness
+
+on:
+  pull_request:
+    paths:
+      - "tools/sam-reference-decision-harness/**"
+      - ".github/workflows/sam-reference-decision-harness.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/sam-reference-decision-harness/**"
+      - ".github/workflows/sam-reference-decision-harness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Reference Decision Harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Format
+        run: cargo fmt --manifest-path tools/sam-reference-decision-harness/Cargo.toml -- --check
+      - name: Test
+        run: cargo test --manifest-path tools/sam-reference-decision-harness/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/sam-reference-decision-harness/Cargo.toml --all-targets -- -D warnings
