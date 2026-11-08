@@ -12,7 +12,8 @@
     "vessel_binding",
     "mass_items",
     "loading_conditions",
-    "claim_limitations"
+    "claim_limitations",
+    "explicit_warning"
   ],
   "properties": {
     "schema_version": {
@@ -130,6 +131,10 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "explicit_warning": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "$defs": {
