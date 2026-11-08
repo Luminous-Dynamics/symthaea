@@ -1,0 +1,5 @@
+{
+  "expected_policy": "maximin",
+  "expected_selected_ids": ["a", "d"],
+  "purpose": "determinism/plumbing only; not a scientific benchmark"
+}
