@@ -194,9 +194,8 @@ mod tests {
 
     #[test]
     fn serialized_blind_view_produces_an_action_accepted_by_the_episode_runner() {
-        use open_world_ansatz_microcosm::BlindEpisode;
         use open_world_ansatz_microcosm::numeric::{Mechanism, ModelHypothesis, SensorMap};
-        use open_world_ansatz_microcosm::protocol::{StructureAccess, WorldFamily};
+        use open_world_ansatz_microcosm::protocol::{BlindEpisode, StructureAccess, WorldFamily};
 
         let mut episode = BlindEpisode::new_numeric(
             "stdio-wire-roundtrip",
