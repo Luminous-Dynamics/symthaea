@@ -1,5 +1,5 @@
 {
-  "schema": "symthaea.pgm.occupation-flow.prism-expected.v1",
+  "schema": "symthaea.pgm.occupation-flow.prism-expected.v2",
   "status": "oracle-values-only-not-prism-executed",
   "source_fixture": "Rust StagewiseIntervalMarkovModel two-state three-period fixture",
   "source_model_sha256": "b1fb89c3775613d7b9aeb20857e6eb1a15b4133419e6fa3a307ddec6c906c466",
@@ -24,21 +24,32 @@
       "minimum_decimal": 0.4,
       "maximum_decimal": 0.8
     },
-    "regret_a": {
-      "worst_case": "11/25",
-      "prism_shift": "2",
-      "shifted_maximum": "61/25"
+    "action_c": {
+      "minimum": "29/50",
+      "maximum": "21/25",
+      "minimum_decimal": 0.58,
+      "maximum_decimal": 0.84
     },
-    "regret_b": {
-      "worst_case": "22/25",
-      "prism_shift": "1",
-      "shifted_maximum": "47/25"
+    "pairwise_regret": {
+      "A_to_B": {"worst_case": "11/25", "shift": "2", "shifted_maximum": "61/25"},
+      "A_to_C": {"worst_case": "11/50", "shift": "1", "shifted_maximum": "61/50"},
+      "B_to_A": {"worst_case": "22/25", "shift": "1", "shifted_maximum": "47/25"},
+      "B_to_C": {"worst_case": "11/25", "shift": "1/2", "shifted_maximum": "47/50"},
+      "C_to_A": {"worst_case": "11/25", "shift": "1/2", "shifted_maximum": "47/50"},
+      "C_to_B": {"worst_case": "11/50", "shift": "1", "shifted_maximum": "61/50"}
+    },
+    "minimax_regret": {
+      "value": "11/25",
+      "optimal_actions": ["A", "C"]
     }
   },
   "qualification": {
     "prism_version": "4.11",
     "prism_executed": false,
     "numeric_comparison_tolerance": "to-be-preregistered",
+    "utility_query_count": 6,
+    "directed_pairwise_regret_query_count": 6,
+    "complete_minimax_regret_tie_set_required": ["A", "C"],
     "independent_symthaea_lp_certificate_required": true
   }
 }
