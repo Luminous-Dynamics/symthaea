@@ -206,11 +206,13 @@ These descriptors describe the system; the four coordinates describe the evidenc
 
 ### NVIDIA Alpamayo 2 Super
 
-- **Role:** external black-box driving VLA/world-model system candidate.
-- **Vendor-reported architecture:** 34B total (32B reasoning backbone + 2B diffusion action expert).
-- **Vendor-reported metrics:** 0.911 m minADE6 at 6.4 s; reasoning score 0.433; LingoQA 79.2 on a named 1,434-sample evaluation.
-- **Claim boundary:** different evaluation/task; do not compare raw values to Bench2Drive, Fail2Drive or Waymo Motion. Match observation, compute, checkpoint, horizon and evaluator before black-box comparison.
-- **Sources:** [NVIDIA release](https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/), [downloads](https://developer.nvidia.com/drive/downloads).
+- **Role:** external driving VLA / world-model system and black-box comparison candidate.
+- **Vendor-reported architecture:** 34B total (32B reasoning backbone + 2B diffusion action expert), processing up to seven cameras for 360-degree perception. NVIDIA's published inference path is BF16; its downloads page requires a single NVIDIA GPU with enough VRAM for the model, plus CUDA 12.x+ and Python 3.12.
+- **Open-loop metrics:** on 1,434 Physical AI AV challenging samples, NVIDIA reports 0.911 m minADE6 at 6.4 s; reasoning score 0.433 on its Physical AI AV Reasoning Benchmark; and LingoQA 79.2.
+- **Closed-loop metric:** on 913 reconstructed scenes in AlpaSim, NVIDIA reports AlpaSim Score 1.50 ± 0.13; it separately reports Alpamayo 1.5 Nano at 1.37 ± 0.10. This is not comparable to NAVSIM EPDMS, Bench2Drive DS or Waymo outcome rates.
+- **Important counterpoint:** NVIDIA's own benchmark table lists GPT-5.5 at 0.502 on the same OOD reasoning benchmark versus Alpamayo 2 Super at 0.433. Do not turn the vendor's broad AV benchmark positioning into a claim that it leads every reasoning metric.
+- **Claim boundary:** results are vendor-reported on named sets. Match sample set, observation privilege, action interface, compute/precision, checkpoint, horizon and evaluator before black-box comparison. A 34B BF16 model is an industry-scale research comparator, not a fair small-edge-compute baseline.
+- **Sources:** [NVIDIA evaluation blog](https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/), [official model information](https://www.nvidia.com/en-us/solutions/autonomous-vehicles/alpamayo/llm-info/), [NVIDIA DRIVE downloads](https://developer.nvidia.com/drive/downloads).
 
 ### Autoware 2.0.0 — open-source system architecture reference (not a benchmark)
 
