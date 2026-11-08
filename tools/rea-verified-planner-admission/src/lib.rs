@@ -451,6 +451,7 @@ impl VerifiedEvidenceCatalog {
                 }
             }
         }
+        self.validate_hypothesis_source_family_independence(hypotheses)?;
         Ok(())
     }
 }
