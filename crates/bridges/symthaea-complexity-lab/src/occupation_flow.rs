@@ -2028,6 +2028,40 @@ mod tests {
             vec![q(11, 25), q(22, 25), q(11, 25)]
         );
         assert_eq!(verified.pairwise_regrets.len(), 6);
+        assert_eq!(verified.source_model_sha256, canonical_interval_model_sha256(&model));
+        assert_eq!(
+            sha256_hex(verified.decision_certificate_sha256),
+            "1a0a489135922fb0d8f653a3ec25165b0df83ba507adfabcf4545feba24644d1"
+        );
+        assert_eq!(
+            verified.pairwise_regrets.iter().map(|item| item.compiled_lp_sha256).collect::<Vec<_>>(),
+            vec![
+                [
+                    0xa7,0x6d,0x0f,0xcc,0xb8,0x88,0xd6,0x0f,0x2e,0x64,0xa3,0x33,0xad,0xbf,0xb6,0x49,
+                    0xba,0x25,0x6a,0x79,0xae,0xa8,0x64,0xaa,0x8d,0xee,0xd7,0x87,0x4f,0x68,0xb8,0x63,
+                ],
+                [
+                    0x35,0xf7,0xd3,0x8c,0x16,0xee,0x49,0xfc,0x54,0x9a,0x5f,0x4d,0xd8,0xc6,0x2f,0x85,
+                    0xbb,0x63,0x56,0xeb,0x31,0xfc,0xf1,0x59,0x05,0x4b,0x80,0xf0,0xe1,0x31,0xd7,0x14,
+                ],
+                [
+                    0x37,0xd6,0x72,0x3e,0xba,0x75,0x2b,0x3b,0x97,0x57,0xc8,0x9c,0x6f,0xe5,0x32,0xa7,
+                    0x10,0xef,0xa8,0x4d,0x85,0xf7,0x9b,0x9e,0x2e,0x98,0xa5,0xf6,0x52,0x89,0xcc,0xd2,
+                ],
+                [
+                    0xa3,0xed,0x55,0x0f,0xe5,0xf4,0xae,0x56,0x2d,0xe2,0x8c,0xa1,0x61,0x03,0x1f,0xca,
+                    0x88,0xbc,0x23,0xd9,0x62,0xad,0x41,0x7a,0x80,0xb3,0x31,0xb1,0x70,0x1b,0x3c,0x94,
+                ],
+                [
+                    0xa3,0xed,0x55,0x0f,0xe5,0xf4,0xae,0x56,0x2d,0xe2,0x8c,0xa1,0x61,0x03,0x1f,0xca,
+                    0x88,0xbc,0x23,0xd9,0x62,0xad,0x41,0x7a,0x80,0xb3,0x31,0xb1,0x70,0x1b,0x3c,0x94,
+                ],
+                [
+                    0x35,0xf7,0xd3,0x8c,0x16,0xee,0x49,0xfc,0x54,0x9a,0x5f,0x4d,0xd8,0xc6,0x2f,0x85,
+                    0xbb,0x63,0x56,0xeb,0x31,0xfc,0xf1,0x59,0x05,0x4b,0x80,0xf0,0xe1,0x31,0xd7,0x14,
+                ],
+            ]
+        );
         assert_eq!(
             verified.pairwise_regrets.iter().map(|item| (
                 item.selected_action,
@@ -2121,6 +2155,74 @@ mod tests {
                 comparator_action: 1,
             })
         );
+
+        let mut out_of_bounds = witnesses[0].clone();
+        out_of_bounds.selected_action = 2;
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[scores_a.clone(), scores_b.clone()],
+                &[out_of_bounds, witnesses[1].clone()],
+                budget(84),
+                2,
+            ),
+            Err(OccupationFlowError::PairwiseActionIndexOutOfBounds {
+                action: 2,
+                action_count: 2,
+            })
+        );
+
+        let mut self_pair = witnesses[0].clone();
+        self_pair.comparator_action = self_pair.selected_action;
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[scores_a.clone(), scores_b.clone()],
+                &[self_pair, witnesses[1].clone()],
+                budget(84),
+                2,
+            ),
+            Err(OccupationFlowError::PairwiseSelfComparison { action: 0 })
+        );
+
+        let mut changed_source = witnesses.clone();
+        changed_source[0].certificate.source_model_sha256[0] ^= 1;
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[scores_a.clone(), scores_b.clone()],
+                &changed_source,
+                budget(84),
+                2,
+            ),
+            Err(OccupationFlowError::CertificateSourceDigestMismatch)
+        );
+
+        let mut changed_lp = witnesses.clone();
+        changed_lp[0].certificate.compiled_lp_sha256[0] ^= 1;
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[scores_a.clone(), scores_b.clone()],
+                &changed_lp,
+                budget(84),
+                2,
+            ),
+            Err(OccupationFlowError::CertificateCompiledLpDigestMismatch)
+        );
+
+        let mut changed_primal = witnesses.clone();
+        changed_primal[0].certificate.primal_dual.primal[0] = q(2, 1);
+        assert!(matches!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[scores_a.clone(), scores_b.clone()],
+                &changed_primal,
+                budget(84),
+                2,
+            ),
+            Err(OccupationFlowError::Lp(_))
+        ));
         assert!(matches!(
             verify_shared_dynamics_minimax_regret(
                 &model,
