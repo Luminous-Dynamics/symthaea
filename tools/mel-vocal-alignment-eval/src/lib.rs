@@ -153,7 +153,8 @@ pub fn score_alignment(
     validate_predictions(total_frames, predicted)?;
     validate_melismas(total_frames, reference, melismas)?;
 
-    let edits = align_phone_sequences(reference, predicted);
+    let phone_edits = align_phone_sequences(reference, predicted, false);
+    let identity_edits = align_phone_sequences(reference, predicted, true);
     let mut counts = EditCounts {
         exact_matches: 0,
         substitutions: 0,
@@ -172,47 +173,51 @@ pub fn score_alignment(
     let mut exact_predicted_duration_frames = 0u128;
 
     let frames_to_ms = 1000.0 / f64::from(sample_rate_hz);
-    for edit in edits {
+    for edit in phone_edits {
         match edit {
-            Edit::Exact {
-                reference: r,
-                predicted: p,
-            } => {
-                counts.exact_matches += 1;
-                let expected = &reference[r];
-                let observed = &predicted[p];
-                if same_phone_identity(expected, observed) {
-                    identity_prediction_for_reference[r] = Some(p);
-                    let onset_error_ms =
-                        expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms;
-                    onset_errors_ms.push(onset_error_ms);
-                    if onset_error_ms <= 20.0 {
-                        joint_onset_hits_20 += 1;
-                    }
-                    if onset_error_ms <= 50.0 {
-                        joint_onset_hits_50 += 1;
-                    }
-                    if onset_error_ms <= 100.0 {
-                        joint_onset_hits_100 += 1;
-                    }
-                    if expected.is_vowel {
-                        vowel_onset_errors_ms.push(onset_error_ms);
-                    }
-                    offset_errors_ms.push(
-                        expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms,
-                    );
-                    let expected_duration = expected.end_frame - expected.start_frame;
-                    let observed_duration = observed.end_frame - observed.start_frame;
-                    exact_reference_duration_frames += u128::from(expected_duration);
-                    exact_predicted_duration_frames += u128::from(observed_duration);
-                    duration_errors_ms.push(
-                        expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms,
-                    );
-                }
-            }
+            Edit::Exact { .. } => counts.exact_matches += 1,
             Edit::Substitute => counts.substitutions += 1,
             Edit::Delete => counts.deletions += 1,
             Edit::Insert => counts.insertions += 1,
+        }
+    }
+
+    // A second alignment pass enforces lexical position and syllable identity.
+    // Its timing denominator is deliberately stricter than canonical phone PER.
+    for edit in identity_edits {
+        if let Edit::Exact {
+            reference: r,
+            predicted: p,
+        } = edit
+        {
+            identity_prediction_for_reference[r] = Some(p);
+            let expected = &reference[r];
+            let observed = &predicted[p];
+            let onset_error_ms =
+                expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms;
+            onset_errors_ms.push(onset_error_ms);
+            if onset_error_ms <= 20.0 {
+                joint_onset_hits_20 += 1;
+            }
+            if onset_error_ms <= 50.0 {
+                joint_onset_hits_50 += 1;
+            }
+            if onset_error_ms <= 100.0 {
+                joint_onset_hits_100 += 1;
+            }
+            if expected.is_vowel {
+                vowel_onset_errors_ms.push(onset_error_ms);
+            }
+            offset_errors_ms.push(
+                expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms,
+            );
+            let expected_duration = expected.end_frame - expected.start_frame;
+            let observed_duration = observed.end_frame - observed.start_frame;
+            exact_reference_duration_frames += u128::from(expected_duration);
+            exact_predicted_duration_frames += u128::from(observed_duration);
+            duration_errors_ms.push(
+                expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms,
+            );
         }
     }
 
@@ -420,7 +425,11 @@ fn same_phone_identity(reference: &PhoneEvent, predicted: &PredictedPhoneEvent) 
         && reference.is_vowel == predicted.is_vowel
 }
 
-fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEvent]) -> Vec<Edit> {
+fn align_phone_sequences(
+    reference: &[PhoneEvent],
+    predicted: &[PredictedPhoneEvent],
+    require_lexical_identity: bool,
+) -> Vec<Edit> {
     let n = reference.len();
     let m = predicted.len();
     let mut costs = vec![vec![0usize; m + 1]; n + 1];
@@ -434,8 +443,12 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
 
     for i in 1..=n {
         for j in 1..=m {
-            let substitution_cost =
-                usize::from(reference[i - 1].symbol != predicted[j - 1].symbol);
+            let matches = if require_lexical_identity {
+                same_phone_identity(&reference[i - 1], &predicted[j - 1])
+            } else {
+                reference[i - 1].symbol == predicted[j - 1].symbol
+            };
+            let substitution_cost = usize::from(!matches);
             let diagonal = costs[i - 1][j - 1] + substitution_cost;
             let deletion = costs[i - 1][j] + 1;
             let insertion = costs[i][j - 1] + 1;
@@ -448,7 +461,12 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
     while i > 0 || j > 0 {
         // Deterministic tie-breaking: diagonal, then deletion, then insertion.
         if i > 0 && j > 0 {
-            let cost = usize::from(reference[i - 1].symbol != predicted[j - 1].symbol);
+            let matches = if require_lexical_identity {
+                same_phone_identity(&reference[i - 1], &predicted[j - 1])
+            } else {
+                reference[i - 1].symbol == predicted[j - 1].symbol
+            };
+            let cost = usize::from(!matches);
             if costs[i][j] == costs[i - 1][j - 1] + cost {
                 if cost == 0 {
                     reversed.push(Edit::Exact {
