@@ -404,3 +404,56 @@ A separate fixture set now tests whether the speech system detects a language tr
 The vectors cover exact matching, missed transitions, extra transitions, one-token shifts, multiple changes and no-boundary non-estimability. A separate boundary formula checker verified all six cases after correcting the false-extra-switch case, whose predicted sequence contains two transitions.
 
 The implementation is in [stacked draft PR #11084](https://github.com/Luminous-Dynamics/symthaea/pull/11084). Twelve boundary-specific test functions are authored, within 28 total tests in the switch-metrics module. None have been executed.
+
+
+## 16. Shared metric vectors and corpus aggregation contracts
+
+### 16.1 Cross-implementation vectors
+
+The repository now contains:
+- [`voice_metric_vectors_v1.json`](./voice_metric_vectors_v1.json): ten synthetic-only, hand-specified WER/PIER/SETER/SPER vectors.
+- [`voice_metric_vectors_v1.schema.json`](./voice_metric_vectors_v1.schema.json): JSON Schema Draft 2020-12 contract.
+
+The vectors cover perfect recognition, embedded-span deletion and substitution, insertion attribution at and outside POI boundaries, trailing insertion after a final POI, all-POI references, no-POI references, overlapping switch windows and no-switch utterances.
+
+A custom independent formula audit recomputed the expected WER, PIER, switch-entry positions, SETER, SPER radii and per-language masked rates from the declared alignment operations. All ten vectors matched their declared counts and rates. This is a check of the authored fixture mathematics; it is **not** Rust execution, schema meta-validation, RapidFuzz differential testing or real-corpus evidence.
+
+See [#11082 — VOICE-METRIC-VECTORS-001](https://github.com/Luminous-Dynamics/symthaea/issues/11082).
+
+### 16.2 Corpus PIER: publish micro and macro separately
+
+The PIER Rust implementation now defines corpus aggregation with:
+- pooled/micro PIER from total POI edit counts;
+- macro PIER as the arithmetic mean of estimable utterance-level PIER;
+- explicit estimable and non-estimable utterance counts;
+- typed, index-aware failures for malformed utterances;
+- full corpus reference/hypothesis token totals, including utterances without POIs.
+
+No-POI utterances are not silently assigned zero and are excluded from PIER-specific denominators. An empty corpus has absent aggregate rates. The implementation draft currently contains 21 authored test functions across utterance and corpus behavior; none has been executed.
+
+### 16.3 Corpus SETER/SPER: window isolation and weighting
+
+The stacked switch-metrics PR adds corpus aggregation with:
+- pooled/micro SETER and SPER@k counts/rates;
+- macro means over only switch-bearing / window-estimable utterances;
+- explicit counts of switch-bearing and no-switch utterances;
+- per-language pooled masked error;
+- per-utterance window union before aggregation, so windows cannot spill across utterance boundaries;
+- WER insertions kept separate from SETER/SPER reference-position masked errors.
+
+This avoids the common but serious reporting ambiguity where one result is utterance-averaged, another token-pooled, and no-switch utterances are implicitly scored as perfect.
+
+The contract is [#11103 — VOICE-SWITCH-AGG-001](https://github.com/Luminous-Dynamics/symthaea/issues/11103). Corpus implementation is in stacked [draft PR #11081](https://github.com/Luminous-Dynamics/symthaea/pull/11081), based on [PIER PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058). The source contains 22 authored switch-metric unit tests, including six corpus aggregation cases; these have not been executed.
+
+### 16.4 Semantic anchors require an acoustic veto
+
+SAMA-ASR (EMNLP 2026) uses translation-derived semantic anchors together with an acoustic anchor to condition low-resource ASR decoding. Its paper reports results on Taiwanese Hokkien and Hakka, not African speech:
+https://aclanthology.org/2026.emnlp-main.1380/
+
+It is a useful comparator for #11057, but semantic context can also overpower what was actually spoken. The new [#11104 — VOICE-SEM-ANCHOR-001](https://github.com/Luminous-Dynamics/symthaea/issues/11104) specifies counterfactual tests: acoustically clear rare words, unusual code-switch inserts, negation flips, number changes and role reversals that conflict with context.
+
+The proposed hybrid should carry explicit evidence status: AUDIO_SUPPORTED, CONTEXT_SUPPORTED, CONFLICTED, AMBIGUOUS or UNSUPPORTED. Semantic priors may propose alternatives, but they must not overwrite clear acoustic evidence without surfacing the conflict.
+
+## 17. Updated benchmark matrix
+
+The machine-readable matrix now contains ten tracks, including cross-implementation metric conformance. The code-switch lane now records pooled/micro and utterance-macro aggregation separately; the semantic lane explicitly compares modular ASR→Broca, speech-native, SAMA-style semantic anchoring and acoustic-veto hybrid systems.
