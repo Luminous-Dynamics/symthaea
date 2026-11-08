@@ -7,6 +7,7 @@ from __future__ import annotations
 import unittest
 
 from diffsinger_phonemes import (
+    _append_weighted_group,
     duration_per_mapped_phone,
     flatten_performance_phones,
     ipa_to_arpabet,
@@ -409,6 +410,21 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         invalid_language = {"language": "zu", "syllables": []}
         with self.assertRaisesRegex(ValueError, "supports language='en' only"):
             flatten_performance_phones(invalid_language)
+
+    def test_sub_millisecond_composite_phone_is_rejected_not_stretched(self) -> None:
+        events = []
+        phones = [{"ipa": "ks", "is_vowel": False, "natural_duration_s": 0.0001}]
+        with self.assertRaisesRegex(ValueError, "refusing to stretch"):
+            _append_weighted_group(
+                events,
+                phones,
+                [["k", "s"]],
+                range(0, 1),
+                0.001,
+                220.0,
+                "sub-millisecond fixture",
+            )
+        self.assertEqual(events, [])
 
     def test_duration_and_language_contracts_reject_invalid_values(self) -> None:
         for duration, count in ((0.0, 1), (float("nan"), 1), (40.0, 0)):
