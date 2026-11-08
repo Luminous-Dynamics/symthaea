@@ -523,3 +523,48 @@ At matched source instances and compute limits, report exact count agreement, so
 - No solver-performance claim until a pinned external corpus and matched proof/count interfaces are benchmarked.
 
 The CPOG workstream is tracked separately in #11036. It must reuse #10868/#10899/#10884/#10887/#10805 rather than introduce a second proof/result/receipt contract.
+
+
+## 17. Arithmetic weighted interactions — a second structural signal
+
+The current pairwise Boolean-interaction graph uses the GF(2) mixed derivative
+\[
+f_{00}\oplus f_{01}\oplus f_{10}\oplus f_{11}.
+\]
+This correctly captures nonzero Boolean pair interactions, but affine functions such as XOR have zero pairwise GF(2) mixed derivatives. A second ordering signal now measures the arithmetic mixed finite difference of the Boolean truth table after its fixed (0/1) embedding:
+\[
+w_{ij}=\sum_{x\in\{0,1\}^{n-2}}
+\left|f_{00}(x)-f_{01}(x)-f_{10}(x)+f_{11}(x)\right|.
+\]
+These weights are **not** a semantic dependency certificate or a theorem about optimal BDD order. They provide a second deterministic heuristic signal.
+
+### Weighted ordering
+
+- Build a symmetric, zero-diagonal matrix with explicit overflow and context-check budgets.
+- Project positive weights to an adjacency graph for frontier measurement.
+- Weighted min-fill ranks candidate eliminations by weighted induced fill cost, then fill-edge count, weighted degree, active degree and variable ID.
+- When an elimination introduces a fill edge between (a,b), its induced weight is the checked product of the selected variable's current coupling weights to (a) and (b). The induced weight is propagated to later elimination steps.
+- Refine the weighted seed with the existing bounded frontier insertion and pass it to the same BDD sifting engine.
+- Keep the original GF(2) graph, natural order, reverse order and their refined variants as separate ablation arms. Select solely by final independently verified BDD node count under one shared search budget.
+
+### Frozen known-answer experiments
+
+1. **XOR3:** the GF(2) interaction graph has no pairwise edges. The arithmetic weight matrix has weight 4 on each of its three pairs (total 12; six context checks). This illustrates a signal difference, not that weighted ordering must improve XOR's BDD size.
+2. **Four-variable constructed function:** for truth-table values (variable 0 is the least-significant assignment bit)
+`[1,0,0,1,1,0,0,1,1,0,1,0,1,0,0,1]`,
+natural order and GF(2) min-fill produce 7 nodes. Arithmetic weighted min-fill returns `[2,3,0,1]` and produces 6 nodes. Exact search finds 5; the bounded multi-start pipeline reaches 5 on this fixture.
+
+The second result is one constructed finite example. It is not an average-case result, an application result, or an external SOTA comparison.
+
+### Required ablation
+
+Compare under matched truth tables and identical resource limits:
+- natural / reverse;
+- GF(2) min-fill and frontier-refined GF(2);
+- arithmetic weighted min-fill and its frontier-refined variant;
+- bounded sifting from each unique seed;
+- exact permutation minimum for scopes where (n!\) fits.
+
+Report per function: source family, support size, both interaction matrices (or their digests and exact weights), pair/context checks, seed orders, induced-fill policy, frontier profiles, unique seed count, order evaluations, search-complete flag, initial/final nodes, exact minimum when available, build peak nodes/bytes, and independent checker time.
+
+Hold out complete function generators and QBF application families. The confirmatory split must not be used to tune weights or tie-breaks. The metric of interest is *verified node-count reduction at equal total construction + checking budget*, not a lower graph score alone.
