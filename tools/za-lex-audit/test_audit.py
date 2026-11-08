@@ -17,12 +17,19 @@ def manifest_for(path: str, payload: bytes) -> dict:
     return {
         "schema": "za-lex-resource-audit/v1",
         "source": {"repository": "https://github.com/NWU-MuST/za_lex", "commit": "a" * 40},
-        "status": {"integration": "not_integrated", "rights_review": "metadata_audited_per_file_not_legal_opinion"},
+        "status": {
+            "integration": "not_integrated",
+            "rights_review": "metadata_audited_per_file_not_legal_opinion",
+            "model_training_rights": "not_assessed_and_not_inferred",
+            "speech_synthesis_rights": "not_assessed_and_not_inferred",
+            "singing_synthesis_rights": "not_assessed_and_not_inferred",
+        },
         "files": [entry(path, payload)],
         "language_profiles": [{
             "id": "xh-ZA", "license": "CC-BY-3.0", "resource_files": [path],
-            "rights_notes": ["synthetic rights note"], "capabilities": {"g2p_rules": True},
-            "qualification": "candidate only"
+            "rights_notes": ["synthetic rights note"],
+            "capabilities": {"g2p_rules": True, "singing_synthesis": False},
+            "qualification": "research_only_not_integrated_not_singing_qualified"
         }]
     }
 
@@ -66,6 +73,33 @@ class ZaLexAuditTests(unittest.TestCase):
         manifest = manifest_for("file.txt", b"x")
         manifest["language_profiles"][0]["resource_files"] = ["untracked.dict"]
         with self.assertRaisesRegex(ValueError, "untracked"):
+            validate_manifest(manifest)
+
+    def test_synthesis_rights_cannot_be_inferred_from_dictionary_metadata(self) -> None:
+        manifest = manifest_for("file.txt", b"x")
+        manifest["status"]["singing_synthesis_rights"] = "permitted"
+        with self.assertRaisesRegex(ValueError, "singing_synthesis_rights"):
+            validate_manifest(manifest)
+
+        manifest = manifest_for("file.txt", b"x")
+        manifest["language_profiles"][0]["capabilities"]["singing_synthesis"] = True
+        with self.assertRaisesRegex(ValueError, "cannot claim singing synthesis"):
+            validate_manifest(manifest)
+
+        manifest = manifest_for("file.txt", b"x")
+        manifest["language_profiles"][0]["qualification"] = "qualified_for_singing"
+        with self.assertRaisesRegex(ValueError, "research-only"):
+            validate_manifest(manifest)
+
+    def test_manifest_requires_typed_resource_paths_and_rights_notes(self) -> None:
+        manifest = manifest_for("file.txt", b"x")
+        manifest["language_profiles"][0]["resource_files"] = [["nested"]]
+        with self.assertRaisesRegex(ValueError, "unique string list"):
+            validate_manifest(manifest)
+
+        manifest = manifest_for("file.txt", b"x")
+        manifest["language_profiles"][0]["rights_notes"] = "not a list"
+        with self.assertRaisesRegex(ValueError, "rights notes"):
             validate_manifest(manifest)
 
     def test_path_traversal_and_duplicate_entries_are_rejected(self) -> None:
