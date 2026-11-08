@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-artifact-trust/manifest.schema.json",
+  "title": "ENG-ARTIFACT-TRUST-001 blueprint manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme_id",
+    "source_issue",
+    "status",
+    "standards",
+    "cases",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme_id": {
+      "const": "ENG-ARTIFACT-TRUST-001"
+    },
+    "source_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corpus",
+        "gold_adjudication",
+        "scoring",
+        "candidate_execution_authorized",
+        "production_keys_authorized",
+        "physical_execution_authorized"
+      ],
+      "properties": {
+        "corpus": {
+          "const": "blueprint_only"
+        },
+        "gold_adjudication": {
+          "const": "not_yet_adjudicated"
+        },
+        "scoring": {
+          "const": "not_scored"
+        },
+        "candidate_execution_authorized": {
+          "const": false
+        },
+        "production_keys_authorized": {
+          "const": false
+        },
+        "physical_execution_authorized": {
+          "const": false
+        }
+      }
+    },
+    "standards": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "source_uri"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_uri": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "family",
+          "critical",
+          "intent",
+          "expected_disposition",
+          "seeded_attack"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TRUST-(P|N)[0-9]{2}$"
+          },
+          "kind": {
+            "enum": [
+              "positive_blueprint",
+              "negative_control_blueprint"
+            ]
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "seeded_attack": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
