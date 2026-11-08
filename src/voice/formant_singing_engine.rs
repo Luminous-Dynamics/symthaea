@@ -781,6 +781,11 @@ impl SingingVoiceEngine for FormantSingingEngine {
 mod tests {
     use super::*;
     use crate::voice::singing_engine::Note;
+    use symthaea_pronunciation_plan::{
+        CandidateProvenance, CandidateSource, Phone, PhoneKind, PronunciationCandidate,
+        PronunciationSyllable, ResolutionState, ScoreEvent, ScoreEventSpan, SelectionAuthority,
+        SelectionReceipt, SyllableNoteBinding, VocalPhraseSpan, WordPronunciation,
+    };
 
     fn note(start_time: f32, duration: f32, frequency: f32) -> Note {
         Note {
@@ -789,6 +794,295 @@ mod tests {
             duration,
             velocity: 0.7,
         }
+    }
+
+    fn selected_word(
+        surface: &str,
+        start_byte: usize,
+        candidate_id: &str,
+        phones: Vec<Phone>,
+    ) -> WordPronunciation {
+        let candidate = PronunciationCandidate {
+            candidate_id: candidate_id.to_string(),
+            provenance: CandidateProvenance {
+                source: CandidateSource::HumanReviewed,
+                provider_id: "fixture-reviewer".to_string(),
+                provider_version: "1".to_string(),
+                source_digest: format!("blake3:{}", "0".repeat(64)),
+            },
+            raw_provider_score: None,
+            syllables: vec![PronunciationSyllable { stress: 1, phones }],
+        };
+        WordPronunciation {
+            start_byte,
+            end_byte: start_byte + surface.len(),
+            surface: surface.to_string(),
+            state: ResolutionState::Selected,
+            candidates: vec![candidate],
+            selected_candidate_id: Some(candidate_id.to_string()),
+            selection_receipt: Some(SelectionReceipt {
+                authority: SelectionAuthority::HumanReviewer,
+                evidence_reference: format!("review:{candidate_id}"),
+            }),
+        }
+    }
+
+    fn phone(ipa: &str, kind: PhoneKind) -> Phone {
+        Phone {
+            ipa: ipa.to_string(),
+            kind,
+        }
+    }
+
+    fn resolved_read_now_fixture() -> (PronunciationPlan, VocalScoreAlignment) {
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".to_string(),
+            source_text: "read now".to_string(),
+            words: vec![
+                selected_word(
+                    "read",
+                    0,
+                    "read-past",
+                    vec![
+                        phone("ɹ", PhoneKind::Consonant),
+                        phone("ɛ", PhoneKind::Vowel),
+                        phone("d", PhoneKind::Consonant),
+                    ],
+                ),
+                selected_word(
+                    "now",
+                    5,
+                    "now-standard",
+                    vec![
+                        phone("n", PhoneKind::Consonant),
+                        phone("aʊ", PhoneKind::Vowel),
+                    ],
+                ),
+            ],
+        };
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![
+                ScoreEvent {
+                    start_s: 0.0,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.4,
+                    duration_s: 0.2,
+                    kind: ScoreEventKind::Rest,
+                },
+                ScoreEvent {
+                    start_s: 0.6,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+            syllable_bindings: vec![
+                SyllableNoteBinding {
+                    word_index: 0,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.4,
+                    }],
+                    melisma_phone_index: None,
+                },
+                SyllableNoteBinding {
+                    word_index: 1,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 2,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.4,
+                    }],
+                    melisma_phone_index: None,
+                },
+            ],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+        };
+        (pronunciation, alignment)
+    }
+
+    #[test]
+    fn resolved_plan_renderer_uses_selected_phones_without_rerunning_g2p() {
+        let (pronunciation, alignment) = resolved_read_now_fixture();
+        let mut engine = FormantSingingEngine::default();
+        let frames = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap();
+        let frame_at = |time_s: f32| {
+            frames
+                .iter()
+                .find(|frame| (frame.time - time_s).abs() < 1e-5)
+                .unwrap()
+        };
+        assert_eq!(frame_at(0.20).source_type, SourceType::Vowel);
+        assert_eq!(frame_at(0.50).source_type, SourceType::Silent);
+        assert_eq!(frame_at(0.70).source_type, SourceType::Nasal);
+        assert_eq!(frame_at(0.90).source_type, SourceType::Vowel);
+
+        let stem = engine
+            .render_resolved_plan(&pronunciation, &alignment)
+            .unwrap();
+        stem.validate().unwrap();
+        assert_eq!(stem.backend, "formant-vocoder-singing-resolved-plan-v1");
+        assert_eq!(stem.sample_rate, 24_000);
+    }
+
+    #[test]
+    fn resolved_plan_renderer_allows_two_syllables_to_share_one_long_note() {
+        let (mut pronunciation, _) = resolved_read_now_fixture();
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![ScoreEvent {
+                start_s: 0.0,
+                duration_s: 1.0,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            }],
+            syllable_bindings: vec![
+                SyllableNoteBinding {
+                    word_index: 0,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.45,
+                    }],
+                    melisma_phone_index: None,
+                },
+                SyllableNoteBinding {
+                    word_index: 1,
+                    syllable_index: 0,
+                    spans: vec![ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.45,
+                        end_offset_s: 1.0,
+                    }],
+                    melisma_phone_index: None,
+                },
+            ],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.0,
+            }],
+        };
+        pronunciation.source_text = "read now".to_string();
+        let mut engine = FormantSingingEngine::default();
+        let frames = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap();
+        let at_end_of_first = frames.iter().find(|frame| (frame.time - 0.35).abs() < 1e-5).unwrap();
+        let at_start_of_second =
+            frames.iter().find(|frame| (frame.time - 0.55).abs() < 1e-5).unwrap();
+        assert_eq!(at_end_of_first.source_type, SourceType::Vowel);
+        assert_eq!(at_start_of_second.source_type, SourceType::Nasal);
+    }
+
+    #[test]
+    fn resolved_plan_renderer_sustains_only_designated_vowel_across_melisma() {
+        let word = selected_word(
+            "read",
+            0,
+            "read-past",
+            vec![
+                phone("ɹ", PhoneKind::Consonant),
+                phone("ɛ", PhoneKind::Vowel),
+                phone("d", PhoneKind::Consonant),
+            ],
+        );
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".to_string(),
+            source_text: "read".to_string(),
+            words: vec![word],
+        };
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![
+                ScoreEvent {
+                    start_s: 0.0,
+                    duration_s: 0.5,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.5,
+                    duration_s: 0.5,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+            syllable_bindings: vec![SyllableNoteBinding {
+                word_index: 0,
+                syllable_index: 0,
+                spans: vec![
+                    ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.5,
+                    },
+                    ScoreEventSpan {
+                        event_index: 1,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.5,
+                    },
+                ],
+                melisma_phone_index: Some(1),
+            }],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 1,
+                breath_before_s: 0.0,
+                breath_after_s: 0.0,
+            }],
+        };
+        let mut engine = FormantSingingEngine::default();
+        let frames = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap();
+        let second_note = frames
+            .iter()
+            .find(|frame| (frame.time - 0.7).abs() < 1e-5)
+            .unwrap();
+        assert_eq!(second_note.source_type, SourceType::Vowel);
+        assert!((second_note.f0 - 246.94).abs() < 0.01);
+    }
+
+    #[test]
+    fn resolved_plan_renderer_rejects_phones_outside_calibrated_inventory() {
+        let mut pronunciation = resolved_read_now_fixture().0;
+        pronunciation.words[0].candidates[0].syllables[0].phones[0].ipa = "ɣ".to_string();
+        let alignment = resolved_read_now_fixture().1;
+        let mut engine = FormantSingingEngine::default();
+        let error = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("outside the calibrated legacy formant inventory"), "{error}");
     }
 
     #[test]
