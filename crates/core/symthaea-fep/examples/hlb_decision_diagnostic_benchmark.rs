@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "claim_ceiling": "A deterministic finite-hypothesis policy comparison only; no live ActiveInferenceAgent, trained RL, field, or deployment result is established.",
         "source_sha": source_sha,
         "protocol": {
-            "task_id": scenario.scenario_id,
+            "task_id": scenario.scenario_id.clone(),
             "episodes": EPISODES,
             "seed": SEED,
             "seed_hex": format!("0x{SEED:016X}"),
