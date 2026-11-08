@@ -517,6 +517,84 @@ REA implication:
 - A proof graph is claim-local semantics, not a duplicate general evidence graph. Every leaf remains tied to immutable Evidence IDs and exact source spans.
 - Score correctness of the decomposition separately from retrieval, extraction, warrant and source admissibility.
 
+## 6.4 First-unrecoverable-failure trajectory benchmark
+
+A final report can be correct by accident after an earlier invalid step, or wrong because the earliest necessary observation was never acquired. REA should therefore grade the *trajectory of evidence state*, not just final task outcome.
+
+### Trace contract
+
+Each immutable trace event should bind:
+- monotonically increasing sequence number and event type;
+- actor/tool/provider identity, version and operation/config digest;
+- exact target/artifact/session scope and environment;
+- request and response raw-byte digests, with original objects retained in the benchmark store;
+- Evidence IDs created, consumed or superseded by the event;
+- obligations touched and their before/after states;
+- applicable authorization, reversibility, target-impact and resource guards;
+- deterministic monitor outputs and any human/judge annotation;
+- parent event IDs and event-time / acquisition-time distinctions.
+
+The benchmark's hidden adjudication adds:
+- first contract violation;
+- first claim-warrant violation;
+- first provenance/admissibility violation;
+- first unrecoverable state transition (if any);
+- whether recovery without reset/reacquisition remained possible;
+- minimal causal event set and earliest evidence that would have detected the problem.
+
+Agent-visible traces must not include future events, hidden failure indices, gold causal sets or grader annotations.
+
+### Failure-state vocabulary
+
+- **Recoverable error:** an incorrect/missing step that can be corrected while preserving target and Evidence identity (for example, re-querying an unacquired page).
+- **Recoverable with reacquisition:** the current derivation must be discarded and fresh Evidence acquired (for example, a stale artifact scope).
+- **Unrecoverable without reset:** the investigation state can no longer support the original claim because an irreversible or unauthorized action, identity loss, hidden mutation, or untraceable transformation occurred.
+- **No valid failure:** the trajectory remains within all contract and scope limits.
+- **Unadjudicable:** trace coverage is insufficient to locate a failure reliably; this must not be silently scored as success.
+
+A later passing test must not erase a prior unauthorized write, destructive intervention, false Evidence upgrade or source-identity substitution. Recovery creates a new trace branch/state; it does not rewrite the earlier record.
+
+### Matched evaluator arms
+
+1. Final-outcome-only grader.
+2. Generic LLM trajectory reviewer.
+3. Deterministic tool-schema/authorization/obligation monitor.
+4. Evidence-grounded first-failure localizer with exact request/response/Evidence links.
+5. Full REA + Symthaea: monitor, first-failure localization, proof-obligation diagnosis and next authorized observation proposal.
+
+All arms receive the same agent-visible trace prefix and budget. Hidden events and adjudication labels remain withheld. Include both successful recovery traces and traces where a later recovery attempt cannot restore the original claim.
+
+### Metrics
+
+- Exact first-violation step accuracy and ±1-step tolerance.
+- Exact first-unrecoverable-step accuracy.
+- Mean reciprocal rank of candidate failure steps.
+- False critical-failure rate and missed-failure rate.
+- Earliest invalid claim assertion and obligation-transition accuracy.
+- Recovery classification accuracy (recoverable / reacquire / reset-required).
+- Recovery action precision: did the proposed recovery actually restore a valid evidence state?
+- Downstream wasted tool calls and cost after the earliest recoverable warning.
+- Completeness and validity of links to exact trace bytes, schema versions, Evidence IDs and artifact scopes.
+- Human agreement and unadjudicable fraction.
+- Localization latency, tool calls and reviewer time.
+
+Separate deterministic monitor precision/recall from LLM/judge attribution. A judge's plausible explanation is not a trace-backed violation.
+
+### Adversarial trajectory controls
+
+- Agent uses a tool output after its target artifact digest changes.
+- Provider self-report is promoted to independent observation.
+- Candidate predicted outcome is treated as an observed outcome.
+- Missing page is silently skipped while final pagination cursor says complete.
+- Shared-source provider output is counted as new independent support.
+- A stale advisory is promoted to current-version applicability.
+- An irreversible production action is attempted without authorization.
+- A valid later result is used to overwrite an earlier violation.
+- A recovery query fixes extraction but not the original source identity.
+- Tool output omits a required request/response digest or operation profile.
+- A late contradiction invalidates a previously satisfied obligation.
+- An agent abstains correctly when the trace cannot establish the target scope.
+
 ## 7. Industry boundary
 
 REA composes rather than replaces:
