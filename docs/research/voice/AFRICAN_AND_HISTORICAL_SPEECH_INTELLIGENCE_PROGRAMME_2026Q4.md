@@ -741,7 +741,7 @@ The new track schemas distinguish external paper comparators, language-profile a
 ### 17.4 FER/TER golden vectors
 
 The shared synthetic conformance set is:
-- `phonological_feature_golden_v0.1.json` (10 vectors);
+- `phonological_feature_golden_v0.1.json` (10 vectors, including 40 per-feature diagnostic rows);
 - `phonological_feature_golden_v0.1.schema.json` (JSON Schema Draft 2020-12).
 
 Cases cover exact match, fractional feature substitutions, NA masking, separate tone/segmental errors, tone non-estimability, tone-bearing deletion, custom gap penalties, all-NA insertions and no-active-reference non-estimability. The expected arithmetic was independently recomputed in JavaScript against the declared scoring policy with no mismatches. This does not execute the Rust scorer or establish reference-implementation parity.
@@ -791,7 +791,7 @@ The FER/TER and acoustic-faithfulness sets were independently recomputed with se
 
 ### 17.7 Per-feature disagreement diagnostics
 
-FER/TER now also returns one diagnostic per feature dimension in the profile's stable order:
+FER/TER now also returns one diagnostic per feature dimension in the profile's stable order. The ten synthetic golden vectors pin 40 dimension-level rows (four dimensions across ten cases), independently formula-checked with no mismatches:
 - active aligned-pair count;
 - mismatch count;
 - mismatch rate, or non-estimable when no aligned pair activates that dimension.
