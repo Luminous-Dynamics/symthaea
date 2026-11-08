@@ -618,8 +618,9 @@ mod tests {
         let operator = Poisson1d::new(n).unwrap();
         let truth: Vec<f64> = (0..n).map(|i| (0.11 * (i as f64 + 1.0)).sin()).collect();
         let (rhs, _) = operator.known_solution(&truth).unwrap();
-        let solution = conjugate_gradient(&operator, &rhs, 1.0e-11, 4 * n).unwrap();
+        let solution = conjugate_gradient(&operator, &rhs, 1.0e-11, 20 * n).unwrap();
         assert!(solution.converged);
+        assert!(solution.iterations <= n);
         let metrics = error_metrics(&operator, &rhs, &solution.x, &truth).unwrap();
         assert!(metrics.relative_residual < 1.0e-10);
         assert!(metrics.relative_forward_error < 1.0e-8);
