@@ -1,0 +1,196 @@
+{
+  "schema_version": "sym-rsi-rrsi-source-lock-v0",
+  "status": "MANIFEST_TEMPLATE_UNACQUIRED",
+  "generated_on": "2026-11-07",
+  "issue": "#10846",
+  "purpose": "Versioned reproduction lock for RRSI regularized harness evolution. Paper-reported result vectors are transcribed for comparison; no source archive, benchmark payload or experiment has been acquired/run by this manifest authoring step.",
+  "sources": {
+    "paper": {
+      "title": "RRSI: Regularized Recursive Self-Improvement of Agent Harnesses",
+      "arxiv_id": "2609.24972v3",
+      "submitted_on": "2026-09-21",
+      "revision_date": "2026-10-04",
+      "url": "https://arxiv.org/abs/2609.24972v3",
+      "manuscript_sha256": "__ACQUIRE_EXACT_PDF_SHA256__",
+      "acquired": false
+    },
+    "implementation": {
+      "repository": "https://github.com/google-research/rrsi",
+      "declared_license": "Apache-2.0",
+      "default_branch": "main",
+      "exact_commit": "__ACQUIRE_EXACT_GIT_COMMIT__",
+      "source_archive_sha256": "__ACQUIRE_EXACT_SOURCE_ARCHIVE_SHA256__",
+      "acquired": false
+    }
+  },
+  "search_method": {
+    "proposer_edit_budget": "Temporally annealed cap on independent edits bundled into one candidate.",
+    "history_conditioning": "Proposer is conditioned on accepted and rejected edit history to avoid reissuing falsified hypotheses.",
+    "stalled_search": "When progress stalls, direct proposals toward components not yet exercised.",
+    "critic": "Screen candidate edits for benchmark-specific logic before task evaluation; exact critic prompt/model/source digest must be locked.",
+    "selector": "Noise-adjusted improvement floor, cost rule, within-band decision and selection among candidates.",
+    "pruner": "Remove edits that are too small, too expensive or no longer useful.",
+    "novelty": "Track structural components that have not appeared in winning edits.",
+    "candidate_execution": "Each candidate in a separate Git worktree; accepted winner advances incumbent branch.",
+    "candidate_count_per_round": 2
+  },
+  "execution_domains": [
+    {
+      "domain": "coding",
+      "evolve_benchmark": "Terminal-Bench 2.1",
+      "ood_benchmarks": [
+        "SWE-bench Verified"
+      ],
+      "base_policy_model": "Claude Opus 4.8",
+      "reference_harness": "__LOCK_BASE_HARNESS_COMMIT__",
+      "domain_config_sha256": "__ACQUIRE_DOMAIN_CONFIG_SHA256__",
+      "task_manifest_sha256": "__ACQUIRE_TASK_MANIFEST_SHA256__",
+      "oracle_version_sha256": "__ACQUIRE_ORACLE_VERSION_SHA256__",
+      "reported_scores": [
+        {
+          "benchmark": "Terminal-Bench 2.1",
+          "role": "evolve",
+          "baseline_h0": 74.2,
+          "rrsi": 80.2,
+          "delta": 6
+        },
+        {
+          "benchmark": "SWE-bench Verified",
+          "role": "ood",
+          "baseline_h0": 82,
+          "rrsi": 83.8,
+          "delta": 1.8
+        }
+      ],
+      "reported_noise_band": 0.017
+    },
+    {
+      "domain": "workspace",
+      "evolve_benchmark": "Harvey LAB",
+      "in_distribution_heldout": [
+        "Harvey LAB heldout 40-task split"
+      ],
+      "ood_benchmarks": [
+        "JobBench",
+        "GDPval",
+        "APEX-Agents"
+      ],
+      "base_policy_model": "Claude Opus 4.8",
+      "grader_model": "Gemini 3.5 Flash",
+      "base_harness_and_environment_commit": "__LOCK_BASE_HARNESS_AND_HARVEY_COMMIT__",
+      "domain_config_sha256": "__ACQUIRE_DOMAIN_CONFIG_SHA256__",
+      "task_manifest_sha256": "__ACQUIRE_TASK_MANIFEST_SHA256__",
+      "oracle_version_sha256": "__ACQUIRE_ORACLE_VERSION_SHA256__",
+      "reported_scores": [
+        {
+          "benchmark": "Harvey LAB",
+          "role": "evolve",
+          "baseline_h0": 89.4,
+          "rrsi": 90.5,
+          "delta": 1.1
+        },
+        {
+          "benchmark": "Harvey LAB",
+          "role": "id_heldout",
+          "baseline_h0": 86.9,
+          "rrsi": 89.2,
+          "delta": 2.3
+        },
+        {
+          "benchmark": "JobBench",
+          "role": "ood",
+          "baseline_h0": 36,
+          "rrsi": 40.7,
+          "delta": 4.7
+        },
+        {
+          "benchmark": "GDPval",
+          "role": "ood",
+          "baseline_h0": 48.8,
+          "rrsi": 52.3,
+          "delta": 3.5
+        },
+        {
+          "benchmark": "APEX-Agents",
+          "role": "ood",
+          "baseline_h0": 34.2,
+          "rrsi": 37.9,
+          "delta": 3.7
+        }
+      ],
+      "reported_noise_band": 0.004
+    },
+    {
+      "domain": "engineering_design",
+      "evolve_benchmark": "EngDesign",
+      "ood_benchmarks": [
+        "Frontier-Eng"
+      ],
+      "base_policy_model": "Claude Opus 4.8",
+      "base_harness_commit": "__LOCK_BASE_HARNESS_COMMIT__",
+      "domain_config_sha256": "__ACQUIRE_DOMAIN_CONFIG_SHA256__",
+      "task_manifest_sha256": "__ACQUIRE_TASK_MANIFEST_SHA256__",
+      "oracle_version_sha256": "__ACQUIRE_ORACLE_VERSION_SHA256__",
+      "reported_scores": [
+        {
+          "benchmark": "EngDesign",
+          "role": "evolve",
+          "baseline_h0": 50,
+          "rrsi": 54.9,
+          "delta": 4.9
+        },
+        {
+          "benchmark": "Frontier-Eng",
+          "role": "ood",
+          "baseline_h0": 17.7,
+          "rrsi": 22,
+          "delta": 4.3
+        }
+      ],
+      "reported_noise_band": 0.02
+    }
+  ],
+  "resource_and_accounting_lock": {
+    "proposer_model_and_calls": "REQUIRED",
+    "critic_model_and_calls": "REQUIRED",
+    "analyst_and_digester_model_and_calls": "REQUIRED",
+    "candidate_execution_inference_cost": "REQUIRED",
+    "benchmark_evaluation_cost": "REQUIRED",
+    "tool_calls_and_api_prices": "REQUIRED",
+    "input_output_tokens_by_role": "REQUIRED",
+    "retries_invalid_and_failed_candidates": "REQUIRED",
+    "wall_clock_cpu_gpu_memory_energy": "REQUIRED_WHERE_MEASURED",
+    "human_review_and_rework_time": "REQUIRED",
+    "total_budget_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "reproduction_design": {
+    "baseline_h0_repeated_runs": true,
+    "compare_unregularized_and_full_rrsi": true,
+    "isolate_each_regularizer": true,
+    "preserve_best_so_far_and_final_separately": true,
+    "fresh_family_transfer": true,
+    "fixed_backbone_factor": true,
+    "post_initialization_improvement_measured": true,
+    "same_start_and_matched_realized_cost_for_r4": true,
+    "report_capability_vector_and_worst_family_regression": true
+  },
+  "limitations": [
+    "Reported scores are paper-reported and are not local reproductions.",
+    "Policy-token reduction is not total-cost reduction unless proposer, critic, target inference, evaluation, retries and human work are counted.",
+    "A regularized harness win is a product/harness result, not R4 unless the improved procedure itself is inherited and improves later optimization.",
+    "All source, environment, task, oracle and baseline digests remain unacquired placeholders."
+  ],
+  "reported_source_discrepancies": [
+    {
+      "metric": "maximum_ood_improvement_in_paper",
+      "paper_abstract_claim_points": 4.3,
+      "detailed_table_jobbench_points": 4.7,
+      "public_repository_readme_jobbench_points": 4.7,
+      "handling": "Preserve as a source-level discrepancy. The reproduction ledger must report every named OOD benchmark individually and must not quote one maximum without naming whether it came from the abstract or detailed table/README.",
+      "sources": [
+        "https://arxiv.org/abs/2609.24972v3",
+        "https://github.com/google-research/rrsi"
+      ]
+    }
+  ]
+}

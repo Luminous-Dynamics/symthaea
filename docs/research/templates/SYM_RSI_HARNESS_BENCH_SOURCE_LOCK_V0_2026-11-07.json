@@ -1,0 +1,103 @@
+{
+  "schema_version": "sym-rsi-harness-bench-source-lock-v0",
+  "status": "MANIFEST_TEMPLATE_UNACQUIRED",
+  "purpose": "Version-separated source lock for reproducing Harness-Bench. No task payload, code archive or run artifact has been acquired by this manifest authoring step.",
+  "generated_on": "2026-11-07",
+  "issue": "#10846",
+  "sources": {
+    "paper_v2": {
+      "title": "Harness-Bench: Evaluating Agent Harnesses across Models and Realistic Workflows",
+      "arxiv_id": "2605.27922v2",
+      "revision_date": "2026-10-15",
+      "url": "https://arxiv.org/abs/2605.27922v2",
+      "html_url": "https://arxiv.org/html/2605.27922v2",
+      "manuscript_license": "CC-BY-4.0",
+      "reported_tasks": {
+        "total": 300,
+        "general": 274,
+        "multimodal": 26
+      },
+      "reported_harnesses": 7,
+      "reported_backends": {
+        "general": 10,
+        "multimodal": 7
+      },
+      "reported_execution_trajectories": 5194,
+      "reported_scored_modules": 1408,
+      "task_oracle": "Hidden task-specific non-LLM oracles on final artifacts and workspace state; module-level partial credit and risk/safety gates.",
+      "immutable_source_commit": "__ACQUIRE_EXACT_SOURCE_COMMIT__",
+      "paper_file_sha256": "__ACQUIRE_EXACT_PDF_SHA256__",
+      "source_asset_manifest_sha256": "__ACQUIRE_EXACT_ASSET_MANIFEST_SHA256__",
+      "task_catalog_sha256": "__ACQUIRE_EXACT_TASK_CATALOG_SHA256__",
+      "oracle_version_sha256": "__ACQUIRE_EXACT_ORACLE_VERSION_SHA256__",
+      "evaluation_protocol_sha256": "__ACQUIRE_EXACT_PROTOCOL_SHA256__",
+      "acquired": false
+    },
+    "live_site_snapshot": {
+      "title": "Harness Bench live project snapshot",
+      "url": "https://www.harness-bench.ai/",
+      "observed_on": "2026-11-07",
+      "site_reported_tasks": 300,
+      "site_reported_harnesses": 7,
+      "site_reported_model_backends": 10,
+      "site_reported_evaluated_runs": 20454,
+      "snapshot_html_sha256": "__ACQUIRE_EXACT_SITE_SNAPSHOT_SHA256__",
+      "task_catalog_sha256": "__ACQUIRE_EXACT_TASK_CATALOG_SHA256__",
+      "oracle_version_sha256": "__ACQUIRE_EXACT_ORACLE_VERSION_SHA256__",
+      "run_release_manifest_sha256": "__ACQUIRE_EXACT_RUN_RELEASE_MANIFEST_SHA256__",
+      "acquired": false
+    },
+    "code_repository": {
+      "url": "https://github.com/Qihoo360/harness-bench",
+      "exact_commit": "__ACQUIRE_EXACT_GIT_COMMIT__",
+      "archive_sha256": "__ACQUIRE_EXACT_SOURCE_ARCHIVE_SHA256__",
+      "license": "VERIFY_AT_EXACT_COMMIT",
+      "acquired": false
+    }
+  },
+  "non_equivalence_policy": "Paper-v2 reports 5,194 execution trajectories; the live website snapshot reports 20,454 evaluated runs. These are separately versioned source observations. Do not sum, average, pool, or imply one denominator unless a source release manifest demonstrates identical task, model, harness, run and evaluator identities.",
+  "right_and_access_review": {
+    "benchmark_task_assets": "REVIEW_REQUIRED",
+    "task_input_rights": "REVIEW_REQUIRED",
+    "reference_solution_rights": "REVIEW_REQUIRED",
+    "hidden_oracle_rights": "REVIEW_REQUIRED",
+    "redistribution_permitted": false,
+    "use_scope": "Do not acquire or redistribute payloads until exact repository/catalog licenses and benchmark terms are reviewed."
+  },
+  "reproduction_design": {
+    "matrix": "model_backend × native_harness × frozen_task_release",
+    "primary_outcomes": [
+      "full_credit_R1",
+      "module_mean_score",
+      "R0_8",
+      "safety_gate_pass"
+    ],
+    "secondary_outcomes": [
+      "api_cost",
+      "input_tokens",
+      "output_tokens",
+      "provider_requests",
+      "wall_clock",
+      "turn_count",
+      "tool_error_rate",
+      "human_intervention_minutes"
+    ],
+    "comparison_arms": [
+      "shared_harness_selected_on_development",
+      "per_model_harness_selected_on_development",
+      "model_agnostic_selector",
+      "minimal_harness_where_interface_equivalent"
+    ],
+    "split_policy": "Partition by task-family/workflow lineage before harness selection. Hold out complete families and, where supported, one model backend. Never select a harness using held-out results.",
+    "checkpoint_policy": "Freeze selector and selected model-harness pair before held-out evaluation. No test-best checkpoint selection.",
+    "cost_boundary": "Include proposal, selector, agent inference, tool/API, evaluator, retry/failure, human review/rework and any training cost. Report each component separately.",
+    "run_replication_unit": "Independent task-family blocks and model-harness run seeds; keep tasks within one stateful rollout clustered.",
+    "comparison_note": "A configuration-selection result does not establish an improved harness proposer or an R4 result."
+  },
+  "limitations": [
+    "All digest fields remain explicit acquisition placeholders; no hash is guessed or asserted.",
+    "The paper-v2 and live-site snapshots may use different run populations and must remain separate.",
+    "A public website summary is not a substitute for a frozen catalog, oracle version and exact source commit.",
+    "A reproduced model-harness matrix does not establish recursive improvement of the procedure that produces later harness revisions."
+  ]
+}

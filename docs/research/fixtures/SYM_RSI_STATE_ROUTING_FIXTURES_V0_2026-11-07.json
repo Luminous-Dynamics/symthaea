@@ -1,0 +1,276 @@
+{
+  "schema_version": "sym-rsi-state-routing-fixtures-v0",
+  "date": "2026-11-07",
+  "status": "SYNTHETIC_FIXTURE_DESCRIPTIONS_NOT_BENCHMARK_RESULTS",
+  "source_issue": "#10844",
+  "source_protocol": "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json",
+  "purpose": "Synthetic design cases for scope-aware research-state routing. They contain no real task content, hidden labels, real memory records, credentials, user data or measured outcomes.",
+  "expected_fixture_count": 16,
+  "expected_negative_count": 10,
+  "expected_positive_count": 4,
+  "expected_abstention_count": 2,
+  "fixtures": [
+    {
+      "fixture_id": "SR-N01",
+      "control_id": "lexical_alias_unrelated_family",
+      "category": "false sharing",
+      "scenario": "Two tasks share prominent words but have disjoint source-family lineage, incompatible goals and no verified reusable mechanism. The router assigns them to one cluster based on lexical similarity.",
+      "disposition": "REJECT_CROSS_SCOPE_SHARE",
+      "hard_gate": true,
+      "fields": [
+        "task_scope_descriptors",
+        "source_family_lineage",
+        "route_input_digest",
+        "selected_cluster_id",
+        "sharing_rationale"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N02",
+      "control_id": "unreceipted_cross_cluster_copy",
+      "category": "transfer provenance",
+      "scenario": "An agent copies a finding from cluster A into cluster B without a transfer receipt, source evidence identity or target-scope check.",
+      "disposition": "REJECT_UNRECEIPTED_TRANSFER",
+      "hard_gate": true,
+      "fields": [
+        "source_cluster_id",
+        "target_cluster_id",
+        "source_record_digest",
+        "transfer_receipt_ref",
+        "scope_compatibility_result"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N03",
+      "control_id": "stale_evaluator_epoch_currentness",
+      "category": "stale evidence",
+      "scenario": "A finding scored under evaluator epoch E1 is surfaced as current evidence under E2 without bridge/revalidation or a scope-validity check.",
+      "disposition": "REJECT_STALE_CURRENTNESS",
+      "hard_gate": true,
+      "fields": [
+        "source_evaluator_epoch",
+        "current_evaluator_epoch",
+        "validity_state",
+        "revalidation_ref",
+        "claim_scope"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N04",
+      "control_id": "hidden_future_task_identifier",
+      "category": "privileged routing leakage",
+      "scenario": "The router sees a future task ID or hidden family label that reveals which cluster contains the answer or relevant payoff.",
+      "disposition": "REJECT_HIDDEN_LABEL_ROUTING",
+      "hard_gate": true,
+      "fields": [
+        "router_input_manifest",
+        "visible_metadata_allowlist",
+        "sealed_access_audit",
+        "future_identifier_canary"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N05",
+      "control_id": "incompatible_tool_action_space",
+      "category": "invalid harness transfer",
+      "scenario": "A method relies on an API/tool action unavailable in the destination task, but the router recommends direct reuse without an adapter or capability check.",
+      "disposition": "REJECT_TOOL_SPACE_TRANSFER",
+      "hard_gate": true,
+      "fields": [
+        "source_tool_contract_digest",
+        "target_tool_contract_digest",
+        "required_actions",
+        "available_actions",
+        "adapter_or_refusal"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N06",
+      "control_id": "global_overmerge_cross_domain",
+      "category": "under-fragmentation",
+      "scenario": "Unrelated task families are merged into one global cluster; retrieval exposes conflicting, irrelevant or capability-incompatible experience and increases downstream error or cost.",
+      "disposition": "REJECT_GLOBAL_SCOPE_MERGE",
+      "hard_gate": true,
+      "fields": [
+        "cluster_scope_digest",
+        "member_family_ids",
+        "cross_family_relevance_audit",
+        "negative_transfer_outcomes",
+        "api_and_context_cost"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N07",
+      "control_id": "per_task_cluster_fragmentation",
+      "category": "over-fragmentation",
+      "scenario": "Every task instance receives a new cluster despite sharing an adjudicated family and reusable mechanism; the system loses validated transfer and incurs duplicate storage/index/retrieval cost.",
+      "disposition": "REJECT_EXCESSIVE_FRAGMENTATION",
+      "hard_gate": true,
+      "fields": [
+        "cluster_count",
+        "task_family_ids",
+        "duplicate_experiment_count",
+        "reuse_opportunities",
+        "storage_and_retrieval_cost"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N08",
+      "control_id": "contradiction_collapsed_across_scopes",
+      "category": "contradiction handling",
+      "scenario": "Two sibling scopes contain incompatible but individually valid findings. The router collapses them into one global fact or discards one without recording scope, time and provenance.",
+      "disposition": "REJECT_CONTRADICTION_COLLAPSE",
+      "hard_gate": true,
+      "fields": [
+        "both_source_record_digests",
+        "scope_ids",
+        "valid_time_and_as_known_time",
+        "contradiction_relation",
+        "resolution_or_unresolved_state"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N09",
+      "control_id": "outcome_reward_route_leakage",
+      "category": "outcome leakage",
+      "scenario": "The router uses private task rewards, final correctness labels or future measured outcomes to choose the cluster during evaluation.",
+      "disposition": "REJECT_OUTCOME_LEAKAGE",
+      "hard_gate": true,
+      "fields": [
+        "router_input_manifest",
+        "reward_visibility_policy",
+        "evaluator_only_fields",
+        "route_decision_trace"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-N10",
+      "control_id": "missing_lineage_false_share",
+      "category": "provenance failure",
+      "scenario": "A proposed cross-family sharing decision has no source-family lineage, no evidence anchor and no independent mechanism-transfer receipt, yet it is accepted as a positive transfer.",
+      "disposition": "REJECT_UNGROUNDED_SHARING",
+      "hard_gate": true,
+      "fields": [
+        "source_lineage_status",
+        "evidence_anchor",
+        "mechanism_transfer_receipt",
+        "independent_verifier_ref"
+      ],
+      "fixture_class": "adversarial_negative_control"
+    },
+    {
+      "fixture_id": "SR-P01",
+      "control_id": null,
+      "category": null,
+      "scenario": "Two tasks belong to the same adjudicated family, use compatible action/tool contracts and share a current verified mechanism. The router selects the existing family cluster and records the route.",
+      "disposition": "ALLOW_SCOPED_REUSE",
+      "hard_gate": false,
+      "fields": [
+        "same_family_witness",
+        "tool_contract_compatibility",
+        "scope_digest",
+        "route_decision_digest"
+      ],
+      "note": "Synthetic positive control; eligibility still depends on the real evidence and independent scope manifest.",
+      "fixture_class": "positive_control"
+    },
+    {
+      "fixture_id": "SR-P02",
+      "control_id": null,
+      "category": null,
+      "scenario": "An adjacent family may reuse one mechanism after a separately verified transfer probe establishes its applicability. The transfer receipt binds source and destination scope, mechanism and evidence.",
+      "disposition": "ALLOW_RECEIPTED_TRANSFER",
+      "hard_gate": false,
+      "fields": [
+        "source_and_target_scope_digests",
+        "mechanism_digest",
+        "transfer_probe_ref",
+        "transfer_receipt_digest"
+      ],
+      "note": "Synthetic positive control; no automatic generalization from lexical or task similarity.",
+      "fixture_class": "positive_control"
+    },
+    {
+      "fixture_id": "SR-P03",
+      "control_id": null,
+      "category": null,
+      "scenario": "A task arrives after its dependency/evaluator context changed. The router returns the relevant record only with its historical as-of state and requires revalidation before current use.",
+      "disposition": "REVALIDATE_BEFORE_REUSE",
+      "hard_gate": false,
+      "fields": [
+        "historical_validity_state",
+        "current_epoch",
+        "revalidation_requirement",
+        "route_explanation"
+      ],
+      "note": "Correct handling of stale evidence preserves history without granting current authority.",
+      "fixture_class": "positive_control"
+    },
+    {
+      "fixture_id": "SR-P04",
+      "control_id": null,
+      "category": null,
+      "scenario": "Two scopes contain incompatible findings. Both are retained with provenance and scope; the router declines to merge them and exposes the conflict only to an authorized query.",
+      "disposition": "PRESERVE_SCOPED_CONTRADICTION",
+      "hard_gate": false,
+      "fields": [
+        "left_record_digest",
+        "right_record_digest",
+        "scope_ids",
+        "contradiction_edge",
+        "authorized_visibility"
+      ],
+      "note": "Preserving a scoped contradiction is preferable to manufacturing consensus.",
+      "fixture_class": "positive_control"
+    },
+    {
+      "fixture_id": "SR-A01",
+      "control_id": null,
+      "category": null,
+      "scenario": "The task description is insufficient to distinguish two plausible task families and available scope descriptors do not resolve the ambiguity.",
+      "disposition": "ABSTAIN_SCOPE_UNIDENTIFIED",
+      "hard_gate": false,
+      "fields": [
+        "candidate_scope_ids",
+        "missing_discriminators",
+        "abstention_reason",
+        "human_resolution_ref"
+      ],
+      "note": "Abstention is the correct result when scope is not identifiable.",
+      "fixture_class": "abstention_control"
+    },
+    {
+      "fixture_id": "SR-A02",
+      "control_id": null,
+      "category": null,
+      "scenario": "A potentially useful cross-family mechanism is reported, but its source artifact, evaluator epoch or transfer evidence is missing.",
+      "disposition": "ABSTAIN_INSUFFICIENT_PROVENANCE",
+      "hard_gate": false,
+      "fields": [
+        "missing_lineage_fields",
+        "source_scope_id",
+        "evidence_status",
+        "abstention_reason"
+      ],
+      "note": "Do not share state until provenance and applicability can be checked.",
+      "fixture_class": "abstention_control"
+    }
+  ],
+  "scoring_policy": {
+    "hard_gate_rule": "Every negative fixture has a hard gate. Any real router that admits the prohibited route fails the relevant integrity criterion regardless of task score.",
+    "positive_control_rule": "Positive fixture descriptions test whether valid, scoped reuse and evidence-bearing transfer are possible; they are not proof of real-world transfer.",
+    "abstention_rule": "Unidentified scope or insufficient provenance must remain unresolved; forced routing is a failure.",
+    "denominator_rule": "All route attempts, rejected routes, abstentions and costs remain in the denominator. Do not report only successful reuse.",
+    "replication_unit": "Complete stateful task rollout / stream. Task instances within one evolving cluster state are dependent observations.",
+    "authority_boundary": "Fixture pack and its validator do not authenticate real source-family labels, scope evidence, independent custodians or memory stores."
+  }
+}
