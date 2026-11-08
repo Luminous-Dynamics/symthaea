@@ -290,6 +290,137 @@ where
     })
 }
 
+
+/// Exact language-switch boundary evaluation result.
+///
+/// Boundary positions use zero-based reference-token coordinates. A boundary
+/// occurs at position i when the language tag at i differs from tag i-1.
+/// Precision and recall are individually non-estimable when their respective
+/// predicted or reference boundary sets are empty. F1 is non-estimable only
+/// when both sets are empty.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SwitchBoundaryResult {
+    /// Reference switch-entry positions.
+    pub reference_positions: Vec<usize>,
+    /// Predicted switch-entry positions.
+    pub predicted_positions: Vec<usize>,
+    /// Exact-position matches.
+    pub true_positives: usize,
+    /// Predicted positions not present in the reference.
+    pub false_positives: usize,
+    /// Reference positions not present in the prediction.
+    pub false_negatives: usize,
+    /// TP / (TP + FP); absent if there are no predicted boundaries.
+    pub precision: Option<f64>,
+    /// TP / (TP + FN); absent if there are no reference boundaries.
+    pub recall: Option<f64>,
+    /// 2TP / (2TP + FP + FN); absent if both boundary sets are empty.
+    pub f1: Option<f64>,
+}
+
+/// Invalid switch-boundary metric input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundaryMetricError {
+    /// A non-empty token-aligned tag sequence is required.
+    EmptyTagSequence,
+    /// Reference and predicted language tags must have equal lengths.
+    TagLengthMismatch {
+        /// Number of reference tags.
+        reference_tags: usize,
+        /// Number of predicted tags.
+        predicted_tags: usize,
+    },
+}
+
+impl fmt::Display for BoundaryMetricError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyTagSequence => write!(f, "switch-boundary metrics require a non-empty tag sequence"),
+            Self::TagLengthMismatch {
+                reference_tags,
+                predicted_tags,
+            } => write!(
+                f,
+                "predicted tag count ({predicted_tags}) must equal reference tag count ({reference_tags})"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for BoundaryMetricError {}
+
+fn switch_entry_positions<L: PartialEq>(tags: &[L]) -> Vec<usize> {
+    (1..tags.len())
+        .filter(|&position| tags[position] != tags[position - 1])
+        .collect()
+}
+
+/// Compute exact language-switch boundary precision, recall and F1.
+///
+/// The caller supplies one reference and one predicted language/variety tag
+/// per aligned reference token. This function evaluates only the positions
+/// where adjacent tags change; it does not infer language IDs, align tokens,
+/// accept positional tolerance, or normalize labels.
+///
+/// Exact matching is intentional: a predicted switch one token away from the
+/// reference is one false positive plus one false negative. A future tolerant
+/// metric must have its own one-to-one matching contract.
+///
+/// Returns an empty-sequence error or tag-cardinality error for invalid input.
+pub fn switch_boundary_precision_recall_f1<L: PartialEq>(
+    reference_tags: &[L],
+    predicted_tags: &[L],
+) -> Result<SwitchBoundaryResult, BoundaryMetricError> {
+    if reference_tags.is_empty() {
+        return Err(BoundaryMetricError::EmptyTagSequence);
+    }
+    if reference_tags.len() != predicted_tags.len() {
+        return Err(BoundaryMetricError::TagLengthMismatch {
+            reference_tags: reference_tags.len(),
+            predicted_tags: predicted_tags.len(),
+        });
+    }
+
+    let reference_positions = switch_entry_positions(reference_tags);
+    let predicted_positions = switch_entry_positions(predicted_tags);
+
+    let true_positives = reference_positions
+        .iter()
+        .filter(|position| predicted_positions.binary_search(position).is_ok())
+        .count();
+    let false_positives = predicted_positions.len() - true_positives;
+    let false_negatives = reference_positions.len() - true_positives;
+
+    let precision = if predicted_positions.is_empty() {
+        None
+    } else {
+        Some(true_positives as f64 / predicted_positions.len() as f64)
+    };
+    let recall = if reference_positions.is_empty() {
+        None
+    } else {
+        Some(true_positives as f64 / reference_positions.len() as f64)
+    };
+
+    let f1_denominator = 2 * true_positives + false_positives + false_negatives;
+    let f1 = if f1_denominator == 0 {
+        None
+    } else {
+        Some((2 * true_positives) as f64 / f1_denominator as f64)
+    };
+
+    Ok(SwitchBoundaryResult {
+        reference_positions,
+        predicted_positions,
+        true_positives,
+        false_positives,
+        false_negatives,
+        precision,
+        recall,
+        f1,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{SwitchMetricError, switch_aware_error_rates};
@@ -502,4 +633,156 @@ mod tests {
         ).expect("valid fixture");
         assert_eq!(first, second);
     }
+
+    #[test]
+    fn exact_switch_boundaries_have_perfect_precision_recall_and_f1() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "en", "zu", "zu", "en"],
+            &["en", "en", "zu", "zu", "en"],
+        ).expect("valid fixture");
+        assert_eq!(result.reference_positions, vec![2, 4]);
+        assert_eq!(result.predicted_positions, vec![2, 4]);
+        assert_eq!(result.true_positives, 2);
+        assert_eq!(result.false_positives, 0);
+        assert_eq!(result.false_negatives, 0);
+        assert_eq!(result.precision, Some(1.0));
+        assert_eq!(result.recall, Some(1.0));
+        assert_eq!(result.f1, Some(1.0));
+    }
+
+    #[test]
+    fn missing_all_reference_boundaries_has_zero_recall_and_non_estimable_precision() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "en", "zu", "zu"],
+            &["en", "en", "en", "en"],
+        ).expect("valid fixture");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 0);
+        assert_eq!(result.false_negatives, 1);
+        assert_eq!(result.precision, None);
+        assert_eq!(result.recall, Some(0.0));
+        assert_eq!(result.f1, Some(0.0));
+    }
+
+    #[test]
+    fn false_extra_boundary_has_zero_precision_and_non_estimable_recall() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "en", "en"],
+            &["en", "zu", "en"],
+        ).expect("valid fixture");
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 0);
+        assert_eq!(result.precision, Some(0.0));
+        assert_eq!(result.recall, None);
+        assert_eq!(result.f1, Some(0.0));
+    }
+
+    #[test]
+    fn one_token_boundary_shift_is_one_false_positive_and_one_false_negative() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "en", "zu", "zu"],
+            &["en", "en", "en", "zu"],
+        ).expect("valid fixture");
+        assert_eq!(result.reference_positions, vec![2]);
+        assert_eq!(result.predicted_positions, vec![3]);
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 1);
+        assert_eq!(result.f1, Some(0.0));
+    }
+
+    #[test]
+    fn multiple_transitions_are_all_reported() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "zu", "en", "af", "en"],
+            &["en", "zu", "en", "af", "en"],
+        ).expect("valid fixture");
+        assert_eq!(result.reference_positions, vec![1, 2, 3, 4]);
+        assert_eq!(result.predicted_positions, vec![1, 2, 3, 4]);
+        assert_eq!(result.f1, Some(1.0));
+    }
+
+    #[test]
+    fn no_reference_and_no_predicted_boundaries_are_non_estimable() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["zu", "zu", "zu"],
+            &["zu", "zu", "zu"],
+        ).expect("valid fixture");
+        assert!(result.reference_positions.is_empty());
+        assert!(result.predicted_positions.is_empty());
+        assert_eq!(result.precision, None);
+        assert_eq!(result.recall, None);
+        assert_eq!(result.f1, None);
+    }
+
+    #[test]
+    fn empty_predicted_boundaries_keep_reference_recall_estimable() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "zu"],
+            &["en", "en"],
+        ).expect("valid fixture");
+        assert_eq!(result.precision, None);
+        assert_eq!(result.recall, Some(0.0));
+        assert_eq!(result.f1, Some(0.0));
+    }
+
+    #[test]
+    fn predicted_boundaries_with_no_reference_switches_are_false_positives() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "en"],
+            &["en", "zu"],
+        ).expect("valid fixture");
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 0);
+        assert_eq!(result.precision, Some(0.0));
+        assert_eq!(result.recall, None);
+        assert_eq!(result.f1, Some(0.0));
+    }
+
+    #[test]
+    fn empty_tag_sequence_is_rejected() {
+        let result = super::switch_boundary_precision_recall_f1::<&str>(&[], &[]);
+        assert_eq!(result, Err(super::BoundaryMetricError::EmptyTagSequence));
+    }
+
+    #[test]
+    fn tag_cardinality_mismatch_is_rejected() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "zu"],
+            &["en"],
+        );
+        assert_eq!(
+            result,
+            Err(super::BoundaryMetricError::TagLengthMismatch {
+                reference_tags: 2,
+                predicted_tags: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn repeated_same_language_tags_do_not_create_boundaries() {
+        let result = super::switch_boundary_precision_recall_f1(
+            &["en", "en", "en", "en"],
+            &["en", "en", "en", "en"],
+        ).expect("valid fixture");
+        assert!(result.reference_positions.is_empty());
+        assert!(result.predicted_positions.is_empty());
+        assert_eq!(result.f1, None);
+    }
+
+    #[test]
+    fn boundary_result_is_deterministic() {
+        let first = super::switch_boundary_precision_recall_f1(
+            &["en", "zu", "zu", "af"],
+            &["en", "en", "zu", "af"],
+        ).expect("valid fixture");
+        let second = super::switch_boundary_precision_recall_f1(
+            &["en", "zu", "zu", "af"],
+            &["en", "en", "zu", "af"],
+        ).expect("valid fixture");
+        assert_eq!(first, second);
+    }
+
 }
