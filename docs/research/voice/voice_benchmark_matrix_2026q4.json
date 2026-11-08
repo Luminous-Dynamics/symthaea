@@ -872,7 +872,7 @@
         "unanswerable_false_answer_and_override_denominators_remain_separate"
       ],
       "implementation_issue": 11140,
-      "implementation_pr": 11141
+      "implementation_pr": 11146
     }
   ],
   "promotion_gates": [
@@ -949,7 +949,7 @@
       "schema_path": "docs/research/voice/acoustic_faithfulness_golden_v0.1.schema.json",
       "cases": 10,
       "linked_issue": 11140,
-      "linked_pr": 11141,
+      "linked_pr": 11146,
       "metrics": [
         "audio_adherence",
         "context_override_rate",
