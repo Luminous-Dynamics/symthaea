@@ -24,3 +24,7 @@ path = "examples/theory_prediction_coverage.rs"
 [[example]]
 name = "model_discrimination_reference"
 path = "examples/model_discrimination_reference.rs"
+
+[[example]]
+name = "model_recovery_reference"
+path = "examples/model_recovery_reference.rs"
