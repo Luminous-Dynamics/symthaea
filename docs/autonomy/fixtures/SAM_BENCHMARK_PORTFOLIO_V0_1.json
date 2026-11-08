@@ -1115,14 +1115,17 @@
       "published_update": "2026-09-24",
       "source_status": "company_reported_operational_outcome",
       "exposure": {
-        "autonomous_miles_overall": 270000000,
+        "release_reported_fully_autonomous_miles_lower_bound": 270000000,
+        "data_hub_rider_only_miles": 271300000,
         "geographies": [
           "Atlanta",
           "Austin",
           "Los Angeles",
           "Phoenix",
           "San Francisco"
-        ]
+        ],
+        "measurement_window": "through_2026-06-30",
+        "definition_note": "The September release describes over 270 million fully autonomous operating miles; the Safety Impact data hub separately displays 271.3 million rider-only miles. Preserve the source-specific definitions and publication snapshots; do not treat rounded release and live dashboard values as exactly identical measures."
       },
       "metrics": {
         "all_locations_serious_injury_or_worse_crashes_per_million_miles": {
@@ -1141,7 +1144,8 @@
         "Geographic, mileage, outcome-definition, benchmark-adjustment and methodology assumptions are material.",
         "Do not compare directly with simulation benchmark scores or extrapolate to a different ODD.",
         "Reproduction requires the downloadable safety data, methodology, outcome definitions, release notes and geography/exposure denominators.",
-        "The 841 avoided-crash figure is an estimate against the stated human benchmark, not a directly observed counterfactual count."
+        "The 841 avoided-crash figure is an estimate against the stated human benchmark, not a directly observed counterfactual count.",
+        "The September release says over 270 million fully autonomous miles, while the current data hub separately displays 271.3 million rider-only miles. Preserve source-specific definitions and snapshots rather than conflating them."
       ],
       "sources": [
         "https://waymo.com/safety/impact/",
