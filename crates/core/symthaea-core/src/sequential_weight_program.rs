@@ -143,8 +143,9 @@ pub struct SignedSequentialVerifierAttestation {
 pub fn sequential_verifier_attestation_message(
     claims: &SequentialVerifierAttestationClaims,
 ) -> Result<[u8; 32], SequentialWeightProgramError> {
-    let encoded = serde_json::to_vec(claims)
-        .map_err(|_| SequentialWeightProgramError::InvalidDigest("verifier claims serialization"))?;
+    let encoded = serde_json::to_vec(claims).map_err(|_| {
+        SequentialWeightProgramError::InvalidDigest("verifier claims serialization")
+    })?;
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-sequential-verifier-attestation-v1\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
@@ -358,20 +359,46 @@ pub fn accept_verified_sequential_candidate(
         ));
     }
     for (field, value) in [
-        ("verification_protocol_digest", claims.verification_protocol_digest.as_str()),
-        ("result_manifest_digest", claims.result_manifest_digest.as_str()),
+        (
+            "verification_protocol_digest",
+            claims.verification_protocol_digest.as_str(),
+        ),
+        (
+            "result_manifest_digest",
+            claims.result_manifest_digest.as_str(),
+        ),
         ("template_digest", claims.template_digest.as_str()),
-        ("parent_candidate_model_digest", claims.parent_candidate_model_digest.as_str()),
-        ("candidate_native_model_digest", claims.candidate_native_model_digest.as_str()),
-        ("target_specification_digest", claims.target_specification_digest.as_str()),
-        ("evidence_batch_digest", claims.evidence_batch_digest.as_str()),
-        ("observation_manifest_digest", claims.observation_manifest_digest.as_str()),
+        (
+            "parent_candidate_model_digest",
+            claims.parent_candidate_model_digest.as_str(),
+        ),
+        (
+            "candidate_native_model_digest",
+            claims.candidate_native_model_digest.as_str(),
+        ),
+        (
+            "target_specification_digest",
+            claims.target_specification_digest.as_str(),
+        ),
+        (
+            "evidence_batch_digest",
+            claims.evidence_batch_digest.as_str(),
+        ),
+        (
+            "observation_manifest_digest",
+            claims.observation_manifest_digest.as_str(),
+        ),
         ("program_digest", claims.program_digest.as_str()),
-        ("candidate_snapshot_digest", claims.candidate_snapshot_digest.as_str()),
+        (
+            "candidate_snapshot_digest",
+            claims.candidate_snapshot_digest.as_str(),
+        ),
     ] {
         validate_digest(value)?;
         if value.is_empty() {
-            return Err(SequentialWeightProgramError::VerifierAttestationMismatch(field));
+            return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                field,
+            ));
         }
     }
     if claims.verifier_id.trim().is_empty() {
@@ -383,23 +410,65 @@ pub fn accept_verified_sequential_candidate(
         return Err(SequentialWeightProgramError::VerifierKeyIdMismatch);
     }
     if claims.session_id != session.session_id {
-        return Err(SequentialWeightProgramError::VerifierAttestationMismatch("session_id"));
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+            "session_id",
+        ));
     }
     if claims.batch_index != prepared.batch.batch_index {
-        return Err(SequentialWeightProgramError::VerifierAttestationMismatch("batch_index"));
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+            "batch_index",
+        ));
     }
     for (field, actual, expected) in [
-        ("template_digest", claims.template_digest.as_str(), prepared.template_digest.as_str()),
-        ("parent_candidate_model_digest", claims.parent_candidate_model_digest.as_str(), session.latest_candidate_model_digest.as_str()),
-        ("candidate_native_model_digest", claims.candidate_native_model_digest.as_str(), candidate_native_model_digest),
-        ("target_specification_digest", claims.target_specification_digest.as_str(), session.target_specification_digest.as_str()),
-        ("evidence_batch_digest", claims.evidence_batch_digest.as_str(), prepared.batch.evidence_batch_digest.as_str()),
-        ("observation_manifest_digest", claims.observation_manifest_digest.as_str(), prepared.batch.observation_manifest_digest.as_str()),
-        ("program_digest", claims.program_digest.as_str(), prepared.candidate.receipt.program_digest.as_str()),
-        ("candidate_snapshot_digest", claims.candidate_snapshot_digest.as_str(), prepared.candidate.receipt.candidate_snapshot_digest.as_str()),
+        (
+            "template_digest",
+            claims.template_digest.as_str(),
+            prepared.template_digest.as_str(),
+        ),
+        (
+            "parent_candidate_model_digest",
+            claims.parent_candidate_model_digest.as_str(),
+            session.latest_candidate_model_digest.as_str(),
+        ),
+        (
+            "candidate_native_model_digest",
+            claims.candidate_native_model_digest.as_str(),
+            candidate_native_model_digest,
+        ),
+        (
+            "target_specification_digest",
+            claims.target_specification_digest.as_str(),
+            session.target_specification_digest.as_str(),
+        ),
+        (
+            "evidence_batch_digest",
+            claims.evidence_batch_digest.as_str(),
+            prepared.batch.evidence_batch_digest.as_str(),
+        ),
+        (
+            "observation_manifest_digest",
+            claims.observation_manifest_digest.as_str(),
+            prepared.batch.observation_manifest_digest.as_str(),
+        ),
+        (
+            "program_digest",
+            claims.program_digest.as_str(),
+            prepared.candidate.receipt.program_digest.as_str(),
+        ),
+        (
+            "candidate_snapshot_digest",
+            claims.candidate_snapshot_digest.as_str(),
+            prepared
+                .candidate
+                .receipt
+                .candidate_snapshot_digest
+                .as_str(),
+        ),
     ] {
         if actual != expected {
-            return Err(SequentialWeightProgramError::VerifierAttestationMismatch(field));
+            return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                field,
+            ));
         }
     }
     let message = sequential_verifier_attestation_message(claims)?;
@@ -411,10 +480,8 @@ pub fn accept_verified_sequential_candidate(
     if !claims.accepted {
         return Err(SequentialWeightProgramError::VerifierRejectedCandidate);
     }
-    let verifier_receipt_digest = hash_value(
-        b"symthaea-sequential-verifier-envelope-v1\0",
-        attestation,
-    )?;
+    let verifier_receipt_digest =
+        hash_value(b"symthaea-sequential-verifier-envelope-v1\0", attestation)?;
     if candidate_native_model_digest == session.latest_candidate_model_digest {
         return Err(SequentialWeightProgramError::InvalidCandidateNativeDigest);
     }
@@ -610,11 +677,11 @@ fn validate_digest(value: &str) -> Result<(), SequentialWeightProgramError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ed25519_dalek::{Signer, SigningKey};
     use crate::weight_space_program::{
         CfCWeightGroupId, ParameterGroupConstraints, ParameterGroupRole, ParameterGroupSnapshot,
         WeightProgramTarget,
     };
+    use ed25519_dalek::{Signer, SigningKey};
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
@@ -644,7 +711,8 @@ mod tests {
             candidate_snapshot_digest: prepared.candidate.receipt.candidate_snapshot_digest.clone(),
             accepted,
         };
-        let message = sequential_verifier_attestation_message(&claims).expect("attestation message");
+        let message =
+            sequential_verifier_attestation_message(&claims).expect("attestation message");
         let signature = signing_key.sign(&message).to_bytes().to_vec();
         SignedSequentialVerifierAttestation {
             claims,
@@ -755,7 +823,10 @@ mod tests {
             &pinned_key,
         )
         .expect("authenticated verifier attestation advances");
-        assert_eq!(receipt.verifier_key_id, sequential_verifier_key_id(&pinned_key));
+        assert_eq!(
+            receipt.verifier_key_id,
+            sequential_verifier_key_id(&pinned_key)
+        );
         assert_eq!(receipt.verification_protocol_digest, digest('8'));
         assert_eq!(receipt.result_manifest_digest, digest('7'));
         assert_eq!(advanced.next_batch_index, 1);
