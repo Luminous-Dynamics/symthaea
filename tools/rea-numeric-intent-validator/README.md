@@ -28,12 +28,12 @@ The embedded profile schema is stored under schema/rea-numeric-intent-profile-v0
 - safe_integer requires an integer-form JSON token, rejects decimal/exponent spellings, and enforces bounds inside plus/minus (2^53-1).
 - exact_integer_string and fixed_decimal_string operate on decoded JSON string values without binary64 conversion.
 - binary64 reports the JCS canonical numeric representation.
-- opaque_numeric confirms numeric token presence but grants no arithmetic, ordering or equivalence authority.
+- opaque_numeric grants no arithmetic, ordering or equivalence authority. The exact original number lexeme is not materialized in the report; retain the original document bytes and use source_raw_sha256 to bind any later token extraction.
 - Quantity-kind and unit references are preserved but reported as unresolved. This crate does not invent or mirror the canonical unit registry.
 
 ## Output and claim ceiling
 
-Each declared path receives an independent status and precision-warning flag. The report binds the profile digest, domain schema digest and exact document raw SHA-256.
+Each declared path receives an independent status, raw-value handling description and precision-warning flag. The report binds the profile digest, domain schema ID/digest and exact document raw SHA-256. If unit/quantity references are supplied without registry validation, the overall outcome explicitly reports conformant_with_unresolved_authority_references rather than unqualified conformance.
 
 A conformant result establishes only path-specific representation, grammar, range and scale conformance to the supplied profile and schema. It does not establish value truth, calibration, source authenticity, suitability of a unit mapping, or downstream security/engineering correctness. A conformant report is not a signature, producer-authentication proof, or Evidence v1 identity.
 
@@ -41,4 +41,4 @@ A conformant result establishes only path-specific representation, grammar, rang
 
 The focused workflow applies rustfmt and persists formatting-only source changes to the pull-request branch before running the format check, tests and warnings-denied Clippy. The resulting branch head is re-qualified after the formatting commit.
 
-The included tests are authored for schema meta-validation, profile/digest checks, exact integer/decimal behavior, binary64 canonicalization, opaque no-arithmetic semantics, raw duplicate-key rejection and fixture structure. They require exact-head CI compile/test/Clippy qualification before any pass is claimed.
+The included tests are authored for schema meta-validation, profile/schema ID and digest checks, exact integer/decimal behavior, binary64 canonicalization, opaque no-arithmetic semantics, unresolved authority references, raw duplicate-key rejection and fixture structure. They require exact-head CI compile/test/Clippy qualification before any pass is claimed.
