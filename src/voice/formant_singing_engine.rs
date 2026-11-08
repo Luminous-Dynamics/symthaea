@@ -9,7 +9,8 @@ use anyhow::{Result, bail};
 
 use symthaea_muse::singing_bridge::{render_sung_frames, sing};
 use symthaea_pronunciation_plan::{
-    Phone, PhoneKind as ResolvedPhoneKind, PronunciationPlan, ScoreEventKind, VocalScoreAlignment,
+    BeatDomainScore, BeatScoreEvent, Phone, PhoneKind as ResolvedPhoneKind, PronunciationPlan,
+    ScoreEventKind, SyllableNoteBinding, TempoChange, VocalPhraseSpan, VocalScoreAlignment,
 };
 use symthaea_vocal_tract::speech::formants::formant_target_pub;
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
@@ -69,6 +70,27 @@ impl FormantSingingEngine {
     /// plan and a score alignment that assigns each note interval exactly once.
     /// Unsupported formant phones fail closed rather than taking the legacy
     /// formant table's default-vowel branch.
+    /// Materialize a beat-domain source score and render its selected pronunciation.
+    ///
+    /// Syllable bindings use offsets inside the materialized seconds-domain
+    /// events, while the original tempo map and beat events remain available to
+    /// the caller for source receipts and reproducibility.
+    pub fn render_beat_domain_plan(
+        &mut self,
+        pronunciation: &PronunciationPlan,
+        score: &BeatDomainScore,
+        syllable_bindings: &[SyllableNoteBinding],
+        phrases: &[VocalPhraseSpan],
+    ) -> Result<VocalStem> {
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: score.materialize_seconds().map_err(anyhow::Error::msg)?,
+            syllable_bindings: syllable_bindings.to_vec(),
+            phrases: phrases.to_vec(),
+        };
+        self.render_resolved_plan(pronunciation, &alignment)
+    }
+
     pub fn render_resolved_plan(
         &mut self,
         pronunciation: &PronunciationPlan,
@@ -1070,6 +1092,102 @@ mod tests {
             .unwrap();
         assert_eq!(second_note.source_type, SourceType::Vowel);
         assert!((second_note.f0 - 246.94).abs() < 0.01);
+    }
+
+    #[test]
+    fn beat_domain_renderer_materializes_tempo_changes_and_explicit_rests() {
+        let (pronunciation, _) = resolved_read_now_fixture();
+        let score = BeatDomainScore {
+            schema_version: 1,
+            tempo_map: vec![
+                TempoChange {
+                    start_beat: 0.0,
+                    quarter_bpm: 120.0,
+                },
+                TempoChange {
+                    start_beat: 4.0,
+                    quarter_bpm: 60.0,
+                },
+            ],
+            events: vec![
+                BeatScoreEvent {
+                    start_beat: 0.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                BeatScoreEvent {
+                    start_beat: 2.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::Rest,
+                },
+                BeatScoreEvent {
+                    start_beat: 4.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+        };
+        let bindings = vec![
+            SyllableNoteBinding {
+                word_index: 0,
+                syllable_index: 0,
+                spans: vec![ScoreEventSpan {
+                    event_index: 0,
+                    start_offset_s: 0.0,
+                    end_offset_s: 1.0,
+                }],
+                melisma_phone_index: None,
+            },
+            SyllableNoteBinding {
+                word_index: 1,
+                syllable_index: 0,
+                spans: vec![ScoreEventSpan {
+                    event_index: 2,
+                    start_offset_s: 0.0,
+                    end_offset_s: 2.0,
+                }],
+                melisma_phone_index: None,
+            },
+        ];
+        let phrases = [VocalPhraseSpan {
+            syllable_start: 0,
+            syllable_end: 2,
+            breath_before_s: 0.0,
+            breath_after_s: 0.1,
+        }];
+        let mut engine = FormantSingingEngine::default();
+        let stem = engine
+            .render_beat_domain_plan(&pronunciation, &score, &bindings, &phrases)
+            .unwrap();
+        assert_eq!(stem.sample_rate, 24_000);
+
+        let frames = engine
+            .resolved_plan_frames(
+                &pronunciation,
+                &VocalScoreAlignment {
+                    schema_version: 1,
+                    events: score.materialize_seconds().unwrap(),
+                    syllable_bindings: bindings,
+                    phrases: phrases.to_vec(),
+                },
+            )
+            .unwrap();
+        let frame_at = |time_s: f32| {
+            frames
+                .iter()
+                .find(|frame| (frame.time - time_s).abs() < 1e-5)
+                .unwrap()
+        };
+        assert_eq!(frame_at(0.5).source_type, SourceType::Vowel);
+        assert_eq!(frame_at(1.5).source_type, SourceType::Silent);
+        assert_eq!(frame_at(3.0).source_type, SourceType::Vowel);
+        assert!((frame_at(3.0).f0 - 246.94).abs() < 0.01);
     }
 
     #[test]
