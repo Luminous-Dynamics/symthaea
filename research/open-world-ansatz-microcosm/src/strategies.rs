@@ -375,16 +375,21 @@ mod tests {
             ProbeStrategy::Random { seed: 17 },
         ];
 
-        let mut episodes = vec![
-            BlindEpisode::new_boolean(
+        for strategy in strategies {
+            let mut boolean = BlindEpisode::new_boolean(
                 "strategy-bool-01",
                 crate::Mechanism::HiddenLag,
                 crate::MeasurementMap::Identity,
                 Some(false),
                 StructureAccess::BooleanWithheld,
                 4,
-            ).unwrap(),
-            BlindEpisode::new_numeric(
+            ).unwrap();
+            let view = boolean.view().unwrap();
+            let intervention = choose_probe(&view, strategy).unwrap();
+            let response = boolean.apply(AgentAction::Probe { intervention }).unwrap();
+            assert_eq!(response.view.observations.len(), 1);
+
+            let mut numeric_episode = BlindEpisode::new_numeric(
                 "strategy-numeric-01",
                 numeric::ModelHypothesis {
                     mechanism: numeric::Mechanism::LeakyMemory,
@@ -395,8 +400,13 @@ mod tests {
                 },
                 StructureAccess::NumericWithheld,
                 4,
-            ).unwrap(),
-            BlindEpisode::new_interaction(
+            ).unwrap();
+            let view = numeric_episode.view().unwrap();
+            let intervention = choose_probe(&view, strategy).unwrap();
+            let response = numeric_episode.apply(AgentAction::Probe { intervention }).unwrap();
+            assert_eq!(response.view.observations.len(), 1);
+
+            let mut interaction_episode = BlindEpisode::new_interaction(
                 "strategy-interaction-01",
                 interaction::ModelHypothesis {
                     structure: interaction::Structure::BilinearInteraction,
@@ -407,16 +417,11 @@ mod tests {
                 },
                 StructureAccess::InteractionWithheld,
                 4,
-            ).unwrap(),
-        ];
-
-        for episode in &mut episodes {
-            let view = episode.view().unwrap();
-            for strategy in strategies {
-                let intervention = choose_probe(&view, strategy).unwrap();
-                let response = episode.apply(AgentAction::Probe { intervention }).unwrap();
-                assert_eq!(response.view.observations.len(), 1);
-            }
+            ).unwrap();
+            let view = interaction_episode.view().unwrap();
+            let intervention = choose_probe(&view, strategy).unwrap();
+            let response = interaction_episode.apply(AgentAction::Probe { intervention }).unwrap();
+            assert_eq!(response.view.observations.len(), 1);
         }
     }
 
