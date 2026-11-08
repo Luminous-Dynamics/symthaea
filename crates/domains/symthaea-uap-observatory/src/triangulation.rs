@@ -346,10 +346,7 @@ pub fn bearing_position_clock_jacobian(
     let horizontal_squared = displacement.x * displacement.x + displacement.y * displacement.y;
     let horizontal = horizontal_squared.sqrt();
     let range_squared = horizontal_squared + displacement.z * displacement.z;
-    if !horizontal_squared.is_finite()
-        || !horizontal.is_finite()
-        || !range_squared.is_finite()
-    {
+    if !horizontal_squared.is_finite() || !horizontal.is_finite() || !range_squared.is_finite() {
         return Err(TriangulationError::NonFiniteIntermediate);
     }
     if horizontal_squared <= VECTOR_EPSILON * VECTOR_EPSILON {
@@ -1160,8 +1157,7 @@ mod tests {
     }
 
     fn wrap_angle_difference(value: f64) -> f64 {
-        (value + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI)
-            - std::f64::consts::PI
+        (value + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI) - std::f64::consts::PI
     }
 
     #[test]
@@ -1216,8 +1212,8 @@ mod tests {
             let (az_minus, el_minus) = angles(minus);
             let numeric_az = wrap_angle_difference(az_plus - az_minus)
                 / (2.0 * epsilon_position * candidate.sigma_azimuth_rad);
-            let numeric_el = (el_plus - el_minus)
-                / (2.0 * epsilon_position * candidate.sigma_elevation_rad);
+            let numeric_el =
+                (el_plus - el_minus) / (2.0 * epsilon_position * candidate.sigma_elevation_rad);
             assert!(
                 (analytic.azimuth_row[column] - numeric_az).abs() < 1.0e-6,
                 "azimuth column={column}, analytic={}, numeric={numeric_az}",
@@ -1237,8 +1233,8 @@ mod tests {
         let (az_minus, el_minus) = angles(minus);
         let numeric_az_time = wrap_angle_difference(az_plus - az_minus)
             / (2.0 * epsilon_time * candidate.sigma_azimuth_rad);
-        let numeric_el_time = (el_plus - el_minus)
-            / (2.0 * epsilon_time * candidate.sigma_elevation_rad);
+        let numeric_el_time =
+            (el_plus - el_minus) / (2.0 * epsilon_time * candidate.sigma_elevation_rad);
         assert!((analytic.azimuth_row[3] - numeric_az_time).abs() < 1.0e-6);
         assert!((analytic.elevation_row[3] - numeric_el_time).abs() < 1.0e-6);
     }
