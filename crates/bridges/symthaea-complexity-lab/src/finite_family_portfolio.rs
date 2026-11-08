@@ -2499,6 +2499,17 @@ mod tests {
         }
     }
 
+    fn cluster_search_budget() -> ExactClusterPolicySearchBudget {
+        ExactClusterPolicySearchBudget {
+            per_node: policy_mask_budget(),
+            max_search_nodes: 100,
+            max_total_dp_multiply_adds: 1_000_000,
+            max_frontier_masks: 100,
+            max_frontier_memory_bytes: 1_000_000,
+            max_total_memory_bytes: 2_000_000,
+        }
+    }
+
     #[test]
     fn exact_action_mask_bound_is_zero_for_full_mask_and_exact_at_leaf() {
         let family = FiniteUmdpModelFamily::new(vec![
@@ -2824,6 +2835,100 @@ mod tests {
                 time: 0,
                 state: 0,
                 action: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn exact_cluster_policy_bnb_proves_specialist_minimax_regret_and_replays() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let result = solve_exact_cluster_policy_bnb(
+            &family, &[0, 1], q(1,2), cluster_search_budget(),
+        ).unwrap();
+        assert_eq!(result.policy_index, 0);
+        assert_eq!(result.policy_actions, vec![0]);
+        assert_eq!(result.model_optimal_values, vec![q(1,1), q(1,1)]);
+        assert_eq!(result.model_policy_values, vec![q(1,1), q(0,1)]);
+        assert_eq!(result.model_regrets, vec![q(0,1), q(1,1)]);
+        assert_eq!(result.worst_case_model_indices, vec![1]);
+        assert_eq!(result.minimax_regret, q(1,1));
+        assert_eq!(result.search_nodes, 3);
+        assert_eq!(result.pruned_nodes, 2);
+        assert_eq!(result.dp_multiply_adds, 54);
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.certificate_sha256),
+            "dc24a2ac4e0c89b98609a3e3a8fd82847e949947c375e642617410144ac237e6"
+        );
+        verify_exact_cluster_policy_bnb(&family, cluster_search_budget(), &result).unwrap();
+
+        let mut mutated = result.clone();
+        mutated.model_regrets[1] = q(0,1);
+        assert_eq!(
+            verify_exact_cluster_policy_bnb(&family, cluster_search_budget(), &mutated),
+            Err(PolicyPortfolioError::PolicyMaskCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn exact_cluster_policy_bnb_discovers_better_policy_than_initial_incumbent() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let result = solve_exact_cluster_policy_bnb(
+            &family, &[0], q(1,2), cluster_search_budget(),
+        ).unwrap();
+        assert_eq!(result.policy_index, 1);
+        assert_eq!(result.policy_actions, vec![1]);
+        assert_eq!(result.model_optimal_values, vec![q(1,1)]);
+        assert_eq!(result.model_policy_values, vec![q(1,1)]);
+        assert_eq!(result.model_regrets, vec![q(0,1)]);
+        assert_eq!(result.minimax_regret, q(0,1));
+        assert_eq!(result.search_nodes, 3);
+        assert_eq!(result.pruned_nodes, 1);
+        assert_eq!(result.dp_multiply_adds, 27);
+        verify_exact_cluster_policy_bnb(&family, cluster_search_budget(), &result).unwrap();
+    }
+
+    #[test]
+    fn exact_cluster_policy_bnb_fails_closed_on_search_work_and_frontier_caps() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+
+        let mut node_tight = cluster_search_budget();
+        node_tight.max_search_nodes = 1;
+        assert_eq!(
+            solve_exact_cluster_policy_bnb(&family, &[0,1], q(1,2), node_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B search nodes",
+                required: 2,
+                limit: 1,
+            })
+        );
+
+        let mut work_tight = cluster_search_budget();
+        work_tight.max_total_dp_multiply_adds = 21;
+        assert_eq!(
+            solve_exact_cluster_policy_bnb(&family, &[0,1], q(1,2), work_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B total DP multiply-add work",
+                required: 22,
+                limit: 21,
+            })
+        );
+
+        let mut frontier_tight = cluster_search_budget();
+        frontier_tight.max_frontier_masks = 1;
+        assert_eq!(
+            solve_exact_cluster_policy_bnb(&family, &[0,1], q(1,2), frontier_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "cluster B&B frontier masks",
+                required: 2,
+                limit: 1,
             })
         );
     }
