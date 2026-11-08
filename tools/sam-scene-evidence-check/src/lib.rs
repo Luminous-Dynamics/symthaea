@@ -1149,10 +1149,8 @@ mod tests {
             Value::String("independent-rule-review-v1".into());
         profiles["profiles"][0]["verification_record_id"] =
             Value::String("review-2026-11-08-001".into());
-        profiles["profiles"][0]["verification_valid_from"] =
-            Value::String("2026-01-01".into());
-        profiles["profiles"][0]["verification_valid_until"] =
-            Value::String("2026-12-31".into());
+        profiles["profiles"][0]["verification_valid_from"] = Value::String("2026-01-01".into());
+        profiles["profiles"][0]["verification_valid_until"] = Value::String("2026-12-31".into());
         assert!(validate_traffic_values(&schema, &profiles).is_err());
     }
 
@@ -1167,10 +1165,8 @@ mod tests {
             Value::String("independent-rule-review-v1".into());
         profiles["profiles"][0]["verification_record_id"] =
             Value::String("review-2026-11-08-001".into());
-        profiles["profiles"][0]["verification_valid_from"] =
-            Value::String("2026-01-01".into());
-        profiles["profiles"][0]["verification_valid_until"] =
-            Value::String("2026-12-31".into());
+        profiles["profiles"][0]["verification_valid_from"] = Value::String("2026-01-01".into());
+        profiles["profiles"][0]["verification_valid_until"] = Value::String("2026-12-31".into());
         profiles["evidence_records"] = Value::Array(vec![serde_json::json!({
             "evidence_id":"law-evidence-1",
             "jurisdiction_profile_id":"synthetic-left-traffic-demo",
@@ -1200,10 +1196,8 @@ mod tests {
             Value::String("independent-rule-review-v1".into());
         profiles["profiles"][0]["verification_record_id"] =
             Value::String("review-2026-11-08-001".into());
-        profiles["profiles"][0]["verification_valid_from"] =
-            Value::String("2026-01-01".into());
-        profiles["profiles"][0]["verification_valid_until"] =
-            Value::String("2026-12-31".into());
+        profiles["profiles"][0]["verification_valid_from"] = Value::String("2026-01-01".into());
+        profiles["profiles"][0]["verification_valid_until"] = Value::String("2026-12-31".into());
         profiles["evidence_records"] = Value::Array(vec![serde_json::json!({
             "evidence_id":"law-evidence-1",
             "jurisdiction_profile_id":"different-jurisdiction",
