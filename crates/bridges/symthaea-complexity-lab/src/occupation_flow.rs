@@ -2124,7 +2124,7 @@ mod tests {
         assert!(matches!(
             verify_shared_dynamics_minimax_regret(
                 &model,
-                &[witnesses[0].certificate.primal_dual.primal.iter().map(|_| q(0,1)).collect::<Vec<_>>()],
+                &[scores_a.clone()],
                 &[],
                 budget(84),
                 2,
