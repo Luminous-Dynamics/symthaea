@@ -229,7 +229,7 @@ pub fn verify_primal_dual_optimality(
             lhs = lhs.checked_add(term)
                 .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
         }
-        if compare_rational(lhs, lp.c[column)? == Ordering::Less {
+        if compare_rational(lhs, lp.c[column])? == Ordering::Less {
             return Err(LpCertificateError::DualConstraintViolation { column });
         }
     }
@@ -368,7 +368,7 @@ mod tests {
         ).unwrap();
 
         let bad_primal = PrimalDualCertificate {
-            primal: vec![q(3, 1), q(2, 1)],
+            primal: vec![q(3, 1), q(1, 1)],
             dual: vec![q(2, 1), q(1, 1), q(0, 1)],
         };
         assert_eq!(
