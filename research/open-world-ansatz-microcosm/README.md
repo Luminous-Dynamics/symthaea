@@ -100,6 +100,10 @@ CLI scenario arguments identify the hidden evaluator-side world. They are for an
 
 For the matched A0 control, use the same world and intervention sequence, changing only the final argument to a0.
 
+## Finite enumerator agent baseline v0
+
+`policy::FiniteEnumeratorBaseline` consumes only an `AgentView` and emits a probe or terminal submission. It maintains the exact finite compatible-model set and uses the existing partition-maximizing probe heuristic in a receding-horizon loop. It is a transparent algorithmic reference, not a trained research policy. Paired A0/A2 tests use the same hidden model and action budget; the external harness still needs to preregister and randomize task seeds and ensure agent/evaluator process isolation.
+
 ## Blind agent episode protocol v0
 
 The public Rust module protocol exposes a bounded, one-action-at-a-time interface over all three worlds. Agents receive a PublicTaskManifest, observations, remaining budget and an evidence-prefix SHA-256; they return typed probes or a terminal version-space submission. The submission must echo the current evidence-prefix digest and cite observation IDs that were actually returned.
@@ -110,7 +114,7 @@ Important boundary: this Rust API is not an OS security sandbox. The agent must 
 
 ## Authored tests
 
-Forty-four Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions and exact version-space scoring.
+Forty-seven Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions and exact version-space scoring.
 
 The previous exact-head focused runs covered 34 tests on commit 58128d025bdb24995c31822a86cd3afcaec28413. The additional protocol tests and wire contract must be qualified on the new exact branch head before this expanded branch is called green.
 
