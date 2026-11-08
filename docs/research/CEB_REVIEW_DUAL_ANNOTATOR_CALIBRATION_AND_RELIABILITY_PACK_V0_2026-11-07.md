@@ -261,6 +261,29 @@ Adjudicate the two verdicts separately. A correct rejection of the mutant does n
 
 The model's proposed patch is not its own oracle. No candidate code, build or test is run by this annotation worksheet. Preserve each first-pass form and disagreements; do not overwrite them with a consensus patch.
 
+
+### 6.4 Selective-risk adjudication worksheet
+
+For any development study of the [Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md), reviewers independently adjudicate accepted claims before the policy threshold is certified.
+
+| Field | Reviewer response |
+|---|---|
+| Claim ID / source revision | |
+| Claim kind and severity | |
+| Evidence authority and scope | |
+| Adjudicated truth | true / false / unresolved |
+| Accepted by frozen policy? | yes / no / routed / escalated |
+| Target and preservation witness status | |
+| Material alternative model(s) | |
+| Reviewer disagreement | |
+| Repository/defect-family cluster | |
+| Human adjudication minutes | |
+| Reason for unresolved / escalation | |
+
+Keep the threshold-selection set separate from the risk-certification set. Do not tune the threshold after observing the certification labels. Repeated prompts or model retries on one defect are not independent calibration units. If the error/coverage profile differs materially by claim kind or severity, record separate strata and do not pool away a risky group.
+
+The two reviewers adjudicate claim truth and evidence authority; they do not certify the policy's statistical guarantee. The statistical owner verifies calibration splits, multiplicity, cluster assumptions and the one-sided risk bound before any policy claim is published.
+
 ## 7. Agreement analysis and interpretation
 
 The calibration exercise has two purposes: reveal unclear rules and train reviewers to apply the same distinctions. It does not create a new CEB performance metric.
