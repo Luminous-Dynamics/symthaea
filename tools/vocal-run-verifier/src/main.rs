@@ -61,6 +61,7 @@ struct CaseReceipt {
     transpose_semitones: f32,
     melody: Vec<NoteReceipt>,
     score_blake3: String,
+    performance_canonical_json: String,
     performance_blake3: String,
 }
 
@@ -300,6 +301,28 @@ fn validate_case(case: &CaseReceipt) -> Result<(), String> {
         return Err(fail(format!(
             "case {} has an invalid performance digest",
             case.case_id
+        )));
+    }
+    let performance_value: Value = serde_json::from_str(&case.performance_canonical_json)
+        .map_err(|error| {
+            fail(format!(
+                "case {} canonical performance JSON is invalid: {error}",
+                case.case_id
+            ))
+        })?;
+    if !performance_value.is_object() {
+        return Err(fail(format!(
+            "case {} canonical performance receipt must be a JSON object",
+            case.case_id
+        )));
+    }
+    let observed_performance = blake3::hash(case.performance_canonical_json.as_bytes())
+        .to_hex()
+        .to_string();
+    if observed_performance != case.performance_blake3 {
+        return Err(fail(format!(
+            "case {} performance digest mismatch: recorded {}, observed {}",
+            case.case_id, case.performance_blake3, observed_performance
         )));
     }
     Ok(())
@@ -719,7 +742,8 @@ mod tests {
             transpose_semitones: 0.0,
             melody,
             score_blake3: score_blake3.clone(),
-            performance_blake3: performance_blake3.clone(),
+            performance_canonical_json: r#"{"synthetic_fixture":true}"#.to_string(),
+            performance_blake3: digest(br#"{"synthetic_fixture":true}"#),
         };
         let run = RunManifest {
             schema: RUN_SCHEMA.into(),
@@ -932,6 +956,22 @@ mod tests {
         run["cases"][0]["score_blake3"] = Value::String("f".repeat(64));
         fs::write(path, serde_json::to_vec(&run).unwrap()).unwrap();
         assert!(verify(&blind, &private).unwrap_err().contains("score digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_canonical_performance_bytes_that_do_not_match_receipt_digest() {
+        let bundle = build_fixture(false);
+        let (blind, private) = bundle.roots();
+        let path = private.join("run_manifest.json");
+        let mut run: Value = read_json(&path).unwrap();
+        run["cases"][0]["performance_canonical_json"] =
+            Value::String(r#"{"version":2,"lyrics":"changed"}"#.into());
+        fs::write(&path, serde_json::to_vec(&run).unwrap()).unwrap();
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("performance digest mismatch")
+        );
     }
 
     #[test]
