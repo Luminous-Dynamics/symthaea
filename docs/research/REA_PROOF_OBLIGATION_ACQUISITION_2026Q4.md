@@ -103,6 +103,21 @@ Every evidence effect names an evidence class and source family. A candidate can
 
 A self-report can satisfy an obligation to reproduce what a provider reported. It cannot satisfy an obligation to independently verify artifact bytes. A complete filtered query cannot satisfy whole-artifact completeness. A transparency checkpoint cannot prove issuer participation without a separate issuer-history obligation.
 
+
+## 3.1 Agent-visible and grader-only views
+
+The combined fixture JSON is a development authoring source only. It must never be used directly as the agent prompt or planner input.
+
+The split development views are:
+
+- `rea-proof-obligation-acquisition-agent-view-v0.json`: claim, visible obligations and admissible evidence classes, candidate descriptions/outcomes, authorization, reversibility, impact and cost. It excludes world-state labels, expected policy labels, and outcome-to-obligation transition annotations.
+- `rea-proof-obligation-acquisition-grader-v0.json`: synthetic world-state oracle, expected-policy annotations and candidate effects. It explicitly declares `never_mount_in_agent_workspace`.
+- Their paired Draft 2020-12 schemas reject undeclared keys.
+
+A Rust fixture checker validates both views, checks exact case/candidate correspondence, requires each grader effect to refer to an agent-visible outcome and obligation, and applies the admissibility no-upgrade rule. Mutation tests inject oracle leakage and effect leakage into the agent view and require rejection.
+
+Important limitation: the grader-only development file remains public in this repository. It is not a hidden test set and cannot support contamination-resistant evaluation. Hidden evaluation cases and gold labels must be held in a separately access-controlled service or private repository, with no oracle material available to the agent runtime. A filename, metadata flag, or branch boundary is not access control.
+
 ## 4. Metrics
 
 Report independent scorecards, not one composite:
