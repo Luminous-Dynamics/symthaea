@@ -811,9 +811,7 @@ fn derive_child_residual_for_verification(
             work = work
                 .checked_add(1)
                 .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
-            if let Some(previous) =
-                polarity_by_variable.insert(literal.variable, literal.positive)
-            {
+            if let Some(previous) = polarity_by_variable.insert(literal.variable, literal.positive) {
                 if previous != literal.positive {
                     tautological = true;
                     break;
@@ -833,9 +831,7 @@ fn derive_child_residual_for_verification(
 /// Independently canonicalize the original source matrix for root binding.
 /// This uses set-based polarity detection rather than the builder's
 /// sort/window canonicalizer.
-fn verifier_source_residual(
-    problem: &CnfProblem,
-) -> Result<(ResidualCnf, u128), QbfGameDagError> {
+fn verifier_source_residual(problem: &CnfProblem) -> Result<(ResidualCnf, u128), QbfGameDagError> {
     let mut work = 0u128;
     let mut clauses = Vec::with_capacity(problem.clauses.len());
     for clause in &problem.clauses {
@@ -1294,12 +1290,7 @@ mod tests {
                 vec![],
             ],
         };
-        let (dag, _) = build_qbf_game_proof_dag(
-            &problem,
-            &prefix(2, vec![]),
-            budget(),
-        )
-        .unwrap();
+        let (dag, _) = build_qbf_game_proof_dag(&problem, &prefix(2, vec![]), budget()).unwrap();
         assert_eq!(dag.nodes[dag.root].residual.len(), 1);
         assert!(dag.nodes[dag.root].residual[0].is_empty());
         assert!(!dag.nodes[dag.root].value);
