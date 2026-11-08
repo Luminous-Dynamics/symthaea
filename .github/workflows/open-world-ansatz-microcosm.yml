@@ -1,0 +1,40 @@
+name: Open-World Ansatz Microcosm
+
+on:
+  pull_request:
+    paths:
+      - "research/open-world-ansatz-microcosm/**"
+      - ".github/workflows/open-world-ansatz-microcosm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-world-ansatz-microcosm-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Format, Clippy and Tests (standalone research crate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/open-world-ansatz-microcosm/Cargo.toml -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --manifest-path research/open-world-ansatz-microcosm/Cargo.toml
