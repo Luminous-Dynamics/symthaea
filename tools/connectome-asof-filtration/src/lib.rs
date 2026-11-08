@@ -515,6 +515,9 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
             "malformed filtration-definition or ledger-chain digest".into(),
         ));
     }
+    if ledger.entries.is_empty() {
+        return Err(AuditError("global ledger must contain at least one entry".into()));
+    }
 
     let mut evidence: BTreeMap<String, (u64, EvidenceEvent)> = BTreeMap::new();
     let mut event_roots: BTreeMap<String, String> = BTreeMap::new();
@@ -1680,5 +1683,33 @@ mod tests {
             ledger.ledger_chain_root_sha256,
             changed.ledger_chain_root_sha256
         );
+    }
+
+    #[test]
+    fn independent_checkpoint_rejects_old_epoch_and_wrong_sequence() {
+        let ledger = fixture();
+        let checkpoint = ExpectedTerminalCheckpoint {
+            campaign_id: ledger.campaign_id.clone(),
+            global_filtration_id: ledger.global_filtration_id.clone(),
+            ledger_epoch_id: "prior-epoch".into(),
+            terminal_sequence: ledger.entries.len() as u64,
+            ledger_chain_root_sha256: ledger.ledger_chain_root_sha256.clone(),
+        };
+        let pin = expected_terminal_checkpoint_sha256(&checkpoint).unwrap();
+        assert!(audit_ledger_against_external_checkpoint(&ledger, &checkpoint, &pin).is_err());
+
+        let mut wrong_sequence = checkpoint;
+        wrong_sequence.ledger_epoch_id = ledger.ledger_epoch_id.clone();
+        wrong_sequence.terminal_sequence += 1;
+        let pin = expected_terminal_checkpoint_sha256(&wrong_sequence).unwrap();
+        assert!(audit_ledger_against_external_checkpoint(&ledger, &wrong_sequence, &pin).is_err());
+    }
+
+    #[test]
+    fn empty_ledger_is_not_a_committed_evidence_history() {
+        let mut ledger = fixture();
+        ledger.entries.clear();
+        ledger.ledger_chain_root_sha256 = genesis_root(&ledger).unwrap();
+        assert!(audit_ledger(&ledger).is_err());
     }
 }
