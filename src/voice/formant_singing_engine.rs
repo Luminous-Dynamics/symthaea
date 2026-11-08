@@ -205,6 +205,32 @@ impl FormantSingingEngine {
         self.render_resolved_plan(pronunciation, &alignment)
     }
 
+    /// Policy-checked resolved-plan rendering. Controlled comparisons should
+    /// use this entry point so the selected API route's capability manifest is
+    /// validated before audio is produced.
+    pub fn render_resolved_plan_with_policy(
+        &mut self,
+        pronunciation: &PronunciationPlan,
+        alignment: &VocalScoreAlignment,
+        policy: &SingingRenderPolicy,
+    ) -> Result<VocalStem> {
+        policy.validate_against(&Self::resolved_plan_capabilities()?)?;
+        self.render_resolved_plan(pronunciation, alignment)
+    }
+
+    /// Beat-domain counterpart to `render_resolved_plan_with_policy`.
+    pub fn render_beat_domain_plan_with_policy(
+        &mut self,
+        pronunciation: &PronunciationPlan,
+        score: &BeatDomainScore,
+        syllable_bindings: &[SyllableNoteBinding],
+        phrases: &[VocalPhraseSpan],
+        policy: &SingingRenderPolicy,
+    ) -> Result<VocalStem> {
+        policy.validate_against(&Self::resolved_plan_capabilities()?)?;
+        self.render_beat_domain_plan(pronunciation, score, syllable_bindings, phrases)
+    }
+
     pub fn render_resolved_plan(
         &mut self,
         pronunciation: &PronunciationPlan,
@@ -1567,6 +1593,30 @@ mod tests {
             error.contains("outside the calibrated legacy formant inventory"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn resolved_plan_policy_blocks_controls_that_this_route_does_not_receive() {
+        let (pronunciation, alignment) = resolved_read_now_fixture();
+        let mut engine = FormantSingingEngine::default();
+        let error = engine
+            .render_resolved_plan_with_policy(
+                &pronunciation,
+                &alignment,
+                &SingingRenderPolicy::phrase_expression_comparison(),
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("cannot satisfy required control PhraseExpressionCurve"), "{error}");
+
+        let stem = engine
+            .render_resolved_plan_with_policy(
+                &pronunciation,
+                &alignment,
+                &SingingRenderPolicy::score_conditioned_comparison(),
+            )
+            .unwrap();
+        stem.validate().unwrap();
     }
 
     #[test]
