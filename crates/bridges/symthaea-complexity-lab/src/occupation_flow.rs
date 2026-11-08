@@ -307,8 +307,14 @@ fn preflight_dimensions(
 ///
 /// The objective is U_comparator(omega) - U_selected(omega), optimized over
 /// one shared occupation-flow trajectory. This preserves dependence between
-/// the two action utilities; subtracting independently optimized utility
+/// the two score functions; subtracting independently optimized utility
 /// intervals would generally be invalid.
+///
+/// Scope boundary: both alternatives are evaluated under the same uncertain
+/// transition dynamics and differ only through their state-score functions.
+/// This is not a general MDP regret compiler for actions that induce different
+/// transition kernels or policy-dependent occupancy processes. Such models
+/// require an explicit joint coupling of the action-conditional kernels.
 pub fn build_pairwise_worst_case_regret_lp(
     model: &StagewiseIntervalMarkovModel,
     selected_scores: &[Vec<CheckedRational>],
