@@ -477,5 +477,22 @@
     "phonetic_supervision_tier_verified",
     "native_acoustic_label_distinguished_from_rule_derived_phones",
     "depth_adapter_retention_noninferiority_on_prior_languages"
+  ],
+  "test_vector_sets": [
+    {
+      "id": "switch_metrics_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_FORMULA_CHECKED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/switch_metric_golden_v0.1.json",
+      "schema_path": "docs/research/voice/switch_metric_golden_v0.1.schema.json",
+      "cases": 10,
+      "linked_issue": 11082,
+      "metrics": [
+        "WER",
+        "PIER",
+        "SETER",
+        "SPER_at_k"
+      ],
+      "note": "Token-level synthetic vectors; expected values are formula-checked using the declared deterministic Levenshtein tie-break, but no Rust test, RapidFuzz differential or real-data result is claimed."
+    }
   ]
 }
