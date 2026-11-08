@@ -142,6 +142,7 @@ struct ObjectiveEntry {
     case_id: usize,
     metrics: VocalQualityMetrics,
     capability_manifest: SingingBackendCapabilities,
+    capability_manifest_canonical_json: String,
     capability_manifest_blake3: String,
 }
 
@@ -314,9 +315,11 @@ fn render_one(
             engine.id()
         );
     }
-    let capability_manifest_blake3 = blake3::hash(&serde_json::to_vec(&capabilities)?)
-        .to_hex()
-        .to_string();
+    let capability_manifest_canonical_json = serde_json::to_string(&capabilities)?;
+    let capability_manifest_blake3 =
+        blake3::hash(capability_manifest_canonical_json.as_bytes())
+            .to_hex()
+            .to_string();
     let policy = SingingRenderPolicy::score_conditioned_comparison();
     let stem = engine.render_with_policy(performance, &policy)?;
     let id = blind_id(salt, &stem.backend, case_id);
@@ -350,6 +353,7 @@ fn render_one(
         case_id,
         metrics,
         capability_manifest: capabilities,
+        capability_manifest_canonical_json,
         capability_manifest_blake3,
     });
     Ok(())
