@@ -2101,7 +2101,7 @@ async fn compose(
                     serialized_sha256(&score).unwrap_or_default(),
                 ),
                 composition: symthaea_muse_protocol::CompositionArtifactId(
-                    serialized_sha256(&recipe).unwrap_or_default(),
+                    serialized_pretty_sha256(&recipe).unwrap_or_default(),
                 ),
                 rendition: symthaea_muse_protocol::RenditionArtifactId(sha256_hex(&wav)),
             };
@@ -2752,6 +2752,7 @@ fn persist_keeper_bundle(
     audio_key: &str,
     wav: &[u8],
     recipe_bytes: &[u8],
+    score_bytes: &[u8],
     score: &Score,
     spec: &CompositionSpec,
     seed: u64,
@@ -2770,6 +2771,7 @@ fn persist_keeper_bundle(
     let result = (|| {
         write_synced(&staging.join("audio.wav"), wav)?;
         write_synced(&staging.join("recipe.json"), recipe_bytes)?;
+        write_synced(&staging.join("score.json"), score_bytes)?;
 
         let midi_path = staging.join("performance.mid");
         let midi_available = symthaea_muse::midi_export::export_performance_midi(
@@ -3072,10 +3074,12 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
 
     let recipe_bytes =
         serde_json::to_vec_pretty(&recipe).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let score_bytes = serde_json::to_vec(&score).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let (bundle_path, midi_available) = persist_keeper_bundle(
         &audio_key,
         &wav,
         &recipe_bytes,
+        &score_bytes,
         &score,
         &spec,
         seed,
@@ -3089,23 +3093,21 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
     // for. Every manifest allocated here is a `Root`: nothing upstream yet
     // tracks "this candidate was derived from kept piece X" (see
     // `symthaea_muse::genealogy`'s module docs).
-    let recipe_sha256 = serialized_sha256(&recipe).ok();
-    let score_sha256 = serialized_sha256(&score).ok();
+    // The score hash is also written to the keeper index for duplicate detection.
+    // The genealogy store independently hashes all exact byte slices, including recipe and audio.
+    let score_sha256 = sha256_hex(&score_bytes);
     let genealogy = studio.genealogy.as_ref().and_then(|store| {
-        let Some(recipe_sha256) = recipe_sha256.as_deref() else {
-            eprintln!("[muse_studio] genealogy: could not hash recipe");
-            return None;
-        };
         let origin = symthaea_muse_protocol::GenealogyOrigin::MuseGenerated {
             seed,
             style_name: spec.name.clone(),
         };
-        match store.allocate_root(
+        match store.allocate_root_from_bundle(
             &origin,
             &audio_key,
-            recipe_sha256,
-            score_sha256.as_deref(),
-            &sha256_hex(&wav),
+            &bundle_path,
+            &recipe_bytes,
+            &score_bytes,
+            &wav,
             unix_time_ms(),
         ) {
             Ok(manifest) => Some(manifest),
@@ -3328,6 +3330,12 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 fn serialized_sha256<T: Serialize>(value: &T) -> Result<String, StatusCode> {
     serde_json::to_vec(value)
+        .map(|bytes| sha256_hex(&bytes))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+fn serialized_pretty_sha256<T: Serialize>(value: &T) -> Result<String, StatusCode> {
+    serde_json::to_vec_pretty(value)
         .map(|bytes| sha256_hex(&bytes))
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
@@ -5459,5 +5467,41 @@ mod compose_bars_contract_tests {
             Err((status, _)) => assert_eq!(status, axum::http::StatusCode::BAD_REQUEST),
             Ok(_) => panic!("1 bar is below COMPOSE_BARS_RANGE and must be rejected"),
         }
+    }
+}
+
+#[cfg(test)]
+mod keeper_artifact_hash_tests {
+    use super::*;
+
+    #[test]
+    fn recipe_identity_uses_the_exact_pretty_bytes_written_to_bundle() {
+        let recipe = serde_json::json!({
+            "name": "byte-bound recipe",
+            "parts": [1, 2, 3]
+        });
+        let persisted_bytes = serde_json::to_vec_pretty(&recipe).unwrap();
+        assert_eq!(
+            serialized_pretty_sha256(&recipe).unwrap(),
+            sha256_hex(&persisted_bytes)
+        );
+        assert_ne!(
+            serialized_sha256(&recipe).unwrap(),
+            sha256_hex(&persisted_bytes),
+            "compact re-serialization is not the persisted pretty-printed artifact"
+        );
+    }
+
+    #[test]
+    fn score_identity_uses_the_exact_compact_bytes_written_to_bundle() {
+        let score = serde_json::json!({
+            "notes": [60, 64, 67],
+            "tempo": 96
+        });
+        let persisted_bytes = serde_json::to_vec(&score).unwrap();
+        assert_eq!(
+            serialized_sha256(&score).unwrap(),
+            sha256_hex(&persisted_bytes)
+        );
     }
 }
