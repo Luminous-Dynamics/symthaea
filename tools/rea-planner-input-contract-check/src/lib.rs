@@ -24,7 +24,10 @@ impl std::fmt::Display for ContractError {
 
 impl std::error::Error for ContractError {}
 
-fn object<'a>(value: &'a Value, key: &str) -> Result<&'a serde_json::Map<String, Value>, ContractError> {
+fn object<'a>(
+    value: &'a Value,
+    key: &str,
+) -> Result<&'a serde_json::Map<String, Value>, ContractError> {
     value
         .get(key)
         .and_then(Value::as_object)
@@ -53,15 +56,12 @@ fn number(value: &Value, key: &str) -> Result<f64, ContractError> {
         .ok_or_else(|| ContractError(format!("{key} must be a finite number")))
 }
 
-fn string_set(
-    values: &[Value],
-    context: &str,
-) -> Result<BTreeSet<String>, ContractError> {
+fn string_set(values: &[Value], context: &str) -> Result<BTreeSet<String>, ContractError> {
     let mut result = BTreeSet::new();
     for item in values {
-        let value = item.as_str().ok_or_else(|| {
-            ContractError(format!("{context} must contain only strings"))
-        })?;
+        let value = item
+            .as_str()
+            .ok_or_else(|| ContractError(format!("{context} must contain only strings")))?;
         if !result.insert(value.to_owned()) {
             return Err(ContractError(format!("{context} contains duplicate {value}")));
         }
@@ -97,9 +97,14 @@ fn normalized_probability_rows(
         }
         let mut total = 0.0;
         for probability in probabilities {
-            let probability = probability.as_f64().filter(|value| value.is_finite()).ok_or_else(|| {
-                ContractError(format!("{context}/{hypothesis_id} contains non-finite probability"))
-            })?;
+            let probability = probability
+                .as_f64()
+                .filter(|value| value.is_finite())
+                .ok_or_else(|| {
+                    ContractError(format!(
+                        "{context}/{hypothesis_id} contains non-finite probability"
+                    ))
+                })?;
             if !(0.0..=1.0).contains(&probability) {
                 return Err(ContractError(format!(
                     "{context}/{hypothesis_id} probability outside [0,1]"
@@ -131,7 +136,9 @@ fn has_independent_root(
         return Ok(*result);
     }
     if !visiting.insert(id.to_owned()) {
-        return Err(ContractError(format!("cycle in Evidence derivation graph at {id}")));
+        return Err(ContractError(format!(
+            "cycle in Evidence derivation graph at {id}"
+        )));
     }
     let record = evidence
         .get(id)
@@ -177,7 +184,9 @@ fn has_independent_root(
 pub fn validate_contract(value: &Value) -> Result<(), ContractError> {
     let mode = string(value, "qualification_mode")?;
     if !matches!(mode, "math_only_synthetic" | "planner_integration_observed") {
-        return Err(ContractError(format!("unsupported qualification mode {mode}")));
+        return Err(ContractError(format!(
+            "unsupported qualification mode {mode}"
+        )));
     }
 
     let mut evidence = HashMap::<String, &Value>::new();
@@ -285,7 +294,9 @@ pub fn validate_contract(value: &Value) -> Result<(), ContractError> {
         }
         let outcomes = string_set(array(experiment, "outcomes")?, &format!("{id} outcomes"))?;
         if outcomes.len() < 2 {
-            return Err(ContractError(format!("{id} requires at least two outcomes")));
+            return Err(ContractError(format!(
+                "{id} requires at least two outcomes"
+            )));
         }
         outcome_map.insert(id.to_owned(), outcomes);
         normalized_probability_rows(
@@ -377,9 +388,12 @@ pub fn validate_contract(value: &Value) -> Result<(), ContractError> {
 
     if mode == "planner_integration_observed" {
         for section in ["prior", "likelihood_models"] {
-            let status = string(object(value, "input_provenance")?.get(section).ok_or_else(|| {
-                ContractError(format!("input_provenance.{section} missing"))
-            })?, "calibration_status")?;
+            let status = string(
+                object(value, "input_provenance")?
+                    .get(section)
+                    .ok_or_else(|| ContractError(format!("input_provenance.{section} missing")))?,
+                "calibration_status",
+            )?;
             if status == "synthetic_known_answer" {
                 return Err(ContractError(format!(
                     "planner integration cannot use synthetic known-answer {section}"
