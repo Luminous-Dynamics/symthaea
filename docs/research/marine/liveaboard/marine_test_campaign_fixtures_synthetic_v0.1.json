@@ -50,7 +50,8 @@
         "analysis_profile_ref": "synthetic:analysis-profile",
         "sampling_adequacy_review_ref": "synthetic:review",
         "uncertainty_budget_ref": "synthetic:uncertainty-budget",
-        "review_authority_ref": "synthetic:review-authority"
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
       },
       "claim_limitations": [
         "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
@@ -106,7 +107,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "permeate_flow",
@@ -154,7 +156,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "concentrate_flow",
@@ -202,7 +205,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "feed_conductivity",
@@ -250,7 +254,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "product_conductivity",
@@ -298,7 +303,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "whole_system_power",
@@ -346,7 +352,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         }
       ],
       "expected_admission": "synthetic_only_no_physical_admission"
@@ -397,7 +404,8 @@
         "analysis_profile_ref": "synthetic:analysis-profile",
         "sampling_adequacy_review_ref": null,
         "uncertainty_budget_ref": "synthetic:uncertainty-budget",
-        "review_authority_ref": "synthetic:review-authority"
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
       },
       "claim_limitations": [
         "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
@@ -453,7 +461,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "dc_bus_current",
@@ -501,7 +510,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         }
       ],
       "expected_admission": "not_admissible_missing_bandwidth_review"
@@ -552,7 +562,8 @@
         "analysis_profile_ref": "synthetic:analysis-profile",
         "sampling_adequacy_review_ref": "synthetic:review",
         "uncertainty_budget_ref": "synthetic:uncertainty-budget",
-        "review_authority_ref": "synthetic:review-authority"
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
       },
       "claim_limitations": [
         "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
@@ -608,7 +619,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "machinery_space_temp",
@@ -656,7 +668,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         }
       ],
       "expected_admission": "not_admissible_stale_calibration"
@@ -707,7 +720,8 @@
         "analysis_profile_ref": "synthetic:analysis-profile",
         "sampling_adequacy_review_ref": "synthetic:review",
         "uncertainty_budget_ref": null,
-        "review_authority_ref": "synthetic:review-authority"
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
       },
       "claim_limitations": [
         "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
@@ -763,7 +777,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "clearance_measurement",
@@ -811,7 +826,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         }
       ],
       "expected_admission": "indeterminate_clock_alignment"
@@ -862,7 +878,8 @@
         "analysis_profile_ref": "synthetic:analysis-profile",
         "sampling_adequacy_review_ref": "synthetic:review",
         "uncertainty_budget_ref": "synthetic:uncertainty-budget",
-        "review_authority_ref": "synthetic:review-authority"
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
       },
       "claim_limitations": [
         "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
@@ -918,7 +935,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         },
         {
           "channel_id": "battery_case_temp",
@@ -966,7 +984,8 @@
             "derived_parent_refs": [],
             "sample_integrity": "complete"
           },
-          "evidence_class": "synthetic"
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "8888888888888888888888888888888888888888888888888888888888888888"
         }
       ],
       "expected_admission": "not_admissible_mixed_configuration"
