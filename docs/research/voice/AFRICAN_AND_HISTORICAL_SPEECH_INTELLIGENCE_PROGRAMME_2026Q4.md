@@ -261,3 +261,64 @@ All new issue and PR artefacts are research or implementation drafts. No dataset
 ## Machine-readable benchmark contract
 
 The seven evaluation lanes are represented in [`voice_benchmark_matrix_2026q4.json`](./voice_benchmark_matrix_2026q4.json). Its structural contract is [`voice_benchmark_matrix_2026q4.schema.json`](./voice_benchmark_matrix_2026q4.schema.json) (JSON Schema Draft 2020-12). The schema checks required identifiers, task/metric fields, and source status metadata; it does not validate licence truth, speaker consent, scientific validity or capability qualification. Those remain human/source-governance gates under #10942 and #5352.
+
+
+## 12. Switch-boundary evaluation, phonetic provenance and depth-aware adaptation
+
+### 12.1 SETER and SPER@k complement PIER
+
+Okocha & Grant (2026), “Beyond Word Error Rate: A Switch-Aware Evaluation of ASR and Audio Language Models on English–Yoruba Code-Switched Speech”:
+https://arxiv.org/abs/2609.11786
+
+The study audits 9,966 AfriCodeSwitch validation metadata rows; 8,181 have audio (9.54h). Its deterministic cap2000 comparison uses 2,000 utterances, with 100 speakers, 2,937 prompts and 13 domains. It introduces:
+- **SETER:** masked substitution/deletion error on the first reference token of each new language run.
+- **SPER@k:** masked substitution/deletion error over the union of all reference-token windows within k positions of any switch entry. k=0 equals SETER; the study foregrounds k=1 and k=3.
+- Language-specific masked error, direction and dominance strata, diacritic-sensitive and diacritic-insensitive comparison, and output failure flags for blank, truncated, repetitive, expanded or prompt-leaking generations.
+
+Its headline observation is that WER ranking poorly predicts switch-localized performance. PIER and these metrics are complementary: PIER scores tagged points of interest (often embedded-language tokens), while SETER/SPER focus on the switch token and surrounding neighbourhood.
+
+The new Rust switch scorer is [#11075](https://github.com/Luminous-Dynamics/symthaea/issues/11075) / [draft PR #11079](https://github.com/Luminous-Dynamics/symthaea/pull/11079). It implements per-language masked error, SETER and SPER@k using caller-supplied reference language tags. It does not infer language identity. Its sixteen tests are authored but not executed. No AfriCodeSwitch dataset has been ingested.
+
+### 12.2 Phonetic supervision needs provenance tiers, not a single IPA label
+
+AfriSpeech's current African Speech IPA card describes 141 language configurations. It reports 70 native rule mappings, 13 equivalent-code mappings and 58 donor-rule mappings. Damara is explicitly excluded because the available G2P rule set does not support its click-letter orthography:
+https://huggingface.co/datasets/AfriSpeech/african-speech-ipa
+
+The card cautions that rule-based IPA reflects orthography rather than actual speaker pronunciation; donor-rule character coverage does not prove a correct phonological mapping; some languages are represented in syllabic-script units; and editorial punctuation can enter the IPA stream.
+
+Therefore a phone sequence must have a typed authority:
+- native expert acoustic phonetic annotation;
+- native rule-based G2P;
+- equivalent-code rule-based G2P;
+- donor-rule G2P;
+- model-predicted phone sequence.
+
+Do not use donor-derived or orthography-derived phone targets as if they were native expert acoustic gold. A high character-coverage percentage is not a phonetic-accuracy measure. For click-rich Namibian languages, this is a direct gap signal, not evidence of existing coverage.
+
+See [#11077 — VOICE-G2P-PROVENANCE-001](https://github.com/Luminous-Dynamics/symthaea/issues/11077).
+
+### 12.3 Depth-aware adaptation is a mandatory external baseline
+
+Xiao, Holden & Dang, Findings of ACL 2026, “Adapting Where It Matters: Depth-Aware Model Adaptation for Efficient Multilingual Speech Recognition in Low-Resource Languages”:
+https://aclanthology.org/2026.findings-acl.827/
+
+DAMA reports a U-shaped adaptability pattern: early and late layers are more language/task-specific while middle layers preserve more shared structure. It allocates adaptation capacity by depth, applies SVD-based initialization and freezes a middle basis. The paper reports competitive performance with 80% fewer trainable parameters and a 29% error reduction in its extreme low-resource setting. These are results in the paper's own experimental context, not a forecast for South African speech.
+
+Compare frozen baseline, full fine-tuning, uniform LoRA, DAMA-style adaptation, language-conditioned HDC projection and a hybrid. Match labelled minutes, parameter budget, compute, decoding and evaluation split. Measure not only new-language gain but retained accuracy across every previously qualified language, memory, optimizer state, training cost and worst-language regression.
+
+See [#11076 — VOICE-DAMA-001](https://github.com/Luminous-Dynamics/symthaea/issues/11076).
+
+## 13. Updated machine-readable benchmark matrix
+
+The matrix now contains nine tracks:
+1. South African monolingual ASR;
+2. natural African code-switching (WER, PIER, SETER, SPER@1/3, switch direction and per-language masked error);
+3. audio-grounded semantic understanding;
+4. Namibian click phonetics;
+5. Egyptian historical phonology;
+6. streaming dialogue;
+7. data efficiency;
+8. phonetic supervision provenance / G2P tier audit;
+9. depth-aware multilingual adaptation and retention.
+
+The JSON Schema includes explicit structural fields for adaptation arms, labelled-hour budgets, required outputs and language profiles. Structural validation is not rights validation or evidence that the proposed model has been trained or evaluated.
