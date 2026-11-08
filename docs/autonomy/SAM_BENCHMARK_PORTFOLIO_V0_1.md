@@ -138,11 +138,25 @@ These descriptors describe the system; the four coordinates describe the evidenc
 
 - **Role:** scalable planning evaluation using real driving scenes plus pseudo-simulated follow-up scenes.
 - **Official implementation:** NAVSIM main branch describes the CoRL 2025 NAVSIM v2 code; official release v2.1.2 added the `navhard_two_stage` dataset and updated EPDMS for the Warmup leaderboard. Pin exact devkit, data split, metric implementation and checkpoint.
-- **Protocol nuance:** NAVSIM v2's two-stage procedure evaluates a first 4-second plan, then weights precomputed follow-up scenes according to how closely their starting states match the planner's first-stage endpoint. This is designed to approximate closed-loop relevance, but the surrounding environment does not interact online with the ego policy as a full reciprocal traffic simulator would.
-- **Metric panel:** report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC alongside EPDMS. Do not report EPDMS alone: the component and multiplier terms have distinct meanings, masks and denominators.
-- **Secondary leaderboard snapshot (not independently verified by SAM):** the SOTA2 planning board currently shows Human Agent EPDMS 90.3, LWDrive 89.6, ExploreVLA 88.8 and DriveWorld-VLA 86.8 on its displayed NAVSIM v2 comparison. These values are discovery references only; verify leaderboard split, evaluator revision, score correction, sensor privilege and model artifact before any reproduced comparison.
-- **Claim boundary:** pseudo-simulation is not equivalent to fully interactive closed-loop driving, not a human counterfactual oracle, and not real-road safety evidence.
-- **Sources:** [official NAVSIM repository](https://github.com/autonomousvision/navsim), [official v2.1.2 release](https://github.com/autonomousvision/navsim/releases), [NAVSIM paper](https://papers.nips.cc/paper_files/paper/2024/file/32768f7faf1995026ef9821c696f3404-Abstract-Datasets_and_Benchmarks_Track.html), [secondary leaderboard snapshot](https://www.sota2.com/research/sota/autonomous-driving-planning-on-navsim-v2).
+- **Protocol nuance:** NAVSIM v2's two-stage procedure evaluates a first 4-second plan, then weights precomputed follow-up scenes according to how closely their starting states match the planner's first-stage endpoint. This approximates closed-loop relevance, but surrounding agents do not replan online in response to ego policy at every tick.
+- **Metric panel:** report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC alongside EPDMS. Do not report EPDMS alone: component metrics/multipliers have distinct meanings, masks and denominators.
+- **Secondary leaderboard snapshot (SOTA2, 2026-11-08; not independently verified by SAM):**
+
+| Method | NC | DAC | DDC | TLC | EP | TTC | LK | HC | EC | EPDMS |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Human Agent | 100 | 100 | 99.8 | 100 | 87.4 | 100 | 100 | 98.1 | 90.1 | 90.3 |
+| LWDrive | 98.8 | 98.4 | 99.0 | 99.7 | 90.3 | 98.6 | 96.3 | 97.9 | 73.3 | 89.6 |
+| ExploreVLA | 98.8 | 96.2 | 99.6 | 99.8 | 87.1 | 98.2 | 97.8 | 98.3 | 86.8 | 88.8 |
+| ELF-VLA-8B | 98.9 | 98.1 | 99.4 | 99.8 | 88.5 | 98.4 | 96.9 | 98.3 | 87.2 | 87.1 |
+| DriveWorld-VLA | 98.6 | 99.1 | 99.6 | 99.8 | 87.4 | 97.9 | 97.0 | 97.8 | 78.6 | 86.8 |
+| TPS-Drive | 98.5 | 98.6 | 99.7 | 99.8 | 87.6 | 98.0 | 97.1 | 98.3 | 82.5 | 86.7 |
+| CdDrive | 98.3 | 97.4 | 99.6 | 99.8 | 88.4 | 97.9 | 97.5 | 98.4 | 88.2 | 86.4 |
+| HydraMDP++ | 98.5 | 98.5 | 99.5 | 99.7 | 87.4 | 97.9 | 95.8 | 98.2 | 75.7 | 85.6 |
+| ARTEMIS | 98.3 | 95.1 | 98.6 | 99.8 | 81.5 | 97.4 | 96.5 | 98.3 | — | 83.1 |
+
+- **Claim boundary:** SOTA2 is a secondary leaderboard. Confirm exact split, evaluator revision, filtering, checkpoint and observation privilege before comparing. NAVSIM v2 is pseudo-simulation, not fully interactive closed-loop traffic simulation, not a human counterfactual oracle, and not real-road safety evidence.
+- **Sources:** [official NAVSIM repository](https://github.com/autonomousvision/navsim), [official v2.1.2 release](https://github.com/autonomousvision/navsim/releases), [NAVSIM paper](https://papers.nips.cc/paper_files/paper/2024/file/32768f7faf1995026ef9821c696f3404-Abstract-Datasets_and_Benchmarks_Track.html), [SOTA2 secondary leaderboard](https://www.sota2.com/research/sota/autonomous-driving-planning-on-navsim-v2).
+
 
 ### ReactSim-Bench — reactive surrounding-agent behavior
 
