@@ -543,3 +543,23 @@ PQR-Search also reports **estimate-ordered early exact computation** in selected
 Official source: https://arxiv.org/abs/2611.07579
 
 The cross-algorithm owner remains [#11022](https://github.com/Luminous-Dynamics/symthaea/issues/11022); estimate/cost scheduling remains [#11041](https://github.com/Luminous-Dynamics/symthaea/issues/11041); global deterministic interval refinement remains [#11078](https://github.com/Luminous-Dynamics/symthaea/issues/11078). No HME speedup or PQR reproduction is claimed.
+
+
+### HME extension: query-weighted but certificate-preserving bit allocation
+
+Recast's bit-gain-aware grouping allocates quantization budget using dimension variance. HME should test a workload-aware extension for blockwise ContinuousHV codes:
+
+\[
+\min_{m_b}\sum_b w_b\,\epsilon_b(m_b)
+\quad\text{s.t.}\quad \sum_b m_b\le B
+\]
+
+where \(\epsilon_b(m_b)\) is an independently verified worst-case residual certificate for block b, and \(w_b\) is a frozen workload query-block-energy statistic. At query time, the deterministic dot bound still uses the actual query block norms:
+
+\[
+q\cdot x\le q\cdot\hat{x}+\sum_b\|q_b\|_2\epsilon_b(m_b).
+\]
+
+The workload weight chooses where to spend storage; it is not a proof premise. Under distribution shift, the chosen code may become less efficient but a verified worst-case epsilon remains safe. Compare uniform allocation, variance-only bit-gain, query-energy-weighted allocation and robust multi-profile allocation at equal total code + certificate bytes. Rebuilds must create a new generation and revalidate all certificates.
+
+Synthetic allocation fixture: [hme_query_weighted_code_allocation_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_query_weighted_code_allocation_v0.json). Its two-block epsilon curve is illustrative only; no production quantizer or benchmark result is claimed.
