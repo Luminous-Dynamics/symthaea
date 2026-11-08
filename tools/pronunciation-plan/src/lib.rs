@@ -959,9 +959,10 @@ pub struct LanguageTaskCapability {
 /// Canonical, versioned dialect/orthography/phone inventory contract.
 ///
 /// The digest covers a canonical serialization of every field except
-/// profile_digest itself. It is computed by the profile publisher and checked
-/// again when the manifest is loaded; this crate deliberately does not assume
-/// a particular canonical-JSON or cryptographic implementation.
+/// profile_digest itself. The profile loader/registry computes and verifies
+/// the digest over the exact stored manifest bytes before passing this value
+/// to the contract; this crate validates the digest format and its binding
+/// to a pronunciation plan, but does not recanonicalize external JSON.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LanguageProfileManifest {
@@ -998,13 +999,14 @@ impl LanguageProfileManifest {
             ));
         }
         if self.profile_id.trim().is_empty()
+            || !valid_source_digest(&format!("git-sha1:{}", self.source_revision))
             || self.language_tag.trim().is_empty()
             || self.language_tag.bytes().any(|byte| byte.is_ascii_whitespace())
             || self.dialect.trim().is_empty()
             || self.orthography_id.trim().is_empty()
             || self.inventory_version.trim().is_empty()
         {
-            return Err("language profile requires ID, BCP-47 tag, dialect, orthography and inventory version".into());
+            return Err("language profile requires ID, exact source Git revision, BCP-47 tag, dialect, orthography and inventory version".into());
         }
         if !valid_source_digest(&self.profile_digest) {
             return Err("language profile requires a valid canonical profile digest".into());
