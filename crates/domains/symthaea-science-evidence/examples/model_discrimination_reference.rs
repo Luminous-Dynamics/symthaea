@@ -5,7 +5,7 @@ use std::error::Error;
 use symthaea_science_evidence::{
     CandidateExperiment, DiscriminationHypothesis, GaussianModelPrediction, MeasurementNoiseModel,
     ModelDiscriminationConfig, ModelPriorScenario, ModelUniverseCoverage, NoiseCalibrationStatus,
-    PredictionDisposition, rank_model_discriminating_experiments,
+    PredictionDisposition, gaussian_predictive_kl_nats, rank_model_discriminating_experiments,
 };
 
 fn hypothesis(id: &str, source_byte: u8) -> DiscriminationHypothesis {
@@ -181,5 +181,78 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "not_claimed=physical_model_selection,new_law,UAP_origin,parameter_EIG,closed_world_truth"
     );
+
+    // Compare a different design objective on exactly the same candidate
+    // experiments. This is the minimum directed pairwise KL divergence across
+    // all ordered model pairs, not model-identity EIG. A partial prediction
+    // matrix remains NOT_COMPARABLE rather than receiving an artificial score.
+    println!("objective=minimum_directed_pairwise_predictive_KL_not_model_identity_EIG");
+    println!("experiment,status,min_directed_pairwise_kl_nats,worst_pair,eig_per_cost_for_reference");
+    for candidate in &experiments {
+        let Some(measurement_sigma) = candidate.measurement_sigma else {
+            println!("{},NOT_COMPARABLE,,,", candidate.experiment_id);
+            continue;
+        };
+        if candidate.measurement_noise_model != MeasurementNoiseModel::Gaussian
+            || candidate.noise_calibration == NoiseCalibrationStatus::Uncalibrated
+            || candidate.predictions.len() != hypotheses.len()
+            || candidate.predictions.iter().any(|prediction| {
+                prediction.disposition != PredictionDisposition::Quantitative
+                    || prediction.predictive_mean.is_none()
+                    || prediction.predictive_sigma.is_none()
+                    || prediction.derivation_reference.is_none()
+            })
+        {
+            println!("{},NOT_COMPARABLE,,,", candidate.experiment_id);
+            continue;
+        }
+
+        let mut minimum: Option<(String, String, f64)> = None;
+        for (left_index, left) in candidate.predictions.iter().enumerate() {
+            for (right_index, right) in candidate.predictions.iter().enumerate() {
+                if left_index == right_index {
+                    continue;
+                }
+                let divergence = gaussian_predictive_kl_nats(
+                    left.predictive_mean.unwrap(),
+                    left.predictive_sigma.unwrap(),
+                    right.predictive_mean.unwrap(),
+                    right.predictive_sigma.unwrap(),
+                    measurement_sigma,
+                )?;
+                let pair = (left.model_id.clone(), right.model_id.clone());
+                let replace = minimum
+                    .as_ref()
+                    .is_none_or(|(best_left, best_right, best_value)| {
+                        divergence
+                            .total_cmp(best_value)
+                            .then_with(|| pair.0.cmp(best_left))
+                            .then_with(|| pair.1.cmp(best_right))
+                            .is_lt()
+                    });
+                if replace {
+                    minimum = Some((pair.0, pair.1, divergence));
+                }
+            }
+        }
+
+        if let Some((left, right, divergence)) = minimum {
+            let eig_per_cost = report
+                .experiments
+                .iter()
+                .find(|score| score.experiment_id == candidate.experiment_id)
+                .and_then(|score| score.weighted_mean_eig_per_cost);
+            println!(
+                "{},{:.9},{left}->{right},{:.9}",
+                candidate.experiment_id,
+                divergence,
+                eig_per_cost.unwrap_or(f64::NAN),
+            );
+        } else {
+            println!("{},NOT_COMPARABLE,,,", candidate.experiment_id);
+        }
+    }
+    println!("KL direction is explicit: D_KL(p_left || p_right); the minimum is over ordered pairs.");
+    println!("The minimum directed KL, model-identity EIG and model-recovery accuracy are distinct objectives.");
     Ok(())
 }
