@@ -1,0 +1,42 @@
+name: Connectome Experiment Design Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/connectome-experiment-design/**"
+      - ".github/workflows/connectome-experiment-design-v1.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths:
+      - "tools/connectome-experiment-design/**"
+      - ".github/workflows/connectome-experiment-design-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-experiment-design-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone-rust:
+    name: EIG and EVSI isolated Rust verification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/connectome-experiment-design/Cargo.toml -- --check
+      - name: Check isolated metadata and lock
+        run: cargo metadata --manifest-path tools/connectome-experiment-design/Cargo.toml --locked --no-deps --format-version 1 > /dev/null
+      - name: Run known-answer and negative-control tests
+        run: cargo test --manifest-path tools/connectome-experiment-design/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-experiment-design/Cargo.toml --locked --all-targets -- -D warnings
