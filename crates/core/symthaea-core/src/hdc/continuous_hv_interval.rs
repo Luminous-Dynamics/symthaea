@@ -55,6 +55,46 @@ impl ContinuousHVScoreInterval {
     }
 }
 
+
+/** Conservative interval for the real-arithmetic cosine over an L2 ball.
+ *
+ * This is a geometry research primitive, not a canonical f32 score interval.
+ * It must not be passed to the exact HME selector or used to prune payloads.
+ */
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ContinuousHVRealCosineInterval {
+    /// Lower real-cosine endpoint in [-1, 1].
+    pub lower: f64,
+    /// Upper real-cosine endpoint in [-1, 1].
+    pub upper: f64,
+}
+
+impl ContinuousHVRealCosineInterval {
+    /// An interval with no geometric pruning information.
+    pub const fn uninformative() -> Self {
+        Self { lower: -1.0, upper: 1.0 }
+    }
+
+    /// Whether a finite real cosine is enclosed.
+    pub fn contains(&self, cosine: f64) -> bool {
+        cosine.is_finite() && self.lower <= cosine && cosine <= self.upper
+    }
+
+    /// Structural range check; this does not validate group membership.
+    pub fn is_well_formed(&self) -> bool {
+        self.lower.is_finite()
+            && self.upper.is_finite()
+            && -1.0 <= self.lower
+            && self.lower <= self.upper
+            && self.upper <= 1.0
+    }
+
+    /// Width of the interval in real cosine units.
+    pub fn width(&self) -> f64 {
+        self.upper - self.lower
+    }
+}
+
 /// Admission errors for a bounded ContinuousHV score request.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ContinuousHVIntervalError {
@@ -455,7 +495,218 @@ fn f32_upper_from_f64(value: f64) -> Option<f32> {
     })
 }
 
+
+/// Outward interval for f64 geometric calculations.
+#[derive(Debug, Clone, Copy)]
+struct F64Interval {
+    lo: f64,
+    hi: f64,
+}
+
+impl F64Interval {
+    const fn point(value: f64) -> Self {
+        Self { lo: value, hi: value }
+    }
+
+    fn mul(self, rhs: Self) -> Option<Self> {
+        let products = [
+            self.lo * rhs.lo,
+            self.lo * rhs.hi,
+            self.hi * rhs.lo,
+            self.hi * rhs.hi,
+        ];
+        if products.iter().any(|value| !value.is_finite()) {
+            return None;
+        }
+        let lo = products.iter().copied().fold(f64::INFINITY, f64::min);
+        let hi = products.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        Some(Self { lo: f64_next_down(lo), hi: f64_next_up(hi) })
+    }
+
+    fn div_positive(self, rhs: Self) -> Option<Self> {
+        if rhs.lo <= 0.0 || !rhs.hi.is_finite() {
+            return None;
+        }
+        let quotients = [
+            self.lo / rhs.lo,
+            self.lo / rhs.hi,
+            self.hi / rhs.lo,
+            self.hi / rhs.hi,
+        ];
+        if quotients.iter().any(|value| !value.is_finite()) {
+            return None;
+        }
+        let lo = quotients.iter().copied().fold(f64::INFINITY, f64::min);
+        let hi = quotients.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        Some(Self { lo: f64_next_down(lo), hi: f64_next_up(hi) })
+    }
+
+    fn square_nonnegative(self) -> Option<Self> {
+        let min_abs = if self.lo <= 0.0 && self.hi >= 0.0 {
+            0.0
+        } else {
+            self.lo.abs().min(self.hi.abs())
+        };
+        let max_abs = self.lo.abs().max(self.hi.abs());
+        let lo = min_abs * min_abs;
+        let hi = max_abs * max_abs;
+        if !lo.is_finite() || !hi.is_finite() {
+            return None;
+        }
+        Some(Self {
+            lo: f64_next_down(lo).max(0.0),
+            hi: f64_next_up(hi),
+        })
+    }
+
+    fn sqrt_nonnegative(self) -> Option<Self> {
+        if self.lo < 0.0 || !self.hi.is_finite() {
+            return None;
+        }
+        let lo = self.lo.sqrt();
+        let hi = self.hi.sqrt();
+        if !lo.is_finite() || !hi.is_finite() {
+            return None;
+        }
+        Some(Self {
+            lo: f64_next_down(lo).max(0.0),
+            hi: f64_next_up(hi),
+        })
+    }
+
+    fn one_minus_square(self) -> Option<Self> {
+        let squared = self.square_nonnegative()?;
+        let lo = f64_next_down(1.0 - squared.hi).max(0.0);
+        let hi = f64_next_up(1.0 - squared.lo).min(1.0);
+        (lo <= hi).then_some(Self { lo, hi })
+    }
+}
+
 impl ContinuousHV {
+
+    /// Bound the real-arithmetic cosine of every nonzero vector in the
+    /// L2 ball around center using its induced spherical cone.
+    ///
+    /// If r < ||center||, every candidate direction lies within a cone
+    /// around the center direction with half-angle asin(r / ||center||).
+    /// This evaluates the equivalent algebraic spherical-cap formula with
+    /// outward f64 intervals; it avoids asin/acos and falls back to [-1, 1]
+    /// whenever the center ball may contain the origin or arithmetic cannot
+    /// be bounded.
+    ///
+    /// IMPORTANT: this bounds real cosine only. It does not enclose the
+    /// canonical f32 score from similarity_full_resolution and is not
+    /// prune-authorizing. A future canonical-score method must add and qualify
+    /// a separate f32 reduction/denominator error envelope.
+    pub fn real_cosine_interval_full_resolution_for_l2_ball_center(
+        &self,
+        center: &Self,
+        residual_l2_upper: f32,
+    ) -> Result<ContinuousHVRealCosineInterval, ContinuousHVIntervalError> {
+        self.validate_full_resolution_pair(center)?;
+        if !residual_l2_upper.is_finite() || residual_l2_upper < 0.0 {
+            return Err(ContinuousHVIntervalError::InvalidResidualBound);
+        }
+
+        let (query_sq_lower, query_sq_upper) = f64_sum_squares_bounds(&self.values);
+        let (center_sq_lower, center_sq_upper) = f64_sum_squares_bounds(&center.values);
+        if query_sq_lower <= 0.0 || center_sq_lower <= 0.0 {
+            return Ok(ContinuousHVRealCosineInterval::uninformative());
+        }
+
+        let query_sq = F64Interval {
+            lo: query_sq_lower.max(0.0),
+            hi: query_sq_upper.max(0.0),
+        };
+        let center_sq = F64Interval {
+            lo: center_sq_lower.max(0.0),
+            hi: center_sq_upper.max(0.0),
+        };
+        let query_norm = match query_sq.sqrt_nonnegative() {
+            Some(value) if value.lo > 0.0 => value,
+            _ => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+        let center_norm = match center_sq.sqrt_nonnegative() {
+            Some(value) if value.lo > 0.0 => value,
+            _ => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+
+        let radius = residual_l2_upper as f64;
+        // Require strict separation from the origin under the lower norm
+        // endpoint; otherwise every angular direction remains possible.
+        if radius >= center_norm.lo {
+            return Ok(ContinuousHVRealCosineInterval::uninformative());
+        }
+
+        let dot_bounds = f64_dot_bounds(&self.values, &center.values);
+        let dot = F64Interval { lo: dot_bounds.0, hi: dot_bounds.1 };
+        let norm_product = match query_norm.mul(center_norm) {
+            Some(value) if value.lo > 0.0 => value,
+            _ => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+        let mut d = match dot.div_positive(norm_product) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+        // The exact normalized dot lies in [-1, 1]; intersect numeric
+        // overhang with this analytic invariant.
+        d.lo = d.lo.max(-1.0);
+        d.hi = d.hi.min(1.0);
+        if d.lo > d.hi {
+            return Ok(ContinuousHVRealCosineInterval::uninformative());
+        }
+
+        // a = sin(alpha) = r / ||center||. Its interval is non-negative.
+        let a = F64Interval {
+            lo: (radius / center_norm.hi).max(0.0),
+            hi: f64_next_up(radius / center_norm.lo),
+        };
+        if !a.lo.is_finite() || !a.hi.is_finite() || a.hi >= 1.0 {
+            return Ok(ContinuousHVRealCosineInterval::uninformative());
+        }
+
+        // cos(alpha) = sqrt(1 - a^2), and sin(theta) = sqrt(1 - d^2).
+        let cos_alpha = match a.one_minus_square().and_then(F64Interval::sqrt_nonnegative) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+        let sin_theta = match d.one_minus_square().and_then(F64Interval::sqrt_nonnegative) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+        let center_term = match d.mul(cos_alpha) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+        let spread = match sin_theta.mul(a) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVRealCosineInterval::uninformative()),
+        };
+
+        // The upper endpoint saturates at +1 when the query direction may
+        // lie inside the cone. The lower endpoint similarly saturates at -1
+        // for the antipodal cone. Ambiguity widens rather than guesses.
+        let upper_may_saturate = d.hi >= cos_alpha.lo;
+        let lower_may_saturate = d.lo <= -cos_alpha.lo;
+        let lower = if lower_may_saturate {
+            -1.0
+        } else {
+            f64_next_down(center_term.lo - spread.hi).max(-1.0)
+        };
+        let upper = if upper_may_saturate {
+            1.0
+        } else {
+            f64_next_up(center_term.hi + spread.hi).min(1.0)
+        };
+
+        let interval = ContinuousHVRealCosineInterval { lower, upper };
+        if interval.is_well_formed() {
+            Ok(interval)
+        } else {
+            Ok(ContinuousHVRealCosineInterval::uninformative())
+        }
+    }
+
     /// Enclose canonical cosine for every candidate x in the L2 ball
     /// ||x - center||_2 <= residual_l2_upper.
     ///
@@ -1236,6 +1487,98 @@ mod tests {
                 ContinuousHVProfileError::DimensionMismatch { .. }
             ))
         ));
+    }
+
+
+    fn exact_real_cosine(left: &[f32], right: &[f32]) -> f64 {
+        let mut dot = 0.0f64;
+        let mut left_norm_sq = 0.0f64;
+        let mut right_norm_sq = 0.0f64;
+        for (&a, &b) in left.iter().zip(right) {
+            let a = a as f64;
+            let b = b as f64;
+            dot += a * b;
+            left_norm_sq += a * a;
+            right_norm_sq += b * b;
+        }
+        let denominator = (left_norm_sq * right_norm_sq).sqrt();
+        if denominator == 0.0 { 0.0 } else { (dot / denominator).clamp(-1.0, 1.0) }
+    }
+
+    #[test]
+    fn spherical_cap_real_cosine_interval_contains_high_dimensional_members() {
+        let mut state = 0x51A7_C0DEu32;
+        for dimension in [8usize, 9, 257, 16_384] {
+            for scenario in 0..5 {
+                let center_values: Vec<f32> = (0..dimension)
+                    .map(|index| match scenario {
+                        0 => ((index as f32) * 0.013).sin() * 0.7,
+                        1 => if index % 2 == 0 { 0.8 } else { -0.8 },
+                        2 => pseudo_random_unit(&mut state) * 0.7,
+                        3 => if index == dimension / 2 { 0.7 } else { 0.0 },
+                        _ => ((index as f32) * 0.017).cos() * 0.02,
+                    })
+                    .collect();
+                let query_values: Vec<f32> = (0..dimension)
+                    .map(|index| match scenario {
+                        0 => center_values[index] * 0.9,
+                        1 => -center_values[index],
+                        2 => pseudo_random_unit(&mut state),
+                        3 => if index == dimension / 2 { -1.0 } else { 0.0 },
+                        _ => ((index as f32) * 0.009).sin(),
+                    })
+                    .collect();
+                let center = ContinuousHV::from_vec(center_values);
+                let query = ContinuousHV::from_vec(query_values);
+                let radius = 0.01f32;
+                let actual = ContinuousHV::from_vec(
+                    center.values.iter().enumerate().map(|(index, value)| {
+                        (*value + 0.0001 * ((index as f32) * 0.037).sin()).clamp(-1.0, 1.0)
+                    }).collect(),
+                );
+                verify_l2_residual_certificate(&actual, &center, radius).unwrap();
+
+                let interval = query
+                    .real_cosine_interval_full_resolution_for_l2_ball_center(&center, radius)
+                    .unwrap();
+                let exact_real = exact_real_cosine(&query.values, &actual.values);
+                assert!(
+                    interval.contains(exact_real),
+                    "scenario={scenario}, dimension={dimension}: real cosine={exact_real}, interval=[{}, {}]",
+                    interval.lower,
+                    interval.upper
+                );
+                assert!(interval.is_well_formed());
+            }
+        }
+    }
+
+    #[test]
+    fn spherical_cap_saturates_aligned_and_antipodal_directions() {
+        let center = ContinuousHV::from_vec(vec![0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let aligned = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let antipodal = ContinuousHV::from_vec(vec![-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+
+        let upper = aligned
+            .real_cosine_interval_full_resolution_for_l2_ball_center(&center, 0.2)
+            .unwrap();
+        let lower = antipodal
+            .real_cosine_interval_full_resolution_for_l2_ball_center(&center, 0.2)
+            .unwrap();
+        assert_eq!(upper.upper, 1.0);
+        assert_eq!(lower.lower, -1.0);
+        assert!(upper.contains(1.0));
+        assert!(lower.contains(-1.0));
+    }
+
+    #[test]
+    fn spherical_cap_falls_back_when_ball_may_contain_origin() {
+        let center = ContinuousHV::from_vec(vec![0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let query = ContinuousHV::ones(8);
+        let interval = query
+            .real_cosine_interval_full_resolution_for_l2_ball_center(&center, 0.2)
+            .unwrap();
+        assert_eq!(interval, ContinuousHVRealCosineInterval::uninformative());
     }
 
     #[test]
