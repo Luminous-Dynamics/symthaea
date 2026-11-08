@@ -384,16 +384,20 @@ impl ContinuousHV {
         candidate_upper: &[f32],
     ) -> Result<ContinuousHVScoreInterval, ContinuousHVIntervalError> {
         if candidate_lower.len() != candidate_upper.len() {
-            return Err(ContinuousHVIntervalError::DimensionMismatch {
-                query_dim: candidate_lower.len(),
-                candidate_dim: candidate_upper.len(),
-            });
+            return Err(ContinuousHVIntervalError::InvalidProfile(
+                ContinuousHVProfileError::DimensionMismatch {
+                    query_dim: candidate_lower.len(),
+                    candidate_dim: candidate_upper.len(),
+                },
+            ));
         }
         if self.values.len() != candidate_lower.len() {
-            return Err(ContinuousHVIntervalError::DimensionMismatch {
-                query_dim: self.values.len(),
-                candidate_dim: candidate_lower.len(),
-            });
+            return Err(ContinuousHVIntervalError::InvalidProfile(
+                ContinuousHVProfileError::DimensionMismatch {
+                    query_dim: self.values.len(),
+                    candidate_dim: candidate_lower.len(),
+                },
+            ));
         }
         self.validate_full_resolution_profile("query")?;
         for (index, (&lower, &upper)) in candidate_lower
@@ -764,7 +768,9 @@ mod tests {
                 &[0.0; 8],
                 &[0.0; 9]
             ),
-            Err(ContinuousHVIntervalError::DimensionMismatch { .. })
+            Err(ContinuousHVIntervalError::InvalidProfile(
+                ContinuousHVProfileError::DimensionMismatch { .. }
+            ))
         ));
     }
 
