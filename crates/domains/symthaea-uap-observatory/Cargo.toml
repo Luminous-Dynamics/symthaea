@@ -18,3 +18,7 @@ path = "src/lib.rs"
 [[example]]
 name = "sensor_placement_design"
 path = "examples/sensor_placement_design.rs"
+
+[[example]]
+name = "budgeted_experiment_design"
+path = "examples/budgeted_experiment_design.rs"
