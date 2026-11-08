@@ -51,7 +51,7 @@ fn main() -> ExitCode {
     let replay = match replay_domain_outages(&value) {
         Ok(replay) => replay,
         Err(error) => {
-            eprintln!("PRELIGHT_REPLAY_UNSUPPORTED: {error}");
+            eprintln!("PREFLIGHT_REPLAY_UNSUPPORTED: {error}");
             return ExitCode::FAILURE;
         }
     };
