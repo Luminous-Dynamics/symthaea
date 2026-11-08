@@ -194,11 +194,11 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
-        if !matches!(
-            access,
-            StructureAccess::BooleanWithheld | StructureAccess::BooleanSupplied(_)
-        ) {
-            return Err(ProtocolError::AccessFamilyMismatch);
+        match access {
+            StructureAccess::BooleanWithheld => {}
+            StructureAccess::BooleanSupplied(supplied) if supplied == mechanism => {}
+            StructureAccess::BooleanSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
+            _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
         let world = HiddenWorld::new(mechanism, measurement_map, initial_hidden_state)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
@@ -220,11 +220,11 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
-        if !matches!(
-            access,
-            StructureAccess::NumericWithheld | StructureAccess::NumericSupplied(_)
-        ) {
-            return Err(ProtocolError::AccessFamilyMismatch);
+        match access {
+            StructureAccess::NumericWithheld => {}
+            StructureAccess::NumericSupplied(supplied) if supplied == truth.mechanism => {}
+            StructureAccess::NumericSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
+            _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
         let world = numeric::NumericWorld::new(truth)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
@@ -246,11 +246,11 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
-        if !matches!(
-            access,
-            StructureAccess::InteractionWithheld | StructureAccess::InteractionSupplied(_)
-        ) {
-            return Err(ProtocolError::AccessFamilyMismatch);
+        match access {
+            StructureAccess::InteractionWithheld => {}
+            StructureAccess::InteractionSupplied(supplied) if supplied == truth.structure => {}
+            StructureAccess::InteractionSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
+            _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
         let world = interaction::InteractionWorld::new(truth)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
@@ -580,6 +580,7 @@ fn compare_model_sets<T: Serialize>(
 pub enum ProtocolError {
     InvalidManifest,
     AccessFamilyMismatch,
+    SuppliedStructureMismatch,
     WrongInterventionFamily,
     ProbeBudgetExhausted,
     EpisodeClosed,
