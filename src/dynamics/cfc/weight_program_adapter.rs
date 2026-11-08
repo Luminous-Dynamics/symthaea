@@ -15,6 +15,11 @@ use symthaea_core::weight_space_program::{
     WeightProgramReceipt, WeightProgramTarget,
 };
 use thiserror::Error;
+use symthaea_fep::gaussian_model_information_gain::{
+    GaussianModelInformationGainError, GaussianModelInformationGainConfig,
+    GaussianObservationAction, GaussianObservationHypothesis,
+    evaluate_gaussian_model_information_gains,
+};
 
 use super::network::{
     CfCNetwork, CfCNetworkConfig, CfCParameterGroupId, CfCParameterGroupReplacement,
@@ -454,6 +459,55 @@ pub struct CfCAlignmentAcceptancePolicy {
     pub min_assignment_margin: f64,
 }
 
+/// Posterior mass over one exact source-to-candidate hidden-unit permutation.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCPermutationHypothesisPosterior {
+    /// Mapping from source unit index to candidate unit index.
+    pub source_to_candidate: Vec<usize>,
+    /// Posterior probability after the existing functional probes.
+    pub posterior_probability: f64,
+}
+
+/// Prospective FEP score for one candidate functional probe.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCGaussianPermutationProbeScore {
+    pub candidate_index: usize,
+    pub augmented_probe_digest: String,
+    pub model_information_gain_nats: f64,
+    pub expected_posterior_permutation_entropy_nats: f64,
+}
+
+/// Source-bound receipt for Gaussian-channel EIG over an exact small permutation space.
+///
+/// The likelihood is a scalar Gaussian observation: a deterministic projection of
+/// candidate hidden activations with an explicit observation standard deviation.
+/// The standard deviation is an experimental assumption that must be calibrated;
+/// this receipt does not infer or justify it.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCGaussianPermutationEIGSelection {
+    pub format_version: u32,
+    pub source_model_digest: String,
+    pub candidate_model_digest: String,
+    pub architecture_digest: String,
+    pub manifest_digest: String,
+    pub layer_index: usize,
+    pub projection_digest: String,
+    pub existing_probe_digest: Option<String>,
+    pub selected_candidate_index: usize,
+    pub selected_probe: CfCFunctionalProbe,
+    pub selected_augmented_probe_digest: String,
+    pub observation_std_dev: f64,
+    pub quadrature_points: usize,
+    pub permutation_hypothesis_count: usize,
+    pub current_permutation_entropy_nats: f64,
+    pub selected_expected_posterior_entropy_nats: f64,
+    pub selected_model_information_gain_nats: f64,
+    /// Posterior after existing probes, before the selected new probe is observed.
+    pub permutation_posterior: Vec<CfCPermutationHypothesisPosterior>,
+    /// Every candidate probe in input order, for reproducible action comparison.
+    pub candidate_scores: Vec<CfCGaussianPermutationProbeScore>,
+}
+
 /// Fail-closed errors for functional hidden-unit correspondence.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum CfCPermutationAlignmentError {
@@ -547,6 +601,17 @@ pub enum CfCPermutationAlignmentError {
     MissingCanonicalizationGroup(String),
     #[error("CfC parameter group has an unexpected shape for canonicalization: {group}")]
     InvalidCanonicalizationGroupShape { group: String },
+    #[error("exact permutation EIG supports at most {maximum_hypotheses} mappings; layer has {hidden_dim} units")]
+    ExactPermutationSpaceTooLarge {
+        hidden_dim: usize,
+        maximum_hypotheses: usize,
+    },
+    #[error(transparent)]
+    GaussianInformationGain(#[from] GaussianModelInformationGainError),
+    #[error("permutation activation signatures have an invalid hidden-unit dimension")]
+    InvalidPermutationSignatureDimension,
+    #[error("permutation posterior normalization failed")]
+    InvalidPermutationPosterior,
     #[error("canonicalization would not change any parameters")]
     NoOpCanonicalization,
 }
@@ -1513,6 +1578,375 @@ pub fn select_cfc_disambiguating_probe(
         selected_mean_squared_activation_error: selected_score.mean_squared_activation_error,
         candidate_scores,
     })
+}
+
+const MAX_EXACT_PERMUTATION_HYPOTHESES: usize = 1024;
+
+/// Select a CfC functional probe by prospective mutual information over exact
+/// hidden-unit permutation hypotheses.
+///
+/// This is the first Bayesian/FEP probe selector for the symmetry workflow.
+/// It is deliberately restricted to small layers (at most 6 units with the
+/// current 1024-hypothesis ceiling). The likelihood assumes a scalar Gaussian
+/// observation channel with the caller-supplied measurement standard deviation.
+/// Existing probes update the permutation posterior; candidate probes are then
+/// scored by I(Permutation; projected activation | probe). It selects a probe
+/// only—it never reorders tensors, creates a WeightProgram, or accepts edits.
+pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
+    source: &CfCNetwork,
+    candidate: &CfCNetwork,
+    layer_index: usize,
+    existing_probes: &[CfCFunctionalProbe],
+    candidate_probes: &[CfCFunctionalProbe],
+    observation_std_dev: f64,
+    quadrature_points: usize,
+) -> Result<CfCGaussianPermutationEIGSelection, CfCPermutationAlignmentError> {
+    if candidate_probes.is_empty() {
+        return Err(CfCPermutationAlignmentError::EmptyCandidateProbeSet);
+    }
+
+    let source_fingerprint = source
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    let candidate_fingerprint = candidate
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    if source_fingerprint.architecture_digest != candidate_fingerprint.architecture_digest {
+        return Err(CfCPermutationAlignmentError::ArchitectureMismatch {
+            source: source_fingerprint.architecture_digest,
+            candidate: candidate_fingerprint.architecture_digest,
+        });
+    }
+    if source_fingerprint.manifest_digest != candidate_fingerprint.manifest_digest {
+        return Err(CfCPermutationAlignmentError::ManifestMismatch {
+            source: source_fingerprint.manifest_digest,
+            candidate: candidate_fingerprint.manifest_digest,
+        });
+    }
+
+    let hidden_dim = source.config().hidden_dim;
+    let permutations = enumerate_hidden_unit_permutations(hidden_dim);
+    if permutations.is_empty() || permutations.len() > MAX_EXACT_PERMUTATION_HYPOTHESES {
+        return Err(CfCPermutationAlignmentError::ExactPermutationSpaceTooLarge {
+            hidden_dim,
+            maximum_hypotheses: MAX_EXACT_PERMUTATION_HYPOTHESES,
+        });
+    }
+
+    let projection = deterministic_permutation_projection(
+        &source_fingerprint.architecture_digest,
+        layer_index,
+        hidden_dim,
+    );
+    let projection_digest = digest_projection(&projection);
+    let existing_probe_digest = if existing_probes.is_empty() {
+        None
+    } else {
+        Some(cfc_probe_set_digest(layer_index, existing_probes))
+    };
+
+    let mut log_posterior = vec![-(permutations.len() as f64).ln(); permutations.len()];
+    let mut existing_fit_squared_error = 0.0_f64;
+    if !existing_probes.is_empty() {
+        let source_signatures =
+            cfc_hidden_unit_activation_signatures(source, layer_index, existing_probes)?;
+        let candidate_signatures =
+            cfc_hidden_unit_activation_signatures(candidate, layer_index, existing_probes)?;
+        let _ = align_cfc_hidden_unit_signatures(&source_signatures, &candidate_signatures)?;
+
+        validate_signature_hidden_dimension(&source_signatures, hidden_dim)?;
+        validate_signature_hidden_dimension(&candidate_signatures, hidden_dim)?;
+        for probe_index in 0..existing_probes.len() {
+            let observed = projected_candidate_activation(&candidate_signatures, probe_index, &projection);
+            let residuals = permutations
+                .iter()
+                .map(|permutation| {
+                    let predicted = projected_permuted_source_activation(
+                        &source_signatures,
+                        probe_index,
+                        &projection,
+                        permutation,
+                    );
+                    (observed - predicted).powi(2)
+                })
+                .collect::<Vec<_>>();
+            let best_residual = residuals
+                .iter()
+                .copied()
+                .fold(f64::INFINITY, f64::min);
+            existing_fit_squared_error += best_residual;
+            for (log_weight, squared_error) in log_posterior.iter_mut().zip(residuals) {
+                *log_weight -= squared_error
+                    / (2.0 * observation_std_dev * observation_std_dev);
+            }
+        }
+    }
+
+    let posterior_probabilities = normalize_log_weights(&log_posterior)
+        .ok_or(CfCPermutationAlignmentError::InvalidPermutationPosterior)?;
+    let current_entropy = categorical_entropy_nats(&posterior_probabilities);
+    let permutation_hypotheses = permutations
+        .iter()
+        .zip(posterior_probabilities.iter().copied())
+        .enumerate()
+        .map(|(index, (permutation, prior_probability))| GaussianObservationHypothesis {
+            hypothesis_id: format!(
+                "perm-{index}:{}",
+                permutation
+                    .iter()
+                    .map(usize::to_string)
+                    .collect::<Vec<_>>()
+                    .join("-")
+            ),
+            prior_probability,
+        })
+        .collect::<Vec<_>>();
+
+    let mut augmented_probe_digests = Vec::with_capacity(candidate_probes.len());
+    let mut actions = Vec::with_capacity(candidate_probes.len());
+    for (candidate_index, probe) in candidate_probes.iter().enumerate() {
+        let mut augmented_probes = Vec::with_capacity(existing_probes.len() + 1);
+        augmented_probes.extend_from_slice(existing_probes);
+        augmented_probes.push(probe.clone());
+
+        let source_signatures =
+            cfc_hidden_unit_activation_signatures(source, layer_index, &augmented_probes)?;
+        let candidate_signatures =
+            cfc_hidden_unit_activation_signatures(candidate, layer_index, &augmented_probes)?;
+        let _ = align_cfc_hidden_unit_signatures(&source_signatures, &candidate_signatures)?;
+        validate_signature_hidden_dimension(&source_signatures, hidden_dim)?;
+        validate_signature_hidden_dimension(&candidate_signatures, hidden_dim)?;
+
+        let final_probe_index = augmented_probes.len() - 1;
+        let outcome_means = permutations
+            .iter()
+            .map(|permutation| {
+                projected_permuted_source_activation(
+                    &source_signatures,
+                    final_probe_index,
+                    &projection,
+                    permutation,
+                )
+            })
+            .collect::<Vec<_>>();
+        augmented_probe_digests.push(cfc_probe_set_digest(layer_index, &augmented_probes));
+        actions.push(GaussianObservationAction {
+            action_id: format!("probe-{candidate_index:06}"),
+            outcome_means,
+        });
+    }
+
+    let information_gains = evaluate_gaussian_model_information_gains(
+        &permutation_hypotheses,
+        &actions,
+        GaussianModelInformationGainConfig {
+            observation_std_dev,
+            quadrature_points,
+            tail_sigma: 8.0,
+        },
+    )?;
+    let mut selected_index = 0_usize;
+    for index in 1..information_gains.len() {
+        let order = information_gains[index]
+            .model_information_gain_nats
+            .total_cmp(&information_gains[selected_index].model_information_gain_nats);
+        if order == std::cmp::Ordering::Greater {
+            selected_index = index;
+        }
+    }
+
+    let scores = information_gains
+        .iter()
+        .enumerate()
+        .map(|(candidate_index, gain)| CfCGaussianPermutationProbeScore {
+            candidate_index,
+            augmented_probe_digest: augmented_probe_digests[candidate_index].clone(),
+            model_information_gain_nats: gain.model_information_gain_nats,
+            expected_posterior_permutation_entropy_nats: gain
+                .expected_posterior_model_entropy_nats,
+        })
+        .collect::<Vec<_>>();
+    let selected_gain = &information_gains[selected_index];
+
+    Ok(CfCGaussianPermutationEIGSelection {
+        format_version: 1,
+        source_model_digest: source_fingerprint.model_digest,
+        candidate_model_digest: candidate_fingerprint.model_digest,
+        architecture_digest: source_fingerprint.architecture_digest,
+        manifest_digest: source_fingerprint.manifest_digest,
+        layer_index,
+        projection_digest,
+        existing_probe_digest,
+        selected_candidate_index: selected_index,
+        selected_probe: candidate_probes[selected_index].clone(),
+        selected_augmented_probe_digest: augmented_probe_digests[selected_index].clone(),
+        observation_std_dev,
+        quadrature_points,
+        permutation_hypothesis_count: permutations.len(),
+        current_permutation_entropy_nats: current_entropy,
+        selected_expected_posterior_entropy_nats: selected_gain
+            .expected_posterior_model_entropy_nats,
+        selected_model_information_gain_nats: selected_gain.model_information_gain_nats,
+        permutation_posterior: permutations
+            .into_iter()
+            .zip(posterior_probabilities)
+            .map(|(source_to_candidate, posterior_probability)| {
+                CfCPermutationHypothesisPosterior {
+                    source_to_candidate,
+                    posterior_probability,
+                }
+            })
+            .collect(),
+        candidate_scores: scores,
+    })
+}
+
+fn enumerate_hidden_unit_permutations(hidden_dim: usize) -> Vec<Vec<usize>> {
+    fn visit(
+        position: usize,
+        current: &mut Vec<usize>,
+        used: &mut [bool],
+        results: &mut Vec<Vec<usize>>,
+    ) {
+        if position == used.len() {
+            results.push(current.clone());
+            return;
+        }
+        for candidate_index in 0..used.len() {
+            if used[candidate_index] {
+                continue;
+            }
+            used[candidate_index] = true;
+            current.push(candidate_index);
+            visit(position + 1, current, used, results);
+            current.pop();
+            used[candidate_index] = false;
+        }
+    }
+
+    if hidden_dim == 0 {
+        return Vec::new();
+    }
+    let mut results = Vec::new();
+    visit(
+        0,
+        &mut Vec::with_capacity(hidden_dim),
+        &mut vec![false; hidden_dim],
+        &mut results,
+    );
+    results
+}
+
+fn deterministic_permutation_projection(
+    architecture_digest: &str,
+    layer_index: usize,
+    hidden_dim: usize,
+) -> Vec<f64> {
+    let mut projection = Vec::with_capacity(hidden_dim);
+    for unit_index in 0..hidden_dim {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-cfc-permutation-eig-projection-v1\0");
+        hasher.update(architecture_digest.as_bytes());
+        hasher.update(&(layer_index as u64).to_le_bytes());
+        hasher.update(&(unit_index as u64).to_le_bytes());
+        let bytes = hasher.finalize();
+        let raw = u64::from_le_bytes([
+            bytes.as_bytes()[0],
+            bytes.as_bytes()[1],
+            bytes.as_bytes()[2],
+            bytes.as_bytes()[3],
+            bytes.as_bytes()[4],
+            bytes.as_bytes()[5],
+            bytes.as_bytes()[6],
+            bytes.as_bytes()[7],
+        ]);
+        projection.push(2.0 * (raw as f64 / u64::MAX as f64) - 1.0);
+    }
+    let norm = projection.iter().map(|value| value * value).sum::<f64>().sqrt();
+    if norm > 1e-15 {
+        for value in &mut projection {
+            *value /= norm;
+        }
+    } else if let Some(first) = projection.first_mut() {
+        *first = 1.0;
+    }
+    projection
+}
+
+fn digest_projection(projection: &[f64]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-cfc-permutation-projection-digest-v1\0");
+    hasher.update(&(projection.len() as u64).to_le_bytes());
+    for value in projection {
+        hasher.update(&value.to_le_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn validate_signature_hidden_dimension(
+    signatures: &CfCActivationSignatureSet,
+    expected: usize,
+) -> Result<(), CfCPermutationAlignmentError> {
+    if signatures.signatures.len() != expected {
+        return Err(CfCPermutationAlignmentError::InvalidPermutationSignatureDimension);
+    }
+    Ok(())
+}
+
+fn projected_candidate_activation(
+    signatures: &CfCActivationSignatureSet,
+    probe_index: usize,
+    projection: &[f64],
+) -> f64 {
+    signatures
+        .signatures
+        .iter()
+        .zip(projection)
+        .map(|(signature, weight)| signature[probe_index] * weight)
+        .sum()
+}
+
+fn projected_permuted_source_activation(
+    signatures: &CfCActivationSignatureSet,
+    probe_index: usize,
+    projection: &[f64],
+    source_to_candidate: &[usize],
+) -> f64 {
+    let mut total = 0.0;
+    for (source_unit, candidate_unit) in source_to_candidate.iter().copied().enumerate() {
+        total += signatures.signatures[source_unit][probe_index] * projection[candidate_unit];
+    }
+    total
+}
+
+fn normalize_log_weights(log_weights: &[f64]) -> Option<Vec<f64>> {
+    let maximum = log_weights.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !maximum.is_finite() {
+        return None;
+    }
+    let unnormalized = log_weights
+        .iter()
+        .map(|value| (value - maximum).exp())
+        .collect::<Vec<_>>();
+    let normalizer = unnormalized.iter().sum::<f64>();
+    if !normalizer.is_finite() || normalizer <= 0.0 {
+        return None;
+    }
+    Some(
+        unnormalized
+            .into_iter()
+            .map(|value| value / normalizer)
+            .collect(),
+    )
+}
+
+fn categorical_entropy_nats(probabilities: &[f64]) -> f64 {
+    probabilities
+        .iter()
+        .copied()
+        .filter(|probability| *probability > 0.0)
+        .map(|probability| -probability * probability.ln())
+        .sum()
 }
 
 /// Fail-closed gate for using an activation alignment in parameter transfer.
