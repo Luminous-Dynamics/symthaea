@@ -557,6 +557,88 @@ mod tests {
     }
 
     #[test]
+    fn generated_finite_models_match_independent_joint_loss_enumerator() {
+        fn next_unit(seed: &mut u64) -> f64 {
+            *seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((*seed >> 11) as f64) / ((1_u64 << 53) as f64)
+        }
+
+        fn normalized(seed: &mut u64) -> Vec<f64> {
+            let weights: Vec<f64> = (0..4).map(|_| 0.01 + next_unit(seed)).collect();
+            let total: f64 = weights.iter().sum();
+            weights.into_iter().map(|weight| weight / total).collect()
+        }
+
+        let losses = [1.0, 1.0, 100.0, 0.0];
+        let mut seed = 0x4e45_4f56_4f49_u64;
+
+        for _case in 0..128 {
+            let prior = 0.005 + 0.20 * next_unit(&mut seed);
+            let conditional_impact = normalized(&mut seed);
+            let conditional_safe = normalized(&mut seed);
+            let evaluated = scenario(
+                prior,
+                &conditional_impact,
+                &conditional_safe,
+                losses,
+            )
+            .expect("positive finite likelihoods should evaluate");
+
+            // Independent identity: score each action directly in joint
+            // probability space, then minimize before summing outcomes.
+            // This avoids using the evaluator's posterior-normalize-then-risk path.
+            let direct_joint_risk: f64 = (0..4)
+                .map(|index| {
+                    let impact_joint = prior * conditional_impact[index];
+                    let safe_joint = (1.0 - prior) * conditional_safe[index];
+                    let protect_joint = impact_joint * losses[0] + safe_joint * losses[1];
+                    let no_protect_joint = impact_joint * losses[2] + safe_joint * losses[3];
+                    protect_joint.min(no_protect_joint)
+                })
+                .sum();
+            let baseline = conditional_risk(prior, losses[0], losses[1], losses[2], losses[3]);
+            close(
+                evaluated.expected_risk,
+                direct_joint_risk,
+                1e-12,
+                "generated direct joint Bayes risk",
+            )
+            .unwrap();
+            close(
+                evaluated.evsi,
+                baseline - direct_joint_risk,
+                1e-12,
+                "generated direct joint EVSI",
+            )
+            .unwrap();
+
+            // Permuting outcome labels must not change risk or information.
+            let reversed_impact: Vec<f64> =
+                conditional_impact.iter().rev().copied().collect();
+            let reversed_safe: Vec<f64> =
+                conditional_safe.iter().rev().copied().collect();
+            let permuted = scenario(prior, &reversed_impact, &reversed_safe, losses)
+                .expect("permuted positive likelihoods should evaluate");
+            close(
+                evaluated.expected_risk,
+                permuted.expected_risk,
+                1e-12,
+                "outcome permutation risk invariance",
+            )
+            .unwrap();
+            close(
+                evaluated.information_gain_bits,
+                permuted.information_gain_bits,
+                1e-12,
+                "outcome permutation information invariance",
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
     fn malformed_json_fails_closed() {
         assert!(verify_fixture_text("{not-json").is_err());
     }
