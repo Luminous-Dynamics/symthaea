@@ -251,6 +251,7 @@ pub trait LinearOperator {
     fn mat_vec(&self, x: &[f64]) -> Result<Vec<f64>, MatrixError>;
     fn frobenius_norm(&self) -> f64;
     fn is_symmetric(&self, relative_tolerance: f64) -> bool;
+    fn diagonal_value(&self, index: usize) -> Option<f64>;
 }
 
 impl LinearOperator for DenseMatrix {
@@ -268,6 +269,10 @@ impl LinearOperator for DenseMatrix {
 
     fn is_symmetric(&self, relative_tolerance: f64) -> bool {
         DenseMatrix::is_symmetric(self, relative_tolerance)
+    }
+
+    fn diagonal_value(&self, index: usize) -> Option<f64> {
+        self.get(index, index)
     }
 }
 
@@ -355,6 +360,10 @@ impl LinearOperator for Poisson1d {
 
     fn is_symmetric(&self, relative_tolerance: f64) -> bool {
         relative_tolerance.is_finite() && relative_tolerance >= 0.0
+    }
+
+    fn diagonal_value(&self, index: usize) -> Option<f64> {
+        if index < self.n { Some(2.0) } else { None }
     }
 }
 
@@ -464,6 +473,149 @@ pub fn conjugate_gradient<A: LinearOperator>(
             p[i] = r[i] + beta * p[i];
         }
         rs_old = rs_new;
+    }
+
+    Ok(IterativeSolution {
+        x,
+        iterations: max_iterations,
+        converged: false,
+        residual_norm: norm2(&r),
+    })
+}
+
+/// Jacobi (diagonal) preconditioner. This only changes solver convergence;
+/// its setup and application costs must be included in architecture benchmarks.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JacobiPreconditioner {
+    inverse_diagonal: Vec<f64>,
+}
+
+impl JacobiPreconditioner {
+    pub fn from_operator<A: LinearOperator>(a: &A) -> Result<Self, MatrixError> {
+        let n = a.dimension();
+        let mut inverse_diagonal = Vec::new();
+        inverse_diagonal.try_reserve_exact(n).map_err(|_| MatrixError::AllocationFailed)?;
+        for index in 0..n {
+            let diagonal = a.diagonal_value(index).ok_or(MatrixError::DimensionMismatch)?;
+            if !diagonal.is_finite() || diagonal <= 0.0 {
+                return Err(MatrixError::NotPositiveDefinite);
+            }
+            inverse_diagonal.push(1.0 / diagonal);
+        }
+        Ok(Self { inverse_diagonal })
+    }
+
+    pub fn apply(&self, residual: &[f64]) -> Result<Vec<f64>, MatrixError> {
+        if residual.len() != self.inverse_diagonal.len() {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if residual.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        let result: Vec<f64> = residual.iter().zip(&self.inverse_diagonal)
+            .map(|(r, inverse)| r * inverse)
+            .collect();
+        if result.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        Ok(result)
+    }
+}
+
+/// Preconditioned conjugate gradients (PCG) with a fixed Jacobi preconditioner.
+/// Acceptance uses a recomputed true residual, just like the unpreconditioned
+/// reference. The preconditioner must be fixed during one solve.
+pub fn preconditioned_conjugate_gradient<A: LinearOperator>(
+    a: &A,
+    preconditioner: &JacobiPreconditioner,
+    b: &[f64],
+    relative_tolerance: f64,
+    max_iterations: usize,
+) -> Result<IterativeSolution, MatrixError> {
+    let n = a.dimension();
+    if b.len() != n {
+        return Err(MatrixError::DimensionMismatch);
+    }
+    if !relative_tolerance.is_finite()
+        || relative_tolerance <= 0.0
+        || relative_tolerance >= 1.0
+        || max_iterations == 0
+    {
+        return Err(MatrixError::InvalidTolerance);
+    }
+    if !a.is_symmetric(1.0e-12) {
+        return Err(MatrixError::NotSymmetric);
+    }
+
+    let mut x = vec![0.0; n];
+    let mut r = b.to_vec();
+    let mut z = preconditioner.apply(&r)?;
+    let mut p = z.clone();
+    let mut rho = dot(&r, &z)?;
+    let b_norm = norm2(b);
+    let threshold = relative_tolerance * b_norm;
+
+    if b_norm == 0.0 {
+        return Ok(IterativeSolution {
+            x,
+            iterations: 0,
+            converged: true,
+            residual_norm: 0.0,
+        });
+    }
+    if !rho.is_finite() || rho <= 0.0 {
+        return Err(MatrixError::Breakdown);
+    }
+
+    for iteration in 1..=max_iterations {
+        let ap = a.mat_vec(&p)?;
+        let denominator = dot(&p, &ap)?;
+        if !denominator.is_finite() || denominator <= 0.0 {
+            return Err(MatrixError::Breakdown);
+        }
+        let alpha = rho / denominator;
+        if !alpha.is_finite() {
+            return Err(MatrixError::NonFinite);
+        }
+        for i in 0..n {
+            x[i] += alpha * p[i];
+            r[i] -= alpha * ap[i];
+        }
+
+        if norm2(&r) <= threshold {
+            let ax = a.mat_vec(&x)?;
+            let true_residual: Vec<f64> = b.iter().zip(ax)
+                .map(|(rhs, lhs)| rhs - lhs)
+                .collect();
+            let true_norm = norm2(&true_residual);
+            if true_norm <= threshold {
+                return Ok(IterativeSolution {
+                    x,
+                    iterations: iteration,
+                    converged: true,
+                    residual_norm: true_norm,
+                });
+            }
+            r = true_residual;
+            z = preconditioner.apply(&r)?;
+            p = z.clone();
+            rho = dot(&r, &z)?;
+            if !rho.is_finite() || rho <= 0.0 {
+                return Err(MatrixError::Breakdown);
+            }
+            continue;
+        }
+
+        z = preconditioner.apply(&r)?;
+        let next_rho = dot(&r, &z)?;
+        if !next_rho.is_finite() || next_rho <= 0.0 {
+            return Err(MatrixError::Breakdown);
+        }
+        let beta = next_rho / rho;
+        for i in 0..n {
+            p[i] = z[i] + beta * p[i];
+        }
+        rho = next_rho;
     }
 
     Ok(IterativeSolution {
@@ -767,6 +919,41 @@ mod tests {
 
         let nonsymmetric = DenseMatrix::new(2, vec![1.0, 2.0, 0.0, 1.0]).unwrap();
         assert_eq!(cholesky_solve(&nonsymmetric, &[1.0, 1.0]), Err(MatrixError::NotSymmetric));
+    }
+
+    #[test]
+    fn jacobi_pcg_solves_diagonally_scaled_spd_system() {
+        let scales = [0.25, 0.5, 2.0, 8.0];
+        let beta = 0.1;
+        let n = scales.len();
+        let mut values = vec![0.0; n * n];
+        for row in 0..n {
+            for col in 0..n {
+                let core = if row == col { 1.0 + beta } else { beta };
+                values[row * n + col] = scales[row] * core * scales[col];
+            }
+        }
+        let matrix = DenseMatrix::new(n, values).unwrap();
+        let truth = [1.0, -0.5, 2.0, 0.25];
+        let rhs = matrix.mat_vec(&truth).unwrap();
+        let preconditioner = JacobiPreconditioner::from_operator(&matrix).unwrap();
+        let result = preconditioned_conjugate_gradient(
+            &matrix,
+            &preconditioner,
+            &rhs,
+            1.0e-12,
+            16,
+        ).unwrap();
+        assert!(result.converged);
+        let metrics = error_metrics(&matrix, &rhs, &result.x, &truth).unwrap();
+        assert!(metrics.relative_residual < 1.0e-12);
+        assert!(metrics.relative_forward_error < 1.0e-10);
+    }
+
+    #[test]
+    fn jacobi_preconditioner_rejects_nonpositive_diagonal() {
+        let matrix = DenseMatrix::new(2, vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+        assert_eq!(JacobiPreconditioner::from_operator(&matrix), Err(MatrixError::NotPositiveDefinite));
     }
 
     #[test]
