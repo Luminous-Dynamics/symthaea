@@ -507,7 +507,7 @@ impl ContinuousHV {
             (operation_count * min_subnormal) / (1.0 - nu),
         );
 
-        let (query_norm_sq_lower, query_norm_sq_upper) =
+        let (_query_norm_sq_lower, query_norm_sq_upper) =
             f64_sum_squares_bounds(&self.values);
         let (center_norm_sq_lower, center_norm_sq_upper) =
             f64_sum_squares_bounds(&center.values);
@@ -991,6 +991,44 @@ mod tests {
             query.similarity_interval_full_resolution_for_l2_ball_center(&center, f32::NAN),
             Err(ContinuousHVIntervalError::InvalidResidualBound)
         );
+    }
+
+    #[test]
+    fn l2_ball_interval_contains_multiple_members_and_zero_radius_group() {
+        let query = ContinuousHV::from_vec(
+            (0..129).map(|i| ((i as f32) * 0.031).sin()).collect(),
+        );
+        let center = ContinuousHV::from_vec(
+            (0..129).map(|i| ((i as f32) * 0.021).cos() * 0.75).collect(),
+        );
+        let mut members = Vec::new();
+        for offset in [0.0001f32, -0.0002, 0.0003, -0.0004] {
+            let member = ContinuousHV::from_vec(
+                center
+                    .values
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        (*value + offset * (((index as f32) * 0.17).sin())).clamp(-1.0, 1.0)
+                    })
+                    .collect(),
+            );
+            verify_l2_residual_certificate(&member, &center, 0.01).unwrap();
+            members.push(member);
+        }
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_ball_center(&center, 0.01)
+            .unwrap();
+        for member in &members {
+            assert!(interval.contains(query.similarity_full_resolution(member)));
+        }
+
+        let point = query
+            .similarity_interval_full_resolution_for_l2_ball_center(&center, 0.0)
+            .unwrap();
+        let exact = query.similarity_full_resolution(&center);
+        assert_eq!(point.lower, exact);
+        assert_eq!(point.upper, exact);
     }
 
     #[test]
