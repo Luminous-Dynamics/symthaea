@@ -4,10 +4,10 @@
 //! It consumes AgentView only, maintains a finite compatible-model set, and
 //! selects receding-horizon partition probes. The evaluator truth is never read.
 
-use crate::{self, interaction, numeric};
+use crate::{interaction, numeric};
 use crate::protocol::{
     AgentAction, AgentClaim, AgentIntervention, AgentSubmission, AgentView,
-    ClaimDisposition, ProtocolError, StructureAccess,
+    ClaimDisposition, StructureAccess,
 };
 
 /// Baseline controller over the declared finite hypothesis family.
@@ -243,7 +243,7 @@ impl std::error::Error for PolicyError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{BlindEpisode, EpisodeStatus};
+    use crate::protocol::{BlindEpisode, EpisodeStatus, ProtocolError};
 
     fn run_to_submission(episode: &mut BlindEpisode, budget: usize) -> Result<(), ProtocolError> {
         for _ in 0..=budget {
