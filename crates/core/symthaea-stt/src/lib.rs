@@ -156,10 +156,11 @@ pub use phoneme::{
 pub use rls::{FastRlsClassifier, RlsClassifier};
 pub use sleep_sentinel::{BandPowers, ConsciousnessSentinel, ConsciousnessState};
 pub use switch_metrics::{
-    BoundaryMetricError, LanguageErrorRate, MacroMaskedErrorRate, MaskedErrorRate,
-    SwitchAwareCorpusResult, SwitchAwareResult, SwitchBoundaryResult, SwitchCorpusError,
-    SwitchMetricError, SwitchWindowErrorRate, aggregate_switch_aware_error_rates,
-    switch_aware_error_rates, switch_boundary_precision_recall_f1,
+    BoundaryMetricError, DirectionBoundaryResult, LanguageErrorRate, MacroMaskedErrorRate,
+    MaskedErrorRate, SwitchAwareCorpusResult, SwitchAwareResult, SwitchBoundaryResult,
+    SwitchCorpusError, SwitchMetricError, SwitchTransition, SwitchWindowErrorRate,
+    aggregate_switch_aware_error_rates, switch_aware_error_rates,
+    switch_boundary_precision_recall_f1, switch_transition_direction_precision_recall_f1,
 };
 pub use streaming::{StreamConfig, StreamProcessor, StreamSession};
 
