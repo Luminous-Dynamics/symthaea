@@ -25,3 +25,7 @@ path = "examples/minkowski_nd.rs"
 [[example]]
 name = "interval_histogram_benchmark"
 path = "examples/interval_histogram_benchmark.rs"
+
+[[example]]
+name = "curved_frw_sweep"
+path = "examples/curved_frw_sweep.rs"
