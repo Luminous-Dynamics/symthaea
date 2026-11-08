@@ -3,8 +3,7 @@
 
 use std::error::Error;
 use symthaea_causal_set_lab::{
-    ConformalFrw1p1, estimate_dimensionless_curvature,
-    qmc_expected_comparable_pair_fraction,
+    ConformalFrw1p1, estimate_dimensionless_curvature, qmc_expected_comparable_pair_fraction,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -23,8 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let causet = metric.sprinkle_fixed_cardinality(SEED, EVENT_COUNT)?;
     let observed = causet.ordering_fraction().ok_or("empty causal set")?;
     let flat_reference = qmc_expected_comparable_pair_fraction(0.0, QMC_POINTS)?;
-    let curved_reference =
-        qmc_expected_comparable_pair_fraction(TRUE_Q, QMC_POINTS)?;
+    let curved_reference = qmc_expected_comparable_pair_fraction(TRUE_Q, QMC_POINTS)?;
     let estimate = estimate_dimensionless_curvature(observed, Q_MAX, QMC_POINTS, 48)?;
 
     // Demonstrate the exact scale degeneracy of (kappa,T): (kappa,T) and
@@ -34,7 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rescaled_q = rescaled_kappa * rescaled_extent * rescaled_extent;
 
     println!("Symthaea curved causal-set dimensionless curvature inversion");
-    println!("epistemic_status=SYNTHETIC_VOLUME_FAITHFUL_1P1D_FRW_INVERSE_NOT_QUANTUM_GRAVITY_EVIDENCE");
+    println!(
+        "epistemic_status=SYNTHETIC_VOLUME_FAITHFUL_1P1D_FRW_INVERSE_NOT_QUANTUM_GRAVITY_EVIDENCE"
+    );
     println!("metric=ds2=a(eta)^2*(-deta^2+dx^2),a=exp(kappa*eta^2/2)");
     println!("sampling=FIXED_CARDINALITY_POISSON_CONDITIONED_VOLUME_FAITHFUL");
     println!("extent={EXTENT:.6}");
@@ -44,23 +44,39 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("seed={SEED}");
     println!("qmc_points={QMC_POINTS}");
     println!("observed_order_fraction={observed:.12}");
-    println!("flat_q0_reference={:.12}", flat_reference.comparable_pair_fraction);
-    println!("curved_true_q_reference={:.12}", curved_reference.comparable_pair_fraction);
+    println!(
+        "flat_q0_reference={:.12}",
+        flat_reference.comparable_pair_fraction
+    );
+    println!(
+        "curved_true_q_reference={:.12}",
+        curved_reference.comparable_pair_fraction
+    );
     println!(
         "flat_reference_abs_error={:.12}",
         (observed - flat_reference.comparable_pair_fraction).abs()
     );
-    println!("estimated_dimensionless_curvature_q={:.9}", estimate.dimensionless_curvature);
+    println!(
+        "estimated_dimensionless_curvature_q={:.9}",
+        estimate.dimensionless_curvature
+    );
     println!(
         "reconstructed_order_fraction={:.12}",
         estimate.reconstructed_ordering_fraction
     );
-    println!("inverse_abs_order_fraction_residual={:.12}",
+    println!(
+        "inverse_abs_order_fraction_residual={:.12}",
         (estimate.reconstructed_ordering_fraction - observed).abs()
     );
     println!("rescaled_equivalent_q={rescaled_q:.12}");
-    println!("Only q=kappa*T^2 is identified by scale-free order statistics; kappa requires an external scale.");
-    println!("Finite-sample uncertainty across independent sprinklings is separate from QMC-reference error.");
-    println!("A curved-volume inversion is conditional on the declared metric, region and sampling law.");
+    println!(
+        "Only q=kappa*T^2 is identified by scale-free order statistics; kappa requires an external scale."
+    );
+    println!(
+        "Finite-sample uncertainty across independent sprinklings is separate from QMC-reference error."
+    );
+    println!(
+        "A curved-volume inversion is conditional on the declared metric, region and sampling law."
+    );
     Ok(())
 }
