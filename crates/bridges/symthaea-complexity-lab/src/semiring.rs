@@ -4,6 +4,7 @@
 //! is generic over a semiring; its cost is exponential in induced width.
 
 use crate::profile::{ProfileError, WeightProfile};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
@@ -693,11 +694,12 @@ pub fn exhaustive_max_times_map_bounded(
     let mut best_score: Option<CheckedRational> = None;
     let mut optimal_assignments = Vec::new();
     let mut assignment = vec![0usize; graph.cardinalities.len()];
+    let all_variables = (0..graph.cardinalities.len()).collect::<Vec<_>>();
 
     for full_index in 0..assignment_count {
         decode_assignment(
             full_index,
-            &(0..graph.cardinalities.len()).collect::<Vec<_>>(),
+            &all_variables,
             &graph.cardinalities,
             &mut assignment,
         );
