@@ -24,7 +24,10 @@ This is a workload-to-primitive-and-substrate selection experiment, not a claim 
 - Reproducible symmetric positive-definite family `A = λI + α11ᵀ`, with a known exact spectrum and condition number.
 - Known-answer RHS generation from a frozen solution vector.
 - Direct Cholesky solve.
+- A matrix-free linear-operator interface shared by dense and structured workloads.
+- Matrix-free 1-D Poisson operator (second-difference stencil) with O(n) storage and O(n) MVM; its exact condition number is available from the discrete spectrum.
 - Unpreconditioned conjugate-gradient solve with explicit tolerance and iteration budget; it recomputes the true residual before acceptance and restarts the recurrence if residual replacement is needed.
+- Compensated dot-product accumulation in the digital reference to reduce avoidable summation error.
 - Separate residual norm, relative residual, relative backward error, absolute forward error and relative forward error.
 - Negative controls for singular/nonsymmetric input, invalid dimensions/tolerances, non-finite values and ill-conditioned residual/forward-error divergence.
 
@@ -59,7 +62,13 @@ Generate matrices with declared eigenvalue spectra and orthogonal basis. Record 
 
 ### M4 — sparse and structured systems
 
-Include banded, Toeplitz, circulant, graph-Laplacian-derived and block-structured systems. Count sparsity, storage, data movement and preconditioner cost.
+The first executable M4 case is the matrix-free 1-D Poisson operator:
+
+`(Ax)_i = 2x_i - x_{i-1} - x_{i+1}`
+
+with zero-boundary convention. Its eigenvalues are `4 sin²(kπ/(2(n+1)))`; therefore the exact 2-norm condition number is `cot²(π/(2(n+1)))`. It requires O(n) storage and O(n) work per MVM, unlike a dense matrix representation. This makes it a better baseline for sparse scientific workloads and a bridge toward discretized PDEs.
+
+Next include banded, Toeplitz, circulant, graph-Laplacian-derived and block-structured systems. Count sparsity, storage, data movement and preconditioner cost. Do not compare a matrix-free operator to a dense solver without counting the difference in representation and memory traffic.
 
 ### M5 — negative controls
 
@@ -70,7 +79,7 @@ Include banded, Toeplitz, circulant, graph-Laplacian-derived and block-structure
 - Random dense full-rank systems.
 - A perturbation that passes a residual threshold but violates forward-error tolerance.
 
-The first Rust oracle currently implements M1 plus selected negative controls. M2–M5 are protocol targets, not completed generators.
+The first Rust oracle currently implements M1, a matrix-free 1-D Poisson M4 workload and selected M5 negative controls. M2, M3, broader M4 families and the nonsymmetric solver lane remain protocol targets, not completed generators.
 
 ## 4. Numerical correctness contract
 
