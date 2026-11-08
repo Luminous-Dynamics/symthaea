@@ -688,7 +688,9 @@
         "closed_set_free_form_rewrite_rate_zero",
         "source_frame_and_model_lineage_completeness_100_percent",
         "no_candidate_correct_false_accept_zero_on_frozen_controls",
-        "MICL_gain_reported_against_same_candidate_pool_at_matched_total_compute"
+        "MICL_gain_reported_against_same_candidate_pool_at_matched_total_compute",
+        "candidate_oracle_regret_at_least_20_percent_relative_reduction_vs_strongest_matched_non_micl_baseline",
+        "report_coverage_and_abstention_with_error"
       ],
       "note": "Candidate selection is not transcript correction. Oracle best-in-pool is an upper bound only. MICL published results are not assumed to transfer to African speech."
     }
