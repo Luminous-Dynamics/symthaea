@@ -98,7 +98,7 @@ def validate(protocol: str, challenge: str, key: str, continuity: str) -> list[s
         "historical truth",
         "current decision-use",
         "event-to-claim impact",
-        "does not add a repository graph",
+        "not a second evidence-continuity system",
         "#10630",
         "#10173",
         "#9112",
@@ -133,7 +133,7 @@ def validate(protocol: str, challenge: str, key: str, continuity: str) -> list[s
         "not hidden ground truth",
         "not secure blinding",
         "not a sealed holdout",
-        "not a real repository invalidation outcome",
+        "no real repository invalidation outcome",
     ):
         if item.lower() not in key.lower():
             errors.append(f"answer key missing public-material boundary: {item}")
@@ -191,54 +191,14 @@ def self_test() -> list[str]:
         return ["valid minimal claim-support pack rejected"]
 
     mutations = (
-        ("case removed", challenge.replace("CCL-S03", "CCL-SXX", 1), key, protocol, continuity),
-        ("support closure removed", challenge.replace("Support closure:", "Missing:", 1), key, protocol, continuity),
+        ("case removed", protocol, challenge.replace("CCL-S03", "CCL-SXX", 1), key, continuity),
+        ("support closure removed", protocol, challenge.replace("Support closure:", "Missing:", 1), key, continuity),
         ("unaffectedness proof removed", protocol.replace("unaffectedness witness", "no retain proof"), challenge, key, continuity),
         ("public key boundary removed", protocol, challenge, key.replace("not secure blinding", "secure"), continuity),
         ("continuity link removed", protocol, challenge, key, continuity.replace("claim-support closure", "removed")),
         ("authority revocation omitted", protocol.replace("Security/authority", "Security event"), challenge, key, continuity),
     )
-    for label, *args in mutations:
-        mutated_protocol, mutated_challenge, mutated_key, mutated_continuity = (
-            (args[2], args[0], args[1], args[3])
-            if label == "unaffectedness proof removed"
-            else (args[2], args[0], args[1], args[3])
-            if label == "authority revocation omitted"
-            else (args[2], args[0], args[1], args[3])
-            if label == "case removed"
-            else (args[2], args[0], args[1], args[3])
-        )
-        # Keep the argument ordering explicit to make each mutation auditable.
-        if label == "unaffectedness proof removed":
-            mutated_protocol = args[0]
-            mutated_challenge = args[1]
-            mutated_key = args[2]
-            mutated_continuity = args[3]
-        elif label == "authority revocation omitted":
-            mutated_protocol = args[0]
-            mutated_challenge = args[1]
-            mutated_key = args[2]
-            mutated_continuity = args[3]
-        elif label == "case removed":
-            mutated_protocol = args[2]
-            mutated_challenge = args[0]
-            mutated_key = args[1]
-            mutated_continuity = args[3]
-        elif label == "support closure removed":
-            mutated_protocol = args[2]
-            mutated_challenge = args[0]
-            mutated_key = args[1]
-            mutated_continuity = args[3]
-        elif label == "public key boundary removed":
-            mutated_protocol = args[2]
-            mutated_challenge = args[0]
-            mutated_key = args[1]
-            mutated_continuity = args[3]
-        elif label == "continuity link removed":
-            mutated_protocol = args[0]
-            mutated_challenge = args[1]
-            mutated_key = args[2]
-            mutated_continuity = args[3]
+    for label, mutated_protocol, mutated_challenge, mutated_key, mutated_continuity in mutations:
         if not validate(mutated_protocol, mutated_challenge, mutated_key, mutated_continuity):
             return [f"negative self-test accepted mutation: {label}"]
     return []
