@@ -355,7 +355,12 @@ fn oracle_signature(hypothesis: &Hypothesis, horizon: usize, sequence_count: usi
                     }
                 }
             };
-            signature.push(hypothesis.measurement_map.apply(latent));
+            let measured = match hypothesis.measurement_map {
+                MeasurementMap::Identity => latent,
+                MeasurementMap::Invert => !latent,
+                MeasurementMap::ConstantZero => false,
+            };
+            signature.push(measured);
         }
     }
     signature
