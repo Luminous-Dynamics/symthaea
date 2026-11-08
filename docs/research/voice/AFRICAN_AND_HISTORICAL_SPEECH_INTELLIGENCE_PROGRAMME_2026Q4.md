@@ -392,3 +392,15 @@ The fixtures include PIER insertions, the trailing-final-POI rule, all-POI and n
 A separate JavaScript checker reproduced the documented dynamic-programming tie-break and metric formulas; all ten expected cases matched. This is an arithmetic/fixture consistency check only. It is not an execution of the Rust modules, a differential test against RapidFuzz, or a real-data benchmark result.
 
 The machine-readable benchmark matrix registers the fixture set and labels it `SYNTHETIC_ONLY_FORMULA_CHECKED_NOT_RUST_EXECUTED`.
+
+
+## 17. Switch-boundary detection vectors
+
+A separate fixture set now tests whether the speech system detects a language transition, rather than whether it transcribes correctly around a known transition:
+- [`switch_boundary_golden_v0.1.json`](./switch_boundary_golden_v0.1.json) — six reference/predicted language-tag sequences.
+- [`switch_boundary_golden_v0.1.schema.json`](./switch_boundary_golden_v0.1.schema.json) — JSON Schema Draft 2020-12.
+- Contract: [#11086 — VOICE-BOUNDARY-F1-001](https://github.com/Luminous-Dynamics/symthaea/issues/11086).
+
+The vectors cover exact matching, missed transitions, extra transitions, one-token shifts, multiple changes and no-boundary non-estimability. A separate boundary formula checker verified all six cases after correcting the false-extra-switch case, whose predicted sequence contains two transitions.
+
+The implementation is in [stacked draft PR #11084](https://github.com/Luminous-Dynamics/symthaea/pull/11084). Twelve boundary-specific test functions are authored, within 28 total tests in the switch-metrics module. None have been executed.
