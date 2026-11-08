@@ -43,6 +43,15 @@ This document is not a report of a completed campaign. No model has yet been eva
 
 Do not average percentages across these tracks. They measure different constructs and have different scoring rules.
 
+### 3.1 Campaign manifest and seed custody
+
+The public campaign manifest is metadata, not the seed ledger. It pins the source commit, agent artifact, policy configuration, task contract, action/compute budgets, common starting-evidence digest and the comparison design. Each pair expands to exactly A0 and A2 with one common agent artifact/configuration and shared budgets.
+
+- `matched_trace` requires an intervention-trace digest and uses identical evidence traces for the structure-access contrast.
+- `adaptive_budget` requires common starting evidence and budgets but permits subsequent action histories to diverge.
+- The actual seed ledger and sealed confirmation ledger remain evaluator-controlled; the public manifest stores only their content digests. Never commit their contents, low-entropy raw seed values, generating truth or confirmation outcomes.
+- The Rust validator checks shape, digest syntax, pair uniqueness, A0/A2 arm order, nonzero budgets and design/trace consistency. It does not authenticate execution, prove seed custody or replace #9332.
+
 ## 4. Matched experimental arms
 
 ### 4.1 Structure-access treatment
