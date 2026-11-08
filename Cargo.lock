@@ -19243,13 +19243,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symthaea-marine-campaign-evidence"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
 name = "symthaea-markov"
 version = "0.1.0"
 dependencies = [
