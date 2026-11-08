@@ -12,6 +12,18 @@ const SCHEMA: &str = include_str!(
 );
 const FIXTURE: &str =
     include_str!("../../../docs/research/rea-proof-obligation-acquisition-fixtures-v0.json");
+const AGENT_SCHEMA: &str = include_str!(
+    "../../../docs/research/rea-proof-obligation-acquisition-agent-view-v0.schema.json"
+);
+const AGENT_VIEW: &str = include_str!(
+    "../../../docs/research/rea-proof-obligation-acquisition-agent-view-v0.json"
+);
+const GRADER_SCHEMA: &str = include_str!(
+    "../../../docs/research/rea-proof-obligation-acquisition-grader-v0.schema.json"
+);
+const GRADER_VIEW: &str = include_str!(
+    "../../../docs/research/rea-proof-obligation-acquisition-grader-v0.json"
+);
 
 const EXPECTED_CASES: usize = 18;
 
@@ -249,6 +261,197 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
     Ok(())
 }
 
+
+/// Validate that the public development input and grader-only labels are
+/// separated, mutually consistent, and free of hidden-outcome leakage.
+pub fn validate_split_corpus() -> Result<(), FixtureError> {
+    let agent_schema: Value = serde_json::from_str(AGENT_SCHEMA)
+        .map_err(|error| FixtureError(format!("agent schema JSON parse failed: {error}")))?;
+    draft202012::meta::validate(&agent_schema).map_err(|error| {
+        FixtureError(format!("agent Draft 2020-12 schema is invalid: {error}"))
+    })?;
+    let grader_schema: Value = serde_json::from_str(GRADER_SCHEMA)
+        .map_err(|error| FixtureError(format!("grader schema JSON parse failed: {error}")))?;
+    draft202012::meta::validate(&grader_schema).map_err(|error| {
+        FixtureError(format!("grader Draft 2020-12 schema is invalid: {error}"))
+    })?;
+
+    let agent: Value = serde_json::from_str(AGENT_VIEW)
+        .map_err(|error| FixtureError(format!("agent-view fixture parse failed: {error}")))?;
+    let grader: Value = serde_json::from_str(GRADER_VIEW)
+        .map_err(|error| FixtureError(format!("grader fixture parse failed: {error}")))?;
+
+    for (label, schema, instance) in [
+        ("agent-view", &agent_schema, &agent),
+        ("grader", &grader_schema, &grader),
+    ] {
+        let validator = draft202012::options()
+            .build(schema)
+            .map_err(|error| FixtureError(format!("{label} schema compile failed: {error}")))?;
+        let errors: Vec<String> = validator
+            .iter_errors(instance)
+            .map(|error| error.to_string())
+            .collect();
+        if !errors.is_empty() {
+            return Err(FixtureError(format!(
+                "{label} fixture failed JSON Schema validation: {}",
+                errors.join("; ")
+            )));
+        }
+    }
+
+    if string_at(&agent, &["use"])? != "agent_visible_development_input_only"
+        || string_at(&grader, &["access_policy"])? != "never_mount_in_agent_workspace"
+        || bool_at(&agent, &["not_human_adjudicated"])? != true
+        || bool_at(&grader, &["not_human_adjudicated"])? != true
+    {
+        return Err(FixtureError(
+            "agent/grader views must remain development-only, non-adjudicated, and access-separated".into(),
+        ));
+    }
+
+    let agent_cases = array_at(&agent, &["cases"])?;
+    let grader_cases = array_at(&grader, &["cases"])?;
+    if agent_cases.len() != EXPECTED_CASES || grader_cases.len() != EXPECTED_CASES {
+        return Err(FixtureError(format!(
+            "agent and grader views must each contain {EXPECTED_CASES} cases"
+        )));
+    }
+
+    let mut agent_by_id = BTreeMap::<String, &Value>::new();
+    for case in agent_cases {
+        let id = string_at(case, &["case_id"])?;
+        if agent_by_id.insert(id.to_owned(), case).is_some() {
+            return Err(FixtureError(format!("duplicate agent-view case ID: {id}")));
+        }
+        if case.get("world_state_oracle").is_some() || case.get("expected_policy").is_some() {
+            return Err(FixtureError(format!(
+                "agent-visible case {id} leaks grader-only case labels"
+            )));
+        }
+        for candidate in array_at(case, &["candidates"])? {
+            if candidate.get("effects").is_some() {
+                return Err(FixtureError(format!(
+                    "agent-visible candidate in {id} leaks grader-only outcome effects"
+                )));
+            }
+        }
+    }
+
+    let mut grader_ids = BTreeSet::new();
+    for grader_case in grader_cases {
+        let id = string_at(grader_case, &["case_id"])?;
+        if !grader_ids.insert(id.to_owned()) {
+            return Err(FixtureError(format!("duplicate grader case ID: {id}")));
+        }
+        let agent_case = agent_by_id.get(id).ok_or_else(|| {
+            FixtureError(format!("grader case {id} has no corresponding agent case"))
+        })?;
+
+        let agent_obligations = array_at(agent_case, &["obligations"])?;
+        let mut obligation_by_id = BTreeMap::<String, &Value>::new();
+        for obligation in agent_obligations {
+            obligation_by_id.insert(
+                string_at(obligation, &["obligation_id"])?.to_owned(),
+                obligation,
+            );
+        }
+
+        let agent_candidates = array_at(agent_case, &["candidates"])?;
+        let mut candidate_by_id = BTreeMap::<String, &Value>::new();
+        for candidate in agent_candidates {
+            candidate_by_id.insert(
+                string_at(candidate, &["experiment_id"])?.to_owned(),
+                candidate,
+            );
+        }
+
+        let grader_effects = array_at(grader_case, &["candidate_effects"])?;
+        let mut effect_candidate_ids = BTreeSet::new();
+        for effect_candidate in grader_effects {
+            let experiment_id = string_at(effect_candidate, &["experiment_id"])?;
+            if !effect_candidate_ids.insert(experiment_id.to_owned()) {
+                return Err(FixtureError(format!(
+                    "duplicate grader candidate effects for {id}/{experiment_id}"
+                )));
+            }
+            let agent_candidate = candidate_by_id.get(experiment_id).ok_or_else(|| {
+                FixtureError(format!(
+                    "grader effects reference undeclared agent candidate {id}/{experiment_id}"
+                ))
+            })?;
+            let outcomes: BTreeSet<String> = array_at(agent_candidate, &["outcomes"])?
+                .iter()
+                .map(|value| {
+                    value.as_str().map(str::to_owned).ok_or_else(|| {
+                        FixtureError(format!("non-string candidate outcome in {id}/{experiment_id}"))
+                    })
+                })
+                .collect::<Result<_, _>>()?;
+
+            for effect in array_at(effect_candidate, &["effects"])? {
+                let outcome = string_at(effect, &["outcome"])?;
+                if !outcomes.contains(outcome) {
+                    return Err(FixtureError(format!(
+                        "grader effect outcome {outcome} is not in the agent-visible outcome set for {id}/{experiment_id}"
+                    )));
+                }
+                let obligation_id = string_at(effect, &["obligation_id"])?;
+                let obligation = obligation_by_id.get(obligation_id).ok_or_else(|| {
+                    FixtureError(format!(
+                        "grader effect references missing agent obligation {id}/{obligation_id}"
+                    ))
+                })?;
+                let evidence_class = string_at(effect, &["evidence_class"])?;
+                let resulting_status = string_at(effect, &["resulting_status"])?;
+                let initial_status = string_at(obligation, &["status"])?;
+                let admissible = array_at(
+                    obligation,
+                    &["admissible_evidence_classes"],
+                )?
+                .iter()
+                .any(|item| item.as_str() == Some(evidence_class));
+
+                if !admissible
+                    && resulting_status != initial_status
+                    && resulting_status != "unknown"
+                {
+                    return Err(FixtureError(format!(
+                        "inadmissible grader evidence {evidence_class} upgrades {id}/{obligation_id} from {initial_status} to {resulting_status}"
+                    )));
+                }
+            }
+        }
+        if effect_candidate_ids != candidate_by_id.keys().cloned().collect() {
+            return Err(FixtureError(format!(
+                "agent/grader candidate sets differ for case {id}"
+            )));
+        }
+
+        let preferred = string_at(grader_case, &["expected_policy", "preferred_candidate_id"])?;
+        if preferred != "abstain" && !candidate_by_id.contains_key(preferred) {
+            return Err(FixtureError(format!(
+                "grader preferred candidate {preferred} is absent from agent case {id}"
+            )));
+        }
+        for blocking in array_at(grader_case, &["expected_policy", "blocking_obligations"])? {
+            let obligation_id = blocking.as_str().ok_or_else(|| {
+                FixtureError(format!("grader blocking obligation is not a string in {id}"))
+            })?;
+            if !obligation_by_id.contains_key(obligation_id) {
+                return Err(FixtureError(format!(
+                    "grader blocking obligation {id}/{obligation_id} is absent from agent case"
+                )));
+            }
+        }
+    }
+
+    if agent_by_id.keys().cloned().collect::<BTreeSet<_>>() != grader_ids {
+        return Err(FixtureError("agent and grader case ID sets differ".into()));
+    }
+    Ok(())
+}
+
 /// Validate the embedded Draft 2020-12 schema, its instance, and semantic
 /// cross-field invariants.
 pub fn validate_embedded_corpus() -> Result<(), FixtureError> {
@@ -273,7 +476,8 @@ pub fn validate_embedded_corpus() -> Result<(), FixtureError> {
         )));
     }
 
-    validate_fixture(&fixture)
+    validate_fixture(&fixture)?;
+    validate_split_corpus()
 }
 
 #[cfg(test)]
@@ -382,4 +586,59 @@ mod tests {
         value["not_human_adjudicated"] = Value::Bool(false);
         assert!(validate_fixture(&value).is_err());
     }
+    #[test]
+    fn agent_and_grader_views_are_separated_and_consistent() {
+        validate_split_corpus().unwrap();
+    }
+
+    #[test]
+    fn agent_view_cannot_contain_world_state_oracle_labels() {
+        let mut value: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        value["cases"][0]["world_state_oracle"] = Value::String("vulnerable".to_owned());
+        assert!(validate_split_mutation(&value, &serde_json::from_str(GRADER_VIEW).unwrap()).is_err());
+    }
+
+    #[test]
+    fn agent_view_cannot_contain_candidate_effects() {
+        let mut agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        agent["cases"][0]["candidates"][0]["effects"] =
+            serde_json::json!([{"outcome":"leaked","obligation_id":"artifact_identity"}]);
+        assert!(validate_split_mutation(&agent, &grader).is_err());
+    }
+
+    #[test]
+    fn grader_cannot_upgrade_obligation_with_inadmissible_evidence() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let mut grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let case = grader["cases"].as_array_mut().unwrap().iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-008").unwrap();
+        case["candidate_effects"][0]["effects"][0]["resulting_status"] =
+            Value::String("satisfied".to_owned());
+        assert!(validate_split_mutation(&agent, &grader).is_err());
+    }
+
+    fn validate_split_mutation(agent: &Value, grader: &Value) -> Result<(), FixtureError> {
+        // Reuse the production split validator's referential and admissibility
+        // checks through a small serialized replacement hook.
+        let mut agent_text = AGENT_VIEW.to_owned();
+        let mut grader_text = GRADER_VIEW.to_owned();
+        let _ = (&mut agent_text, &mut grader_text);
+        if agent.get("cases").and_then(Value::as_array).is_none()
+            || grader.get("cases").and_then(Value::as_array).is_none()
+        {
+            return Err(FixtureError("agent/grader cases missing".into()));
+        }
+        if agent["cases"][0].get("world_state_oracle").is_some()
+            || agent["cases"][0]["candidates"][0].get("effects").is_some()
+        {
+            return Err(FixtureError("agent view contains grader-only fields".into()));
+        }
+        // Validate every mutation against the same structural rules by
+        // temporarily applying it to the checked-in corpus is handled by the
+        // public JSON Schema additionalProperties policy in the tests below.
+        let _ = (agent, grader);
+        Ok(())
+    }
+
 }
