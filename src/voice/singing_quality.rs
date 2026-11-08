@@ -309,7 +309,7 @@ fn rest_leakage_metrics(
     }
     let rest_rms = (rest_energy / rest_count as f64).sqrt();
     let voiced_rms = (voiced_energy / voiced_count as f64).sqrt();
-    let leakage_db = 20.0 * (rest_rms / voiced_rms.max(1e-12)).max(1e-12).log10() as f32;
+    let leakage_db = (20.0 * (rest_rms / voiced_rms.max(1e-12)).max(1e-12).log10()) as f32;
     let pass = leakage_db <= -35.0;
     (rest_intervals.len(), Some(leakage_db), Some(pass))
 }
