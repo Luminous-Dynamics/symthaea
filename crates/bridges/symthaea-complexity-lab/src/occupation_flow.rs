@@ -978,7 +978,7 @@ fn canonical_minimax_regret_decision_sha256(
     minimax_regret: CheckedRational,
 ) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(b"SYMPGM-SHARED-DYNAMICS-MINIMAX-REGRET\\0\\x01");
+    hasher.update(b"SYMPGM-SHARED-DYNAMICS-MINIMAX-REGRET\0\x01");
     hasher.update(source_model_sha256);
     hasher.update((pairwise.len() as u64).to_le_bytes());
     for pair in pairwise {
@@ -1942,6 +1942,212 @@ mod tests {
         changed.primal_dual.primal[2] = q(3, 5);
         assert_ne!(changed.sha256(), certificate.sha256());
         assert!(built.verify_bound_optimality(&changed).is_err());
+    }
+
+    #[test]
+    fn verifies_complete_three_action_minimax_regret_and_all_ties() {
+        let model = fixture();
+        let scores_a = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let scores_b = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(1, 1), q(0, 1)],
+            vec![q(0, 1), q(0, 1)],
+        ];
+        let scores_c = scores_a.iter().zip(&scores_b).map(|(a_row, b_row)| {
+            a_row.iter().zip(b_row).map(|(a, b)| {
+                a.checked_add(*b).unwrap().checked_mul(q(1, 2)).unwrap()
+            }).collect::<Vec<_>>()
+        }).collect::<Vec<_>>();
+        let actions = vec![scores_a.clone(), scores_b.clone(), scores_c.clone()];
+
+        let proof_a_vs_b = PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,4,5),(3,1,5),(4,21,25),(5,4,25),(6,4,5),(7,1,5),(10,18,25),(11,2,25),(12,3,25),(13,2,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,11,25),(2,9,10),(4,9,10),(6,9,10),(8,9,10),(11,7,5),(14,23,10),(27,1,1),(30,1,1),(34,1,1)],
+            ),
+        };
+        let proof_b_vs_a = PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,22,25),(2,9,5),(5,1,2),(6,9,5),(9,1,2),(10,9,5),(15,23,10),(26,1,1),(31,1,1),(35,1,1)],
+            ),
+        };
+        let half = |proof: &PrimalDualCertificate| PrimalDualCertificate {
+            primal: proof.primal.clone(),
+            dual: proof.dual.iter().map(|value| {
+                value.checked_mul(q(1, 2)).unwrap()
+            }).collect(),
+        };
+
+        let pair_specs = [
+            (0usize, 1usize, proof_a_vs_b.clone()),
+            (0, 2, half(&proof_a_vs_b)),
+            (1, 0, proof_b_vs_a.clone()),
+            (1, 2, half(&proof_b_vs_a)),
+            (2, 0, half(&proof_b_vs_a)),
+            (2, 1, half(&proof_a_vs_b)),
+        ];
+        let mut witnesses = Vec::new();
+        for (selected_action, comparator_action, proof) in pair_specs {
+            let pair_lp = build_pairwise_worst_case_regret_lp(
+                &model,
+                &actions[selected_action],
+                &actions[comparator_action],
+                budget(84),
+            ).unwrap();
+            witnesses.push(PairwiseRegretWitness {
+                selected_action,
+                comparator_action,
+                certificate: pair_lp.bind_certificate(proof),
+            });
+        }
+
+        let verified = verify_shared_dynamics_minimax_regret(
+            &model,
+            &actions,
+            &witnesses,
+            budget(84),
+            6,
+        ).unwrap();
+        assert_eq!(verified.minimax_regret, q(11, 25));
+        assert_eq!(verified.minimax_actions, vec![0, 2]);
+        assert_eq!(
+            verified.action_regrets.iter().map(|item| item.worst_case_regret).collect::<Vec<_>>(),
+            vec![q(11, 25), q(22, 25), q(11, 25)]
+        );
+        assert_eq!(verified.pairwise_regrets.len(), 6);
+        assert_eq!(
+            verified.pairwise_regrets.iter().map(|item| (
+                item.selected_action,
+                item.comparator_action,
+                item.regret_contribution,
+            )).collect::<Vec<_>>(),
+            vec![
+                (0, 1, q(11, 25)),
+                (0, 2, q(11, 50)),
+                (1, 0, q(22, 25)),
+                (1, 2, q(11, 25)),
+                (2, 0, q(11, 25)),
+                (2, 1, q(11, 50)),
+            ]
+        );
+
+        let mut reversed = witnesses.clone();
+        reversed.reverse();
+        let replay = verify_shared_dynamics_minimax_regret(
+            &model,
+            &actions,
+            &reversed,
+            budget(84),
+            6,
+        ).unwrap();
+        assert_eq!(verified, replay);
+    }
+
+    #[test]
+    fn minimax_regret_rejects_missing_duplicate_and_over_budget_pairs() {
+        let model = fixture();
+        let scores_a = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let scores_b = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(1, 1), q(0, 1)],
+            vec![q(0, 1), q(0, 1)],
+        ];
+        let lp_ab = build_pairwise_worst_case_regret_lp(
+            &model, &scores_a, &scores_b, budget(84),
+        ).unwrap();
+        let lp_ba = build_pairwise_worst_case_regret_lp(
+            &model, &scores_b, &scores_a, budget(84),
+        ).unwrap();
+        let witnesses = vec![
+            PairwiseRegretWitness {
+                selected_action: 0,
+                comparator_action: 1,
+                certificate: lp_ab.bind_certificate(PrimalDualCertificate {
+                    primal: sparse_vector(
+                        14,
+                        &[(0,1,1),(2,4,5),(3,1,5),(4,21,25),(5,4,25),(6,4,5),(7,1,5),(10,18,25),(11,2,25),(12,3,25),(13,2,25)],
+                    ),
+                    dual: sparse_vector(
+                        36,
+                        &[(0,11,25),(2,9,10),(4,9,10),(6,9,10),(8,9,10),(11,7,5),(14,23,10),(27,1,1),(30,1,1),(34,1,1)],
+                    ),
+                }),
+            },
+            PairwiseRegretWitness {
+                selected_action: 1,
+                comparator_action: 0,
+                certificate: lp_ba.bind_certificate(PrimalDualCertificate {
+                    primal: sparse_vector(
+                        14,
+                        &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+                    ),
+                    dual: sparse_vector(
+                        36,
+                        &[(0,22,25),(2,9,5),(5,1,2),(6,9,5),(9,1,2),(10,9,5),(15,23,10),(26,1,1),(31,1,1),(35,1,1)],
+                    ),
+                }),
+            },
+        ];
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model, &[scores_a.clone(), scores_b.clone()], &witnesses[..1], budget(84), 2,
+            ),
+            Err(OccupationFlowError::PairwiseWitnessCountMismatch { expected: 2, actual: 1 })
+        );
+        let duplicate = vec![witnesses[0].clone(), witnesses[0].clone()];
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model, &[scores_a, scores_b], &duplicate, budget(84), 2,
+            ),
+            Err(OccupationFlowError::DuplicatePairwiseWitness {
+                selected_action: 0,
+                comparator_action: 1,
+            })
+        );
+        assert!(matches!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[witnesses[0].certificate.primal_dual.primal.iter().map(|_| q(0,1)).collect::<Vec<_>>()],
+                &[],
+                budget(84),
+                2,
+            ),
+            Err(OccupationFlowError::InvalidMinimaxRegretActionCount { actual: 1 })
+        ));
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[
+                    vec![vec![q(0,1), q(0,1)]; 3],
+                    vec![vec![q(0,1), q(0,1)]; 3],
+                ],
+                &witnesses,
+                budget(84),
+                1,
+            ),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "pairwise regret LP count",
+                required: 2,
+                limit: 1,
+            })
+        );
     }
 
     #[test]
