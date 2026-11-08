@@ -577,6 +577,7 @@
       "The occluded and unobserved regions are not clear free space.",
       "Vision HDC proposals do not supply metric or semantic authority.",
       "All measurements and predictions are synthetic."
-    ]
+    ],
+    "traffic_convention_profile_id": "synthetic-lht-rhd-v1"
   }
 }
