@@ -3,6 +3,7 @@
 //! Exact finite-grid transforms and weighted-profile experiments for complexity research.
 
 pub mod design;
+pub mod finite_family_portfolio;
 pub mod matrix;
 pub mod permutation_polynomial;
 pub mod profile;
