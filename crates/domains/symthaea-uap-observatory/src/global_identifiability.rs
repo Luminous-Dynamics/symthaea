@@ -126,10 +126,9 @@ impl fmt::Display for GlobalIdentifiabilityError {
                 write!(f, "candidate solution ID {id} is duplicated")
             }
             Self::NoParameters => write!(f, "candidate parameter vector is empty"),
-            Self::ParameterScaleCount { expected, actual } => write!(
-                f,
-                "received {actual} parameter scales; expected {expected}"
-            ),
+            Self::ParameterScaleCount { expected, actual } => {
+                write!(f, "received {actual} parameter scales; expected {expected}")
+            }
             Self::ObservationSigmaCount { expected, actual } => write!(
                 f,
                 "received {actual} observation sigmas; expected {expected}"
@@ -160,16 +159,25 @@ impl fmt::Display for GlobalIdentifiabilityError {
                 write!(f, "observation {index} is not finite")
             }
             Self::NonFiniteParameter { solution_id, index } => {
-                write!(f, "parameter {index} for candidate {solution_id} is not finite")
+                write!(
+                    f,
+                    "parameter {index} for candidate {solution_id} is not finite"
+                )
             }
             Self::NonFinitePrediction { solution_id, index } => {
-                write!(f, "prediction {index} for candidate {solution_id} is not finite")
+                write!(
+                    f,
+                    "prediction {index} for candidate {solution_id} is not finite"
+                )
             }
             Self::InvalidConfiguration => {
                 write!(f, "global-identifiability thresholds are invalid")
             }
             Self::NumericalOverflow { solution_id } => {
-                write!(f, "residual or separation calculation overflowed for {solution_id}")
+                write!(
+                    f,
+                    "residual or separation calculation overflowed for {solution_id}"
+                )
             }
         }
     }
@@ -336,27 +344,23 @@ pub fn screen_global_ambiguities(
         let mut chi_squared = 0.0;
         let mut max_abs_standardized_residual = 0.0_f64;
         for index in 0..observations.len() {
-            let standardized =
-                (candidate.predicted_observations[index] - observations[index])
-                    / config.observation_sigmas[index];
+            let standardized = (candidate.predicted_observations[index] - observations[index])
+                / config.observation_sigmas[index];
             if !standardized.is_finite() {
                 return Err(GlobalIdentifiabilityError::NumericalOverflow {
                     solution_id: candidate.solution_id.clone(),
                 });
             }
             chi_squared += standardized * standardized;
-            max_abs_standardized_residual =
-                max_abs_standardized_residual.max(standardized.abs());
+            max_abs_standardized_residual = max_abs_standardized_residual.max(standardized.abs());
             if !chi_squared.is_finite() {
                 return Err(GlobalIdentifiabilityError::NumericalOverflow {
                     solution_id: candidate.solution_id.clone(),
                 });
             }
         }
-        let rms_standardized_residual =
-            (chi_squared / observations.len() as f64).sqrt();
-        let admissible = rms_standardized_residual
-            <= config.max_rms_standardized_residual
+        let rms_standardized_residual = (chi_squared / observations.len() as f64).sqrt();
+        let admissible = rms_standardized_residual <= config.max_rms_standardized_residual
             && max_abs_standardized_residual <= config.max_abs_standardized_residual;
 
         candidate_fits.push(CandidateFit {
@@ -385,8 +389,7 @@ pub fn screen_global_ambiguities(
 
             let mut scaled_separation_squared = 0.0;
             for parameter_index in 0..parameter_count {
-                let delta = (left.parameters[parameter_index]
-                    - right.parameters[parameter_index])
+                let delta = (left.parameters[parameter_index] - right.parameters[parameter_index])
                     / config.parameter_scales[parameter_index];
                 scaled_separation_squared += delta * delta;
             }
@@ -412,8 +415,8 @@ pub fn screen_global_ambiguities(
                     });
                 }
                 prediction_difference_squared += standardized_difference * standardized_difference;
-                max_abs_standardized_prediction_difference = max_abs_standardized_prediction_difference
-                    .max(standardized_difference.abs());
+                max_abs_standardized_prediction_difference =
+                    max_abs_standardized_prediction_difference.max(standardized_difference.abs());
             }
             if !prediction_difference_squared.is_finite() {
                 return Err(GlobalIdentifiabilityError::NumericalOverflow {
@@ -423,8 +426,7 @@ pub fn screen_global_ambiguities(
 
             let rms_standardized_prediction_difference =
                 (prediction_difference_squared / observations.len() as f64).sqrt();
-            if rms_standardized_prediction_difference
-                <= config.max_rms_prediction_difference
+            if rms_standardized_prediction_difference <= config.max_rms_prediction_difference
                 && max_abs_standardized_prediction_difference
                     <= config.max_abs_prediction_difference
             {
@@ -441,10 +443,7 @@ pub fn screen_global_ambiguities(
 
     Ok(GlobalIdentifiabilityReport {
         candidate_count: candidates.len(),
-        admissible_candidate_count: candidate_fits
-            .iter()
-            .filter(|fit| fit.admissible)
-            .count(),
+        admissible_candidate_count: candidate_fits.iter().filter(|fit| fit.admissible).count(),
         no_supplied_ambiguity_found: ambiguous_pairs.is_empty(),
         candidate_fits,
         ambiguous_pairs,
@@ -464,14 +463,15 @@ mod tests {
     }
 
     fn range(left: Point3, right: Point3) -> f64 {
-        ((left.x - right.x).powi(2)
-            + (left.y - right.y).powi(2)
-            + (left.z - right.z).powi(2))
-        .sqrt()
+        ((left.x - right.x).powi(2) + (left.y - right.y).powi(2) + (left.z - right.z).powi(2))
+            .sqrt()
     }
 
     fn predict_ranges(target: Point3, anchors: &[Point3]) -> Vec<f64> {
-        anchors.iter().map(|anchor| range(target, *anchor)).collect()
+        anchors
+            .iter()
+            .map(|anchor| range(target, *anchor))
+            .collect()
     }
 
     fn mirror_config(observation_count: usize) -> GlobalIdentifiabilityConfig {
@@ -697,10 +697,9 @@ mod tests {
             max_abs_prediction_difference: 1.0e-6,
             min_scaled_parameter_separation: 1.0,
         };
-        let left = screen_global_ambiguities(&observations, &[a.clone(), b.clone()], &config)
-            .unwrap();
-        let right =
-            screen_global_ambiguities(&observations, &[b, a], &config).unwrap();
+        let left =
+            screen_global_ambiguities(&observations, &[a.clone(), b.clone()], &config).unwrap();
+        let right = screen_global_ambiguities(&observations, &[b, a], &config).unwrap();
         assert_eq!(left, right);
     }
 
