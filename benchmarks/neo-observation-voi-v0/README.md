@@ -109,3 +109,10 @@ The dedicated workflow is `.github/workflows/neo-observation-voi-v0.yml`. It is 
 
 
 The verifier also includes a deterministic 128-case finite-model sweep. For each generated likelihood pair it compares posterior-based evaluation against an independent joint-probability action-loss identity, then permutes outcome labels to check risk and information invariance. This adds a second path to the finite risk calculation without introducing a property-testing dependency.
+
+
+## Unknown dependence is a first-class outcome
+
+The fixture also links the synthetic unknown optical/radar source relation from Mycelix's `source-correlation-profile-v0.1`. When dependence assessment is `unknown`, the joint likelihood is unavailable and independence is not evidenced. The evaluator therefore requires `ABSTAIN_DEPENDENCE_UNRESOLVED`, rejects a numeric EVSI, and rejects an independent-likelihood product. It does not relabel unknown as dependent; it simply prevents the planner from pretending it knows the joint model.
+
+This control is important in real campaigns: sensor modality, provider count or different observation IDs are not proofs of independence. A bounded, evidence-backed dependence model can restore quantitative evaluation; until then, abstention is the honest output.
