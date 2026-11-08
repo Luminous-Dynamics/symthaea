@@ -727,7 +727,10 @@
         "per_tone_error_rate",
         "unscorable_feature_pair_count",
         "profile_specific_non_estimability",
-        "native_expert_agreement"
+        "native_expert_agreement",
+        "per_feature_dimension_error_rate",
+        "per_feature_active_pair_count",
+        "per_feature_mismatch_count"
       ],
       "required_outputs": [
         "feature_profile_id",
@@ -744,7 +747,9 @@
         "phonological_feature_golden_vector_manifest",
         "phonological_feature_profile_manifest",
         "phonological_feature_profile_review_status",
-        "feature_dimension_order_and_applicability"
+        "feature_dimension_order_and_applicability",
+        "per_feature_dimension_diagnostics_in_profile_order",
+        "non_estimable_feature_dimension_flags"
       ],
       "system_arms": [
         "strict_orthographic_WER_CER_baseline",
