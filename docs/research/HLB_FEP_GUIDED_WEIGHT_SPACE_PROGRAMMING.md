@@ -900,6 +900,57 @@ The critical fixture is a four-hypothesis XOR task. Two diagnostic probes indepe
 
 Tracking: [issue #11179](https://github.com/Luminous-Dynamics/symthaea/issues/11179). Required next step: extend the paired diagnostic benchmark to compare myopic EVSI and bounded sequential EVSI under identical probe, compute, and cost budgets, including model-likelihood misspecification.
 
-## 11. Claim boundary
+## 11. Current industry and hardware comparison requirements
+
+The HLB programme must compare against current deployable systems, not only academic neural-network baselines.
+
+### Liquid AI LFM3
+
+Liquid AI's 27 October 2026 LFM3 release is a relevant on-device/agentic baseline. Its LFM3-1.7B uses a tri-hybrid mix of gated short convolutions, sliding-window attention, and global attention; the vendor reports a 256K context window, a Q4 footprint around 1 GB, and hardware-in-the-loop architecture search across 14 device/backend combinations including Raspberry Pi 5, mobile devices, CPUs, GPUs, and Qualcomm NPU. Its published benchmark table includes agent, tool-use, coding, knowledge, and instruction-following tasks.
+
+This is **not** a continuous-time LTC/CfC network merely because the product family is called Liquid Foundation Models. It is a hybrid sequence architecture. It belongs in the deployment/agent capability comparison, while NIALIM/DFA-CfN/PRDFA-CfN remain direct continuous-time sequence competitors.
+
+Sources:
+- Liquid AI, *Introducing LFM3: Every Modality for Specialized Intelligence* (27 Oct 2026): https://www.liquid.ai/blog/lfm3
+- Liquid AI, model release and model cards: https://www.liquid.ai/news/models
+
+### Liquid AI d1-ultra decision model
+
+The 15 October 2026 d1-ultra announcement describes a multimodal decision model that returns probabilities for yes/no, multiple-choice, and scalar-score questions in one forward pass, with explicit emphasis on confidence calibration. Liquid AI reports comparisons across 112 evaluations and calibrated decision outputs.
+
+This is a direct industry comparator for the **decision-scoring/calibration** slice of HLB-FEP, not for sequential experiment selection, causal intervention, or model repair. Compare Brier score, log score, calibration error, selective risk, accuracy, latency, and cost. Then compare whether Symthaea's active diagnostic loop improves downstream decisions after spending the same observation budget.
+
+Source: Liquid AI, *d1-ultra: Introducing the World's Best Decision Model* (15 Oct 2026): https://www.liquid.ai/blog/d1-ultra
+
+### GHRR and dedicated hardware
+
+The DATE 2026 GHRR work reports non-commutative matrix-based binding with a vector-space flattening method and a custom ASIC. The published abstract reports 1.36×–1.56× throughput and 16.2×–18.6× energy-efficiency improvements relative to a PyTorch/RTX 4090 baseline. This is a serious competitor for order-aware holographic operations and hardware acceleration.
+
+The comparison is not automatically apples-to-apples because the hardware and software baselines differ. Require end-to-end task quality, implementation details, device power measurement, and equivalent workload definitions before drawing energy or throughput conclusions.
+
+Source: DATE 2026, *Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration*: https://doi.org/10.23919/DATE69613.2026.11539261
+
+### WeightLoop
+
+WeightLoop (arXiv:2611.07319, 5 Nov 2026) is a direct baseline for fixed-editor, experimental-feedback weight-space programming. Its authors report offline replay gains over endpoint-budget settings and sequential discovery tasks. Treat those findings as author-reported until independently reproduced.
+
+Symthaea must not claim the fixed reusable editor / experimental feedback loop as unique. Its potential differentiation is the integration of typed architecture-aware programs, decision-relevant and sequential diagnostics, candidate-only transactional editing, independent verification, and capability preservation.
+
+Source: https://arxiv.org/abs/2611.07319
+
+### Required fair deployment protocol
+
+For every industry comparison, record:
+- exact model/checkpoint and quantization;
+- hardware, firmware, compiler/runtime, driver, and backend;
+- input/output or observation budget;
+- concurrency, batch size, warm/cold start, context length, and cache state;
+- p50/p95/p99 latency, throughput, peak memory, allocations, and energy per completed task;
+- task success, decision loss, calibration, abstention, and failure/recovery behavior;
+- tool/editor calls, forward passes, tokens, and total wall-clock cost.
+
+Use both a shared-device comparison and a best-supported deployment comparison. A model's benchmark score is not an end-to-end systems result.
+
+## 12. Claim boundary
 
 This document defines hypotheses and an experiment. It does not claim that current Symthaea FEP action selection performs valid expected-information planning, that WSP is implemented as an autonomous editor, that HDC/CfC/FEP/WSP adapters are integrated, that the architecture exceeds any SOTA system, that weight edits are safe in general, or that any consciousness property has been demonstrated.
