@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-numeric-intent-profile-v0.schema.json",
+  "title": "REA schema-bound numeric intent profile v0",
+  "description": "A profile declares the intended semantics of a numeric field at an exact RFC 6901 JSON Pointer. It does not change REA Evidence v1 JCS identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile_id",
+    "profile_version",
+    "value_schema",
+    "numeric_paths",
+    "profile_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.rea.numeric-intent-profile.v0"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "profile_version": {
+      "const": 0
+    },
+    "value_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "numeric_paths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "json_pointer",
+          "intent",
+          "contract"
+        ],
+        "properties": {
+          "json_pointer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(?:/(?:[^~/]|~[01])*)+$"
+          },
+          "intent": {
+            "enum": [
+              "binary64",
+              "safe_integer",
+              "exact_integer_string",
+              "fixed_decimal_string",
+              "opaque_numeric"
+            ]
+          },
+          "quantity_kind_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "unit_code_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "contract": {
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "binary64"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/binary64"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "safe_integer"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/safe_integer"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "exact_integer_string"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/exact_integer_string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "fixed_decimal_string"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/fixed_decimal_string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "intent": {
+                  "const": "opaque_numeric"
+                }
+              },
+              "required": [
+                "intent"
+              ]
+            },
+            "then": {
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/opaque_numeric"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "quantity_kind_ref"
+              ]
+            },
+            "then": {
+              "required": [
+                "unit_code_ref"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "unit_code_ref"
+              ]
+            },
+            "then": {
+              "required": [
+                "quantity_kind_ref"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "binary64": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantics",
+        "non_finite_policy",
+        "negative_zero_policy"
+      ],
+      "properties": {
+        "semantics": {
+          "const": "rfc8785_ecmascript_binary64"
+        },
+        "non_finite_policy": {
+          "const": "reject"
+        },
+        "negative_zero_policy": {
+          "const": "jcs_canonicalizes_to_zero"
+        }
+      }
+    },
+    "safe_integer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signedness",
+        "min_value",
+        "max_value",
+        "integer_form_only",
+        "safe_range_only"
+      ],
+      "properties": {
+        "signedness": {
+          "enum": [
+            "signed",
+            "unsigned"
+          ]
+        },
+        "min_value": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)$"
+        },
+        "max_value": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "integer_form_only": {
+          "const": true
+        },
+        "safe_range_only": {
+          "const": true
+        }
+      }
+    },
+    "exact_integer_string": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signedness",
+        "max_digits",
+        "min_value",
+        "max_value",
+        "leading_zero_policy",
+        "plus_sign_policy",
+        "negative_zero_policy"
+      ],
+      "properties": {
+        "signedness": {
+          "enum": [
+            "signed",
+            "unsigned"
+          ]
+        },
+        "max_digits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "min_value": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)$"
+        },
+        "max_value": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "leading_zero_policy": {
+          "const": "reject"
+        },
+        "plus_sign_policy": {
+          "const": "reject"
+        },
+        "negative_zero_policy": {
+          "const": "reject"
+        }
+      }
+    },
+    "fixed_decimal_string": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signedness",
+        "scale",
+        "max_integer_digits",
+        "scale_policy",
+        "exponent_policy",
+        "rounding_policy",
+        "negative_zero_policy"
+      ],
+      "properties": {
+        "signedness": {
+          "enum": [
+            "signed",
+            "unsigned"
+          ]
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128
+        },
+        "max_integer_digits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "scale_policy": {
+          "const": "exact"
+        },
+        "exponent_policy": {
+          "const": "reject"
+        },
+        "rounding_policy": {
+          "const": "reject_excess_scale"
+        },
+        "negative_zero_policy": {
+          "const": "reject"
+        }
+      }
+    },
+    "opaque_numeric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arithmetic_policy",
+        "ordering_policy",
+        "equivalence_policy"
+      ],
+      "properties": {
+        "arithmetic_policy": {
+          "const": "forbidden"
+        },
+        "ordering_policy": {
+          "const": "forbidden"
+        },
+        "equivalence_policy": {
+          "const": "none"
+        }
+      }
+    }
+  }
+}
