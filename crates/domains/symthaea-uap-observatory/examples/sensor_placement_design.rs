@@ -63,16 +63,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             EcefVector3::new(-100.0, 0.0, 0.0),
             sigma,
         ),
-        candidate(
-            "candidate-south",
-            EcefVector3::new(0.0, 100.0, 0.0),
-            sigma,
-        ),
-        candidate(
-            "candidate-high",
-            EcefVector3::new(0.0, 0.0, 100.0),
-            sigma,
-        ),
+        candidate("candidate-south", EcefVector3::new(0.0, 100.0, 0.0), sigma),
+        candidate("candidate-high", EcefVector3::new(0.0, 0.0, 100.0), sigma),
         candidate(
             "candidate-west-high",
             EcefVector3::new(-100.0, -100.0, 100.0),
@@ -140,7 +132,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         rank_sensor_placements_over_target_region(&existing, &target_hypotheses, &candidates)?;
     println!("epistemic_status=FINITE_SCENARIO_ROBUST_LOCAL_FIM_NOT_CONTINUOUS_REGION_GUARANTEE");
     println!("target_hypotheses=4");
-    println!("robust_candidate,expected_logdet,worst_logdet,expected_trace_m2,worst_trace_m2,worst_condition");
+    println!(
+        "robust_candidate,expected_logdet,worst_logdet,expected_trace_m2,worst_trace_m2,worst_condition"
+    );
     for score in &robust {
         println!(
             "{},{:.9},{:.9},{:.12e},{:.12e},{:.9}",
