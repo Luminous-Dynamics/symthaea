@@ -216,6 +216,7 @@ impl AigComposer {
 
     fn clone_local_node(
         &mut self,
+        layer_position: usize,
         local_index: usize,
         local_aig: &StrategyAig,
         dependency_to_paired_input: &[usize],
@@ -237,7 +238,7 @@ impl AigComposer {
             AigNode::Input { dependency_index } => {
                 let paired_input = *dependency_to_paired_input.get(dependency_index).ok_or(
                     SynQbfConstructionError::LayerInputOutOfRange {
-                        layer: local_aig.dependencies.len(),
+                        layer: layer_position,
                         dependency_index,
                     },
                 )?;
@@ -261,10 +262,11 @@ impl AigComposer {
                 self.and(left, right, budget)?
             }
         };
+        let memo_len = memo.len();
         let slot = memo.get_mut(local_index).ok_or(
             SynQbfConstructionError::CircuitCompositionOutOfRange {
                 node: local_index,
-                node_count: memo.len(),
+                node_count: memo_len,
             },
         )?;
         *slot = Some(value);
@@ -273,6 +275,7 @@ impl AigComposer {
 
     fn clone_local_literal(
         &mut self,
+        layer_position: usize,
         literal: AigLiteral,
         local_aig: &StrategyAig,
         dependency_to_paired_input: &[usize],
@@ -283,6 +286,7 @@ impl AigComposer {
             AigLiteral::Constant(value) => Ok(AigLiteral::Constant(value)),
             AigLiteral::Node { index, inverted } => {
                 let base = self.clone_local_node(
+                    layer_position,
                     index,
                     local_aig,
                     dependency_to_paired_input,
@@ -296,12 +300,14 @@ impl AigComposer {
 
     fn clone_local_output(
         &mut self,
+        layer_position: usize,
         local_aig: &StrategyAig,
         dependency_to_paired_input: &[usize],
         budget: SynQbfConstructionBudget,
     ) -> Result<AigLiteral, SynQbfConstructionError> {
         let mut memo = vec![None; local_aig.nodes.len()];
         self.clone_local_literal(
+            layer_position,
             local_aig.output,
             local_aig,
             dependency_to_paired_input,
@@ -329,6 +335,12 @@ pub fn construct_synqbf_from_game_value_profile(
     .map_err(SynQbfConstructionError::GameValueProfile)?;
 
     let n = profile.prefix_order.len();
+    if n > budget.checker.max_variables {
+        return Err(SynQbfConstructionError::CheckerVariableBudgetExceeded {
+            required: n,
+            limit: budget.checker.max_variables,
+        });
+    }
     let paired_input_count = n
         .checked_mul(2)
         .ok_or(SynQbfConstructionError::InputCountOverflow)?;
@@ -395,6 +407,7 @@ pub fn construct_synqbf_from_game_value_profile(
         initial_mapping.push(position);
     }
     let mut result = composer.clone_local_output(
+        0,
         &layer_circuits[0],
         &initial_mapping,
         budget,
@@ -416,7 +429,7 @@ pub fn construct_synqbf_from_game_value_profile(
         }
 
         let layer_value =
-            composer.clone_local_output(layer, &mapping, budget)?;
+            composer.clone_local_output(position, layer, &mapping, budget)?;
         let current = AigLiteral::node(position - 1);
         let dual = AigLiteral::node(n + position - 1);
         let differs = composer.xor(current, dual, budget)?;
@@ -602,7 +615,10 @@ mod tests {
             construction_budget().game_values,
         )
         .unwrap();
-        profile.layers[1].values.insert(vec![false], !profile.layers[1].values[&vec![false]]);
+        let old_value = profile.layers[1].values[&vec![false]];
+        profile.layers[1]
+            .values
+            .insert(vec![false], !old_value);
         assert!(matches!(
             construct_synqbf_from_game_value_profile(
                 &problem,
