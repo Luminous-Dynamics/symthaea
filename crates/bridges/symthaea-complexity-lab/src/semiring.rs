@@ -168,8 +168,11 @@ impl ExactSemiring for CheckedRational {
 ///
 /// Addition is maximum and multiplication is ordinary rational multiplication.
 /// The constructor rejects negative values so this type cannot accidentally be
-/// used as a probability-potential semiring with signed coefficients. Exact zero
-/// remains a first-class impossible-support value; no log floor is introduced.
+/// used as a probability-potential semiring with signed coefficients. This wrapper
+/// validates the coefficient sign domain only; it does not establish CPT row
+/// normalization or that a complete graph is a calibrated probability model.
+/// Exact zero remains a first-class impossible-support value; no log floor is
+/// introduced.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MaxTimesRational(CheckedRational);
 
