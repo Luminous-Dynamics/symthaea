@@ -86,7 +86,14 @@
         "SPER_at_1",
         "SPER_at_3",
         "per_language_masked_error_rate",
-        "switch_direction_error_rate"
+        "switch_direction_error_rate",
+        "diacritic_sensitive_WER",
+        "diacritic_insensitive_WER",
+        "blank_output_rate",
+        "truncation_rate",
+        "degenerate_repetition_rate",
+        "length_expansion_rate",
+        "prompt_leakage_rate"
       ],
       "complexity_axes": [
         "CMI",
@@ -116,6 +123,9 @@
           "paper_url": "https://arxiv.org/abs/2609.11786",
           "note": "The 2026 switch-aware study audits 8,181 audio-available rows / 9.54h from 9,966 AfriCodeSwitch validation metadata rows and uses a deterministic 2,000-utterance manifest. Its exact artifact, manifest, license, speaker split and permission must be pinned before use; no download or ingestion is authorized."
         }
+      ],
+      "required_outputs": [
+        "output_quality_flags"
       ]
     },
     {
@@ -138,14 +148,19 @@
         "unsupported_answer_rate",
         "abstention_precision_recall",
         "calibration",
-        "native_reviewer_correction_time"
+        "native_reviewer_correction_time",
+        "blank_output_rate",
+        "truncation_rate",
+        "degenerate_repetition_rate",
+        "unsupported_prompt_echo_rate"
       ],
       "required_outputs": [
         "typed_slots",
         "source_audio_spans",
         "transcript_spans_when_available",
         "uncertainty",
-        "unsupported_or_unknown_state"
+        "unsupported_or_unknown_state",
+        "output_quality_flags"
       ],
       "system_arms": [
         "ASR_then_Broca",
