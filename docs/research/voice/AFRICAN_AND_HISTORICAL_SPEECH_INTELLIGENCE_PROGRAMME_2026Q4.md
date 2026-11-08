@@ -595,3 +595,14 @@ Keep per-language, variety, switch-density and worst-group results. Use speaker/
 - The experiment receipt schema now has an optional `candidate_selection` section for candidate-set manifest, selector model/prompt, demonstration manifest/policy, target-language demonstration/training regime, selected candidate or abstention, rewrite permission/count and exact-copy integrity checks. The design example marks candidate selection NOT_USED.
 
 This is an integrity primitive, not a MICL model or an ASR improvement. No model/provider was invoked and no audio, dataset or training run was used.
+
+
+### 16.7 Updated benchmark and receipt registry
+
+The machine-readable matrix now contains **twelve** tracks, with acoustic hypothesis selection as track 12:
+- `voice_benchmark_matrix_2026q4.json`
+- `voice_benchmark_matrix_2026q4.schema.json`
+
+The experiment receipt schema (`voice_experiment_receipt_v1.schema.json`) now accepts an optional candidate-selection object with immutable candidate-set and generator manifests, selector model/prompt, demonstration manifest and policy, target-language demonstration/training regime, candidate-ID-or-abstain decision, rewrite permission/count, source interval and exact-copy integrity state.
+
+The design example explicitly uses `mode=NOT_USED` and `decision_type=NOT_APPLICABLE`. This is schema design evidence only. No selector or model was run.
