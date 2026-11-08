@@ -776,3 +776,14 @@ The schema explicitly distinguishes:
 Its QUALIFIED state structurally requires at least two reviewers and EXPERT_NATIVE_PHONETIC_ANNOTATION. This is a structural gate, not proof that a review occurred or that a language profile is scientifically correct.
 
 The FER/TER receipt now records the feature-profile schema version and profile status alongside profile ID/revision/digest, tone dimensions, annotation authority and alignment policy. The current design receipt marks it NOT_USED.
+
+
+### 19.1 Synthetic conformance vector inventory
+
+The machine-readable matrix registers four independent synthetic vector sets:
+1. `switch_metric_golden_v0.1.json` — 10 WER/PIER/SETER/SPER token-level cases.
+2. `switch_boundary_golden_v0.1.json` — 6 exact boundary TP/FP/FN/F1 cases.
+3. `phonological_feature_golden_v0.1.json` — 10 FER/TER and NA-aware alignment cases.
+4. `acoustic_faithfulness_golden_v0.1.json` — 10 trial groups for audio adherence, text overrides, unsupported claims and abstention.
+
+The FER/TER and acoustic-faithfulness sets were independently recomputed with separate JavaScript formula implementations; all expected numerators, denominators and rates matched. This is arithmetic validation of synthetic fixtures only. It does not execute the Rust scorers, validate every schema with a dedicated Draft 2020-12 implementation, reproduce the published research implementations or establish real-world model performance.
