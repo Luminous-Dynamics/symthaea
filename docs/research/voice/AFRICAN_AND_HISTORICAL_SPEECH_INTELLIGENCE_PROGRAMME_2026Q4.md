@@ -443,7 +443,7 @@ The stacked switch-metrics PR adds corpus aggregation with:
 
 This avoids the common but serious reporting ambiguity where one result is utterance-averaged, another token-pooled, and no-switch utterances are implicitly scored as perfect.
 
-The contract is [#11103 — VOICE-SWITCH-AGG-001](https://github.com/Luminous-Dynamics/symthaea/issues/11103). Corpus implementation is in stacked [draft PR #11081](https://github.com/Luminous-Dynamics/symthaea/pull/11081), based on [PIER PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058). The source contains 34 authored switch-metric unit tests: 16 for SETER/SPER/per-language, 12 for exact boundary F1, and six for corpus aggregation; none have been executed.
+The contract is [#11103 — VOICE-SWITCH-AGG-001](https://github.com/Luminous-Dynamics/symthaea/issues/11103). Corpus implementation is in stacked [draft PR #11084](https://github.com/Luminous-Dynamics/symthaea/pull/11084), based on [PIER PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058). The source contains 34 authored switch-metric unit tests: 16 for SETER/SPER/per-language, 12 for exact boundary F1, and six for corpus aggregation; none have been executed.
 
 ### 16.4 Semantic anchors require an acoustic veto
 
