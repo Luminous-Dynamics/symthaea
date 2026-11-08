@@ -13,7 +13,7 @@ Accept different graph decompositions when they preserve:
 - the distinction between historical truth and current decision-use admissibility;
 - the open-world remainder.
 
-A file-path match alone does not prove semantic impact. A missing path match does not prove non-impact. A retain decision needs an unaffectedness argument, not merely an absent diff.
+A file-path match alone does not prove semantic impact. A missing path match does not prove non-impact. A retain decision needs an unaffectedness argument, not merely an absent diff. The closure includes known counter-evidence and contradicted premises, not just supportive citations. Mutually dependent claims are not independent roots; absent an independently grounded root, a circular support chain remains unresolved.
 
 ## 2. CCL-S01 — direct source-anchor edit
 
