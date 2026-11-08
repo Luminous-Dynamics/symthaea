@@ -1761,8 +1761,13 @@ mod tests {
     }
     #[test]
     fn resolved_plan_renderer_rejects_unqualified_non_english_profiles() {
-        assert!(validate_formant_language("en").is_ok());
-        let error = validate_formant_language("xh-ZA").unwrap_err().to_string();
+        let (mut pronunciation, alignment) = resolved_read_now_fixture();
+        pronunciation.language = "xh-ZA".to_string();
+        let mut engine = FormantSingingEngine::default();
+        let error = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("language='en' only"), "{error}");
     }
 }
