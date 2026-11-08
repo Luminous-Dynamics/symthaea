@@ -127,6 +127,8 @@ Retry alone is not sufficient if the logical operation ID is durably deduplicate
 
 **Expected target mechanism:** Authorization is evaluated at enqueue time; revocation occurs while the job waits; the worker relies on the serialized boolean and mutates without checking current authority.
 
+**Canonical topology:** A happens-before chain from enqueue-time authorization through revocation to stale worker use.
+
 **Canonical temporal topology:**
 
 \`\`\`text
