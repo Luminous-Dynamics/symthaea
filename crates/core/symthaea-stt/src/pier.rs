@@ -335,6 +335,21 @@ mod tests {
     }
 
     #[test]
+    fn empty_reference_is_rejected() {
+        let error = point_of_interest_error_rate::<&str>(&[], &[], &[]);
+        assert_eq!(error, Err(PierError::EmptyReference));
+    }
+
+    #[test]
+    fn pier_can_exceed_one_hundred_percent_due_to_insertions() {
+        let result = score(&["hello"], &["extra_a", "extra_b", "hello"], &[true]);
+        assert_eq!(result.hits, 1);
+        assert_eq!(result.insertions, 2);
+        assert_eq!(result.denominator(), 1);
+        assert_eq!(result.pier_percent(), 200.0);
+    }
+
+    #[test]
     fn zero_poi_is_explicitly_non_estimable() {
         let error = point_of_interest_error_rate(
             &["matrix_a", "matrix_b"],
