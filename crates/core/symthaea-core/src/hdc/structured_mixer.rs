@@ -38,7 +38,7 @@ impl std::fmt::Display for HdcStructuredMixerError {
             Self::ZeroDimension => write!(f, "structured HDC mixer dimension must be non-zero"),
             Self::NonPowerOfTwo { dimension } => write!(
                 f,
-                "Walsh-Hadamard mixer requires a power-of-two dimension, got {dimension}"
+                "Walsh-Hadamard and butterfly mixers require a power-of-two dimension, got {dimension}"
             ),
             Self::DimensionMismatch { expected, actual } => write!(
                 f,
@@ -236,15 +236,19 @@ impl HdcButterflyMixer {
         }
 
         let mut values = input.values.clone();
-        let stages = self.dimension.trailing_zeros() as usize;
+        let stage_count = self.dimension.trailing_zeros() as usize;
         let pairs_per_stage = self.dimension / 2;
-        let stage_order: Box<dyn Iterator<Item = usize>> = if reverse_stages {
-            Box::new((0..stages).rev())
-        } else {
-            Box::new(0..stages)
-        };
+        let mut stages = 0..stage_count;
 
-        for stage in stage_order {
+        loop {
+            let next_stage = if reverse_stages {
+                stages.next_back()
+            } else {
+                stages.next()
+            };
+            let Some(stage) = next_stage else {
+                break;
+            };
             let half_width = 1usize << stage;
             let block_width = half_width * 2;
             let mut pair_index = 0usize;
