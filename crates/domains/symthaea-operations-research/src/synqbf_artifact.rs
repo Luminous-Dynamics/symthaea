@@ -556,7 +556,14 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::super::decomposition::Literal;
+    use super::super::qdimacs::{QdimacsParseBudget, parse_qdimacs};
+    use super::super::quantified_game_dag::{QbfGameDagBudget, build_qbf_game_proof_dag};
+    use super::super::quantified_game_values::extract_game_value_profile_from_dag;
     use super::super::quantified_scope::QuantifierBlock;
+    use super::super::synqbf_construction::{
+        SynQbfConstructionBudget,
+        construct_synqbf_from_game_value_profile,
+    };
     use super::super::strategy_aig::{StrategyAigBudget, compile_strategy_function_to_aig};
     use super::super::quantified_strategy::BooleanStrategyFunction;
     use super::*;
@@ -643,6 +650,56 @@ mod tests {
                 1
             );
         }
+    }
+
+    #[test]
+    fn qdimacs_game_dag_synqbf_and_portable_artifact_form_one_vertical_slice() {
+        let source = concat!(
+            "c exists x: x\n",
+            "p cnf 1 1\n",
+            "e 1 0\n",
+            "1 0\n"
+        );
+        let parsed = parse_qdimacs(source, QdimacsParseBudget::default()).unwrap();
+        let dag_budget = QbfGameDagBudget::default();
+        let (dag, _) =
+            build_qbf_game_proof_dag(&parsed.problem, &parsed.prefix, dag_budget).unwrap();
+        let profile = extract_game_value_profile_from_dag(
+            &parsed.problem,
+            &parsed.prefix,
+            &dag,
+            dag_budget,
+            SynQbfConstructionBudget::default().game_values,
+        )
+        .unwrap();
+        let constructed = construct_synqbf_from_game_value_profile(
+            &parsed.problem,
+            &parsed.prefix,
+            &profile,
+            SynQbfConstructionBudget::default(),
+        )
+        .unwrap();
+        let bytes = encode_synqbf_proof(&constructed.proof, budget()).unwrap();
+        let verified = verify_synqbf_artifact(
+            &parsed.problem,
+            &parsed.prefix,
+            &bytes,
+            budget(),
+            budget().proof,
+        )
+        .unwrap();
+
+        assert!(verified.proof.claimed_truth_value);
+        assert_eq!(verified.proof, constructed.proof);
+        assert_eq!(
+            verified.verification.source_equivalence_assignments_checked,
+            2
+        );
+        assert_eq!(
+            verified.verification.representability_conditions_checked,
+            1
+        );
+        assert_eq!(parsed.stats.declared_variables, 1);
     }
 
     #[test]
