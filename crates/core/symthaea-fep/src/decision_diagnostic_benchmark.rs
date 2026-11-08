@@ -702,6 +702,14 @@ mod tests {
         assert!(evsi.mean_decision_regret < pure_eig.mean_decision_regret);
         assert!(evsi.mean_realized_model_entropy_reduction_nats > 0.0);
         assert!((no_probe.mean_task_loss - 0.5).abs() < 0.03);
+        assert_eq!(result.paired_evsi_contrasts.len(), 4);
+        let evsi_vs_pure_eig = &result.paired_evsi_contrasts[1];
+        assert_eq!(evsi_vs_pure_eig.episodes, 10_000);
+        assert!(evsi_vs_pure_eig.mean_decision_regret_difference < -0.15);
+        let regret_interval = evsi_vs_pure_eig
+            .decision_regret_difference_ci95
+            .expect("paired interval with 10,000 episodes");
+        assert!(regret_interval[1] < 0.0);
     }
 
     #[test]
