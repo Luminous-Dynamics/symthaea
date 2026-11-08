@@ -4,8 +4,9 @@
 use std::error::Error;
 use symthaea_science_evidence::{
     ArtifactDigest, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
-    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictionDisposition, THEORY_PREDICTION_SCHEMA,
-    TheoryModel, TheoryModelRole, TheoryPredictionLedger, TheoryPredictionRecord,
+    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictiveUncertaintyStatus,
+    PredictionDisposition, THEORY_PREDICTION_SCHEMA, TheoryModel, TheoryModelRole,
+    TheoryPredictionLedger, TheoryPredictionRecord,
 };
 
 // Commit that introduced the exact model-specification descriptors below.
@@ -41,6 +42,11 @@ fn prediction(
         scope_id: scope.to_string(),
         units: units.to_string(),
         predicted_value: value,
+        uncertainty_status: if disposition == PredictionDisposition::Quantitative {
+            PredictiveUncertaintyStatus::PointValueOnly
+        } else {
+            PredictiveUncertaintyStatus::NotApplicable
+        },
         derivation_reference: derivation.map(str::to_string),
         notes: notes.to_string(),
     }
