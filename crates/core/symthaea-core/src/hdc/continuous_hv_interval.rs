@@ -183,6 +183,9 @@ fn next_down(value: f32) -> f32 {
     if value.is_nan() || value == f32::NEG_INFINITY {
         return value;
     }
+    if value == f32::INFINITY {
+        return f32::MAX;
+    }
     if value == 0.0 {
         return f32::from_bits(0x8000_0001);
     }
@@ -390,6 +393,7 @@ mod tests {
         assert_eq!(next_up(f32::NEG_INFINITY), -f32::MAX);
         assert_eq!(next_down(f32::INFINITY), f32::MAX);
         assert_eq!(next_up(f32::MAX), f32::INFINITY);
+        assert_eq!(next_down(f32::INFINITY), f32::MAX);
         assert_eq!(next_down(-f32::MAX), f32::NEG_INFINITY);
     }
 
