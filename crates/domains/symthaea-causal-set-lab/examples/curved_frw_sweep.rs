@@ -60,16 +60,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     const SEED: u64 = 0xF12_2026;
 
     println!("Symthaea conformal FRW causal-set sampling sweep");
-    println!("epistemic_status=CURVED_MEASURE_SAMPLER_AND_FINITE_SAMPLE_DIAGNOSTIC_NOT_CONTINUUM_LIMIT");
+    println!(
+        "epistemic_status=CURVED_MEASURE_SAMPLER_AND_FINITE_SAMPLE_DIAGNOSTIC_NOT_CONTINUUM_LIMIT"
+    );
     println!("metric=ds2=a(eta)^2*(-deta^2+dx^2)");
     println!("scale_factor=exp(kappa*eta^2/2)");
-    println!("ricci_convention=R=2*a''/a^3");
+    println!("ricci_convention=R=2*(ln(a))''/a^2");
     println!("diamond=|eta|<=T/2, |x|<=T/2-|eta|");
     println!("extent={EXTENT}");
     println!("events={EVENT_COUNT}");
     println!("seed={SEED}");
     println!("qmc_reference_points={REFERENCE_POINTS}");
-    println!("kappa,total_volume,expected_eta2,empirical_eta2,empirical_order_fraction,qmc_order_fraction,longest_chain,events_per_volume");
+    println!(
+        "kappa,total_volume,expected_eta2,empirical_eta2,empirical_order_fraction,qmc_order_fraction,longest_chain,events_per_volume"
+    );
 
     for kappa in [0.0_f64, 0.2, 0.5, 1.0, 2.0] {
         let metric = ConformalFrw1p1::new(kappa, EXTENT)?;
@@ -97,7 +101,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    println!("The kappa=0 row is the flat-space control; curved ordering fractions must not be inverted using the flat Myrheim-Meyer law.");
-    println!("The QMC ordering reference is deterministic finite-sample quadrature, not an exact integral or a continuum-limit proof.");
+    println!(
+        "The kappa=0 row is the flat-space control; curved ordering fractions must not be inverted using the flat Myrheim-Meyer law."
+    );
+    println!(
+        "The QMC ordering reference is deterministic finite-sample quadrature, not an exact integral or a continuum-limit proof."
+    );
     Ok(())
 }
