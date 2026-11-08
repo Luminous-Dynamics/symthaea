@@ -28,6 +28,28 @@ This patch:
 
 No claim is made that the physical waveguide singer is exposed or buildable by this patch. The comparison gate now covers only the integrated Kokoro path and optional DiffSinger worker. Its `run_manifest.json` records the source revision, voice ID, optional worker path, per-case seed/lyrics/style/score notes, and serialized VocalPerformance digest. Each blind clip carries the exact WAV-file digest and its performance-input digest. The manifest does not yet attest the full voicebank/model-weight tree; that needs a separate provisioned-model manifest before claiming complete model provenance.
 
+
+## Capability-qualified DiffSinger score timeline — 8 November 2026
+
+The local DiffSinger worker now consumes a frozen `VocalPerformance` through a deterministic phone/timeline flattener in `scripts/diffsinger_phonemes.py`. The flattener emits ordered (phone, duration, F0) events, explicit `SP` silence events for absolute score gaps, and explicit melisma vowel events. It validates finite note timing and refuses overlaps. Consonant anticipation is represented by moving onset consonants before the target note onset and shortening the preceding vowel by the same amount; if there is no safe preceding vowel to borrow from, it fails rather than shifting or deleting a note.
+
+The strict workflow now includes deterministic tests for:
+- phone-duration conservation within a note and coda;
+- absolute score-gap insertion as an `SP` event;
+- consonant anticipation with duration borrowed from the preceding vowel;
+- one-vowel melisma with coda released after the final melisma note;
+- overlap rejection when borrowing would violate the minimum preceding vowel duration;
+- invalid language/profile rejection.
+
+This closes an important distinction between “worker produces some audio” and “worker follows the notated timeline.” It remains a score-conditioned synthesis path, not a claim of naturalness or SOTA. Vibrato, arbitrary continuous pitch curves, phrase expression, breath events, and true local editing remain unsupported by the current worker and are reported as such in its capability manifest.
+
+## Executable backend capability receipts
+
+The comparative release gate now requires every renderer to declare all 20 controls in `SingingBackendCapabilities`, checks renderer identity against the manifest, applies the score-conditioned render policy before synthesis, and records the complete manifest plus BLAKE3 digest with each objective clip. The private backend key also binds that digest to the blind clip.
+
+The gate includes only currently integrated renderers: Kokoro, the formant-vocoder baseline, and optional DiffSinger. The physical waveguide prototype remains excluded pending issue #10860. A renderer cannot silently pass a score-conditioned comparison by ignoring an undeclared control. Approximations and conditional behavior are visible in the report.
+
+
 ## G2P replacement candidates and isolated spike — 7 November 2026
 
 The current Muse English G2P is a small dictionary plus ASCII letter fallback. Its strict input checks prevent dropped characters and missing syllables, but do not prove correct pronunciation. Issue #10869 tracks the actual replacement.
