@@ -1042,7 +1042,7 @@ mod tests {
             vec![MaxTimesRational::zero(), MaxTimesRational::zero()],
         ).unwrap();
 
-        let result = exhaustive_max_times_map_bounded(&graph, 2).unwrap();
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 2, max_optimal_assignments: 2, max_tie_assignment_values: 2 }).unwrap();
         assert_eq!(result.optimum_score, rational(0, 1));
         assert_eq!(result.support_status, ExactMapSupportStatus::NoPositiveSupport);
         assert_eq!(result.optimal_assignments.len(), 2);
@@ -1080,7 +1080,7 @@ mod tests {
             ],
         ).unwrap();
 
-        let result = exhaustive_max_times_map_bounded(&graph, 6).unwrap();
+        let result = exhaustive_max_times_map_bounded(&graph, BoundedMapBudget { max_full_assignments: 6, max_optimal_assignments: 6, max_tie_assignment_values: 12 }).unwrap();
         assert_eq!(result.optimum_score, rational(3, 1));
         assert_eq!(
             result.optimal_assignments.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
