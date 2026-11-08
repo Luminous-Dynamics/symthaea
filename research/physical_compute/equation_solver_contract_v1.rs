@@ -255,6 +255,131 @@ pub fn cholesky_solve(a: &DenseMatrix, b: &[f64]) -> Result<Vec<f64>, MatrixErro
     Ok(x)
 }
 
+/// Matrix-free 2-D five-point Dirichlet Poisson operator on an interior grid.
+///
+/// The unknowns are row-major interior grid values. Values outside the grid
+/// are fixed to zero (homogeneous Dirichlet boundary conditions). The
+/// resulting operator is symmetric positive definite and uses O(nx * ny)
+/// storage for vectors and O(nx * ny) work per matrix-vector product; the
+/// matrix itself is never materialized.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Poisson2d {
+    nx: usize,
+    ny: usize,
+}
+
+impl Poisson2d {
+    pub const MAX_CELLS: usize = 1_000_000;
+
+    pub fn new(nx: usize, ny: usize) -> Result<Self, MatrixError> {
+        if nx == 0 || ny == 0 {
+            return Err(MatrixError::Empty);
+        }
+        let cells = nx.checked_mul(ny).ok_or(MatrixError::InvalidParameter)?;
+        if cells > Self::MAX_CELLS {
+            return Err(MatrixError::TooLarge);
+        }
+        Ok(Self { nx, ny })
+    }
+
+    pub fn dimensions(&self) -> (usize, usize) {
+        (self.nx, self.ny)
+    }
+
+    /// Construct b from an evaluator-known x* and return the exact spectral
+    /// 2-norm condition number of this finite-grid operator.
+    ///
+    /// Its eigenvalues are
+    ///   4 sin²(pπ/(2(nx+1))) + 4 sin²(qπ/(2(ny+1)))
+    /// for p=1..nx and q=1..ny. The extrema occur at (1,1) and (nx,ny).
+    pub fn known_solution(&self, x_truth: &[f64]) -> Result<(Vec<f64>, f64), MatrixError> {
+        if x_truth.len() != self.dimension() {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if x_truth.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        let rhs = self.mat_vec(x_truth)?;
+        let half_pi = std::f64::consts::PI / 2.0;
+        let ax = half_pi / (self.nx as f64 + 1.0);
+        let ay = half_pi / (self.ny as f64 + 1.0);
+        let sin_x = ax.sin();
+        let sin_y = ay.sin();
+        let cos_x = ax.cos();
+        let cos_y = ay.cos();
+        let lambda_min = 4.0 * (sin_x * sin_x + sin_y * sin_y);
+        let lambda_max = 4.0 * (cos_x * cos_x + cos_y * cos_y);
+        let condition_number = lambda_max / lambda_min;
+        if !condition_number.is_finite() || condition_number < 1.0 {
+            return Err(MatrixError::NonFinite);
+        }
+        Ok((rhs, condition_number))
+    }
+}
+
+impl LinearOperator for Poisson2d {
+    fn dimension(&self) -> usize {
+        self.nx * self.ny
+    }
+
+    fn mat_vec(&self, x: &[f64]) -> Result<Vec<f64>, MatrixError> {
+        if x.len() != self.dimension() {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if x.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+
+        let mut out = Vec::new();
+        out.try_reserve_exact(self.dimension())
+            .map_err(|_| MatrixError::AllocationFailed)?;
+        out.resize(self.dimension(), 0.0);
+
+        for row in 0..self.ny {
+            for col in 0..self.nx {
+                let index = row * self.nx + col;
+                let mut value = 4.0 * x[index];
+                if col > 0 {
+                    value -= x[index - 1];
+                }
+                if col + 1 < self.nx {
+                    value -= x[index + 1];
+                }
+                if row > 0 {
+                    value -= x[index - self.nx];
+                }
+                if row + 1 < self.ny {
+                    value -= x[index + self.nx];
+                }
+                if !value.is_finite() {
+                    return Err(MatrixError::NonFinite);
+                }
+                out[index] = value;
+            }
+        }
+        Ok(out)
+    }
+
+    fn frobenius_norm(&self) -> f64 {
+        let cells = self.dimension() as f64;
+        let horizontal_edges = ((self.nx - 1) * self.ny) as f64;
+        let vertical_edges = ((self.ny - 1) * self.nx) as f64;
+        (16.0 * cells + 2.0 * (horizontal_edges + vertical_edges)).sqrt()
+    }
+
+    fn is_symmetric(&self, relative_tolerance: f64) -> bool {
+        relative_tolerance.is_finite() && relative_tolerance >= 0.0
+    }
+
+    fn diagonal_value(&self, index: usize) -> Option<f64> {
+        if index < self.dimension() {
+            Some(4.0)
+        } else {
+            None
+        }
+    }
+}
+
 /// A matrix-free linear operator interface for solver comparisons.
 ///
 /// Implementations must return deterministic results for a given input.
@@ -1091,4 +1216,98 @@ mod tests {
         assert_eq!(result.iterations, 0);
         assert_eq!(result.x, vec![0.0, 0.0]);
     }
+
+    #[test]
+    fn matrix_free_poisson_2d_matches_dense_five_point_stencil() {
+        let nx = 3;
+        let ny = 2;
+        let n = nx * ny;
+        let operator = Poisson2d::new(nx, ny).unwrap();
+        let mut dense_values = vec![0.0; n * n];
+        for row in 0..ny {
+            for col in 0..nx {
+                let index = row * nx + col;
+                dense_values[index * n + index] = 4.0;
+                if col > 0 {
+                    dense_values[index * n + index - 1] = -1.0;
+                }
+                if col + 1 < nx {
+                    dense_values[index * n + index + 1] = -1.0;
+                }
+                if row > 0 {
+                    dense_values[index * n + index - nx] = -1.0;
+                }
+                if row + 1 < ny {
+                    dense_values[index * n + index + nx] = -1.0;
+                }
+            }
+        }
+        let dense = DenseMatrix::new(n, dense_values).unwrap();
+        let truth: Vec<f64> = (0..n).map(|i| (0.23 * (i as f64 + 1.0)).sin()).collect();
+        let matrix_free_product = operator.mat_vec(&truth).unwrap();
+        let dense_product = dense.mat_vec(&truth).unwrap();
+        let difference: Vec<f64> = matrix_free_product.iter()
+            .zip(dense_product.iter())
+            .map(|(left, right)| left - right)
+            .collect();
+        assert!(norm2(&difference) < 1.0e-12);
+        assert_eq!(operator.dimensions(), (nx, ny));
+        assert!((operator.frobenius_norm() - dense.frobenius_norm()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn matrix_free_poisson_2d_reports_exact_spectral_condition_number() {
+        let nx = 5;
+        let ny = 3;
+        let operator = Poisson2d::new(nx, ny).unwrap();
+        let truth: Vec<f64> = (0..operator.dimension())
+            .map(|i| ((i + 1) as f64 * 0.19).cos())
+            .collect();
+        let (rhs, condition) = operator.known_solution(&truth).unwrap();
+        let ax = std::f64::consts::PI / (2.0 * (nx as f64 + 1.0));
+        let ay = std::f64::consts::PI / (2.0 * (ny as f64 + 1.0));
+        let expected = (ax.cos().powi(2) + ay.cos().powi(2))
+            / (ax.sin().powi(2) + ay.sin().powi(2));
+        assert!((condition - expected).abs() / expected < 1.0e-12);
+        assert_eq!(rhs, operator.mat_vec(&truth).unwrap());
+        assert!(condition >= 1.0);
+    }
+
+    #[test]
+    fn conjugate_gradient_solves_matrix_free_poisson_2d_system() {
+        let operator = Poisson2d::new(12, 9).unwrap();
+        let truth: Vec<f64> = (0..operator.dimension())
+            .map(|i| (0.071 * (i as f64 + 1.0)).sin()
+                + 0.2 * (0.13 * (i as f64 + 1.0)).cos())
+            .collect();
+        let (rhs, _) = operator.known_solution(&truth).unwrap();
+        let solution = conjugate_gradient(
+            &operator,
+            &rhs,
+            1.0e-11,
+            20 * operator.dimension(),
+        ).unwrap();
+        assert!(solution.converged);
+        let metrics = error_metrics(&operator, &rhs, &solution.x, &truth).unwrap();
+        assert!(metrics.relative_residual < 1.0e-10);
+        assert!(metrics.relative_forward_error < 1.0e-8);
+    }
+
+    #[test]
+    fn poisson_2d_rejects_invalid_dimensions_and_non_finite_values() {
+        assert_eq!(Poisson2d::new(0, 3), Err(MatrixError::Empty));
+        assert_eq!(Poisson2d::new(3, 0), Err(MatrixError::Empty));
+        assert_eq!(Poisson2d::new(usize::MAX, 2), Err(MatrixError::InvalidParameter));
+        assert_eq!(Poisson2d::new(1001, 1000), Err(MatrixError::TooLarge));
+        let operator = Poisson2d::new(2, 2).unwrap();
+        assert_eq!(
+            operator.mat_vec(&[1.0, f64::NAN, 0.0, 1.0]),
+            Err(MatrixError::NonFinite)
+        );
+        assert_eq!(
+            operator.known_solution(&[1.0, 2.0]),
+            Err(MatrixError::DimensionMismatch)
+        );
+    }
+
 }
