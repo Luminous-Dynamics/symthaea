@@ -81,7 +81,7 @@ has_target() {
   local d="$1"
   [[ -f "$d/src/lib.rs" || -f "$d/src/main.rs" ]] && return 0
   local b; for b in "$d"/src/bin/*.rs; do [[ -e "$b" ]] && return 0; done
-  grep -qE '^\[\[bin\]\]|^\[lib\]' "$d/Cargo.toml" && return 0
+  grep -qE "^\[\[bin\]\]|^\[lib\]" "$d/Cargo.toml" && return 0
   return 1
 }
 
@@ -140,8 +140,8 @@ check_declared_targets() {
       if (kind != "") { print kind "\t" name "\t" (path == "" ? "-" : path) }
       kind = ""; name = ""; path = ""; next
     }
-    kind != "" && /^[[:space:]]*name[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); name = v }
-    kind != "" && /^[[:space:]]*path[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); path = v }
+    kind != "" && /^[[:space:]]*name[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); name = v }
+    kind != "" && /^[[:space:]]*path[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); path = v }
     END { if (kind != "") print kind "\t" name "\t" (path == "" ? "-" : path) }
   ' "$manifest" | while IFS=$'\t' read -r kind name path; do
     [[ -n "$name" ]] || continue
@@ -227,7 +227,7 @@ has_target() {
   local d="$1"
   [[ -f "$d/src/lib.rs" || -f "$d/src/main.rs" ]] && return 0
   local b; for b in "$d"/src/bin/*.rs; do [[ -e "$b" ]] && return 0; done
-  grep -qE '^\[\[bin\]\]|^\[lib\]' "$d/Cargo.toml" && return 0
+  grep -qE "^\[\[bin\]\]|^\[lib\]" "$d/Cargo.toml" && return 0
   return 1
 }
 
@@ -286,8 +286,8 @@ check_declared_targets() {
       if (kind != "") { print kind "\t" name "\t" (path == "" ? "-" : path) }
       kind = ""; name = ""; path = ""; next
     }
-    kind != "" && /^[[:space:]]*name[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); name = v }
-    kind != "" && /^[[:space:]]*path[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); path = v }
+    kind != "" && /^[[:space:]]*name[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); name = v }
+    kind != "" && /^[[:space:]]*path[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); path = v }
     END { if (kind != "") print kind "\t" name "\t" (path == "" ? "-" : path) }
   ' "$manifest" | while IFS=$'\t' read -r kind name path; do
     [[ -n "$name" ]] || continue
