@@ -9,8 +9,8 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use symthaea_rea_compat::{EvidenceError, canonical_jcs_bytes, sha256_hex, verify_evidence_json};
 use symthaea_rea_investigator::{
-    AbstentionReason, EvidenceOrigin, EvidenceProvenance, ExperimentProposal, Hypothesis,
-    InvestigationPlan, PlannerConfig, PlannerError, plan_next_experiment,
+    EvidenceOrigin, EvidenceProvenance, ExperimentProposal, Hypothesis, InvestigationPlan,
+    PlannerConfig, PlannerError, plan_next_experiment,
 };
 
 const LINEAGE_SCHEMA: &str = "luminous.rea.planner-lineage-declaration.v0";
@@ -164,6 +164,7 @@ impl From<PlannerError> for AdmissionError {
     }
 }
 
+#[derive(Debug)]
 struct AdmittedRecord {
     evidence_id: String,
     semantic_sha256: String,
@@ -173,6 +174,7 @@ struct AdmittedRecord {
     source_family_id: String,
 }
 
+#[derive(Debug)]
 pub struct VerifiedEvidenceCatalog {
     records: BTreeMap<String, AdmittedRecord>,
     lineage_manifest_sha256: String,
@@ -473,6 +475,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use symthaea_rea_compat::compute_evidence_id;
+    use symthaea_rea_investigator::AbstentionReason;
 
     fn golden_id() -> String {
         verify_evidence_json(GOLDEN_EVIDENCE).unwrap().evidence_id
