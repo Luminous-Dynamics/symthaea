@@ -693,6 +693,157 @@
         "report_coverage_and_abstention_with_error"
       ],
       "note": "Candidate selection is not transcript correction. Oracle best-in-pool is an upper bound only. MICL published results are not assumed to transfer to African speech."
+    },
+    {
+      "id": "african_phonological_feature_evaluation",
+      "name": "Language-profiled phonological feature and tone-aware ASR evaluation",
+      "task": "PHONOLOGICAL_FEATURE_ASR_EVALUATION",
+      "issue": 11137,
+      "implementation_pr": 11139,
+      "parent_issues": [
+        10913,
+        10999,
+        11077,
+        11038,
+        11082,
+        11107,
+        5352
+      ],
+      "candidate_sources": [
+        {
+          "id": "africanlp_2026_fer_ter",
+          "status": "PAPER_FORMULA_REFERENCE_FEATURE_INVENTORY_NOT_UNIVERSAL",
+          "paper_url": "https://aclanthology.org/2026.africanlp-main.14/",
+          "note": "Chen, Adeleke & Downey (AfricaNLP 2026) introduce NA-masked FER and tone-only TER with sparse {-1,0,+1} vectors and Needleman-Wunsch alignment. Their 24-dim inventory is designed for Edoid/Yoruboid phonology; do not apply it to other languages without a native-authorized profile."
+        }
+      ],
+      "metrics": [
+        "strict_WER",
+        "strict_CER",
+        "PER_when_validated_phone_reference_exists",
+        "FER",
+        "TER_when_tone_profiled",
+        "per_feature_error_rate",
+        "per_tone_error_rate",
+        "unscorable_feature_pair_count",
+        "profile_specific_non_estimability",
+        "native_expert_agreement"
+      ],
+      "required_outputs": [
+        "feature_profile_id",
+        "feature_profile_revision",
+        "feature_dimension_definitions",
+        "tone_dimension_indices",
+        "G2P_or_annotation_authority",
+        "source_lineage",
+        "alignment_gap_penalty",
+        "alignment_tie_policy",
+        "FER_raw_numerator_and_reference_denominator",
+        "TER_raw_numerator_and_reference_denominator",
+        "non_estimable_reasons"
+      ],
+      "system_arms": [
+        "strict_orthographic_WER_CER_baseline",
+        "IPA_PER_with_expert_phonetics",
+        "NA_masked_FER",
+        "tone_only_TER",
+        "feature_conditioned_multilingual_encoder_if_present"
+      ],
+      "required_controls": [
+        "zero_zero_feature_dimensions_are_NA",
+        "non_tonal_profile_TER_not_applicable",
+        "unknown_G2P_rule_not_treated_as_gold",
+        "feature_width_and_schema_reject_mismatch",
+        "native_profile_revision_pinned",
+        "alignment_and_gap_policy_pinned"
+      ],
+      "prospective_gates": [
+        "feature_profile_native_authority_verified",
+        "100_percent_frozen_synthetic_formula_conformance",
+        "no_cross_language_inventory_reuse_without_authorization",
+        "non_estimable_feature_cells_not_reported_as_zero"
+      ]
+    },
+    {
+      "id": "acoustic_faithfulness_and_hallucination",
+      "name": "Acoustic faithfulness under text, context and prompt conflict",
+      "task": "AUDIO_GROUNDING_AND_HALLUCINATION_DIAGNOSTICS",
+      "issue": 11138,
+      "parent_issues": [
+        11104,
+        11057,
+        10890,
+        10873,
+        11119,
+        10970,
+        5352
+      ],
+      "candidate_sources": [
+        {
+          "id": "deaf_acoustic_faithfulness",
+          "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-aacl.165/",
+          "url": "https://github.com/kikixiong/DEAF",
+          "note": "Over 2,700 conflict stimuli covering emotional prosody, background sounds and speaker identity, with staged semantic-context and misleading-prompt conflicts. Evaluate the official protocol; do not assume all tasks or speaker attributes are appropriate for this speech program."
+        },
+        {
+          "id": "hallu_audio",
+          "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.acl-long.1797/",
+          "note": "Over 5,000 human-verified audio QA pairs spanning speech, environmental sound and music; reports hallucination, yes/no bias, error types and refusal. Use speech-relevant subsets and pin exact rights/version."
+        },
+        {
+          "id": "speechllm_attention_hallucination",
+          "status": "RESEARCH_BASELINE_REPRODUCTION_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-acl.2147/",
+          "note": "Uses AudioRatio, AudioConsistency, AudioEntropy and TextEntropy attention-derived features with lightweight classifiers. Model-dependent and task-specific; requires attention access and should not be treated as universal confidence."
+        }
+      ],
+      "metrics": [
+        "audio_supported_answer_accuracy",
+        "acoustic_evidence_adherence",
+        "context_induced_override_rate",
+        "prompt_induced_override_rate",
+        "unsupported_claim_rate",
+        "hallucination_rate",
+        "yes_no_bias",
+        "abstention_precision_recall",
+        "audio_evidence_span_localization",
+        "counterfactual_audio_sensitivity",
+        "prompt_invariance"
+      ],
+      "system_arms": [
+        "asr_to_evidence_aware_semantic_pipeline",
+        "speech_native_audio_language_model",
+        "MICL_closed_set_candidate_selection",
+        "SAMA_semantic_anchor_with_acoustic_veto",
+        "hybrid_audio_transcript_evidence_ledger"
+      ],
+      "required_outputs": [
+        "source_audio_hash",
+        "counterfactual_pair_manifest",
+        "acoustic_property_changed",
+        "prompt_and_context_revision",
+        "claim_level_evidence_spans",
+        "evidence_status",
+        "abstention_or_refusal_reason",
+        "model_output_hash"
+      ],
+      "required_controls": [
+        "context_predicts_wrong_word_audio_unambiguous",
+        "misleading_prompt_conflicts_with_audio",
+        "number_unit_negation_role_counterfactuals",
+        "silence_or_unanswerable_audio",
+        "mixed_audio_source_ambiguity",
+        "text_only_negative_control"
+      ],
+      "prospective_gates": [
+        "zero_context_only_substitution_on_unambiguous_controls",
+        "zero_supported_as_fact_answers_without_audio_evidence",
+        "100_percent_factual_slots_evidence_linked_or_unknown",
+        "separate_context_override_and_prompt_override_rates",
+        "privacy_and_consent_review_for_real_speakers"
+      ]
     }
   ],
   "promotion_gates": [
@@ -708,7 +859,9 @@
     "native_acoustic_label_distinguished_from_rule_derived_phones",
     "depth_adapter_retention_noninferiority_on_prior_languages",
     "closed_set_candidate_selection_integrity_verified",
-    "selector_demonstration_manifest_and_leakage_audit_complete"
+    "selector_demonstration_manifest_and_leakage_audit_complete",
+    "phonological_feature_profile_authority_and_applicability_verified",
+    "acoustic_faithfulness_counterfactual_suite_passed_on_synthetic_controls"
   ],
   "test_vector_sets": [
     {
