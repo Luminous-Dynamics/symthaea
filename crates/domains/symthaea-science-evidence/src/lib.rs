@@ -27,7 +27,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::fmt;
 use thiserror::Error;
 
 pub const SCIENCE_EVIDENCE_SCHEMA: &str = "symthaea-science-evidence-v2";
