@@ -740,7 +740,8 @@
         "alignment_tie_policy",
         "FER_raw_numerator_and_reference_denominator",
         "TER_raw_numerator_and_reference_denominator",
-        "non_estimable_reasons"
+        "non_estimable_reasons",
+        "phonological_feature_golden_vector_manifest"
       ],
       "system_arms": [
         "strict_orthographic_WER_CER_baseline",
@@ -892,6 +893,22 @@
         "boundary_f1"
       ],
       "note": "Six synthetic token-aligned language-tag cases with exact-position boundary matching; no tolerance and no audio evidence."
+    },
+    {
+      "id": "phonological_feature_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/phonological_feature_golden_v0.1.json",
+      "schema_path": "docs/research/voice/phonological_feature_golden_v0.1.schema.json",
+      "cases": 10,
+      "linked_issue": 11137,
+      "linked_pr": 11139,
+      "metrics": [
+        "FER",
+        "TER",
+        "NA_masked_feature_cost",
+        "alignment_gap_cost"
+      ],
+      "note": "Synthetic generic feature-profile vectors. A separate JavaScript implementation of the declared NA-aware Needleman-Wunsch policy recomputed all ten expected cases with no mismatches. No Rust tests or external-reference differential have been executed."
     }
   ]
 }
