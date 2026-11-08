@@ -37,6 +37,8 @@ rustc --edition=2021 --test reliability_contract_v1.rs -o /tmp/rc
 
 The current authoring environment did not contain rustc. Source compilation and tests are therefore explicitly outstanding. Do not describe this draft as passing tests or CI.
 
+The semantic validator is deliberately narrow: it checks referential integrity, selected experiment/evidence invariants and canonical identity. It does not estimate common-cause probabilities, prove statistical independence, parse calibration timestamps into a mission profile, validate arbitrary JSON Schema constraints, or establish physical device behavior.
+
 ## Model boundary
 
 This is a first executable slice, not the complete nested dependency graph in #10993. It does not model subarray/die/wafer/lot hierarchies, realistic spatial stochastic fields, device I-V behavior, conductance mapping, differential pairs, ADC/DAC/readout, noise spectra, write physics, drift, endurance, thermal feedback, real task arithmetic, measured latency, physical energy, area, cost or yield.
@@ -45,10 +47,11 @@ The evaluator-only ground-truth field must not be visible to the verifier being 
 
 ## Versioned scenario manifest
 
-The machine-readable v1 contract is:
+The machine-readable v1 contract and semantic validator are:
 
 - `research/physical_compute/scenario_manifest_v1.schema.json`
 - `research/physical_compute/scenarios/v1/common_cause_controller_outage.json`
+- `research/physical_compute/manifest-validator/`: isolated Rust CLI and semantic validation library (uses `serde_json` and `sha2`; not a Symthaea workspace member).
 
 The example is a deterministic **negative-control fixture**, not a probability estimate. It injects a controller-domain outage and declares that adding healthy cells must not make the workload executable.
 
@@ -62,7 +65,17 @@ The JSON Schema validates structure and primitive types. A semantic validator is
 - disjoint training, validation and confirmatory seed sets;
 - independence claims against the actual dependency graph.
 
-Until that validator exists, a schema-valid file is not a qualified scenario.
+Run the semantic pass after a Draft 2020-12 JSON Schema validator:
+
+```sh
+cargo test --manifest-path research/physical_compute/manifest-validator/Cargo.toml
+cargo run --manifest-path research/physical_compute/manifest-validator/Cargo.toml -- \
+  research/physical_compute/scenarios/v1/common_cause_controller_outage.json
+```
+
+The CLI prints a canonical SHA-256 digest and `SEMANTIC_VALID` or `SEMANTIC_INVALID`. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs and canonical key ordering.
+
+The crate and tests are authored but have not been compiled in this environment because `rustc` / `cargo` are unavailable. Until the JSON Schema and semantic passes have both executed on an exact head, a manifest is not a qualified scenario.
 
 ## Required next steps
 
