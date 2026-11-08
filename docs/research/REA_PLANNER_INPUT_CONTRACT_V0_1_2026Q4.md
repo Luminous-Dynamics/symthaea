@@ -40,11 +40,15 @@ No planner is copied or reimplemented by the schema.
 1. Priors sum to 1 and hypothesis IDs are unique.
 2. All support/contradiction IDs exist in evidence_catalog; evidence IDs are unique and derivation parents resolve.
 3. `planner_integration_observed` hypotheses have independently rooted evidence according to the existing planner rules; a synthetic-only root must reject.
-4. Each point experiment has exactly one likelihood row for every hypothesis, in the declared outcome order; each row sums to 1.
+4. Each point experiment has exactly one likelihood row for every hypothesis; every row repeats the exact `outcome_order` labels and sequence declared by the experiment, and its probability vector has that same length and sums to 1.
 5. Every robust scenario has exactly one matrix per experiment, with all rows and outcome lengths aligned; scenario weights sum to 1.
 6. Every terminal decision has exactly one finite utility for every hypothesis, with no missing or duplicate entries.
 7. Every policy arm binds identical claim, evidence catalog, hypothesis, candidate, scope, resource, scenario and utility digests.
 8. Predicted outcomes are never applied to claim readiness. Only an executed, independently admitted observation may change obligation state.
+
+
+
+Each `LikelihoodRow` now repeats `outcome_order` in the input contract. The adapter maps `outcome_probabilities[i]` only to `outcome_order[i]`, and the checker requires that list to equal the experiment's declared `outcomes` array exactly for both point and robust-scenario likelihood matrices. This catches same-length reorderings that a vector-length check would miss.
 
 ## Synthetic known-answer case
 
