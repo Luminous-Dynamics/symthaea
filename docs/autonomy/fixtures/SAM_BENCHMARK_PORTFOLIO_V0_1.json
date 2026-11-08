@@ -1,6 +1,6 @@
 {
   "schema": "sam-benchmark-evidence-registry-v0.1",
-  "snapshot_date": "2026-11-04",
+  "snapshot_date": "2026-11-08",
   "parent_issue": "Luminous-Dynamics/symthaea#6256",
   "semantics": {
     "source_status": [
@@ -686,6 +686,114 @@
       "sources": [
         "https://link.springer.com/article/10.1007/s44163-026-02122-1"
       ]
+    },
+    {
+      "id": "navsim-v2-epdms-2026",
+      "name": "NAVSIM v2 / Extended Predictive Driver Model Score",
+      "category": "planning_pseudo_simulation",
+      "capability_target": [
+        "trajectory_planning",
+        "pseudo_simulated_outcome",
+        "component_safety_comfort_progress"
+      ],
+      "protocol": {
+        "kind": "two_stage_pseudo_simulation_non_reactive",
+        "official_devkit": "v2.1.2",
+        "first_stage_horizon_seconds": 4,
+        "followup_scene_horizon_seconds": 4,
+        "followup_weighting": "precomputed_followup_scenes_weighted_by_proximity_to_planner_first_stage_endpoint"
+      },
+      "metrics": [
+        "NC",
+        "DAC",
+        "DDC",
+        "TLC",
+        "EP",
+        "TTC",
+        "LK",
+        "HC",
+        "EC",
+        "EPDMS"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_date": "2026-11-08",
+        "human_agent_EPDMS": 90.3,
+        "LWDrive_EPDMS": 89.6,
+        "ExploreVLA_EPDMS": 88.8,
+        "DriveWorld_VLA_EPDMS": 86.8
+      },
+      "caveats": [
+        "SOTA2 is a secondary leaderboard and these values are not independently verified by SAM.",
+        "The official NAVSIM v2 protocol is pseudo-simulation with precomputed follow-up scenes; it is not a fully reciprocal online traffic simulator.",
+        "EPDMS aggregates multiple component metrics; report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC separately.",
+        "Exact data split, evaluator revision, filtering, model checkpoint and sensor privilege must be pinned before reproducing or comparing numbers."
+      ],
+      "sources": [
+        "https://github.com/autonomousvision/navsim",
+        "https://github.com/autonomousvision/navsim/releases",
+        "https://papers.nips.cc/paper_files/paper/2024/file/32768f7faf1995026ef9821c696f3404-Abstract-Datasets_and_Benchmarks_Track.html",
+        "https://www.sota2.com/research/sota/autonomous-driving-planning-on-navsim-v2"
+      ]
+    },
+    {
+      "id": "reactsim-bench-2026",
+      "name": "ReactSim-Bench",
+      "category": "reactive_agent_world_model",
+      "capability_target": [
+        "reactive_surrounding_agent_simulation",
+        "ego_conditioned_actor_response",
+        "interaction_safety_and_feasibility"
+      ],
+      "protocol": {
+        "kind": "ego_deviation_conditioned_reactive_agent_evaluation",
+        "dataset": "nuPlan",
+        "test_scenarios": 2636,
+        "scenario_duration_seconds": 9,
+        "history_seconds": 1,
+        "future_seconds": 8,
+        "sampling_hz": 10,
+        "deviation_categories": {
+          "longitudinal": 937,
+          "directional": 799,
+          "lateral": 900
+        },
+        "ego_control": "pre-generated ego behavior deviations; agents are simulated separately"
+      },
+      "metrics": [
+        "AV_Agent_Collision_Count",
+        "AV_Agent_Risky_Count",
+        "Agent_Agent_Collision_Percent",
+        "Offroad_Percent",
+        "Direction_Violation_Percent",
+        "Acceleration_Infeasibility_Percent",
+        "Steering_Infeasibility_Percent"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "selected_method": "SMART",
+        "AV_Agent_Collision_Count": 0.1419,
+        "AV_Agent_Risky_Count": 0.3976,
+        "Agent_Agent_Collision_Percent": 2.23,
+        "Offroad_Percent": 0.68,
+        "Direction_Violation_Percent": 1.09,
+        "Acceleration_Infeasibility_Percent": 9.74,
+        "Steering_Infeasibility_Percent": 4.83
+      },
+      "caveats": [
+        "Numbers are reported in the benchmark repository and have not been independently reproduced by SAM.",
+        "Metrics have distinct units and denominators; do not collapse them into one score.",
+        "The ego deviations are scenario inputs. The benchmark is not, by itself, a fully reciprocal online ego/actor policy loop.",
+        "Use Symtropy #3532 for the complementary reciprocal interaction research track."
+      ],
+      "sources": [
+        "https://github.com/Thinklab-SJTU/ReactSim-Bench",
+        "https://arxiv.org/abs/2606.14058",
+        "https://huggingface.co/datasets/zzzy0729/ReactSim-Bench-Data"
+      ]
     }
   ],
   "prospective_targets": {
@@ -694,7 +802,9 @@
     "fail2drive-2026": "At least 25% lower relative paired OOD degradation than strongest reproduced baseline with ID SR within 1 percentage point.",
     "colt-drive-2026": "Exceed 60.8% action-pair accuracy at matched split/input privilege and report worst rare-object-family errors.",
     "driving-world-model-counterfactual-2026": "At least +0.15 absolute event recovered fraction over direct prediction on exact same cases, with identity/timing/geometry non-inferior.",
-    "mrsq-icml-2026": "Reduce search-induced optimism/regret at matched compute without worsening tail performance, feasibility or deadlines."
+    "mrsq-icml-2026": "Reduce search-induced optimism/regret at matched compute without worsening tail performance, feasibility or deadlines.",
+    "navsim_v2_epdms_2026": "Reproduce the current strongest matched EPDMS baseline first; then improve the aggregate and individual NC/DAC/DDC/TLC/EP/TTC/LK/HC/EC dimensions on sealed slices without worsening worst-family results.",
+    "reactsim_bench_2026": "Beat strongest reproduced actor-world-model baselines on matched ego-deviation inputs, preserving AV-agent risk, agent-agent collision, off-road, direction and kinematic feasibility metrics separately; qualify reciprocal online interaction separately."
   },
   "global_rules": [
     "No composite score across non-comparable benchmark families.",
@@ -702,6 +812,34 @@
     "A public code license does not automatically grant dataset/asset rights.",
     "Missing, timeout, censored and unsupported scenarios remain in the denominator with typed status.",
     "Benchmark adapters do not constitute benchmark reproduction.",
-    "All target thresholds are prospective, not measured Symthaea results."
+    "All target thresholds are prospective, not measured Symthaea results.",
+    "NAVSIM v2 is a non-reactive pseudo-simulation profile; do not describe it as fully interactive closed-loop traffic simulation.",
+    "ReactSim-Bench evaluates surrounding-agent responses to pre-generated ego deviations; it is not a complete reciprocal online ego/actor policy loop.",
+    "System architecture references (for example Autoware 2.0) are not benchmark results and are stored separately from benchmark entries."
+  ],
+  "system_references": [
+    {
+      "id": "autoware-2.0.0-2026",
+      "name": "Autoware 2.0.0",
+      "category": "open_source_autonomy_architecture_reference",
+      "reference_date": "2026-11-02",
+      "architecture": [
+        "generator_selector_design",
+        "rule_based_planner",
+        "diffusion_planner"
+      ],
+      "implementation_status": {
+        "rule_based_stack": "default",
+        "diffusion_planner": "selectable_at_launch",
+        "multiple_generators_parallel": "architecture_goal_not_released_2_0_0_behavior",
+        "selector_node": "documented_but_not_launched_in_2_0_0"
+      },
+      "comparison_use": "Architecture comparator only; not a benchmark score.",
+      "sources": [
+        "https://github.com/autowarefoundation/autoware/releases",
+        "https://autoware.org/autoware-foundation-releases-autoware-2-0-to-expand-ai-support-for-open-source-autonomous-driving/",
+        "https://docs.autoware.org/main/design/autoware-architecture-v2/"
+      ]
+    }
   ]
 }
