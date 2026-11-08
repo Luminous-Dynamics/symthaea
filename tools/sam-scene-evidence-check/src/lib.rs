@@ -130,6 +130,37 @@ pub fn validate_bundle_values(
                 scene_profile_id, profile_frame_id, ego_frame, road_frame
             ));
         }
+        if profile
+            .and_then(|profile| profile.get("applicability"))
+            .and_then(Value::as_str)
+            == Some("verified_for_declared_context")
+        {
+            let source_ids: BTreeSet<&str> = snapshot
+                .and_then(|snapshot| snapshot.get("sources"))
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|source| source.get("source_id").and_then(Value::as_str))
+                .collect();
+            let evidence_refs = profile
+                .and_then(|profile| profile.get("verification_evidence_refs"))
+                .and_then(Value::as_array);
+            if evidence_refs.is_none_or(Vec::is_empty) {
+                errors.push(
+                    "verified traffic profile has no evidence references in the scene bundle"
+                        .into(),
+                );
+            } else if let Some(references) = evidence_refs {
+                for reference in references {
+                    let id = reference.as_str().unwrap_or_default();
+                    if !source_ids.contains(id) {
+                        errors.push(format!(
+                            "verified traffic profile evidence reference {id:?} does not resolve in the scene source registry"
+                        ));
+                    }
+                }
+            }
+        }
     }
 
     if errors.is_empty() {
@@ -249,26 +280,63 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
                 "profiles[{index}]: traffic-side signs do not match the declared travel-frame convention"
             ));
         }
-        if traffic_side == Some("unknown")
-            && (profile.get("passing_side_sign") != Some(&Value::Null)
-                || profile.get("applicability").and_then(Value::as_str) != Some("unknown"))
+        let applicability = profile.get("applicability").and_then(Value::as_str);
+        let passing_rule_id = profile
+            .get("passing_rule_profile_id")
+            .and_then(Value::as_str);
+        let passing_rule_version = profile
+            .get("passing_rule_profile_version")
+            .and_then(Value::as_str);
+        if traffic_side == Some("unknown") {
+            if profile.get("passing_side_sign") != Some(&Value::Null)
+                || applicability != Some("unknown")
+                || profile.get("passing_rule_profile_id") != Some(&Value::Null)
+                || profile.get("passing_rule_profile_version") != Some(&Value::Null)
+            {
+                errors.push(format!(
+                    "profiles[{index}]: unknown traffic side must have no passing-side or passing-rule authority and unknown applicability"
+                ));
+            }
+        } else if passing_rule_id.is_none_or(str::is_empty)
+            || passing_rule_version.is_none_or(str::is_empty)
         {
             errors.push(format!(
-                "profiles[{index}]: unknown traffic side must have no passing-side authority and unknown applicability"
+                "profiles[{index}]: known traffic side requires an explicit passing-rule profile ID and version"
             ));
         }
-        if profile
-            .get("passing_rule_profile_id")
-            .and_then(Value::as_str)
-            .is_none_or(str::is_empty)
-            || profile
-                .get("passing_rule_profile_version")
-                .and_then(Value::as_str)
-                .is_none_or(str::is_empty)
-        {
-            errors.push(format!(
-                "profiles[{index}]: passing-side semantics require an explicit rule-profile ID and version"
-            ));
+
+        if applicability == Some("verified_for_declared_context") {
+            let evidence_refs = profile
+                .get("verification_evidence_refs")
+                .and_then(Value::as_array);
+            if evidence_refs.is_none_or(Vec::is_empty)
+                || profile
+                    .get("verification_method_id")
+                    .and_then(Value::as_str)
+                    .is_none_or(str::is_empty)
+                || profile
+                    .get("verification_record_id")
+                    .and_then(Value::as_str)
+                    .is_none_or(str::is_empty)
+            {
+                errors.push(format!(
+                    "profiles[{index}]: verified applicability requires evidence references, method ID and verification record ID"
+                ));
+            }
+            let from = profile
+                .get("verification_valid_from")
+                .and_then(Value::as_str);
+            let until = profile
+                .get("verification_valid_until")
+                .and_then(Value::as_str);
+            if from.is_none_or(|date| date.len() != 10)
+                || until.is_none_or(|date| date.len() != 10)
+                || from.zip(until).is_some_and(|(from, until)| from > until)
+            {
+                errors.push(format!(
+                    "profiles[{index}]: verified applicability requires an ordered YYYY-MM-DD validity interval"
+                ));
+            }
         }
     }
 
