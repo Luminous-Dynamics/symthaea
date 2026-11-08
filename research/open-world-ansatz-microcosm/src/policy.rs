@@ -4,11 +4,11 @@
 //! It consumes AgentView only, maintains a finite compatible-model set, and
 //! selects receding-horizon partition probes. The evaluator truth is never read.
 
-use crate::{interaction, numeric};
 use crate::protocol::{
-    AgentAction, AgentClaim, AgentIntervention, AgentSubmission, AgentView,
-    ClaimDisposition, StructureAccess,
+    AgentAction, AgentClaim, AgentIntervention, AgentSubmission, AgentView, ClaimDisposition,
+    StructureAccess,
 };
+use crate::{interaction, numeric};
 
 /// Baseline controller over the declared finite hypothesis family.
 pub struct FiniteEnumeratorBaseline;
@@ -174,7 +174,10 @@ fn boolean_log(view: &AgentView) -> Result<crate::ObservationLog, PolicyError> {
     let mut measurements = Vec::with_capacity(view.observations.len());
     for record in &view.observations {
         match (record.intervention, record.measurement) {
-            (AgentIntervention::Boolean(input), crate::protocol::AgentMeasurement::Boolean(output)) => {
+            (
+                AgentIntervention::Boolean(input),
+                crate::protocol::AgentMeasurement::Boolean(output),
+            ) => {
                 interventions.push(input);
                 measurements.push(output);
             }
@@ -192,7 +195,10 @@ fn numeric_log(view: &AgentView) -> Result<numeric::ObservationLog, PolicyError>
     let mut measurements = Vec::with_capacity(view.observations.len());
     for record in &view.observations {
         match (record.intervention, record.measurement) {
-            (AgentIntervention::Numeric(input), crate::protocol::AgentMeasurement::Numeric(output)) => {
+            (
+                AgentIntervention::Numeric(input),
+                crate::protocol::AgentMeasurement::Numeric(output),
+            ) => {
                 interventions.push(input);
                 measurements.push(output);
             }
@@ -210,7 +216,10 @@ fn interaction_log(view: &AgentView) -> Result<interaction::ObservationLog, Poli
     let mut measurements = Vec::with_capacity(view.observations.len());
     for record in &view.observations {
         match (record.intervention, record.measurement) {
-            (AgentIntervention::Pair(input), crate::protocol::AgentMeasurement::Numeric(output)) => {
+            (
+                AgentIntervention::Pair(input),
+                crate::protocol::AgentMeasurement::Numeric(output),
+            ) => {
                 interventions.push(input);
                 measurements.push(output);
             }
@@ -272,13 +281,15 @@ mod tests {
             truth,
             StructureAccess::NumericSupplied(numeric::Mechanism::LeakyMemory),
             12,
-        ).unwrap();
+        )
+        .unwrap();
         let mut a2 = BlindEpisode::new_numeric(
             "baseline-numeric-a2",
             truth,
             StructureAccess::NumericWithheld,
             12,
-        ).unwrap();
+        )
+        .unwrap();
 
         run_to_submission(&mut a0, 12).unwrap();
         run_to_submission(&mut a2, 12).unwrap();
@@ -305,7 +316,8 @@ mod tests {
             Some(false),
             StructureAccess::BooleanWithheld,
             6,
-        ).unwrap();
+        )
+        .unwrap();
         run_to_submission(&mut episode, 6).unwrap();
         let score = episode.evaluate_after_submission().unwrap();
         assert!(score.set_score.exact_version_space_match);
@@ -328,7 +340,8 @@ mod tests {
             truth,
             StructureAccess::InteractionWithheld,
             9,
-        ).unwrap();
+        )
+        .unwrap();
         run_to_submission(&mut episode, 9).unwrap();
         let score = episode.evaluate_after_submission().unwrap();
         assert!(score.set_score.exact_version_space_match);
@@ -345,10 +358,13 @@ mod tests {
             None,
             StructureAccess::BooleanWithheld,
             2,
-        ).unwrap();
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Boolean(true),
-        }).unwrap();
+        )
+        .unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Boolean(true),
+            })
+            .unwrap();
         let view = episode.view().unwrap();
         let submission = AgentSubmission {
             claim: AgentClaim::Boolean {
