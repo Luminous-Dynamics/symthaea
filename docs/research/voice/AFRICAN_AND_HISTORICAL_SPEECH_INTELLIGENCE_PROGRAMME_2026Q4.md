@@ -462,3 +462,16 @@ The machine-readable matrix now contains ten tracks, including cross-implementat
 ### 16.5 Exact switch-boundary conformance vectors
 
 The programme also links [`switch_boundary_golden_v0.1.json`](./switch_boundary_golden_v0.1.json) and its Draft 2020-12 schema. These six synthetic sequences independently exercise exact boundary TP/FP/FN, precision, recall and F1, including empty-boundary states and one-token shifts. A second formula audit recomputed all six cases successfully. These vectors measure tag-boundary scoring only; they do not test audio-based language identification or recognition output.
+
+
+### 16.6 Direction-aware switch-transition scoring
+
+Position-only boundary F1 does not establish that the direction of a language transition was recognized. A system can place a boundary at the right token while confusing EN→ZU with ZU→EN or predicting the wrong destination language.
+
+The direction-aware scorer requires exact agreement on the tuple (boundary position, source language/variety, destination language/variety). A direction mismatch at the correct position counts as one directional FP and one FN. It is reported separately from position-only boundary F1, SETER and SPER.
+
+- Contract: [#11106 — VOICE-TRANSITION-DIRECTION-001](https://github.com/Luminous-Dynamics/symthaea/issues/11106).
+- Implementation: stacked [draft PR #11084](https://github.com/Luminous-Dynamics/symthaea/pull/11084).
+- Golden vectors: [`switch_transition_direction_golden_v0.1.json`](./switch_transition_direction_golden_v0.1.json), with Draft 2020-12 schema.
+
+Nine synthetic cases were independently recomputed for exact transition tuple sets and directional TP/FP/FN/precision/recall/F1; all cases matched. This validates the fixture arithmetic, not Rust execution or audio-derived language identification.
