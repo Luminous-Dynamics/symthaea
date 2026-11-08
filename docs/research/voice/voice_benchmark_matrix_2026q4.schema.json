@@ -238,6 +238,12 @@
           },
           "note": {
             "type": "string"
+          },
+          "adaptation_arms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": true
