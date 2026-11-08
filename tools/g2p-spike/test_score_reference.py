@@ -70,8 +70,8 @@ class G2PReferenceScorerTests(unittest.TestCase):
 
             result = evaluate(candidates, references)
             piper, muse = result["systems"]
-            self.assertEqual(piper["exact_word_pronunciation_accuracy"], 1.0)
-            self.assertEqual(muse["exact_word_pronunciation_accuracy"], 1.0)
+            self.assertEqual(piper["exact_normalized_ipa_sequence_accuracy"], 1.0)
+            self.assertEqual(muse["exact_normalized_ipa_sequence_accuracy"], 1.0)
             self.assertEqual(piper["oov_nonempty_guess_rate"], 1.0)
             self.assertEqual(muse["oov_nonempty_guess_rate"], 1.0)
 
