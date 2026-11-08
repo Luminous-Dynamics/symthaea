@@ -146,7 +146,7 @@ pub fn sequential_verifier_attestation_message(
     let encoded = serde_json::to_vec(claims)
         .map_err(|_| SequentialWeightProgramError::InvalidDigest("verifier claims serialization"))?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-sequential-verifier-attestation-v1\\0");
+    hasher.update(b"symthaea-sequential-verifier-attestation-v1\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(*hasher.finalize().as_bytes())
@@ -156,7 +156,7 @@ pub fn sequential_verifier_attestation_message(
 /// caller's pinned key registry, not from this identifier alone.
 pub fn sequential_verifier_key_id(verifying_key: &VerifyingKey) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-sequential-verifier-key-id-v1\\0");
+    hasher.update(b"symthaea-sequential-verifier-key-id-v1\0");
     hasher.update(&verifying_key.to_bytes());
     hasher.finalize().to_hex().to_string()
 }
@@ -412,7 +412,7 @@ pub fn accept_verified_sequential_candidate(
         return Err(SequentialWeightProgramError::VerifierRejectedCandidate);
     }
     let verifier_receipt_digest = hash_value(
-        b"symthaea-sequential-verifier-envelope-v1\\0",
+        b"symthaea-sequential-verifier-envelope-v1\0",
         attestation,
     )?;
     if candidate_native_model_digest == session.latest_candidate_model_digest {
@@ -610,6 +610,7 @@ fn validate_digest(value: &str) -> Result<(), SequentialWeightProgramError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
     use crate::weight_space_program::{
         CfCWeightGroupId, ParameterGroupConstraints, ParameterGroupRole, ParameterGroupSnapshot,
         WeightProgramTarget,
@@ -617,6 +618,39 @@ mod tests {
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn signed_attestation(
+        session: &SequentialEditSession,
+        prepared: &PreparedSequentialCandidate,
+        candidate_native_model_digest: &str,
+        accepted: bool,
+        signing_key: &SigningKey,
+    ) -> SignedSequentialVerifierAttestation {
+        let claims = SequentialVerifierAttestationClaims {
+            format_version: 1,
+            verifier_id: "independent-test-verifier".into(),
+            verification_protocol_digest: digest('8'),
+            result_manifest_digest: digest('7'),
+            session_id: session.session_id.clone(),
+            batch_index: prepared.batch.batch_index,
+            template_digest: prepared.template_digest.clone(),
+            parent_candidate_model_digest: session.latest_candidate_model_digest.clone(),
+            candidate_native_model_digest: candidate_native_model_digest.to_owned(),
+            target_specification_digest: session.target_specification_digest.clone(),
+            evidence_batch_digest: prepared.batch.evidence_batch_digest.clone(),
+            observation_manifest_digest: prepared.batch.observation_manifest_digest.clone(),
+            program_digest: prepared.candidate.receipt.program_digest.clone(),
+            candidate_snapshot_digest: prepared.candidate.receipt.candidate_snapshot_digest.clone(),
+            accepted,
+        };
+        let message = sequential_verifier_attestation_message(&claims).expect("attestation message");
+        let signature = signing_key.sign(&message).to_bytes().to_vec();
+        SignedSequentialVerifierAttestation {
+            claims,
+            verifier_key_id: sequential_verifier_key_id(&signing_key.verifying_key()),
+            signature,
+        }
     }
 
     fn snapshot() -> WeightModelSnapshot {
@@ -697,26 +731,33 @@ mod tests {
         );
         assert_eq!(prepared.candidate.receipt.changed_parameter_count, 2);
         assert!(prepared.candidate.receipt.total_l2_delta > 0.0);
+        let signing_key = SigningKey::from_bytes(&[42_u8; 32]);
+        let pinned_key = signing_key.verifying_key();
+        let rejected = signed_attestation(&session, &prepared, &digest('9'), false, &signing_key);
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &session,
                 &template,
                 &prepared,
                 &digest('9'),
-                &digest('8'),
-                false,
+                &rejected,
+                &pinned_key,
             ),
             Err(SequentialWeightProgramError::VerifierRejectedCandidate)
         ));
+        let attestation = signed_attestation(&session, &prepared, &digest('9'), true, &signing_key);
         let (advanced, receipt) = accept_verified_sequential_candidate(
             &session,
             &template,
             &prepared,
             &digest('9'),
-            &digest('8'),
-            true,
+            &attestation,
+            &pinned_key,
         )
-        .expect("verified batch advances");
+        .expect("authenticated verifier attestation advances");
+        assert_eq!(receipt.verifier_key_id, sequential_verifier_key_id(&pinned_key));
+        assert_eq!(receipt.verification_protocol_digest, digest('8'));
+        assert_eq!(receipt.result_manifest_digest, digest('7'));
         assert_eq!(advanced.next_batch_index, 1);
         assert_eq!(advanced.latest_candidate_model_digest, digest('9'));
         assert_eq!(receipt.parent_candidate_model_digest, base.model_digest);
@@ -761,14 +802,17 @@ mod tests {
         ));
         let mut modified = prepared.clone();
         modified.batch.evidence_batch_digest = digest('2');
+        let signing_key = SigningKey::from_bytes(&[43_u8; 32]);
+        let pinned_key = signing_key.verifying_key();
+        let attestation = signed_attestation(&session, &modified, &digest('9'), true, &signing_key);
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &session,
                 &template,
                 &modified,
                 &digest('9'),
-                &digest('8'),
-                true,
+                &attestation,
+                &pinned_key,
             ),
             Err(SequentialWeightProgramError::StalePreparedCandidate)
         ));
@@ -788,13 +832,17 @@ mod tests {
             &batch(&session_id, 0, &base.model_digest, '1'),
         )
         .expect("prepare batch zero");
+        let signing_key = SigningKey::from_bytes(&[44_u8; 32]);
+        let pinned_key = signing_key.verifying_key();
+        let attestation0 =
+            signed_attestation(&session, &prepared0, &digest('9'), true, &signing_key);
         let (advanced, _) = accept_verified_sequential_candidate(
             &session,
             &template,
             &prepared0,
             &digest('9'),
-            &digest('8'),
-            true,
+            &attestation0,
+            &pinned_key,
         )
         .expect("accept batch zero");
 
@@ -808,16 +856,81 @@ mod tests {
             &batch(&session_id, 1, &digest('9'), '2'),
         )
         .expect("prepare batch one");
+        let attestation1 =
+            signed_attestation(&advanced, &prepared1, &digest('7'), true, &signing_key);
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &advanced,
                 &template,
                 &prepared1,
                 &digest('7'),
-                &digest('6'),
-                true,
+                &attestation1,
+                &pinned_key,
             ),
             Err(SequentialWeightProgramError::CumulativeL2BudgetExceeded)
+        ));
+    }
+
+    #[test]
+    fn verifier_attestation_is_bound_to_exact_candidate_and_trusted_key() {
+        let base = snapshot();
+        let template = template();
+        let session_id = digest('f');
+        let session =
+            begin_sequential_edit_session(session_id.clone(), &template, &base).expect("begin");
+        let prepared = prepare_sequential_candidate(
+            &session,
+            &template,
+            &base,
+            &batch(&session_id, 0, &base.model_digest, '1'),
+        )
+        .expect("prepare");
+        let signing_key = SigningKey::from_bytes(&[45_u8; 32]);
+        let pinned_key = signing_key.verifying_key();
+        let correctly_bound =
+            signed_attestation(&session, &prepared, &digest('9'), true, &signing_key);
+
+        let wrong_candidate =
+            signed_attestation(&session, &prepared, &digest('7'), true, &signing_key);
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &wrong_candidate,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "candidate_native_model_digest"
+            ))
+        ));
+
+        let mut tampered = correctly_bound.clone();
+        tampered.claims.result_manifest_digest = digest('6');
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &tampered,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::InvalidVerifierSignature)
+        ));
+
+        let untrusted_key = SigningKey::from_bytes(&[46_u8; 32]).verifying_key();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &correctly_bound,
+                &untrusted_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierKeyIdMismatch)
         ));
     }
 
