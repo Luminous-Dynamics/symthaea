@@ -40,14 +40,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             cost: 1.0,
             exclusive_group: Some("station-a".to_string()),
             jacobian_rows_by_scenario: vec![
-                vec![
-                    vec![0.15, 1.20, 0.10, 0.02],
-                    vec![1.00, 0.10, 0.20, 0.00],
-                ],
-                vec![
-                    vec![0.10, 0.75, 0.55, 0.03],
-                    vec![0.85, 0.10, 0.25, 0.00],
-                ],
+                vec![vec![0.15, 1.20, 0.10, 0.02], vec![1.00, 0.10, 0.20, 0.00]],
+                vec![vec![0.10, 0.75, 0.55, 0.03], vec![0.85, 0.10, 0.25, 0.00]],
             ],
         },
         ExperimentOption {
@@ -55,14 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             cost: 2.2,
             exclusive_group: Some("station-a".to_string()),
             jacobian_rows_by_scenario: vec![
-                vec![
-                    vec![0.22, 1.80, 0.15, 0.03],
-                    vec![1.50, 0.15, 0.30, 0.00],
-                ],
-                vec![
-                    vec![0.15, 1.10, 0.82, 0.04],
-                    vec![1.25, 0.15, 0.38, 0.00],
-                ],
+                vec![vec![0.22, 1.80, 0.15, 0.03], vec![1.50, 0.15, 0.30, 0.00]],
+                vec![vec![0.15, 1.10, 0.82, 0.04], vec![1.25, 0.15, 0.38, 0.00]],
             ],
         },
         ExperimentOption {
@@ -70,14 +58,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             cost: 1.25,
             exclusive_group: None,
             jacobian_rows_by_scenario: vec![
-                vec![
-                    vec![0.20, 0.10, 1.35, 0.08],
-                    vec![0.90, 0.12, 0.10, 0.00],
-                ],
-                vec![
-                    vec![0.25, 0.18, 0.92, 0.12],
-                    vec![0.75, 0.20, 0.12, 0.02],
-                ],
+                vec![vec![0.20, 0.10, 1.35, 0.08], vec![0.90, 0.12, 0.10, 0.00]],
+                vec![vec![0.25, 0.18, 0.92, 0.12], vec![0.75, 0.20, 0.12, 0.02]],
             ],
         },
         ExperimentOption {
@@ -94,14 +76,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             cost: 1.1,
             exclusive_group: None,
             jacobian_rows_by_scenario: vec![
-                vec![
-                    vec![0.25, 0.20, 0.15, 0.90],
-                    vec![0.45, 0.10, 0.20, 0.75],
-                ],
-                vec![
-                    vec![0.18, 0.25, 0.22, 1.10],
-                    vec![0.36, 0.15, 0.28, 0.88],
-                ],
+                vec![vec![0.25, 0.20, 0.15, 0.90], vec![0.45, 0.10, 0.20, 0.75]],
+                vec![vec![0.18, 0.25, 0.22, 1.10], vec![0.36, 0.15, 0.28, 0.88]],
             ],
         },
     ];
@@ -122,11 +98,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("exclusive_fidelity_groups=station-a,clock-reference");
     println!("greedy_selected={}", greedy.selected_option_ids.join(";"));
     println!("greedy_cost={:.6}", greedy.total_cost);
-    println!("greedy_expected_eig_nats={:.9}", greedy.expected_information_gain_nats);
-    println!("greedy_worst_case_eig_nats={:.9}", greedy.worst_case_information_gain_nats);
+    println!(
+        "greedy_expected_eig_nats={:.9}",
+        greedy.expected_information_gain_nats
+    );
+    println!(
+        "greedy_worst_case_eig_nats={:.9}",
+        greedy.worst_case_information_gain_nats
+    );
     println!("exact_selected={}", exact.selected_option_ids.join(";"));
     println!("exact_cost={:.6}", exact.total_cost);
-    println!("exact_expected_eig_nats={:.9}", exact.expected_information_gain_nats);
+    println!(
+        "exact_expected_eig_nats={:.9}",
+        exact.expected_information_gain_nats
+    );
     println!(
         "greedy_optimality_gap_nats={:.9}",
         exact.expected_information_gain_nats - greedy.expected_information_gain_nats
