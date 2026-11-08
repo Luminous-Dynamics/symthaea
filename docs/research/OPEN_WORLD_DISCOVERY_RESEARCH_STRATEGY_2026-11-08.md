@@ -312,18 +312,27 @@ For A2 performance, establish random, fixed-grid, symbolic-search and active-pro
 
 ## 7. Architecture integration boundaries
 
-Compose with existing owners:
-- #6879 / ScientificModel and PhysicsIR for canonical model representation.
-- #6868/#6869 for gradual physical typing and explicit unknowns.
-- #8286 for active-probe selection.
-- #8669 for posterior, support omission, equivalence classes and abstention.
-- #6874/#6875 for independent proposal qualification.
-- #9332 for sealed benchmark generation.
-- #10756 for evaluator quality.
-- #10877/#8721 and #11015 for research judgment and orchestration.
-- #8143/#8150 for existing open-world family-selection v0.
+Compose with existing owners; the microcosm is a reference adapter and benchmark harness, not a second science platform.
 
-The microcosm should remain a reference adapter. Do not introduce another production PhysicsIR, scheduler, posterior authority or receipts service.
+| Existing owner | Responsibility to reuse | What this lane must not duplicate |
+|---|---|---|
+| #8487 / #8143 / #8150 | Scientific-discovery benchmark protocol and open-world family-selection v0 | A second general evaluator / hidden-law authority |
+| #6879 / #6880 | Canonical ScientificModel / PhysicsIR, equations, units, assumptions and provenance | Another production model IR |
+| #6868 / #6869 | Physical typing and explicit unknowns | A parallel dimensional/type system |
+| #8286 | Noisy SCM active-probe selection and intervention semantics | A second generic experiment-selection API |
+| #8588 | Hidden regime-transition and boundary-identifiability benchmark | A second threshold/hinge discovery engine |
+| #8607 | Unknown noise, adaptive sampling and observation-process calibration | A parallel statistical/noise authority |
+| #8628 | Law-drift versus measurement-drift diagnosis by costed intervention | Another robust-acquisition or information-gain engine |
+| #8667 | Paired unit/coordinate transformations and canonical law identity | A competing dimensional-invariance implementation |
+| #8669 | Class-level posterior, equivalence classes, support omission, prior-splitting and abstention scoring | Another posterior / support authority |
+| #8671 | Progressive law discovery, intermediate knowledge and negative-transfer evaluation | Another symbolic-search or knowledge-memory framework |
+| #8705 | Invariant mechanisms across environments and transfer rejection | A second transportability benchmark engine |
+| #5476 / #5478 / #8721 | Prospective value-of-computation, causal metareasoning and tool allocation | A second VoC predictor or generic tool scheduler |
+| #10877 / #11012 / #11015 | Research taste and fixed-versus-adaptive orchestration | Another research orchestration authority |
+| #6874 / #6875 | Independent proposal qualification | A self-certifying proposal gate |
+| #9332 / #10756 | Sealed benchmark generation and evaluator quality | A second hidden-test generator, evaluator or receipt service |
+
+The immediate microcosm should therefore stay deliberately finite and small. Harder domains enter through versioned adapters owned by their respective lanes, with their own task-specific semantics, scoring and external benchmark contracts. This keeps the central scientific question coherent without flattening regime detection, noise attribution, dimensional invariance, transport or progressive knowledge into one misleading score.
 
 ## 8. Updated external benchmark map — 2026-11-08
 
