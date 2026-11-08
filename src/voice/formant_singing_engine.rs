@@ -174,7 +174,7 @@ impl FormantSingingEngine {
                     bail!("binding {binding_index} has invalid materialized timing");
                 }
 
-                let phones: Vec<&Phone> = if span_index == 0 {
+                let phones: Vec<&Phone> = if binding.spans.len() == 1 {
                     syllable.phones.iter().collect()
                 } else {
                     let phone_index = binding.melisma_phone_index.ok_or_else(|| {
@@ -182,7 +182,24 @@ impl FormantSingingEngine {
                             "binding {binding_index} has additional note spans without a designated melisma vowel"
                         )
                     })?;
-                    vec![&syllable.phones[phone_index]]
+                    if syllable.phones.iter().skip(phone_index + 1).any(|phone| {
+                        matches!(
+                            phone.kind,
+                            ResolvedPhoneKind::Vowel | ResolvedPhoneKind::SyllabicConsonant
+                        )
+                    }) {
+                        bail!(
+                            "binding {binding_index} melisma phone must be the final syllabic nucleus"
+                        );
+                    }
+                    let melisma_phone = &syllable.phones[phone_index];
+                    if span_index == 0 {
+                        syllable.phones[..=phone_index].iter().collect()
+                    } else if span_index + 1 == binding.spans.len() {
+                        syllable.phones[phone_index..].iter().collect()
+                    } else {
+                        vec![melisma_phone]
+                    }
                 };
                 let durations = allocate_resolved_phone_durations(
                     &phones,
@@ -1251,6 +1268,85 @@ mod tests {
             error.contains("outside the calibrated legacy formant inventory"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn resolved_melisma_releases_coda_only_after_the_final_sustained_vowel() {
+        let word = selected_word(
+            "read",
+            0,
+            "read-past",
+            vec![
+                phone("ɹ", PhoneKind::Consonant),
+                phone("ɛ", PhoneKind::Vowel),
+                phone("d", PhoneKind::Consonant),
+            ],
+        );
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".to_string(),
+            source_text: "read".to_string(),
+            words: vec![word],
+        };
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![
+                ScoreEvent {
+                    start_s: 0.0,
+                    duration_s: 0.5,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.5,
+                    duration_s: 0.5,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+            syllable_bindings: vec![SyllableNoteBinding {
+                word_index: 0,
+                syllable_index: 0,
+                spans: vec![
+                    ScoreEventSpan {
+                        event_index: 0,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.5,
+                    },
+                    ScoreEventSpan {
+                        event_index: 1,
+                        start_offset_s: 0.0,
+                        end_offset_s: 0.5,
+                    },
+                ],
+                melisma_phone_index: Some(1),
+            }],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 1,
+                breath_before_s: 0.0,
+                breath_after_s: 0.0,
+            }],
+        };
+        let mut engine = FormantSingingEngine::default();
+        let frames = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap();
+        let vowel_during_melisma = frames
+            .iter()
+            .find(|frame| (frame.time - 0.7).abs() < 1e-5)
+            .unwrap();
+        let coda_after_melisma = frames
+            .iter()
+            .find(|frame| (frame.time - 0.95).abs() < 1e-5)
+            .unwrap();
+        assert_eq!(vowel_during_melisma.source_type, SourceType::Vowel);
+        assert_eq!(coda_after_melisma.source_type, SourceType::Stop);
+        assert!((vowel_during_melisma.f0 - 246.94).abs() < 0.01);
     }
 
     #[test]
