@@ -602,16 +602,20 @@
         "realized_model_entropy_reduction_nats",
         "multiclass_model_brier_score",
         "likelihood_misspecification_sensitivity",
-        "paired_episode_seed_identity"
+        "paired_episode_seed_identity",
+        "predicted_decision_information_gain_nats",
+        "posterior_optimal_decision_entropy"
       ],
       "negative_controls": [
         "high_eig_zero_evsi_irrelevant_probe",
         "lower_eig_higher_evsi_decision_relevant_probe",
         "no_probe_when_cost_exceeds_evsi",
         "truth_outside_agent_likelihood_support_rejected",
-        "matched_vs_misspecified_likelihood"
+        "matched_vs_misspecified_likelihood",
+        "high_model_eig_zero_decision_information_gain",
+        "targeted_decision_information_vs_evsi_divergence"
       ],
-      "scope_note": "Current executable implementation is a deterministic synthetic fixture and four-policy harness; it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
+      "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
     },
     {
       "id": "packed_binaryhv_bundle_capacity_pilot",
@@ -1092,7 +1096,15 @@
     "dense_orthogonal_matrix_reference",
     "monarch_structured_matrix_reference",
     "butterfly_factorization_reference",
-    "boft_orthogonal_butterfly_reference"
+    "boft_orthogonal_butterfly_reference",
+    {
+      "id": "targeted_active_learning_optimal_decision_information_gain",
+      "scope": "Published decision-focused active-learning criterion maximizing expected information gain about the optimal downstream decision; compare as a distinct policy from EVSI (Filstroff et al., TMLR 2024)."
+    },
+    {
+      "id": "weightloop_experimental_feedback_2026",
+      "scope": "Fixed reusable weight-editor with sequential experimental-feedback-driven predictor updates; reproduce matched feedback budget and candidate-validation protocol (Li et al., arXiv:2611.07319, 2026)."
+    }
   ],
   "seeds": {
     "development": [
@@ -1216,7 +1228,8 @@
       "relative_norm_error",
       "apply_latency_ns",
       "butterfly_angle_parameter_count",
-      "dense_matrix_parameter_count"
+      "dense_matrix_parameter_count",
+      "decision_information_gain_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1318,7 +1331,10 @@
       "orthogonal_mixer_inverse_error",
       "butterfly_parameter_count_contract_error",
       "butterfly_nonfinite_angle_acceptance_rate",
-      "orthogonal_mixer_basis_spread_control_error"
+      "orthogonal_mixer_basis_spread_control_error",
+      "high_model_eig_zero_decision_information_gain",
+      "decision_information_vs_model_information_gap",
+      "targeted_decision_eig_policy_selection_error"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1577,6 +1593,14 @@
     {
       "id": "efficient_structured_linear_layers_neurips_2024",
       "url": "https://proceedings.neurips.cc/paper_files/paper/2024/hash/0729c38b421cd66f2313ab397d099e37-Abstract-Conference.html"
+    },
+    {
+      "id": "targeted_active_learning_bayesian_decision_tmlr_2024",
+      "url": "https://openreview.net/forum?id=KxPjuiMgmm"
+    },
+    {
+      "id": "weightloop_wsp_experimental_feedback_2026",
+      "url": "https://arxiv.org/abs/2611.07319"
     }
   ]
 }
