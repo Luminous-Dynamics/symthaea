@@ -8,9 +8,7 @@
 use crate::interaction;
 use crate::numeric;
 use crate::policy::{PolicyError, StrategyEnumeratorBaseline};
-use crate::protocol::{
-    BlindEpisode, EvaluatorScore, StructureAccess, WorldFamily,
-};
+use crate::protocol::{BlindEpisode, EvaluatorScore, StructureAccess, WorldFamily};
 use crate::strategies::ProbeStrategy;
 use crate::{Hypothesis, candidate_hypotheses};
 use serde::{Deserialize, Serialize};
@@ -49,13 +47,34 @@ struct PolicySpec {
 
 fn policies() -> [PolicySpec; 7] {
     [
-        PolicySpec { name: "maximum_partition", strategy: ProbeStrategy::MaximumPartition },
-        PolicySpec { name: "minimax", strategy: ProbeStrategy::Minimax },
-        PolicySpec { name: "maximum_entropy", strategy: ProbeStrategy::MaximumEntropy },
-        PolicySpec { name: "minimum_expected_remaining", strategy: ProbeStrategy::MinimumExpectedRemaining },
-        PolicySpec { name: "maximum_structure_information_gain", strategy: ProbeStrategy::MaximumStructureInformationGain },
-        PolicySpec { name: "fixed_grid", strategy: ProbeStrategy::FixedGrid },
-        PolicySpec { name: "random_seed_23", strategy: ProbeStrategy::Random { seed: 23 } },
+        PolicySpec {
+            name: "maximum_partition",
+            strategy: ProbeStrategy::MaximumPartition,
+        },
+        PolicySpec {
+            name: "minimax",
+            strategy: ProbeStrategy::Minimax,
+        },
+        PolicySpec {
+            name: "maximum_entropy",
+            strategy: ProbeStrategy::MaximumEntropy,
+        },
+        PolicySpec {
+            name: "minimum_expected_remaining",
+            strategy: ProbeStrategy::MinimumExpectedRemaining,
+        },
+        PolicySpec {
+            name: "maximum_structure_information_gain",
+            strategy: ProbeStrategy::MaximumStructureInformationGain,
+        },
+        PolicySpec {
+            name: "fixed_grid",
+            strategy: ProbeStrategy::FixedGrid,
+        },
+        PolicySpec {
+            name: "random_seed_23",
+            strategy: ProbeStrategy::Random { seed: 23 },
+        },
     ]
 }
 
@@ -86,11 +105,7 @@ pub struct ArmAggregate {
 }
 
 fn bool_count(value: bool) -> usize {
-    if value {
-        1
-    } else {
-        0
-    }
+    if value { 1 } else { 0 }
 }
 
 impl ArmAggregate {
@@ -117,12 +132,14 @@ impl ArmAggregate {
     fn record(&mut self, score: &EvaluatorScore) {
         self.episodes += 1;
         self.exact_version_space_matches += bool_count(score.set_score.exact_version_space_match);
-        self.exact_structure_set_matches += bool_count(score.structure_score.exact_structure_set_match);
+        self.exact_structure_set_matches +=
+            bool_count(score.structure_score.exact_structure_set_match);
         self.generating_model_retained += bool_count(score.generating_model_in_version_space);
         self.decision_correct += bool_count(score.decision_correct);
         self.evidence_references_valid += bool_count(score.evidence_references_valid);
         self.oracle_singleton_model_cases += bool_count(score.set_score.oracle_model_count == 1);
-        self.oracle_identified_structure_cases += bool_count(score.structure_score.oracle_structure_identified);
+        self.oracle_identified_structure_cases +=
+            bool_count(score.structure_score.oracle_structure_identified);
         self.false_unique_structure_claims += bool_count(
             !score.structure_score.oracle_structure_identified
                 && score.structure_score.claimed_structure_identified,
@@ -230,11 +247,7 @@ fn default_budget(family: WorldFamily) -> usize {
     }
 }
 
-fn strategy_for_pair(
-    policy: PolicySpec,
-    family: WorldFamily,
-    pair_index: usize,
-) -> PolicySpec {
+fn strategy_for_pair(policy: PolicySpec, family: WorldFamily, pair_index: usize) -> PolicySpec {
     let family_salt = match family {
         WorldFamily::BooleanMechanism => 0xB001_EA01_u64,
         WorldFamily::NumericMechanism => 0xA11C_0C02_u64,
@@ -242,9 +255,7 @@ fn strategy_for_pair(
     };
     let strategy = match policy.strategy {
         ProbeStrategy::Random { seed } => ProbeStrategy::Random {
-            seed: seed
-                ^ family_salt
-                ^ (pair_index as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93),
+            seed: seed ^ family_salt ^ (pair_index as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93),
         },
         other => other,
     };
@@ -277,9 +288,7 @@ fn run_arm(
         (GeneratingModel::Interaction(model), CampaignArm::A0) => {
             StructureAccess::InteractionSupplied(model.structure)
         }
-        (GeneratingModel::Interaction(_), CampaignArm::A2) => {
-            StructureAccess::InteractionWithheld
-        }
+        (GeneratingModel::Interaction(_), CampaignArm::A2) => StructureAccess::InteractionWithheld,
     };
 
     let mut episode = match truth {
@@ -419,15 +428,24 @@ mod tests {
         let truths = candidate_truths();
         assert_eq!(truths.len(), 393);
         assert_eq!(
-            truths.iter().filter(|truth| truth.family() == WorldFamily::BooleanMechanism).count(),
+            truths
+                .iter()
+                .filter(|truth| truth.family() == WorldFamily::BooleanMechanism)
+                .count(),
             9
         );
         assert_eq!(
-            truths.iter().filter(|truth| truth.family() == WorldFamily::NumericMechanism).count(),
+            truths
+                .iter()
+                .filter(|truth| truth.family() == WorldFamily::NumericMechanism)
+                .count(),
             120
         );
         assert_eq!(
-            truths.iter().filter(|truth| truth.family() == WorldFamily::TwoInputResponse).count(),
+            truths
+                .iter()
+                .filter(|truth| truth.family() == WorldFamily::TwoInputResponse)
+                .count(),
             264
         );
     }
