@@ -750,7 +750,7 @@ Cases cover exact match, fractional feature substitutions, NA masking, separate 
 ### 18.5 Rust scorer and golden conformance vectors
 
 - [#11140 — VOICE-ACOUSTIC-SCORER-001](https://github.com/Luminous-Dynamics/symthaea/issues/11140) defines the outcome-level metric contract.
-- [Draft PR #11141](https://github.com/Luminous-Dynamics/symthaea/pull/11141) adds `acoustic_faithfulness.rs` to `symthaea-stt`.
+- [Draft PR #11146](https://github.com/Luminous-Dynamics/symthaea/pull/11141) adds `acoustic_faithfulness.rs` to `symthaea-stt`.
 - Sixteen synthetic unit-test functions are authored but not executed.
 - [`acoustic_faithfulness_golden_v0.1.json`](./acoustic_faithfulness_golden_v0.1.json) contains ten synthetic trial groups with a companion Draft 2020-12 schema.
 - A separate JavaScript formula implementation recomputed all numerators, denominators and rates for all ten cases with no mismatches. This is an arithmetic fixture audit only; it is not Rust execution or reproduction of DEAF/HalluAudio.
