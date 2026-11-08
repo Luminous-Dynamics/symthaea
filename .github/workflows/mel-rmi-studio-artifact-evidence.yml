@@ -1,0 +1,74 @@
+name: MEL-RMI Studio artifact evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - "tools/mel-rmi-studio-evidence-harness/**"
+      - ".github/workflows/mel-rmi-studio-artifact-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  studio-artifact-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Stage standalone verifier crate outside the root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-rmi-studio-evidence-harness"
+          mkdir -p "$staged/src" "$staged/protocol/src"
+          cp tools/mel-rmi-studio-evidence-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-rmi-studio-evidence-harness/Cargo.lock "$staged/Cargo.lock"
+          cp tools/mel-rmi-studio-evidence-harness/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-rmi-studio-evidence-harness/src/evidence_digest.rs "$staged/src/evidence_digest.rs"
+          cp tools/mel-rmi-studio-evidence-harness/src/rmi_artifact_evidence.rs "$staged/src/rmi_artifact_evidence.rs"
+          cp tools/mel-rmi-studio-evidence-harness/protocol/Cargo.toml "$staged/protocol/Cargo.toml"
+          cp tools/mel-rmi-studio-evidence-harness/protocol/src/lib.rs "$staged/protocol/src/lib.rs"
+          echo "MEL_RMI_STUDIO_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "MEL_RMI_STUDIO_DIR=$staged" >> "$GITHUB_ENV"
+      - name: Format isolated verifier harness and exact production module
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
+      - name: Resolve pinned standalone lock from the offline Rust registry index
+        run: cargo +1.96.0 generate-lockfile --offline --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
+      - name: Test exact production Studio artifact evidence module
+        run: cargo +1.96.0 test --offline --locked --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
+      - name: Record resolved dependency-lock evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-rmi-studio-evidence"
+          mkdir -p "$evidence"
+          cp "$MEL_RMI_STUDIO_DIR/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.lock" | tee "$evidence/Cargo.lock.sha256"
+          printf 'production_module_sha256=%s\n' "$(sha256sum crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs | cut -d' ' -f1)" > "$evidence/source-identities.txt"
+          printf 'protocol_module_sha256=%s\n' "$(sha256sum crates/domains/symthaea-muse-protocol/src/lib.rs | cut -d' ' -f1)" >> "$evidence/source-identities.txt"
+      - name: Upload isolated verifier test evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-rmi-studio-artifact-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-rmi-studio-evidence/
+          if-no-files-found: error
+          retention-days: 90
