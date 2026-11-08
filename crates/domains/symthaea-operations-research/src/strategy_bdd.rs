@@ -1261,12 +1261,7 @@ pub fn anf_hypergraph_min_fill_order(
                 }
             }
             let fill_pairs = possible_pairs.saturating_sub(already_coupled);
-            let candidate = (
-                fill_pairs,
-                neighbors.len(),
-                incident_count,
-                variable,
-            );
+            let candidate = (fill_pairs, neighbors.len(), incident_count, variable);
             if best.is_none_or(|current| candidate < current) {
                 best = Some(candidate);
             }
@@ -1729,10 +1724,7 @@ pub fn multi_start_sift_strategy_function_robdd(
         refine_interaction_order_by_frontier(&weighted_graph, &weighted_min_fill, budget)?;
 
     let anf_report = strategy_anf_interaction_hypergraph(function, budget)?;
-    let anf_min_fill = anf_hypergraph_min_fill_order(
-        dependency_count,
-        &anf_report.hyperedges,
-    )?;
+    let anf_min_fill = anf_hypergraph_min_fill_order(dependency_count, &anf_report.hyperedges)?;
     let weighted_min_fill_profile =
         interaction_graph_frontier_profile(&weighted_graph, &weighted_min_fill)?;
     let weighted_min_fill_max_frontier =
@@ -2808,12 +2800,18 @@ mod tests {
         let second = anf_hypergraph_min_fill_order(6, &edges).unwrap();
         assert_eq!(first, second);
         assert_eq!(first.len(), 6);
-        assert_eq!(first.iter().copied().collect::<BTreeSet<_>>(), (0..6).collect());
+        assert_eq!(
+            first.iter().copied().collect::<BTreeSet<_>>(),
+            (0..6).collect()
+        );
     }
 
     #[test]
     fn anf_transform_budget_is_fail_closed() {
-        let source = function(&[0, 1, 2], &[false, true, true, false, true, false, false, true]);
+        let source = function(
+            &[0, 1, 2],
+            &[false, true, true, false, true, false, false, true],
+        );
         let tight = StrategyBddBudget {
             max_anf_transform_checks: 11,
             ..budget()
@@ -2871,21 +2869,25 @@ mod tests {
         let source = function(
             &[0, 1, 2, 3],
             &[
-                false, true, true, false, true, false, false, true,
-                true, false, false, true, false, true, true, false,
+                false, false, false, false, false, false, false, true,
+                false, false, false, false, false, false, false, true,
             ],
         );
         let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
         assert!(report.anf_transform_checks > 0);
         assert!(report.anf_hyperedge_count > 0);
-        assert!(report
-            .seed_orders
-            .iter()
-            .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFill));
-        assert!(report
-            .seed_orders
-            .iter()
-            .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFillReverse));
+        assert!(
+            report
+                .seed_orders
+                .iter()
+                .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFill)
+        );
+        assert!(
+            report
+                .seed_orders
+                .iter()
+                .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFillReverse)
+        );
         verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
     }
 
