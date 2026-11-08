@@ -1,0 +1,786 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_state": "SYNTHETIC_ONLY",
+  "purpose": "Golden arithmetic vectors for audio adherence, context/prompt override, unsupported claims, abstention and evidence-span coverage.",
+  "policy": {
+    "answerable_denominator": "All supported-audio trials, including abstentions.",
+    "override_denominator": "All trials annotated with the conflict axis, including abstentions.",
+    "unsupported_denominator": "All claimed outputs.",
+    "unanswerable_denominator": "All UNANSWERABLE trials.",
+    "evidence_denominator": "All claimed outputs.",
+    "unanswerable_text": "Context/prompt distractors on unanswerable audio are false-answer probes, not override trials."
+  },
+  "vectors": [
+    {
+      "id": "audio_followed_over_context",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "context_claim": "A",
+          "prompt_claim": null,
+          "conflict_axis": "CONTEXT",
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "evidence_span_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 1,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    },
+    {
+      "id": "context_override",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "context_claim": "A",
+          "prompt_claim": null,
+          "conflict_axis": "CONTEXT",
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "context_override_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "evidence_span_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 1,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    },
+    {
+      "id": "prompt_override",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "context_claim": null,
+          "prompt_claim": "A",
+          "conflict_axis": "PROMPT",
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "prompt_override_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "evidence_span_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 0,
+        "prompt_conflict_trials": 1,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    },
+    {
+      "id": "both_text_sources_conflict",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "context_claim": "A",
+          "prompt_claim": "C",
+          "conflict_axis": "CONTEXT_AND_PROMPT",
+          "outcome": {
+            "claim": "C"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "prompt_override_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "evidence_span_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 1,
+        "prompt_conflict_trials": 1,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    },
+    {
+      "id": "third_label_not_text_override",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "context_claim": "A",
+          "prompt_claim": null,
+          "conflict_axis": "CONTEXT",
+          "outcome": {
+            "claim": "C"
+          },
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "evidence_span_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 1,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    },
+    {
+      "id": "unanswerable_claim",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": "UNANSWERABLE",
+          "context_claim": "A",
+          "prompt_claim": null,
+          "conflict_axis": "NONE",
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "evidence_span_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "total_trials": 1,
+        "answerable_trials": 0,
+        "unanswerable_trials": 1,
+        "context_conflict_trials": 0,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    },
+    {
+      "id": "unanswerable_abstention",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": "UNANSWERABLE",
+          "context_claim": null,
+          "prompt_claim": null,
+          "conflict_axis": "NONE",
+          "outcome": "ABSTAIN",
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "abstention_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "evidence_span_coverage": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "total_trials": 1,
+        "answerable_trials": 0,
+        "unanswerable_trials": 1,
+        "context_conflict_trials": 0,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 0,
+        "abstained_outputs": 1
+      }
+    },
+    {
+      "id": "answerable_abstention",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "A"
+          },
+          "context_claim": null,
+          "prompt_claim": null,
+          "conflict_axis": "NONE",
+          "outcome": "ABSTAIN",
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "answerable_abstention_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "evidence_span_coverage": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 0,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 0,
+        "abstained_outputs": 1
+      }
+    },
+    {
+      "id": "mixed_coverage_and_overrides",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "context_claim": "A",
+          "prompt_claim": null,
+          "conflict_axis": "CONTEXT",
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "t2",
+          "pair_id": "pair-t2",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "C"
+          },
+          "context_claim": null,
+          "prompt_claim": "D",
+          "conflict_axis": "PROMPT",
+          "outcome": {
+            "claim": "D"
+          },
+          "evidence_span_present": false
+        },
+        {
+          "trial_id": "t3",
+          "pair_id": "pair-t3",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": "UNANSWERABLE",
+          "context_claim": null,
+          "prompt_claim": null,
+          "conflict_axis": "NONE",
+          "outcome": "ABSTAIN",
+          "evidence_span_present": false
+        },
+        {
+          "trial_id": "t4",
+          "pair_id": "pair-t4",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "E"
+          },
+          "context_claim": null,
+          "prompt_claim": null,
+          "conflict_axis": "NONE",
+          "outcome": "ABSTAIN",
+          "evidence_span_present": false
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 1,
+          "denominator": 3,
+          "value": 0.3333333333333333
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "prompt_override_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 2,
+          "value": 0.5
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "abstention_rate": {
+          "numerator": 2,
+          "denominator": 4,
+          "value": 0.5
+        },
+        "answerable_abstention_rate": {
+          "numerator": 1,
+          "denominator": 3,
+          "value": 0.3333333333333333
+        },
+        "evidence_span_coverage": {
+          "numerator": 1,
+          "denominator": 2,
+          "value": 0.5
+        },
+        "total_trials": 4,
+        "answerable_trials": 3,
+        "unanswerable_trials": 1,
+        "context_conflict_trials": 1,
+        "prompt_conflict_trials": 1,
+        "claimed_outputs": 2,
+        "abstained_outputs": 2
+      }
+    },
+    {
+      "id": "no_conflict_groups",
+      "trials": [
+        {
+          "trial_id": "t1",
+          "pair_id": "pair-t1",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "A"
+          },
+          "context_claim": null,
+          "prompt_claim": null,
+          "conflict_axis": "NONE",
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "expected": {
+        "audio_adherence": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "context_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "prompt_override_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "unsupported_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "unanswerable_false_answer_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "appropriate_abstention_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        },
+        "abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "answerable_abstention_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "evidence_span_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "total_trials": 1,
+        "answerable_trials": 1,
+        "unanswerable_trials": 0,
+        "context_conflict_trials": 0,
+        "prompt_conflict_trials": 0,
+        "claimed_outputs": 1,
+        "abstained_outputs": 0
+      }
+    }
+  ]
+}
