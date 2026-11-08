@@ -811,7 +811,14 @@
         "abstention_precision_recall",
         "audio_evidence_span_localization",
         "counterfactual_audio_sensitivity",
-        "prompt_invariance"
+        "prompt_invariance",
+        "audio_adherence",
+        "context_override_rate",
+        "prompt_override_rate",
+        "unanswerable_false_answer_rate",
+        "appropriate_abstention_rate",
+        "answerable_abstention_rate",
+        "evidence_span_coverage"
       ],
       "system_arms": [
         "asr_to_evidence_aware_semantic_pipeline",
@@ -828,7 +835,12 @@
         "claim_level_evidence_spans",
         "evidence_status",
         "abstention_or_refusal_reason",
-        "model_output_hash"
+        "model_output_hash",
+        "scorer_revision",
+        "claim_label_ontology_revision",
+        "conflict_axis_annotation_revision",
+        "trial_manifest_sha256",
+        "exact_metric_numerators_and_denominators"
       ],
       "required_controls": [
         "context_predicts_wrong_word_audio_unambiguous",
@@ -843,8 +855,12 @@
         "zero_supported_as_fact_answers_without_audio_evidence",
         "100_percent_factual_slots_evidence_linked_or_unknown",
         "separate_context_override_and_prompt_override_rates",
-        "privacy_and_consent_review_for_real_speakers"
-      ]
+        "privacy_and_consent_review_for_real_speakers",
+        "frozen_acoustic_faithfulness_vectors_match_exact_numerators_and_denominators",
+        "unanswerable_false_answer_and_override_denominators_remain_separate"
+      ],
+      "implementation_issue": 11140,
+      "implementation_pr": 11141
     }
   ],
   "promotion_gates": [
@@ -862,7 +878,8 @@
     "closed_set_candidate_selection_integrity_verified",
     "selector_demonstration_manifest_and_leakage_audit_complete",
     "phonological_feature_profile_authority_and_applicability_verified",
-    "acoustic_faithfulness_counterfactual_suite_passed_on_synthetic_controls"
+    "acoustic_faithfulness_counterfactual_suite_passed_on_synthetic_controls",
+    "acoustic_faithfulness_unanswerable_and_override_denominators_separately_validated"
   ],
   "test_vector_sets": [
     {
@@ -909,6 +926,25 @@
         "alignment_gap_cost"
       ],
       "note": "Synthetic generic feature-profile vectors. A separate JavaScript implementation of the declared NA-aware Needleman-Wunsch policy recomputed all ten expected cases with no mismatches. No Rust tests or external-reference differential have been executed."
+    },
+    {
+      "id": "acoustic_faithfulness_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/acoustic_faithfulness_golden_v0.1.json",
+      "schema_path": "docs/research/voice/acoustic_faithfulness_golden_v0.1.schema.json",
+      "cases": 10,
+      "linked_issue": 11140,
+      "linked_pr": 11141,
+      "metrics": [
+        "audio_adherence",
+        "context_override_rate",
+        "prompt_override_rate",
+        "unsupported_claim_rate",
+        "unanswerable_false_answer_rate",
+        "appropriate_abstention_rate",
+        "evidence_span_coverage"
+      ],
+      "note": "Ten synthetic trial groups. Independent JavaScript recomputation of every numerator, denominator and rate matches all expected values; this is formula audit only, not Rust execution or DEAF/HalluAudio reproduction."
     }
   ]
 }
