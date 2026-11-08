@@ -3,9 +3,9 @@
 
 use std::error::Error;
 use symthaea_science_evidence::{
-    CandidateExperiment, DiscriminationHypothesis, GaussianModelPrediction,
-    MeasurementNoiseModel, ModelPriorScenario, NoiseCalibrationStatus, PredictionDisposition,
-    RecoveryGenerator, evaluate_model_recovery,
+    CandidateExperiment, DiscriminationHypothesis, GaussianModelPrediction, MeasurementNoiseModel,
+    ModelPriorScenario, NoiseCalibrationStatus, PredictionDisposition, RecoveryGenerator,
+    evaluate_model_recovery,
 };
 
 fn hypothesis(id: &str, byte: u8) -> DiscriminationHypothesis {
@@ -97,8 +97,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("abstention_threshold={:.6}", report.abstention_threshold);
     println!("inference_models={}", report.model_ids.join(";"));
     println!("generators={}", report.generator_ids.join(";"));
-    println!("confusion_matrix_columns={},ABSTAIN", report.model_ids.join(","));
-    for (generator_id, row) in report.generator_ids.iter().zip(report.confusion_counts.iter()) {
+    println!(
+        "confusion_matrix_columns={},ABSTAIN",
+        report.model_ids.join(",")
+    );
+    for (generator_id, row) in report
+        .generator_ids
+        .iter()
+        .zip(report.confusion_counts.iter())
+    {
         let row_text = row
             .iter()
             .map(|count| count.to_string())
@@ -133,7 +140,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|value| format!("{value:.9}"))
             .unwrap_or_else(|| "not_tested".to_string())
     );
-    println!("claim_boundary=known_synthetic_scalar_gaussian_generator_and_frozen_MAP_abstention_rule");
-    println!("not_claimed=general_Bayesian_recovery,physical_model_truth,model_set_completeness,parameter_EIG");
+    println!(
+        "claim_boundary=known_synthetic_scalar_gaussian_generator_and_frozen_MAP_abstention_rule"
+    );
+    println!(
+        "not_claimed=general_Bayesian_recovery,physical_model_truth,model_set_completeness,parameter_EIG"
+    );
     Ok(())
 }
