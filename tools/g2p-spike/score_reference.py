@@ -4,8 +4,11 @@
 """Score G2P candidate output against independently adjudicated word references.
 
 The input token columns are Rust Debug lists emitted by g2p-spike. This script
-is research-only and uses Unicode code-point PER so different IPA token
-segmentation (e.g. /tʃ/ vs /t/ + /ʃ/) does not create a false boundary error.
+uses a deliberately coarse Unicode-codepoint edit measure over normalized IPA
+text. It is NOT canonical phoneme error rate: combining diacritics, affricates,
+diphthongs and provider-specific segmentations require a reviewed language
+inventory before a true phone-level metric can be computed. Use tools/g2p-eval
+with canonical phone tokens for PER and phone confusion reporting.
 """
 from __future__ import annotations
 
@@ -108,7 +111,7 @@ def score_system(
     system_name: str,
 ) -> dict[str, Any]:
     phone_errors = 0
-    reference_phones = 0
+    reference_codepoints = 0
     exact_words = 0
     evaluated_words = 0
     missing_words = 0
@@ -144,7 +147,7 @@ def score_system(
         best_reference = variants[best_index]
 
         phone_errors += best_distance
-        reference_phones += len(best_reference)
+        reference_codepoints += len(best_reference)
         evaluated_words += 1
         exact = best_distance == 0
         exact_words += int(exact)
@@ -161,13 +164,13 @@ def score_system(
     return {
         "system": system_name,
         "evaluated_words": evaluated_words,
-        "reference_phones": reference_phones,
+        "reference_codepoints": reference_codepoints,
         "phone_edits": phone_errors,
-        "phoneme_error_rate": phone_errors / reference_phones if reference_phones else None,
-        "exact_word_pronunciation_accuracy": exact_words / evaluated_words if evaluated_words else None,
+        "ipa_codepoint_edit_rate": phone_errors / reference_codepoints if reference_codepoints else None,
+        "exact_normalized_ipa_sequence_accuracy": exact_words / evaluated_words if evaluated_words else None,
         "missing_candidate_words": missing_words,
         "heteronym_words": heteronym_total,
-        "heteronym_exact_accuracy": heteronym_exact / heteronym_total if heteronym_total else None,
+        "heteronym_exact_sequence_accuracy": heteronym_exact / heteronym_total if heteronym_total else None,
         "oov_words": oov_total,
         "oov_nonempty_guess_rate": oov_nonempty_guesses / oov_total if oov_total else None,
         "oov_nonempty_guess_count": oov_nonempty_guesses,
@@ -280,11 +283,12 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
             score_system(adjudicated, candidate_rows, "muse"),
         ],
         "method": {
-            "phone_unit": "Unicode code point after IPA token-boundary flattening",
-            "stress_markers": "excluded from PER; score stress separately in a future annotation release",
+            "unit": "Unicode code point after IPA token-boundary flattening; not canonical phoneme tokens",
+            "stress_markers": "excluded from codepoint edit rate; score stress separately in a future annotation release",
             "multiple_reference_variants": "minimum edit distance among explicitly accepted variants",
             "pending_rows": "excluded from metrics but retained as positional placeholders so later lexical words cannot shift",
-            "oov": "non-empty returned phone sequence on a reviewed OOV reference is reported as a non-empty-guess rate; this does not imply the G2P engine exposes an OOV classifier",
+            "oov": "non-empty returned IPA codepoint sequence on a reviewed OOV reference is reported as a non-empty-guess rate; this does not imply the G2P engine exposes an OOV classifier",
+            "limitation": "this helper is a rough cross-segmentation IPA-text comparison only; do not label its output PER or treat it as a canonical phone metric",
         },
     }
 
