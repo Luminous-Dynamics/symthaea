@@ -1,0 +1,12 @@
+[package]
+name = "physical-scenario-validator"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Isolated research utility: it does not become a Symthaea workspace member.
+[workspace]
+
+[dependencies]
+serde_json = "1.0"
+sha2 = "0.10"
