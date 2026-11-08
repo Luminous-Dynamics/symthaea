@@ -553,6 +553,28 @@
       "supports": [
         "CEB-CONTINUITY"
       ]
+    },
+    {
+      "source_id": "conflictbench-merge-tools-2024",
+      "source_url": "https://doi.org/10.1016/j.jss.2024.112084",
+      "title": "ConflictBench: A benchmark to evaluate software merge tools",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-08",
+      "published_on": null,
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "history-change-propagation-channels",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0164121223003072",
+      "title": "Revealing code change propagation channels by evolution history mining",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": null,
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
     }
   ],
   "comparators": [
@@ -1702,6 +1724,46 @@
         "100 tasks; average history spans 233 days and 71 consecutive commits.",
         "Long-horizon maintenance success is adjacent to CEB-CONTINUITY but is not evidence-disposition macro-F1, stale-evidence use or proof of selective claim retention.",
         "Do not rank SWE-CI and CEB scores together without matched tasks, harness, budgets and outcome definitions."
+      ]
+    },
+    {
+      "comparator_id": "conflictbench-java-merge-tools",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "ConflictBench",
+      "benchmark_version": "Journal of Systems and Software 214 (August 2024), article 112084",
+      "split": "Java merge-conflict dataset; five software merge tools compared",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "Java merge-conflict cases; exact abstract denominator not reported"
+      },
+      "source_id": "conflictbench-merge-tools-2024",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Evaluates software merge tools, not engineering agents or claim/evidence validity.",
+        "Java-specific merge-conflict population; transfer to Rust and multi-language repository histories is unestablished.",
+        "Useful for designing merge-resolution controls; no numerical score is comparable with CEB."
+      ]
+    },
+    {
+      "comparator_id": "history-mined-change-propagation",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "Change propagation channels mined from software evolution history",
+      "benchmark_version": "Journal of Systems and Software; 2023 publication record",
+      "split": "Five maintained projects; 5,032 project versions; 40 mined propagation-channel types",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 5032,
+        "unit": "project versions across five maintained projects"
+      },
+      "source_id": "history-change-propagation-channels",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "History-mined propagation channels are empirical dependency candidates, not proof of causal impact or claim invalidation.",
+        "The reported population is five projects and 5,032 versions; it is not an agent benchmark.",
+        "Co-change/history relationships cannot alone establish branch-scoped claim validity, authorization scope or evidence completeness."
       ]
     }
   ],
@@ -7061,6 +7123,108 @@
       },
       "notes": [
         "History-length descriptor; not agent action or turn count."
+      ]
+    },
+    {
+      "observation_id": "conflictbench-merge-tool-count",
+      "comparator_id": "conflictbench-java-merge-tools",
+      "source_locator": "ConflictBench abstract and article metadata; DOI 10.1016/j.jss.2024.112084",
+      "system": {
+        "system_id": "conflictbench-five-tools",
+        "model": "Five software merge tools",
+        "harness": "ConflictBench",
+        "configuration": "Java merge-conflict dataset"
+      },
+      "metric": {
+        "metric_id": "merge_tool_count",
+        "label": "Merge tools compared",
+        "definition": "Number of software merge tools compared in the ConflictBench study.",
+        "value": 5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tools",
+        "direction": "not_applicable",
+        "raw_display": "Five software merge tools",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "reported as a study descriptor",
+          "applies_to_metric_id": "merge_tool_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Benchmark-population descriptor, not merge correctness or agent performance."
+      ]
+    },
+    {
+      "observation_id": "history-propagation-version-count",
+      "comparator_id": "history-mined-change-propagation",
+      "source_locator": "Article abstract; ScienceDirect PII S0164121223003072",
+      "system": {
+        "system_id": "history-propagation-five-projects",
+        "model": "History-mining study",
+        "harness": "Change propagation channel mining",
+        "configuration": "Five maintained software projects"
+      },
+      "metric": {
+        "metric_id": "project_version_count",
+        "label": "Project versions analyzed",
+        "definition": "Number of project versions represented in the mined evolution-history dataset.",
+        "value": 5032,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "versions",
+        "direction": "not_applicable",
+        "raw_display": "5,032 versions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "reported as dataset descriptor",
+          "applies_to_metric_id": "project_version_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Dataset population descriptor; not a model evaluation."
+      ]
+    },
+    {
+      "observation_id": "history-propagation-channel-type-count",
+      "comparator_id": "history-mined-change-propagation",
+      "source_locator": "Article abstract; ScienceDirect PII S0164121223003072",
+      "system": {
+        "system_id": "history-propagation-channel-types",
+        "model": "History-mining study",
+        "harness": "Change propagation channel mining",
+        "configuration": "Mined change-propagation relationship taxonomy"
+      },
+      "metric": {
+        "metric_id": "propagation_channel_type_count",
+        "label": "Propagation channel types",
+        "definition": "Number of distinct change-propagation channel types identified by the study.",
+        "value": 40,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "channel types",
+        "direction": "not_applicable",
+        "raw_display": "40 types",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "reported as taxonomy descriptor",
+          "applies_to_metric_id": "propagation_channel_type_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Taxonomy descriptor; channel membership does not prove semantic causation."
       ]
     }
   ]
