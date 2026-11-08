@@ -493,6 +493,7 @@ def semantic_errors(payload: dict) -> list[str]:
         "agent-evidence-tracing-provenance-survey": ("CEB-REVIEW", "agent-evidence-tracing-survey-2026", "not_reported", None),
         "llm-se-empirical-reproducibility-guidelines": ("CEB-REVIEW", "llm-se-empirical-guidelines-2026", "not_reported", None),
         "pr-change-impact-callgraph-history": ("CEB-REVIEW", "pr-change-impact-analysis-2025", "not_reported", None),
+        "history-mined-change-propagation": ("CEB-CONTINUITY", "history-change-propagation-channels", "not_reported", None),
         "microservice-evolution-formal-verification-slr": ("CEB-CONTINUITY", "microservice-evolution-verification-slr-2026", "reported", 18),
     }
     for comparator_id, expected in required_provenance_comparators.items():
@@ -857,6 +858,15 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "microservice-evolution-formal-verification-slr")
     comparator["sample_denominator"]["value"] = 1187
     must_reject(mutant, "systematic review search yield conflated with included-study denominator")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "history-mined-change-propagation")
+    comparator["sample_denominator"] = {
+        "status": "reported",
+        "value": 5032,
+        "unit": "project versions",
+    }
+    must_reject(mutant, "evolution-history dataset size conflated with task denominator")
 
     mutant = copy.deepcopy(payload)
     row = next(row for row in mutant["observations"] if row["observation_id"] == "sweci-average-history-days")
