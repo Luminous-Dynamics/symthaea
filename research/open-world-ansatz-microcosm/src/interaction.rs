@@ -186,27 +186,31 @@ pub fn candidate_models(access: StructureAccess) -> Vec<ModelHypothesis> {
 
     for structure in structures {
         for bias in BIAS_VALUES {
-            for weight_u in COEFFICIENT_VALUES {
-                match structure {
-                    Structure::SingleInputU => candidates.push(ModelHypothesis {
-                        structure,
-                        bias,
-                        weight_u,
-                        weight_v: 0,
-                        interaction_weight: 0,
-                    }),
-                    Structure::SingleInputV => {
-                        for weight_v in COEFFICIENT_VALUES {
-                            candidates.push(ModelHypothesis {
-                                structure,
-                                bias,
-                                weight_u: 0,
-                                weight_v,
-                                interaction_weight: 0,
-                            });
-                        }
+            match structure {
+                Structure::SingleInputU => {
+                    for weight_u in COEFFICIENT_VALUES {
+                        candidates.push(ModelHypothesis {
+                            structure,
+                            bias,
+                            weight_u,
+                            weight_v: 0,
+                            interaction_weight: 0,
+                        });
                     }
-                    Structure::AdditiveTwoInput => {
+                }
+                Structure::SingleInputV => {
+                    for weight_v in COEFFICIENT_VALUES {
+                        candidates.push(ModelHypothesis {
+                            structure,
+                            bias,
+                            weight_u: 0,
+                            weight_v,
+                            interaction_weight: 0,
+                        });
+                    }
+                }
+                Structure::AdditiveTwoInput => {
+                    for weight_u in COEFFICIENT_VALUES {
                         for weight_v in COEFFICIENT_VALUES {
                             candidates.push(ModelHypothesis {
                                 structure,
@@ -217,7 +221,9 @@ pub fn candidate_models(access: StructureAccess) -> Vec<ModelHypothesis> {
                             });
                         }
                     }
-                    Structure::BilinearInteraction => {
+                }
+                Structure::BilinearInteraction => {
+                    for weight_u in COEFFICIENT_VALUES {
                         for weight_v in COEFFICIENT_VALUES {
                             for interaction_weight in COEFFICIENT_VALUES {
                                 candidates.push(ModelHypothesis {
@@ -238,7 +244,6 @@ pub fn candidate_models(access: StructureAccess) -> Vec<ModelHypothesis> {
     candidates.sort();
     candidates
 }
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiscoveryDisposition {
@@ -370,7 +375,7 @@ pub fn recommend_discriminating_probe(
     report: &DiscoveryReport,
 ) -> Result<Option<ProbeRecommendation>, InteractionError> {
     log.validate()?;
-    if report.compatible_models.is_empty() {
+    if report.compatible_models.len() <= 1 {
         return Ok(None);
     }
 
@@ -573,7 +578,7 @@ mod tests {
             InteractionWorld::new(ModelHypothesis {
                 weight_v: 1,
                 ..ModelHypothesis {
-                    structure: Structure::SingleInput,
+                    structure: Structure::SingleInputU,
                     bias: 0,
                     weight_u: 1,
                     weight_v: 0,
