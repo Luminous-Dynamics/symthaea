@@ -94,9 +94,9 @@ for (algorithm_name, algorithm) in ALGORITHMS
     println("algorithm=", algorithm_name)
     for (query_name, scores, mode, expected) in QUERIES
         result = solve_reward(scores, mode, algorithm)
-        @assert result.value == expected (
-            "$algorithm_name / $query_name: got $(result.value), expected $expected"
-        )
+        if result.value != expected
+            error("$algorithm_name / $query_name: got $(result.value), expected $expected")
+        end
         println(
             query_name,
             " value=", result.value,
