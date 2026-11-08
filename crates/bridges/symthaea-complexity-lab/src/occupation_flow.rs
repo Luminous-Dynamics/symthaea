@@ -143,6 +143,17 @@ pub struct OccupationFlowBudget {
     pub max_verifier_multiply_adds: usize,
 }
 
+/// Aggregate pre-allocation limits for a complete multi-action minimax-regret
+/// proof. The per-LP limits remain in `OccupationFlowBudget`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SharedDynamicsMinimaxRegretBudget {
+    pub max_pairwise_lp_count: usize,
+    /// Sum of verifier multiply-add terms over every ordered action pair.
+    pub max_total_verifier_multiply_adds: usize,
+    /// Estimated peak bytes for pair references and the aggregate result vectors.
+    pub max_result_memory_bytes: usize,
+}
+
 /// Canonical variable layout for the occupation-flow LP.
 ///
 /// First are all occupancy variables in (time, state) order, followed by all
@@ -494,6 +505,11 @@ pub enum OccupationFlowError {
     InvalidMinimaxRegretActionCount { actual: usize },
     PairwiseWitnessCountMismatch { expected: usize, actual: usize },
     PairwiseActionIndexOutOfBounds { action: usize, action_count: usize },
+    PairwiseAggregateBudgetExceeded {
+        resource: &'static str,
+        required: usize,
+        limit: usize,
+    },
     PairwiseSelfComparison { action: usize },
     DuplicatePairwiseWitness { selected_action: usize, comparator_action: usize },
     MissingPairwiseWitness { selected_action: usize, comparator_action: usize },
@@ -538,6 +554,10 @@ impl fmt::Display for OccupationFlowError {
             Self::PairwiseActionIndexOutOfBounds { action, action_count } => write!(
                 f,
                 "pairwise action index {action} is outside action count {action_count}"
+            ),
+            Self::PairwiseAggregateBudgetExceeded { resource, required, limit } => write!(
+                f,
+                "aggregate minimax-regret {resource} requires {required}; configured limit is {limit}"
             ),
             Self::PairwiseSelfComparison { action } => {
                 write!(f, "pairwise minimax regret witness compares action {action} with itself")
@@ -796,7 +816,7 @@ pub fn verify_shared_dynamics_minimax_regret(
     action_scores: &[Vec<Vec<CheckedRational>>],
     witnesses: &[PairwiseRegretWitness],
     budget: OccupationFlowBudget,
-    max_pairwise_lp_count: usize,
+    decision_budget: SharedDynamicsMinimaxRegretBudget,
 ) -> Result<VerifiedSharedDynamicsMinimaxRegret, OccupationFlowError> {
     let action_count = action_scores.len();
     if action_count < 2 {
@@ -806,13 +826,56 @@ pub fn verify_shared_dynamics_minimax_regret(
     }
     let expected_pairs = action_count.checked_mul(action_count - 1)
         .ok_or(OccupationFlowError::DimensionOverflow)?;
-    if expected_pairs > max_pairwise_lp_count {
-        return Err(OccupationFlowError::BudgetExceeded {
-            resource: "pairwise regret LP count",
+    if expected_pairs > decision_budget.max_pairwise_lp_count {
+        return Err(OccupationFlowError::PairwiseAggregateBudgetExceeded {
+            resource: "LP count",
             required: expected_pairs,
-            limit: max_pairwise_lp_count,
+            limit: decision_budget.max_pairwise_lp_count,
         });
     }
+    for scores in action_scores {
+        validate_score_matrix(model, scores, budget)?;
+    }
+    let (layout, row_count, nonzero_count) = preflight_dimensions(model, budget)?;
+    let per_pair_work = nonzero_count.checked_mul(2)
+        .and_then(|value| value.checked_add(row_count))
+        .and_then(|value| value.checked_add(layout.variable_count()))
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let aggregate_work = expected_pairs.checked_mul(per_pair_work)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    if aggregate_work > decision_budget.max_total_verifier_multiply_adds {
+        return Err(OccupationFlowError::PairwiseAggregateBudgetExceeded {
+            resource: "verifier multiply-add work",
+            required: aggregate_work,
+            limit: decision_budget.max_total_verifier_multiply_adds,
+        });
+    }
+
+    let pair_result_bytes = expected_pairs
+        .checked_mul(std::mem::size_of::<VerifiedPairwiseRegret>())
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let pair_reference_bytes = expected_pairs
+        .checked_mul(std::mem::size_of::<&PairwiseRegretWitness>())
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let per_action_bytes = std::mem::size_of::<CheckedRational>()
+        .checked_add(std::mem::size_of::<VerifiedActionRegret>())
+        .and_then(|value| value.checked_add(std::mem::size_of::<usize>()))
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let action_bytes = action_count.checked_mul(per_action_bytes)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let result_bytes = pair_result_bytes
+        .checked_add(pair_reference_bytes)
+        .and_then(|value| value.checked_add(action_bytes))
+        .and_then(|value| value.checked_add(std::mem::size_of::<VerifiedSharedDynamicsMinimaxRegret>()))
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    if result_bytes > decision_budget.max_result_memory_bytes {
+        return Err(OccupationFlowError::PairwiseAggregateBudgetExceeded {
+            resource: "estimated result memory bytes",
+            required: result_bytes,
+            limit: decision_budget.max_result_memory_bytes,
+        });
+    }
+
     if witnesses.len() != expected_pairs {
         return Err(OccupationFlowError::PairwiseWitnessCountMismatch {
             expected: expected_pairs,
@@ -1441,6 +1504,14 @@ mod tests {
         }
     }
 
+    fn minimax_budget(max_pairwise_lp_count: usize) -> SharedDynamicsMinimaxRegretBudget {
+        SharedDynamicsMinimaxRegretBudget {
+            max_pairwise_lp_count,
+            max_total_verifier_multiply_adds: max_pairwise_lp_count * 218,
+            max_result_memory_bytes: 1_000_000,
+        }
+    }
+
     fn sparse_vector(
         length: usize,
         entries: &[(usize, i128, i128)],
@@ -2019,7 +2090,7 @@ mod tests {
             &actions,
             &witnesses,
             budget(84),
-            6,
+            minimax_budget(6),
         ).unwrap();
         assert_eq!(verified.minimax_regret, q(11, 25));
         assert_eq!(verified.minimax_actions, vec![0, 2]);
@@ -2141,14 +2212,14 @@ mod tests {
         ];
         assert_eq!(
             verify_shared_dynamics_minimax_regret(
-                &model, &[scores_a.clone(), scores_b.clone()], &witnesses[..1], budget(84), 2,
+                &model, &[scores_a.clone(), scores_b.clone()], &witnesses[..1], budget(84), minimax_budget(2),
             ),
             Err(OccupationFlowError::PairwiseWitnessCountMismatch { expected: 2, actual: 1 })
         );
         let duplicate = vec![witnesses[0].clone(), witnesses[0].clone()];
         assert_eq!(
             verify_shared_dynamics_minimax_regret(
-                &model, &[scores_a, scores_b], &duplicate, budget(84), 2,
+                &model, &[scores_a, scores_b], &duplicate, budget(84), minimax_budget(2),
             ),
             Err(OccupationFlowError::DuplicatePairwiseWitness {
                 selected_action: 0,
@@ -2164,7 +2235,7 @@ mod tests {
                 &[scores_a.clone(), scores_b.clone()],
                 &[out_of_bounds, witnesses[1].clone()],
                 budget(84),
-                2,
+                minimax_budget(2),
             ),
             Err(OccupationFlowError::PairwiseActionIndexOutOfBounds {
                 action: 2,
@@ -2242,15 +2313,55 @@ mod tests {
                 ],
                 &witnesses,
                 budget(84),
-                1,
+                SharedDynamicsMinimaxRegretBudget {
+                    max_pairwise_lp_count: 1,
+                    max_total_verifier_multiply_adds: 436,
+                    max_result_memory_bytes: 1_000_000,
+                },
             ),
-            Err(OccupationFlowError::BudgetExceeded {
-                resource: "pairwise regret LP count",
+            Err(OccupationFlowError::PairwiseAggregateBudgetExceeded {
+                resource: "LP count",
                 required: 2,
                 limit: 1,
             })
         );
     }
+
+        assert_eq!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[vec![vec![q(0,1), q(0,1)]; 3], vec![vec![q(0,1), q(0,1)]; 3]],
+                &witnesses,
+                budget(84),
+                SharedDynamicsMinimaxRegretBudget {
+                    max_pairwise_lp_count: 2,
+                    max_total_verifier_multiply_adds: 435,
+                    max_result_memory_bytes: 1_000_000,
+                },
+            ),
+            Err(OccupationFlowError::PairwiseAggregateBudgetExceeded {
+                resource: "verifier multiply-add work",
+                required: 436,
+                limit: 435,
+            })
+        );
+        assert!(matches!(
+            verify_shared_dynamics_minimax_regret(
+                &model,
+                &[vec![vec![q(0,1), q(0,1)]; 3], vec![vec![q(0,1), q(0,1)]; 3]],
+                &witnesses,
+                budget(84),
+                SharedDynamicsMinimaxRegretBudget {
+                    max_pairwise_lp_count: 2,
+                    max_total_verifier_multiply_adds: 436,
+                    max_result_memory_bytes: 1,
+                },
+            ),
+            Err(OccupationFlowError::PairwiseAggregateBudgetExceeded {
+                resource: "estimated result memory bytes",
+                ..
+            })
+        ));
 
     #[test]
     fn rejects_infeasible_interval_rows_and_invalid_dimensions() {
