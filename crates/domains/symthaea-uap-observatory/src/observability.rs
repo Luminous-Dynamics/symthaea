@@ -40,7 +40,7 @@ pub enum ObservabilityError {
         column: usize,
     },
     NumericalOverflow,
-    EigenSolverDidNotConverge,
+    JacobiSvdDidNotConverge,
 }
 
 impl fmt::Display for ObservabilityError {
@@ -86,8 +86,8 @@ impl fmt::Display for ObservabilityError {
             Self::NumericalOverflow => {
                 write!(f, "Jacobian scaling or information accumulation overflowed")
             }
-            Self::EigenSolverDidNotConverge => {
-                write!(f, "symmetric Jacobi eigensolver did not converge")
+            Self::JacobiSvdDidNotConverge => {
+                write!(f, "one-sided Jacobi SVD did not converge")
             }
         }
     }
@@ -380,7 +380,7 @@ fn one_sided_jacobi_svd(
             }
         }
         if maximum_correlation > ORTHOGONALITY_TOLERANCE {
-            return Err(ObservabilityError::EigenSolverDidNotConverge);
+            return Err(ObservabilityError::JacobiSvdDidNotConverge);
         }
     }
 
