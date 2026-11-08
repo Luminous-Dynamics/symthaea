@@ -60,7 +60,7 @@ pub struct PublicTaskManifest {
     pub probe_cost_units: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum AgentIntervention {
     Boolean(bool),
