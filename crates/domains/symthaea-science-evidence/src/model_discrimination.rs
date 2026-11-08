@@ -1,0 +1,1172 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Open-world-aware experimental ranking for discrete theory discrimination.
+//!
+//! The objective is expected information gain about a *discrete model label*,
+//! not parameter uncertainty. Candidate experiments are evaluated from
+//! calibrated scalar Gaussian predictive distributions using deterministic
+//! composite Simpson quadrature.
+//!
+//! This is deliberately not a full nonlinear BOED/SBI implementation. It is a
+//! small, auditable reference kernel for known predictive distributions.
+//! Missing predictions, an unresolved open-world model, non-Gaussian noise,
+//! or uncalibrated measurement noise are never converted into convenient
+//! numeric likelihoods.
+
+use super::theory_prediction::{
+    OTHER_UNRESOLVED_MODEL_ID, MeasurementNoiseModel, NoiseCalibrationStatus,
+    PredictionDisposition,
+};
+use std::collections::BTreeSet;
+use thiserror::Error;
+
+/// Upper bound for the discrete model set in the scalar reference kernel.
+pub const MAX_DISCRIMINATION_HYPOTHESES: usize = 16;
+/// Upper bound for a single candidate ranking request.
+pub const MAX_DISCRIMINATION_EXPERIMENTS: usize = 128;
+/// Upper bound for prior-sensitivity scenarios.
+pub const MAX_MODEL_PRIOR_SCENARIOS: usize = 8;
+/// Maximum coarse Simpson intervals; the refined pass uses twice this count.
+pub const MAX_EIG_QUADRATURE_INTERVALS: usize = 1024;
+
+/// Whether the named model set is open-world or has an explicit completeness
+/// argument. The unresolved open-world alternative is never assigned a
+/// predictive distribution by this module.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ModelUniverseCoverage {
+    OpenWorld,
+    DeclaredClosed {
+        completeness_reference: String,
+    },
+}
+
+/// Versioned named model included in a discrete model-identity design.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DiscriminationHypothesis {
+    pub model_id: String,
+    /// Full 40-character lowercase Git commit SHA for the model implementation.
+    pub source_revision_sha: String,
+    /// Stable reference to the model equations, assumptions or specification.
+    pub specification_reference: String,
+}
+
+/// One declared prior scenario. Probabilities are normalized internally;
+/// zero-probability hypotheses remain in the model coverage contract.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModelPriorScenario {
+    pub scenario_id: String,
+    /// Relative importance of this prior scenario in the weighted mean.
+    pub scenario_weight: f64,
+    /// One non-negative prior weight per DiscriminationHypothesis, in order.
+    pub probabilities: Vec<f64>,
+}
+
+/// Quantitative predictive distribution for one model under one candidate
+/// experiment. Predictive sigma represents model/parameter uncertainty only;
+/// calibrated measurement sigma is supplied by CandidateExperiment.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GaussianModelPrediction {
+    pub model_id: String,
+    pub disposition: PredictionDisposition,
+    pub predictive_mean: Option<f64>,
+    pub predictive_sigma: Option<f64>,
+    pub derivation_reference: Option<String>,
+}
+
+/// One scalar candidate experiment. The likelihood variance for model i is
+/// predictive_sigma_i^2 + measurement_sigma^2. The two uncertainty sources
+/// are treated as independent in this initial reference model.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CandidateExperiment {
+    pub experiment_id: String,
+    pub observable_id: String,
+    pub domain_id: String,
+    pub units: String,
+    pub measurement_noise_model: MeasurementNoiseModel,
+    pub measurement_sigma: Option<f64>,
+    pub noise_calibration: NoiseCalibrationStatus,
+    pub calibration_reference: Option<String>,
+    pub cost: f64,
+    /// Optional mutual-exclusion group for downstream portfolio selection.
+    pub exclusive_group: Option<String>,
+    /// Exactly one typed prediction record is required per named hypothesis.
+    pub predictions: Vec<GaussianModelPrediction>,
+}
+
+/// Quadrature and resource limits for model-identity EIG estimation.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModelDiscriminationConfig {
+    pub model_universe: ModelUniverseCoverage,
+    pub prior_scenarios: Vec<ModelPriorScenario>,
+    /// Coarse Simpson intervals. A second pass uses twice this count.
+    pub quadrature_intervals: usize,
+    /// Candidate is not ranked unless |EIG(2N)-EIG(N)| is at or below this.
+    pub quadrature_tolerance_nats: f64,
+}
+
+/// Why a candidate experiment cannot be scored quantitatively.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ExperimentBlocker {
+    PredictionNotQuantitative {
+        model_id: String,
+        disposition: PredictionDisposition,
+    },
+    PredictionMissingMean {
+        model_id: String,
+    },
+    PredictionMissingUncertainty {
+        model_id: String,
+    },
+    PredictionMissingDerivation {
+        model_id: String,
+    },
+    NonGaussianMeasurementNoise,
+    MeasurementNoiseUncalibrated,
+    MeasurementSigmaMissing,
+    CalibrationReferenceMissing,
+}
+
+/// Numerical status for one candidate. A non-comparable result is not a
+/// zero-EIG result; its score fields remain None.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ExperimentDiscriminationStatus {
+    Scored,
+    NotComparable {
+        blockers: Vec<ExperimentBlocker>,
+    },
+    QuadratureNotConverged {
+        maximum_error_nats: f64,
+        tolerance_nats: f64,
+    },
+}
+
+/// EIG estimate under one explicit model-prior scenario.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PriorScenarioEIG {
+    pub scenario_id: String,
+    pub prior_entropy_nats: f64,
+    pub coarse_eig_nats: f64,
+    pub refined_eig_nats: f64,
+    pub quadrature_error_nats: f64,
+    pub converged: bool,
+}
+
+/// EIG-based ranking record for one candidate experiment.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExperimentDiscriminationScore {
+    pub experiment_id: String,
+    pub observable_id: String,
+    pub cost: f64,
+    pub status: ExperimentDiscriminationStatus,
+    pub prior_scenario_scores: Vec<PriorScenarioEIG>,
+    pub worst_case_model_identity_eig_nats: Option<f64>,
+    pub weighted_mean_model_identity_eig_nats: Option<f64>,
+    pub worst_case_eig_per_cost: Option<f64>,
+    pub weighted_mean_eig_per_cost: Option<f64>,
+    /// True means OTHER_UNRESOLVED and any unenumerated model are outside the
+    /// numerical EIG calculation; the report does not claim open-world closure.
+    pub open_world_unresolved_excluded: bool,
+}
+
+/// Ranked candidate experiments with explicit model-universe coverage.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModelDiscriminationReport {
+    pub model_ids: Vec<String>,
+    pub model_universe: ModelUniverseCoverage,
+    pub prior_scenario_ids: Vec<String>,
+    pub experiments: Vec<ExperimentDiscriminationScore>,
+}
+
+/// Malformed inputs are errors; scientifically incomplete predictions remain
+/// typed NotComparable results.
+#[derive(Clone, Debug, Error, PartialEq)]
+pub enum ModelDiscriminationError {
+    #[error("at least two named model hypotheses are required")]
+    TooFewHypotheses,
+    #[error("model set has {count} hypotheses; maximum is {maximum}")]
+    TooManyHypotheses { count: usize, maximum: usize },
+    #[error("candidate set is empty")]
+    NoExperiments,
+    #[error("candidate set has {count} experiments; maximum is {maximum}")]
+    TooManyExperiments { count: usize, maximum: usize },
+    #[error("at least one prior scenario is required")]
+    NoPriorScenarios,
+    #[error("prior scenario count {count} exceeds maximum {maximum}")]
+    TooManyPriorScenarios { count: usize, maximum: usize },
+    #[error("hypothesis ID at index {0} is empty")]
+    EmptyHypothesisId(usize),
+    #[error("duplicate hypothesis ID: {0}")]
+    DuplicateHypothesisId(String),
+    #[error("OTHER_UNRESOLVED must not be assigned a numeric model likelihood")]
+    UnresolvedHypothesisMustRemainOpen,
+    #[error("hypothesis {model_id} has an invalid source revision SHA")]
+    InvalidSourceRevision { model_id: String },
+    #[error("hypothesis {model_id} has no model specification reference")]
+    MissingSpecificationReference { model_id: String },
+    #[error("prior scenario ID at index {0} is empty")]
+    EmptyPriorScenarioId(usize),
+    #[error("duplicate prior scenario ID: {0}")]
+    DuplicatePriorScenarioId(String),
+    #[error("prior scenario {scenario_id} has {actual} probabilities; expected {expected}")]
+    PriorProbabilityCount {
+        scenario_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("prior scenario {scenario_id} has invalid probability at index {index}")]
+    InvalidPriorProbability { scenario_id: String, index: usize },
+    #[error("prior scenario {0} has zero total probability")]
+    ZeroPriorProbability(String),
+    #[error("prior scenario {0} must have a finite positive scenario weight")]
+    InvalidPriorScenarioWeight(String),
+    #[error("closed model universe requires a non-empty completeness reference")]
+    MissingCompletenessReference,
+    #[error("experiment ID at index {0} is empty")]
+    EmptyExperimentId(usize),
+    #[error("duplicate experiment ID: {0}")]
+    DuplicateExperimentId(String),
+    #[error("experiment {experiment_id} has an empty {field}")]
+    EmptyExperimentField {
+        experiment_id: String,
+        field: &'static str,
+    },
+    #[error("experiment {0} must have a finite positive cost")]
+    InvalidExperimentCost(String),
+    #[error("experiment {0} has an empty mutual-exclusion group")]
+    EmptyExclusiveGroup(String),
+    #[error("experiment {experiment_id} has {actual} prediction rows; expected {expected}")]
+    PredictionCount {
+        experiment_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("experiment {experiment_id} has duplicate prediction for model {model_id}")]
+    DuplicateModelPrediction {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id} is missing prediction row for model {model_id}")]
+    MissingModelPrediction {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id}, model {model_id} has non-finite predictive mean")]
+    NonFinitePredictiveMean {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id}, model {model_id} has invalid predictive sigma")]
+    InvalidPredictiveSigma {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("non-quantitative prediction for {experiment_id}/{model_id} carries numeric fields")]
+    NonQuantitativePredictionHasNumbers {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id} has invalid measurement sigma")]
+    InvalidMeasurementSigma { experiment_id: String },
+    #[error("quadrature intervals must be even and between 64 and {maximum}")]
+    InvalidQuadratureIntervals { maximum: usize },
+    #[error("quadrature tolerance must be finite and positive")]
+    InvalidQuadratureTolerance,
+    #[error("numerical overflow while evaluating experiment {0}")]
+    NumericalOverflow(String),
+}
+
+impl ModelDiscriminationConfig {
+    fn validate(
+        &self,
+        hypotheses: &[DiscriminationHypothesis],
+    ) -> Result<(), ModelDiscriminationError> {
+        if hypotheses.len() < 2 {
+            return Err(ModelDiscriminationError::TooFewHypotheses);
+        }
+        if hypotheses.len() > MAX_DISCRIMINATION_HYPOTHESES {
+            return Err(ModelDiscriminationError::TooManyHypotheses {
+                count: hypotheses.len(),
+                maximum: MAX_DISCRIMINATION_HYPOTHESES,
+            });
+        }
+        if self.prior_scenarios.is_empty() {
+            return Err(ModelDiscriminationError::NoPriorScenarios);
+        }
+        if self.prior_scenarios.len() > MAX_MODEL_PRIOR_SCENARIOS {
+            return Err(ModelDiscriminationError::TooManyPriorScenarios {
+                count: self.prior_scenarios.len(),
+                maximum: MAX_MODEL_PRIOR_SCENARIOS,
+            });
+        }
+        if self.quadrature_intervals < 64
+            || self.quadrature_intervals > MAX_EIG_QUADRATURE_INTERVALS
+            || self.quadrature_intervals % 2 != 0
+        {
+            return Err(ModelDiscriminationError::InvalidQuadratureIntervals {
+                maximum: MAX_EIG_QUADRATURE_INTERVALS,
+            });
+        }
+        if !self.quadrature_tolerance_nats.is_finite()
+            || self.quadrature_tolerance_nats <= 0.0
+        {
+            return Err(ModelDiscriminationError::InvalidQuadratureTolerance);
+        }
+        if let ModelUniverseCoverage::DeclaredClosed {
+            completeness_reference,
+        } = &self.model_universe
+            && completeness_reference.trim().is_empty()
+        {
+            return Err(ModelDiscriminationError::MissingCompletenessReference);
+        }
+
+        let mut model_ids = BTreeSet::new();
+        for (index, hypothesis) in hypotheses.iter().enumerate() {
+            if hypothesis.model_id.trim().is_empty() {
+                return Err(ModelDiscriminationError::EmptyHypothesisId(index));
+            }
+            if hypothesis.model_id == OTHER_UNRESOLVED_MODEL_ID {
+                return Err(ModelDiscriminationError::UnresolvedHypothesisMustRemainOpen);
+            }
+            if !model_ids.insert(hypothesis.model_id.as_str()) {
+                return Err(ModelDiscriminationError::DuplicateHypothesisId(
+                    hypothesis.model_id.clone(),
+                ));
+            }
+            if !is_lower_hex_git_sha(&hypothesis.source_revision_sha) {
+                return Err(ModelDiscriminationError::InvalidSourceRevision {
+                    model_id: hypothesis.model_id.clone(),
+                });
+            }
+            if hypothesis.specification_reference.trim().is_empty() {
+                return Err(ModelDiscriminationError::MissingSpecificationReference {
+                    model_id: hypothesis.model_id.clone(),
+                });
+            }
+        }
+
+        let mut scenario_ids = BTreeSet::new();
+        for (index, scenario) in self.prior_scenarios.iter().enumerate() {
+            if scenario.scenario_id.trim().is_empty() {
+                return Err(ModelDiscriminationError::EmptyPriorScenarioId(index));
+            }
+            if !scenario_ids.insert(scenario.scenario_id.as_str()) {
+                return Err(ModelDiscriminationError::DuplicatePriorScenarioId(
+                    scenario.scenario_id.clone(),
+                ));
+            }
+            if !scenario.scenario_weight.is_finite() || scenario.scenario_weight <= 0.0 {
+                return Err(ModelDiscriminationError::InvalidPriorScenarioWeight(
+                    scenario.scenario_id.clone(),
+                ));
+            }
+            if scenario.probabilities.len() != hypotheses.len() {
+                return Err(ModelDiscriminationError::PriorProbabilityCount {
+                    scenario_id: scenario.scenario_id.clone(),
+                    expected: hypotheses.len(),
+                    actual: scenario.probabilities.len(),
+                });
+            }
+            let mut total = 0.0;
+            for (probability_index, probability) in
+                scenario.probabilities.iter().copied().enumerate()
+            {
+                if !probability.is_finite() || probability < 0.0 {
+                    return Err(ModelDiscriminationError::InvalidPriorProbability {
+                        scenario_id: scenario.scenario_id.clone(),
+                        index: probability_index,
+                    });
+                }
+                total += probability;
+            }
+            if !total.is_finite() || total <= 0.0 {
+                return Err(ModelDiscriminationError::ZeroPriorProbability(
+                    scenario.scenario_id.clone(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Rank scalar candidate experiments by expected information gain about the
+/// discrete model identity.
+///
+/// The prior-scenario objective is robust: experiments are sorted first by
+/// worst-case model-identity EIG per cost, then by weighted-mean EIG per cost.
+/// An open-world run explicitly excludes OTHER_UNRESOLVED from numeric
+/// likelihoods. It therefore ranks discrimination among the supplied named
+/// hypotheses; it cannot prove that the selected hypothesis is true.
+pub fn rank_model_discriminating_experiments(
+    hypotheses: &[DiscriminationHypothesis],
+    experiments: &[CandidateExperiment],
+    config: &ModelDiscriminationConfig,
+) -> Result<ModelDiscriminationReport, ModelDiscriminationError> {
+    config.validate(hypotheses)?;
+    if experiments.is_empty() {
+        return Err(ModelDiscriminationError::NoExperiments);
+    }
+    if experiments.len() > MAX_DISCRIMINATION_EXPERIMENTS {
+        return Err(ModelDiscriminationError::TooManyExperiments {
+            count: experiments.len(),
+            maximum: MAX_DISCRIMINATION_EXPERIMENTS,
+        });
+    }
+
+    let mut experiment_ids = BTreeSet::new();
+    let mut scores = Vec::with_capacity(experiments.len());
+    for (index, experiment) in experiments.iter().enumerate() {
+        validate_experiment(experiment, hypotheses, index, &mut experiment_ids)?;
+        scores.push(score_experiment(experiment, hypotheses, config)?);
+    }
+
+    scores.sort_by(|left, right| {
+        let left_scored = matches!(left.status, ExperimentDiscriminationStatus::Scored);
+        let right_scored = matches!(right.status, ExperimentDiscriminationStatus::Scored);
+        right_scored
+            .cmp(&left_scored)
+            .then_with(|| {
+                right
+                    .worst_case_eig_per_cost
+                    .unwrap_or(f64::NEG_INFINITY)
+                    .total_cmp(&left.worst_case_eig_per_cost.unwrap_or(f64::NEG_INFINITY))
+            })
+            .then_with(|| {
+                right
+                    .weighted_mean_eig_per_cost
+                    .unwrap_or(f64::NEG_INFINITY)
+                    .total_cmp(&left.weighted_mean_eig_per_cost.unwrap_or(f64::NEG_INFINITY))
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+
+    Ok(ModelDiscriminationReport {
+        model_ids: hypotheses
+            .iter()
+            .map(|hypothesis| hypothesis.model_id.clone())
+            .collect(),
+        model_universe: config.model_universe.clone(),
+        prior_scenario_ids: config
+            .prior_scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_id.clone())
+            .collect(),
+        experiments: scores,
+    })
+}
+
+fn validate_experiment(
+    experiment: &CandidateExperiment,
+    hypotheses: &[DiscriminationHypothesis],
+    index: usize,
+    experiment_ids: &mut BTreeSet<&str>,
+) -> Result<(), ModelDiscriminationError> {
+    if experiment.experiment_id.trim().is_empty() {
+        return Err(ModelDiscriminationError::EmptyExperimentId(index));
+    }
+    if !experiment_ids.insert(experiment.experiment_id.as_str()) {
+        return Err(ModelDiscriminationError::DuplicateExperimentId(
+            experiment.experiment_id.clone(),
+        ));
+    }
+    for (field_name, value) in [
+        ("observable_id", experiment.observable_id.as_str()),
+        ("domain_id", experiment.domain_id.as_str()),
+        ("units", experiment.units.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(ModelDiscriminationError::EmptyExperimentField {
+                experiment_id: experiment.experiment_id.clone(),
+                field: field_name,
+            });
+        }
+    }
+    if !experiment.cost.is_finite() || experiment.cost <= 0.0 {
+        return Err(ModelDiscriminationError::InvalidExperimentCost(
+            experiment.experiment_id.clone(),
+        ));
+    }
+    if experiment
+        .exclusive_group
+        .as_ref()
+        .is_some_and(|group| group.trim().is_empty())
+    {
+        return Err(ModelDiscriminationError::EmptyExclusiveGroup(
+            experiment.experiment_id.clone(),
+        ));
+    }
+    if experiment.predictions.len() != hypotheses.len() {
+        return Err(ModelDiscriminationError::PredictionCount {
+            experiment_id: experiment.experiment_id.clone(),
+            expected: hypotheses.len(),
+            actual: experiment.predictions.len(),
+        });
+    }
+
+    let expected: BTreeSet<&str> = hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.model_id.as_str())
+        .collect();
+    let mut actual = BTreeSet::new();
+    for prediction in &experiment.predictions {
+        if !actual.insert(prediction.model_id.as_str()) {
+            return Err(ModelDiscriminationError::DuplicateModelPrediction {
+                experiment_id: experiment.experiment_id.clone(),
+                model_id: prediction.model_id.clone(),
+            });
+        }
+        match prediction.disposition {
+            PredictionDisposition::Quantitative => {
+                let mean = prediction.predictive_mean.ok_or_else(|| {
+                    ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
+                        experiment_id: experiment.experiment_id.clone(),
+                        model_id: prediction.model_id.clone(),
+                    }
+                })?;
+                let sigma = prediction.predictive_sigma.ok_or_else(|| {
+                    ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
+                        experiment_id: experiment.experiment_id.clone(),
+                        model_id: prediction.model_id.clone(),
+                    }
+                })?;
+                if !mean.is_finite() {
+                    return Err(ModelDiscriminationError::NonFinitePredictiveMean {
+                        experiment_id: experiment.experiment_id.clone(),
+                        model_id: prediction.model_id.clone(),
+                    });
+                }
+                if !sigma.is_finite() || sigma < 0.0 {
+                    return Err(ModelDiscriminationError::InvalidPredictiveSigma {
+                        experiment_id: experiment.experiment_id.clone(),
+                        model_id: prediction.model_id.clone(),
+                    });
+                }
+            }
+            _ => {
+                if prediction.predictive_mean.is_some() || prediction.predictive_sigma.is_some() {
+                    return Err(ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
+                        experiment_id: experiment.experiment_id.clone(),
+                        model_id: prediction.model_id.clone(),
+                    });
+                }
+            }
+        }
+    }
+    for model_id in expected {
+        if !actual.contains(model_id) {
+            return Err(ModelDiscriminationError::MissingModelPrediction {
+                experiment_id: experiment.experiment_id.clone(),
+                model_id: model_id.to_string(),
+            });
+        }
+    }
+
+    if let Some(sigma) = experiment.measurement_sigma
+        && (!sigma.is_finite() || sigma <= 0.0)
+    {
+        return Err(ModelDiscriminationError::InvalidMeasurementSigma {
+            experiment_id: experiment.experiment_id.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn score_experiment(
+    experiment: &CandidateExperiment,
+    hypotheses: &[DiscriminationHypothesis],
+    config: &ModelDiscriminationConfig,
+) -> Result<ExperimentDiscriminationScore, ModelDiscriminationError> {
+    let mut blockers = Vec::new();
+    if experiment.measurement_noise_model != MeasurementNoiseModel::Gaussian {
+        blockers.push(ExperimentBlocker::NonGaussianMeasurementNoise);
+    }
+    if experiment.noise_calibration == NoiseCalibrationStatus::Uncalibrated {
+        blockers.push(ExperimentBlocker::MeasurementNoiseUncalibrated);
+    }
+    if experiment.measurement_sigma.is_none() {
+        blockers.push(ExperimentBlocker::MeasurementSigmaMissing);
+    }
+    if experiment
+        .calibration_reference
+        .as_ref()
+        .is_none_or(|reference| reference.trim().is_empty())
+    {
+        blockers.push(ExperimentBlocker::CalibrationReferenceMissing);
+    }
+    for prediction in &experiment.predictions {
+        if prediction.disposition != PredictionDisposition::Quantitative {
+            blockers.push(ExperimentBlocker::PredictionNotQuantitative {
+                model_id: prediction.model_id.clone(),
+                disposition: prediction.disposition,
+            });
+            continue;
+        }
+        if prediction.predictive_mean.is_none() {
+            blockers.push(ExperimentBlocker::PredictionMissingMean {
+                model_id: prediction.model_id.clone(),
+            });
+        }
+        if prediction.predictive_sigma.is_none() {
+            blockers.push(ExperimentBlocker::PredictionMissingUncertainty {
+                model_id: prediction.model_id.clone(),
+            });
+        }
+        if prediction
+            .derivation_reference
+            .as_ref()
+            .is_none_or(|reference| reference.trim().is_empty())
+        {
+            blockers.push(ExperimentBlocker::PredictionMissingDerivation {
+                model_id: prediction.model_id.clone(),
+            });
+        }
+    }
+
+    let open_world_unresolved_excluded =
+        matches!(config.model_universe, ModelUniverseCoverage::OpenWorld);
+    if !blockers.is_empty() {
+        return Ok(ExperimentDiscriminationScore {
+            experiment_id: experiment.experiment_id.clone(),
+            observable_id: experiment.observable_id.clone(),
+            cost: experiment.cost,
+            status: ExperimentDiscriminationStatus::NotComparable { blockers },
+            prior_scenario_scores: Vec::new(),
+            worst_case_model_identity_eig_nats: None,
+            weighted_mean_model_identity_eig_nats: None,
+            worst_case_eig_per_cost: None,
+            weighted_mean_eig_per_cost: None,
+            open_world_unresolved_excluded,
+        });
+    }
+
+    let measurement_sigma = experiment.measurement_sigma.expect("validated above");
+    let normal_predictions: Vec<(f64, f64)> = experiment
+        .predictions
+        .iter()
+        .map(|prediction| {
+            (
+                prediction.predictive_mean.expect("validated above"),
+                prediction.predictive_sigma.expect("validated above"),
+            )
+        })
+        .collect();
+
+    let mut prior_scenario_scores = Vec::with_capacity(config.prior_scenarios.len());
+    let mut worst_case = f64::INFINITY;
+    let mut weighted_sum = 0.0;
+    let mut total_scenario_weight = 0.0;
+    let mut maximum_error = 0.0_f64;
+
+    for scenario in &config.prior_scenarios {
+        let probabilities = normalize_probabilities(&scenario.probabilities);
+        let coarse = gaussian_model_identity_eig(
+            &normal_predictions,
+            measurement_sigma,
+            &probabilities,
+            config.quadrature_intervals,
+        )
+        .ok_or_else(|| {
+            ModelDiscriminationError::NumericalOverflow(experiment.experiment_id.clone())
+        })?;
+        let refined = gaussian_model_identity_eig(
+            &normal_predictions,
+            measurement_sigma,
+            &probabilities,
+            config.quadrature_intervals * 2,
+        )
+        .ok_or_else(|| {
+            ModelDiscriminationError::NumericalOverflow(experiment.experiment_id.clone())
+        })?;
+        let error = (refined - coarse).abs();
+        let prior_entropy = discrete_entropy(&probabilities);
+        let converged = error <= config.quadrature_tolerance_nats;
+        maximum_error = maximum_error.max(error);
+        worst_case = worst_case.min(refined);
+        weighted_sum += scenario.scenario_weight * refined;
+        total_scenario_weight += scenario.scenario_weight;
+        prior_scenario_scores.push(PriorScenarioEIG {
+            scenario_id: scenario.scenario_id.clone(),
+            prior_entropy_nats: prior_entropy,
+            coarse_eig_nats: coarse,
+            refined_eig_nats: refined,
+            quadrature_error_nats: error,
+            converged,
+        });
+    }
+
+    if prior_scenario_scores.iter().any(|score| !score.converged) {
+        return Ok(ExperimentDiscriminationScore {
+            experiment_id: experiment.experiment_id.clone(),
+            observable_id: experiment.observable_id.clone(),
+            cost: experiment.cost,
+            status: ExperimentDiscriminationStatus::QuadratureNotConverged {
+                maximum_error_nats: maximum_error,
+                tolerance_nats: config.quadrature_tolerance_nats,
+            },
+            prior_scenario_scores,
+            worst_case_model_identity_eig_nats: None,
+            weighted_mean_model_identity_eig_nats: None,
+            worst_case_eig_per_cost: None,
+            weighted_mean_eig_per_cost: None,
+            open_world_unresolved_excluded,
+        });
+    }
+
+    let weighted_mean = weighted_sum / total_scenario_weight;
+    let worst_case = worst_case.max(0.0);
+    let weighted_mean = weighted_mean.max(0.0);
+    Ok(ExperimentDiscriminationScore {
+        experiment_id: experiment.experiment_id.clone(),
+        observable_id: experiment.observable_id.clone(),
+        cost: experiment.cost,
+        status: ExperimentDiscriminationStatus::Scored,
+        prior_scenario_scores,
+        worst_case_model_identity_eig_nats: Some(worst_case),
+        weighted_mean_model_identity_eig_nats: Some(weighted_mean),
+        worst_case_eig_per_cost: Some(worst_case / experiment.cost),
+        weighted_mean_eig_per_cost: Some(weighted_mean / experiment.cost),
+        open_world_unresolved_excluded,
+    })
+}
+
+fn normalize_probabilities(probabilities: &[f64]) -> Vec<f64> {
+    let total: f64 = probabilities.iter().sum();
+    probabilities.iter().map(|value| value / total).collect()
+}
+
+fn discrete_entropy(probabilities: &[f64]) -> f64 {
+    -probabilities
+        .iter()
+        .copied()
+        .filter(|probability| *probability > 0.0)
+        .map(|probability| probability * probability.ln())
+        .sum::<f64>()
+}
+
+fn gaussian_model_identity_eig(
+    means_and_predictive_sigmas: &[(f64, f64)],
+    measurement_sigma: f64,
+    probabilities: &[f64],
+    intervals: usize,
+) -> Option<f64> {
+    let mut distributions = Vec::new();
+    let mut lower = f64::INFINITY;
+    let mut upper = f64::NEG_INFINITY;
+    for ((mean, predictive_sigma), probability) in means_and_predictive_sigmas
+        .iter()
+        .copied()
+        .zip(probabilities.iter().copied())
+    {
+        if probability == 0.0 {
+            continue;
+        }
+        let sigma = predictive_sigma.hypot(measurement_sigma);
+        if !sigma.is_finite() || sigma <= 0.0 {
+            return None;
+        }
+        lower = lower.min(mean - 10.0 * sigma);
+        upper = upper.max(mean + 10.0 * sigma);
+        distributions.push((mean, sigma, probability));
+    }
+    if distributions.len() <= 1 || !lower.is_finite() || !upper.is_finite() || upper <= lower {
+        return Some(0.0);
+    }
+
+    let step = (upper - lower) / intervals as f64;
+    if !step.is_finite() || step <= 0.0 {
+        return None;
+    }
+    let mut sum = 0.0;
+    for index in 0..=intervals {
+        let y = lower + index as f64 * step;
+        let density = mutual_information_density(y, &distributions)?;
+        let weight = if index == 0 || index == intervals {
+            1.0
+        } else if index % 2 == 0 {
+            2.0
+        } else {
+            4.0
+        };
+        sum += weight * density;
+    }
+    let integral = sum * step / 3.0;
+    if !integral.is_finite() {
+        return None;
+    }
+    if integral < -1.0e-9 {
+        return None;
+    }
+    Some(integral.max(0.0))
+}
+
+fn mutual_information_density(
+    observation: f64,
+    distributions: &[(f64, f64, f64)],
+) -> Option<f64> {
+    let log_joint: Vec<f64> = distributions
+        .iter()
+        .map(|(mean, sigma, probability)| {
+            probability.ln() + normal_log_density(observation, *mean, *sigma)
+        })
+        .collect();
+    let log_mixture = log_sum_exp(&log_joint)?;
+    let mut density = 0.0;
+    for (log_probability, log_joint_value) in
+        distributions.iter().map(|(_, _, p)| p.ln()).zip(log_joint.iter().copied())
+    {
+        let joint = log_joint_value.exp();
+        density += joint * (log_joint_value - log_mixture);
+        if !density.is_finite() || !log_probability.is_finite() {
+            return None;
+        }
+    }
+    Some(density)
+}
+
+fn normal_log_density(value: f64, mean: f64, sigma: f64) -> f64 {
+    let standardized = (value - mean) / sigma;
+    -0.5 * std::f64::consts::TAU.ln()
+        - sigma.ln()
+        - 0.5 * standardized * standardized
+}
+
+fn log_sum_exp(values: &[f64]) -> Option<f64> {
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !maximum.is_finite() {
+        return None;
+    }
+    let sum = values.iter().map(|value| (*value - maximum).exp()).sum::<f64>();
+    if !sum.is_finite() || sum <= 0.0 {
+        return None;
+    }
+    Some(maximum + sum.ln())
+}
+
+fn is_lower_hex_git_sha(value: &str) -> bool {
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hypothesis(id: &str, byte: u8) -> DiscriminationHypothesis {
+        DiscriminationHypothesis {
+            model_id: id.to_string(),
+            source_revision_sha: (0..40).map(|_| byte as char).collect(),
+            specification_reference: format!("spec://{id}"),
+        }
+    }
+
+    fn prediction(id: &str, mean: Option<f64>, sigma: Option<f64>) -> GaussianModelPrediction {
+        GaussianModelPrediction {
+            model_id: id.to_string(),
+            disposition: if mean.is_some() {
+                PredictionDisposition::Quantitative
+            } else {
+                PredictionDisposition::NotDerived
+            },
+            predictive_mean: mean,
+            predictive_sigma: sigma,
+            derivation_reference: mean.map(|_| format!("derivation://{id}")),
+        }
+    }
+
+    fn experiment(
+        id: &str,
+        cost: f64,
+        measurement_sigma: Option<f64>,
+        predictions: Vec<GaussianModelPrediction>,
+    ) -> CandidateExperiment {
+        CandidateExperiment {
+            experiment_id: id.to_string(),
+            observable_id: "observable-y".to_string(),
+            domain_id: "synthetic-domain".to_string(),
+            units: "dimensionless".to_string(),
+            measurement_noise_model: MeasurementNoiseModel::Gaussian,
+            measurement_sigma,
+            noise_calibration: NoiseCalibrationStatus::SyntheticKnownAnswer,
+            calibration_reference: Some("synthetic-noise-fixture-v1".to_string()),
+            cost,
+            exclusive_group: None,
+            predictions,
+        }
+    }
+
+    fn config(prior_scenarios: Vec<ModelPriorScenario>, intervals: usize) -> ModelDiscriminationConfig {
+        ModelDiscriminationConfig {
+            model_universe: ModelUniverseCoverage::OpenWorld,
+            prior_scenarios,
+            quadrature_intervals: intervals,
+            quadrature_tolerance_nats: 1.0e-6,
+        }
+    }
+
+    fn equal_prior() -> ModelPriorScenario {
+        ModelPriorScenario {
+            scenario_id: "equal".to_string(),
+            scenario_weight: 1.0,
+            probabilities: vec![0.5, 0.5],
+        }
+    }
+
+    #[test]
+    fn identical_predictions_have_zero_model_identity_eig() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let experiment = experiment(
+            "same-outcome",
+            1.0,
+            Some(0.1),
+            vec![
+                prediction("model-a", Some(2.0), Some(0.05)),
+                prediction("model-b", Some(2.0), Some(0.05)),
+            ],
+        );
+        let report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[experiment],
+            &config(vec![equal_prior()], 128),
+        )
+        .unwrap();
+        let score = &report.experiments[0];
+        assert_eq!(score.status, ExperimentDiscriminationStatus::Scored);
+        assert!(score.worst_case_model_identity_eig_nats.unwrap().abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn separated_models_approach_prior_entropy_and_gain_increases_with_separation() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let make = |separation: f64| {
+            experiment(
+                "candidate",
+                1.0,
+                Some(0.1),
+                vec![
+                    prediction("model-a", Some(-separation / 2.0), Some(0.0)),
+                    prediction("model-b", Some(separation / 2.0), Some(0.0)),
+                ],
+            )
+        };
+        let close = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[make(0.2)],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        let far = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[make(4.0)],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        assert!(
+            far.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+                > close.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+        );
+        assert!(
+            far.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+                > std::f64::consts::LN_2 * 0.95
+        );
+        assert!(
+            far.experiments[0].worst_case_model_identity_eig_nats.unwrap()
+                <= std::f64::consts::LN_2 + 1.0e-6
+        );
+    }
+
+    #[test]
+    fn eig_is_invariant_to_common_affine_outcome_scaling() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let base = experiment(
+            "base",
+            1.0,
+            Some(0.2),
+            vec![
+                prediction("model-a", Some(1.0), Some(0.1)),
+                prediction("model-b", Some(2.0), Some(0.15)),
+            ],
+        );
+        let scaled = experiment(
+            "scaled",
+            1.0,
+            Some(20.0),
+            vec![
+                prediction("model-a", Some(100.0), Some(10.0)),
+                prediction("model-b", Some(200.0), Some(15.0)),
+            ],
+        );
+        let report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[base, scaled],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        let left = report.experiments.iter().find(|score| score.experiment_id == "base").unwrap();
+        let right = report.experiments.iter().find(|score| score.experiment_id == "scaled").unwrap();
+        assert!(
+            (left.worst_case_model_identity_eig_nats.unwrap()
+                - right.worst_case_model_identity_eig_nats.unwrap())
+            .abs()
+                < 1.0e-7
+        );
+    }
+
+    #[test]
+    fn prior_sensitivity_is_reported_and_worst_case_is_used_for_ranking() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let priors = vec![
+            ModelPriorScenario {
+                scenario_id: "balanced".to_string(),
+                scenario_weight: 1.0,
+                probabilities: vec![0.5, 0.5],
+            },
+            ModelPriorScenario {
+                scenario_id: "skewed".to_string(),
+                scenario_weight: 1.0,
+                probabilities: vec![0.99, 0.01],
+            },
+        ];
+        let report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[experiment(
+                "measurement",
+                2.0,
+                Some(0.05),
+                vec![
+                    prediction("model-a", Some(0.0), Some(0.0)),
+                    prediction("model-b", Some(1.0), Some(0.0)),
+                ],
+            )],
+            &config(priors, 256),
+        )
+        .unwrap();
+        let score = &report.experiments[0];
+        assert_eq!(score.prior_scenario_scores.len(), 2);
+        assert!(
+            score.prior_scenario_scores[0].refined_eig_nats
+                > score.prior_scenario_scores[1].refined_eig_nats
+        );
+        assert!(score.worst_case_model_identity_eig_nats.is_some());
+    }
+
+    #[test]
+    fn not_derived_prediction_and_uncalibrated_noise_block_numeric_score() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let mut experiment = experiment(
+            "blocked",
+            1.0,
+            None,
+            vec![
+                prediction("model-a", Some(0.0), Some(0.0)),
+                prediction("model-b", None, None),
+            ],
+        );
+        experiment.noise_calibration = NoiseCalibrationStatus::Uncalibrated;
+        let report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[experiment],
+            &config(vec![equal_prior()], 128),
+        )
+        .unwrap();
+        let score = &report.experiments[0];
+        assert!(matches!(
+            score.status,
+            ExperimentDiscriminationStatus::NotComparable { .. }
+        ));
+        assert!(score.worst_case_model_identity_eig_nats.is_none());
+    }
+
+    #[test]
+    fn open_world_unresolved_model_is_not_assigned_a_numeric_distribution() {
+        let hypotheses = vec![
+            hypothesis("model-a", b'a'),
+            hypothesis("model-b", b'b'),
+            // OTHER_UNRESOLVED is not a member of the numeric hypothesis set.
+        ];
+        let result = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[experiment(
+                "candidate",
+                1.0,
+                Some(0.1),
+                vec![
+                    prediction("model-a", Some(0.0), Some(0.0)),
+                    prediction("model-b", Some(1.0), Some(0.0)),
+                ],
+            )],
+            &config(vec![equal_prior()], 128),
+        )
+        .unwrap();
+        assert!(result.experiments[0].open_world_unresolved_excluded);
+        assert_eq!(result.model_universe, ModelUniverseCoverage::OpenWorld);
+    }
+
+    #[test]
+    fn cost_normalized_worst_case_eig_determines_ranking() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let expensive = experiment(
+            "expensive",
+            10.0,
+            Some(0.1),
+            vec![
+                prediction("model-a", Some(0.0), Some(0.0)),
+                prediction("model-b", Some(2.0), Some(0.0)),
+            ],
+        );
+        let cheap = experiment(
+            "cheap",
+            1.0,
+            Some(0.1),
+            vec![
+                prediction("model-a", Some(0.0), Some(0.0)),
+                prediction("model-b", Some(1.0), Some(0.0)),
+            ],
+        );
+        let report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[expensive, cheap],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        assert_eq!(report.experiments[0].experiment_id, "cheap");
+    }
+
+    #[test]
+    fn malformed_prediction_coverage_and_prior_fail_closed() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let incomplete = experiment(
+            "incomplete",
+            1.0,
+            Some(0.1),
+            vec![prediction("model-a", Some(0.0), Some(0.0))],
+        );
+        assert!(matches!(
+            rank_model_discriminating_experiments(
+                &hypotheses,
+                &[incomplete],
+                &config(vec![equal_prior()], 128)
+            ),
+            Err(ModelDiscriminationError::PredictionCount { .. })
+        ));
+
+        let mut prior = equal_prior();
+        prior.probabilities[1] = f64::NAN;
+        assert!(matches!(
+            rank_model_discriminating_experiments(
+                &hypotheses,
+                &[experiment(
+                    "valid",
+                    1.0,
+                    Some(0.1),
+                    vec![
+                        prediction("model-a", Some(0.0), Some(0.0)),
+                        prediction("model-b", Some(1.0), Some(0.0)),
+                    ]
+                )],
+                &config(vec![prior], 128)
+            ),
+            Err(ModelDiscriminationError::InvalidPriorProbability { .. })
+        ));
+    }
+}
