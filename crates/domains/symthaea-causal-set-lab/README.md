@@ -42,6 +42,40 @@ The implementation uses (u=t+x), (v=t-x). A 1+1D Alexandrov
 interval of endpoint proper-time separation (T) is the square
 (0\le u,v\le T), with spacetime volume (T^2/2).
 
+## Curved 1+1D conformal-FRW sprinkling (new research prototype)
+
+The `curved_frw_1p1` module adds a separate fixed-cardinality sampler for
+
+    ds^2 = a(eta)^2 (-deta^2 + dx^2)
+    a(eta) = exp(kappa * eta^2 / 2), kappa >= 0
+
+inside the diamond `|eta| <= T/2`, `|x| <= T/2 - |eta|`. The volume density
+is `sqrt(|g|) = a(eta)^2`, while the causal cones are conformally unchanged.
+Events are mapped to the existing null-coordinate square using
+`u = eta + x + T/2`, `v = eta - x + T/2`.
+
+The implementation provides:
+- fixed-N sampling from the curved Lorentzian volume measure using a
+  deterministic SplitMix64 stream and a tabulated Simpson inverse CDF;
+- total spacetime volume and the expected eta-squared moment;
+- scale factor, Ricci scalar under the stated convention
+  `R = 2 (ln a)'' / a^2`, and numerical comoving proper time;
+- flat-limit, deterministic replay, causal-order, and analytic-curvature tests.
+
+Run the finite-sample sweep with:
+
+    cargo run --locked -p symthaea-causal-set-lab --example curved_frw_sweep
+
+The sweep compares empirical order fractions with a separate Halton
+importance-quadrature reference and emits the flat `kappa=0` control. It
+explicitly does not apply the flat Myrheim–Meyer dimension law as a universal
+curved-spacetime dimension estimator. The QMC reference is deterministic
+finite-sample quadrature, not an exact integral or a continuum-limit proof.
+
+This is a curved-measure kinematics prototype. It does not yet implement a
+causal-set d'Alembertian, link propagator, AdS boundary conditions, or a
+continuum-limit analysis. See [CAUSAL-CURVED-001](../../../../issues/11053).
+
 ## Epistemic boundary
 
 This is a kinematics, finite-set action-bracket and estimator testbed. It
