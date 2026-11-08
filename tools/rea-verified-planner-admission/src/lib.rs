@@ -29,10 +29,17 @@ pub enum DeclaredEvidenceOrigin {
 }
 
 impl DeclaredEvidenceOrigin {
-    fn to_planner_origin(self) -> EvidenceOrigin {
+    /// Preserve the caller's declaration in the report, but do not let an
+    /// unverified declaration qualify as a planner grounding root. The existing
+    /// planner has no CallerDeclaredUnverified variant, so v0 maps both
+    /// caller-declared observation classes to its non-grounding ExternalReference
+    /// category. A future verified attestation policy can add a separate,
+    /// explicit qualification path.
+    fn to_unverified_planner_origin(self) -> EvidenceOrigin {
         match self {
-            Self::IndependentObservation => EvidenceOrigin::IndependentObservation,
-            Self::IndependentDerivation => EvidenceOrigin::IndependentDerivation,
+            Self::IndependentObservation | Self::IndependentDerivation => {
+                EvidenceOrigin::ExternalReference
+            }
             Self::ModelGenerated => EvidenceOrigin::ModelGenerated,
             Self::Synthetic => EvidenceOrigin::Synthetic,
             Self::ExternalReference => EvidenceOrigin::ExternalReference,
@@ -441,12 +448,13 @@ impl VerifiedEvidenceCatalog {
         Ok(sha256_hex(&canonical))
     }
 
-    /// Project verified IDs into the existing planner type. Origin remains a
-    /// caller declaration; this method does not authenticate a source or origin.
-    pub fn planner_provenance_projection(&self) -> Vec<EvidenceProvenance> {
+    /// Project verified IDs into the existing planner type. Caller-declared
+    /// observation/derivation labels are deliberately downgraded to
+    /// ExternalReference until a separate attestation policy qualifies them.
+    fn planner_provenance_projection(&self) -> Vec<EvidenceProvenance> {
         self.records.values().map(|record| EvidenceProvenance {
             evidence_id: record.evidence_id.clone(),
-            origin: record.declared_origin.to_planner_origin(),
+            origin: record.declared_origin.to_unverified_planner_origin(),
             parent_evidence_ids: record.parent_evidence_ids.clone(),
         }).collect()
     }
@@ -878,7 +886,11 @@ mod tests {
             &[],
             PlannerConfig::default(),
         ).unwrap();
-        assert_eq!(result.plan.abstention, Some(AbstentionReason::NoCompetingHypotheses));
+        assert_eq!(
+            result.plan.abstention,
+            Some(AbstentionReason::NoIndependentlyGroundedHypothesis),
+            "caller-declared origin must not ground a production planner hypothesis"
+        );
         assert!(!result.plan.claim_ceiling.evidence_producer_authenticated);
         assert!(!result.admission.claim_ceiling.caller_origin_authenticated);
         assert!(!result.admission.claim_ceiling.source_independence_authenticated);
