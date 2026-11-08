@@ -150,6 +150,49 @@ impl FormantSingingEngine {
                     anyhow::anyhow!("binding {binding_index} has no pronunciation syllable")
                 })?;
 
+            // A multi-note melisma is one sustained vowel event, not a fresh
+            // vowel attack on every note. Compute its envelope once across the
+            // first vowel onset through the final vowel offset; note F0 targets
+            // may still change at the score-event boundaries.
+            let melisma_envelope = if binding.spans.len() > 1 {
+                let phone_index = binding.melisma_phone_index.ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "binding {binding_index} has multiple spans without a melisma phone"
+                    )
+                })?;
+                let first_span = &binding.spans[0];
+                let first_event = &alignment.events[first_span.event_index];
+                let first_start_s = first_event.start_s + first_span.start_offset_s;
+                let first_end_s = first_event.start_s + first_span.end_offset_s;
+                let first_phone_refs: Vec<&Phone> =
+                    syllable.phones[..=phone_index].iter().collect();
+                let first_durations = allocate_resolved_phone_durations(
+                    &first_phone_refs,
+                    first_end_s - first_start_s,
+                    syllable.stress,
+                    binding_index,
+                )?;
+                let vowel_onset_s = first_start_s
+                    + first_durations[..phone_index].iter().sum::<f32>();
+
+                let last_span = binding.spans.last().expect("multi-span binding is non-empty");
+                let last_event = &alignment.events[last_span.event_index];
+                let last_start_s = last_event.start_s + last_span.start_offset_s;
+                let last_end_s = last_event.start_s + last_span.end_offset_s;
+                let last_phone_refs: Vec<&Phone> =
+                    syllable.phones[phone_index..].iter().collect();
+                let last_durations = allocate_resolved_phone_durations(
+                    &last_phone_refs,
+                    last_end_s - last_start_s,
+                    syllable.stress,
+                    binding_index,
+                )?;
+                let vowel_release_s = last_start_s + last_durations[0];
+                Some((vowel_onset_s, vowel_release_s))
+            } else {
+                None
+            };
+
             for (span_index, span) in binding.spans.iter().enumerate() {
                 let event = alignment.events.get(span.event_index).ok_or_else(|| {
                     anyhow::anyhow!("binding {binding_index} references missing score event")
@@ -174,8 +217,8 @@ impl FormantSingingEngine {
                     bail!("binding {binding_index} has invalid materialized timing");
                 }
 
-                let phones: Vec<&Phone> = if binding.spans.len() == 1 {
-                    syllable.phones.iter().collect()
+                let phone_indices: Vec<usize> = if binding.spans.len() == 1 {
+                    (0..syllable.phones.len()).collect()
                 } else {
                     let phone_index = binding.melisma_phone_index.ok_or_else(|| {
                         anyhow::anyhow!(
@@ -192,15 +235,18 @@ impl FormantSingingEngine {
                             "binding {binding_index} melisma phone must be the final syllabic nucleus"
                         );
                     }
-                    let melisma_phone = &syllable.phones[phone_index];
                     if span_index == 0 {
-                        syllable.phones[..=phone_index].iter().collect()
+                        (0..=phone_index).collect()
                     } else if span_index + 1 == binding.spans.len() {
-                        syllable.phones[phone_index..].iter().collect()
+                        (phone_index..syllable.phones.len()).collect()
                     } else {
-                        vec![melisma_phone]
+                        vec![phone_index]
                     }
                 };
+                let phones: Vec<&Phone> = phone_indices
+                    .iter()
+                    .map(|index| &syllable.phones[*index])
+                    .collect();
                 let durations = allocate_resolved_phone_durations(
                     &phones,
                     span_duration_s,
@@ -208,7 +254,9 @@ impl FormantSingingEngine {
                     binding_index,
                 )?;
                 let mut phone_start_s = start_s;
-                for (phone, phone_duration_s) in phones.iter().zip(durations) {
+                for ((phone, phone_index), phone_duration_s) in
+                    phones.iter().zip(phone_indices).zip(durations)
+                {
                     let (f1, f2, f3, source_type) = strict_formant_target(phone)?;
                     let phone_end_s = phone_start_s + phone_duration_s;
                     let stress_gain = match syllable.stress {
@@ -228,9 +276,17 @@ impl FormantSingingEngine {
                         SourceType::Silent => 0.0,
                     };
                     let base_energy = (velocity * stress_gain).clamp(0.0, 1.0);
+                    let (envelope_start_s, envelope_end_s) =
+                        if Some(phone_index) == binding.melisma_phone_index {
+                            melisma_envelope.unwrap_or((phone_start_s, phone_end_s))
+                        } else {
+                            (phone_start_s, phone_end_s)
+                        };
                     segments.push(ResolvedPhoneSegment {
                         start_s: phone_start_s,
                         end_s: phone_end_s,
+                        envelope_start_s,
+                        envelope_end_s,
                         f1,
                         f2,
                         f3,
@@ -269,8 +325,8 @@ impl FormantSingingEngine {
                 && time_s >= segment.start_s
                 && time_s < segment.end_s
             {
-                let attack = ((time_s - segment.start_s) / 0.015).clamp(0.0, 1.0);
-                let release = ((segment.end_s - time_s) / 0.015).clamp(0.0, 1.0);
+                let attack = ((time_s - segment.envelope_start_s) / 0.015).clamp(0.0, 1.0);
+                let release = ((segment.envelope_end_s - time_s) / 0.015).clamp(0.0, 1.0);
                 let envelope = attack.min(release);
                 FormantFrame {
                     f1: segment.f1,
@@ -388,6 +444,8 @@ impl FormantSingingEngine {
 struct ResolvedPhoneSegment {
     start_s: f32,
     end_s: f32,
+    envelope_start_s: f32,
+    envelope_end_s: f32,
     f1: f32,
     f2: f32,
     f3: f32,
