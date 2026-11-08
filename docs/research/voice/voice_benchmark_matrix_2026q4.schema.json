@@ -278,6 +278,16 @@
           "profile_example_path": {
             "type": "string",
             "minLength": 1
+          },
+          "implementation_branch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_requirements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": true
@@ -337,6 +347,10 @@
           },
           "note": {
             "type": "string"
+          },
+          "linked_pr": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "additionalProperties": true
