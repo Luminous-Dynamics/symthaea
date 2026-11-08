@@ -901,6 +901,9 @@ fn evaluate(
                 totals.oov_true_positive,
                 totals.oov_true_positive + totals.oov_false_negative,
             );
+            let calibration = language_confidence
+                .get(&language)
+                .and_then(|samples| confidence_calibration(samples));
             LanguageMetrics {
                 language,
                 cases: totals.cases,
@@ -918,9 +921,7 @@ fn evaluate(
                 oov_false_negative: totals.oov_false_negative,
                 oov_precision,
                 oov_recall,
-                confidence_calibration: language_confidence
-                    .get(&language)
-                    .and_then(|samples| confidence_calibration(samples)),
+                confidence_calibration: calibration,
             }
         })
         .collect();
@@ -935,6 +936,9 @@ fn evaluate(
                 totals.oov_true_positive,
                 totals.oov_true_positive + totals.oov_false_negative,
             );
+            let calibration = profile_confidence
+                .get(&profile_id)
+                .and_then(|samples| confidence_calibration(samples));
             ProfileMetrics {
                 profile_id,
                 cases: totals.cases,
@@ -952,9 +956,7 @@ fn evaluate(
                 oov_false_negative: totals.oov_false_negative,
                 oov_precision,
                 oov_recall,
-                confidence_calibration: profile_confidence
-                    .get(&profile_id)
-                    .and_then(|samples| confidence_calibration(samples)),
+                confidence_calibration: calibration,
             }
         })
         .collect();
