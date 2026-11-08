@@ -10,7 +10,9 @@ use std::process::ExitCode;
 use open_world_ansatz_microcosm::policy::{
     FiniteEnumeratorBaseline, PolicyError, StrategyEnumeratorBaseline,
 };
-use open_world_ansatz_microcosm::protocol::{AgentAction, AgentView, EpisodeStatus, PROTOCOL_VERSION};
+use open_world_ansatz_microcosm::protocol::{
+    AgentAction, AgentView, EpisodeStatus, PROTOCOL_VERSION,
+};
 use open_world_ansatz_microcosm::strategies::ProbeStrategy;
 
 const MAX_INPUT_LINE_BYTES: usize = 1_048_576;
@@ -47,12 +49,12 @@ fn parse_policy(args: &[String]) -> Result<AgentPolicy, String> {
         "maximum_partition" => Ok(AgentPolicy::Strategy(ProbeStrategy::MaximumPartition)),
         "minimax" => Ok(AgentPolicy::Strategy(ProbeStrategy::Minimax)),
         "maximum_entropy" => Ok(AgentPolicy::Strategy(ProbeStrategy::MaximumEntropy)),
-        "minimum_expected_remaining" => {
-            Ok(AgentPolicy::Strategy(ProbeStrategy::MinimumExpectedRemaining))
-        }
-        "maximum_structure_information_gain" => {
-            Ok(AgentPolicy::Strategy(ProbeStrategy::MaximumStructureInformationGain))
-        }
+        "minimum_expected_remaining" => Ok(AgentPolicy::Strategy(
+            ProbeStrategy::MinimumExpectedRemaining,
+        )),
+        "maximum_structure_information_gain" => Ok(AgentPolicy::Strategy(
+            ProbeStrategy::MaximumStructureInformationGain,
+        )),
         "fixed_grid" => Ok(AgentPolicy::Strategy(ProbeStrategy::FixedGrid)),
         random if random.starts_with("random:") => {
             let seed = random["random:".len()..]
@@ -69,10 +71,7 @@ enum LineRead {
     Line,
 }
 
-fn read_bounded_line<R: BufRead>(
-    reader: &mut R,
-    buffer: &mut Vec<u8>,
-) -> io::Result<LineRead> {
+fn read_bounded_line<R: BufRead>(reader: &mut R, buffer: &mut Vec<u8>) -> io::Result<LineRead> {
     buffer.clear();
     loop {
         let available = reader.fill_buf()?;
@@ -106,8 +105,8 @@ fn read_bounded_line<R: BufRead>(
 }
 
 fn next_action(policy: AgentPolicy, line: &[u8]) -> Result<Vec<u8>, String> {
-    let view: AgentView = serde_json::from_slice(line)
-        .map_err(|error| format!("invalid AgentView JSON: {error}"))?;
+    let view: AgentView =
+        serde_json::from_slice(line).map_err(|error| format!("invalid AgentView JSON: {error}"))?;
     if view.task.protocol_version != PROTOCOL_VERSION {
         return Err(format!(
             "unsupported protocol version: {}",
@@ -139,7 +138,10 @@ fn run() -> Result<(), String> {
         {
             LineRead::Eof => break,
             LineRead::Line => {
-                while line.last().is_some_and(|byte| *byte == b'\n' || *byte == b'\r') {
+                while line
+                    .last()
+                    .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
+                {
                     line.pop();
                 }
                 if line.is_empty() {
@@ -174,7 +176,10 @@ mod tests {
 
     #[test]
     fn parses_finite_and_random_strategies() {
-        assert!(matches!(parse_policy(&[]), Ok(AgentPolicy::FiniteEnumerator)));
+        assert!(matches!(
+            parse_policy(&[]),
+            Ok(AgentPolicy::FiniteEnumerator)
+        ));
         assert!(matches!(
             parse_policy(&["--strategy".to_owned(), "random:19".to_owned()]),
             Ok(AgentPolicy::Strategy(ProbeStrategy::Random { seed: 19 }))
