@@ -87,3 +87,22 @@ The downstream composition remains:
 ## Limitations
 
 This v0.1 fixture tests the mathematics of finite decision value and shared-source dependence only. It is not an asteroid observation likelihood, orbit determination, Sentry reproduction, alerting service, or mitigation planner. No superiority over CNEOS or any operational authority is claimed.
+
+
+## Rust reference evaluator (v0.1)
+
+The standalone Rust package at `verifier/` recomputes the exact finite oracle rather than trusting the expected values in the fixture. It enumerates the one-reading, shared-calibration two-reading and independent-source two-reading outcome distributions, applies Bayes' rule, chooses the minimum conditional expected-loss action, checks every frozen outcome row, checks mutual information / EVSI / expected risk, and emits a SHA-256 receipt over the embedded fixture bytes.
+
+The nested Cargo package is intentionally isolated from the root Symthaea workspace; it adds no dependency to the production workspace. Its direct dependencies are exact-pinned to versions already present in the root lockfile.
+
+Run:
+
+```sh
+cargo generate-lockfile --manifest-path benchmarks/neo-observation-voi-v0/verifier/Cargo.toml
+cargo fmt --manifest-path benchmarks/neo-observation-voi-v0/verifier/Cargo.toml -- --check
+cargo clippy --manifest-path benchmarks/neo-observation-voi-v0/verifier/Cargo.toml --locked --all-targets -- -D warnings
+cargo test --manifest-path benchmarks/neo-observation-voi-v0/verifier/Cargo.toml --locked
+cargo run --manifest-path benchmarks/neo-observation-voi-v0/verifier/Cargo.toml --locked --release
+```
+
+The dedicated workflow is `.github/workflows/neo-observation-voi-v0.yml`. It is defined on this research branch and will run for subsequent benchmark changes once merged into the default branch. The existing root CI does not compile this independent nested package, so root-workspace CI success must not be reported as verifier test success.
