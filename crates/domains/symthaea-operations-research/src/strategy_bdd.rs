@@ -2680,28 +2680,22 @@ mod tests {
         let source = function(
             &[0, 1, 2, 3],
             &[
-                true, false, false, true, true, false, false, true,
-                true, false, true, false, true, false, false, true,
+                true, false, false, true, true, false, false, true, true, false, true, false, true,
+                false, false, true,
             ],
         );
         let natural_order = vec![0, 1, 2, 3];
-        let natural = compile_strategy_function_to_robdd_with_order(
-            &source,
-            &natural_order,
-            budget(),
-        )
-        .unwrap();
+        let natural =
+            compile_strategy_function_to_robdd_with_order(&source, &natural_order, budget())
+                .unwrap();
 
         let (gf2_graph, _) = strategy_interaction_graph(&source, budget()).unwrap();
         let unweighted_order = interaction_graph_min_fill_order(&gf2_graph).unwrap();
         let weighted = strategy_arithmetic_weighted_interaction_graph(&source, budget()).unwrap();
         let weighted_order = weighted_interaction_min_fill_order(&weighted.weights).unwrap();
-        let weighted_bdd = compile_strategy_function_to_robdd_with_order(
-            &source,
-            &weighted_order,
-            budget(),
-        )
-        .unwrap();
+        let weighted_bdd =
+            compile_strategy_function_to_robdd_with_order(&source, &weighted_order, budget())
+                .unwrap();
         let exact = find_exact_minimum_robdd_order(&source, budget()).unwrap();
 
         assert_eq!(unweighted_order, natural_order);
