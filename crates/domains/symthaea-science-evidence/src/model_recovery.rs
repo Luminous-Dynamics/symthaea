@@ -16,8 +16,7 @@ use super::model_discrimination::{
     ModelDiscriminationError, ModelPriorScenario,
 };
 use super::theory_prediction::{
-    MeasurementNoiseModel, NoiseCalibrationStatus, OTHER_UNRESOLVED_MODEL_ID,
-    PredictionDisposition,
+    MeasurementNoiseModel, NoiseCalibrationStatus, OTHER_UNRESOLVED_MODEL_ID, PredictionDisposition,
 };
 use std::collections::BTreeSet;
 use thiserror::Error;
@@ -298,11 +297,9 @@ pub fn evaluate_model_recovery(
         let model_index = model_ids
             .iter()
             .position(|model_id| model_id == &prediction.model_id)
-            .ok_or_else(|| {
-                ModelDiscriminationError::MissingModelPrediction {
-                    experiment_id: experiment.experiment_id.clone(),
-                    model_id: prediction.model_id.clone(),
-                }
+            .ok_or_else(|| ModelDiscriminationError::MissingModelPrediction {
+                experiment_id: experiment.experiment_id.clone(),
+                model_id: prediction.model_id.clone(),
             })?;
         inference_models.push((
             model_index,
@@ -415,8 +412,8 @@ pub fn evaluate_model_recovery(
                 };
                 log_joint.push(value);
             }
-            let normalizer = log_sum_exp(&log_joint)
-                .ok_or(ModelRecoveryError::NonFiniteSyntheticCalculation)?;
+            let normalizer =
+                log_sum_exp(&log_joint).ok_or(ModelRecoveryError::NonFiniteSyntheticCalculation)?;
             let (best_index, best_log_joint) = log_joint
                 .iter()
                 .copied()
@@ -445,8 +442,8 @@ pub fn evaluate_model_recovery(
             .iter()
             .position(|model_id| model_id == &generator.generator_id)
         {
-            let row_accuracy =
-                confusion_counts[generator_index][model_index] as f64 / samples_per_generator as f64;
+            let row_accuracy = confusion_counts[generator_index][model_index] as f64
+                / samples_per_generator as f64;
             prior_weighted_accuracy += normalized_prior[model_index] * row_accuracy;
         }
     }
@@ -454,8 +451,8 @@ pub fn evaluate_model_recovery(
     let named_total = named_trial_count as u64;
     let named_model_accuracy = named_correct as f64 / named_total as f64;
     let named_model_coverage = named_assigned as f64 / named_total as f64;
-    let named_model_selective_accuracy = (named_assigned > 0)
-        .then_some(named_correct as f64 / named_assigned as f64);
+    let named_model_selective_accuracy =
+        (named_assigned > 0).then_some(named_correct as f64 / named_assigned as f64);
     let (open_world_false_confident_assignment_rate, open_world_abstention_rate) =
         if has_unresolved_generator {
             let row_index = generator_ids
@@ -542,9 +539,7 @@ fn log_sum_exp(values: &[f64]) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model_discrimination::{
-        GaussianModelPrediction, PredictionDisposition,
-    };
+    use crate::model_discrimination::{GaussianModelPrediction, PredictionDisposition};
 
     fn hypothesis(id: &str, byte: u8) -> DiscriminationHypothesis {
         DiscriminationHypothesis {
@@ -601,9 +596,21 @@ mod tests {
             prediction("c", 10.0, 0.0),
         ]);
         let generators = vec![
-            RecoveryGenerator { generator_id: "a".into(), predictive_mean: -10.0, predictive_sigma: 0.0 },
-            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.0 },
-            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 10.0, predictive_sigma: 0.0 },
+            RecoveryGenerator {
+                generator_id: "a".into(),
+                predictive_mean: -10.0,
+                predictive_sigma: 0.0,
+            },
+            RecoveryGenerator {
+                generator_id: "b".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.0,
+            },
+            RecoveryGenerator {
+                generator_id: "c".into(),
+                predictive_mean: 10.0,
+                predictive_sigma: 0.0,
+            },
         ];
         let report = evaluate_model_recovery(
             &hypotheses,
@@ -634,9 +641,21 @@ mod tests {
             prediction("c", 0.0, 0.1),
         ]);
         let generators = vec![
-            RecoveryGenerator { generator_id: "a".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
+            RecoveryGenerator {
+                generator_id: "a".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "b".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "c".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
         ];
         let report = evaluate_model_recovery(
             &hypotheses,
@@ -670,9 +689,21 @@ mod tests {
             prediction("c", 0.0, 0.1),
         ]);
         let generators = vec![
-            RecoveryGenerator { generator_id: "a".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
+            RecoveryGenerator {
+                generator_id: "a".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "b".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "c".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
         ];
         let skewed_prior = ModelPriorScenario {
             scenario_id: "model-a-dominant".to_string(),
@@ -713,9 +744,21 @@ mod tests {
             prediction("c", 1.0, 0.1),
         ]);
         let mut generators = vec![
-            RecoveryGenerator { generator_id: "a".into(), predictive_mean: -1.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 1.0, predictive_sigma: 0.1 },
+            RecoveryGenerator {
+                generator_id: "a".into(),
+                predictive_mean: -1.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "b".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "c".into(),
+                predictive_mean: 1.0,
+                predictive_sigma: 0.1,
+            },
         ];
         generators.push(RecoveryGenerator {
             generator_id: OTHER_UNRESOLVED_MODEL_ID.to_string(),
@@ -733,8 +776,16 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(report.generator_ids.last().unwrap(), OTHER_UNRESOLVED_MODEL_ID);
-        assert!(report.model_ids.iter().all(|id| id != OTHER_UNRESOLVED_MODEL_ID));
+        assert_eq!(
+            report.generator_ids.last().unwrap(),
+            OTHER_UNRESOLVED_MODEL_ID
+        );
+        assert!(
+            report
+                .model_ids
+                .iter()
+                .all(|id| id != OTHER_UNRESOLVED_MODEL_ID)
+        );
         assert!(report.open_world_false_confident_assignment_rate.is_some());
         assert!(report.open_world_abstention_rate.is_some());
     }
@@ -752,13 +803,43 @@ mod tests {
             prediction("c", 0.5, 0.1),
         ]);
         let generators = vec![
-            RecoveryGenerator { generator_id: "a".into(), predictive_mean: -0.5, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 0.5, predictive_sigma: 0.1 },
+            RecoveryGenerator {
+                generator_id: "a".into(),
+                predictive_mean: -0.5,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "b".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "c".into(),
+                predictive_mean: 0.5,
+                predictive_sigma: 0.1,
+            },
         ];
 
-        let first = evaluate_model_recovery(&hypotheses, &experiment, &prior(), &generators, 128, 1234, 0.8).unwrap();
-        let second = evaluate_model_recovery(&hypotheses, &experiment, &prior(), &generators, 128, 1234, 0.8).unwrap();
+        let first = evaluate_model_recovery(
+            &hypotheses,
+            &experiment,
+            &prior(),
+            &generators,
+            128,
+            1234,
+            0.8,
+        )
+        .unwrap();
+        let second = evaluate_model_recovery(
+            &hypotheses,
+            &experiment,
+            &prior(),
+            &generators,
+            128,
+            1234,
+            0.8,
+        )
+        .unwrap();
         assert_eq!(first.confusion_counts, second.confusion_counts);
     }
 
@@ -778,9 +859,21 @@ mod tests {
         experiment.predictions[2].predictive_mean = None;
         experiment.predictions[2].predictive_sigma = None;
         let generators = vec![
-            RecoveryGenerator { generator_id: "a".into(), predictive_mean: -0.5, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
-            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 0.5, predictive_sigma: 0.1 },
+            RecoveryGenerator {
+                generator_id: "a".into(),
+                predictive_mean: -0.5,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "b".into(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "c".into(),
+                predictive_mean: 0.5,
+                predictive_sigma: 0.1,
+            },
         ];
 
         assert!(matches!(
