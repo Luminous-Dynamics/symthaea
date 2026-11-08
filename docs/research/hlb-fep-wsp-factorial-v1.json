@@ -1501,7 +1501,10 @@
     "For dimension D=2^L, the butterfly angle manifest contains exactly (D/2)*L finite parameters, stage-major and pair-major, and reports this count against D^2 dense parameters.",
     "Each butterfly stage consists of disjoint orthogonal Givens rotations; the inverse applies transposed rotations in reverse stage order and must restore the input within the preregistered floating-point tolerance.",
     "Operator characterization reports norm preservation, inverse error, basis-coordinate spread, parameter count, and measured latency separately; operator-level performance is not a downstream task or SOTA claim.",
-    "A zero-angle butterfly is the identity and invalid dimensions, angle counts, non-finite angles, and input dimensions must fail closed."
+    "A zero-angle butterfly is the identity and invalid dimensions, angle counts, non-finite angles, and input dimensions must fail closed.",
+    "Optimal-decision information gain is computed from a deterministic hypothesis-to-optimal-decision map and must not exceed model information gain beyond the preregistered numerical tolerance.",
+    "The decision-diagnostic harness must run no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, and always-inspect on paired episode seeds; report paired EVSI-versus-baseline differences and identify the confidence-interval method.",
+    "WeightLoop comparisons must match endpoint/assay budget, candidate/forward-pass budget, parameter-edit budget, and editor-call/token budget; author-reported offline replay results must remain distinct from independent reproduction."
   ],
   "research_references": [
     {
