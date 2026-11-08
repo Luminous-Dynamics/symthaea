@@ -30,6 +30,7 @@ pub mod queue;
 pub mod quantified_scope;
 pub mod quantified_strategy;
 pub mod strategy_bdd;
+pub mod strategy_aig;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
