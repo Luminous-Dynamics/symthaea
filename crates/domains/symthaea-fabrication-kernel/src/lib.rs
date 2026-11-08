@@ -247,7 +247,10 @@ pub use containment_state::{
     verify_containment_state_successor,
 };
 pub use crypto_digest::{DigestParseError, Sha256, Sha256Digest, sha256};
-pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};
+pub use csg::{
+    BooleanOp, CSGNode, CsgValidationError, CsgValidationLimits, CsgValidationSummary, Primitive,
+    Transform3D,
+};
 pub use delegation::{
     DelegatedReleaseAuthorization, DelegationBuildError, DelegationGrantBody, DelegationSigner,
     DelegationVerifier, DelegationViolation, SignedDelegationGrant,
@@ -550,7 +553,7 @@ pub use submission_ledger::{
 };
 pub use support::{SupportColumn, SupportConfig, SupportPlan, plan_column_supports};
 pub use telemetry_tracker::{MachineTelemetryTracker, TelemetryTrackingError};
-pub use thought::GeometricThought;
+pub use thought::{ConstraintFitStatus, GeometricThought};
 pub use threshold::{
     SignedThresholdApproval, ThresholdApproval, ThresholdApprovalSigner, ThresholdApprovalVerifier,
     ThresholdCeremonyError, ThresholdCeremonyPolicy, ThresholdCeremonyViolation,
