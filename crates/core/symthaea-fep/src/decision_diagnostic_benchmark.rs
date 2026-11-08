@@ -578,6 +578,26 @@ mod tests {
     }
 
     #[test]
+    fn targeted_decision_information_is_not_a_substitute_for_cost_aware_evsi() {
+        let mut scenario = irrelevant_vs_relevant_scenario();
+        scenario.actions[1].observation_cost = 0.25;
+        let result = run_diagnostic_policy_benchmark(&scenario, 10_000, 0xC057, config())
+            .expect("cost-sensitive comparison should run");
+
+        let pure_eig = &result.policies[1];
+        let decision_eig = &result.policies[2];
+        let evsi = &result.policies[3];
+
+        assert_eq!(pure_eig.selected_action_counts, vec![10_000, 0]);
+        assert_eq!(decision_eig.selected_action_counts, vec![0, 10_000]);
+        assert_eq!(evsi.selected_action_counts, vec![0, 0]);
+        assert_eq!(evsi.probes_declined, 10_000);
+        assert!(decision_eig.mean_predicted_decision_eig_nats > 0.0);
+        assert!(evsi.mean_predicted_decision_eig_nats == 0.0);
+        assert!((evsi.mean_task_loss - 0.5).abs() < 0.03);
+    }
+
+    #[test]
     fn model_misspecification_is_visible_in_decision_and_brier_metrics() {
         let matched = irrelevant_vs_relevant_scenario();
         let mut misspecified = irrelevant_vs_relevant_scenario();
