@@ -470,7 +470,48 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
     Ok(())
 }
 
-pub fn verify_fixture_text(text: &str) -> Result<VerificationReport, String> {
+pub fn verify_unknown_dependence(fixture: &Value) -> Result<(), String> {
+    if string(
+        fixture,
+        &["unknown_dependence_control", "mycelix_profile_schema"],
+    )? != "mycelix.neo_evidence.source_correlation_profile.v0.1"
+    {
+        return Err("unknown-dependence profile schema mismatch".to_owned());
+    }
+    if string(fixture, &["unknown_dependence_control", "assessment"])? != "unknown" {
+        return Err("unknown-dependence control must retain unknown assessment".to_owned());
+    }
+    let independent_permitted = fixture
+        .get("unknown_dependence_control")
+        .and_then(|value| value.get("independent_product_permitted"))
+        .and_then(Value::as_bool)
+        .ok_or_else(|| "missing independent_product_permitted flag".to_owned())?;
+    let joint_likelihood_available = fixture
+        .get("unknown_dependence_control")
+        .and_then(|value| value.get("joint_likelihood_available"))
+        .and_then(Value::as_bool)
+        .ok_or_else(|| "missing joint_likelihood_available flag".to_owned())?;
+    let numeric_evsi = fixture
+        .get("unknown_dependence_control")
+        .and_then(|value| value.get("numeric_evsi"))
+        .ok_or_else(|| "missing numeric_evsi field".to_owned())?;
+    if independent_permitted || joint_likelihood_available || !numeric_evsi.is_null() {
+        return Err(
+            "unresolved dependence must not produce an independence product or numeric EVSI"
+                .to_owned(),
+        );
+    }
+    if string(
+        fixture,
+        &["unknown_dependence_control", "required_behavior"],
+    )? != "ABSTAIN_DEPENDENCE_UNRESOLVED"
+    {
+        return Err("unresolved dependence must force explicit abstention".to_owned());
+    }
+    Ok(())
+}
+
+fn verify_fixture_text(text: &str) -> Result<VerificationReport, String> {
     let fixture: Value =
         serde_json::from_str(text).map_err(|error| format!("invalid fixture JSON: {error}"))?;
     if string(&fixture, &["schema_version"])?
@@ -488,6 +529,7 @@ pub fn verify_fixture_text(text: &str) -> Result<VerificationReport, String> {
     {
         return Err("fixture data_status mismatch".to_owned());
     }
+    verify_unknown_dependence(&fixture)?;
 
     let prior = number(&fixture, &["decision_model", "prior", "impact_mode_probability"])?;
     let safe_prior = number(&fixture, &["decision_model", "prior", "safe_mode_probability"])?;
@@ -714,6 +756,34 @@ mod tests {
             )
             .unwrap();
         }
+    }
+
+    #[test]
+    fn unknown_source_dependence_forces_abstention() {
+        let fixture: Value = serde_json::from_str(FIXTURE).unwrap();
+        verify_unknown_dependence(&fixture).expect("unknown dependence should force abstention");
+        assert_eq!(
+            string(&fixture, &["unknown_dependence_control", "required_behavior"]).unwrap(),
+            "ABSTAIN_DEPENDENCE_UNRESOLVED"
+        );
+    }
+
+    #[test]
+    fn unknown_source_dependence_cannot_be_promoted_to_independence() {
+        let invalid = FIXTURE.replace(
+            "\"independent_product_permitted\": false",
+            "\"independent_product_permitted\": true",
+        );
+        assert!(verify_fixture_text(&invalid).is_err());
+    }
+
+    #[test]
+    fn unresolved_dependence_cannot_emit_numeric_evsi() {
+        let invalid = FIXTURE.replace(
+            "\"numeric_evsi\": null",
+            "\"numeric_evsi\": 0.686",
+        );
+        assert!(verify_fixture_text(&invalid).is_err());
     }
 
     #[test]
