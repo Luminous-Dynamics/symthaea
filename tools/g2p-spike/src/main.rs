@@ -111,7 +111,7 @@ mod tests {
         );
         assert_eq!(
             tokens.len(),
-            _prosody.len(),
+            prosody.len(),
             "prosody entries must remain aligned one-to-one with IPA character tokens"
         );
         let normalized = normalize_piper_english(&tokens, &prosody)
