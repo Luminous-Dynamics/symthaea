@@ -826,3 +826,11 @@ pub mod observability;
 pub use observability::{
     MAX_OBSERVABILITY_PARAMETERS, ObservabilityError, ObservabilityReport, analyze_jacobian,
 };
+
+/// Residual-qualified screening for discrete global solution ambiguities.
+pub mod global_identifiability;
+
+pub use global_identifiability::{
+    AmbiguousSolutionPair, CandidateFit, CandidateSolution, GlobalIdentifiabilityConfig,
+    GlobalIdentifiabilityError, GlobalIdentifiabilityReport, screen_global_ambiguities,
+};
