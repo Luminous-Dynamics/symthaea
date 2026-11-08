@@ -137,7 +137,7 @@ The `process` module adds a parent-runner boundary for episodes. The evaluator k
 The parent records:
 - the child executable's SHA-256 and exact argument vector;
 - explicit `env_clear()` behavior (no inherited environment variables);
-- the initial and final evidence-prefix digests;
+- the initial and final evidence-prefix digests, plus SHA-256 digests of each exact serialized AgentView and AgentAction JSONL frame (including delimiters);
 - each action with the evidence-prefix digest immediately before and after it;
 - the evaluator's post-submission score and the child exit code.
 
@@ -180,7 +180,7 @@ The focused workflow runs the census and fails closed on incomplete exact versio
 
 ## Authored tests
 
-Eighty-six Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, serialized AgentView-to-AgentAction round trip, and bounded parent-runner process-frame handling.
+Eighty-seven Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, serialized AgentView-to-AgentAction round trip, bounded parent-runner process-frame handling, and exact JSONL frame-digest semantics.
 
 Test functions include the finite truth-census, paired A0/A2 episode, campaign seed-schedule controls, process JSONL framing/round-trip and campaign manifest negative controls. The exact current-head formatting, Clippy, tests and exhaustive-census status must be read from the focused workflow; do not infer a pass from this authored-test count or an older source SHA.
 
