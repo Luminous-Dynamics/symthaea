@@ -167,10 +167,7 @@ fn same_phones(
 }
 
 /// Replace Muse's fixed vibrato with the per-note controls frozen in VocalPerformance.
-fn apply_note_pitch_controls(
-    frames: &mut [FormantFrame],
-    performance: &VocalPerformance,
-) {
+fn apply_note_pitch_controls(frames: &mut [FormantFrame], performance: &VocalPerformance) {
     let mut previous_frequency: Option<f32> = None;
     let mut previous_end = 0.0f32;
     for syllable in &performance.syllables {
@@ -188,9 +185,10 @@ fn apply_note_pitch_controls(
             let vibrato_ramp_s = 0.05f32;
             let edge_ramp_s = 0.015f32;
 
-            for frame in frames.iter_mut().filter(|frame| {
-                frame.time >= note_start && frame.time < note_end
-            }) {
+            for frame in frames
+                .iter_mut()
+                .filter(|frame| frame.time >= note_start && frame.time < note_end)
+            {
                 let elapsed = (frame.time - note_start).max(0.0);
                 let transition = if transition_s > f32::EPSILON {
                     (elapsed / transition_s).clamp(0.0, 1.0)
@@ -199,8 +197,7 @@ fn apply_note_pitch_controls(
                 };
                 // Interpolate in log-frequency so the transition is uniform in cents.
                 let pitch = if from_frequency > 0.0 && note.frequency > 0.0 {
-                    from_frequency
-                        * (note.frequency / from_frequency).powf(transition)
+                    from_frequency * (note.frequency / from_frequency).powf(transition)
                 } else {
                     note.frequency
                 };
@@ -212,7 +209,8 @@ fn apply_note_pitch_controls(
                     && syllable.vibrato_rate_hz > 0.0
                     && frame.time >= vibrato_start
                 {
-                    let onset_gate = ((frame.time - vibrato_start) / vibrato_ramp_s).clamp(0.0, 1.0);
+                    let onset_gate =
+                        ((frame.time - vibrato_start) / vibrato_ramp_s).clamp(0.0, 1.0);
                     onset_gate * release
                 } else {
                     0.0
@@ -220,8 +218,7 @@ fn apply_note_pitch_controls(
                 let phase = std::f32::consts::TAU
                     * syllable.vibrato_rate_hz
                     * (frame.time - vibrato_start).max(0.0);
-                let vibrato_cents =
-                    syllable.vibrato_depth_cents * phase.sin() * vibrato_gate;
+                let vibrato_cents = syllable.vibrato_depth_cents * phase.sin() * vibrato_gate;
                 let vibrato_ratio = 2.0f32.powf(vibrato_cents / 1200.0);
                 frame.f0 = pitch * envelope * vibrato_ratio;
             }
@@ -678,7 +675,10 @@ mod tests {
             .map(|frame| frame.f0)
             .collect();
         assert!(!before_onset.is_empty());
-        let before_spread = before_onset.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+        let before_spread = before_onset
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max)
             - before_onset.iter().copied().fold(f32::INFINITY, f32::min);
         assert!(
             before_spread < 0.1,
@@ -691,21 +691,26 @@ mod tests {
             .map(|frame| frame.f0)
             .collect();
         assert!(!after_onset.is_empty());
-        let after_spread = after_onset.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+        let after_spread = after_onset
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max)
             - after_onset.iter().copied().fold(f32::INFINITY, f32::min);
         assert!(
             after_spread > 3.0,
             "configured vibrato depth must measurably modulate F0: spread={after_spread}"
         );
         let mean = after_onset.iter().sum::<f32>() / after_onset.len() as f32;
-        assert!((mean - 220.0).abs() < 2.0, "vibrato should remain centered on the score pitch: {mean}");
+        assert!(
+            (mean - 220.0).abs() < 2.0,
+            "vibrato should remain centered on the score pitch: {mean}"
+        );
     }
 
     #[test]
     fn per_syllable_portamento_glides_in_log_frequency_and_reaches_target() {
         let notes = [note(0.0, 0.5, 220.0), note(0.5, 0.5, 440.0)];
-        let mut performance =
-            VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        let mut performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
         performance.syllables[0].vibrato_depth_cents = 0.0;
         performance.syllables[1].vibrato_depth_cents = 0.0;
         performance.syllables[1].vibrato_onset = 1.0;
