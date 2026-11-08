@@ -7,9 +7,17 @@ pub mod group_envelope;
 pub mod interval_select;
 
 pub use group_envelope::{
-    ContinuousHVGroupEnvelope, GroupEnvelopeError, member_id_set_digest,
+    ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
+    member_id_set_digest,
 };
 pub use interval_select::{
-    ExactScoreRecord, IntervalCoverageCounts, IntervalSelectionError, IntervalSelectionPlan,
-    ScoreIntervalBuildError, ScoreIntervalRecord, select_refinement_set, stable_exact_top_k,
+    ExactScoreRecord, GroupIntervalCoverageCounts, GroupIntervalSelectionError,
+    GroupIntervalSelectionPlan, GroupMemberScoreIntervalBuildError,
+    GroupMemberScoreIntervalRecord, GroupScoreIntervalBuildError,
+    GroupScoreIntervalIdentity, GroupScoreIntervalRecord, HierarchicalIntervalSelectionError,
+    HierarchicalIntervalSelectionPlan, IntervalCoverageCounts, IntervalSelectionError,
+    IntervalSelectionPlan, ScoreIntervalBuildError, ScoreIntervalRecord,
+    VerifiedMemberResidualCertificate, VerifiedMemberResidualError,
+    select_group_refinement_set, select_hierarchical_refinement_set, select_refinement_set,
+    stable_exact_top_k,
 };
