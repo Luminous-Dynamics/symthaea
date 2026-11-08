@@ -1,0 +1,973 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0_1",
+  "status": "synthetic_contract_fixtures_not_real_structural_data",
+  "mission_binding": {
+    "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+    "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "explicit_warning": "All values, sensor outputs, inspection measurements, costs, uncertainty, thresholds and identities are synthetic test fixtures. They are not material properties, structural criteria, NDT results, operating limits or maintenance recommendations.",
+  "cases": [
+    {
+      "schema_version": "0.1.0",
+      "case_id": "ut_thickness_interval_clear",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "shell_plate_P01",
+        "component_id": "SYN-shell_plate_P01",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "steel",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:shell_plate_P01",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "general_corrosion"
+      ],
+      "exposure": {
+        "duration_h": 120,
+        "sea_state_class": "moderate",
+        "speed_kn": 7,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 22,
+        "salinity_ppt": 35,
+        "wet_dry_state": "submerged",
+        "evidence_ref": "synthetic:exposure:ut_thickness_interval_clear",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "load-env",
+          "modality": "wave_radar",
+          "evidence_role": "environment_context",
+          "sensor_or_method_ref": "synthetic:wave-radar",
+          "region_id": "shell_plate_P01",
+          "data_quality": "valid",
+          "calibration_status": "current",
+          "coverage_fraction": 1,
+          "sample_rate_hz": 1,
+          "time_sync_status": "synchronized",
+          "value": 1.8,
+          "unit": "m_Hs",
+          "uncertainty": 0.1,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [
+        {
+          "inspection_id": "ut-grid-01",
+          "method": "ultrasonic_thickness",
+          "procedure_ref": "synthetic:qualified-reference-procedure",
+          "procedure_revision": "SYN-0.1",
+          "operator_qualification_ref": "synthetic:qualified-operator",
+          "region_id": "shell_plate_P01",
+          "coverage_fraction": 0.98,
+          "result": "no_indication",
+          "measured_value": 8,
+          "unit": "mm",
+          "expanded_uncertainty": 0.2,
+          "acceptance_lower_bound": 7,
+          "acceptance_upper_bound": null,
+          "criterion_ref": "synthetic:criterion-only-not-real-acceptance",
+          "evidence_class": "synthetic"
+        }
+      ],
+      "assessment": {
+        "method_ref": "synthetic:interval-rule",
+        "method_validation_status": "synthetic_rule",
+        "applicability_status": "within_scope",
+        "condition_disposition": "valid_within_declared_scope",
+        "uncertainty_status": "quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:ut-grid-01"
+        ]
+      },
+      "decision": {
+        "recommended_action": "continue_existing_approved_plan",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "The complete synthetic measurement interval is above the supplied synthetic lower bound; this applies only to this inspected grid and criterion.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "not_applicable",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "not_applicable",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "not_applicable",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 0.98
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "ut_uncertainty_crosses_lower_bound",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "shell_plate_P02",
+        "component_id": "SYN-shell_plate_P02",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "steel",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:shell_plate_P02",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "general_corrosion"
+      ],
+      "exposure": {
+        "duration_h": 90,
+        "sea_state_class": "calm",
+        "speed_kn": 4,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 24,
+        "salinity_ppt": 35,
+        "wet_dry_state": "submerged",
+        "evidence_ref": "synthetic:exposure:ut_uncertainty_crosses_lower_bound",
+        "evidence_class": "synthetic"
+      },
+      "observations": [],
+      "direct_inspections": [
+        {
+          "inspection_id": "ut-grid-02",
+          "method": "ultrasonic_thickness",
+          "procedure_ref": "synthetic:qualified-reference-procedure",
+          "procedure_revision": "SYN-0.1",
+          "operator_qualification_ref": "synthetic:qualified-operator",
+          "region_id": "shell_plate_P02",
+          "coverage_fraction": 0.9,
+          "result": "inconclusive",
+          "measured_value": 7.1,
+          "unit": "mm",
+          "expanded_uncertainty": 0.3,
+          "acceptance_lower_bound": 7,
+          "acceptance_upper_bound": null,
+          "criterion_ref": "synthetic:criterion-only-not-real-acceptance",
+          "evidence_class": "synthetic"
+        }
+      ],
+      "assessment": {
+        "method_ref": "synthetic:interval-rule",
+        "method_validation_status": "synthetic_rule",
+        "applicability_status": "within_scope",
+        "condition_disposition": "indeterminate",
+        "uncertainty_status": "quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:ut-grid-02"
+        ]
+      },
+      "decision": {
+        "recommended_action": "targeted_inspection",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "The uncertainty interval crosses the supplied synthetic lower bound; the central value alone cannot establish conformance.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 0.9
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "ae_anomaly_requires_confirmation",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "cross_deck_joint_J01",
+        "component_id": "SYN-cross_deck_joint_J01",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "aluminium",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:cross_deck_joint_J01",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "fatigue_crack"
+      ],
+      "exposure": {
+        "duration_h": 42,
+        "sea_state_class": "severe",
+        "speed_kn": 12,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 19,
+        "salinity_ppt": 35,
+        "wet_dry_state": "cyclic",
+        "evidence_ref": "synthetic:exposure:ae_anomaly_requires_confirmation",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "ae-evt-01",
+          "modality": "acoustic_emission",
+          "evidence_role": "damage_indicator",
+          "sensor_or_method_ref": "synthetic:ae-array",
+          "region_id": "cross_deck_joint_J01",
+          "data_quality": "valid",
+          "calibration_status": "current",
+          "coverage_fraction": 0.7,
+          "sample_rate_hz": 100000,
+          "time_sync_status": "synchronized",
+          "value": 14,
+          "unit": "hits",
+          "uncertainty": 3,
+          "raw_artifact_digest": null
+        },
+        {
+          "observation_id": "strain-01",
+          "modality": "strain_gauge",
+          "evidence_role": "structural_response",
+          "sensor_or_method_ref": "synthetic:strain-gauge",
+          "region_id": "cross_deck_joint_J01",
+          "data_quality": "valid",
+          "calibration_status": "current",
+          "coverage_fraction": 0.8,
+          "sample_rate_hz": 100,
+          "time_sync_status": "synchronized",
+          "value": 420,
+          "unit": "microstrain",
+          "uncertainty": 20,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [],
+      "assessment": {
+        "method_ref": "synthetic:anomaly-rule",
+        "method_validation_status": "research_only",
+        "applicability_status": "unknown",
+        "condition_disposition": "inspection_required",
+        "uncertainty_status": "partially_quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:ae-evt-01",
+          "synthetic:strain-01"
+        ]
+      },
+      "decision": {
+        "recommended_action": "targeted_inspection",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "An AE event/strain anomaly is not crack size; request independent qualified inspection and structural review.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 0.7
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "eis_environment_confounded",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "ballast_void_B03",
+        "component_id": "SYN-ballast_void_B03",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "steel",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:ballast_void_B03",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "coating_degradation"
+      ],
+      "exposure": {
+        "duration_h": 24,
+        "sea_state_class": "calm",
+        "speed_kn": 0,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 31,
+        "salinity_ppt": 42,
+        "wet_dry_state": "cyclic",
+        "evidence_ref": "synthetic:exposure:eis_environment_confounded",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "eis-01",
+          "modality": "electrochemical_impedance",
+          "evidence_role": "damage_indicator",
+          "sensor_or_method_ref": "synthetic:eis-probe",
+          "region_id": "ballast_void_B03",
+          "data_quality": "drift_suspected",
+          "calibration_status": "current",
+          "coverage_fraction": 0.25,
+          "sample_rate_hz": 0.01,
+          "time_sync_status": "synchronized",
+          "value": 0.45,
+          "unit": "normalized_impedance",
+          "uncertainty": 0.12,
+          "raw_artifact_digest": null
+        },
+        {
+          "observation_id": "env-01",
+          "modality": "anemometer",
+          "evidence_role": "environment_context",
+          "sensor_or_method_ref": "synthetic:env",
+          "region_id": "ballast_void_B03",
+          "data_quality": "valid",
+          "calibration_status": "current",
+          "coverage_fraction": 1,
+          "sample_rate_hz": 1,
+          "time_sync_status": "synchronized",
+          "value": 31,
+          "unit": "degC",
+          "uncertainty": 0.5,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [],
+      "assessment": {
+        "method_ref": "synthetic:proxy-context-rule",
+        "method_validation_status": "research_only",
+        "applicability_status": "unknown",
+        "condition_disposition": "indeterminate",
+        "uncertainty_status": "partially_quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:eis-01",
+          "synthetic:env-01"
+        ]
+      },
+      "decision": {
+        "recommended_action": "competent_structural_review",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "The synthetic EIS change is confounded by wet/dry, temperature and salinity conditions; it does not establish coating failure or remaining thickness.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 0.25
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "stale_calibration_no_alarm",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "keel_beam_K01",
+        "component_id": "SYN-keel_beam_K01",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "aluminium",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:keel_beam_K01",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "fatigue_crack"
+      ],
+      "exposure": {
+        "duration_h": 600,
+        "sea_state_class": "moderate",
+        "speed_kn": 8,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 21,
+        "salinity_ppt": 35,
+        "wet_dry_state": "cyclic",
+        "evidence_ref": "synthetic:exposure:stale_calibration_no_alarm",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "strain-02",
+          "modality": "fiber_bragg_grating",
+          "evidence_role": "structural_response",
+          "sensor_or_method_ref": "synthetic:fbg",
+          "region_id": "keel_beam_K01",
+          "data_quality": "stale",
+          "calibration_status": "expired",
+          "coverage_fraction": 0.6,
+          "sample_rate_hz": 100,
+          "time_sync_status": "uncertain",
+          "value": 0,
+          "unit": "microstrain",
+          "uncertainty": null,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [],
+      "assessment": {
+        "method_ref": "synthetic:monitoring-rule",
+        "method_validation_status": "unqualified",
+        "applicability_status": "unknown",
+        "condition_disposition": "indeterminate",
+        "uncertainty_status": "not_quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:strain-02"
+        ]
+      },
+      "decision": {
+        "recommended_action": "targeted_inspection",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "No alarm from stale, expired-calibration monitoring is not evidence of no damage.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "uncertain",
+        "calibration_status": "expired",
+        "coverage_fraction": 0.6
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "rov_visual_coverage_blind_zone",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "underwater_hull_zone_H07",
+        "component_id": "SYN-underwater_hull_zone_H07",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "aluminium",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:underwater_hull_zone_H07",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "localized_corrosion"
+      ],
+      "exposure": {
+        "duration_h": 300,
+        "sea_state_class": "moderate",
+        "speed_kn": 5,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 18,
+        "salinity_ppt": 35,
+        "wet_dry_state": "submerged",
+        "evidence_ref": "synthetic:exposure:rov_visual_coverage_blind_zone",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "rov-visual",
+          "modality": "visual_rov",
+          "evidence_role": "direct_inspection",
+          "sensor_or_method_ref": "synthetic:rov-camera",
+          "region_id": "underwater_hull_zone_H07",
+          "data_quality": "valid",
+          "calibration_status": "current",
+          "coverage_fraction": 0.65,
+          "sample_rate_hz": null,
+          "time_sync_status": "synchronized",
+          "value": 0,
+          "unit": "indication_count",
+          "uncertainty": null,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [
+        {
+          "inspection_id": "visual-rov-07",
+          "method": "visual",
+          "procedure_ref": "synthetic:qualified-reference-procedure",
+          "procedure_revision": "SYN-0.1",
+          "operator_qualification_ref": "synthetic:qualified-operator",
+          "region_id": "underwater_hull_zone_H07",
+          "coverage_fraction": 0.65,
+          "result": "no_indication",
+          "measured_value": null,
+          "unit": "qualitative",
+          "expanded_uncertainty": null,
+          "acceptance_lower_bound": null,
+          "acceptance_upper_bound": null,
+          "criterion_ref": "synthetic:criterion-only-not-real-acceptance",
+          "evidence_class": "synthetic"
+        }
+      ],
+      "assessment": {
+        "method_ref": "synthetic:coverage-rule",
+        "method_validation_status": "synthetic_rule",
+        "applicability_status": "within_scope",
+        "condition_disposition": "inspection_required",
+        "uncertainty_status": "not_quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:rov-visual",
+          "synthetic:visual-rov-07"
+        ]
+      },
+      "decision": {
+        "recommended_action": "targeted_inspection",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "No indication applies only to 65% accessible visual coverage; blind zones remain unassessed.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 0.65
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "wrong_region_inspection_identity",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "shell_plate_P08",
+        "component_id": "SYN-shell_plate_P08",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "steel",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:shell_plate_P08",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "general_corrosion"
+      ],
+      "exposure": {
+        "duration_h": 120,
+        "sea_state_class": "calm",
+        "speed_kn": 0,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 20,
+        "salinity_ppt": 35,
+        "wet_dry_state": "submerged",
+        "evidence_ref": "synthetic:exposure:wrong_region_inspection_identity",
+        "evidence_class": "synthetic"
+      },
+      "observations": [],
+      "direct_inspections": [
+        {
+          "inspection_id": "ut-wrong-region",
+          "method": "ultrasonic_thickness",
+          "procedure_ref": "synthetic:qualified-reference-procedure",
+          "procedure_revision": "SYN-0.1",
+          "operator_qualification_ref": "synthetic:qualified-operator",
+          "region_id": "shell_plate_P09",
+          "coverage_fraction": 1,
+          "result": "no_indication",
+          "measured_value": 9,
+          "unit": "mm",
+          "expanded_uncertainty": 0.1,
+          "acceptance_lower_bound": 7,
+          "acceptance_upper_bound": null,
+          "criterion_ref": "synthetic:criterion-only-not-real-acceptance",
+          "evidence_class": "synthetic"
+        }
+      ],
+      "assessment": {
+        "method_ref": "synthetic:identity-rule",
+        "method_validation_status": "synthetic_rule",
+        "applicability_status": "within_scope",
+        "condition_disposition": "rejected_by_qualified_evidence",
+        "uncertainty_status": "quantified",
+        "probability_of_damage": null,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:ut-wrong-region"
+        ]
+      },
+      "decision": {
+        "recommended_action": "competent_structural_review",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "The direct inspection is bound to P09, not the required P08 region; it cannot support the P08 assessment.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 1
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "synthetic_voi_targeted_inspection",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "hull_region_H10",
+        "component_id": "SYN-hull_region_H10",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "steel",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:hull_region_H10",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "general_corrosion"
+      ],
+      "exposure": {
+        "duration_h": 500,
+        "sea_state_class": "moderate",
+        "speed_kn": 6,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 23,
+        "salinity_ppt": 35,
+        "wet_dry_state": "submerged",
+        "evidence_ref": "synthetic:exposure:synthetic_voi_targeted_inspection",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "strain-trend",
+          "modality": "strain_gauge",
+          "evidence_role": "structural_response",
+          "sensor_or_method_ref": "synthetic:strain-sensor",
+          "region_id": "hull_region_H10",
+          "data_quality": "valid",
+          "calibration_status": "current",
+          "coverage_fraction": 0.9,
+          "sample_rate_hz": 100,
+          "time_sync_status": "synchronized",
+          "value": 240,
+          "unit": "microstrain",
+          "uncertainty": 25,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [],
+      "assessment": {
+        "method_ref": "synthetic:posterior-and-voi-fixture",
+        "method_validation_status": "synthetic_rule",
+        "applicability_status": "within_scope",
+        "condition_disposition": "inspection_required",
+        "uncertainty_status": "quantified",
+        "probability_of_damage": 0.18,
+        "rul_interval_days": null,
+        "evidence_refs": [
+          "synthetic:strain-trend"
+        ]
+      },
+      "decision": {
+        "recommended_action": "targeted_inspection",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "Synthetic expected loss falls from 1000 to 400 cost points after information; subtract 100 cost points for inspection and downtime. Net VoI is positive only in this fictional fixture.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "calculated_synthetic",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": 1000,
+        "expected_loss_after_information": 400,
+        "evsi": 600,
+        "acquisition_and_downtime_cost": 100,
+        "net_voi": 500,
+        "assumption_class": "synthetic",
+        "cost_model_ref": "synthetic:voi-cost-model"
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "synchronized",
+        "calibration_status": "current",
+        "coverage_fraction": 0.9
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "overconfident_rul_out_of_domain",
+      "status": "synthetic_fixture_not_structural_acceptance",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_STRUCTURAL_HEALTH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset_region": {
+        "region_id": "weld_toe_W03",
+        "component_id": "SYN-weld_toe_W03",
+        "structure_revision": "SYN-REV-1",
+        "material_family": "steel",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "geometry_ref": "synthetic:geometry:weld_toe_W03",
+        "criterion_ref": "synthetic:structural-criterion"
+      },
+      "failure_mechanisms": [
+        "fatigue_crack"
+      ],
+      "exposure": {
+        "duration_h": 800,
+        "sea_state_class": "severe",
+        "speed_kn": 11,
+        "loading_ref": "synthetic:loading-context",
+        "temperature_c": 25,
+        "salinity_ppt": 35,
+        "wet_dry_state": "cyclic",
+        "evidence_ref": "synthetic:exposure:overconfident_rul_out_of_domain",
+        "evidence_class": "synthetic"
+      },
+      "observations": [
+        {
+          "observation_id": "ml-rul",
+          "modality": "other",
+          "evidence_role": "damage_indicator",
+          "sensor_or_method_ref": "synthetic:unvalidated-model",
+          "region_id": "weld_toe_W03",
+          "data_quality": "out_of_domain",
+          "calibration_status": "unknown",
+          "coverage_fraction": 0.2,
+          "sample_rate_hz": null,
+          "time_sync_status": "uncertain",
+          "value": 45,
+          "unit": "remaining_life_days",
+          "uncertainty": null,
+          "raw_artifact_digest": null
+        }
+      ],
+      "direct_inspections": [],
+      "assessment": {
+        "method_ref": "synthetic:unvalidated-rul",
+        "method_validation_status": "unqualified",
+        "applicability_status": "out_of_domain",
+        "condition_disposition": "unsupported",
+        "uncertainty_status": "not_quantified",
+        "probability_of_damage": 0.98,
+        "rul_interval_days": [
+          45,
+          45
+        ],
+        "evidence_refs": [
+          "synthetic:ml-rul"
+        ]
+      },
+      "decision": {
+        "recommended_action": "no_recommendation",
+        "authority_mode": "advisory_only_no_authorization",
+        "governing_limit_ref": null,
+        "reason": "A point RUL from an unqualified out-of-domain model with no calibrated interval cannot support a maintenance or operating decision.",
+        "human_decision_status": "not_reviewed"
+      },
+      "voi": {
+        "status": "unknown",
+        "policy_id": "synthetic-voi-policy-v0",
+        "cost_unit": "synthetic_cost_points",
+        "expected_loss_before": null,
+        "expected_loss_after_information": null,
+        "evsi": null,
+        "acquisition_and_downtime_cost": null,
+        "net_voi": null,
+        "assumption_class": "unqualified",
+        "cost_model_ref": null
+      },
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-structural-health-corpus",
+        "raw_artifact_digest": null,
+        "time_sync_status": "uncertain",
+        "calibration_status": "unknown",
+        "coverage_fraction": 0.2
+      },
+      "claim_limitations": [
+        "Synthetic benchmark fixture only; not a structural diagnosis, fatigue/corrosion model, NDT procedure or inspection interval.",
+        "No statement of seaworthiness, structural adequacy, safe operating envelope, class/flag approval or permission to defer inspection is made.",
+        "All sensor values, inspection values, costs, uncertainties and identifiers are fictional contract-test inputs."
+      ]
+    }
+  ]
+}
