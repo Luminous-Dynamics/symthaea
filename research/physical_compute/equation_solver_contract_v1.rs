@@ -250,6 +250,7 @@ pub trait LinearOperator {
     fn dimension(&self) -> usize;
     fn mat_vec(&self, x: &[f64]) -> Result<Vec<f64>, MatrixError>;
     fn frobenius_norm(&self) -> f64;
+    fn is_symmetric(&self, relative_tolerance: f64) -> bool;
 }
 
 impl LinearOperator for DenseMatrix {
@@ -263,6 +264,10 @@ impl LinearOperator for DenseMatrix {
 
     fn frobenius_norm(&self) -> f64 {
         DenseMatrix::frobenius_norm(self)
+    }
+
+    fn is_symmetric(&self, relative_tolerance: f64) -> bool {
+        DenseMatrix::is_symmetric(self, relative_tolerance)
     }
 }
 
@@ -347,6 +352,10 @@ impl LinearOperator for Poisson1d {
         // off-diagonal entries of magnitude 1.
         ((4.0 * self.n as f64) + (2.0 * self.n.saturating_sub(1) as f64)).sqrt()
     }
+
+    fn is_symmetric(&self, relative_tolerance: f64) -> bool {
+        relative_tolerance.is_finite() && relative_tolerance >= 0.0
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -365,7 +374,7 @@ pub fn conjugate_gradient<A: LinearOperator>(
     relative_tolerance: f64,
     max_iterations: usize,
 ) -> Result<IterativeSolution, MatrixError> {
-    let n = a.n;
+    let n = a.dimension();
     if b.len() != n {
         return Err(MatrixError::DimensionMismatch);
     }
