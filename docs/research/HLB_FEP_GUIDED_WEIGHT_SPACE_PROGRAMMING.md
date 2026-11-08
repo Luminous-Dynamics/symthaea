@@ -68,16 +68,59 @@ p(m | o, a) = p(m) p(o | m, a) / p(o | a)
 I(M; O | a) = H(M) - sum_o p(o | a) H(M | o, a)
 ```
 
-A candidate action score may take the explicitly scoped form:
+### Three different quantities must remain separate
+
+A diagnostic can reveal a great deal about a model without changing the best action. Conversely, a relatively low-information observation can be valuable if it changes a consequential downstream decision. We therefore distinguish:
+
+1. **Model information gain:** \(I(M;O\mid a)\), information about which generative/fault model is true.
+2. **Optimal-decision information gain:** \(I(D^*;O\mid a)\), information about which downstream decision is optimal.
+3. **Expected value of sample information (EVSI):** expected reduction in downstream Bayes risk, measured in the task's declared loss units.
+
+For a fixed loss table \(L(d,m)\), define the hypothesis-conditioned optimal decision with a deterministic tie-break:
 
 ```text
-J(a) = E[L_task | a]
-     + lambda_cost * C(a)
-     + lambda_risk * R_safety(a)
-     - lambda_info * I(M; O | a)
+D*(m) = argmin_d L(d, m)
+
+p(d* | a) = sum_m p(m) 1[D*(m) = d*]
+
+I(D*; O | a) = H(D*) - sum_o p(o | a) H(D* | o, a)
 ```
 
-where lower is better, (C(a)) is observation/action cost, and (R_{mathrm{safety}}) is a separately measured risk term. This is a benchmark decision rule, not a claim that the equation alone is a complete expected-free-energy implementation. The full policy must declare preferences, horizon, model uncertainty, and action constraints.
+Let \(q(m)\) denote the current model posterior and define Bayes risk as:
+
+```text
+R(q) = min_d sum_m q(m) L(d, m)
+
+EVSI(a) = R(q) - sum_o p(o | a) R(q(m | o, a))
+```
+
+If \(D^*\) is a deterministic function of model hypothesis \(M\), the data-processing inequality requires:
+
+```text
+0 <= I(D*; O | a) <= I(M; O | a)
+```
+
+The implementation checks this bound (within a declared numerical tolerance). It is a mathematical invariant, not an empirical performance target.
+
+These quantities answer different questions. Model EIG asks whether the observation distinguishes models. Decision EIG asks whether it distinguishes which decision is optimal. EVSI asks whether observing it is expected to reduce the actual loss. Decision EIG does not encode loss magnitudes or probe costs; EVSI does. Even EVSI must be adjusted for operational cost and hard safety eligibility before a probe is selected.
+
+A reproducible synthetic counterexample in the branch separates them: an irrelevant nuisance probe has model EIG \(\ln 2\) nats but zero decision EIG and zero EVSI. A noisier fault-relevant probe has model/decision information gain \(\ln 2-H(0.3)\) nats and EVSI 0.2 loss units. At cost 0.05, the EVSI policy may choose it; at cost 0.25, the cost-aware policy declines it even though targeted decision information remains positive. These are analytical fixture values, not measured Symthaea results.
+
+The targeted decision-information criterion is related to published *Targeted Active Learning for Bayesian Decision-Making* (Filstroff et al., TMLR 2024, https://openreview.net/forum?id=KxPjuiMgmm). The current branch implements a one-step finite-hypothesis criterion analogue for a controlled comparison; it is not a full reproduction of that paper's sequential algorithm.
+
+A candidate cost-aware decision score may therefore be written as:
+
+```text
+J_EVSI(a) = sum_o p(o | a) R(q(m | o, a))
+          + lambda_cost * C(a)
+          + lambda_risk * R_safety(a)
+
+          = R(q) - EVSI(a)
+          + lambda_cost * C(a)
+          + lambda_risk * R_safety(a)
+```
+
+where lower is better, \(C(a)\) is observation/action cost, and \(R_{safety}(a)\) is a separately measured risk term. Pure model EIG and targeted decision EIG remain comparator policies and diagnostics, not substitutes for this utility calculation. This is a benchmark decision rule, not a claim that the equation alone is a complete expected-free-energy implementation. The full policy must declare preferences, horizon, model uncertainty, likelihood provenance, cost units, and action constraints.
 
 **FEP acceptance condition:** an action must be preferred because its prospective observation distributions distinguish plausible hypotheses, and the selected observation must improve posterior calibration, realized diagnosis, or downstream task utility on held-out episodes. Novelty alone is not information gain.
 
@@ -624,7 +667,7 @@ The field is moving quickly, and there is no single "SOTA" across these differen
 |---|---|---|---|
 | Weight-space learning | Dayan, Eitan & Maron, ICML 2026, permutation-equivariant weight-space networks | A theoretical expressivity analysis, universality results under stated assumptions, and a reported 34% improvement over prior SOTA on their own benchmarks | Include their permutation-equivariant family as a baseline where implementable. Compare function-space generalization, symmetry handling, task transfer, parameter count, and compute. Do not equate SWI's candidate editor with a trained weight-space learner. |
 | Continuous-time networks | NIALIM / DFA-CfN / PRDFA-CfN, IEEE TNNLS 2026 | A revised closed-form approximation with an error upper bound and reported results across six sequence domains | Reproduce at least two appropriate public tasks with exact splits, missingness, sampling intervals, parameter count, and reference solver accuracy before making a CfC superiority claim. |
-| Active inference | Friston et al., Nature Communications 2026, active structure learning and the three-ball rule-discovery paradigm | Model-structure information gain can guide observation selection; BMR can efficiently compare reduced models after evidence accumulation | Reproduce the bounded task, then test whether Symthaea's state/parameter/model decomposition improves observations-to-correct-model and calibration. The paper assumes a known generative model family; it is not a result for general perception or open-ended reasoning. |
+| Active inference / decision-focused acquisition | Friston et al., Nature Communications 2026; Filstroff et al., *Targeted Active Learning for Bayesian Decision-Making*, TMLR 2024 | Model-structure information gain can guide observation selection; targeted active learning maximizes information about the optimal downstream decision rather than generic model entropy | Compare model EIG, optimal-decision information gain, EVSI, cost-aware EVSI and matched RL on identical episodes. Enforce I(D*;O|a) <= I(M;O|a). The Friston task assumes a known model family; the TMLR result is a targeted-acquisition baseline, not evidence that Symthaea's implementation is novel. |
 | Weight-space programming | Takehi et al., MIT CSAIL 2026; OpenWSP; Alan Turing Institute replication (2026) | Small-network policy compilation into weights can work, but new-task classification and deeper weight-only interpretation are much harder: the Turing replication reports 50% average handwritten-digit accuracy versus 82% for a fitted template baseline; on Breakout, two independent decompilers matched the network over 49,189 states | Separate program-to-weights compilation from learning new representations and from weight-only auditing. Include executable-program, non-program classification, input-layer-only, activation-probe and full functional baselines. |
 | Sequential weight-space adaptation | Li et al., WeightLoop (arXiv:2611.07319, 5 Nov 2026) | A fixed editor writes a reusable bounded editing program; successive assay batches supply evidence for persistent predictor updates. Authors report targeted edits improved mean ranking utility in 7/8 endpoint-budget settings (all 8 vs random edits) and discovery across 3 sequential tasks in offline replay | Reproduce the sequential batch protocol and separate fixed-program reuse from per-batch LLM re-prompting, online/gradient updates and random matched edits. Record endpoint budgets, assays, editor calls, candidate evaluations, drift and held-out retention. This is a fresh preprint claim, not yet an independent replication. |
 | Weight-only interpretation / causal audit | Weight Oracles (arXiv:2610.07334, Oct 2026) and Ahmed (arXiv:2611.08070, 5 Nov 2026) | Weight Oracles reports 99% holdout accuracy when simulating small transformers with a staged curriculum and external deterministic computation, plus AUROC 0.93 for attention-routed backdoors and 0.81 over a diversified threat distribution; Ahmed's exploratory label-permutation experiments show that local weight arithmetic can coexist with incorrect semantic labels. Neither establishes general scaling to realistic model sizes or causal interpretation without behavioral checks. | Compare raw weights, weight-only priors, frozen activation probes, controlled semantic interventions, and verifier-only full-function oracles. Include label remapping, hidden-unit permutation, within-matrix shuffling, unseen tasks, and positive/negative causal intervention controls. Score intervention predictions, not guessed dataset names. |\n| HDC/VSA | 2025 comparative review across popular HD/VSA tasks and 121 UCI datasets | HDC has resource and compositional advantages in some settings, but conventional SVM/RVFL baselines can win selected classification tasks | Require identical feature inputs and conventional baselines. Win on compositional OOD transfer, robust online learning, memory/latency, or proof/privacy compatibility rather than assuming HDC wins ordinary classification. |
@@ -813,6 +856,8 @@ This is a quotient-space operation: it changes coordinates while preserving the 
 - Navon et al., *Equivariant Deep Weight Space Alignment*, ICML 2024, for learned permutation-equivariant weight alignment; compare its learned alignment with this branch's deterministic functional-probe baseline.
 - Dayan, Eitan & Maron, *On the Expressive Power of Permutation-Equivariant Weight-Space Networks*, ICML 2026, for expressivity/universality results and the reported 34% benchmark improvement under that paper's protocols.
 - Friston et al., *Active inference and artificial reasoning*, Nature Communications 17, 10125 (2026), for active model-structure information gain and post-observation BMR in the three-ball paradigm.
+- Filstroff et al., *Targeted Active Learning for Bayesian Decision-Making*, Transactions on Machine Learning Research (2024): https://openreview.net/forum?id=KxPjuiMgmm.
+- Li et al., *WeightLoop: Weight-Space Programming with Experimental Feedback* (arXiv:2611.07319, 5 Nov 2026): https://arxiv.org/abs/2611.07319. Treat the paper's offline-replay claims as author-reported until independently replicated.
 - Liang et al., *Rederived Closed-Form Continuous-Time Neural Networks*, IEEE TNNLS 37(9) (2026), for NIALIM and the DFA-CfN / PRDFA-CfN baselines.
 - Vergés et al., *Classification using hyperdimensional computing: a review with comparative analysis*, Artificial Intelligence Review 58, 173 (2025), for a shared seven-task and 121-UCI-dataset comparative HDC evaluation.
 - OpenWSP, independent replication records for the 2026 weight-space programming paper; treat each run and calibration row with its own prompt, sample-count, token-limit, and finish-reason metadata.
@@ -832,6 +877,8 @@ This is a quotient-space operation: it changes coordinates while preserving the 
 - Symthaea SWI-001: https://github.com/Luminous-Dynamics/symthaea/pull/10628
 - Symthaea HLB factorial v1: https://github.com/Luminous-Dynamics/symthaea/pull/8375
 - Symthaea model information gain primitive: https://github.com/Luminous-Dynamics/symthaea/pull/8394
+- Symthaea decision-focused FEP integration: https://github.com/Luminous-Dynamics/symthaea/issues/11122.
+- Symthaea WeightLoop reproduction baseline: https://github.com/Luminous-Dynamics/symthaea/issues/11159.
 
 ---
 
