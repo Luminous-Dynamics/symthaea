@@ -500,6 +500,54 @@ mod tests {
     }
 
     #[test]
+    fn score_pitch_and_velocity_have_measurable_frame_level_responses() {
+        let mut engine = FormantSingingEngine::default();
+        let performance_for = |frequency: f32, velocity: f32| {
+            VocalPerformance::from_melody(
+                "light",
+                &[Note {
+                    frequency,
+                    start_time: 0.0,
+                    duration: 0.6,
+                    velocity,
+                }],
+                "en",
+            )
+            .unwrap()
+        };
+
+        let low = performance_for(220.0, 0.2);
+        let high = performance_for(440.0, 0.8);
+        let low_aligned = engine.aligned_syllables(&low).unwrap();
+        let high_aligned = engine.aligned_syllables(&high).unwrap();
+        let low_frames = render_sung_frames(&low_aligned, FRAME_RATE_HZ);
+        let high_frames = render_sung_frames(&high_aligned, FRAME_RATE_HZ);
+
+        let mean_middle = |frames: &[FormantFrame], field: fn(&FormantFrame) -> f32| {
+            let values: Vec<_> = frames
+                .iter()
+                .filter(|frame| (0.15..=0.45).contains(&frame.time))
+                .map(field)
+                .collect();
+            assert!(!values.is_empty(), "middle steady-state frames must exist");
+            values.iter().sum::<f32>() / values.len() as f32
+        };
+        let low_pitch = mean_middle(&low_frames, |frame| frame.f0);
+        let high_pitch = mean_middle(&high_frames, |frame| frame.f0);
+        let low_energy = mean_middle(&low_frames, |frame| frame.energy);
+        let high_energy = mean_middle(&high_frames, |frame| frame.energy);
+
+        assert!(
+            high_pitch > low_pitch * 1.8,
+            "doubling the score frequency must measurably raise F0: low={low_pitch}, high={high_pitch}"
+        );
+        assert!(
+            high_energy > low_energy * 1.8,
+            "increasing note velocity must measurably raise the frame energy: low={low_energy}, high={high_energy}"
+        );
+    }
+
+    #[test]
     fn phrase_expression_modulates_formant_energy_voicing_and_bandwidth() {
         let note = note(0.0, 0.5, 220.0);
         let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
