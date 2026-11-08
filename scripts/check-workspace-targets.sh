@@ -29,6 +29,14 @@ EXCLUDES=(
   "crates/domains/symthaea-spore/fuzz"
   "crates/domains/spark-engine"
   "crates/domains/symthaea-lab"
+  # Root-glob directories without a Cargo.toml; see Cargo.toml [workspace].exclude.
+  "crates/core/symthaea"
+  "crates/core/symthaea-iit"
+  "crates/core/symthaea-observation-attestation"
+  "crates/domains/symthaea-architecture-engineering"
+  "crates/domains/symthaea-dishwasher-design"
+  "crates/domains/symthaea-rea-compat"
+  "crates/domains/symthaea-rea-evidence-verifier"
 )
 
 is_excluded() {
@@ -49,7 +57,15 @@ has_target() {
 fail=0
 for glob in "${MEMBER_GLOBS[@]}"; do
   for dir in $glob; do
-    [[ -f "$dir/Cargo.toml" ]] || continue
+    [[ -d "$dir" ]] || continue
+    if [[ ! -f "$dir/Cargo.toml" ]]; then
+      if is_excluded "$dir"; then
+        continue
+      fi
+      echo "MISSING MANIFEST: $dir  (directory matches a workspace member glob but has no Cargo.toml; add a real package manifest or an explicit [workspace].exclude entry)"
+      fail=1
+      continue
+    fi
     is_excluded "$dir" && continue
     if ! has_target "$dir"; then
       echo "MISSING TARGET: $dir  (Cargo.toml but no src/lib.rs, src/main.rs, src/bin/*.rs, [lib], or [[bin]])"
