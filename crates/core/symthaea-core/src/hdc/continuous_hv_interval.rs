@@ -1857,6 +1857,85 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn spherical_cap_f32_interval_property_random_residual_directions() {
+        let mut state = 0xF32B_A11Du32;
+        for dimension in [1usize, 7, 8, 9, 17, 257, 2_048, 16_384] {
+            for _ in 0..16 {
+                let center = ContinuousHV::from_vec(
+                    (0..dimension)
+                        .map(|_| pseudo_random_unit(&mut state) * 0.5)
+                        .collect(),
+                );
+                let query = ContinuousHV::from_vec(
+                    (0..dimension)
+                        .map(|_| pseudo_random_unit(&mut state))
+                        .collect(),
+                );
+                let center_norm = center
+                    .values
+                    .iter()
+                    .map(|value| (*value as f64) * (*value as f64))
+                    .sum::<f64>()
+                    .sqrt();
+                if center_norm <= 1.0e-6 {
+                    continue;
+                }
+                let radius = (center_norm * 0.04).min(0.1) as f32;
+                let direction: Vec<f32> = (0..dimension)
+                    .map(|_| pseudo_random_unit(&mut state))
+                    .collect();
+                let direction_norm = direction
+                    .iter()
+                    .map(|value| (*value as f64) * (*value as f64))
+                    .sum::<f64>()
+                    .sqrt();
+                if direction_norm == 0.0 {
+                    continue;
+                }
+                let scale = (radius as f64 * 0.9) / direction_norm;
+                let actual = ContinuousHV::from_vec(
+                    center
+                        .values
+                        .iter()
+                        .zip(direction.iter())
+                        .map(|(c, d)| ((*c as f64 + *d as f64 * scale) as f32).clamp(-1.0, 1.0))
+                        .collect(),
+                );
+                verify_l2_residual_certificate(&actual, &center, radius).unwrap();
+
+                let interval = query
+                    .similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(
+                        &center,
+                        radius,
+                    )
+                    .unwrap();
+                let exact = query.similarity_full_resolution(&actual);
+                assert!(
+                    interval.contains(exact),
+                    "dimension={dimension}: canonical score={exact}, interval=[{}, {}]",
+                    interval.lower,
+                    interval.upper
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn spherical_cap_f32_interval_uses_canonical_near_zero_branch() {
+        let query = ContinuousHV::from_vec(vec![1.0e-6; 8]);
+        let center = ContinuousHV::from_vec(vec![1.0e-6; 8]);
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(
+                &center,
+                1.0e-6,
+            )
+            .unwrap();
+        assert_eq!(interval, ContinuousHVSphericalCapF32ScoreInterval::zero_score());
+        assert_eq!(query.similarity_full_resolution(&center), 0.0);
+    }
+
     #[test]
     fn spherical_cap_f32_interval_handles_zero_radius_and_zero_query() {
         let query = ContinuousHV::from_vec(vec![0.5, -0.2, 0.7, 0.1, -0.8, 0.3, 0.9, -0.4]);
