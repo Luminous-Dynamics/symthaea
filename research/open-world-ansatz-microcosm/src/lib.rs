@@ -1,9 +1,9 @@
-pub mod numeric;
-
 //! Executable finite-state reference world for ansatz-free discovery.
 //! The simulator uses an explicit state transition. The oracle uses a separate
 //! closed-form trace construction; this is a finite synthetic reference, not
 //! a general equation-discovery engine or physical-world simulator.
+
+pub mod numeric;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
