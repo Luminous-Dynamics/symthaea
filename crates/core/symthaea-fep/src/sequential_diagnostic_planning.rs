@@ -521,10 +521,8 @@ mod tests {
         )
         .expect("horizon-one evaluation");
         assert_eq!(sequential.selected_action_index, myopic.selected_action_index);
-        assert!(
-            (sequential.expected_total_cost - myopic.no_probe_score).abs() < 1e-12
-                || sequential.selected_action_index.is_some()
-        );
+        assert_eq!(sequential.selected_action_index, None);
+        assert!((sequential.expected_total_cost - myopic.no_probe_score).abs() < 1e-12);
     }
 
     #[test]
