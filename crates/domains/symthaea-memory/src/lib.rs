@@ -13,6 +13,7 @@ pub mod conversation;
 pub mod coordinator;
 pub mod episodic_replay;
 pub mod hippocampus;
+pub mod hme; // Holographic Memory Engine query algorithms
 pub mod semantic;
 
 pub use coherence::{CoherenceTrajectoryStats, ConversationCoherenceTracker};
