@@ -797,3 +797,86 @@ FER/TER now also returns one diagnostic per feature dimension in the profile's s
 - mismatch rate, or non-estimable when no aligned pair activates that dimension.
 
 This avoids collapsing all phonological errors into one aggregate. For example, a profile can reveal that a model mostly preserves segmental dimensions but systematically loses tone, phonation or click-related dimensions. Those labels remain meaningful only when the supplied feature profile defines them with appropriate language-specific authority. Insertions/deletions remain in aggregate FER/TER, while per-dimension pair diagnostics are computed only on aligned reference/hypothesis pairs.
+
+## 20. Paired causal counterfactual evaluation
+
+### 20.1 Research motivation
+
+The trial-level acoustic-faithfulness scorer (#11140 / PR #11146) measures whether one model output follows one adjudicated audio truth. That is necessary but insufficient to test how a system responds when inputs are intervened upon.
+
+A system may pass many isolated trials while:
+- changing its answer when only misleading prompt/context text changes;
+- keeping the same answer when the audio itself changes the fact;
+- remaining semantically stable under acoustic degradation only because it abstains;
+- returning the same wrong answer across every condition.
+
+The new requirement is to test two opposing properties together:
+- **Nuisance invariance:** changes that should not alter the audio-grounded answer must not alter it.
+- **Evidence sensitivity:** changes to the waveform that change the adjudicated fact must change the answer accordingly.
+
+This is not invariance to every perturbation. It is invariance to irrelevant input changes and sensitivity to evidence-bearing changes.
+
+### 20.2 Three intervention kinds
+
+[#11156 — VOICE-COUNTERFACTUAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/11156) defines three paired conditions:
+
+1. **TEXT_NUISANCE** — same exact audio and same audio truth; context/prompt changes. Measure response invariance, joint correctness and joint abstention separately.
+2. **AUDIO_RELEVANT** — source waveform and answerable audio truth change, while non-audio condition manifests remain fixed. Require both outputs to match their respective, distinct audio truths.
+3. **AUDIO_NUISANCE** — source waveform changes through a declared noise/channel/codec/room nuisance while truth and non-audio conditions remain fixed. Measure semantic stability only among pairs where both systems claim; report joint correctness and differential abstention separately.
+
+A system that always abstains can score 100% on response invariance but cannot pass joint correctness or audio sensitivity. Two identical wrong claims count as invariant but not grounded.
+
+### 20.3 Rust implementation and golden vectors
+
+- [Draft PR #11157](https://github.com/Luminous-Dynamics/symthaea/pull/11157) adds counterfactual_pairs.rs to symthaea-stt.
+- Eighteen synthetic unit-test functions are authored but not executed.
+- Eight synthetic cases live in acoustic_counterfactual_pair_golden_v0.1.json, with a Draft 2020-12 schema.
+- A separate JavaScript formula audit recomputed all eight cases' pair-level numerators, denominators and rates with no mismatches after correcting the false-invariance denominator to count eligible pairs with two claims.
+- The scorer validates pair/trial references, pair-ID consistency, reuse, intervention kind, source-audio relation, audio-truth relation, non-audio condition-manifest relation, changed dimensions and SHA-256 digests.
+
+This scorer consumes externally adjudicated trials. It does not prove audio truth, causal signal construction, model internals or acoustic evidence spans.
+
+### 20.4 AHA as a counterfactual-hard-negative comparator
+
+Chen et al., Findings ACL 2026, “AHA: Aligning Large Audio-Language Models for Reasoning Hallucinations via Counterfactual Hard Negatives”:
+https://aclanthology.org/2026.findings-acl.1464/
+
+The paper identifies event omission, false event identity, temporal-relation error and quantitative-temporal error. It constructs preference pairs using counterfactual hard negatives and keeps a separate human-verified evaluation set. The paper reports a 13.7% improvement on AHA-Eval for its evaluated Qwen2.5-Omni setup, with smaller gains on two other audio benchmarks. These are paper-reported results for its own audio-reasoning tasks—not African speech, Symthaea, or a guarantee of transfer.
+
+Use its taxonomy only where task-specific annotations support it. For speech, that may include word/event omission, event identity, temporal ordering and count/duration errors. Do not import environmental-sound assumptions into phoneme or code-switch metrics without validation.
+
+**Training/evaluation separation:** no counterfactual pair used to construct preference-training data may appear in held-out evaluation. A generated rejected response is not ground truth. Keep adjudicated truth and preference choice as separate records.
+
+### 20.5 Reproducible pair receipts
+
+The experiment receipt now has an optional counterfactual_pairs section recording:
+- pair-manifest, intervention-manifest and trial-manifest digests;
+- scorer revision;
+- condition-manifest schema version;
+- changed-dimension annotation revision;
+- pair count and intervention kinds;
+- pair split revision;
+- source-lineage manifest digest.
+
+The design receipt marks this section NOT_USED. Presence of the schema does not establish an executed paired experiment.
+
+## 21. Updated benchmark registry
+
+The programme matrix now contains **15 tracks** and five registered synthetic vector suites:
+1. WER/PIER/SETER/SPER vectors;
+2. switch-boundary vectors;
+3. FER/TER vectors (10 cases);
+4. acoustic-faithfulness vectors (10 trial groups);
+5. paired counterfactual vectors (8 cases).
+
+Track 15 is **paired causal counterfactual evaluation**. It is distinct from trial-level audio faithfulness (track 14), MICL candidate selection (track 12), and semantic anchoring (#11104). The paired contract specifically tests response invariance and evidence sensitivity under matched interventions.
+
+Files:
+- voice_benchmark_matrix_2026q4.json
+- voice_benchmark_matrix_2026q4.schema.json
+- voice_experiment_receipt_v1.schema.json
+- voice_experiment_receipt_design_example_v1.json
+- acoustic_counterfactual_pair_golden_v0.1.json
+- acoustic_counterfactual_pair_golden_v0.1.schema.json
+
+No model benchmark or Rust PASS is implied by registry or fixture presence.
