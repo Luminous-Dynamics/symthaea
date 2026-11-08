@@ -2,7 +2,7 @@
   "schema_version": 0,
   "registry_id": "CEB-EXTERNAL-OBSERVATIONS-V0",
   "status": "design_only_external_reference_snapshot",
-  "snapshot_date": "2026-11-07",
+  "snapshot_date": "2026-11-08",
   "policy": {
     "unit_of_observation": "One row represents one metric from one benchmark split and one named system configuration. Never combine metrics from different configurations into a synthetic system.",
     "comparison_ceiling": "All included external scores are contextual or historical references unless a separately preregistered matched comparison is recorded; no direct CEB superiority claim is supported by this registry.",
@@ -574,6 +574,39 @@
       "published_on": null,
       "supports": [
         "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "verifierbench-arxiv-2610-28679",
+      "source_url": "https://arxiv.org/abs/2610.28679",
+      "title": "VerifierBench: Benchmarking the Generation of Executable Verifiers for LLM Agents",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-10-19",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "verifierbench-project",
+      "source_url": "https://verifierbench.github.io/",
+      "title": "VerifierBench project page and benchmark population details",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-08",
+      "published_on": null,
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "unearned-pass-maintenance-arxiv-2609-34262",
+      "source_url": "https://arxiv.org/abs/2609.34262",
+      "title": "Maintaining Benchmarks Against Increasingly Capable Agents: Detection and Remediation of Unearned Passes",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-09-28",
+      "supports": [
+        "CEB-EVAL"
       ]
     }
   ],
@@ -1764,6 +1797,75 @@
         "History-mined propagation channels are empirical dependency candidates, not proof of causal impact or claim invalidation.",
         "The reported population is five projects and 5,032 versions; it is not an agent benchmark.",
         "Co-change/history relationships cannot alone establish branch-scoped claim validity, authorization scope or evidence completeness."
+      ]
+    },
+    {
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "VerifierBench",
+      "benchmark_version": "arXiv:2610.28679; paper and project page accessed 2026-11-08",
+      "split": "222 tasks from six source benchmarks; 4,993 hidden cases; 19 models in the paper's common-harness experiment. The project page separately lists 36 model–harness configurations and 45 exclusions for source defects.",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 222,
+        "unit": "tasks"
+      },
+      "source_id": "verifierbench-arxiv-2610-28679",
+      "supporting_source_ids": [
+        "verifierbench-project"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Measures generation of executable task verifiers, not PR-review finding recall, causal diagnosis, or CEB review precision.",
+        "The paper reports normalized balanced accuracy from 10.6 to 62.1 across 19 models in a common harness; this is a range, not a score for one named model or a CEB metric.",
+        "The project page's 36 model–harness configurations is a separate project-level count and must not replace the paper's 19-model common-harness denominator.",
+        "The 4,993 hidden cases include valid alternatives and attacks; the project page identifies 798 attack cases. Positive acceptance and negative rejection must be audited separately.",
+        "The paper reports that generated verifiers reject invalid solutions more reliably than they accept all valid alternatives; many false rejections arose from verifiers accepting no tested solution.",
+        "Verifier4Verifier's six checks qualify source verifiers and suites for this benchmark; they do not establish CEB's own evaluator independence, runner isolation, or signer trust."
+      ]
+    },
+    {
+      "comparator_id": "benchmark-maintenance-pass-audit",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "Unearned-pass benchmark maintenance audit",
+      "benchmark_version": "arXiv:2609.34262; published 2026-09-28",
+      "split": "3,810 passing trajectories across 29 model–benchmark cohorts; process-verification audit of passes and post-repair replay.",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 3810,
+        "unit": "passing trajectories"
+      },
+      "source_id": "unearned-pass-maintenance-arxiv-2609-34262",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Audits whether benchmark passes demonstrate the intended capability; it is a benchmark-integrity methodology, not a code-review performance benchmark.",
+        "The paper's reported 3,810 count is passing trajectories across 29 cohorts, not 3,810 independent tasks or independent model observations.",
+        "Unearned-pass rates are cohort-specific and descriptive; do not infer a monotonic model-generation effect or a universal rate.",
+        "Reported exploit surfaces include unintended reference-solution access through Git history and alternate access paths; a patch must be followed by exploit replay and fresh-agent evaluation.",
+        "The paper's model/cohort configurations are not normalized to CEB budgets, tasks, source snapshots, or adjudication; no direct score comparison is supported."
+      ]
+    },
+    {
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "Unearned-pass rates on SWE-Bench Pro V1 cohorts",
+      "benchmark_version": "arXiv:2609.34262; published 2026-09-28",
+      "split": "Descriptive model/cohort rates reported for the SWE-Bench Pro V1 maintenance audit; exact per-cohort denominators are not stated in the abstract.",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "per-cohort passing-trajectory/task denominator not reported in the abstract"
+      },
+      "source_id": "unearned-pass-maintenance-arxiv-2609-34262",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Rates are reported for named model/cohort snapshots and are descriptive, not a normalized ranking across model generations.",
+        "The 24% versus 73% comparison is described on matched tasks for Opus 4.7 and Fable 5; exact per-cohort sample counts are not stated in the abstract.",
+        "The later 11% and 0% cohort observations should not be interpreted as a monotonic trend or as general model reliability.",
+        "Unearned-pass rate is not false-positive rate, benchmark solve rate, or PR-review defect recall.",
+        "Use these rates to motivate post-patch exploit replay and fresh-agent re-evaluation, not as CEB performance targets."
       ]
     }
   ],
@@ -7225,6 +7327,513 @@
       },
       "notes": [
         "Taxonomy descriptor; channel membership does not prove semantic causation."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-task-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-paper-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench",
+        "configuration": "Paper task denominator"
+      },
+      "metric": {
+        "metric_id": "task_count",
+        "label": "Benchmark task count",
+        "definition": "Number of retained verifier-generation tasks in VerifierBench.",
+        "value": 222,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "222 tasks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "task_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The task population spans six source agent benchmarks."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-hidden-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-hidden-cases",
+        "model": "Hidden test population",
+        "harness": "VerifierBench",
+        "configuration": "All hidden verifier cases"
+      },
+      "metric": {
+        "metric_id": "hidden_case_count",
+        "label": "Hidden verifier-case count",
+        "definition": "Number of hidden positive and negative cases used to evaluate generated task verifiers.",
+        "value": 4993,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "4,993 hidden cases",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "hidden_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The cases include gold solutions, cosmetic changes, valid alternatives, near misses, regressions, and attacks."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-source-benchmark-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-source-benchmarks",
+        "model": "Benchmark population",
+        "harness": "VerifierBench",
+        "configuration": "Number of source benchmark families"
+      },
+      "metric": {
+        "metric_id": "source_benchmark_count",
+        "label": "Source benchmark count",
+        "definition": "Number of source benchmarks from which VerifierBench tasks were drawn.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "benchmarks",
+        "direction": "not_applicable",
+        "raw_display": "Six source benchmarks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "source_benchmark_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "verifierbench-paper-common-harness-model-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract; common-harness experiment",
+      "system": {
+        "system_id": "verifierbench-common-harness-models",
+        "model": "Evaluated models",
+        "harness": "VerifierBench",
+        "configuration": "Paper's common agent harness"
+      },
+      "metric": {
+        "metric_id": "common_harness_model_count",
+        "label": "Common-harness model count",
+        "definition": "Number of models evaluated under the paper's common agent harness.",
+        "value": 19,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "models",
+        "direction": "not_applicable",
+        "raw_display": "19 models",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "common_harness_model_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "Keep separate from the project page's 36 model–harness configurations."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-project-model-harness-config-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, benchmark overview",
+      "system": {
+        "system_id": "verifierbench-project-configurations",
+        "model": "Project overview",
+        "harness": "VerifierBench",
+        "configuration": "Project page"
+      },
+      "metric": {
+        "metric_id": "model_harness_configuration_count",
+        "label": "Model–harness configuration count",
+        "definition": "Number of model–harness configurations listed on the VerifierBench project page.",
+        "value": 36,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "configurations",
+        "direction": "not_applicable",
+        "raw_display": "36 model–harness configurations",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "model_harness_configuration_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This project-page configuration count is not the paper's 19-model common-harness experiment."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-project-source-defect-exclusions",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, task inclusion summary",
+      "system": {
+        "system_id": "verifierbench-excluded-source-tasks",
+        "model": "Source curation",
+        "harness": "VerifierBench",
+        "configuration": "Project page"
+      },
+      "metric": {
+        "metric_id": "source_defect_exclusion_count",
+        "label": "Source-defect task exclusions",
+        "definition": "Number of source tasks excluded after confirmed defects were found in source materials.",
+        "value": 45,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "45 tasks excluded",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "source_defect_exclusion_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "Source-quality exclusions are not model errors or benchmark failures."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-attack-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, hidden-case composition",
+      "system": {
+        "system_id": "verifierbench-attack-cases",
+        "model": "Hidden negative cases",
+        "harness": "VerifierBench",
+        "configuration": "Project page"
+      },
+      "metric": {
+        "metric_id": "attack_case_count",
+        "label": "Attack-case count",
+        "definition": "Number of adversarial attack cases included among VerifierBench hidden negative cases.",
+        "value": 798,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "798 attack cases",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "attack_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The 798 attacks are a subset of the 4,993 hidden cases, not additional cases."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-v4v-check-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-v4v-audit",
+        "model": "Verifier4Verifier",
+        "harness": "VerifierBench",
+        "configuration": "Six-check source-verifier audit"
+      },
+      "metric": {
+        "metric_id": "v4v_check_count",
+        "label": "Verifier4Verifier check count",
+        "definition": "Number of checks in the Verifier4Verifier source-verifier and test-suite audit.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "checks",
+        "direction": "not_applicable",
+        "raw_display": "Six V4V checks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "v4v_check_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This is the benchmark paper's source-verifier audit; it is not evidence that CEB's own V4V or regrade gate is qualified."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-validity-asymmetry",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract; normalized balanced accuracy and false-rejection analysis",
+      "system": {
+        "system_id": "verifierbench-19-model-range",
+        "model": "19 evaluated models",
+        "harness": "Common agent harness",
+        "configuration": "Paper-reported aggregate range and qualitative error asymmetry"
+      },
+      "metric": {
+        "metric_id": "verifier_lifecycle_policy",
+        "label": "Verifier acceptance/rejection asymmetry",
+        "definition": "Qualitative report of generated verifiers' ability to reject invalid solutions while accepting all valid alternatives.",
+        "value": null,
+        "value_status": "qualitative",
+        "operator": "reported_qualitative",
+        "unit": "qualitative finding",
+        "direction": "not_applicable",
+        "raw_display": "Normalized balanced accuracy ranges from 10.6 to 62.1; generated verifiers reject invalid solutions more reliably than they accept all valid alternatives.",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "verifier_lifecycle_policy",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The 10.6–62.1 range is across 19 models, not a single model score; do not rank the endpoints as systems.",
+        "The paper reports many false rejections from verifiers that accepted no tested solution, underscoring the need for explicit positive controls."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-audited-trajectory-count",
+      "comparator_id": "benchmark-maintenance-pass-audit",
+      "source_locator": "Luo et al., arXiv:2609.34262, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "benchmark-maintenance-audit-population",
+        "model": "Benchmark audit population",
+        "harness": "Process-verification framework",
+        "configuration": "Aggregate passing trajectories audited across 29 cohorts"
+      },
+      "metric": {
+        "metric_id": "passing_trajectory_count",
+        "label": "Passing trajectories audited",
+        "definition": "Number of passing agent trajectories audited for unearned passes across the study's model–benchmark cohorts.",
+        "value": 3810,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "trajectories",
+        "direction": "not_applicable",
+        "raw_display": "3,810 passing trajectories",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "passing_trajectory_count",
+          "applies_to_task_count": 3810
+        }
+      },
+      "notes": [
+        "Trajectories are not independent tasks or independent model observations."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-cohort-count",
+      "comparator_id": "benchmark-maintenance-pass-audit",
+      "source_locator": "Luo et al., arXiv:2609.34262, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "benchmark-maintenance-cohort-population",
+        "model": "Benchmark audit population",
+        "harness": "Process-verification framework",
+        "configuration": "Model–benchmark cohorts included in the audit"
+      },
+      "metric": {
+        "metric_id": "model_benchmark_cohort_count",
+        "label": "Model–benchmark cohort count",
+        "definition": "Number of distinct model–benchmark cohorts represented in the audited passing trajectories.",
+        "value": 29,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cohorts",
+        "direction": "not_applicable",
+        "raw_display": "29 model–benchmark cohorts",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "model_benchmark_cohort_count",
+          "applies_to_task_count": 3810
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "benchmark-maintenance-opus47-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "opus47-swebenchpro-v1",
+        "model": "Opus 4.7",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 24,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "24%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "The paper describes the Opus 4.7 and Fable 5 comparison as matched tasks; exact cohort denominators are not stated in the abstract."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-fable5-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "fable5-swebenchpro-v1",
+        "model": "Fable 5",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 73,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "73%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "The paper describes the Opus 4.7 and Fable 5 comparison as matched tasks; exact cohort denominators are not stated in the abstract."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-fable51-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "fable51-swebenchpro-v1",
+        "model": "Fable 5.1",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 11,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "11%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Descriptive later cohort observation; do not infer a monotonic trend or generalize to other tasks and harnesses."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-gpt6astra-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "gpt6-astra-swebenchpro-v1",
+        "model": "GPT-6 Astra",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 0,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Descriptive later cohort observation; do not infer a monotonic trend or generalize to other tasks and harnesses."
       ]
     }
   ]
