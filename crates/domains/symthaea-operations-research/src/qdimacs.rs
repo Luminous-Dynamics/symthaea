@@ -245,7 +245,7 @@ fn parse_quantifier_line(
         if variable <= 0 || usize::try_from(variable).unwrap_or(usize::MAX) > header.variables {
             return Err(QdimacsError::QuantifierVariableOutOfRange {
                 line: line_number,
-                variable,
+                variable: usize::try_from(variable).unwrap_or(0),
                 variable_count: header.variables,
             });
         }
@@ -257,7 +257,7 @@ fn parse_quantifier_line(
         if seen_variables[index] {
             return Err(QdimacsError::DuplicateQuantifiedVariable {
                 line: line_number,
-                variable,
+                variable: index + 1,
             });
         }
 
