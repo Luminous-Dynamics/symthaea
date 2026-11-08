@@ -114,6 +114,14 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
             .and_then(|value| value.get("reference_frame_id")),
         &frame_ids,
     );
+    check_source_refs(
+        &mut errors,
+        "ego_state.source_refs",
+        snapshot
+            .get("ego_state")
+            .and_then(|value| value.get("source_refs")),
+        &source_ids,
+    );
     check_ref(
         &mut errors,
         "road_geometry.reference_frame_id",
@@ -122,6 +130,20 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
             .and_then(|value| value.get("reference_frame_id")),
         &frame_ids,
     );
+    if let Some(lanes) = snapshot
+        .get("road_geometry")
+        .and_then(|value| value.get("lane_hypotheses"))
+        .and_then(Value::as_array)
+    {
+        for (index, lane) in lanes.iter().enumerate() {
+            check_source_refs(
+                &mut errors,
+                &format!("road_geometry.lane_hypotheses[{index}].source_refs"),
+                lane.get("source_refs"),
+                &source_ids,
+            );
+        }
+    }
     check_ref(
         &mut errors,
         "free_space.reference_frame_id",
