@@ -130,23 +130,25 @@ impl FormantSingingEngine {
 
         let mut segments = Vec::new();
         for (binding_index, binding) in alignment.syllable_bindings.iter().enumerate() {
-            let word = pronunciation
-                .words
-                .get(binding.word_index)
-                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} references missing word"))?;
-            let selected_id = word
-                .selected_candidate_id
-                .as_deref()
-                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} has no selected candidate"))?;
+            let word = pronunciation.words.get(binding.word_index).ok_or_else(|| {
+                anyhow::anyhow!("binding {binding_index} references missing word")
+            })?;
+            let selected_id = word.selected_candidate_id.as_deref().ok_or_else(|| {
+                anyhow::anyhow!("binding {binding_index} has no selected candidate")
+            })?;
             let candidate = word
                 .candidates
                 .iter()
                 .find(|candidate| candidate.candidate_id == selected_id)
-                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} selects a missing candidate"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("binding {binding_index} selects a missing candidate")
+                })?;
             let syllable = candidate
                 .syllables
                 .get(binding.syllable_index)
-                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} has no pronunciation syllable"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("binding {binding_index} has no pronunciation syllable")
+                })?;
 
             for (span_index, span) in binding.spans.iter().enumerate() {
                 let event = alignment.events.get(span.event_index).ok_or_else(|| {
@@ -409,9 +411,7 @@ fn allocate_resolved_phone_durations(
     let consonant_budget = consonants as f32 * CONSONANT_DURATION_S;
     let nucleus_budget = total_duration_s - consonant_budget;
     if nucleus_budget < nuclei.len() as f32 * MIN_NUCLEUS_DURATION_S {
-        bail!(
-            "binding {binding_index} is too short to preserve its consonants and vowel nucleus"
-        );
+        bail!("binding {binding_index} is too short to preserve its consonants and vowel nucleus");
     }
     let nucleus_weights: Vec<f32> = nuclei
         .iter()
@@ -447,10 +447,49 @@ fn allocate_resolved_phone_durations(
 fn strict_formant_target(phone: &Phone) -> Result<(f32, f32, f32, SourceType)> {
     let supported = matches!(
         phone.ipa.as_str(),
-        "iː" | "i" | "ɪ" | "ɛ" | "æ" | "ɑ" | "ɑː" | "ɒ" | "ɔ" | "ɔː" | "ʌ" | "ʊ"
-            | "uː" | "u" | "ə" | "ɜː" | "eɪ" | "aɪ" | "oʊ" | "aʊ" | "m" | "n" | "ŋ"
-            | "p" | "b" | "t" | "d" | "k" | "ɡ" | "f" | "v" | "θ" | "ð" | "s" | "z"
-            | "ʃ" | "ʒ" | "h" | "tʃ" | "dʒ" | "l" | "ɹ" | "w" | "j"
+        "iː" | "i"
+            | "ɪ"
+            | "ɛ"
+            | "æ"
+            | "ɑ"
+            | "ɑː"
+            | "ɒ"
+            | "ɔ"
+            | "ɔː"
+            | "ʌ"
+            | "ʊ"
+            | "uː"
+            | "u"
+            | "ə"
+            | "ɜː"
+            | "eɪ"
+            | "aɪ"
+            | "oʊ"
+            | "aʊ"
+            | "m"
+            | "n"
+            | "ŋ"
+            | "p"
+            | "b"
+            | "t"
+            | "d"
+            | "k"
+            | "ɡ"
+            | "f"
+            | "v"
+            | "θ"
+            | "ð"
+            | "s"
+            | "z"
+            | "ʃ"
+            | "ʒ"
+            | "h"
+            | "tʃ"
+            | "dʒ"
+            | "l"
+            | "ɹ"
+            | "w"
+            | "j"
     );
     if !supported {
         bail!(
@@ -461,7 +500,10 @@ fn strict_formant_target(phone: &Phone) -> Result<(f32, f32, f32, SourceType)> {
     let (f1, f2, f3, source) = formant_target_pub(&phone.ipa);
     match phone.kind {
         ResolvedPhoneKind::Vowel if source != SourceType::Vowel => {
-            bail!("resolved vowel {:?} maps to a non-vowel formant source", phone.ipa)
+            bail!(
+                "resolved vowel {:?} maps to a non-vowel formant source",
+                phone.ipa
+            )
         }
         ResolvedPhoneKind::SyllabicConsonant
             if !matches!(source, SourceType::Nasal | SourceType::Liquid) =>
@@ -1013,9 +1055,14 @@ mod tests {
         let frames = engine
             .resolved_plan_frames(&pronunciation, &alignment)
             .unwrap();
-        let at_end_of_first = frames.iter().find(|frame| (frame.time - 0.35).abs() < 1e-5).unwrap();
-        let at_start_of_second =
-            frames.iter().find(|frame| (frame.time - 0.55).abs() < 1e-5).unwrap();
+        let at_end_of_first = frames
+            .iter()
+            .find(|frame| (frame.time - 0.35).abs() < 1e-5)
+            .unwrap();
+        let at_start_of_second = frames
+            .iter()
+            .find(|frame| (frame.time - 0.55).abs() < 1e-5)
+            .unwrap();
         assert_eq!(at_end_of_first.source_type, SourceType::Vowel);
         assert_eq!(at_start_of_second.source_type, SourceType::Nasal);
     }
@@ -1216,7 +1263,10 @@ mod tests {
             .resolved_plan_frames(&pronunciation, &alignment)
             .unwrap_err()
             .to_string();
-        assert!(error.contains("outside the calibrated legacy formant inventory"), "{error}");
+        assert!(
+            error.contains("outside the calibrated legacy formant inventory"),
+            "{error}"
+        );
     }
 
     #[test]
