@@ -51,6 +51,296 @@ pub fn validate_values(schema: &Value, instance: &Value) -> Result<(), Vec<Strin
     }
 }
 
+pub fn validate_traffic_files(schema_path: &Path, fixture_path: &Path) -> Result<(), Vec<String>> {
+    let schema_text = fs::read_to_string(schema_path)
+        .map_err(|error| vec![format!("read traffic schema {}: {error}", schema_path.display())])?;
+    let fixture_text = fs::read_to_string(fixture_path).map_err(|error| {
+        vec![format!(
+            "read traffic fixture {}: {error}",
+            fixture_path.display()
+        )]
+    })?;
+    let schema: Value = serde_json::from_str(&schema_text)
+        .map_err(|error| vec![format!("parse traffic schema {}: {error}", schema_path.display())])?;
+    let fixture: Value = serde_json::from_str(&fixture_text).map_err(|error| {
+        vec![format!(
+            "parse traffic fixture {}: {error}",
+            fixture_path.display()
+        )]
+    })?;
+    validate_traffic_values(&schema, &fixture)
+}
+
+pub fn validate_traffic_values(schema: &Value, fixture: &Value) -> Result<(), Vec<String>> {
+    if !jsonschema::meta::is_valid(schema) {
+        return Err(vec![
+            "traffic schema is not valid under its declared JSON Schema meta-schema".into(),
+        ]);
+    }
+    let validator = jsonschema::options()
+        .offline()
+        .build(schema)
+        .map_err(|error| vec![format!("compile traffic schema: {error}")])?;
+    let mut errors: Vec<String> = validator
+        .iter_errors(fixture)
+        .map(|error| format!("traffic schema {}: {error}", error.instance_path()))
+        .collect();
+    errors.extend(validate_traffic_semantics(fixture));
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let profiles = fixture.get("profiles").and_then(Value::as_array);
+    let Some(profiles) = profiles else {
+        return errors;
+    };
+    let mut profile_index = std::collections::BTreeMap::new();
+    for (index, profile) in profiles.iter().enumerate() {
+        let Some(id) = profile.get("profile_id").and_then(Value::as_str) else {
+            errors.push(format!("profiles[{index}]: missing profile_id"));
+            continue;
+        };
+        if profile_index.insert(id.to_owned(), profile).is_some() {
+            errors.push(format!("duplicate traffic profile_id: {id}"));
+        }
+        let traffic_side = profile.get("traffic_side").and_then(Value::as_str);
+        let keep = profile.get("keep_side_sign").and_then(Value::as_i64);
+        let kerb = profile.get("kerbside_sign").and_then(Value::as_i64);
+        let median = profile.get("median_side_sign").and_then(Value::as_i64);
+        let expected = match traffic_side {
+            Some("left") => Some((1, 1, -1)),
+            Some("right") => Some((-1, -1, 1)),
+            _ => None,
+        };
+        if let Some((expected_keep, expected_kerb, expected_median)) = expected
+            && (keep != Some(expected_keep)
+                || kerb != Some(expected_kerb)
+                || median != Some(expected_median))
+        {
+            errors.push(format!(
+                "profiles[{index}]: traffic-side signs do not match the declared travel-frame convention"
+            ));
+        }
+        if profile
+            .get("passing_rule_profile_id")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+            || profile
+                .get("passing_rule_profile_version")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+        {
+            errors.push(format!(
+                "profiles[{index}]: passing-side semantics require an explicit rule-profile ID and version"
+            ));
+        }
+    }
+
+    // Steering-wheel position is independent of traffic side. Any profiles
+    // sharing a traffic side must preserve the road/lane sign convention.
+    for left in profiles {
+        for right in profiles {
+            if left.get("profile_id") == right.get("profile_id")
+                || left.get("traffic_side") != right.get("traffic_side")
+            {
+                continue;
+            }
+            for field in ["keep_side_sign", "kerbside_sign", "median_side_sign"] {
+                if left.get(field) != right.get(field) {
+                    errors.push(format!(
+                        "profiles with equal traffic_side disagree on {field}; steering-wheel position must not alter road semantics"
+                    ));
+                }
+            }
+        }
+    }
+
+    let Some(scenes) = fixture.get("paired_scenes").and_then(Value::as_array) else {
+        errors.push("paired_scenes must be an array".into());
+        return errors;
+    };
+    let mut pairs: std::collections::BTreeMap<String, Vec<&Value>> =
+        std::collections::BTreeMap::new();
+    for (index, scene) in scenes.iter().enumerate() {
+        let Some(pair_id) = scene.get("pair_id").and_then(Value::as_str) else {
+            errors.push(format!("paired_scenes[{index}]: missing pair_id"));
+            continue;
+        };
+        pairs.entry(pair_id.to_owned()).or_default().push(scene);
+        let profile_id = scene
+            .get("traffic_convention_profile_id")
+            .and_then(Value::as_str);
+        if profile_id.is_none_or(|id| !profile_index.contains_key(id)) {
+            errors.push(format!(
+                "paired_scenes[{index}]: traffic convention profile reference is unresolved"
+            ));
+        } else if let Some(profile) = profile_index.get(profile_id.unwrap()) {
+            if scene.get("declared_passing_side_sign")
+                != profile.get("passing_side_sign")
+            {
+                errors.push(format!(
+                    "paired_scenes[{index}]: declared passing side conflicts with the versioned rule profile"
+                ));
+            }
+        }
+    }
+
+    for (pair_id, pair) in pairs {
+        if pair.len() != 2 {
+            errors.push(format!(
+                "pair {pair_id}: expected exactly two mirrored scenes, got {}",
+                pair.len()
+            ));
+            continue;
+        }
+        let (Some(a_id), Some(b_id)) = (
+            pair[0]
+                .get("traffic_convention_profile_id")
+                .and_then(Value::as_str),
+            pair[1]
+                .get("traffic_convention_profile_id")
+                .and_then(Value::as_str),
+        ) else {
+            errors.push(format!("pair {pair_id}: missing traffic profile reference"));
+            continue;
+        };
+        let (Some(a_profile), Some(b_profile)) =
+            (profile_index.get(a_id), profile_index.get(b_id))
+        else {
+            continue;
+        };
+        let a_side = a_profile.get("traffic_side").and_then(Value::as_str);
+        let b_side = b_profile.get("traffic_side").and_then(Value::as_str);
+        if !matches!((a_side, b_side), (Some("left"), Some("right")) | (Some("right"), Some("left"))) {
+            errors.push(format!("pair {pair_id}: traffic_side must flip left <-> right"));
+        }
+        if pair[0].get("scenario_family") != pair[1].get("scenario_family") {
+            errors.push(format!("pair {pair_id}: scenario families do not match"));
+        }
+        validate_mirrored_pair(&mut errors, pair_id, pair[0], pair[1]);
+    }
+    errors
+}
+
+fn approx_eq(a: Option<f64>, b: Option<f64>, expected: f64) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => (a - expected).abs() <= 1e-9,
+        _ => false,
+    }
+}
+
+fn number_at(value: Option<&Value>, index: usize) -> Option<f64> {
+    value?
+        .as_array()?
+        .get(index)?
+        .as_f64()
+}
+
+fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b: &Value) {
+    let a_state = a.get("ego_state");
+    let b_state = b.get("ego_state");
+    let fields = [
+        ("position_m", 0usize, 1i8),
+        ("position_m", 1usize, -1i8),
+        ("position_m", 2usize, 1i8),
+        ("velocity_mps", 0usize, 1i8),
+        ("velocity_mps", 1usize, -1i8),
+        ("velocity_mps", 2usize, 1i8),
+    ];
+    for (field, index, sign) in fields {
+        let av = number_at(a_state.and_then(|state| state.get(field)), index);
+        let bv = number_at(b_state.and_then(|state| state.get(field)), index);
+        let expected = av.map(|value| value * f64::from(sign));
+        if !approx_eq(bv, expected, 0.0) {
+            errors.push(format!(
+                "pair {pair_id}: {field}[{index}] violates mirror sign/magnitude invariant"
+            ));
+        }
+    }
+    for (field, sign) in [
+        ("heading_rad", -1.0),
+        ("yaw_rate_rad_s", -1.0),
+        ("lateral_offset_m", -1.0),
+        ("curvature_per_m", -1.0),
+        ("steering_angle_rad", -1.0),
+    ] {
+        let av = a_state
+            .and_then(|state| state.get(field))
+            .and_then(Value::as_f64);
+        let bv = b_state
+            .and_then(|state| state.get(field))
+            .and_then(Value::as_f64);
+        if !approx_eq(bv, av.map(|value| value * sign), 0.0) {
+            errors.push(format!("pair {pair_id}: {field} violates mirror invariant"));
+        }
+    }
+    let a_command = a.get("candidate_command");
+    let b_command = b.get("candidate_command");
+    for (field, sign) in [
+        ("steering", -1.0),
+        ("throttle", 1.0),
+        ("brake", 1.0),
+    ] {
+        let av = a_command
+            .and_then(|command| command.get(field))
+            .and_then(Value::as_f64);
+        let bv = b_command
+            .and_then(|command| command.get(field))
+            .and_then(Value::as_f64);
+        if !approx_eq(bv, av.map(|value| value * sign), 0.0) {
+            errors.push(format!(
+                "pair {pair_id}: command.{field} violates mirror invariant"
+            ));
+        }
+    }
+    let a_lanes = a.get("lanes").and_then(Value::as_array);
+    let b_lanes = b.get("lanes").and_then(Value::as_array);
+    if let (Some(a_lanes), Some(b_lanes)) = (a_lanes, b_lanes) {
+        if a_lanes.len() != b_lanes.len() {
+            errors.push(format!("pair {pair_id}: lane count changed"));
+        } else {
+            for (index, (a_lane, b_lane)) in a_lanes.iter().zip(b_lanes).enumerate() {
+                if a_lane.get("role") != b_lane.get("role")
+                    || a_lane.get("lane_id") != b_lane.get("lane_id")
+                {
+                    errors.push(format!(
+                        "pair {pair_id}: lane role / identity changed at index {index}"
+                    ));
+                }
+                for field in ["center_lateral_m"] {
+                    let av = a_lane.get(field).and_then(Value::as_f64);
+                    let bv = b_lane.get(field).and_then(Value::as_f64);
+                    if !approx_eq(bv, av.map(|value| -value), 0.0) {
+                        errors.push(format!(
+                            "pair {pair_id}: lane {index} field {field} did not reflect"
+                        ));
+                    }
+                }
+                if a_lane.get("relative_lateral_sign")
+                    == b_lane.get("relative_lateral_sign")
+                {
+                    errors.push(format!(
+                        "pair {pair_id}: lane {index} relative lateral sign did not flip"
+                    ));
+                }
+            }
+        }
+    } else {
+        errors.push(format!("pair {pair_id}: lanes must be present in both scenes"));
+    }
+
+    let a_pass = a.get("declared_passing_side_sign").and_then(Value::as_i64);
+    let b_pass = b.get("declared_passing_side_sign").and_then(Value::as_i64);
+    if a_pass.zip(b_pass).is_none_or(|(a, b)| a != -b) {
+        errors.push(format!("pair {pair_id}: passing-side sign did not flip"));
+    }
+}
+
 fn validate_semantics(instance: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let Some(snapshot) = instance.get("snapshot") else {
