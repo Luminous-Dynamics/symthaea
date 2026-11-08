@@ -130,6 +130,10 @@ pub enum BudgetedDesignError {
         expected: usize,
         actual: usize,
     },
+    TooManyParameters {
+        count: usize,
+        maximum: usize,
+    },
     InvalidParameterScale { column: usize },
     TooManyOptionsForExhaustive {
         count: usize,
@@ -205,6 +209,9 @@ impl fmt::Display for BudgetedDesignError {
             Self::InvalidParameterScale { column } => {
                 write!(f, "parameter scale at column {column} is not finite and positive")
             }
+            Self::TooManyParameters { count, maximum } => {
+                write!(f, "design has {count} parameters; maximum supported is {maximum}")
+            }
             Self::TooManyOptionsForExhaustive { count, maximum } => write!(
                 f,
                 "exhaustive design has {count} options; maximum supported is {maximum}"
@@ -249,7 +256,6 @@ pub fn greedy_budgeted_design(
         scenarios,
         options,
         &selected,
-        &weights,
         &config.parameter_scales,
         dimension,
     )?;
@@ -275,7 +281,6 @@ pub fn greedy_budgeted_design(
                 scenarios,
                 options,
                 &trial,
-                &weights,
                 &config.parameter_scales,
                 dimension,
             )?;
@@ -327,7 +332,6 @@ pub fn greedy_budgeted_design(
             scenarios,
             options,
             &selected,
-            &weights,
             &config.parameter_scales,
             dimension,
         )?;
@@ -374,7 +378,6 @@ pub fn exhaustive_budgeted_design(
         scenarios,
         options,
         &best_selection,
-        &weights,
         &config.parameter_scales,
         dimension,
     )?;
@@ -466,11 +469,22 @@ fn validate_inputs(
         return Err(BudgetedDesignError::InvalidBudget);
     }
 
-    let dimension = config.parameter_scales.len();
-    if dimension == 0 || dimension > MAX_OBSERVABILITY_PARAMETERS {
+    let dimension = scenarios[0].prior_precision.len();
+    if dimension == 0 {
+        return Err(BudgetedDesignError::InvalidPriorShape {
+            scenario_id: scenarios[0].scenario_id.clone(),
+        });
+    }
+    if dimension > MAX_OBSERVABILITY_PARAMETERS {
+        return Err(BudgetedDesignError::TooManyParameters {
+            count: dimension,
+            maximum: MAX_OBSERVABILITY_PARAMETERS,
+        });
+    }
+    if config.parameter_scales.len() != dimension {
         return Err(BudgetedDesignError::ParameterScaleCount {
-            expected: MAX_OBSERVABILITY_PARAMETERS,
-            actual: dimension,
+            expected: dimension,
+            actual: config.parameter_scales.len(),
         });
     }
     for (column, scale) in config.parameter_scales.iter().copied().enumerate() {
@@ -605,7 +619,6 @@ fn evaluate_selection(
     scenarios: &[DesignScenario],
     options: &[ExperimentOption],
     selected: &[usize],
-    weights: &[f64],
     parameter_scales: &[f64],
     dimension: usize,
 ) -> Result<Vec<ScenarioDesignScore>, BudgetedDesignError> {
@@ -661,7 +674,6 @@ fn evaluate_selection(
         });
     }
 
-    let _ = weights;
     Ok(scores)
 }
 
