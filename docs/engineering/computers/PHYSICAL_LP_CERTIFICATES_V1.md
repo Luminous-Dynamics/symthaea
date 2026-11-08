@@ -45,7 +45,7 @@ When a Rust toolchain is available, run:
     rustc --edition=2021 --test research/physical_compute/lp_certificate_v1.rs -o /tmp/lp_certificate_v1_tests
     /tmp/lp_certificate_v1_tests
 
-The source currently authors 11 positive/negative unit tests covering:
+The source currently authors 12 positive/negative unit tests covering:
 - a known primal/dual optimality pair;
 - primal infeasibility and dual infeasibility;
 - excessive duality gap;
@@ -53,7 +53,7 @@ The source currently authors 11 positive/negative unit tests covering:
 - valid and invalid improving rays;
 - dimension mismatch;
 - non-finite model input;
-- invalid tolerance configuration.
+- invalid, non-finite and greater-than-one tolerance configurations.
 
 **Execution status:** tests are authored but have not been compiled or run in the current authoring environment. No CI, repository or hardware qualification is implied.
 
