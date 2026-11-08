@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use sam_scene_evidence_check::{validate_files, validate_traffic_files};
+use sam_scene_evidence_check::{validate_bundle_files, validate_files};
 
 fn main() {
     let mut args = env::args_os().skip(1);
@@ -22,34 +22,40 @@ fn main() {
         std::process::exit(2);
     }
 
-    if let Err(errors) = validate_files(&schema, &fixture) {
-        for error in &errors {
-            eprintln!("ERROR: {error}");
-        }
-        eprintln!("FAIL: {} scene validation error(s)", errors.len());
-        std::process::exit(1);
-    }
-    println!(
-        "PASS: {} conforms to {} (Draft 2020-12 + SAM semantic checks)",
-        fixture.display(),
-        schema.display()
-    );
+    let result = match (traffic_schema, traffic_fixture) {
+        (Some(traffic_schema), Some(traffic_fixture)) => validate_bundle_files(
+            &schema,
+            &fixture,
+            &traffic_schema,
+            &traffic_fixture,
+        ),
+        (None, None) => validate_files(&schema, &fixture),
+        _ => unreachable!("argument pairing checked above"),
+    };
 
-    if let (Some(traffic_schema), Some(traffic_fixture)) = (traffic_schema, traffic_fixture) {
-        if let Err(errors) = validate_traffic_files(&traffic_schema, &traffic_fixture) {
+    match result {
+        Ok(()) => {
+            println!(
+                "PASS: {} conforms to {} (scene schema, traffic profile and cross-contract identity checks)",
+                fixture.display(),
+                schema.display()
+            );
+            if args_count_has_traffic_args() {
+                println!("PASS: scene traffic_convention_profile_id resolves in the validated traffic profile registry");
+            }
+        }
+        Err(errors) => {
             for error in &errors {
                 eprintln!("ERROR: {error}");
             }
-            eprintln!(
-                "FAIL: {} traffic convention validation error(s)",
-                errors.len()
-            );
+            eprintln!("FAIL: {} validation error(s)", errors.len());
             std::process::exit(1);
         }
-        println!(
-            "PASS: {} conforms to {} (Draft 2020-12 + traffic-side mirror semantics)",
-            traffic_fixture.display(),
-            traffic_schema.display()
-        );
     }
+}
+
+// The CLI always consumes its optional traffic pair before calling this function;
+// this helper is avoided by keeping the mode as an explicit value instead.
+fn args_count_has_traffic_args() -> bool {
+    std::env::args_os().count() >= 5
 }
