@@ -52,7 +52,10 @@ impl fmt::Display for LinkMatrixError {
                 write!(f, "link matrix has {count} events; maximum is {maximum}")
             }
             Self::OracleLimitExceeded { count, maximum } => {
-                write!(f, "brute-force link oracle has {count} events; maximum is {maximum}")
+                write!(
+                    f,
+                    "brute-force link oracle has {count} events; maximum is {maximum}"
+                )
             }
             Self::MemoryBudgetExceeded {
                 required_bytes,
@@ -237,7 +240,11 @@ impl LinkMatrix {
     }
 
     /// Whether source -> target is a direct link.
-    pub fn has_link(&self, source_event_id: usize, target_event_id: usize) -> Result<bool, LinkMatrixError> {
+    pub fn has_link(
+        &self,
+        source_event_id: usize,
+        target_event_id: usize,
+    ) -> Result<bool, LinkMatrixError> {
         let source = self.event_index.get(&source_event_id).copied().ok_or(
             LinkMatrixError::UnknownEventId {
                 event_id: source_event_id,
@@ -422,12 +429,8 @@ mod tests {
 
     #[test]
     fn antichain_has_no_links_or_two_link_paths() {
-        let causet = causet_from_points(&[
-            (0, 0.0, 3.0),
-            (1, 1.0, 2.0),
-            (2, 2.0, 1.0),
-            (3, 3.0, 0.0),
-        ]);
+        let causet =
+            causet_from_points(&[(0, 0.0, 3.0), (1, 1.0, 2.0), (2, 2.0, 1.0), (3, 3.0, 0.0)]);
         let matrix = LinkMatrix::from_causet_bitset(&causet).unwrap();
         assert_eq!(matrix.link_count(), 0);
         assert_eq!(matrix.total_two_link_paths(), 0);
@@ -471,18 +474,40 @@ mod tests {
             .link_pairs()
             .into_iter()
             .map(|(source, target)| {
-                let a = original.events().iter().find(|event| event.id == source).unwrap();
-                let b = original.events().iter().find(|event| event.id == target).unwrap();
-                ((a.u.to_bits(), a.v.to_bits()), (b.u.to_bits(), b.v.to_bits()))
+                let a = original
+                    .events()
+                    .iter()
+                    .find(|event| event.id == source)
+                    .unwrap();
+                let b = original
+                    .events()
+                    .iter()
+                    .find(|event| event.id == target)
+                    .unwrap();
+                (
+                    (a.u.to_bits(), a.v.to_bits()),
+                    (b.u.to_bits(), b.v.to_bits()),
+                )
             })
             .collect();
         let mut relabelled_coordinate_links: Vec<((u64, u64), (u64, u64))> = right
             .link_pairs()
             .into_iter()
             .map(|(source, target)| {
-                let a = relabelled.events().iter().find(|event| event.id == source).unwrap();
-                let b = relabelled.events().iter().find(|event| event.id == target).unwrap();
-                ((a.u.to_bits(), a.v.to_bits()), (b.u.to_bits(), b.v.to_bits()))
+                let a = relabelled
+                    .events()
+                    .iter()
+                    .find(|event| event.id == source)
+                    .unwrap();
+                let b = relabelled
+                    .events()
+                    .iter()
+                    .find(|event| event.id == target)
+                    .unwrap();
+                (
+                    (a.u.to_bits(), a.v.to_bits()),
+                    (b.u.to_bits(), b.v.to_bits()),
+                )
             })
             .collect();
         original_coordinate_links.sort_unstable();
@@ -492,12 +517,8 @@ mod tests {
 
     #[test]
     fn duplicate_coordinates_are_not_links_or_intermediate_events() {
-        let causet = causet_from_points(&[
-            (0, 0.0, 0.0),
-            (1, 1.0, 1.0),
-            (2, 1.0, 1.0),
-            (3, 2.0, 2.0),
-        ]);
+        let causet =
+            causet_from_points(&[(0, 0.0, 0.0), (1, 1.0, 1.0), (2, 1.0, 1.0), (3, 2.0, 2.0)]);
         let matrix = LinkMatrix::from_causet_bitset(&causet).unwrap();
         let oracle = LinkMatrix::from_causet_bruteforce(&causet).unwrap();
         assert_eq!(matrix, oracle);
@@ -508,7 +529,11 @@ mod tests {
     fn empty_and_singleton_posets_are_valid() {
         let empty = CausalSet2D::new(vec![], 1.0, 1.0).unwrap();
         let singleton = CausalSet2D::new(
-            vec![Event2D { id: 7, u: 0.5, v: 0.5 }],
+            vec![Event2D {
+                id: 7,
+                u: 0.5,
+                v: 0.5,
+            }],
             1.0,
             1.0,
         )
@@ -530,8 +555,8 @@ mod tests {
             Err(LinkMatrixError::UnknownEventId { event_id: 999 })
         );
 
-        let large = CausalSet2D::sprinkle_fixed_cardinality(8, MAX_LINK_ORACLE_EVENTS + 1, 2.0)
-            .unwrap();
+        let large =
+            CausalSet2D::sprinkle_fixed_cardinality(8, MAX_LINK_ORACLE_EVENTS + 1, 2.0).unwrap();
         assert!(matches!(
             LinkMatrix::from_causet_bruteforce(&large),
             Err(LinkMatrixError::OracleLimitExceeded { .. })
