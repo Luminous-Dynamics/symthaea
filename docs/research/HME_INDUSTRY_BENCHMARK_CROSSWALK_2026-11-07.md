@@ -492,3 +492,37 @@ It investigates immutable group-level coordinate envelopes (per-coordinate minim
 The fixture JSON was fetched and parsed. Its four cases were recomputed: positive numerator uses the lower norm denominator; negative numerator uses the upper norm denominator; a zero lower-norm bound disables positive pruning; and threshold equality continues. This is a real-arithmetic sanity check, not an outward-rounded f32 proof, runtime test or speed result.
 
 The group synopsis must be built against an immutable eligible generation. Mixed authorization/temporal/forgetting sets require a separately verified eligible-subset synopsis or item-level refinement; metadata grouping must not leak excluded records. Strict U_group < theta_k is required and stale/corrupt metadata falls back or fails closed.
+
+
+## 2026-11-08 addendum: Recast and global interval-first exact refinement
+
+Yang, Tao, Dong & Chen, **Recast: Refinement-Centered Approximate Nearest Neighbor Search Optimized for Storage**, arXiv:2611.02765 (2026-11-02), is now a direct storage/retrieval baseline.
+
+Recast keeps raw vectors on disk, compact RecastQ codes and an IVF structure in memory, and uses QUIC interval selection to retrieve/refine only candidates whose uncertainty intervals can still contain a top-K item. The paper reports, on its evaluated datasets, 1.56–2.01x QPS of the strongest baseline at 0.99 recall with matched memory budget, 1.22–6.75x less external storage than evaluated systems, and 3.10–37.27x faster batched insert/delete operations than SPFresh/OdinANN. These are author-reported ANNS system results, not HME results.
+
+**Guarantee distinctions are mandatory:**
+- Recast's distribution-free Cauchy–Schwarz residual bound is deterministic but can be too loose for refinement selection.
+- Its tighter interval invokes Assumption 5.2, directional isotropy of normalized encoding residuals on the unit sphere. The paper explicitly says this is a high-dimensional analytical model, not necessarily enforced by the encoding. It derives asymptotic Gaussian interval coverage and reports aggregate empirical coverage at z=1 and z=2.
+- QUIC's deterministic retention lemma is conditional on all candidate intervals actually containing their distances.
+- The probabilistic refinement-quality theorem adds simplified assumptions about conditional independent Gaussian normalized errors, a common interval scale and evenly spaced interval upper endpoints; its scope is the already-probed IVF-list union. It does not prove unprobed IVF lists contain no global top-K vector.
+- HME must not conflate item-interval coverage, query-level top-k recall, candidate-set coverage and deterministic interval validity.
+
+Official paper: https://arxiv.org/abs/2611.02765
+
+### HME opportunity: global interval select-and-refine
+
+New [#11078 — HME-INTERVAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/11078) tests a deterministic analogue of QUIC for the complete eligible HME corpus.
+
+For larger-is-better exact similarity, if every eligible record has a valid canonical-score interval [L_i,U_i], define theta_k as the kth-largest lower endpoint and refine every record with U_i >= theta_k. At least k true scores are >= theta_k; any excluded score is strictly below it. Exact reranking of the retained set therefore yields the full exact top-k, provided interval validity and whole-corpus coverage are proven.
+
+This is a new global two-phase selector, distinct from #10945's progressive sequential early-abandon algorithm and #10978's certificate-generation/compact-code work.
+
+Protocol and synthetic fixture:
+- [HME interval select/refine protocol](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/HME_INTERVAL_SELECT_REFINE_2026-11-08.md)
+- [Synthetic interval-selection fixture](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_interval_select_refine_v0.json)
+
+For ContinuousHV, a residual certificate ||x-x_hat|| <= epsilon gives real-arithmetic dot and norm intervals by Cauchy–Schwarz and reverse triangle inequality. A cosine interval follows from the quotient enclosure when the denominator lower bound is positive. However, that real-arithmetic enclosure must be extended with outward-rounded analysis that contains the actual #10918 canonical f32 reduction; ordinary f32/f64 arithmetic is insufficient. If norm lower bounds, metadata or interval coverage are invalid, do not prune.
+
+Exact mode requires a valid interval for every eligible record or an admissible aggregate bound for every unopened segment. ANN/IVF candidate omission remains a separate guarantee problem. Recast-style directional-isotropy intervals belong only in an explicitly probabilistic profile and cannot authorize deterministic ExactComplete.
+
+No interval selector, certified ContinuousHV quantizer, canonical-f32 outward interval proof, Recast reproduction, benchmark result or SOTA win is claimed yet.
