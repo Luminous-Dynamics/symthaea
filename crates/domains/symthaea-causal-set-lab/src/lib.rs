@@ -14,6 +14,7 @@
 
 pub mod causal_set_nd;
 pub mod curved_frw_1p1;
+pub mod curved_order_statistics;
 pub mod link_matrix;
 
 use std::collections::HashSet;
@@ -22,6 +23,11 @@ use std::f64::consts::PI;
 use std::fmt;
 
 pub use curved_frw_1p1::{ConformalFrw1p1, CurvedFrwError};
+pub use curved_order_statistics::{
+    CurvedOrderFractionReference, CurvedOrderStatisticsError, DimensionlessCurvatureEstimate,
+    MIN_CURVED_ORDER_QMC_POINTS, estimate_dimensionless_curvature,
+    qmc_expected_comparable_pair_fraction,
+};
 pub use link_matrix::{
     LinkMatrix, LinkMatrixError, MAX_LINK_MATRIX_BYTES, MAX_LINK_MATRIX_EVENTS,
     MAX_LINK_ORACLE_EVENTS,
