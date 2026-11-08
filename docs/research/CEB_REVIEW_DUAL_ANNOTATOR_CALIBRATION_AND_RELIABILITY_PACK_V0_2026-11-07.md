@@ -309,6 +309,30 @@ Use the eight public [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPO
 
 Adjudicate closure completeness separately from event-impact correctness. A reviewer can identify the correct changed dependency but still miss another dependency needed by the claim. A retain answer without an unaffectedness witness is incomplete. Keep historical truth separate from current decision-use admissibility and preserve unresolved closure gaps.
 
+
+### 6.5 Claim-support closure worksheet (CCL cases only)
+
+For each public case in the [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md), reviewers independently lock one worksheet per claim/event pair.
+
+| Field | Reviewer response |
+|---|---|
+| Case / claim ID | |
+| Claim proposition and decision-use scope | |
+| Claim kind | source possibility / build selection / execution realization / actual cause / interventional effect / incident attribution |
+| Support-closure nodes | source / evidence / assumption / contract-policy / environment / authority / evaluator-method / upstream claim |
+| Typed dependency edges | supports / derived_from / assumes / scoped_by / authorized_by / measured_under / produced_under / contradicts |
+| Closure-completeness argument | |
+| Open-world remainder | |
+| Change event and changed nodes | |
+| Impact witness | |
+| Unaffectedness witness | |
+| #10630 disposition | retain / revalidate / invalidate / supersede / unresolved |
+| #10610 treatment | rerun / regrade / reuse / assurance re-evaluation / not applicable |
+| Historical truth versus current decision-use status | |
+| Claim ceiling | |
+
+Adjudicate closure completeness independently of the proposed disposition. A claim with an incomplete closure cannot be retained merely because no impact edge was found. Keep reviewer disagreement about hidden dependencies visible and preserve the unresolved disposition until an independent adjudicator closes the scope gap.
+
 ## 7. Agreement analysis and interpretation
 
 The calibration exercise has two purposes: reveal unclear rules and train reviewers to apply the same distinctions. It does not create a new CEB performance metric.
