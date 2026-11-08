@@ -72,6 +72,22 @@ The protocol module covers the boolean hidden-lag world, numeric direct/leaky-me
 - matched A0 structure validation;
 - full-factorial interaction episodes and evaluator scoring.
 
+## Parent-runner / child-agent transport
+
+The library module `process` implements a JSONL process bridge around the same blind protocol. The trusted parent owns the `BlindEpisode` and evaluator score. It starts a child with cleared inherited environment, explicit arguments and an explicit working directory. The child receives one serialized public `AgentView` frame and returns one `AgentAction` frame for each action.
+
+The process receipt binds:
+- executable-byte SHA-256, argument vector, working directory and frame limits;
+- each exact serialized `AgentView` and `AgentAction` JSONL frame SHA-256, including delimiters;
+- the evidence-prefix digest before and after each action;
+- the terminal action, child exit code and post-submission evaluator score.
+
+Transport bounds are 1 MiB by default, 16 MiB maximum per frame and 1,024 maximum probes per process episode. Blank/malformed/oversized frames, unsolicited trailing stdout after terminal submission, episode budget violations and non-zero exits fail closed.
+
+**Security boundary:** this is process separation and an evidence-binding transport, not a security sandbox. It does not impose CPU/memory/wall-clock limits or restrict filesystem/network access. Untrusted agents still require an external OS/container isolation boundary. The executable hash does not commit to shared libraries or the complete runtime image, and does not authenticate the host.
+
+The `process_episode_smoke` executable drives matched-world A0/A2 arms through the same child binary and policy arguments. It verifies exact set scoring, generating-model retention, evidence references, frame hashes and action-budget compliance. The default child is the finite reference policy; this smoke test is not a learned Symthaea researcher evaluation.
+
 ## Finite enumerator reference policy
 
 `policy::FiniteEnumeratorBaseline` consumes only `AgentView` values and emits one probe or a terminal submission. It uses exact consistency filtering over the declared finite model family and the finite partition heuristic. This provides a transparent reproducible reference against which the learned Symthaea research policy can be compared; it is not itself learned and does not demonstrate scientific discovery beyond the finite grammar.
