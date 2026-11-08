@@ -1,0 +1,193 @@
+{
+  "schema_version": "symthaea.neo_observation_voi.finite_case.v0.1",
+  "case_id": "NEO-VOI-FINITE-001",
+  "title": "Entropy gain versus decision value under rare-event risk and correlated observations",
+  "claim_ceiling": "SYNTHETIC_ANALYTIC_ORACLE_ONLY",
+  "purpose": "Test exact expected-value-of-sample-information calculations and prevent entropy-first selection from outranking observations that change a consequential decision.",
+  "units": {
+    "probability": "dimensionless",
+    "loss": "dimensionless_decision_loss_units",
+    "information": "bits"
+  },
+  "decision_model": {
+    "latent_state": [
+      "impact_mode",
+      "safe_mode"
+    ],
+    "prior": {
+      "impact_mode_probability": 0.02,
+      "safe_mode_probability": 0.98
+    },
+    "actions": {
+      "protect": {
+        "loss_in_impact_mode": 1,
+        "loss_in_safe_mode": 1
+      },
+      "no_protect": {
+        "loss_in_impact_mode": 100,
+        "loss_in_safe_mode": 0
+      }
+    },
+    "baseline_bayes_action": "protect",
+    "baseline_expected_bayes_risk": 1,
+    "decision_threshold_impact_probability": 0.01
+  },
+  "exact_information_value_controls": [
+    {
+      "candidate_id": "bright_nuisance_only",
+      "description": "A perfect observation reveals an independent binary nuisance variable, such as an idealized brightness/albedo class, but carries no information about the impact/safe latent state.",
+      "nuisance_prior": [
+        0.5,
+        0.5
+      ],
+      "expected_entropy_reduction_bits": 1,
+      "expected_post_observation_bayes_risk": 1,
+      "expected_value_of_sample_information": 0,
+      "expected_mutual_information_with_decision_state_bits": 0,
+      "optimal_choice": "not decision-relevant under this case"
+    },
+    {
+      "candidate_id": "impact_mode_perfect",
+      "description": "A perfect observation distinguishes impact_mode from safe_mode.",
+      "expected_entropy_reduction_bits": 0.14144054254182067,
+      "expected_post_observation_bayes_risk": 0.02,
+      "expected_value_of_sample_information": 0.98,
+      "expected_mutual_information_with_decision_state_bits": 0.14144054254182067,
+      "optimal_choice": "rank above bright_nuisance_only on decision value"
+    }
+  ],
+  "correlated_observation_control": {
+    "latent_observation_model": {
+      "shared_calibration_bias_probability": 0.1,
+      "independent_per_reading_error_probability_given_calibration_state": 0.05,
+      "calibration_state_good": "Each observation is independently inverted with probability 0.05.",
+      "calibration_state_bad": "The entire source calibration is inverted; each observation is independently correct with probability 0.05.",
+      "effective_single_reading_error_probability": 0.14,
+      "explanation": "A 10% common bad-calibration state is shared by observations from the same source. Conditional on that shared state, per-reading noise is independent. Marginal single-reading error is 0.9*0.05 + 0.1*0.95 = 0.14."
+    },
+    "single_reading": {
+      "expected_information_gain_bits": 0.03650383168720506,
+      "expected_post_observation_bayes_risk": 0.4344,
+      "expected_value_of_sample_information": 0.5656,
+      "outcomes": [
+        {
+          "outcome": "negative",
+          "probability": 0.8456,
+          "posterior_impact_probability": 0.003311258278145696,
+          "bayes_action": "no_protect",
+          "conditional_bayes_risk": 0.33112582781456956
+        },
+        {
+          "outcome": "positive",
+          "probability": 0.1544,
+          "posterior_impact_probability": 0.11139896373056994,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        }
+      ]
+    },
+    "two_readings_same_source": {
+      "source_correlation_group": "shared_calibration_A",
+      "expected_information_gain_bits": 0.0434174064542725,
+      "expected_post_observation_bayes_risk": 0.3869,
+      "expected_value_of_sample_information": 0.6131,
+      "outcome_table": [
+        {
+          "outcome": "negative_negative",
+          "probability": 0.7981,
+          "posterior_impact_probability": 0.0023180052624984337,
+          "bayes_action": "no_protect",
+          "conditional_bayes_risk": 0.23180052624984337
+        },
+        {
+          "outcome": "negative_positive",
+          "probability": 0.0475,
+          "posterior_impact_probability": 0.02,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        },
+        {
+          "outcome": "positive_negative",
+          "probability": 0.0475,
+          "posterior_impact_probability": 0.02,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        },
+        {
+          "outcome": "positive_positive",
+          "probability": 0.1069,
+          "posterior_impact_probability": 0.1520112254443405,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        }
+      ]
+    },
+    "two_readings_independent_sources": {
+      "source_correlation_groups": [
+        "independent_A",
+        "independent_B"
+      ],
+      "expected_information_gain_bits": 0.06897668656485645,
+      "expected_post_observation_bayes_risk": 0.314,
+      "expected_value_of_sample_information": 0.686,
+      "outcome_table": [
+        {
+          "outcome": "negative_negative",
+          "probability": 0.7252,
+          "posterior_impact_probability": 0.0005405405405405408,
+          "bayes_action": "no_protect",
+          "conditional_bayes_risk": 0.05405405405405408
+        },
+        {
+          "outcome": "negative_positive",
+          "probability": 0.1204,
+          "posterior_impact_probability": 0.02,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        },
+        {
+          "outcome": "positive_negative",
+          "probability": 0.1204,
+          "posterior_impact_probability": 0.02,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        },
+        {
+          "outcome": "positive_positive",
+          "probability": 0.034,
+          "posterior_impact_probability": 0.4350588235294117,
+          "bayes_action": "protect",
+          "conditional_bayes_risk": 1
+        }
+      ]
+    },
+    "naive_independence_failure": {
+      "actual_expected_bayes_risk_for_two_same_source_readings": 0.3869,
+      "incorrectly_assumed_expected_bayes_risk_if_shared_bias_is_ignored": 0.314,
+      "risk_underestimation": 0.0729,
+      "actual_evsi": 0.6131,
+      "incorrectly_assumed_evsi": 0.686,
+      "evsi_overstatement": 0.0729,
+      "required_behavior": "Preserve the shared calibration latent variable. Do not multiply marginal likelihoods as though two readings from one source were independent."
+    }
+  },
+  "acceptance_invariants": [
+    "The nuisance-only candidate must produce 1.0 bit expected entropy reduction and exactly 0.0 expected decision value within tolerance.",
+    "The perfect impact-mode observation must produce 0.98 expected decision value within tolerance.",
+    "The finite evaluator must rank impact_mode_perfect above bright_nuisance_only by expected decision value.",
+    "The single noisy reading expected Bayes risk must be 0.4344 within tolerance.",
+    "Two same-source readings must produce expected Bayes risk 0.3869, not the naive independent value 0.314.",
+    "Two independent-source readings must produce expected Bayes risk 0.314 within tolerance.",
+    "All outcome probabilities for a scenario must sum to 1 within tolerance.",
+    "Every posterior probability must be in [0,1], and each posterior action must minimize conditional expected loss.",
+    "The evaluator must not infer physical likelihoods from observatory name, aperture, brightness, or source count."
+  ],
+  "numerical_tolerance": 1e-12,
+  "data_status": "synthetic_exact_finite_case",
+  "limitations": [
+    "This is a finite decision-theory oracle, not an asteroid orbit model or real impact probability estimate.",
+    "Loss values are dimensionless pedagogical costs, not monetary values or civil-protection recommendations.",
+    "The calibration mixture is synthetic and deliberately simple; it does not represent a named observatory, catalogue or instrument.",
+    "No physical observation likelihood, telescope performance, or real NEO data is included."
+  ]
+}
