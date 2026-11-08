@@ -1,3 +1,5 @@
+pub mod numeric;
+
 //! Executable finite-state reference world for ansatz-free discovery.
 //! The simulator uses an explicit state transition. The oracle uses a separate
 //! closed-form trace construction; this is a finite synthetic reference, not
