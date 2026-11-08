@@ -18031,6 +18031,7 @@ dependencies = [
  "symthaea-mujoco-bridge",
  "symthaea-multirotor",
  "symthaea-muse",
+ "symthaea-pronunciation-plan",
  "symthaea-mycelix-conductor",
  "symthaea-narrative-self",
  "symthaea-neuroevolution",
@@ -25189,4 +25190,12 @@ dependencies = [
  "serde",
  "syn 2.0.117",
  "winnow 1.0.3",
+]
+
+[[package]]
+name = "symthaea-pronunciation-plan"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json 1.0.150",
 ]
