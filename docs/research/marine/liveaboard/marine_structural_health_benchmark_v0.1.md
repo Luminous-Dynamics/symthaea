@@ -121,6 +121,20 @@ Never pool corrosion, fatigue cracking and composite delamination into one headl
 5. Full-scale vessel trial comparing continuous observations with independent periodic inspection and measured load/weather histories.
 6. Longitudinal fleet exposure before reliability, damage-growth or inspection-interval claims.
 
-## 11. Claim ceiling
+## 11. Executable Rust primitives
+
+A dependency-free crate now exists at `crates/domains/symthaea-marine-structural-health`. It deliberately implements only rules that can be evaluated from caller-supplied evidence:
+- exact region and structure-revision identity;
+- qualified method, data-quality, calibration and coverage gates;
+- conservative measurement-interval comparison against authority-supplied bounds;
+- no-indication-within-declared-scope semantics;
+- VoI arithmetic when the prior/likelihood/consequence/cost model is declared qualified;
+- advisory recommendation mapping where mandatory inspection remains dominant.
+
+It does not calculate structural stress, fatigue growth, corrosion kinetics, signal interpretation, NDT results, RUL, inspection intervals or repair approval. It creates no default acceptance limits. A direct no-indication result is limited to the declared region/revision, method, criterion and coverage.
+
+Fourteen unit tests are authored for the narrow primitives, including uncertainty crossing a lower limit, fully outside intervals, stale calibration, incomplete coverage, wrong region, superseded structure revision, missing criterion, research-only method and mandatory-inspection precedence over negative VoI. **These tests are written but have not been compiled or executed in this environment** because Rust/Cargo are unavailable. The branch remains subject to exact-head Cargo test, Clippy and formatting before any software PASS is claimed.
+
+## 12. Claim ceiling
 
 A synthetic PASS validates only contract semantics. Sensor alerts, ML scores, digital twins, AE events, coating proxies, visual surveys and RUL estimates do not establish structural adequacy, safe operating limits, seaworthiness, class/flag approval or permission to defer an inspection. Structural decisions remain with qualified engineers, inspectors, surveyors and competent authorities under the actual vessel's applicable requirements.
