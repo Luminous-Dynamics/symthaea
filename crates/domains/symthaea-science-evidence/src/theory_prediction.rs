@@ -199,7 +199,9 @@ pub enum TheoryPredictionError {
         theory_id: String,
         observable_id: String,
     },
-    #[error("non-quantitative prediction for {theory_id}/{observable_id} must not carry a numeric value")]
+    #[error(
+        "non-quantitative prediction for {theory_id}/{observable_id} must not carry a numeric value"
+    )]
     NonQuantitativePredictionHasValue {
         theory_id: String,
         observable_id: String,
@@ -209,12 +211,16 @@ pub enum TheoryPredictionError {
         theory_id: String,
         observable_id: String,
     },
-    #[error("quantitative prediction for {theory_id}/{observable_id} uses units different from its observable")]
+    #[error(
+        "quantitative prediction for {theory_id}/{observable_id} uses units different from its observable"
+    )]
     PredictionUnitsMismatch {
         theory_id: String,
         observable_id: String,
     },
-    #[error("quantitative prediction for {theory_id}/{observable_id} is outside the declared observable domain")]
+    #[error(
+        "quantitative prediction for {theory_id}/{observable_id} is outside the declared observable domain"
+    )]
     QuantitativePredictionOutsideDomain {
         theory_id: String,
         observable_id: String,
@@ -232,7 +238,9 @@ pub enum TheoryPredictionError {
 impl TheoryPredictionLedger {
     pub fn validate(&self) -> Result<(), TheoryPredictionError> {
         if self.schema != THEORY_PREDICTION_SCHEMA {
-            return Err(TheoryPredictionError::UnsupportedSchema(self.schema.clone()));
+            return Err(TheoryPredictionError::UnsupportedSchema(
+                self.schema.clone(),
+            ));
         }
         if self.models.is_empty() {
             return Err(TheoryPredictionError::NoModels);
@@ -252,7 +260,9 @@ impl TheoryPredictionLedger {
             }
             require_nonempty("theory model family", &model.family)?;
             if !model_ids.insert(model.theory_id.as_str()) {
-                return Err(TheoryPredictionError::DuplicateModelId(model.theory_id.clone()));
+                return Err(TheoryPredictionError::DuplicateModelId(
+                    model.theory_id.clone(),
+                ));
             }
             if model.model_spec_artifact.validate().is_err() {
                 return Err(TheoryPredictionError::InvalidModelSpecificationArtifact {
@@ -287,7 +297,10 @@ impl TheoryPredictionLedger {
                 return Err(TheoryPredictionError::InvalidObservableId(index));
             }
             require_nonempty("observable units", &observable.units)?;
-            require_nonempty("observable operational definition", &observable.operational_definition)?;
+            require_nonempty(
+                "observable operational definition",
+                &observable.operational_definition,
+            )?;
             require_nonempty("observable domain ID", &observable.domain_id)?;
             if !observable_ids.insert(observable.observable_id.as_str()) {
                 return Err(TheoryPredictionError::DuplicateObservableId(
@@ -309,7 +322,10 @@ impl TheoryPredictionLedger {
                 });
             }
             if observable.noise_calibration != NoiseCalibrationStatus::Uncalibrated {
-                let reference = observable.calibration_reference.as_deref().unwrap_or_default();
+                let reference = observable
+                    .calibration_reference
+                    .as_deref()
+                    .unwrap_or_default();
                 require_nonempty("noise calibration reference", reference).map_err(|_| {
                     TheoryPredictionError::MissingCalibrationReference {
                         observable_id: observable.observable_id.clone(),
@@ -320,10 +336,20 @@ impl TheoryPredictionLedger {
 
         let mut observed = BTreeSet::new();
         for record in &self.predictions {
-            let model = self.models.iter().find(|item| item.theory_id == record.theory_id)
-                .ok_or_else(|| TheoryPredictionError::UnknownTheoryModel(record.theory_id.clone()))?;
-            let observable = self.observables.iter().find(|item| item.observable_id == record.observable_id)
-                .ok_or_else(|| TheoryPredictionError::UnknownObservable(record.observable_id.clone()))?;
+            let model = self
+                .models
+                .iter()
+                .find(|item| item.theory_id == record.theory_id)
+                .ok_or_else(|| {
+                    TheoryPredictionError::UnknownTheoryModel(record.theory_id.clone())
+                })?;
+            let observable = self
+                .observables
+                .iter()
+                .find(|item| item.observable_id == record.observable_id)
+                .ok_or_else(|| {
+                    TheoryPredictionError::UnknownObservable(record.observable_id.clone())
+                })?;
             let key = (record.theory_id.as_str(), record.observable_id.as_str());
             if !observed.insert(key) {
                 return Err(TheoryPredictionError::DuplicatePrediction {
@@ -340,9 +366,11 @@ impl TheoryPredictionLedger {
                     || record.predicted_value.is_some()
                     || record.derivation_reference.is_some()
                 {
-                    return Err(TheoryPredictionError::UnresolvedModelMustNotInventPrediction {
-                        observable_id: record.observable_id.clone(),
-                    });
+                    return Err(
+                        TheoryPredictionError::UnresolvedModelMustNotInventPrediction {
+                            observable_id: record.observable_id.clone(),
+                        },
+                    );
                 }
                 continue;
             }
@@ -361,11 +389,19 @@ impl TheoryPredictionLedger {
                             observable_id: record.observable_id.clone(),
                         });
                     }
-                    if record.derivation_reference.as_deref().unwrap_or_default().trim().is_empty() {
-                        return Err(TheoryPredictionError::QuantitativePredictionMissingDerivation {
-                            theory_id: record.theory_id.clone(),
-                            observable_id: record.observable_id.clone(),
-                        });
+                    if record
+                        .derivation_reference
+                        .as_deref()
+                        .unwrap_or_default()
+                        .trim()
+                        .is_empty()
+                    {
+                        return Err(
+                            TheoryPredictionError::QuantitativePredictionMissingDerivation {
+                                theory_id: record.theory_id.clone(),
+                                observable_id: record.observable_id.clone(),
+                            },
+                        );
                     }
                     if record.units != observable.units {
                         return Err(TheoryPredictionError::PredictionUnitsMismatch {
@@ -388,12 +424,19 @@ impl TheoryPredictionLedger {
                         });
                     }
                     if record.disposition == PredictionDisposition::QualitativeOnly
-                        && record.derivation_reference.as_deref().unwrap_or_default().trim().is_empty()
+                        && record
+                            .derivation_reference
+                            .as_deref()
+                            .unwrap_or_default()
+                            .trim()
+                            .is_empty()
                     {
-                        return Err(TheoryPredictionError::QuantitativePredictionMissingDerivation {
-                            theory_id: record.theory_id.clone(),
-                            observable_id: record.observable_id.clone(),
-                        });
+                        return Err(
+                            TheoryPredictionError::QuantitativePredictionMissingDerivation {
+                                theory_id: record.theory_id.clone(),
+                                observable_id: record.observable_id.clone(),
+                            },
+                        );
                     }
                 }
             }
@@ -403,7 +446,9 @@ impl TheoryPredictionLedger {
         if observed.len() != expected {
             for model in &self.models {
                 for observable in &self.observables {
-                    if !observed.contains(&(model.theory_id.as_str(), observable.observable_id.as_str())) {
+                    if !observed
+                        .contains(&(model.theory_id.as_str(), observable.observable_id.as_str()))
+                    {
                         return Err(TheoryPredictionError::MissingPrediction {
                             theory_id: model.theory_id.clone(),
                             observable_id: observable.observable_id.clone(),
@@ -428,7 +473,9 @@ impl TheoryPredictionLedger {
                 PredictionDisposition::Quantitative => report.quantitative += 1,
                 PredictionDisposition::QualitativeOnly => report.qualitative_only += 1,
                 PredictionDisposition::NotDerived => report.not_derived += 1,
-                PredictionDisposition::OutsideValidatedDomain => report.outside_validated_domain += 1,
+                PredictionDisposition::OutsideValidatedDomain => {
+                    report.outside_validated_domain += 1
+                }
                 PredictionDisposition::Unresolved => report.unresolved += 1,
             }
         }
@@ -447,28 +494,53 @@ impl TheoryPredictionLedger {
     ) -> Result<ModelPredictionComparison, TheoryPredictionError> {
         self.validate()?;
         if left_theory_id == right_theory_id {
-            return Err(TheoryPredictionError::SelfComparison(left_theory_id.to_string()));
+            return Err(TheoryPredictionError::SelfComparison(
+                left_theory_id.to_string(),
+            ));
         }
-        if !self.models.iter().any(|model| model.theory_id == left_theory_id) {
-            return Err(TheoryPredictionError::ModelNotFound(left_theory_id.to_string()));
+        if !self
+            .models
+            .iter()
+            .any(|model| model.theory_id == left_theory_id)
+        {
+            return Err(TheoryPredictionError::ModelNotFound(
+                left_theory_id.to_string(),
+            ));
         }
-        if !self.models.iter().any(|model| model.theory_id == right_theory_id) {
-            return Err(TheoryPredictionError::ModelNotFound(right_theory_id.to_string()));
+        if !self
+            .models
+            .iter()
+            .any(|model| model.theory_id == right_theory_id)
+        {
+            return Err(TheoryPredictionError::ModelNotFound(
+                right_theory_id.to_string(),
+            ));
         }
-        let observable = self.observables.iter().find(|item| item.observable_id == observable_id)
+        let observable = self
+            .observables
+            .iter()
+            .find(|item| item.observable_id == observable_id)
             .ok_or_else(|| TheoryPredictionError::ObservableNotFound(observable_id.to_string()))?;
-        let left = self.predictions.iter().find(|record| {
-            record.theory_id == left_theory_id && record.observable_id == observable_id
-        }).ok_or_else(|| TheoryPredictionError::MissingPrediction {
-            theory_id: left_theory_id.to_string(),
-            observable_id: observable_id.to_string(),
-        })?;
-        let right = self.predictions.iter().find(|record| {
-            record.theory_id == right_theory_id && record.observable_id == observable_id
-        }).ok_or_else(|| TheoryPredictionError::MissingPrediction {
-            theory_id: right_theory_id.to_string(),
-            observable_id: observable_id.to_string(),
-        })?;
+        let left = self
+            .predictions
+            .iter()
+            .find(|record| {
+                record.theory_id == left_theory_id && record.observable_id == observable_id
+            })
+            .ok_or_else(|| TheoryPredictionError::MissingPrediction {
+                theory_id: left_theory_id.to_string(),
+                observable_id: observable_id.to_string(),
+            })?;
+        let right = self
+            .predictions
+            .iter()
+            .find(|record| {
+                record.theory_id == right_theory_id && record.observable_id == observable_id
+            })
+            .ok_or_else(|| TheoryPredictionError::MissingPrediction {
+                theory_id: right_theory_id.to_string(),
+                observable_id: observable_id.to_string(),
+            })?;
 
         let mut blockers = Vec::new();
         if left.disposition != PredictionDisposition::Quantitative {
@@ -510,8 +582,12 @@ impl TheoryPredictionLedger {
             });
         }
 
-        let left_value = left.predicted_value.expect("validated quantitative prediction");
-        let right_value = right.predicted_value.expect("validated quantitative prediction");
+        let left_value = left
+            .predicted_value
+            .expect("validated quantitative prediction");
+        let right_value = right
+            .predicted_value
+            .expect("validated quantitative prediction");
         let absolute_difference = (left_value - right_value).abs();
         Ok(ModelPredictionComparison::Comparable {
             left_theory_id: left_theory_id.to_string(),
@@ -540,7 +616,9 @@ fn is_git_sha(value: &str) -> bool {
 
 fn is_lower_hex_digest(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[cfg(test)]
@@ -615,7 +693,11 @@ mod tests {
             model("causal-set", TheoryModelRole::NamedTheory, b'a'),
             model("minkowski-continuum", TheoryModelRole::NamedTheory, b'b'),
             model("chain-theory", TheoryModelRole::NamedTheory, b'c'),
-            model(OTHER_UNRESOLVED_MODEL_ID, TheoryModelRole::OtherUnresolved, b'd'),
+            model(
+                OTHER_UNRESOLVED_MODEL_ID,
+                TheoryModelRole::OtherUnresolved,
+                b'd',
+            ),
         ];
         let observables = vec![
             observable(
@@ -644,34 +726,114 @@ mod tests {
             ),
         ];
         let predictions = vec![
-            prediction("causal-set", "ordering-fraction-1p1", PredictionDisposition::Quantitative,
-                "poisson-sprinkling-minkowski-1p1", "fraction", Some(0.5),
-                Some("Myrheim-Meyer expected ordering fraction, d=2")),
-            prediction("minkowski-continuum", "ordering-fraction-1p1", PredictionDisposition::Quantitative,
-                "poisson-sprinkling-minkowski-1p1", "fraction", Some(0.5),
-                Some("continuum Alexandrov-interval ordering reference")),
-            prediction("chain-theory", "ordering-fraction-1p1", PredictionDisposition::NotDerived,
-                "qudit-entanglement-network", "fraction", None, None),
-            prediction(OTHER_UNRESOLVED_MODEL_ID, "ordering-fraction-1p1", PredictionDisposition::Unresolved,
-                "open-world", "fraction", None, None),
-            prediction("chain-theory", "inverse-alpha-candidate", PredictionDisposition::Quantitative,
-                "low-energy-fine-structure-constant-definition", "dimensionless",
-                Some(137.035_999_189_566), Some("Chain Theory candidate readout; Photon Conjecture not inferred")),
-            prediction("causal-set", "inverse-alpha-candidate", PredictionDisposition::NotDerived,
-                "causal-set-minkowski", "dimensionless", None, None),
-            prediction("minkowski-continuum", "inverse-alpha-candidate", PredictionDisposition::NotDerived,
-                "standard-model-parameter-input", "dimensionless", None, None),
-            prediction(OTHER_UNRESOLVED_MODEL_ID, "inverse-alpha-candidate", PredictionDisposition::Unresolved,
-                "open-world", "dimensionless", None, None),
-            prediction("chain-theory", "photon-propagator", PredictionDisposition::NotDerived,
-                "qudit-entanglement-network", "declared-amplitude-units", None, None),
-            prediction("causal-set", "photon-propagator", PredictionDisposition::OutsideValidatedDomain,
-                "causal-set-link-propagator-not-implemented", "declared-amplitude-units", None, None),
-            prediction("minkowski-continuum", "photon-propagator", PredictionDisposition::QualitativeOnly,
-                "fixed-momentum-scattering-protocol", "declared-amplitude-units", None,
-                Some("QED contains a photon propagator; this observable protocol is not pinned")),
-            prediction(OTHER_UNRESOLVED_MODEL_ID, "photon-propagator", PredictionDisposition::Unresolved,
-                "open-world", "declared-amplitude-units", None, None),
+            prediction(
+                "causal-set",
+                "ordering-fraction-1p1",
+                PredictionDisposition::Quantitative,
+                "poisson-sprinkling-minkowski-1p1",
+                "fraction",
+                Some(0.5),
+                Some("Myrheim-Meyer expected ordering fraction, d=2"),
+            ),
+            prediction(
+                "minkowski-continuum",
+                "ordering-fraction-1p1",
+                PredictionDisposition::Quantitative,
+                "poisson-sprinkling-minkowski-1p1",
+                "fraction",
+                Some(0.5),
+                Some("continuum Alexandrov-interval ordering reference"),
+            ),
+            prediction(
+                "chain-theory",
+                "ordering-fraction-1p1",
+                PredictionDisposition::NotDerived,
+                "qudit-entanglement-network",
+                "fraction",
+                None,
+                None,
+            ),
+            prediction(
+                OTHER_UNRESOLVED_MODEL_ID,
+                "ordering-fraction-1p1",
+                PredictionDisposition::Unresolved,
+                "open-world",
+                "fraction",
+                None,
+                None,
+            ),
+            prediction(
+                "chain-theory",
+                "inverse-alpha-candidate",
+                PredictionDisposition::Quantitative,
+                "low-energy-fine-structure-constant-definition",
+                "dimensionless",
+                Some(137.035_999_189_566),
+                Some("Chain Theory candidate readout; Photon Conjecture not inferred"),
+            ),
+            prediction(
+                "causal-set",
+                "inverse-alpha-candidate",
+                PredictionDisposition::NotDerived,
+                "causal-set-minkowski",
+                "dimensionless",
+                None,
+                None,
+            ),
+            prediction(
+                "minkowski-continuum",
+                "inverse-alpha-candidate",
+                PredictionDisposition::NotDerived,
+                "standard-model-parameter-input",
+                "dimensionless",
+                None,
+                None,
+            ),
+            prediction(
+                OTHER_UNRESOLVED_MODEL_ID,
+                "inverse-alpha-candidate",
+                PredictionDisposition::Unresolved,
+                "open-world",
+                "dimensionless",
+                None,
+                None,
+            ),
+            prediction(
+                "chain-theory",
+                "photon-propagator",
+                PredictionDisposition::NotDerived,
+                "qudit-entanglement-network",
+                "declared-amplitude-units",
+                None,
+                None,
+            ),
+            prediction(
+                "causal-set",
+                "photon-propagator",
+                PredictionDisposition::OutsideValidatedDomain,
+                "causal-set-link-propagator-not-implemented",
+                "declared-amplitude-units",
+                None,
+                None,
+            ),
+            prediction(
+                "minkowski-continuum",
+                "photon-propagator",
+                PredictionDisposition::QualitativeOnly,
+                "fixed-momentum-scattering-protocol",
+                "declared-amplitude-units",
+                None,
+                Some("QED contains a photon propagator; this observable protocol is not pinned"),
+            ),
+            prediction(
+                OTHER_UNRESOLVED_MODEL_ID,
+                "photon-propagator",
+                PredictionDisposition::Unresolved,
+                "open-world",
+                "declared-amplitude-units",
+                None,
+                None,
+            ),
         ];
         TheoryPredictionLedger {
             schema: THEORY_PREDICTION_SCHEMA.to_string(),
@@ -694,7 +856,9 @@ mod tests {
             })
         );
         let mut ledger = fixture();
-        ledger.models.retain(|model| model.role != TheoryModelRole::OtherUnresolved);
+        ledger
+            .models
+            .retain(|model| model.role != TheoryModelRole::OtherUnresolved);
         assert_eq!(
             ledger.validate(),
             Err(TheoryPredictionError::MissingOrDuplicateUnresolvedModel)
@@ -729,8 +893,12 @@ mod tests {
         let ModelPredictionComparison::NotComparable { blockers, .. } = comparison else {
             panic!("a missing prediction must block quantitative comparison");
         };
-        assert!(blockers.contains(&ComparisonBlocker::LeftNotQuantitative(PredictionDisposition::NotDerived)));
-        assert!(blockers.contains(&ComparisonBlocker::RightNotQuantitative(PredictionDisposition::QualitativeOnly)));
+        assert!(blockers.contains(&ComparisonBlocker::LeftNotQuantitative(
+            PredictionDisposition::NotDerived
+        )));
+        assert!(blockers.contains(&ComparisonBlocker::RightNotQuantitative(
+            PredictionDisposition::QualitativeOnly
+        )));
         assert!(blockers.contains(&ComparisonBlocker::NonGaussianNoise));
         assert!(blockers.contains(&ComparisonBlocker::NoiseNotCalibrated));
     }
@@ -738,12 +906,18 @@ mod tests {
     #[test]
     fn uncalibrated_candidate_number_cannot_enter_likelihood_comparison() {
         let comparison = fixture()
-            .compare_models("chain-theory", "minkowski-continuum", "inverse-alpha-candidate")
+            .compare_models(
+                "chain-theory",
+                "minkowski-continuum",
+                "inverse-alpha-candidate",
+            )
             .unwrap();
         let ModelPredictionComparison::NotComparable { blockers, .. } = comparison else {
             panic!("uncalibrated measurement noise must block comparison");
         };
-        assert!(blockers.contains(&ComparisonBlocker::RightNotQuantitative(PredictionDisposition::NotDerived)));
+        assert!(blockers.contains(&ComparisonBlocker::RightNotQuantitative(
+            PredictionDisposition::NotDerived
+        )));
         assert!(blockers.contains(&ComparisonBlocker::NonGaussianNoise));
         assert!(blockers.contains(&ComparisonBlocker::NoiseNotCalibrated));
     }
@@ -763,9 +937,13 @@ mod tests {
     #[test]
     fn non_quantitative_status_cannot_carry_a_numeric_value() {
         let mut ledger = fixture();
-        let record = ledger.predictions.iter_mut().find(|record| {
-            record.theory_id == "chain-theory" && record.observable_id == "photon-propagator"
-        }).unwrap();
+        let record = ledger
+            .predictions
+            .iter_mut()
+            .find(|record| {
+                record.theory_id == "chain-theory" && record.observable_id == "photon-propagator"
+            })
+            .unwrap();
         record.predicted_value = Some(0.0);
         assert_eq!(
             ledger.validate(),
@@ -779,33 +957,47 @@ mod tests {
     #[test]
     fn quantitative_prediction_requires_derivation() {
         let mut ledger = fixture();
-        let record = ledger.predictions.iter_mut().find(|record| {
-            record.theory_id == "chain-theory" && record.observable_id == "inverse-alpha-candidate"
-        }).unwrap();
+        let record = ledger
+            .predictions
+            .iter_mut()
+            .find(|record| {
+                record.theory_id == "chain-theory"
+                    && record.observable_id == "inverse-alpha-candidate"
+            })
+            .unwrap();
         record.derivation_reference = None;
         assert_eq!(
             ledger.validate(),
-            Err(TheoryPredictionError::QuantitativePredictionMissingDerivation {
-                theory_id: "chain-theory".to_string(),
-                observable_id: "inverse-alpha-candidate".to_string(),
-            })
+            Err(
+                TheoryPredictionError::QuantitativePredictionMissingDerivation {
+                    theory_id: "chain-theory".to_string(),
+                    observable_id: "inverse-alpha-candidate".to_string(),
+                }
+            )
         );
     }
 
     #[test]
     fn unresolved_model_cannot_be_given_an_arbitrary_quantitative_prediction() {
         let mut ledger = fixture();
-        let record = ledger.predictions.iter_mut().find(|record| {
-            record.theory_id == OTHER_UNRESOLVED_MODEL_ID && record.observable_id == "ordering-fraction-1p1"
-        }).unwrap();
+        let record = ledger
+            .predictions
+            .iter_mut()
+            .find(|record| {
+                record.theory_id == OTHER_UNRESOLVED_MODEL_ID
+                    && record.observable_id == "ordering-fraction-1p1"
+            })
+            .unwrap();
         record.disposition = PredictionDisposition::Quantitative;
         record.predicted_value = Some(0.0);
         record.derivation_reference = Some("convenience zero".to_string());
         assert_eq!(
             ledger.validate(),
-            Err(TheoryPredictionError::UnresolvedModelMustNotInventPrediction {
-                observable_id: "ordering-fraction-1p1".to_string(),
-            })
+            Err(
+                TheoryPredictionError::UnresolvedModelMustNotInventPrediction {
+                    observable_id: "ordering-fraction-1p1".to_string(),
+                }
+            )
         );
     }
 
@@ -833,12 +1025,17 @@ mod tests {
     fn duplicate_and_unknown_model_observables_are_rejected() {
         let mut ledger = fixture();
         ledger.predictions.push(ledger.predictions[0].clone());
-        assert!(matches!(ledger.validate(), Err(TheoryPredictionError::DuplicatePrediction { .. })));
+        assert!(matches!(
+            ledger.validate(),
+            Err(TheoryPredictionError::DuplicatePrediction { .. })
+        ));
         let mut ledger = fixture();
         ledger.predictions[0].theory_id = "unknown-theory".to_string();
         assert_eq!(
             ledger.validate(),
-            Err(TheoryPredictionError::UnknownTheoryModel("unknown-theory".to_string()))
+            Err(TheoryPredictionError::UnknownTheoryModel(
+                "unknown-theory".to_string()
+            ))
         );
     }
 }
