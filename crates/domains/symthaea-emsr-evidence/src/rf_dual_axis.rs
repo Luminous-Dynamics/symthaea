@@ -6,12 +6,12 @@
 //! not a receiver driver or RF classifier.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
 use super::{
-    assess_common_mode_independence, sha256_hex, EvidenceSourceProfile,
-    IndependenceSummary, PairwiseIndependence, PairwiseRelation, ValidationError,
+    EvidenceSourceProfile, IndependenceSummary, PairwiseIndependence, PairwiseRelation,
+    ValidationError, assess_common_mode_independence, sha256_hex,
 };
 
 pub const FIXTURE_SCHEMA: &str = "emsr.rf-dual-axis-fixture-pack";
@@ -195,7 +195,9 @@ fn digest_with_prefix(value: &str) -> bool {
 
 fn unique_nonempty(values: &[String]) -> bool {
     let mut seen = BTreeSet::new();
-    values.iter().all(|value| nonempty(value) && seen.insert(value))
+    values
+        .iter()
+        .all(|value| nonempty(value) && seen.insert(value))
 }
 
 fn validate_assessment(assessment: &Assessment, fixture_id: &str) -> Result<(), ValidationError> {
@@ -261,9 +263,11 @@ fn validate_assessment(assessment: &Assessment, fixture_id: &str) -> Result<(), 
         }
     }
 
-    if assessment.recognition.confidence.is_some_and(|value| {
-        !value.is_finite() || !(0.0..=1.0).contains(&value)
-    }) {
+    if assessment
+        .recognition
+        .confidence
+        .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+    {
         return Err(ValidationError::new(
             format!("{path}.recognition.confidence"),
             "confidence must be null or a finite number in [0, 1]",
@@ -321,17 +325,13 @@ fn validate_assessment(assessment: &Assessment, fixture_id: &str) -> Result<(), 
         if matches!(
             check.result,
             AcquisitionCheckResult::Pass | AcquisitionCheckResult::Fail
-        ) && check
-            .evidence_ref
-            .as_deref()
-            .is_none_or(|value| {
-                !assessment
-                    .evidence
-                    .acquisition_evidence_refs
-                    .iter()
-                    .any(|reference| reference == value)
-            })
-        {
+        ) && check.evidence_ref.as_deref().is_none_or(|value| {
+            !assessment
+                .evidence
+                .acquisition_evidence_refs
+                .iter()
+                .any(|reference| reference == value)
+        }) {
             return Err(ValidationError::new(
                 format!("{path}.acquisition.checks[{index}].evidence_ref"),
                 "PASS/FAIL checks require an evidence reference present in acquisition_evidence_refs",
@@ -518,15 +518,51 @@ fn derive_reference(
         (A::Qualified, R::KnownClass) => (C::KnownClass, true, "qualified_known_class"),
         (A::Qualified, R::UnknownClass) => (C::UnknownClass, false, "qualified_unknown_class"),
         (A::Qualified, R::Indeterminate) => (C::Indeterminate, false, "qualified_indeterminate"),
-        (A::Degraded, R::KnownClass) => (C::DegradedAcquisition, false, "degraded_acquisition_overrides_known_candidate"),
-        (A::Degraded, R::UnknownClass) => (C::DegradedAcquisition, false, "degraded_acquisition_overrides_unknown_candidate"),
-        (A::Degraded, R::Indeterminate) => (C::DegradedAcquisition, false, "degraded_acquisition_overrides_indeterminate"),
-        (A::Unqualified, R::KnownClass) => (C::DegradedAcquisition, false, "unqualified_acquisition_blocks_candidate"),
-        (A::Unqualified, R::UnknownClass) => (C::DegradedAcquisition, false, "unqualified_acquisition_blocks_unknown_claim"),
-        (A::Unqualified, R::Indeterminate) => (C::DegradedAcquisition, false, "unqualified_acquisition_takes_precedence"),
-        (A::Unknown, R::KnownClass) => (C::DegradedAcquisition, false, "missing_acquisition_evidence_blocks_class_admission"),
-        (A::Unknown, R::UnknownClass) => (C::DegradedAcquisition, false, "missing_acquisition_evidence_blocks_unknown_admission"),
-        (A::Unknown, R::Indeterminate) => (C::DegradedAcquisition, false, "unknown_acquisition_precedes_recognition"),
+        (A::Degraded, R::KnownClass) => (
+            C::DegradedAcquisition,
+            false,
+            "degraded_acquisition_overrides_known_candidate",
+        ),
+        (A::Degraded, R::UnknownClass) => (
+            C::DegradedAcquisition,
+            false,
+            "degraded_acquisition_overrides_unknown_candidate",
+        ),
+        (A::Degraded, R::Indeterminate) => (
+            C::DegradedAcquisition,
+            false,
+            "degraded_acquisition_overrides_indeterminate",
+        ),
+        (A::Unqualified, R::KnownClass) => (
+            C::DegradedAcquisition,
+            false,
+            "unqualified_acquisition_blocks_candidate",
+        ),
+        (A::Unqualified, R::UnknownClass) => (
+            C::DegradedAcquisition,
+            false,
+            "unqualified_acquisition_blocks_unknown_claim",
+        ),
+        (A::Unqualified, R::Indeterminate) => (
+            C::DegradedAcquisition,
+            false,
+            "unqualified_acquisition_takes_precedence",
+        ),
+        (A::Unknown, R::KnownClass) => (
+            C::DegradedAcquisition,
+            false,
+            "missing_acquisition_evidence_blocks_class_admission",
+        ),
+        (A::Unknown, R::UnknownClass) => (
+            C::DegradedAcquisition,
+            false,
+            "missing_acquisition_evidence_blocks_unknown_admission",
+        ),
+        (A::Unknown, R::Indeterminate) => (
+            C::DegradedAcquisition,
+            false,
+            "unknown_acquisition_precedes_recognition",
+        ),
     };
 
     DerivedOutcome {
@@ -602,14 +638,17 @@ pub fn validate_rf_dual_axis_fixture_pack(source_bytes: &[u8]) -> Result<Value, 
             fixture.assessment.recognition.disposition,
         );
         let reference_agrees = primary == reference;
-        let submitted_derived_matches = outcome_matches_derived(&primary, &fixture.assessment.derived);
+        let submitted_derived_matches =
+            outcome_matches_derived(&primary, &fixture.assessment.derived);
         let expected_matches = outcome_matches_expected(&primary, &fixture.expected);
         // Count a false admission presented by the assessment producer. The
         // primary evaluator should never generate one; forged/legacy outputs
         // still need to be visible in the benchmark's hard-gate denominator.
         let false_accept = fixture.assessment.derived.candidate_admitted
-            && (fixture.assessment.acquisition.qualification != AcquisitionQualification::Qualified
-                || fixture.assessment.recognition.disposition != RecognitionDisposition::KnownClass);
+            && (fixture.assessment.acquisition.qualification
+                != AcquisitionQualification::Qualified
+                || fixture.assessment.recognition.disposition
+                    != RecognitionDisposition::KnownClass);
         if false_accept {
             false_accept_count += 1;
         }
@@ -623,10 +662,8 @@ pub fn validate_rf_dual_axis_fixture_pack(source_bytes: &[u8]) -> Result<Value, 
             reference_disagreement_count += 1;
         }
 
-        let passed = reference_agrees
-            && submitted_derived_matches
-            && expected_matches
-            && !false_accept;
+        let passed =
+            reference_agrees && submitted_derived_matches && expected_matches && !false_accept;
         if !passed {
             failure_count += 1;
         }
@@ -722,17 +759,19 @@ pub fn assess_rf_source_independence(
 #[cfg(test)]
 mod tests {
     use super::{
-        assess_rf_source_independence, validate_rf_dual_axis_fixture_pack, ConsumerDisposition,
+        ConsumerDisposition, assess_rf_source_independence, validate_rf_dual_axis_fixture_pack,
     };
     use crate::{EvidenceSourceProfile, PairwiseRelation};
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     const FIXTURES: &str =
         include_str!("../../../../docs/research/emsr-v0.1/emsr-rf-dual-axis-fixtures-v0.1.json");
-    const FIXTURE_SCHEMA: &str =
-        include_str!("../../../../docs/research/emsr-v0.1/emsr-rf-dual-axis-contract-v0.1.schema.json");
-    const REPORT_SCHEMA: &str =
-        include_str!("../../../../tools/schema/emsr-rf-dual-axis-conformance-report-v0.1.schema.json");
+    const FIXTURE_SCHEMA: &str = include_str!(
+        "../../../../docs/research/emsr-v0.1/emsr-rf-dual-axis-contract-v0.1.schema.json"
+    );
+    const REPORT_SCHEMA: &str = include_str!(
+        "../../../../tools/schema/emsr-rf-dual-axis-conformance-report-v0.1.schema.json"
+    );
 
     fn fixture_document() -> Value {
         serde_json::from_str(FIXTURES).expect("RF dual-axis fixtures parse")
@@ -759,10 +798,19 @@ mod tests {
             serde_json::from_str(FIXTURE_SCHEMA).expect("RF input schema parses");
         let report_schema: Value =
             serde_json::from_str(REPORT_SCHEMA).expect("RF report schema parses");
-        assert_eq!(input_schema["$id"], "urn:luminous:emsr:rf-dual-axis-assessment:0.1");
+        assert_eq!(
+            input_schema["$id"],
+            "urn:luminous:emsr:rf-dual-axis-assessment:0.1"
+        );
         assert_eq!(input_schema["properties"]["state"]["const"], FIXTURE_STATE);
-        assert_eq!(report_schema["$id"], "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1");
-        assert_eq!(report_schema["properties"]["report_contract"]["const"], REPORT_SCHEMA);
+        assert_eq!(
+            report_schema["$id"],
+            "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1"
+        );
+        assert_eq!(
+            report_schema["properties"]["report_contract"]["const"],
+            REPORT_SCHEMA
+        );
         assert_eq!(report_schema["additionalProperties"], false);
     }
 
@@ -789,7 +837,10 @@ mod tests {
             report["per_fixture"][3]["primary"]["consumer_disposition"],
             json!(ConsumerDisposition::DegradedAcquisition)
         );
-        assert_eq!(report["per_fixture"][3]["primary"]["candidate_admitted"], false);
+        assert_eq!(
+            report["per_fixture"][3]["primary"]["candidate_admitted"],
+            false
+        );
     }
 
     #[test]
