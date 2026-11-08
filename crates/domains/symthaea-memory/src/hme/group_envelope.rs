@@ -25,7 +25,8 @@ use symthaea_core::hdc::unified_hv::CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT
 use symthaea_core::hdc::ContinuousHV;
 
 /// Domain separator for deterministic group-envelope content identities.
-const GROUP_ENVELOPE_DOMAIN: &[u8] = b"hme_continuous_hv_group_envelope_v1";
+const GROUP_ENVELOPE_DOMAIN: &[u8] = b"hme_continuous_hv_group_envelope_v2";
+const MEMBER_PAYLOAD_DOMAIN: &[u8] = b"hme_continuous_hv_member_payload_v1";
 
 /// Immutable coordinate envelope for one homogeneous ContinuousHV group.
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +35,7 @@ pub struct ContinuousHVGroupEnvelope {
     eligibility_generation: u64,
     dimension: usize,
     member_ids: Vec<String>,
+    member_payload_digests: Vec<[u8; 32]>,
     member_set_digest: [u8; 32],
     content_digest: [u8; 32],
     coordinate_minima: Vec<f32>,
@@ -147,6 +149,26 @@ impl std::fmt::Display for GroupEnvelopeError {
 }
 
 impl std::error::Error for GroupEnvelopeError {}
+
+/// Compute a content digest for one stable-ID/ContinuousHV payload pair.
+///
+/// The digest is suitable for binding a per-member interval certificate to
+/// the original bytes admitted into a group envelope. It is not a residual
+/// proof by itself; it only verifies that later work refers to the same item.
+pub fn continuous_hv_member_payload_digest(
+    member_id: &str,
+    vector: &ContinuousHV,
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(MEMBER_PAYLOAD_DOMAIN);
+    hasher.update(&(member_id.len() as u64).to_le_bytes());
+    hasher.update(member_id.as_bytes());
+    hasher.update(&(vector.values.len() as u64).to_le_bytes());
+    for value in &vector.values {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+    *hasher.finalize().as_bytes()
+}
 
 /// Compute the deterministic digest of a stable-ID set.
 ///
@@ -322,6 +344,7 @@ impl ContinuousHVGroupEnvelope {
             return Err(GroupEnvelopeError::InvalidRadius);
         }
 
+        let mut member_payload_digests = Vec::with_capacity(member_ids.len());
         let mut hasher = blake3::Hasher::new();
         hasher.update(GROUP_ENVELOPE_DOMAIN);
         hasher.update(b"/content");
@@ -337,6 +360,9 @@ impl ContinuousHVGroupEnvelope {
                 .expect("member ID was inserted and sorted from the same map");
             hasher.update(&(id.len() as u64).to_le_bytes());
             hasher.update(id.as_bytes());
+            let payload_digest = continuous_hv_member_payload_digest(id, vector);
+            member_payload_digests.push(payload_digest);
+            hasher.update(&payload_digest);
             for value in &vector.values {
                 hasher.update(&value.to_bits().to_le_bytes());
             }
@@ -354,6 +380,7 @@ impl ContinuousHVGroupEnvelope {
             eligibility_generation,
             dimension,
             member_ids,
+            member_payload_digests,
             member_set_digest,
             content_digest: *hasher.finalize().as_bytes(),
             coordinate_minima,
@@ -366,6 +393,19 @@ impl ContinuousHVGroupEnvelope {
     /// Stable IDs covered by the envelope, sorted ascending.
     pub fn member_ids(&self) -> &[String] {
         &self.member_ids
+    }
+
+    /// Per-member payload digests aligned with member_ids() order.
+    pub fn member_payload_digests(&self) -> &[[u8; 32]] {
+        &self.member_payload_digests
+    }
+
+    /// Digest of the original payload associated with one stable member ID.
+    pub fn member_payload_digest(&self, member_id: &str) -> Option<[u8; 32]> {
+        self.member_ids
+            .binary_search_by(|candidate| candidate.as_str().cmp(member_id))
+            .ok()
+            .and_then(|index| self.member_payload_digests.get(index).copied())
     }
 
     /// Digest of the exact member-ID set.
