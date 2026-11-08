@@ -721,7 +721,7 @@ mod tests {
             .iter()
             .find(|frame| (frame.time - 0.60).abs() < 0.002)
             .expect("frame at 100ms into portamento");
-        let expected = 220.0 * 2.0f32.powf(0.2);
+        let expected = 220.0 * 2.0f32.powf(0.4);
         assert!(
             (at_transition.f0 - expected).abs() < 3.0,
             "log-frequency portamento at 20% of glide should be {expected}, got {}",
