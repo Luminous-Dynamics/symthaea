@@ -1475,7 +1475,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.group_plan, group_plan);
-        assert_eq!(plan.member_plan.threshold, 0.959);
+        let expected_second_score = query.similarity_full_resolution(&high_members[1].1);
+        assert_eq!(plan.member_plan.threshold, expected_second_score);
         assert_eq!(
             plan.member_plan.refinement_ids,
             vec!["high-a".to_owned(), "high-b".to_owned()]
