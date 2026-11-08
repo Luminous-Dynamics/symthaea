@@ -18821,6 +18821,7 @@ dependencies = [
  "criterion",
  "proptest",
  "serde",
+ "serde_json",
  "sha2",
  "symthaea-core",
  "tracing",
