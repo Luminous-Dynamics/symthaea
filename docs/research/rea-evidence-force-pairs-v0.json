@@ -1,0 +1,1017 @@
+{
+  "schema_version": "0.1.0",
+  "dataset_id": "rea-evidence-force-calibration",
+  "status": "design_fixture_only",
+  "source_policy": "original_synthetic_text_only",
+  "use": "development_and_schema_conformance",
+  "not_human_adjudicated": true,
+  "language": "en",
+  "primary_axes": [
+    "relation",
+    "modality",
+    "scope",
+    "temporal_validity",
+    "numeric_specificity"
+  ],
+  "rea_extension_axes": [
+    "attribution",
+    "source_lineage",
+    "population_completeness"
+  ],
+  "primary_monotonicity_pairs": [
+    {
+      "pair_id": "REA-FORCE-REL-001",
+      "axis": "relation",
+      "domain": "observational_science",
+      "source_family_id": "synthetic:cohort-observation-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-REL-001",
+        "source_kind": "synthetic",
+        "text": "A retrospective cohort of 1,240 adults found that higher weekly activity was associated with lower reported symptom scores. Participants were not randomized, and the report states that residual confounding cannot be excluded."
+      },
+      "calibrated_claim": {
+        "text": "In this retrospective cohort, higher weekly activity was associated with lower reported symptom scores.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Higher weekly activity caused symptom scores to fall.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "relation",
+        "from": "was associated with",
+        "to": "caused",
+        "defect": "association_to_causation"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The passage reports an observational association and explicitly leaves residual confounding unresolved. It does not identify a causal effect.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-REL-002",
+      "axis": "relation",
+      "domain": "software_operations",
+      "source_family_id": "synthetic:service-telemetry-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-REL-002",
+        "source_kind": "synthetic",
+        "text": "Across 18 weekly service snapshots, deployments with more warning logs also showed more reported incidents. The snapshots are descriptive; the incident report does not test whether warning volume changes incident probability."
+      },
+      "calibrated_claim": {
+        "text": "Higher warning-log volume co-occurred with more reported incidents in the observed snapshots.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Higher warning-log volume increased the probability of reported incidents.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "relation",
+        "from": "co-occurred with",
+        "to": "increased the probability of",
+        "defect": "co_occurrence_to_effect"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Co-occurrence in descriptive snapshots does not establish that warning-log volume caused or increased incident probability.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-REL-003",
+      "axis": "relation",
+      "domain": "engineering",
+      "source_family_id": "synthetic:load-test-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-REL-003",
+        "source_kind": "synthetic",
+        "text": "A load-test note records that CPU utilization and request latency rose together during a single replay. No intervention, counterfactual run, or causal model was performed."
+      },
+      "calibrated_claim": {
+        "text": "CPU utilization and request latency rose together during this replay.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "CPU utilization was the mechanism that produced the latency increase.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "relation",
+        "from": "rose together",
+        "to": "was the mechanism that produced",
+        "defect": "covariation_to_mechanism"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "A single joint rise is compatible with multiple common causes and does not identify a mechanism.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-MOD-001",
+      "axis": "modality",
+      "domain": "security_testing",
+      "source_family_id": "synthetic:parser-test-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-MOD-001",
+        "source_kind": "synthetic",
+        "text": "In a controlled test configuration, the parser rejected malformed records when strict mode was enabled. The report does not evaluate default-mode behavior or every supported input shape."
+      },
+      "calibrated_claim": {
+        "text": "The parser can reject malformed records when strict mode is enabled.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The parser always rejects malformed records.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "modality",
+        "from": "can reject malformed records",
+        "to": "always rejects malformed records",
+        "defect": "conditional_capability_to_universal_guarantee"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "A conditional result in one test configuration cannot support an unconditional guarantee across modes and inputs.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-MOD-002",
+      "axis": "modality",
+      "domain": "materials_research",
+      "source_family_id": "synthetic:material-screen-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-MOD-002",
+        "source_kind": "synthetic",
+        "text": "A small screening experiment suggests that coating X may improve corrosion resistance under the tested salt-spray condition. The authors describe the result as preliminary and request replication."
+      },
+      "calibrated_claim": {
+        "text": "The preliminary experiment suggests coating X may improve corrosion resistance under the tested condition.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Coating X improves corrosion resistance.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "modality",
+        "from": "may improve corrosion resistance",
+        "to": "improves corrosion resistance",
+        "defect": "preliminary_possibility_to_established_fact"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The passage explicitly characterizes the finding as preliminary and conditional; it does not establish a general fact.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-MOD-003",
+      "axis": "modality",
+      "domain": "incident_analysis",
+      "source_family_id": "synthetic:incident-review-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-MOD-003",
+        "source_kind": "synthetic",
+        "text": "The incident review lists a stale cache as one plausible explanation for the observed mismatch. The review says the cause remains unresolved pending reproduction."
+      },
+      "calibrated_claim": {
+        "text": "A stale cache is one plausible explanation for the mismatch.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "A stale cache is the confirmed cause of the mismatch.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "modality",
+        "from": "plausible explanation",
+        "to": "confirmed cause",
+        "defect": "plausible_hypothesis_to_confirmation"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The source expressly leaves causation unresolved and identifies the cache only as a candidate explanation.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-SCP-001",
+      "axis": "scope",
+      "domain": "infrastructure",
+      "source_family_id": "synthetic:fleet-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-SCP-001",
+        "source_kind": "synthetic",
+        "text": "The signed inventory snapshot covers 27 Linux nodes in the staging region at 2026-10-01T00:00:00Z. The inventory explicitly excludes production and disaster-recovery regions."
+      },
+      "calibrated_claim": {
+        "text": "The 27 staging-region Linux nodes in this snapshot were inventoried.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "All Linux nodes across the organization were inventoried.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "scope",
+        "from": "27 staging-region Linux nodes",
+        "to": "Linux nodes across the organization",
+        "defect": "bounded_environment_to_global_population"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The passage defines a bounded staging-only population and explicitly excludes other regions.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-SCP-002",
+      "axis": "scope",
+      "domain": "survey_research",
+      "source_family_id": "synthetic:local-survey-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-SCP-002",
+        "source_kind": "synthetic",
+        "text": "A convenience survey received 240 responses from residents recruited at three community centers in one metropolitan district. The report provides no probability sampling frame for the wider province."
+      },
+      "calibrated_claim": {
+        "text": "Among the 240 respondents recruited at the three district community centers, the reported preference was the most common.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Residents across the province most commonly prefer this option.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "scope",
+        "from": "240 respondents recruited at the three district community centers",
+        "to": "Residents across the province",
+        "defect": "local_convenience_sample_to_province"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The sample is local and non-probability-based; the passage does not establish province-wide representativeness.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-SCP-003",
+      "axis": "scope",
+      "domain": "software_archives",
+      "source_family_id": "synthetic:release-files-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-SCP-003",
+        "source_kind": "synthetic",
+        "text": "The inspection log lists 12 selected executable members from a release archive. Its selection rule filters out documentation, test data, and nested archives; no exhaustive member inventory is attached."
+      },
+      "calibrated_claim": {
+        "text": "The 12 selected executable members were inspected.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Every member of the release archive was inspected.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "scope",
+        "from": "12 selected executable members",
+        "to": "member of the release archive",
+        "defect": "selected_subset_to_entire_artifact"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The inspection is explicitly filtered and no exhaustive archive inventory exists.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-TMP-001",
+      "axis": "temporal_validity",
+      "domain": "software_security",
+      "source_family_id": "synthetic:advisory-2022-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-TMP-001",
+        "source_kind": "synthetic",
+        "text": "An advisory dated 2022-04-11 states that product version 2.4.1 was affected at publication time. The advisory contains no statement about versions released after 2.4.1."
+      },
+      "calibrated_claim": {
+        "text": "Version 2.4.1 was reported as affected by the advisory published on 2022-04-11.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The currently supported product version is affected.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "temporal_validity",
+        "from": "Version 2.4.1 was reported as affected",
+        "to": "currently supported product version",
+        "defect": "historical_version_fact_to_current_version_claim"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The evidence is historical and version-specific; it does not identify the current supported version.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-TMP-002",
+      "axis": "temporal_validity",
+      "domain": "public_policy",
+      "source_family_id": "synthetic:tariff-notice-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-TMP-002",
+        "source_kind": "synthetic",
+        "text": "The notice states that the listed tariff applied from 2023-01-01 through 2023-12-31. It says the schedule is superseded after that interval and includes no later schedule."
+      },
+      "calibrated_claim": {
+        "text": "The listed tariff applied during calendar year 2023.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The listed tariff is the tariff currently in force.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "temporal_validity",
+        "from": "applied during calendar year 2023",
+        "to": "currently in force",
+        "defect": "bounded_valid_time_to_present_tense"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The evidence explicitly bounds validity to 2023 and says later schedules supersede it.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-TMP-003",
+      "axis": "temporal_validity",
+      "domain": "asset_inventory",
+      "source_family_id": "synthetic:inventory-snapshot-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-TMP-003",
+        "source_kind": "synthetic",
+        "text": "A database export is timestamped 2024-06-30 and records 81 active assets. The export is immutable but contains no update stream or retention evidence after that timestamp."
+      },
+      "calibrated_claim": {
+        "text": "The 2024-06-30 export recorded 81 active assets.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "There are currently 81 active assets.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "temporal_validity",
+        "from": "The 2024-06-30 export recorded",
+        "to": "currently 81 active assets",
+        "defect": "snapshot_at_time_to_current_state"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "An immutable historical snapshot without a current update stream cannot establish the present state.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-NUM-001",
+      "axis": "numeric_specificity",
+      "domain": "performance_measurement",
+      "source_family_id": "synthetic:latency-report-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-NUM-001",
+        "source_kind": "synthetic",
+        "text": "The report summarizes observed median request latency as approximately 15–20 ms across the sampled runs. Raw per-request observations and a more precise estimator are not provided."
+      },
+      "calibrated_claim": {
+        "text": "Median request latency was approximately 15–20 ms in the sampled runs.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Median request latency was exactly 17.3 ms.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "numeric_specificity",
+        "from": "approximately 15–20 ms",
+        "to": "exactly 17.3 ms",
+        "defect": "approximate_range_to_exact_point"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The source supplies an approximate interval, not a point estimate or exact measurement.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-NUM-002",
+      "axis": "numeric_specificity",
+      "domain": "survey_research",
+      "source_family_id": "synthetic:survey-count-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-NUM-002",
+        "source_kind": "synthetic",
+        "text": "The survey appendix reports 4 affirmative responses among 9 participants. No population estimate or weighting procedure is described."
+      },
+      "calibrated_claim": {
+        "text": "Four of the nine participants answered affirmatively.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Exactly 44.444444% of the nine participants answered affirmatively.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "numeric_specificity",
+        "from": "Four of the nine participants",
+        "to": "Exactly 44.444444% of the nine participants",
+        "defect": "sample_count_to_false_exact_percentage"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The exact sample count does not warrant a high-precision population percentage.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-NUM-003",
+      "axis": "numeric_specificity",
+      "domain": "financial_reporting",
+      "source_family_id": "synthetic:cost-summary-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-NUM-003",
+        "source_kind": "synthetic",
+        "text": "A preliminary budget summary rounds the expected cost to about 1.2 million currency units. The underlying estimates and rounding convention are not attached."
+      },
+      "calibrated_claim": {
+        "text": "The preliminary summary estimates the cost at about 1.2 million currency units.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The expected cost is exactly 1,200,000.00 currency units.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "numeric_specificity",
+        "from": "about 1.2 million",
+        "to": "exactly 1,200,000.00",
+        "defect": "rounded_estimate_to_exact_decimal"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The rounded summary does not establish the underlying exact amount or decimal scale.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-ATT-001",
+      "axis": "attribution",
+      "domain": "software_supply_chain",
+      "source_family_id": "synthetic:provider-receipt-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-ATT-001",
+        "source_kind": "synthetic",
+        "text": "The provider response contains a field named artifact_sha256 with value abc123. The evidence package contains the response bytes but no acquired artifact bytes and no local digest computation."
+      },
+      "calibrated_claim": {
+        "text": "The provider response reported artifact_sha256 as abc123.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The artifact's SHA-256 was independently verified as abc123.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "attribution",
+        "from": "provider response reported",
+        "to": "was independently verified",
+        "defect": "provider_report_to_independent_verification"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The evidence proves the content of the provider response, not that the artifact bytes were hashed or matched.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-ATT-002",
+      "axis": "attribution",
+      "domain": "incident_management",
+      "source_family_id": "synthetic:analyst-note-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-ATT-002",
+        "source_kind": "synthetic",
+        "text": "An analyst's preliminary note says the operator may have disabled the control. The note is unsigned, marked 'working hypothesis', and is not an approved incident finding."
+      },
+      "calibrated_claim": {
+        "text": "A preliminary analyst note proposed that the operator may have disabled the control.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The incident investigation confirmed that the operator disabled the control.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "attribution",
+        "from": "preliminary analyst note proposed",
+        "to": "investigation confirmed",
+        "defect": "analyst_hypothesis_to_official_finding"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The document is a working hypothesis, not an approved finding or independently verified event record.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-ATT-003",
+      "axis": "attribution",
+      "domain": "public_administration",
+      "source_family_id": "synthetic:policy-summary-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-ATT-003",
+        "source_kind": "synthetic",
+        "text": "A secondary policy digest characterizes a draft proposal as 'binding guidance'. The cited primary document is a consultation draft that labels itself non-binding and subject to revision."
+      },
+      "calibrated_claim": {
+        "text": "The secondary digest described the consultation draft as binding guidance.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The agency issued binding guidance.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "attribution",
+        "from": "The secondary digest described",
+        "to": "The agency issued",
+        "defect": "secondary_author_interpretation_to_primary_authority"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The source is a secondary characterization contradicted by the primary draft's explicit non-binding status.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-LIN-001",
+      "axis": "source_lineage",
+      "domain": "vulnerability_intelligence",
+      "source_family_id": "synthetic:cve-feed-root-001",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-LIN-001",
+        "source_kind": "synthetic",
+        "text": "Two advisory pages contain the same text, same CVE reference, and same upstream publication identifier. Both pages identify the same upstream feed as their source."
+      },
+      "calibrated_claim": {
+        "text": "Two advisory pages reproduce the same upstream vulnerability statement.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Two independent sources independently corroborate the vulnerability statement.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "source_lineage",
+        "from": "Two advisory pages reproduce",
+        "to": "independent sources independently corroborate",
+        "defect": "mirrors_to_independent_corroboration"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Two mirrors of one upstream statement are one source family, not independent corroboration.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-LIN-002",
+      "axis": "source_lineage",
+      "domain": "security_scanning",
+      "source_family_id": "synthetic:scanner-feed-root-002",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-LIN-002",
+        "source_kind": "synthetic",
+        "text": "Scanner A and Scanner B report the same package alert. Their documentation states that both products ingest the same third-party vulnerability feed and do not independently reproduce the finding."
+      },
+      "calibrated_claim": {
+        "text": "Both scanners surfaced an alert originating from the same third-party feed.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Two independent scanners independently confirmed the vulnerability.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "source_lineage",
+        "from": "same third-party feed",
+        "to": "independently confirmed",
+        "defect": "shared_upstream_feed_to_independent_detection"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Distinct products do not create independent evidence when both findings derive from the same upstream source.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-LIN-003",
+      "axis": "source_lineage",
+      "domain": "news_reporting",
+      "source_family_id": "synthetic:wire-story-root-003",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-LIN-003",
+        "source_kind": "synthetic",
+        "text": "Three local news websites publish identical paragraphs and all credit the same wire service. No outlet reports a separate interview, document, or independent observation."
+      },
+      "calibrated_claim": {
+        "text": "Three outlets republished a report originating from one wire-service story.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Three independent newsrooms independently verified the event.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "source_lineage",
+        "from": "one wire-service story",
+        "to": "independent newsrooms independently verified",
+        "defect": "syndicated_republication_to_independent_reporting"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Syndication increases distribution count, not independent source count.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-POP-001",
+      "axis": "population_completeness",
+      "domain": "api_collection",
+      "source_family_id": "synthetic:cursor-manifest-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-POP-001",
+        "source_kind": "synthetic",
+        "text": "The collection manifest shows pages 1 and 3, a terminal cursor after page 3, and a provider flag `all_pages_seen=true`. Page 2 is absent and no independently recorded snapshot root or page-chain proof is attached."
+      },
+      "calibrated_claim": {
+        "text": "The captured manifest contains pages 1 and 3 and reports a terminal cursor.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "Every record in the declared API population was enumerated.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "population_completeness",
+        "from": "contains pages 1 and 3",
+        "to": "record in the declared API population was enumerated",
+        "defect": "terminal_cursor_with_gap_to_complete_enumeration"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "A terminal cursor and self-reported flag do not repair an explicit missing page.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-POP-002",
+      "axis": "population_completeness",
+      "domain": "transparency_logs",
+      "source_family_id": "synthetic:transparency-view-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-POP-002",
+        "source_kind": "synthetic",
+        "text": "An independently verified transparency checkpoint contains every entry registered in the named tree. The service accepts only statements submitted by issuers, and no independent issuer-issuance history or participation audit is available."
+      },
+      "calibrated_claim": {
+        "text": "Every entry registered in the named transparency tree at this checkpoint was enumerated.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The issuer registered every statement it created.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "population_completeness",
+        "from": "entry registered in the named transparency tree",
+        "to": "statement it created",
+        "defect": "complete_registered_view_to_complete_issuer_history"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Complete enumeration of registered entries does not establish that the issuer submitted every statement it created.",
+        "human_review_required": true
+      }
+    },
+    {
+      "pair_id": "REA-FORCE-POP-003",
+      "axis": "population_completeness",
+      "domain": "archive_inspection",
+      "source_family_id": "synthetic:archive-index-a",
+      "split": "development",
+      "evidence": {
+        "evidence_id": "E-POP-003",
+        "source_kind": "synthetic",
+        "text": "The inspection tool reports all files matching `bin/**/*.exe` were processed in the captured directory. The archive contains other file types and nested archives; no complete archive-member inventory was retained."
+      },
+      "calibrated_claim": {
+        "text": "All files matching the declared executable filter were processed in the captured directory.",
+        "expected_warrant": "adequate_as_written"
+      },
+      "force_raised_claim": {
+        "text": "The entire archive was completely inspected.",
+        "expected_warrant": "insufficient"
+      },
+      "single_axis_mutation": {
+        "operation": "replace_span",
+        "dimension": "population_completeness",
+        "from": "files matching the declared executable filter",
+        "to": "entire archive was completely inspected",
+        "defect": "complete_filtered_query_to_complete_archive"
+      },
+      "expected_pair_relation": "calibrated_strictly_more_warranted",
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Completeness within one declared filtered query is not completeness of the entire archive.",
+        "human_review_required": true
+      }
+    }
+  ],
+  "positive_evidence_growth_controls": [
+    {
+      "control_id": "REA-FORCE-GROW-001",
+      "axis": "relation",
+      "domain": "clinical_research",
+      "source_family_id": "synthetic:randomized-trial-a",
+      "split": "development",
+      "claim_text": "The intervention reduced the measured outcome under the trial protocol.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "A non-randomized observational cohort found an association between the intervention and the outcome."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "A preregistered randomized controlled trial with allocation concealment, prespecified outcomes, complete follow-up accounting, and an independent replication found a reduction under the same target population and protocol."
+      },
+      "expected_transition": {
+        "before": "adequate_only_with_qualification",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The addition of qualified causal evidence may warrant a stronger causal formulation; the evaluator must not remain permanently hedged.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-002",
+      "axis": "modality",
+      "domain": "software_testing",
+      "source_family_id": "synthetic:parser-proof-a",
+      "split": "development",
+      "claim_text": "The parser rejects duplicate object keys under the declared input and configuration contract.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "One regression test rejects a duplicate-key example in a local debug build."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "An independently maintained conformance suite covers the declared grammar, duplicate-key variants and escaped-equivalent names; all cases pass on the release binary and the tested configuration is bound to the artifact."
+      },
+      "expected_transition": {
+        "before": "adequate_only_with_qualification",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Broader, independently checked coverage can justify stronger wording within the exact declared grammar and configuration.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-003",
+      "axis": "scope",
+      "domain": "fleet_inventory",
+      "source_family_id": "synthetic:fleet-root-b",
+      "split": "development",
+      "claim_text": "Every managed Linux node in the declared organization inventory was enumerated at the snapshot.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "A staging-only inventory contains 27 Linux nodes."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "A stable organization-wide snapshot is independently reconciled to an authoritative node registry; every partition, page and node identity is accounted for, and acquisition and processing outcomes are complete."
+      },
+      "expected_transition": {
+        "before": "insufficient",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "An independently qualified population definition and reconciled enumeration can support a broader but still explicitly bounded population claim.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-004",
+      "axis": "temporal_validity",
+      "domain": "software_security",
+      "source_family_id": "synthetic:live-advisory-a",
+      "split": "development",
+      "claim_text": "The currently supported release is affected by the vulnerability.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "A 2022 advisory identifies version 2.4.1 as affected."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "A current vendor advisory explicitly identifies the current supported release, is valid at the target time, and is independently checked against the release manifest and supersession history."
+      },
+      "expected_transition": {
+        "before": "insufficient",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "A temporally current, version-specific source can support a present-tense claim that stale historical evidence cannot.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-005",
+      "axis": "numeric_specificity",
+      "domain": "metrology",
+      "source_family_id": "synthetic:calibrated-instrument-a",
+      "split": "development",
+      "claim_text": "The measured output was 17.30 units under the declared calibration and uncertainty model.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "A summary report gives an approximate range of 15–20 units."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "The original instrument record, calibration certificate, uncertainty budget, exact unit, rounding policy and raw measurement are available and independently checked."
+      },
+      "expected_transition": {
+        "before": "insufficient",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "Exactness and stated uncertainty may be warranted by traceable source measurements and a declared measurement model.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-006",
+      "axis": "attribution",
+      "domain": "artifact_verification",
+      "source_family_id": "synthetic:local-hash-a",
+      "split": "development",
+      "claim_text": "The acquired artifact bytes have SHA-256 digest d34db33f.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "A provider API response reports the digest d34db33f."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "The exact artifact bytes are acquired, bounded, hashed by an independent verifier, and the computed digest matches d34db33f."
+      },
+      "expected_transition": {
+        "before": "insufficient",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "The system may upgrade from reporting a provider assertion to reporting its own verification only after it actually verifies the bound bytes.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-007",
+      "axis": "source_lineage",
+      "domain": "independent_measurement",
+      "source_family_id": "synthetic:independent-lab-roots",
+      "split": "development",
+      "claim_text": "Two independently collected measurement programmes corroborate the finding.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "Two websites reproduce one upstream report."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "Two laboratories with independently documented sampling, instruments, custody, analysis pipelines and no shared upstream measurements report compatible results."
+      },
+      "expected_transition": {
+        "before": "insufficient",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "A real second evidence-generation path can justify independent corroboration; a mirror cannot.",
+        "human_review_required": true
+      }
+    },
+    {
+      "control_id": "REA-FORCE-GROW-008",
+      "axis": "population_completeness",
+      "domain": "archive_assurance",
+      "source_family_id": "synthetic:archive-manifest-root",
+      "split": "development",
+      "claim_text": "Every member of the captured archive was enumerated and processed under the declared reader.",
+      "evidence_before": {
+        "source_kind": "synthetic",
+        "text": "A filtered file listing contains the executable members selected for inspection."
+      },
+      "evidence_after": {
+        "source_kind": "synthetic",
+        "text": "A stable archive digest, complete independently validated member inventory, per-member acquisition outcomes and per-member processing outcomes account for every member under the declared reader."
+      },
+      "expected_transition": {
+        "before": "insufficient",
+        "after": "adequate_as_written"
+      },
+      "adjudication": {
+        "status": "synthetic_design_expectation",
+        "rationale": "A complete captured-artifact contract can warrant completeness within that archive, without implying authenticity or completeness of an issuer's external history.",
+        "human_review_required": true
+      }
+    }
+  ]
+}

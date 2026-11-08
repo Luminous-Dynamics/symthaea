@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-evidence-force-pairs-v0.schema.json",
+  "title": "REA evidence-force calibration development fixture v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_policy",
+    "use",
+    "not_human_adjudicated",
+    "language",
+    "primary_axes",
+    "rea_extension_axes",
+    "primary_monotonicity_pairs",
+    "positive_evidence_growth_controls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-evidence-force-calibration"
+    },
+    "status": {
+      "const": "design_fixture_only"
+    },
+    "source_policy": {
+      "const": "original_synthetic_text_only"
+    },
+    "use": {
+      "const": "development_and_schema_conformance"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "language": {
+      "const": "en"
+    },
+    "primary_axes": {
+      "type": "array",
+      "const": [
+        "relation",
+        "modality",
+        "scope",
+        "temporal_validity",
+        "numeric_specificity"
+      ]
+    },
+    "rea_extension_axes": {
+      "type": "array",
+      "const": [
+        "attribution",
+        "source_lineage",
+        "population_completeness"
+      ]
+    },
+    "primary_monotonicity_pairs": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    },
+    "positive_evidence_growth_controls": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/growthControl"
+      }
+    }
+  },
+  "$defs": {
+    "axis": {
+      "enum": [
+        "relation",
+        "modality",
+        "scope",
+        "temporal_validity",
+        "numeric_specificity",
+        "attribution",
+        "source_lineage",
+        "population_completeness"
+      ]
+    },
+    "warrant": {
+      "enum": [
+        "adequate_as_written",
+        "adequate_only_with_qualification",
+        "insufficient",
+        "contradicted",
+        "not_adjudicable"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "text"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_kind": {
+          "const": "synthetic"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rationale",
+        "human_review_required"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_design_expectation"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 20
+        },
+        "human_review_required": {
+          "const": true
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "axis",
+        "domain",
+        "source_family_id",
+        "split",
+        "evidence",
+        "calibrated_claim",
+        "force_raised_claim",
+        "single_axis_mutation",
+        "expected_pair_relation",
+        "adjudication"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "pattern": "^REA-FORCE-(REL|MOD|SCP|TMP|NUM|ATT|LIN|POP)-[0-9]{3}$"
+        },
+        "axis": {
+          "$ref": "#/$defs/axis"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 2
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "split": {
+          "const": "development"
+        },
+        "evidence": {
+          "$ref": "#/$defs/source",
+          "allOf": [
+            {
+              "required": [
+                "evidence_id"
+              ]
+            }
+          ]
+        },
+        "calibrated_claim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "expected_warrant"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 10
+            },
+            "expected_warrant": {
+              "const": "adequate_as_written"
+            }
+          }
+        },
+        "force_raised_claim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "expected_warrant"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 10
+            },
+            "expected_warrant": {
+              "const": "insufficient"
+            }
+          }
+        },
+        "single_axis_mutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "dimension",
+            "from",
+            "to",
+            "defect"
+          ],
+          "properties": {
+            "operation": {
+              "const": "replace_span"
+            },
+            "dimension": {
+              "$ref": "#/$defs/axis"
+            },
+            "from": {
+              "type": "string",
+              "minLength": 2
+            },
+            "to": {
+              "type": "string",
+              "minLength": 2
+            },
+            "defect": {
+              "type": "string",
+              "minLength": 3
+            }
+          }
+        },
+        "expected_pair_relation": {
+          "const": "calibrated_strictly_more_warranted"
+        },
+        "adjudication": {
+          "$ref": "#/$defs/adjudication"
+        }
+      }
+    },
+    "growthControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control_id",
+        "axis",
+        "domain",
+        "source_family_id",
+        "split",
+        "claim_text",
+        "evidence_before",
+        "evidence_after",
+        "expected_transition",
+        "adjudication"
+      ],
+      "properties": {
+        "control_id": {
+          "type": "string",
+          "pattern": "^REA-FORCE-GROW-[0-9]{3}$"
+        },
+        "axis": {
+          "$ref": "#/$defs/axis"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 2
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "split": {
+          "const": "development"
+        },
+        "claim_text": {
+          "type": "string",
+          "minLength": 10
+        },
+        "evidence_before": {
+          "$ref": "#/$defs/source"
+        },
+        "evidence_after": {
+          "$ref": "#/$defs/source"
+        },
+        "expected_transition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "before",
+            "after"
+          ],
+          "properties": {
+            "before": {
+              "$ref": "#/$defs/warrant"
+            },
+            "after": {
+              "$ref": "#/$defs/warrant"
+            }
+          }
+        },
+        "adjudication": {
+          "$ref": "#/$defs/adjudication"
+        }
+      }
+    }
+  }
+}
