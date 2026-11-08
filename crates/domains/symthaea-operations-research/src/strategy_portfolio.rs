@@ -14,6 +14,10 @@
 
 use super::decomposition::CnfProblem;
 use super::quantified_scope::ValidatedQuantifierPrefix;
+use super::quantified_proof::{
+    QbfGameProof, QbfProofNodeKind, QbfProofVerificationReport, QuantifiedProofBudget,
+    QuantifiedProofError, verify_qbf_game_proof,
+};
 use super::quantified_strategy::{
     QbfEvaluationResult, QuantifiedEvaluationBudget, QuantifiedStrategyError,
     StrategyVerificationReport,
@@ -56,6 +60,11 @@ impl Default for StrategyPortfolioBudget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StrategyPortfolioError {
     SourceOrBddCompilation(VerifiedStrategyCompilationError),
+    GameProof(QuantifiedProofError),
+    GameProofResultMismatch {
+        proof_value: bool,
+        candidate_value: bool,
+    },
     BddVerification(StrategyBddError),
     AigCompilation(StrategyAigError),
     AigVerification(StrategyAigError),
@@ -93,6 +102,18 @@ pub struct VerifiedStrategyPortfolio {
     pub total_bdd_nodes: usize,
     pub total_aig_and_nodes: usize,
     pub bdd_search_complete: bool,
+}
+
+/// A complete verified bundle: quantified game proof, extracted strategy,
+/// and independently checked BDD/AIG representations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedQbfEvidencePortfolio {
+    pub value: bool,
+    pub game_proof: QbfGameProof,
+    pub game_proof_verification: QbfProofVerificationReport,
+    pub game_proof_bytes: Vec<u8>,
+    pub strategy_portfolio: VerifiedStrategyPortfolio,
+    pub total_evidence_bytes: usize,
 }
 
 fn ensure_append(
@@ -244,6 +265,120 @@ pub fn encode_strategy_robdd(
 /// support-minimized function, independently verify each, and choose the
 /// smaller canonical encoding. The original QBF verification always precedes
 /// representation compilation.
+/// Encode a verified QBF game proof in canonical LD-QBFPROOF1 little-endian
+/// format. The caller must run the source-bound independent proof checker
+/// before accepting this byte sequence as evidence.
+pub fn encode_qbf_game_proof(
+    proof: &QbfGameProof,
+    encoding_budget: StrategyPortfolioBudget,
+) -> Result<Vec<u8>, StrategyPortfolioError> {
+    let mut bytes = Vec::new();
+    for byte in b"LD-QBFPROOF1" {
+        append_byte(&mut bytes, *byte, encoding_budget)?;
+    }
+    append_u64(&mut bytes, proof.variable_count, encoding_budget)?;
+    append_u64(&mut bytes, proof.root, encoding_budget)?;
+    append_u64(&mut bytes, proof.nodes.len(), encoding_budget)?;
+
+    for node in &proof.nodes {
+        append_u64(&mut bytes, node.prefix_position, encoding_budget)?;
+        append_byte(&mut bytes, u8::from(node.value), encoding_budget)?;
+        match node.kind {
+            QbfProofNodeKind::MatrixLeaf => {
+                append_byte(&mut bytes, 0, encoding_budget)?;
+            }
+            QbfProofNodeKind::EarlyTrue => {
+                append_byte(&mut bytes, 1, encoding_budget)?;
+            }
+            QbfProofNodeKind::EarlyFalseClause { clause_index } => {
+                append_byte(&mut bytes, 2, encoding_budget)?;
+                append_u64(&mut bytes, clause_index, encoding_budget)?;
+            }
+            QbfProofNodeKind::ExistsDecision {
+                variable,
+                low_child,
+                high_child,
+            } => {
+                append_byte(&mut bytes, 3, encoding_budget)?;
+                append_u64(&mut bytes, variable, encoding_budget)?;
+                append_u64(&mut bytes, low_child, encoding_budget)?;
+                append_u64(&mut bytes, high_child, encoding_budget)?;
+            }
+            QbfProofNodeKind::ForAllDecision {
+                variable,
+                low_child,
+                high_child,
+            } => {
+                append_byte(&mut bytes, 4, encoding_budget)?;
+                append_u64(&mut bytes, variable, encoding_budget)?;
+                append_u64(&mut bytes, low_child, encoding_budget)?;
+                append_u64(&mut bytes, high_child, encoding_budget)?;
+            }
+        }
+    }
+    Ok(bytes)
+}
+
+/// Verify and compile the game proof, winning strategy and both circuit
+/// representations as one evidence bundle. The independent game proof and
+/// strategy verifiers are both mandatory; equal truth values alone are not
+/// treated as a substitute for either check.
+pub fn verify_and_compile_qbf_evidence_portfolio(
+    problem: &CnfProblem,
+    prefix: &ValidatedQuantifierPrefix,
+    proof: &QbfGameProof,
+    candidate: &QbfEvaluationResult,
+    qbf_budget: QuantifiedEvaluationBudget,
+    proof_budget: QuantifiedProofBudget,
+    bdd_budget: StrategyBddBudget,
+    aig_budget: StrategyAigBudget,
+    encoding_budget: StrategyPortfolioBudget,
+) -> Result<VerifiedQbfEvidencePortfolio, StrategyPortfolioError> {
+    let game_proof_verification =
+        verify_qbf_game_proof(problem, prefix, proof, proof_budget)
+            .map_err(StrategyPortfolioError::GameProof)?;
+    if game_proof_verification.root_value != candidate.value {
+        return Err(StrategyPortfolioError::GameProofResultMismatch {
+            proof_value: game_proof_verification.root_value,
+            candidate_value: candidate.value,
+        });
+    }
+    let game_proof_bytes = encode_qbf_game_proof(proof, encoding_budget)?;
+    let strategy_portfolio = verify_and_compile_qbf_strategy_portfolio(
+        problem,
+        prefix,
+        candidate,
+        qbf_budget,
+        bdd_budget,
+        aig_budget,
+        encoding_budget,
+    )?;
+
+    let circuit_bytes = strategy_portfolio
+        .total_bdd_bytes
+        .checked_add(strategy_portfolio.total_aig_bytes)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+    let total_evidence_bytes = game_proof_bytes
+        .len()
+        .checked_add(circuit_bytes)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+    if total_evidence_bytes > encoding_budget.max_total_representation_bytes {
+        return Err(StrategyPortfolioError::TotalPortfolioTooLarge {
+            required: total_evidence_bytes,
+            limit: encoding_budget.max_total_representation_bytes,
+        });
+    }
+
+    Ok(VerifiedQbfEvidencePortfolio {
+        value: game_proof_verification.root_value,
+        game_proof: proof.clone(),
+        game_proof_verification,
+        game_proof_bytes,
+        strategy_portfolio,
+        total_evidence_bytes,
+    })
+}
+
 pub fn verify_and_compile_qbf_strategy_portfolio(
     problem: &CnfProblem,
     prefix: &ValidatedQuantifierPrefix,
