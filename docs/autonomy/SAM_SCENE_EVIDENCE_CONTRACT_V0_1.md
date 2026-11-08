@@ -176,6 +176,20 @@ Use distinct labels for at least `observed_free`, `occupied`, `occluded`, `unobs
 12. Local object tracks cannot cite remote cooperative claims or simulator oracle truth; those sources remain in their separate typed reference collections.
 13. The scene layer cannot grant vehicle, ODD or actuator authority. Symthaea's separate runtime-assurance boundary owns command admission.
 
+## 9.5. Follow-target evidence context
+
+A controller or teacher that needs a lead-actor gap must name the evidence domain supplying it. The typed `follow_target_context` is separate from the legacy `VehicleState` mesh channels.
+
+- `simulation_benchmark`: may consume only a current, exact-scenario `simulator_oracle` source. The benchmark and resulting measurements must remain labelled simulation-only.
+- `local_perception`: requires a current, frame-resolved `local_sensor_observation` measurement from the declared scene. Image-space HDC proposals and simulator truth are not local metric tracks.
+- `deployment`: requires a current local sensor measurement with matching calibration/frame/time provenance. The schema does not itself attest a sensor, calibration or physical installation.
+- `remote_cooperative_claim`: is not a valid Follow-target source in any profile. V2X provenance may enrich an advisory stream, but cannot silently substitute for a locally observed lead track.
+- `unknown` / `rejected`: carries no selected source and no numeric gap fallback. The controller must expose the target as unavailable and let the separately qualified planner/RTA determine the admissible response.
+
+The source must match the scene scenario, frame, acquisition time, clock domain and transform. The snapshot event time is compared to the normalized observation tick and declared maximum age. Missing, future-dated, stale, wrong-frame or role-incompatible targets are rejected or remain unknown.
+
+The canonical fixture demonstrates the simulation-benchmark path using simulator oracle truth and includes a separate local-lidar measurement source solely to exercise the deployment/local-perception contract. Both are synthetic fixture records; no physical sensing is claimed.
+
 ## 10. Ownership boundaries
 
 Compose rather than duplicate:
