@@ -153,12 +153,14 @@ pub struct OccupationFlowLayout {
     states: usize,
     flow_start: usize,
     variable_count: usize,
+    nonzero_count: usize,
 }
 
 impl OccupationFlowLayout {
     pub fn period_count(&self) -> usize { self.periods }
     pub fn state_count(&self) -> usize { self.states }
     pub fn variable_count(&self) -> usize { self.variable_count }
+    pub fn nonzero_count(&self) -> usize { self.nonzero_count }
 
     pub fn occupancy_variable(&self, time: usize, state: usize) -> Option<usize> {
         if time >= self.periods || state >= self.states {
@@ -549,12 +551,30 @@ fn preflight_dimensions(
         .ok_or(OccupationFlowError::DimensionOverflow)?;
     let initial_nonzeros = states.checked_mul(2)
         .ok_or(OccupationFlowError::DimensionOverflow)?;
-    let per_stage_nonzeros = states.checked_mul(states)
-        .and_then(|value| value.checked_mul(8))
+    // Each stage has two families of paired conservation equalities:
+    // outflow and inflow, with 4Q^2 + 4Q stored coefficients total.
+    let conservation_nonzeros = states.checked_mul(states)
+        .and_then(|value| value.checked_mul(4))
         .and_then(|value| value.checked_add(states.checked_mul(4)?))
         .ok_or(OccupationFlowError::DimensionOverflow)?;
+    // Each interval contributes one mandatory flow coefficient per bound;
+    // occupancy coefficients are stored only when their endpoint is nonzero.
+    let mut interval_bound_nonzeros = 0usize;
+    for stage in &model.transitions {
+        for row in stage {
+            for interval in row {
+                let lower_entries = if interval.lower.is_zero() { 1 } else { 2 };
+                let upper_entries = if interval.upper.is_zero() { 1 } else { 2 };
+                interval_bound_nonzeros = interval_bound_nonzeros
+                    .checked_add(lower_entries + upper_entries)
+                    .ok_or(OccupationFlowError::DimensionOverflow)?;
+            }
+        }
+    }
+    let per_stage_nonzeros = conservation_nonzeros;
     let nonzero_count = model.transitions.len()
         .checked_mul(per_stage_nonzeros)
+        .and_then(|value| value.checked_add(interval_bound_nonzeros))
         .and_then(|value| value.checked_add(initial_nonzeros))
         .ok_or(OccupationFlowError::DimensionOverflow)?;
 
@@ -574,6 +594,7 @@ fn preflight_dimensions(
             states,
             flow_start: occupancy_count,
             variable_count,
+            nonzero_count,
         },
         constraint_count,
         nonzero_count,
@@ -942,7 +963,7 @@ fn add_sparse_equality(
 fn zero_row(length: usize) -> Result<Vec<CheckedRational>, OccupationFlowError> {
     let mut row = Vec::new();
     row.try_reserve_exact(length).map_err(|_| OccupationFlowError::AllocationFailed {
-        resource: "dense constraint row",
+        resource: "dense objective vector",
         requested: length,
     })?;
     row.resize(length, CheckedRational::zero());
@@ -1590,7 +1611,7 @@ mod tests {
         let tight = OccupationFlowBudget {
             max_variables: 14,
             max_constraints: 36,
-            max_nonzero_entries: 44,
+            max_nonzero_entries: 84,
             max_rational_bit_width: 3,
             max_certificate_entries: 64,
             max_certificate_memory_bytes: 1_000_000,
@@ -1632,6 +1653,7 @@ mod tests {
         let (layout, constraints, nonzeros) =
             preflight_dimensions(&model, exact_budget).unwrap();
         assert_eq!(layout.variable_count(), 4_224);
+        assert_eq!(layout.nonzero_count(), 32_976);
         assert_eq!(constraints, 8_784);
         assert_eq!(nonzeros, 32_976);
 
@@ -1675,5 +1697,7 @@ mod tests {
         ).unwrap();
         assert_eq!(built.problem().row_count(), 20);
         assert_eq!(built.problem().column_count(), 6);
+        assert_eq!(built.problem().nonzero_count(), 40);
+        assert_eq!(built.layout().nonzero_count(), 40);
     }
 }
