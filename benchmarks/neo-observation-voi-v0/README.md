@@ -116,3 +116,6 @@ The verifier also includes a deterministic 128-case finite-model sweep. For each
 The fixture also links the synthetic unknown optical/radar source relation from Mycelix's `source-correlation-profile-v0.1`. When dependence assessment is `unknown`, the joint likelihood is unavailable and independence is not evidenced. The evaluator therefore requires `ABSTAIN_DEPENDENCE_UNRESOLVED`, rejects a numeric EVSI, and rejects an independent-likelihood product. It does not relabel unknown as dependent; it simply prevents the planner from pretending it knows the joint model.
 
 This control is important in real campaigns: sensor modality, provider count or different observation IDs are not proofs of independence. A bounded, evidence-backed dependence model can restore quantitative evaluation; until then, abstention is the honest output.
+
+
+The evaluator also pins the nuisance-only case to the unchanged baseline Bayes risk and exactly zero EVSI, and pins perfect-information post-observation risk to the baseline-minus-EVSI identity. This prevents a fixture edit from accidentally relabeling irrelevant entropy as decision value.
