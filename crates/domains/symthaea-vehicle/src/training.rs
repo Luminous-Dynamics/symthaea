@@ -50,6 +50,8 @@ pub struct EpisodeMetrics {
     pub avg_control_effort: f64,
     /// Number of exploration bursts triggered.
     pub exploration_count: usize,
+    /// Physics steps in Follow mode where no admissible lead-target evidence was available.
+    pub follow_evidence_unavailable_steps: usize,
     /// Final subterranean navigation sigma when subterranean context is active.
     pub subterranean_navigation_sigma_m: Option<f64>,
     /// Number of subterranean navigation updates applied.
@@ -277,6 +279,7 @@ impl VehicleTrainer {
         let mut total_heading_error = 0.0;
         let mut total_control_effort = 0.0;
         let mut exploration_count = 0usize;
+        let mut follow_evidence_unavailable_steps = 0usize;
         let mut fe_samples = 0usize;
         let mut steps_completed = 0usize;
         let mut current_tau_factor = fep_result.tau_factor;
@@ -329,6 +332,15 @@ impl VehicleTrainer {
             Some(SwarmSimulator::new(scaled_cfg))
         });
 
+        // This identity and profile are fixed for the entire synthetic episode. Simulator
+        // oracle evidence is never accepted under a local-perception/deployment profile.
+        let follow_scenario_id = format!("symthaea-vehicle-training-episode-{episode}");
+        let follow_profile = FollowConsumerProfile::SimulationBenchmark {
+            scenario_id: follow_scenario_id.clone(),
+            frame_id: "ego_body".to_owned(),
+            max_age_s: 0.5,
+        };
+
         let subterranean_bridge = self
             .subterranean_context
             .as_ref()
@@ -376,6 +388,18 @@ impl VehicleTrainer {
                 self.perturbation_schedule.apply_to_state(step, &mut state);
             }
 
+            let follow_target = if matches!(task, VehicleTask::Follow { .. }) {
+                swarm
+                    .as_ref()
+                    .and_then(|simulator| simulator.nearest_follow_target(&state, &follow_scenario_id))
+            } else {
+                None
+            };
+            let follow_target_admitted = matches!(task, VehicleTask::Follow { .. })
+                && admit_follow_target(follow_target.as_ref(), &follow_profile).is_ok();
+            let mut follow_evidence_unavailable_this_step =
+                matches!(task, VehicleTask::Follow { .. }) && !follow_target_admitted;
+
             if let (Some(context), Some(bridge), Some(navigator)) = (
                 self.subterranean_context.as_ref(),
                 subterranean_bridge.as_ref(),
@@ -413,23 +437,41 @@ impl VehicleTrainer {
             let proj = self.road.project(state.position_x, state.position_y);
             let road_heading = proj.road_heading;
 
-            let sensor_hv = encoder.encode(&state);
+            // Peer channels are admitted to HDC only through the explicit synthetic-oracle path.
+            let sensor_hv = if follow_target_admitted {
+                encoder.encode_simulator_oracle(&state)
+            } else {
+                encoder.encode(&state)
+            };
             let mut command = controller.forward(&sensor_hv, dt as f32);
 
-            // Blend with PD teacher during curriculum
+            // Blend with PD teacher during curriculum. Missing Follow evidence means no Follow
+            // teacher command; it does not fall back to the untyped VehicleState peer distance.
             if pd_weight > 0.01 {
                 let pd_cmd = match task {
-                    VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
-                    }
-                    _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
+                    VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
+                        &state,
+                        drive_target,
+                        road_heading,
+                        target_gap,
+                        follow_target.as_ref(),
+                        &follow_profile,
+                    )
+                    .ok()
+                    .or_else(|| {
+                        follow_evidence_unavailable_this_step = true;
+                        None
+                    }),
+                    _ => Some(pd_cruise_baseline_with_road(&state, drive_target, road_heading)),
                 };
-                command = VehicleCommand {
-                    steering: pd_weight * pd_cmd.steering + (1.0 - pd_weight) * command.steering,
-                    throttle: pd_weight * pd_cmd.throttle + (1.0 - pd_weight) * command.throttle,
-                    brake: pd_weight * pd_cmd.brake + (1.0 - pd_weight) * command.brake,
-                };
-                command = command.clamped();
+                if let Some(pd_cmd) = pd_cmd {
+                    command = VehicleCommand {
+                        steering: pd_weight * pd_cmd.steering + (1.0 - pd_weight) * command.steering,
+                        throttle: pd_weight * pd_cmd.throttle + (1.0 - pd_weight) * command.throttle,
+                        brake: pd_weight * pd_cmd.brake + (1.0 - pd_weight) * command.brake,
+                    };
+                    command = command.clamped();
+                }
             }
 
             // Add exploration noise
@@ -442,7 +484,21 @@ impl VehicleTrainer {
 
             // Track metrics
             let safe_r = reward::safety_reward(&state);
-            let episode_r = reward::episode_reward(&state, &task, drive_target, road_heading);
+            let episode_r = match task {
+                VehicleTask::Follow { .. } => reward::episode_reward_with_follow_target(
+                    &state,
+                    &task,
+                    drive_target,
+                    road_heading,
+                    follow_target.as_ref(),
+                    &follow_profile,
+                )
+                .unwrap_or_else(|_| {
+                    follow_evidence_unavailable_this_step = true;
+                    reward::episode_reward(&state, &task, drive_target, road_heading)
+                }),
+                _ => reward::episode_reward(&state, &task, drive_target, road_heading),
+            };
             total_safety_reward += safe_r;
             total_episode_reward += episode_r;
             total_speed += state.speed;
@@ -492,40 +548,51 @@ impl VehicleTrainer {
             // -- TRAINING (every train_every steps, 50Hz) --
             if step % self.config.train_every == 0 {
                 let target = match task {
-                    VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
-                    }
-                    _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
+                    VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
+                        &state,
+                        drive_target,
+                        road_heading,
+                        target_gap,
+                        follow_target.as_ref(),
+                        &follow_profile,
+                    )
+                    .ok()
+                    .or_else(|| {
+                        follow_evidence_unavailable_this_step = true;
+                        None
+                    }),
+                    _ => Some(pd_cruise_baseline_with_road(&state, drive_target, road_heading)),
                 };
 
-                // Reward-modulated BPTT: scale gradient by safety reward
-                // so the network learns more when stable (clear signal)
-                // and less when sliding (noisy signal). Floor at 0.1.
-                let reward_mod = (safe_r as f32).max(0.1);
-                let lr = controller.learning_rate()
-                    * fep_result.learning_rate_factor
-                    * lr_scale
-                    * reward_mod;
+                // Missing Follow evidence blocks teacher-labelled training and replay insertion.
+                if let Some(target) = target {
+                    // Reward-modulated BPTT: scale gradient by safety reward. Floor at 0.1.
+                    let reward_mod = (safe_r as f32).max(0.1);
+                    let lr = controller.learning_rate()
+                        * fep_result.learning_rate_factor
+                        * lr_scale
+                        * reward_mod;
 
-                controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
+                    controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
 
-                // Replay buffer
-                if replay_cap > 0 {
-                    if replay_buf.len() < replay_cap {
-                        replay_buf.push((sensor_hv.clone(), target));
-                    } else {
-                        replay_buf[replay_idx % replay_cap] = (sensor_hv.clone(), target);
-                    }
-                    replay_idx += 1;
+                    // Replay buffer
+                    if replay_cap > 0 {
+                        if replay_buf.len() < replay_cap {
+                            replay_buf.push((sensor_hv.clone(), target));
+                        } else {
+                            replay_buf[replay_idx % replay_cap] = (sensor_hv.clone(), target);
+                        }
+                        replay_idx += 1;
 
-                    let buf_len = replay_buf.len();
-                    if buf_len > 1 {
-                        for _ in 0..replay_count.min(buf_len) {
-                            replay_rng =
-                                replay_rng.wrapping_mul(6364136223846793005).wrapping_add(1);
-                            let idx = (replay_rng >> 33) as usize % buf_len;
-                            let (ref replay_hv, ref replay_target) = replay_buf[idx];
-                            controller.train_step(replay_hv, replay_target, dt as f32, Some(lr));
+                        let buf_len = replay_buf.len();
+                        if buf_len > 1 {
+                            for _ in 0..replay_count.min(buf_len) {
+                                replay_rng =
+                                    replay_rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+                                let idx = (replay_rng >> 33) as usize % buf_len;
+                                let (ref replay_hv, ref replay_target) = replay_buf[idx];
+                                controller.train_step(replay_hv, replay_target, dt as f32, Some(lr));
+                            }
                         }
                     }
                 }
@@ -534,6 +601,10 @@ impl VehicleTrainer {
             // -- STATE NORMALIZATION (every 100 steps) --
             if step % 100 == 0 && step > 0 {
                 controller.normalize_states();
+            }
+
+            if follow_evidence_unavailable_this_step {
+                follow_evidence_unavailable_steps += 1;
             }
 
             // -- COGNITIVE TICK (every cognitive_interval steps, 50Hz) --
@@ -578,6 +649,7 @@ impl VehicleTrainer {
             avg_heading_error: total_heading_error / n,
             avg_control_effort: total_control_effort / n,
             exploration_count,
+            follow_evidence_unavailable_steps,
             subterranean_navigation_sigma_m,
             subterranean_navigation_updates,
             subterranean_buffered_relays,
@@ -660,7 +732,7 @@ impl VehicleTrainer {
 
         let mut summary = if telemetry_dir.is_some() {
             Some(String::from(
-                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps\n",
+                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,follow_evidence_unavailable_steps,total_steps\n",
             ))
         } else {
             None
@@ -756,7 +828,7 @@ impl VehicleTrainer {
 
                 if let Some(ref mut s) = summary {
                     s.push_str(&format!(
-                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{}\n",
                         ep,
                         metrics.task,
                         metrics.avg_safety_reward,
@@ -767,6 +839,7 @@ impl VehicleTrainer {
                         metrics.avg_heading_error,
                         metrics.avg_control_effort,
                         metrics.exploration_count,
+                        metrics.follow_evidence_unavailable_steps,
                         metrics.total_steps,
                     ));
                 }
