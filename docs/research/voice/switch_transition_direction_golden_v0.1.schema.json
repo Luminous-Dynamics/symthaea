@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_transition_direction_golden_v0.1.schema.json",
+  "title": "Synthetic switch-transition direction vectors",
+  "description": "Structural schema for exact position/from/to transition vectors. Cross-field tuple and metric equations require the fixture evaluator.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "purpose",
+    "matching_policy",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "classification": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "matching_policy": {
+      "type": "string"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference_tags",
+          "predicted_tags",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^D[0-9]+-"
+          },
+          "reference_tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "predicted_tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "reference_transitions",
+              "predicted_transitions",
+              "true_positives",
+              "false_positives",
+              "false_negatives",
+              "precision",
+              "recall",
+              "f1"
+            ],
+            "properties": {
+              "reference_transitions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/transition"
+                }
+              },
+              "predicted_transitions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/transition"
+                }
+              },
+              "true_positives": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "false_positives": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "false_negatives": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "precision": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "recall": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "f1": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "transition": {
+      "type": "object",
+      "required": [
+        "position",
+        "from_language",
+        "to_language"
+      ],
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "from_language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_language": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
