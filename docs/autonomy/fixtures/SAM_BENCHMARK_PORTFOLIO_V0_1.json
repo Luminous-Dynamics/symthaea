@@ -271,6 +271,107 @@
       ]
     },
     {
+      "id": "drivinggen-iclr-2026",
+      "name": "DrivingGen",
+      "category": "generative_driving_world_model_benchmark",
+      "capability_target": [
+        "generated_video_distribution_quality",
+        "automotive_visual_quality",
+        "scene_and_agent_temporal_consistency",
+        "trajectory_plausibility",
+        "ego_trajectory_controllability"
+      ],
+      "protocol": {
+        "kind": "two_track_generative_video_evaluation",
+        "paper_release": "ICLR 2026",
+        "paper_samples_total": 400,
+        "paper_samples_per_track": 200,
+        "tracks": [
+          "open_domain",
+          "ego_conditioned"
+        ],
+        "hosted_dataset_card_eval_examples_per_track": 222,
+        "hosted_dataset_card_total_rows": 22866,
+        "hosted_card_paper_count_difference": "Unresolved: paper says 200 evaluation samples per track; current HF README card says 222 examples per track and the page shows 22,866 rows. Pin dataset repo revision and split/sample IDs; do not assume these counts describe the same unit/release.",
+        "source_datasets_ego_conditioned": [
+          "ZOD",
+          "DrivingDojo",
+          "COVLA",
+          "nuPlan",
+          "Waymo Open Motion Dataset"
+        ],
+        "open_domain_sources": "internet-sourced driving video across global regions",
+        "inference_video_shape": "101 frames at 10 fps, 576x1024 per upstream repository example",
+        "trajectory_extraction": [
+          "UniDepthV2",
+          "visual SLAM",
+          "YOLOv10 agent detection/depth"
+        ]
+      },
+      "metrics": [
+        "FVD",
+        "FTD",
+        "CLIP-IQA+ subjective visual quality",
+        "IEEE P2020 automotive imaging quality",
+        "DINOv3 scene consistency",
+        "agent appearance consistency",
+        "agent disappearance/missing-detection consistency",
+        "LPIPS",
+        "SSIM",
+        "ADE",
+        "FDE",
+        "success rate",
+        "Hausdorff distance",
+        "DTW",
+        "comfort score (jerk, acceleration, yaw rate)",
+        "curvature RMS",
+        "speed score",
+        "velocity consistency",
+        "acceleration consistency"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "code_apache_2_dataset_card_declares_apache_2_source_video_provenance_review_required",
+      "snapshot": {
+        "models_evaluated": 14,
+        "leaderboard_status": "project_website_says_leaderboard_coming",
+        "geographic_coverage_open_domain": {
+          "North_America_percent": 20.7,
+          "East_Asia_and_Pacific_percent": 22.1,
+          "Europe_and_Central_Asia_percent": 26.6,
+          "Middle_East_and_North_Africa_percent": 12.1,
+          "Latin_America_and_Caribbean_percent": 6.3,
+          "South_Asia_percent": 6.8,
+          "Sub_Saharan_Africa_percent": 5.4
+        },
+        "open_domain_weather_percent": {
+          "normal": 51.8,
+          "rain": 22.5,
+          "snow": 13.1,
+          "fog": 12.6
+        },
+        "open_domain_time_of_day_percent": {
+          "day": 50.5,
+          "night": 26.1,
+          "sunrise_sunset": 23.4
+        }
+      },
+      "caveats": [
+        "ICLR 2026 paper reports 400 evaluation clips (200 per track); current Hugging Face dataset card lists 222 eval examples per track and the dataset page displays 22,866 rows. Resolve dataset commit, split semantics and sample IDs before reproduction.",
+        "The benchmark measures video distribution, visual quality, temporal/agent consistency and trajectory alignment. It does not evaluate downstream planner task success or closed-loop driving outcomes.",
+        "Ego and agent trajectories are derived through visual SLAM/depth/detection pipelines; they are not direct ground-truth measurements for every video frame. Report extraction failures and estimator uncertainty.",
+        "Open-domain track draws on internet-sourced videos. Code repository declares Apache-2.0 and dataset card declares Apache-2.0, but preserve source provenance and review third-party footage rights / dataset terms before commercial use or redistribution.",
+        "Sub-Saharan Africa is 5.4% of the paper's open-domain geographic mix; this is not country-specific South African coverage and does not demonstrate right-hand-drive / left-hand-traffic coverage.",
+        "FVD / visual preference scores alone do not establish metric physical correctness, controllability, causal actor response, decision value or safety.",
+        "All figures are author-reported; SAM has not reproduced this benchmark."
+      ],
+      "sources": [
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html",
+        "https://drivinggen-bench.github.io/",
+        "https://github.com/youngzhou1999/DrivingGen",
+        "https://huggingface.co/datasets/yangzhou99/DrivingGen"
+      ]
+    },
+    {
       "id": "fail2drive-2026",
       "name": "Fail2Drive",
       "category": "driving_distribution_shift",
@@ -847,7 +948,8 @@
     "mrsq-icml-2026": "Reduce search-induced optimism/regret at matched compute without worsening tail performance, feasibility or deadlines.",
     "navsim_v2_epdms_2026": "Reproduce the current strongest matched EPDMS baseline first; then improve the aggregate and individual NC/DAC/DDC/TLC/EP/TTC/LK/HC/EC dimensions on sealed slices without worsening worst-family results.",
     "reactsim_bench_2026": "Beat strongest reproduced actor-world-model baselines on matched ego-deviation inputs, preserving AV-agent risk, agent-agent collision, off-road, direction and kinematic feasibility metrics separately; qualify reciprocal online interaction separately.",
-    "sam-traffic-convention-mirror-v0.1": "100% of exact paired geometric/control sign invariants; 100% of missing/stale/map-rule-mismatch negatives reject or remain unresolved; 0 silent inference of traffic side from steering-wheel layout, GPS, map appearance or image pixel orientation."
+    "sam-traffic-convention-mirror-v0.1": "100% of exact paired geometric/control sign invariants; 100% of missing/stale/map-rule-mismatch negatives reject or remain unresolved; 0 silent inference of traffic side from steering-wheel layout, GPS, map appearance or image pixel orientation.",
+    "drivinggen_iclr_2026": "Reproduce the exact 400-paper-sample or separately frozen hosted-card release with pinned sample IDs, then improve worst-stratum scene/agent temporal consistency, automotive imaging quality, trajectory feasibility and ego-control alignment without regressions. Add a distinct decision-value experiment: counterfactual planner outcome and reactive-agent response under matched action/call budgets; do not treat visual scores as downstream safety."
   },
   "global_rules": [
     "No composite score across non-comparable benchmark families.",
