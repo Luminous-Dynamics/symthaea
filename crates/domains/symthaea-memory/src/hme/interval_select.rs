@@ -1040,6 +1040,17 @@ mod tests {
         }
         let mut content_digest = member_set_digest;
         content_digest[31] ^= 0xA5;
+        let member_ids: Vec<String> = (0..member_count)
+            .map(|index| format!("{id}-member-{index:04}"))
+            .collect();
+        let member_payload_digests: Vec<[u8; 32]> = (0..member_count)
+            .map(|index| {
+                let mut digest = member_set_digest;
+                digest[0] ^= index as u8;
+                digest[1] ^= (index >> 8) as u8;
+                digest
+            })
+            .collect();
         GroupScoreIntervalRecord {
             identity: GroupScoreIntervalIdentity {
                 manifest_generation: 1,
@@ -1047,6 +1058,8 @@ mod tests {
                 member_set_digest,
                 content_digest,
             },
+            member_ids,
+            member_payload_digests,
             member_count,
             interval: ContinuousHVScoreInterval { lower, upper },
         }
