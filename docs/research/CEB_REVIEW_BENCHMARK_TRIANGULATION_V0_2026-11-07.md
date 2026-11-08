@@ -190,6 +190,32 @@ Yuan et al.'s **CGARF** (Empirical Software Engineering; published August 22, 20
 **CEB implication:** use it as a downstream secure-code generation comparator and possible cross-lane robustness context, not a direct code-review SOTA row. A future matched experiment could compare whether diagnoses from CEB produce safer repairs, but only after freezing the same source snapshot, security contract, tests/PoCs, model/harness, budget and independent oracle.
 
 
+
+### 2.19 Requirement-conformance over-correction and Fix-guided Verification Filter
+
+Jin and Chen's **Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement** (Automated Software Engineering, published June 26, 2026) constructs paired canonical/buggy implementations from HumanEval, MBPP and QuixBugs: over 700 tasks and over 1,400 instances. It evaluates five models under Direct, Direct+Explain and Full (verdict, rationale, proposed fix) prompting. It reports that richer explanation/repair prompts can substantially increase false rejection of correct implementations. For GPT-4o, FNR rises from 26.2% to 73.2% on HumanEval and 35.9% to 87.9% on MBPP when moving from Direct to Full prompting. Across models under Full prompting, the Fix-guided Verification Filter reduces average FNR from 54.8% to 16.3% on HumanEval, 69.0% to 28.9% on MBPP, and 51.0% to 24.0% on QuixBugs. [Paper](https://doi.org/10.1007/s10515-026-00638-5).
+
+The filter checks the original and proposed fixed implementation against benchmark and specification-constrained tests. Its four outcomes distinguish: both pass/equivalent (the fix was unnecessary), both fail (oracle augmentation or repair remains unresolved), original passes but patch fails (over-repair/regression), and original fails while patch passes (repair-supported). The authors report small FPR increases in some settings; QuixBugs' shallower tests limit the filter's discriminative power. They explicitly acknowledge that canonical solutions and benchmark tests may not fully define the natural-language specification, and prompt semantics can alter the implied review rubric. These caveats matter: an executable patch is a hypothesis, not an independent oracle.
+
+**CEB extension:** require a target witness and a preservation witness for repair-bearing findings, with an independently frozen contract/oracle. Test both false rejection of canonical behavior and false acceptance of mutant behavior. A patch cannot be called verified solely because it passes tests generated from its own rationale.
+
+### 2.20 ReviewGrounder — draft then ground, but in academic peer review
+
+Li et al.'s **ReviewGrounder** (ACL 2026) separates review drafting from an evidence-grounding stage, using explicit paper-specific rubrics and targeted evidence consolidation. Its reported framework uses a Phi-4-14B-based drafter and GPT-OSS-120B-based grounding stage, and outperforms larger backbone baselines on human-judgment alignment and rubric-based review quality across eight dimensions on an academic-paper review benchmark. [ACL Anthology](https://aclanthology.org/2026.acl-long.1477/).
+
+**Scope and limitation:** this is academic peer review, not source-code pull-request review, and its eight rubric dimensions are not CEB metrics. It supports a transferable *pipeline* principle—draft, ground each claim, then adjudicate—not a claim of software-review SOTA.
+
+**CEB extension:** make the grounding stage bind every finding to exact source revision, contract clause, causal claim kind and independent oracle. Keep grounding evidence distinct from the model's own rationale and patch.
+
+### 2.21 Selective conformal judging — calibrate accepted claims, not verbal confidence
+
+The SCOPE work summarized by the HyperMatrix Research Lab uses bidirectional preference entropy (querying both pairwise response orders) and conformal calibration to control the error rate among non-abstained LLM judgments under exchangeability. Its summary reports empirical FDR around 0.097–0.099 at a target alpha of 0.10 and up to 2.4× as many accepted judgments as vanilla baselines. [Research summary](https://hypermatrix.cs.dal.ca/selective-prediction/).
+
+**Scope and limitation:** SCOPE concerns pairwise LLM judging, not code review or causal diagnosis. Its risk guarantee depends on the calibration assumptions and task population; it cannot be imported unaltered across repositories, languages, severities or claim kinds.
+
+**CEB extension:** calibrate acceptance/abstention separately by claim type and severity on a repository-/defect-family-disjoint calibration set. Measure selective risk versus coverage and report group-wise gaps. A judge's confidence, consensus or stable rationale is not itself a finite-sample guarantee.
+
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -301,7 +327,15 @@ These are prospective aspirations, not achievements. Do not pick thresholds afte
 
 Move from **“Did the model point at the bug?”** to **“Can the reviewer discover, explain, evidence, challenge and communicate the defect accurately at the right cost?”** This is a more meaningful engineering standard than optimizing comment count, lexical overlap, pass rate or a single composite leaderboard score.
 
-A further step is to ask **“Which causal conclusions are identifiable from the evidence actually available?”** Require a compatible-model set, claim-specific identifiability disposition and minimum discriminating evidence request. This prevents a coherent but underdetermined graph from being rewarded as a proven cause. The three development levels are I0 unstructured diagnosis, I1 causal topology, and I2 topology plus identifiability. I2 is exploratory and does not change the registered Phase A/B/C hypotheses. Also record the claim kind: source structural possibility, build-world selection, execution realization, actual-cause attribution, interventional-effect identifiability, or incident attribution. These distinctions prevent one evidence type from silently proving a stronger claim.
+A further step is to ask **“Which causal conclusions are identifiable from the evidence actually available?”** Require a compatible-model set, claim-specific identifiability disposition and minimum discriminating evidence request. This prevents a coherent but underdetermined graph from being rewarded as a proven cause. The three development levels are I0 unstructured diagnosis, I1 causal topology, and I2 topology plus identifiability. I2 is exploratory and does not change the registered Phase A/B/C hypotheses. Also record the claim kind: source structural possibility, build-world selection, execution realization, actual-cause attribution, interventional-effect identifiability, or incident attribution. These distinctions prevent one evidence type from silently proving a stronger claim. A further extension asks whether the proposed repair preserves canonical behavior. Require both a target witness and a preservation witness, and compare the original and proposed patch against an independently frozen requirement/oracle. This addresses documented over-rejection of correct code under richer prompts; do not treat the candidate's own generated tests as an independent oracle.
+
+### Preservation-aware repair verification
+
+A review finding must not only identify a target violation; a proposed correction must preserve the nearest valid neighboring behavior. Require a **target witness** and a **preservation witness**, both grounded in the same frozen requirement, plus independent target and preservation oracle plans. Compare three development conditions: P0 verdict only, P1 verdict plus rationale/patch, and P2 dual-witness review. The public six-case preservation challenge is design-only; no candidate code is executed. A patch that passes only the target oracle is not a verified repair, and a correct canonical implementation must not be rejected simply because an agent can imagine a stricter alternative contract.
+
+### Calibrated acceptance and abstention
+
+Use disjoint calibration material to estimate selective risk among accepted claims, then measure risk versus coverage by claim type and severity. Calibrate repository-/defect-family groups separately or report when the exchangeability assumption is implausible. An uncalibrated confidence number, agent consensus, or persuasive explanation is not a guarantee. The SCOPE results are a methodological reference for selective judging, not evidence that its FDR bounds transfer directly to code review.
 
 ### Causal topology as the next research extension
 
@@ -356,5 +390,10 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Orujlu et al., [Partially Observed Structural Causal Models](https://proceedings.mlr.press/v337/orujlu26a.html), UAI 2026, PMLR 337.
 - Yuan et al., [CGARF: a causality-guided framework for reliable automated program repair](https://doi.org/10.1007/s10664-026-10940-1), published August 22, 2026.
 - Shen et al., [SecRepoBench](https://research.google/pubs/secrepobench-benchmarking-code-agents-for-secure-code-completion-in-real-world-repositories/), 2025; [leaderboard and methodology](https://secrepobench.github.io/), accessed November 7, 2026.
+
+- Jin and Chen, [Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement](https://doi.org/10.1007/s10515-026-00638-5), Automated Software Engineering 33, article 90 (June 26, 2026).
+- Li et al., [ReviewGrounder: Improving Review Substantiveness with Rubric-Guided, Tool-Integrated Agents](https://aclanthology.org/2026.acl-long.1477/), ACL 2026.
+- Badshah, Emami and Sajjad, [SCOPE: Selective Conformal Optimized Pairwise LLM Judging](https://hypermatrix.cs.dal.ca/selective-prediction/), ACL 2026; research summary accessed November 8, 2026.
+- Ashby, Nguyen and Luo, [Uncertainty-aware large language models: a scoping review of conformal prediction methods](https://doi.org/10.1098/rsta.2026.0061), Philosophical Transactions of the Royal Society A (August 27, 2026).
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
