@@ -236,6 +236,24 @@ The **in-toto Attestation Framework v1.2** separates predicate, statement, envel
 **CEB implication:** bind support-closure leaves to exact digests and existing receipt/attestation subjects where available. Keep signer identity, builder identity, trust roots and current authorization as separate dependencies. Do not create a parallel CEB receipt or replace #10314/#10370; use their canonical identity and trust contracts.
 
 
+
+### 2.24 Incremental Program Analysis in the Wild — empirical dependency-reuse limits
+
+Wang et al.'s ASE 2025 study constructs a real-world Java program-change benchmark from **4,084 commits across 20 open-source projects** and evaluates two representative incremental program analysis tools. The authors report that incremental analysis can substantially improve efficiency over exhaustive analysis, but the evaluated tools exhibit inconsistencies and markedly higher peak-memory use. They identify gaps in standardized real-world program-change benchmarks and in balanced evaluation metrics. [IEEE publication](https://doi.org/10.1109/ASE63991.2025.00194) · [ASE research-program entry](https://conf.researchr.org/details/ase-2025/ase-2025-papers/211/Incremental-Program-Analysis-in-the-Wild-An-Empirical-Study-on-Real-World-Program-Ch).
+
+**Scope and limitation:** this is incremental program analysis, not engineering-claim validity or CEB-CONTINUITY. Its population is Java; its measured outcomes concern analysis result maintenance, efficiency, consistency and memory. Do not map incremental-analysis efficiency onto stale-evidence safety or claim-disposition accuracy.
+
+**CEB implication:** include consistency and resource costs when studying support-closure updates. An incremental closure implementation must be compared against a clean full recomputation on sampled sequences; a fast update that misses a dependency is worse than an expensive rebuild. Report peak memory and worst-case closure growth, not only mean update time.
+
+### 2.25 DiffCI Open Evidence Study 2026 — change-aware test selection against a cheap path rule
+
+DiffCI's public open study reports a pre-registered historical replay of **2,000 commit deltas across 20 repositories**. Only 29.8% of deltas offered a selective-test opportunity; across the full corpus, the reported test reduction against a path-rule baseline was **4.2%**. The study reports **96.4% versus 70.7% job-level recall** of 280 historical CI failures for DiffCI versus a path rule. Its repository-clustered 95% interval for aggregate reduction was **−4.8% to +47.9%**, crossing zero; the report explicitly says the sample cannot rule out a null population effect. In measurable mutation cases it reports 32/32 detections but states this is not a reliability estimate. It also reports that only three of seven attempted repositories passed canonical suite-green qualification. [Open study and data](https://diffci.com/research/diffci-open-evidence-2026).
+
+**Scope and limitation:** this is a self-published change-aware test-selection study, not an independent CEB benchmark. Historical test/job selection recall is not evidence-disposition recall, claim invalidation precision, or correct selective retain. Its 4.2% whole-corpus reduction is more informative economically than the 94.3% win rate within the 29.8% opportunity bucket. The repository-clustered interval and limited reach must accompany any quoted result.
+
+**CEB implication:** use a cheap path/change heuristic as a required baseline for support-closure computation. C2 must demonstrate that typed semantic dependencies improve *claim validity decisions* over C0 path overlap and C1 continuity dispositions, not simply produce a larger graph or a higher within-opportunity win rate. Include full recomputation as a correctness oracle on a sampled subset; measure incremental cost net of graph construction and evidence retrieval.
+
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -419,5 +437,8 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Bazel team, [Skyframe: Incremental build evaluation](https://bazel.googlesource.com/bazel/+/refs/heads/master/site/en/reference/skyframe.md), accessed November 8, 2026.
 - SLSA, [v1.1 specification](https://slsa.dev/spec/v1.1/), including [provenance](https://slsa.dev/spec/v1.1/provenance) and [artifact verification](https://slsa.dev/spec/v1.1/verifying-artifacts), accessed November 8, 2026.
 - in-toto, [Attestation Framework Specification v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md), accessed November 8, 2026.
+
+- Wang et al., [Incremental Program Analysis in the Wild: An Empirical Study on Real-World Program Changes](https://doi.org/10.1109/ASE63991.2025.00194), ASE 2025.
+- DiffCI, [DiffCI Open Evidence Study 2026](https://diffci.com/research/diffci-open-evidence-2026), published September 3, updated September 25, 2026; self-published open study, accessed November 8, 2026.
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
