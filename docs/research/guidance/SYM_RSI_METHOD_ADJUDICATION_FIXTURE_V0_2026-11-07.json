@@ -1,0 +1,143 @@
+{
+  "schema_version": "sym-rsi-method-adjudication-v0",
+  "status": "SYNTHETIC_POLICY_CONTRACT_NOT_EXPERT_GOLD",
+  "source_issue": "#11006",
+  "purpose": "Define a set-valued, assumption-aware adjudication contract for method selection at B3. Method labels are descriptive identifiers, not exact-match gold answers.",
+  "policy": {
+    "exact_method_name_match_required": false,
+    "accept_multiple_admissible_methods": true,
+    "accept_novel_method_if_independently_justified": true,
+    "reject_unsupported_assumptions": true,
+    "reject_infeasible_resource_plan": true,
+    "abstention_or_escalation_allowed": true,
+    "adjudicator_must_be_blinded_to_agent_identity": true
+  },
+  "admissibility_dimensions": [
+    {
+      "id": "objective_alignment",
+      "description": "Method can produce the required scientific answer or artifact for the task objective."
+    },
+    {
+      "id": "assumption_support",
+      "description": "Assumptions are explicit and supported by available evidence, or tested before reliance."
+    },
+    {
+      "id": "data_and_measurement_fit",
+      "description": "Method is compatible with the actual data modality, quantity, quality and measurement process."
+    },
+    {
+      "id": "identifiability",
+      "description": "Method can identify or bound the target under the stated observations; non-identifiability is acknowledged."
+    },
+    {
+      "id": "resource_feasibility",
+      "description": "Method and implementation fit the frozen compute, experiment, time and human-review envelope."
+    },
+    {
+      "id": "falsifiability",
+      "description": "Method yields discriminating predictions, counterexamples or validation tests."
+    },
+    {
+      "id": "artifact_and_reproducibility",
+      "description": "Method produces the required artifacts and a reproducible execution path."
+    },
+    {
+      "id": "claim_scope",
+      "description": "Conclusions do not exceed the method's validity envelope or the supplied evidence."
+    }
+  ],
+  "decision_outcomes": [
+    "VALID_ADMISSIBLE_METHOD",
+    "VALID_ALTERNATIVE_METHOD",
+    "INVALID_ASSUMPTION",
+    "UNSUPPORTED_BY_EVIDENCE",
+    "INFEASIBLE_RESOURCE_PLAN",
+    "NON_IDENTIFIABLE_ACKNOWLEDGED",
+    "UNDERDETERMINED_ESCALATE",
+    "INVALID_OUTPUT_OR_EXECUTION"
+  ],
+  "evidence_requirements": [
+    "method family and implementation identity",
+    "explicit assumptions and applicability envelope",
+    "data and measurement compatibility statement",
+    "predicted intermediate observations and failure modes",
+    "resource estimate bound to the frozen budget",
+    "required artifact list and reproducibility details",
+    "evidence and validation results supporting each material claim"
+  ],
+  "synthetic_cases": [
+    {
+      "case_id": "MSET-SYN-001",
+      "status": "SYNTHETIC_KNOWN_FUNCTION_NOT_EXPERT_GOLD",
+      "objective": "Estimate and rank an unknown smooth scalar response over a one-dimensional design domain using a small, fixed measurement budget, then predict values for unmeasured designs.",
+      "facts": {
+        "domain": "x in [0,1]",
+        "response_definition": "f(x) = sin(2*pi*x) + 0.3*x",
+        "measurement_budget": 12,
+        "observed_designs": 6,
+        "required_outputs": [
+          "predictions for a frozen held-out grid",
+          "uncertainty or error summary",
+          "reproducible method artifact"
+        ],
+        "data_modality": "scalar observations with declared Gaussian measurement noise",
+        "evaluation_truth": "held outside the candidate researcher; available only to independent fixture evaluator"
+      },
+      "admissible_method_families": [
+        {
+          "method_id": "MSET-SYN-001-A",
+          "family": "Gaussian process regression",
+          "assumptions": [
+            "response is sufficiently smooth for the chosen kernel over the domain",
+            "noise model is correctly specified or sensitivity-tested"
+          ],
+          "failure_modes": [
+            "kernel misspecification",
+            "poor calibration under sparse or nonstationary behavior"
+          ],
+          "required_checks": [
+            "held-out prediction error",
+            "uncertainty calibration or coverage",
+            "sensitivity to kernel/noise assumptions"
+          ]
+        },
+        {
+          "method_id": "MSET-SYN-001-B",
+          "family": "regularized spline regression",
+          "assumptions": [
+            "spline basis can represent the function at the resolution required by the task",
+            "regularization is selected without access to held-out truth"
+          ],
+          "failure_modes": [
+            "underfitting from excessive regularization",
+            "boundary artifacts or overfitting from insufficient regularization"
+          ],
+          "required_checks": [
+            "held-out prediction error",
+            "regularization sensitivity",
+            "residual structure and boundary diagnostics"
+          ]
+        }
+      ],
+      "expected_disposition": "Accept either method family if its assumptions, resource plan, validation evidence and output artifact satisfy the task contract. Do not require exact method-ID match.",
+      "prohibited_inferences": [
+        "one method family is universally superior",
+        "a plausible method narrative proves the method was executed",
+        "held-out truth may be used to select hyperparameters",
+        "a prediction score alone proves the assumptions are valid"
+      ],
+      "evidence_to_request": [
+        "chosen method and implementation digest",
+        "assumption-to-evidence map",
+        "predeclared hyperparameter-selection procedure",
+        "execution trace and resource receipt",
+        "predictions and held-out evaluation receipt"
+      ]
+    }
+  ],
+  "limitations": [
+    "This synthetic case tests the policy contract, not human expert agreement or real scientific performance.",
+    "Admissibility depends on task-specific assumptions and evidence; the listed methods are not declared universally valid.",
+    "A novel method may be accepted if independent reviewers establish its applicability and evidence, even if it is absent from the prelisted examples."
+  ]
+}

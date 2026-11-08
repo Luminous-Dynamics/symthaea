@@ -1,0 +1,118 @@
+{
+  "schema_version": "sym-rsi-guidance-withdrawal-manifest-v0",
+  "status": "DESIGN_ONLY_NOT_PREREGISTERED",
+  "authored_date": "2026-11-07",
+  "owner_issue": "#11006",
+  "purpose": "Pin the external ASI-Bench project-level methodology-withdrawal comparator and define a non-official Symthaea research-autonomy evaluation boundary.",
+  "upstream": {
+    "repository": "apexin-ai/ASI-Bench",
+    "url": "https://github.com/apexin-ai/ASI-Bench",
+    "release": "0.3.0",
+    "commit": "eb60952124b90e9f0886c1212bf7463e26d0bc19",
+    "commit_url": "https://github.com/apexin-ai/ASI-Bench/commit/eb60952124b90e9f0886c1212bf7463e26d0bc19",
+    "paper": "https://arxiv.org/abs/2608.17271",
+    "license": "Apache-2.0",
+    "pinned_files": [
+      {
+        "path": "README.md",
+        "git_blob_sha": "2da047e28862a933c4c163fc595bd397baf492bd",
+        "purpose": "release scope, reported benchmark coverage, B1-B4 definitions and official execution guidance"
+      },
+      {
+        "path": "pyproject.toml",
+        "git_blob_sha": "5d84bcb430b94994fadf65af744f47e7a91d1f37",
+        "purpose": "release version and package/runtime interface"
+      },
+      {
+        "path": "LICENSE",
+        "git_blob_sha": "df1bcc49b91d0ab9d65e328c73be2b76e6a927dd",
+        "purpose": "upstream project license"
+      }
+    ],
+    "reported_scope": {
+      "project_level_tasks": 60,
+      "scientific_domains": 11,
+      "evaluated_agent_model_configurations": 18,
+      "reported_interaction_turns_over": 2600,
+      "reported_execution_steps_over": 2400,
+      "reported_agent_execution_hours_over": 35,
+      "note": "Counts are project-reported release metadata, not independently remeasured by Symthaea."
+    }
+  },
+  "guidance_levels": [
+    {
+      "id": "B1",
+      "information": "Scientific background, method, equations and full procedure.",
+      "required_capability": "Implement and execute the prescribed approach."
+    },
+    {
+      "id": "B2",
+      "information": "Intended method and relevant constraints, without the full procedure.",
+      "required_capability": "Translate a method into a working research workflow."
+    },
+    {
+      "id": "B3",
+      "information": "Objective, data, constraints and required outputs only.",
+      "required_capability": "Select the method, construct the workflow and validate the result independently."
+    },
+    {
+      "id": "B4",
+      "information": "B3 plus factually correct, non-essential context.",
+      "required_capability": "Perform the same autonomous research while resisting distraction."
+    }
+  ],
+  "invariants": [
+    "The task objective, input data, constraints, required artifacts and scoring criteria remain fixed across B1-B4.",
+    "Only permitted methodological guidance changes between B1-B3; B4 adds context documented as factually correct and non-essential.",
+    "The same Agent×Model, harness, tools, context budget policy, total compute/token budget and evaluator revision are matched across all four levels unless an imbalance is explicitly reported.",
+    "The benchmark's exact upstream prompts, task revisions and artifact contracts are pinned before an external-comparability claim.",
+    "Task-level raw scores and validity results are reported separately for every guidance level.",
+    "A legitimate alternative method must be evaluated against its assumptions and task objective; method-name exact match is not a substitute for scientific validity.",
+    "B4 distraction effects are interpreted with paired task evidence and a context audit, not from a pooled score alone.",
+    "Local public seed31415 scoring and private-reference seed42 official submissions are separate claim tiers.",
+    "The displayed public leaderboard is not treated as a final official baseline until maintainers publish reviewed official aggregates.",
+    "Guidance autonomy, scientific validity, research taste, cross-family transfer and recursive improvement are distinct claims."
+  ],
+  "data_seeds": {
+    "seed31415": {
+      "purpose": "Public local-reference scoring for reproducible development.",
+      "official_submission": false
+    },
+    "seed42": {
+      "purpose": "Private-reference official scoring through the documented portal.",
+      "official_submission": true,
+      "requirements": "Use only the benchmark's documented OS-sandbox and verified-submission process; do not claim official scoring from local seed31415 results."
+    }
+  },
+  "leaderboard_status": {
+    "status": "PUBLIC_PAGE_SNAPSHOT_NOT_FINAL_OFFICIAL_BASELINE",
+    "source": "https://asibench.apexin.ai/faq/",
+    "note": "The FAQ describes the displayed website data as a repo-verified/conservative snapshot and states that the final public official baseline has not yet been published."
+  },
+  "symthaea_claims": {
+    "planned_outputs": [
+      "B1-B4 per-task score and valid-artifact vector",
+      "B1-to-B2, B2-to-B3 and B3-to-B4 paired changes",
+      "method-selection validity and assumption/applicability audit",
+      "execution and artifact reproducibility",
+      "claim-to-evidence integrity",
+      "B4 context distraction audit",
+      "total inclusive cost and human intervention",
+      "fresh-family and fresh-domain transfer"
+    ],
+    "excluded_claims": [
+      "official ASI-Bench leaderboard standing",
+      "human-level scientific research",
+      "scientific discovery from benchmark compatibility alone",
+      "R4 recursive self-improvement"
+    ]
+  },
+  "composition": {
+    "research_taste_issue": 10877,
+    "direction_board_issue": 9230,
+    "evaluator_integrity_issue": 10756,
+    "adaptive_benchmark_issue": 9332,
+    "causal_attribution_issue": 10717,
+    "r4_issue": 10497
+  }
+}
