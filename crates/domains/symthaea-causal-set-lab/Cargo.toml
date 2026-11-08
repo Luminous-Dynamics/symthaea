@@ -33,3 +33,7 @@ path = "examples/curved_frw_sweep.rs"
 [[example]]
 name = "curved_order_inversion"
 path = "examples/curved_order_inversion.rs"
+
+[[example]]
+name = "link_sampling_bias_reference"
+path = "examples/link_sampling_bias_reference.rs"
