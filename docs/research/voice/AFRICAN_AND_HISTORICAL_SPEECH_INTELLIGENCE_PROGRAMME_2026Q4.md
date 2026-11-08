@@ -378,3 +378,17 @@ Sources:
 - Research paper: https://arxiv.org/abs/2608.26434
 
 The previously identified paper/card discrepancies in size, language count, split and licence remain. This reconciliation is additive: preserve the prior observation, mark the access-state difference, and re-check instead of silently overwriting history.
+
+
+## 16. Shared switch-metric golden vectors
+
+The programme now includes a cross-implementation synthetic fixture set:
+- [`switch_metric_golden_v0.1.json`](./switch_metric_golden_v0.1.json) — ten frozen token-level cases for WER, PIER, SETER and SPER@k.
+- [`switch_metric_golden_v0.1.schema.json`](./switch_metric_golden_v0.1.schema.json) — JSON Schema Draft 2020-12.
+- Parent contract: [#11082 — VOICE-METRIC-VECTORS-001](https://github.com/Luminous-Dynamics/symthaea/issues/11082).
+
+The fixtures include PIER insertions, the trailing-final-POI rule, all-POI and no-POI references, switch-entry deletions/substitutions, overlapping SPER windows, no-switch non-estimability and empty-reference failures.
+
+A separate JavaScript checker reproduced the documented dynamic-programming tie-break and metric formulas; all ten expected cases matched. This is an arithmetic/fixture consistency check only. It is not an execution of the Rust modules, a differential test against RapidFuzz, or a real-data benchmark result.
+
+The machine-readable benchmark matrix registers the fixture set and labels it `SYNTHETIC_ONLY_FORMULA_CHECKED_NOT_RUST_EXECUTED`.
