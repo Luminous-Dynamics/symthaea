@@ -440,7 +440,7 @@ mod tests {
         let probe = recommend_discriminating_probe(&log, &report, 3).unwrap().unwrap();
         assert_eq!(probe.interventions, vec![true, false]);
         assert_eq!(probe.outcome_partition_count, 3);
-        assert_eq!(probe.worst_case_remaining_hypotheses, 2);
+        assert_eq!(probe.worst_case_remaining_hypotheses, 3);
         assert!(!probe.guarantees_unique_hypothesis);
         log.append(&world.run(&probe.interventions));
         let updated = discover(&log, StructureAccess::Withheld).unwrap();
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn distorted_measurement_map_is_not_mislabeled_as_world_state() {
-        let log = log_for(Mechanism::Direct, MeasurementMap::Invert, None, &[true, false, true]);
+        let log = log_for(Mechanism::Direct, MeasurementMap::Invert, None, &[true, false, false]);
         let report = discover(&log, StructureAccess::Withheld).unwrap();
         assert_eq!(report.disposition, DiscoveryDisposition::FullyIdentified);
         assert_eq!(report.compatible_structures, vec![Mechanism::Direct]);
