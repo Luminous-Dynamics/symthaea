@@ -84,3 +84,39 @@ The differentiation hypothesis is the cross-system, mission-level acceptance cha
 5. Feed only measured, calibrated, rights-cleared physical service traces from the staged LOS-18 test programme into the same contract.
 
 Skipped, queued, missing or stale CI evidence is not PASS.
+
+
+## 8. Product-level industry baseline
+
+This benchmark must not misrepresent existing marine maintenance and condition-monitoring products:
+
+- **Kongsberg K-Fleet Maintenance** is already a type-approved planned-maintenance system with calendar/hour-counter planning, class surveys/jobs/certificates, E0 survey items, electrical megger-test reports, dry-docking specifications, traceable circulating components, work history, overdue/critical-equipment reporting, postponed-reason tracking and integration with K-Fleet Purchase.
+- **Kongsberg Condition Monitoring (K-CMS)** describes analysis of vital onboard equipment, including third-party machinery, with condition-based maintenance support and a Health Management service in which specialists review findings and provide recommendations.
+- **Wärtsilä Expert Insight** combines vessel data, AI-based and rule-based anomaly detection, expert analysis and recommendations through a ship/shore collaboration application.
+
+These published capabilities mean we cannot claim to invent maintenance scheduling, equipment condition monitoring, anomaly detection, class-job tracking, traceable components, expert recommendations or digital ship/shore collaboration. Public product pages do not disclose matched, independent performance datasets for the end-to-end metrics proposed here; feature descriptions are not proof of comparative accuracy or superiority.
+
+### Narrow differentiation hypothesis
+
+The present Rust module is not a fleet-management product. It is a small, deterministic, independently auditable evaluator for:
+- non-compensating service-floor outcomes across multiple essential services;
+- event-time exposure below owner-declared delivery floors;
+- service-specific shortfall integrals with no summation across incompatible units;
+- TASR ending only at a tested, configuration-updated, authorized restoration;
+- rejection of releases unsupported by the declared maintenance, spares, competence and test gates.
+
+The potential product differentiation is the **portable verification boundary** between multiple existing systems: telemetry/condition-monitoring, PMS/work orders, inventory/parts, competence records, post-repair testing, configuration management and service-level mission objectives. It is a hypothesis, not an asserted vendor capability gap. Vendors may have internal implementations not visible in public documentation.
+
+### Fair vendor comparison protocol
+
+A later comparison must use permissioned, anonymized records and map each system's source-native semantics into a shared, versioned event contract without losing source provenance. For the same fault episodes, compare separately:
+1. anomaly detection lead time, precision/recall and false-negative rate against independently adjudicated fault onset;
+2. recommended action, evidence presented, human acceptance/rejection and time to decision;
+3. time spent awaiting compatible spares, qualified crew, tools, access/workspace and specialist support;
+4. time from repair completion to passing post-test, configuration update and authorized return to service;
+5. service-floor breach duration, deficit and TASR by service criticality;
+6. data completeness, event-latency, configuration/revision correctness, auditability and export/interoperability cost.
+
+Match fault definitions, sensor coverage, vessel/system boundary, component revision, crew/parts assumptions, operating regime, evidence quality and observation horizon. Include all faults and unsuccessful or censored episodes; do not cherry-pick only detected anomalies or successful interventions. A vendor that does not expose an event or evidence field is scored as unavailable/unknown for that metric, not assigned a zero or presumed failure.
+
+No comparative result can be inferred from public marketing pages. No superiority claim is permitted until both sides are evaluated on the same adjudicated episodes under equivalent information and operational constraints.
