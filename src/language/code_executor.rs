@@ -1,10 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Code Executor — Sandboxed compilation and test execution
+//! Code Executor — simulation and explicit host-opt-in execution
 //!
 //! Closes the code generation feedback loop: generate → compile → test → learn.
-//! Uses `infrastructure::sandbox::Sandbox` for safe command execution.
+//! Real execution launches allowlisted programs on the host; it is not an OS isolation boundary.
 //!
 //! # Pipeline
 //!
@@ -141,7 +141,7 @@ impl ExecutionResult {
     }
 }
 
-/// Sandboxed code executor for compilation and testing
+/// Code executor that defaults to simulation and can explicitly opt into host execution.
 pub struct CodeExecutor {
     sandbox: Sandbox,
     /// Temporary directory for writing source files
@@ -158,7 +158,11 @@ impl CodeExecutor {
         Self { sandbox, work_dir }
     }
 
-    /// Create an executor that actually runs commands.
+    /// Create an executor that runs allowlisted commands directly on the host.
+    ///
+    /// This is not a secure sandbox and must not be used for untrusted repository-controlled
+    /// builds, tests, macros, generated programs, or patches. Use only with trusted inputs
+    /// until an independently qualified OS isolation backend is available.
     pub fn with_real_execution() -> Self {
         let mut sandbox = Sandbox::new()
             .with_timeout(Duration::from_secs(30))
@@ -190,17 +194,14 @@ impl CodeExecutor {
         let patch_file = self.work_dir.join("fix.patch");
         std::fs::write(&patch_file, patch_content).map_err(|e| e.to_string())?;
 
-        self.sandbox.allow_command("bash");
         self.sandbox.allow_command("patch");
 
-        let cmd = format!(
-            "cd {} && patch -p1 < {}",
-            repo_path.display(),
-            patch_file.display()
-        );
+        // Pass the repository path as the process working directory, not as shell text.
+        // The patch utility receives its input file through argv; no shell is involved.
+        let patch_path = patch_file.to_string_lossy();
         let result = self
             .sandbox
-            .run("bash", &["-c", &cmd])
+            .run_in("patch", &["-p1", "-i", patch_path.as_ref()], repo_path)
             .map_err(|e| e.to_string())?;
 
         if result.success() {
@@ -212,12 +213,11 @@ impl CodeExecutor {
 
     pub fn execute_workspace_tests(&mut self, repo_path: &std::path::Path) -> ExecutionResult {
         let start = std::time::Instant::now();
-        self.sandbox.allow_command("bash");
         self.sandbox.allow_command("cargo");
 
-        let cmd = format!("cd {} && cargo test", repo_path.display());
-
-        match self.sandbox.run("bash", &["-c", &cmd]) {
+        // Run Cargo with a structured working directory. Repository paths remain path
+        // data and can never be interpreted as shell syntax.
+        match self.sandbox.run_in("cargo", &["test"], repo_path) {
             Ok(result) => {
                 if !result.success() {
                     let errors = parse_compile_errors(&result.stderr);
