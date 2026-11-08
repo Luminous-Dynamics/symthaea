@@ -71,9 +71,25 @@ fn string_set(values: &[Value], context: &str) -> Result<BTreeSet<String>, Contr
     Ok(result)
 }
 
+
+fn string_vec(values: &[Value], context: &str) -> Result<Vec<String>, ContractError> {
+    let mut result = Vec::with_capacity(values.len());
+    let mut seen = BTreeSet::new();
+    for item in values {
+        let value = item
+            .as_str()
+            .ok_or_else(|| ContractError(format!("{context} must contain only strings")))?;
+        if !seen.insert(value.to_owned()) {
+            return Err(ContractError(format!("{context} contains duplicate {value}")));
+        }
+        result.push(value.to_owned());
+    }
+    Ok(result)
+}
+
 fn normalized_probability_rows(
     rows: &[Value],
-    outcome_count: usize,
+    expected_outcomes: &[String],
     hypothesis_ids: &BTreeSet<String>,
     context: &str,
 ) -> Result<(), ContractError> {
@@ -90,11 +106,21 @@ fn normalized_probability_rows(
                 "{context} contains duplicate row for {hypothesis_id}"
             )));
         }
-        let probabilities = array(row, "outcome_probabilities")?;
-        if probabilities.len() != outcome_count {
+        let declared_order = string_vec(
+            array(row, "outcome_order")?,
+            &format!("{context}/{hypothesis_id} outcome_order"),
+        )?;
+        if declared_order != expected_outcomes {
             return Err(ContractError(format!(
-                "{context}/{hypothesis_id} has {} probabilities for {outcome_count} outcomes",
-                probabilities.len()
+                "{context}/{hypothesis_id} outcome_order differs from the experiment's declared outcome order"
+            )));
+        }
+        let probabilities = array(row, "outcome_probabilities")?;
+        if probabilities.len() != expected_outcomes.len() {
+            return Err(ContractError(format!(
+                "{context}/{hypothesis_id} has {} probabilities for {} outcomes",
+                probabilities.len(),
+                expected_outcomes.len()
             )));
         }
         let mut total = 0.0;
@@ -288,22 +314,22 @@ pub fn validate_contract(value: &Value) -> Result<(), ContractError> {
 
     let experiments = array(value, "experiments")?;
     let mut experiment_ids = BTreeSet::new();
-    let mut outcome_map = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut outcome_map = BTreeMap::<String, Vec<String>>::new();
     for experiment in experiments {
         let id = string(experiment, "id")?;
         if !experiment_ids.insert(id.to_owned()) {
             return Err(ContractError(format!("duplicate experiment ID {id}")));
         }
-        let outcomes = string_set(array(experiment, "outcomes")?, &format!("{id} outcomes"))?;
+        let outcomes = string_vec(array(experiment, "outcomes")?, &format!("{id} outcomes"))?;
         if outcomes.len() < 2 {
             return Err(ContractError(format!(
                 "{id} requires at least two outcomes"
             )));
         }
-        outcome_map.insert(id.to_owned(), outcomes);
+        outcome_map.insert(id.to_owned(), outcomes.clone());
         normalized_probability_rows(
             array(experiment, "point_likelihoods")?,
-            array(experiment, "outcomes")?.len(),
+            &outcomes,
             &hypothesis_ids,
             &format!("{id} point likelihoods"),
         )?;
@@ -339,10 +365,12 @@ pub fn validate_contract(value: &Value) -> Result<(), ContractError> {
                     "scenario {id} duplicates experiment {experiment_id}"
                 )));
             }
-            let outcome_count = outcome_map[experiment_id].len();
+            let outcome_order = outcome_map.get(experiment_id).ok_or_else(|| {
+                ContractError(format!("experiment {experiment_id} has no outcome ordering"))
+            })?;
             normalized_probability_rows(
                 array(matrix, "likelihoods")?,
-                outcome_count,
+                outcome_order,
                 &hypothesis_ids,
                 &format!("{id}/{experiment_id} likelihoods"),
             )?;
@@ -548,5 +576,22 @@ mod tests {
         assert!(((nominal_evsi + conservative_evsi) / 2.0 - 0.775).abs() < 1.0e-12);
     }
 
+
+
+    #[test]
+    fn likelihood_probability_vector_must_bind_exact_outcome_order() {
+        let mut value = example();
+        value["likelihood_scenarios"][0]["experiments"][0]["likelihoods"][0]["outcome_order"] =
+            serde_json::json!(["not_reproduced", "reproduced"]);
+        assert!(validate_contract(&value).is_err());
+    }
+
+    #[test]
+    fn point_likelihood_probability_vector_must_bind_exact_outcome_order() {
+        let mut value = example();
+        value["experiments"][0]["point_likelihoods"][0]["outcome_order"] =
+            serde_json::json!(["not_reproduced", "reproduced"]);
+        assert!(validate_contract(&value).is_err());
+    }
 
 }
