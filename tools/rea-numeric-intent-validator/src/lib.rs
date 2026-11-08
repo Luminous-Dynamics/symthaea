@@ -1036,8 +1036,7 @@ mod tests {
         let mut profile_value: Value = serde_json::from_slice(&profile).unwrap();
         profile_value["numeric_paths"][0]["quantity_kind_ref"] =
             json!("urn:example:quantity:length");
-        profile_value["numeric_paths"][0]["unit_code_ref"] =
-            json!("urn:example:unit:metre");
+        profile_value["numeric_paths"][0]["unit_code_ref"] = json!("urn:example:unit:metre");
         let profile_body = profile_body_without_digest(&profile_value).unwrap();
         profile_value["profile_sha256"] = json!(jcs_sha256(&profile_body).unwrap());
 
@@ -1049,7 +1048,9 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            report.path_results[0].unit_quantity_reference_status.as_deref(),
+            report.path_results[0]
+                .unit_quantity_reference_status
+                .as_deref(),
             Some("unresolved_authority_reference_not_validated")
         );
         assert_eq!(
