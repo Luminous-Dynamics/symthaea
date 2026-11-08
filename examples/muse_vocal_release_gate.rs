@@ -449,8 +449,11 @@ fn main() -> Result<()> {
         .parse()
         .context("invalid --minimum-listeners")?;
     let source_revision = source_revision(&args)?;
-    std::fs::create_dir_all(&output)?;
-    let salt = blind_salt(&args, &output)?;
+    let blind_output = output.join("blind");
+    let private_output = output.join("private");
+    std::fs::create_dir_all(&blind_output)?;
+    std::fs::create_dir_all(&private_output)?;
+    let salt = blind_salt(&args, &private_output)?;
 
     let mut kokoro = KokoroSingingEngine::load(&voice)?;
     let mut formant = FormantSingingEngine::default();
@@ -510,7 +513,7 @@ fn main() -> Result<()> {
             case_id,
             case,
             &salt,
-            &output,
+            &blind_output,
             &mut clips,
             &mut key,
             &mut objective,
@@ -521,7 +524,7 @@ fn main() -> Result<()> {
             case_id,
             case,
             &salt,
-            &output,
+            &blind_output,
             &mut clips,
             &mut key,
             &mut objective,
@@ -533,7 +536,7 @@ fn main() -> Result<()> {
                 case_id,
                 case,
                 &salt,
-                &output,
+                &blind_output,
                 &mut clips,
                 &mut key,
                 &mut objective,
@@ -553,29 +556,29 @@ fn main() -> Result<()> {
         cases: case_receipts,
     };
     std::fs::write(
-        output.join("run_manifest.json"),
+        private_output.join("run_manifest.json"),
         serde_json::to_vec_pretty(&run_manifest)?,
     )?;
 
     if let Some(manifest) = reference_manifest {
-        import_references(&manifest, &salt, &output, &mut clips, &mut key)?;
+        import_references(&manifest, &salt, &blind_output, &mut clips, &mut key)?;
     }
 
     // Deterministic IDs conceal the backend; sort by ID so presentation order
     // does not reveal alternating render order.
     clips.sort_by(|a, b| a.clip_id.cmp(&b.clip_id));
     std::fs::write(
-        output.join("blind_manifest.json"),
+        blind_output.join("blind_manifest.json"),
         serde_json::to_vec_pretty(&clips)?,
     )?;
     std::fs::write(
-        output.join("private_backend_key.json"),
+        private_output.join("private_backend_key.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
             "format_version": 2, "salt": salt, "entries": key
         }))?,
     )?;
     std::fs::write(
-        output.join("objective_report.json"),
+        private_output.join("objective_report.json"),
         serde_json::to_vec_pretty(&objective)?,
     )?;
 
@@ -585,7 +588,7 @@ fn main() -> Result<()> {
         "lyric_words_understood": null, "lyric_words_total": c.lyrics.split_whitespace().count()
     })).collect();
     std::fs::write(
-        output.join("ratings.template.json"),
+        blind_output.join("ratings.template.json"),
         serde_json::to_vec_pretty(&rating_template)?,
     )?;
 
@@ -644,10 +647,13 @@ fn main() -> Result<()> {
         });
     }
     std::fs::write(
-        output.join("release_status.json"),
+        private_output.join("release_status.json"),
         serde_json::to_vec_pretty(&status)?,
     )?;
     println!("{}", serde_json::to_string_pretty(&status)?);
+    eprintln!("Blind listener bundle: {}", blind_output.display());
+    eprintln!("Private evaluator receipts: {}", private_output.display());
+    eprintln!("Share only the blind/ directory with listeners.");
     Ok(())
 }
 
