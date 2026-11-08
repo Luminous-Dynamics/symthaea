@@ -9,8 +9,9 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use symthaea_rea_compat::{EvidenceError, canonical_jcs_bytes, sha256_hex, verify_evidence_json};
 use symthaea_rea_investigator::{
-    EvidenceOrigin, EvidenceProvenance, ExperimentProposal, Hypothesis, InvestigationPlan,
-    PlannerConfig, PlannerError, plan_next_experiment,
+    Authorization, CostWeights, EvidenceOrigin, EvidenceProvenance, ExperimentProposal,
+    Hypothesis, InvestigationPlan, PlannerConfig, PlannerError, TargetImpact,
+    plan_next_experiment,
 };
 
 const LINEAGE_SCHEMA: &str = "luminous.rea.planner-lineage-declaration.v0";
@@ -185,6 +186,9 @@ pub struct VerifiedEvidenceCatalog {
 pub struct VerifiedPlannerRun {
     pub plan: InvestigationPlan,
     pub admission: AdmissionReport,
+    /// Canonical digest of the exact planner inputs and admitted lineage/raw digests.
+    /// This binds a request; it is not a planner-run receipt or signature.
+    pub planner_request_sha256: String,
 }
 
 impl VerifiedEvidenceCatalog {
@@ -360,6 +364,84 @@ impl VerifiedEvidenceCatalog {
         }
     }
 
+
+    fn planner_request_digest(
+        &self,
+        hypotheses: &[Hypothesis],
+        experiments: &[ExperimentProposal],
+        config: PlannerConfig,
+    ) -> Result<String, AdmissionError> {
+        fn authorization(value: Authorization) -> &'static str {
+            match value {
+                Authorization::Unknown => "unknown",
+                Authorization::Denied => "denied",
+                Authorization::Authorized => "authorized",
+            }
+        }
+        fn impact(value: TargetImpact) -> &'static str {
+            match value {
+                TargetImpact::ReadOnlyObservation => "read_only_observation",
+                TargetImpact::TemporaryConfiguration => "temporary_configuration",
+                TargetImpact::ServiceRestart => "service_restart",
+                TargetImpact::DataMutation => "data_mutation",
+                TargetImpact::PhysicalActuation => "physical_actuation",
+            }
+        }
+
+        let payload = json!({
+            "schema": "luminous.rea.verified-planner-request.v0",
+            "lineage_manifest_sha256": self.lineage_manifest_sha256,
+            "admitted_evidence": self.records.values().map(|record| json!({
+                "evidence_id": record.evidence_id,
+                "semantic_sha256": record.semantic_sha256,
+                "raw_file_sha256": record.raw_file_sha256,
+                "declared_origin": record.declared_origin,
+                "parent_evidence_ids": record.parent_evidence_ids,
+                "source_family_id": record.source_family_id,
+            })).collect::<Vec<_>>(),
+            "hypotheses": hypotheses.iter().map(|hypothesis| json!({
+                "id": hypothesis.id,
+                "prior_probability": hypothesis.prior_probability,
+                "supporting_evidence_ids": hypothesis.supporting_evidence_ids,
+                "contradicting_evidence_ids": hypothesis.contradicting_evidence_ids,
+            })).collect::<Vec<_>>(),
+            "experiments": experiments.iter().map(|experiment| json!({
+                "id": experiment.id,
+                "outcomes": experiment.outcomes,
+                "likelihoods": experiment.likelihoods.iter().map(|row| json!({
+                    "hypothesis_id": row.hypothesis_id,
+                    "outcome_probabilities": row.outcome_probabilities,
+                })).collect::<Vec<_>>(),
+                "authorization": authorization(experiment.authorization),
+                "reversible": experiment.reversible,
+                "destructive": experiment.destructive,
+                "target_impact": impact(experiment.target_impact),
+                "estimated_time_seconds": experiment.estimated_time_seconds,
+                "estimated_energy_joules": experiment.estimated_energy_joules,
+                "estimated_risk": experiment.estimated_risk,
+            })).collect::<Vec<_>>(),
+            "planner_config": {
+                "max_time_seconds": config.max_time_seconds,
+                "max_energy_joules": config.max_energy_joules,
+                "max_risk": config.max_risk,
+                "cost_weights": {
+                    "time": config.cost_weights.time,
+                    "energy": config.cost_weights.energy,
+                    "risk": config.cost_weights.risk,
+                },
+                "max_target_impact": impact(config.max_target_impact),
+                "minimum_information_gain_bits": config.minimum_information_gain_bits,
+            }
+        });
+        let canonical = canonical_jcs_bytes(&payload).map_err(|error| {
+            AdmissionError::new(
+                AdmissionErrorKind::RawEvidenceRejected,
+                format!("planner request canonicalization failed: {error}"),
+            )
+        })?;
+        Ok(sha256_hex(&canonical))
+    }
+
     /// Project verified IDs into the existing planner type. Origin remains a
     /// caller declaration; this method does not authenticate a source or origin.
     pub fn planner_provenance_projection(&self) -> Vec<EvidenceProvenance> {
@@ -466,11 +548,14 @@ pub fn plan_next_experiment_from_verified_evidence(
     config: PlannerConfig,
 ) -> Result<VerifiedPlannerRun, AdmissionError> {
     catalog.validate_hypothesis_references(hypotheses)?;
+    let planner_request_sha256 =
+        catalog.planner_request_digest(hypotheses, experiments, config)?;
     let evidence = catalog.planner_provenance_projection();
     let plan = plan_next_experiment(&evidence, hypotheses, experiments, config)?;
     Ok(VerifiedPlannerRun {
         plan,
         admission: catalog.report(),
+        planner_request_sha256,
     })
 }
 
@@ -896,6 +981,57 @@ mod tests {
         assert!(catalog
             .validate_hypothesis_source_family_independence(&[hypothesis])
             .is_ok());
+    }
+
+
+    #[test]
+    fn planner_request_digest_is_deterministic_and_binds_cost_config() {
+        let catalog = one_record(DeclaredEvidenceOrigin::IndependentObservation);
+        let hypothesis = Hypothesis {
+            id: "h1".to_owned(),
+            prior_probability: 1.0,
+            supporting_evidence_ids: vec![golden_id()],
+            contradicting_evidence_ids: Vec::new(),
+        };
+        let config = PlannerConfig::default();
+        let first = catalog
+            .planner_request_digest(&[hypothesis.clone()], &[], config)
+            .unwrap();
+        let repeated = catalog
+            .planner_request_digest(&[hypothesis.clone()], &[], config)
+            .unwrap();
+        assert_eq!(first, repeated);
+
+        let mut changed = config;
+        changed.cost_weights = CostWeights {
+            time: config.cost_weights.time + 0.25,
+            energy: config.cost_weights.energy,
+            risk: config.cost_weights.risk,
+        };
+        let changed_digest = catalog
+            .planner_request_digest(&[hypothesis], &[], changed)
+            .unwrap();
+        assert_ne!(first, changed_digest);
+    }
+
+    #[test]
+    fn planner_run_exposes_request_binding_without_claiming_run_attestation() {
+        let catalog = one_record(DeclaredEvidenceOrigin::IndependentObservation);
+        let hypothesis = Hypothesis {
+            id: "h1".to_owned(),
+            prior_probability: 1.0,
+            supporting_evidence_ids: vec![golden_id()],
+            contradicting_evidence_ids: Vec::new(),
+        };
+        let result = plan_next_experiment_from_verified_evidence(
+            &catalog,
+            &[hypothesis],
+            &[],
+            PlannerConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(result.planner_request_sha256.len(), 64);
+        assert!(result.planner_request_sha256.bytes().all(|byte| byte.is_ascii_hexdigit()));
     }
 
 }
