@@ -324,7 +324,13 @@ fn validate_assessment(assessment: &Assessment, fixture_id: &str) -> Result<(), 
         ) && check
             .evidence_ref
             .as_deref()
-            .is_none_or(|value| !assessment.evidence.acquisition_evidence_refs.contains(&value.to_owned()))
+            .is_none_or(|value| {
+                !assessment
+                    .evidence
+                    .acquisition_evidence_refs
+                    .iter()
+                    .any(|reference| reference == value)
+            })
         {
             return Err(ValidationError::new(
                 format!("{path}.acquisition.checks[{index}].evidence_ref"),
@@ -533,7 +539,8 @@ fn derive_reference(
 fn outcome_matches_derived(outcome: &DerivedOutcome, supplied: &DerivedAxis) -> bool {
     supplied.consumer_disposition == outcome.consumer_disposition
         && supplied.candidate_admitted == outcome.candidate_admitted
-        && supplied.reason_codes.as_slice() == [outcome.reason_code]
+        && supplied.reason_codes.len() == 1
+        && supplied.reason_codes[0] == outcome.reason_code
 }
 
 fn outcome_matches_expected(outcome: &DerivedOutcome, expected: &ExpectedOutcome) -> bool {
