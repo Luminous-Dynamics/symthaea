@@ -54,7 +54,7 @@ Do not infer evidence transfer from branch names, commit messages, patch similar
 
 **Initial state:** A reviewed source change has commit C and tree T. A behavioral claim C1 is scoped to source tree T, contract P and configuration W. A provenance claim C2 is scoped to the exact artifact produced from commit C.
 
-**Branch events:** The branch is rebased and squash-merged. The resulting commit identifier is C-prime. The relevant source tree remains byte-identical to T, but no new build provenance for C-prime is supplied.
+**Branch events:** The branch is rebased and squash-merged. The resulting commit identifier is C-prime. The relevant source tree remains byte-identical to T, so the tree identity is unchanged, but no new build provenance for C-prime is supplied.
 
 **Claims:** C1 is a source-behavior claim. C2 is an artifact/provenance claim.
 
