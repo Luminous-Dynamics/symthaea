@@ -1290,7 +1290,10 @@ mod tests {
                 vec![],
             ],
         };
-        let (dag, _) = build_qbf_game_proof_dag(&problem, &prefix(2, vec![]), budget()).unwrap();
+        let constrained_prefix =
+            prefix(2, vec![block(Quantifier::Exists, &[0, 1])]);
+        let (dag, _) =
+            build_qbf_game_proof_dag(&problem, &constrained_prefix, budget()).unwrap();
         assert_eq!(dag.nodes[dag.root].residual.len(), 1);
         assert!(dag.nodes[dag.root].residual[0].is_empty());
         assert!(!dag.nodes[dag.root].value);
