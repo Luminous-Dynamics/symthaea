@@ -283,6 +283,48 @@ The targets are prospective objectives. No current Symthaea or Symtropy measurem
 - **Claim boundary:** these are Waymo-reported, geography-, exposure-, case-definition- and methodology-dependent operational comparisons. They do not establish SAM performance, do not compare directly with simulation leaderboard scores, and do not establish a universal safety rate for other ODDs or jurisdictions. Reproduce from the data hub's downloadable datasets, dynamic benchmark methodology, release notes and outcome definitions before an independent comparison.
 - **Sources:** [Waymo Safety Impact data hub](https://waymo.com/safety/impact/), [September 24, 2026 release](https://blog.waymo.com/blog/shorts/safetydata-september26/).
 
+## 7. Compositional evidence ladder — how to compare systems without conflating claims
+
+The current industry landscape contains benchmarks at different points in the autonomy evidence chain. A result at one rung does not establish capability at the next.
+
+| Evidence rung | What it can establish | Current comparator / SAM owner | What it does not establish |
+|---|---|---|---|
+| **1. Generative scene fidelity** | Whether a world model generates visually plausible, temporally consistent, controllable video and plausible extracted trajectories | DrivingGen (ICLR 2026); scene evidence contract #11109 | Correct metric state, causal response, planner success or safety |
+| **2. Planning under pseudo-simulation** | Whether proposed ego trajectories score well against real-scene and precomputed follow-up evidence | NAVSIM v2 / EPDMS | Reciprocal actor replanning or true intervention outcomes |
+| **3. Ego-conditioned reactive actors** | Whether other-agent models respond plausibly/feasibly to supplied ego deviations | ReactSim-Bench | A jointly replanning ego+traffic policy loop |
+| **4. Reciprocal closed-loop interaction** | Whether ego and surrounding agents mutually respond at each tick, with policies and environment coupled | Symtropy #3532 and its exact scenario/causal-actor harness | Real-road transfer or deployment-rate safety |
+| **5. Decision quality and runtime assurance** | Whether world-model use improves action feasibility, counterfactual regret, fallback validity, deadline performance and safe abstention | SAM #10237, #10256, #10257, #10320, #10012; NIST MAVS Tier 1–4 | Statistical operational safety across a public-road ODD |
+| **6. Operational outcomes** | Crash / injury rates per exposure under a specified live deployment ODD and benchmark methodology | Waymo Safety Impact (company-reported); independent fleet evidence where available | Transfer to a different system, geography, law, vehicle or ODD |
+
+### The strategic gap to target
+
+Do not compete by maximizing FVD, EPDMS, ReactSim collision counts or a single composite score in isolation. Build a **decision-coupled world model** whose outputs remain valid as they cross the evidence ladder:
+
+1. generate future-scene hypotheses with persistent actor identity and explicit uncertainty;
+2. admit only the portions with traceable frame, time, calibration and metric evidence;
+3. produce action-conditioned actor prediction sets and preserve unknown / occluded space;
+4. test whether a selected action remains feasible across the admitted set, not only under the most likely rollout;
+5. request another observation, reduce speed, enter a minimal-risk manoeuvre or abstain when the decision boundary is not supported;
+6. measure whether these mechanisms reduce counterfactual decision regret and tail risk at the same compute, inference-time and action-call budget.
+
+### Required matched experiment matrix
+
+For each world-model or planner comparison, freeze the following before scoring: model/checkpoint/build digest, dataset revision and sample IDs, observation privilege, reference-frame and rule-profile identities, scenario seeds, other-agent policy, action-set completeness, rollout horizon, simulator/evaluator version, inference compute, p95/p99 latency and resource budget.
+
+Report the complete denominator and each metric family independently. Keep missing, unsupported, censored, timeout, invalid and failed outcomes distinct. Use paired scenario seeds for ablations and cluster-aware uncertainty intervals for repeated scenes / routes.
+
+Core ablations:
+- direct planner vs planner + world model;
+- point prediction vs calibrated prediction set;
+- single best hypothesis vs multi-hypothesis / unknown-preserving scene;
+- fixed rollout depth vs action-conditioned horizon and discrepancy-triggered stop;
+- always-act vs decision-sensitive measure-more / abstain / fallback;
+- one model vs ensemble with pessimistic value aggregation (MRS.Q as an external search-bias comparator);
+- nominal-only vs weather/lighting/sensor/traffic-side/jurisdiction shifts;
+- static/log-replay actors vs reactive actors vs reciprocal re-planning actors.
+
+The primary success criterion is **downstream decision improvement without weakening feasibility, uncertainty calibration, tail-family performance, deadline guarantees or fallback integrity**. Visual quality is a supporting metric, never a safety surrogate.
+
 ## 8. Registry status semantics
 
 - `upstream_reported`: published by benchmark/model authors.
