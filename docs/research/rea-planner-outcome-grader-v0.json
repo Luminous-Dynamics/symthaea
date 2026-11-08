@@ -54,7 +54,9 @@
         }
       ],
       "realized_hypothesis_id": "hypothesis_a",
-      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input."
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
     },
     {
       "case_id": "REA-POA-002",
@@ -101,7 +103,9 @@
         }
       ],
       "realized_hypothesis_id": "hypothesis_b",
-      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input."
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
     },
     {
       "case_id": "REA-POA-004",
@@ -148,7 +152,9 @@
         }
       ],
       "realized_hypothesis_id": "hypothesis_a",
-      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input."
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
     },
     {
       "case_id": "REA-POA-008",
@@ -197,7 +203,9 @@
         }
       ],
       "realized_hypothesis_id": "hypothesis_b",
-      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input."
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
     },
     {
       "case_id": "REA-POA-013",
@@ -244,7 +252,9 @@
         }
       ],
       "realized_hypothesis_id": "hypothesis_b",
-      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input."
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
     },
     {
       "case_id": "REA-POA-012",
@@ -287,7 +297,9 @@
         }
       ],
       "realized_hypothesis_id": "hypothesis_a",
-      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input."
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": false,
+      "not_testable_reason": "All candidates in this negative-control case have a single declared outcome; no distinct categorical likelihood model can be represented without changing the source case contract."
     }
   ]
 }
