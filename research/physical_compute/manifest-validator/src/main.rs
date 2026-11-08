@@ -35,9 +35,12 @@ fn main() -> ExitCode {
         for error in report.errors {
             eprintln!("ERROR: {error}");
         }
-        eprintln!("SEMANTIC_INVALID");
+        eprintln!("MANIFEST_SEMANTIC_SUBSET_INVALID");
         return ExitCode::FAILURE;
     }
+
+    eprintln!("MANIFEST_SEMANTIC_SUBSET_VALID");
+    eprintln!("JSON_SCHEMA_VALIDATION_REQUIRED: this CLI does not run a Draft 2020-12 schema validator");
 
     let value: serde_json::Value = match serde_json::from_str(&input) {
         Ok(value) => value,
@@ -63,6 +66,9 @@ fn main() -> ExitCode {
     };
     let receipt = serde_json::json!({
         "receipt_version": "1.0.0",
+        "json_schema_validation": "not_performed_by_rust_cli",
+        "semantic_validation": "passed_subset",
+        "replay_scope": "domain_outage_only",
         "result_kind": "preflight_only",
         "scenario_id": scenario_id,
         "manifest_sha256": report.canonical_sha256,
