@@ -50,6 +50,9 @@ Unit tests mutate the canonical fixture to test rejection of:
 - covariance dimension mismatch;
 - observed-free regions without source evidence;
 - duplicate hypothesis identity (while allowing multiple hypotheses on one track lineage);
+- remote cooperative claim or simulator oracle used as local track evidence;
+- local sensor incorrectly placed in cooperative-advisory or simulator-truth references;
+- V2X source mislabeled as a local sensor;
 - predictions referring to unknown tracks;
 - out-of-order snapshot clock fields;
 - LHT/RHT profile and lane-side mismatches;
