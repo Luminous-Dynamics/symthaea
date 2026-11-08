@@ -89,7 +89,7 @@ impl FiniteEnumeratorBaseline {
                 },
             ));
         }
-        let horizon = view.remaining_probe_actions.min(3).max(1);
+        let horizon = view.remaining_probe_actions.clamp(1, 3);
         let recommendation = numeric::recommend_discriminating_probe(&log, &report, horizon)
             .map_err(|error| PolicyError::ProbeFailure(error.to_string()))?;
         match recommendation.and_then(|result| result.interventions.first().copied()) {
