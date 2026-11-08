@@ -379,6 +379,25 @@ Use disjoint calibration material to estimate selective risk among accepted clai
 
 A five-link chain remains the minimum explanation. For multi-path, stateful and concurrent defects, compare that baseline with a typed graph that represents AND-gated interactions, OR alternative routes, temporal partial orders and residual path reachability after intervention. The graph is a falsifiable mechanism contract, not a decorative dependency map. See [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) and its six public synthetic development cases.
 
+
+### Prospective CEB benchmark targets — not achieved results
+
+Use these as a staged target ladder. They are aspirations for future preregistered, matched studies, not present Symthaea performance or safety claims.
+
+| Capability | Prospective target | Correct industry comparison | Qualification condition |
+|---|---|---|---|
+| **CEB-REVIEW core** | defect Recall@5 ≥ 0.85; actionable precision ≥ 0.80; reviewer burden ≥ 20% lower at non-inferior recall | ReviewBench grounded high-severity F1/precision/recall, plus CR-Bench-v2 KDDR and Usefulness Rate on separate matched subsets | Preserve the three existing CEB primary measures; common tasks, denominators, model/harness/tool budgets and independent adjudication |
+| **Matched industry improvement** | +5 percentage points on a compatible quality measure at equal all-in cost, or ≥20% lower all-in cost at non-inferior quality | ReviewBench/CR-Bench-v2/SecPRBench, only on genuinely compatible task slices | Paired repository-clustered inference; do not translate unmatched benchmark scores |
+| **Security causal diagnosis** | ≥85% correct target-mechanism diagnosis on a matched security slice | SecPRBench direct-review top reported recall 78.1% (265 tasks); its 68% wrong-mechanism/file-localization result is the diagnostic target | Same introduction-state, source evidence, judge protocol, failure denominator and budget; 85% is an aspiration, not a claimed result |
+| **Known-defect detection + comment utility** | KDDR ≥45% while usefulness ≥90% on a matched CR-Bench-style slice | CR-Bench-v2 verified slice: best reported KDDR ≈33.7%, usefulness ≈72.6% for GPT-5-mini Reflexion in the cited comparison | Preserve the single-known-defect denominator and use independent judge/human audit; KDDR is not defect Recall@5 |
+| **Preservation-aware repair** | ≥95% canonical acceptance; ≥95% target-mutant detection; ≥90% of repair-bearing findings carry valid target and preservation witnesses; zero critical over-repair events in the adjudicated critical slice | Jin & Chen's paired canonical/buggy conformance study and Fix-guided Verification Filter | Diagnostic targets only, not new CEB primary metrics; independent contract/oracles and repository-/defect-family-disjoint cases |
+| **Risk-controlled acceptance** | one-sided 95% upper FDR bound ≤5% for ordinary accepted claims and ≤1% for critical claims; ≥70% coverage on eligible non-critical claims after risk qualification | SCOPE as selective-judging methodology only; no direct code-review score equivalence | Disjoint development/calibration/confirmatory sets, cluster/exchangeability checks, absolute counts; at zero observed errors the planning examples require 59 and 299 independent accepted calibration claims respectively |
+| **CEB-CONTINUITY** | ≥20% lower revalidation cost than reset-and-recheck at non-inferior sequence correctness; zero stale-evidence use on the predeclared high-severity controls | SWE-Milestone, SWE-CI, ASE incremental program analysis, DiffCI change-aware test selection and Bazel/Skyframe | Use the existing seven CEB-CONTINUITY primary measures; full-cost accounting, clean-recomputation oracle and sequence/repository clustering |
+| **Claim-support closure** | C2 (typed support closure) beats both C0 path overlap and C1 existing continuity dispositions on false-retain/stale-evidence safety without increasing false invalidation; incremental updates agree with clean recomputation on sampled sequences | Bazel reverse-transitive invalidation/change pruning, ASE IPA and DiffCI as contextual analogues | Do not add a metric lane; score with existing CEB-CONTINUITY metrics and secondary closure/witness annotations |
+
+**Interpretation:** CEB should aim to beat the strongest compatible baseline, not the largest number visible on any nearby leaderboard. A 90% source-only diagnosis rate cannot be compared with 78.1% execution-validated security review; 95% canonical acceptance cannot be averaged with KDDR; and FDR/coverage cannot be folded into reviewer precision. Publish a Pareto view across quality, safety, coverage, cost, latency and human burden, plus every failed/unresolved denominator.
+
+
 ## 8. Reuse and integration boundaries
 
 - #10419 continues to own the CEB-REVIEW capability/task profile and primary metric contract.
