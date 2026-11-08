@@ -359,7 +359,7 @@ Use [CEB Review Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVI
 
 The protocol's four development policy arms (S0 accept-all, S1 verbal-confidence threshold, S2 disagreement/evidence route, S3 calibrated selective policy) compose with the existing sequential evidence policy and human escalation. They add no scheduler, primary metric, task schema, receipt or oracle authority. Report risk/coverage with absolute counts, one-sided bounds, claim-kind/severity strata, and the exchangeability/cluster assumptions. Where calibration is inadequate, automatic acceptance remains uncertified and claims are escalated.
 
-This is a design proposal, not a current CEB risk guarantee or a registered confirmatory Phase A/B/C hypothesis. The example sample sizes (59 for a 5% bound and 299 for a 1% bound with zero errors at one-sided 95% confidence) are planning illustrations under independent/exchangeable Bernoulli assumptions; do not apply them to correlated prompt variants or clustered defects without a valid analysis.
+This is a design proposal, not a current CEB risk guarantee or a registered confirmatory Phase A/B/C hypothesis. It is complemented by the [Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), an extension to #10630 that makes each claim's evidence, assumptions, authority, environment and evaluator dependencies explicit. It introduces no second evidence ledger or repository graph. The example sample sizes (59 for a 5% bound and 299 for a 1% bound with zero errors at one-sided 95% confidence) are planning illustrations under independent/exchangeable Bernoulli assumptions; do not apply them to correlated prompt variants or clustered defects without a valid analysis.
 
 
 ## 12.9 Claim-support closure extension to CEB-CONTINUITY
@@ -369,6 +369,15 @@ Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CE
 The extension asks whether every consequential claim has a complete enough support closure to justify selective retain/revalidate/invalidate/supersede/unresolved decisions after a change event. It requires an impact witness for affected claims and an unaffectedness witness for retained claims, with the open-world remainder explicit. The static validator checks only document structure; it does not implement a repository graph or prove real claim invalidation.
 
 The eight public cases compose source edits, shared dependencies, feature/build transitions, verifier-only changes, authority-root revocation, incomplete closure under metadata-only change, circular claim support and omitted contradictory evidence. They remain public development cases, not admitted sequences or sealed holdout tasks. Any C0/C1/C2 comparisons are exploratory and must reuse #10630's evaluation unit and existing CEB-CONTINUITY primary metrics registered under #10632. Compare C0 path-overlap, C1 the existing continuity process, and C2 support-closure-aware impact analysis against a sampled clean full-recomputation oracle. Charge full closure construction, evidence ingestion, update cost and peak memory; do not report marginal update time alone. C2 should reduce stale retention without increasing false invalidation, preserve sequence-complete rate and the existing ≥20% revalidation-cost aspiration versus reset-and-recheck. The latter target is not a new metric and must be evaluated under #10630's paired, cluster-aware design.
+
+
+## 12.9 Claim-support closure and selective invalidation
+
+Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its six-case [development challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and separate [public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) as an extension of CEB-CONTINUITY-001 (#10630).
+
+The extension asks reviewers to make selective invalidation auditable by recording a typed claim-support closure and, for each event, an impact witness or unaffectedness witness. The existing #10630 dispositions and #10610 rerun/regrade/reuse rules remain authoritative. It adds no CEB metric, task schema, receipt, DSSE envelope, repository graph or generic dependency engine.
+
+Compare C0 path heuristic, C1 the existing continuity baseline and C2 support-closure reasoning on identical public development sequences. This is exploratory; the six public cases are not independent statistical samples or sealed holdout material. Missing closure dependencies must not be converted into retain. No executable repository graph evaluation is authorized by this addition; #10064 and #10369 gates remain unchanged.
 
 ## 13. Claim boundary
 
