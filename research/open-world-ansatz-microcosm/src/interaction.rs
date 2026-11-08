@@ -24,8 +24,10 @@ pub const FACTORIAL_DESIGN: [[i64; 2]; 9] = [
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Structure {
-    /// The second controllable variable is irrelevant.
-    SingleInput,
+    /// Only the first controllable variable matters.
+    SingleInputU,
+    /// Only the second controllable variable matters.
+    SingleInputV,
     /// Both variables matter, but their effects are separable.
     AdditiveTwoInput,
     /// The effect of one variable depends on the value of the other.
@@ -52,13 +54,28 @@ pub struct ModelHypothesis {
 
 impl ModelHypothesis {
     pub fn validate(&self) -> Result<(), InteractionError> {
-        if !BIAS_VALUES.contains(&self.bias) || !COEFFICIENT_VALUES.contains(&self.weight_u) {
+        if !BIAS_VALUES.contains(&self.bias) {
             return Err(InteractionError::InvalidCoefficient);
         }
         match self.structure {
-            Structure::SingleInput if self.weight_v == 0 && self.interaction_weight == 0 => Ok(()),
+            Structure::SingleInputU
+                if COEFFICIENT_VALUES.contains(&self.weight_u)
+                    && self.weight_v == 0
+                    && self.interaction_weight == 0 =>
+            {
+                Ok(())
+            }
+            Structure::SingleInputV
+                if self.weight_u == 0
+                    && COEFFICIENT_VALUES.contains(&self.weight_v)
+                    && self.interaction_weight == 0 =>
+            {
+                Ok(())
+            }
             Structure::AdditiveTwoInput
-                if COEFFICIENT_VALUES.contains(&self.weight_v) && self.interaction_weight == 0 =>
+                if COEFFICIENT_VALUES.contains(&self.weight_u)
+                    && COEFFICIENT_VALUES.contains(&self.weight_v)
+                    && self.interaction_weight == 0 =>
             {
                 Ok(())
             }
@@ -159,7 +176,8 @@ pub fn candidate_models(access: StructureAccess) -> Vec<ModelHypothesis> {
     let structures = match access {
         StructureAccess::Supplied(structure) => vec![structure],
         StructureAccess::Withheld => vec![
-            Structure::SingleInput,
+            Structure::SingleInputU,
+            Structure::SingleInputV,
             Structure::AdditiveTwoInput,
             Structure::BilinearInteraction,
         ],
@@ -170,13 +188,24 @@ pub fn candidate_models(access: StructureAccess) -> Vec<ModelHypothesis> {
         for bias in BIAS_VALUES {
             for weight_u in COEFFICIENT_VALUES {
                 match structure {
-                    Structure::SingleInput => candidates.push(ModelHypothesis {
+                    Structure::SingleInputU => candidates.push(ModelHypothesis {
                         structure,
                         bias,
                         weight_u,
                         weight_v: 0,
                         interaction_weight: 0,
                     }),
+                    Structure::SingleInputV => {
+                        for weight_v in COEFFICIENT_VALUES {
+                            candidates.push(ModelHypothesis {
+                                structure,
+                                bias,
+                                weight_u: 0,
+                                weight_v,
+                                interaction_weight: 0,
+                            });
+                        }
+                    }
                     Structure::AdditiveTwoInput => {
                         for weight_v in COEFFICIENT_VALUES {
                             candidates.push(ModelHypothesis {
@@ -312,11 +341,9 @@ fn closed_form_signature(model: &ModelHypothesis) -> Result<Vec<i64>, Interactio
         value = value
             .checked_add(model.weight_u * u)
             .ok_or(InteractionError::ArithmeticOverflow)?;
-        if model.structure != Structure::SingleInput {
-            value = value
-                .checked_add(model.weight_v * v)
-                .ok_or(InteractionError::ArithmeticOverflow)?;
-        }
+        value = value
+            .checked_add(model.weight_v * v)
+            .ok_or(InteractionError::ArithmeticOverflow)?;
         if model.structure == Structure::BilinearInteraction {
             value = value
                 .checked_add(model.interaction_weight * u * v)
@@ -349,6 +376,9 @@ pub fn recommend_discriminating_probe(
 
     let mut best: Option<ProbeRecommendation> = None;
     for intervention in FACTORIAL_DESIGN {
+        if log.interventions.contains(&intervention) {
+            continue;
+        }
         let mut partitions: BTreeMap<i64, usize> = BTreeMap::new();
         for model in &report.compatible_models {
             *partitions.entry(model.predict(intervention)?).or_insert(0) += 1;
@@ -470,11 +500,12 @@ mod tests {
         let log = world.run(&[[1, 1], [-1, -1]]).unwrap();
         let report = discover(&log, StructureAccess::Withheld).unwrap();
 
-        assert_eq!(report.compatible_models.len(), 4);
+        assert_eq!(report.compatible_models.len(), 5);
         assert_eq!(
             report.compatible_structures,
             vec![
-                Structure::SingleInput,
+                Structure::SingleInputU,
+                Structure::SingleInputV,
                 Structure::AdditiveTwoInput,
                 Structure::BilinearInteraction
             ]
@@ -483,25 +514,38 @@ mod tests {
     }
 
     #[test]
-    fn one_factorial_probe_breaks_the_collinear_alias() {
+    fn adaptive_factorial_probes_break_collinear_alias_without_repeating_queries() {
         let world = InteractionWorld::new(bilinear_truth()).unwrap();
         let mut log = world.run(&[[1, 1], [-1, -1]]).unwrap();
         let report = discover(&log, StructureAccess::Withheld).unwrap();
-        let probe = recommend_discriminating_probe(&log, &report)
+        let first_probe = recommend_discriminating_probe(&log, &report)
             .unwrap()
             .unwrap();
 
-        assert_eq!(probe.outcome_partition_count, 4);
-        assert_eq!(probe.worst_case_remaining_models, 1);
-        assert!(probe.guarantees_unique_model);
+        assert_eq!(first_probe.outcome_partition_count, 4);
+        assert_eq!(first_probe.worst_case_remaining_models, 2);
+        assert!(!first_probe.guarantees_unique_model);
+        assert!(!log.interventions.contains(&first_probe.intervention));
 
-        log.append(&world.run(&[probe.intervention]).unwrap());
+        log.append(&world.run(&[first_probe.intervention]).unwrap());
+        let intermediate = discover(&log, StructureAccess::Withheld).unwrap();
+        assert_eq!(intermediate.compatible_models.len(), 2);
+
+        let second_probe = recommend_discriminating_probe(&log, &intermediate)
+            .unwrap()
+            .unwrap();
+        assert!(!log.interventions.contains(&second_probe.intervention));
+        assert_eq!(second_probe.outcome_partition_count, 2);
+        assert_eq!(second_probe.worst_case_remaining_models, 1);
+        assert!(second_probe.guarantees_unique_model);
+
+        log.append(&world.run(&[second_probe.intervention]).unwrap());
         let updated = discover(&log, StructureAccess::Withheld).unwrap();
         assert_eq!(updated.compatible_models, vec![bilinear_truth()]);
     }
 
     #[test]
-    fn full_factorial_oracle_identifies_every_declared_candidate() {
+    fn full_factorial_oracle_identifies_every_declared_candidate_and_variable_role() {
         let classes = oracle_equivalence_classes().unwrap();
         assert_eq!(
             classes.len(),
