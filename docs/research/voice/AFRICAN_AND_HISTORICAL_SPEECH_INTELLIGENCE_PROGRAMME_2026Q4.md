@@ -322,3 +322,8 @@ The matrix now contains nine tracks:
 9. depth-aware multilingual adaptation and retention.
 
 The JSON Schema includes explicit structural fields for adaptation arms, labelled-hour budgets, required outputs and language profiles. Structural validation is not rights validation or evidence that the proposed model has been trained or evaluated.
+
+
+### 12.4 Output fidelity diagnostics for generative speech systems
+
+The same switch-aware study flags blank output, truncation, degenerate repetition, length expansion and prompt leakage. These are system-output fidelity diagnostics, not substitutes for WER, PIER or semantic evaluation. Explicit provider finish/stop metadata should be preserved when available; text-length heuristics must be identified as heuristics rather than confirmed truncation. The nine-track matrix now includes these per-utterance flags and rates in the code-switch and semantic lanes.
