@@ -22,7 +22,7 @@ A review claim can therefore be correct for one branch tip and false, out of sco
 
 **Paradigm shift:** move from linear evidence freshness to **branch-scoped evidence validity over a version-control history DAG**. CEB should ask not only whether evidence is current, but *for which lineage, branch tip, configuration, policy epoch and time interval it is admissible*.
 
-This is an evaluation adapter over existing repository-twin and evidence-continuity facts. It is **not a new repository graph**, a Git implementation, a dependency engine, an evidence ledger, a task schema, a receipt or a scheduler.
+The Git commit DAG is the version-control ancestry input; it is not the CEB repository dependency graph and does not establish semantic dependency. This is an evaluation adapter over existing repository-twin and evidence-continuity facts. It is **not a new repository graph**, a Git implementation, a dependency engine, an evidence ledger, a task schema, a receipt or a scheduler.
 
 ## 2. Research distinction and comparator boundary
 
@@ -129,7 +129,7 @@ The companion challenge contains eight synthetic anchors:
 - BHC-S07: global authority revocation versus branch-scoped policy/configuration change;
 - BHC-S08: missing second parent and incomplete ancestry require unresolved, not retain.
 
-The public answer key is deliberately separate for annotation workflow convenience, but it is **not secure blinding**. These cases are public synthetic development anchors, not independent statistical tasks, admitted tasks, a sealed holdout or evidence of candidate performance. They must never be counted as eight independent confirmatory observations.
+The public answer key is deliberately separate for annotation workflow convenience, but it is **not secure blinding**. These cases are public synthetic development anchors, are not independent statistical tasks, and are **not a sealed holdout** or evidence of candidate performance. They must never be counted as eight independent confirmatory observations.
 
 ## 7. Development experiment and clean oracle
 
@@ -206,7 +206,7 @@ Two reviewers must independently annotate the public development pack before see
 
 Before those gates are qualified, permissible work is limited to protocol authoring, synthetic non-executable cases, annotation guidance, static validators, matched baseline definitions and design-only analysis. No candidate-controlled code, build, test, PoC, repair, runtime trace, graph engine, grader or performance evaluation is run by this tranche.
 
-This extension adds no primary metric, task schema, release manifest, receipt, DSSE envelope, generic dependency engine, evidence ledger or scheduler. It is an annotation/evaluation adapter over existing CEB owners.
+This extension creates **not a new metric lane** and adds no primary metric, task schema, release manifest, receipt, DSSE envelope, generic dependency engine, evidence ledger or scheduler. It is an annotation/evaluation adapter over existing CEB owners.
 
 ## 11. Acceptance and claim boundary
 
