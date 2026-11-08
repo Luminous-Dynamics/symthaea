@@ -604,7 +604,9 @@
         "likelihood_misspecification_sensitivity",
         "paired_episode_seed_identity",
         "predicted_decision_information_gain_nats",
-        "posterior_optimal_decision_entropy"
+        "posterior_optimal_decision_entropy",
+        "mean_predicted_decision_eig_nats",
+        "optimal_decision_posterior_entropy"
       ],
       "negative_controls": [
         "high_eig_zero_evsi_irrelevant_probe",
@@ -613,7 +615,10 @@
         "truth_outside_agent_likelihood_support_rejected",
         "matched_vs_misspecified_likelihood",
         "high_model_eig_zero_decision_information_gain",
-        "targeted_decision_information_vs_evsi_divergence"
+        "targeted_decision_information_vs_evsi_divergence",
+        "model_eig_vs_decision_eig_separation",
+        "targeted_decision_eig_ignores_cost_while_evsi_declines",
+        "decision_information_data_processing_inequality"
       ],
       "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
     },
@@ -1229,7 +1234,8 @@
       "apply_latency_ns",
       "butterfly_angle_parameter_count",
       "dense_matrix_parameter_count",
-      "decision_information_gain_nats"
+      "decision_information_gain_nats",
+      "mean_predicted_decision_eig_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1334,7 +1340,9 @@
       "orthogonal_mixer_basis_spread_control_error",
       "high_model_eig_zero_decision_information_gain",
       "decision_information_vs_model_information_gap",
-      "targeted_decision_eig_policy_selection_error"
+      "targeted_decision_eig_policy_selection_error",
+      "decision_information_data_processing_inequality_violation_rate",
+      "targeted_decision_policy_cost_ignorance_guardrail"
     ],
     "efficiency": [
       "diagnostic_probes",
