@@ -20,3 +20,7 @@ path = "examples/manifest_demo.rs"
 [[example]]
 name = "theory_prediction_coverage"
 path = "examples/theory_prediction_coverage.rs"
+
+[[example]]
+name = "model_discrimination_reference"
+path = "examples/model_discrimination_reference.rs"
