@@ -623,19 +623,14 @@ impl VocalPerformance {
         }
         Ok(())
     }
-    /// Evaluate the canonical score-conditioned pitch target at an absolute time.
-    ///
-    /// Portamento is interpolated in log-frequency (uniform cents), resets
-    /// after an explicit score rest, and vibrato uses the frozen per-syllable
-    /// onset/rate/depth controls. Renderers apply their own attack/release
-    /// envelopes around this shared musical target; evaluators use the same
-    /// target so control adherence is not scored against a different curve.
-    pub fn target_pitch_at(&self, time_s: f32) -> Option<f32> {
+    fn pitch_control_at(
+        &self,
+        time_s: f32,
+    ) -> Option<(f32, &VocalSyllable, &Note)> {
         if !time_s.is_finite() || time_s < 0.0 {
             return None;
         }
         const REST_EPSILON_S: f32 = 0.000_01;
-        const VIBRATO_ONSET_RAMP_S: f32 = 0.05;
         let mut previous_frequency: Option<f32> = None;
         let mut previous_end_s = 0.0f32;
 
@@ -662,27 +657,49 @@ impl VocalPerformance {
                     } else {
                         note.frequency
                     };
-                    if syllable.vibrato_depth_cents <= 0.0 || syllable.vibrato_rate_hz <= 0.0 {
-                        return Some(center_frequency);
-                    }
-                    let vibrato_start =
-                        note_start + note.duration * syllable.vibrato_onset.clamp(0.0, 1.0);
-                    if time_s < vibrato_start {
-                        return Some(center_frequency);
-                    }
-                    let onset_gate =
-                        ((time_s - vibrato_start) / VIBRATO_ONSET_RAMP_S).clamp(0.0, 1.0);
-                    let phase = std::f32::consts::TAU
-                        * syllable.vibrato_rate_hz
-                        * (time_s - vibrato_start).max(0.0);
-                    let cents = syllable.vibrato_depth_cents * phase.sin() * onset_gate;
-                    return Some(center_frequency * 2.0f32.powf(cents / 1200.0));
+                    return Some((center_frequency, syllable, note));
                 }
                 previous_frequency = Some(note.frequency);
                 previous_end_s = note_end;
             }
         }
         None
+    }
+
+    /// Evaluate the portamento-only score pitch target at an absolute time.
+    ///
+    /// This centre frequency excludes vibrato and backend attack/release
+    /// envelopes. It is the reference around which the per-note vibrato is
+    /// defined and is useful for independent waveform measurements.
+    pub fn target_pitch_center_at(&self, time_s: f32) -> Option<f32> {
+        self.pitch_control_at(time_s)
+            .map(|(center_frequency, _, _)| center_frequency)
+    }
+
+    /// Evaluate the canonical score-conditioned pitch target at an absolute time.
+    ///
+    /// Portamento is interpolated in log-frequency (uniform cents), resets
+    /// after an explicit score rest, and vibrato uses the frozen per-syllable
+    /// onset/rate/depth controls. Renderers apply their own attack/release
+    /// envelopes around this shared musical target; evaluators use the same
+    /// target so control adherence is not scored against a different curve.
+    pub fn target_pitch_at(&self, time_s: f32) -> Option<f32> {
+        const VIBRATO_ONSET_RAMP_S: f32 = 0.05;
+        let (center_frequency, syllable, note) = self.pitch_control_at(time_s)?;
+        if syllable.vibrato_depth_cents <= 0.0 || syllable.vibrato_rate_hz <= 0.0 {
+            return Some(center_frequency);
+        }
+        let vibrato_start =
+            note.start_time + note.duration * syllable.vibrato_onset.clamp(0.0, 1.0);
+        if time_s < vibrato_start {
+            return Some(center_frequency);
+        }
+        let onset_gate = ((time_s - vibrato_start) / VIBRATO_ONSET_RAMP_S).clamp(0.0, 1.0);
+        let phase = std::f32::consts::TAU
+            * syllable.vibrato_rate_hz
+            * (time_s - vibrato_start).max(0.0);
+        let cents = syllable.vibrato_depth_cents * phase.sin() * onset_gate;
+        Some(center_frequency * 2.0f32.powf(cents / 1200.0))
     }
 
     pub fn duration_s(&self) -> f32 {
