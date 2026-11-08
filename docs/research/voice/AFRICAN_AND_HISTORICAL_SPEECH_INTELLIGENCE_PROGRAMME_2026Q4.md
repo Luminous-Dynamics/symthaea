@@ -644,7 +644,7 @@ Important limitation: its 24-dimensional inventory was designed around Edoid/Yor
 
 - [#11137 — VOICE-PHON-FER-001](https://github.com/Luminous-Dynamics/symthaea/issues/11137) owns the scorer contract.
 - [Draft PR #11139](https://github.com/Luminous-Dynamics/symthaea/pull/11139) adds `phonological_eval.rs`, a generic language-profiled Rust scorer.
-- Nineteen synthetic test functions are authored but not executed.
+- Twenty-one synthetic test functions are authored but not executed.
 - Ten synthetic FER/TER golden vectors and a Draft 2020-12 schema are registered in the benchmark matrix. A separate JavaScript implementation of the stated NA-aware Needleman–Wunsch policy recomputed all ten expected cases with no mismatches; this is arithmetic fixture validation only.
 - The scorer accepts feature-profile ID/revision, signed feature vectors, explicit tone-dimension indices and a declared gap penalty.
 - The dynamic-programming recurrence and backtrace both use the same NA-aware gap cost; an all-NA segment does not influence alignment cost or reported FER.
@@ -787,3 +787,13 @@ The machine-readable matrix registers four independent synthetic vector sets:
 4. `acoustic_faithfulness_golden_v0.1.json` — 10 trial groups for audio adherence, text overrides, unsupported claims and abstention.
 
 The FER/TER and acoustic-faithfulness sets were independently recomputed with separate JavaScript formula implementations; all expected numerators, denominators and rates matched. This is arithmetic validation of synthetic fixtures only. It does not execute the Rust scorers, validate every schema with a dedicated Draft 2020-12 implementation, reproduce the published research implementations or establish real-world model performance.
+
+
+### 17.7 Per-feature disagreement diagnostics
+
+FER/TER now also returns one diagnostic per feature dimension in the profile's stable order:
+- active aligned-pair count;
+- mismatch count;
+- mismatch rate, or non-estimable when no aligned pair activates that dimension.
+
+This avoids collapsing all phonological errors into one aggregate. For example, a profile can reveal that a model mostly preserves segmental dimensions but systematically loses tone, phonation or click-related dimensions. Those labels remain meaningful only when the supplied feature profile defines them with appropriate language-specific authority. Insertions/deletions remain in aggregate FER/TER, while per-dimension pair diagnostics are computed only on aligned reference/hypothesis pairs.
