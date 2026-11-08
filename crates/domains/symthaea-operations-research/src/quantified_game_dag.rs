@@ -1133,7 +1133,13 @@ mod tests {
     fn complementary_parent_literals_produce_identical_residual_suffixes() {
         // (x OR y) AND (!x OR y) is equivalent to y. Both x branches simplify
         // to the exact same residual formula and should share the same node.
-        let problem = equality_problem();
+        let problem = CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![
+                vec![Literal::positive(0), Literal::positive(1)],
+                vec![Literal::negative(0), Literal::positive(1)],
+            ],
+        };
         let prefix = prefix(
             2,
             vec![
@@ -1295,6 +1301,85 @@ mod tests {
     }
 
     #[test]
+    fn generated_three_variable_dags_match_independent_game_oracle() {
+        let mut state = 0x6a09_e667_f3bc_c909u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            state
+        };
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+            Literal::positive(2),
+            Literal::negative(2),
+        ];
+        let orders = [
+            [0usize, 1usize, 2usize],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+
+        for formula_index in 0..32 {
+            let clause_count = (next() % 5) as usize;
+            let mut clauses = Vec::with_capacity(clause_count);
+            for _ in 0..clause_count {
+                let literal_count = (next() % 5) as usize;
+                let mut clause = Vec::with_capacity(literal_count);
+                for _ in 0..literal_count {
+                    clause.push(literals[(next() % literals.len() as u64) as usize]);
+                }
+                clauses.push(clause);
+            }
+            let problem = CnfProblem {
+                variables: vec!["x".into(), "y".into(), "z".into()],
+                clauses,
+            };
+
+            for order in orders {
+                for quantifier_mask in 0..8usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = prefix(3, blocks);
+                    let (dag, built) =
+                        build_qbf_game_proof_dag(&problem, &prefix, budget()).unwrap();
+                    let verified =
+                        verify_qbf_game_proof_dag(&problem, &prefix, &dag, budget()).unwrap();
+                    let expected = direct_game_oracle(&problem, &prefix);
+                    assert_eq!(
+                        built.root_value,
+                        expected,
+                        "builder formula {formula_index}, order {order:?}, mask {quantifier_mask}"
+                    );
+                    assert_eq!(
+                        verified.root_value,
+                        expected,
+                        "verifier formula {formula_index}, order {order:?}, mask {quantifier_mask}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn proof_node_and_builder_visit_budgets_fail_closed() {
         let problem = equality_problem();
         let prefix = prefix(
@@ -1348,7 +1433,6 @@ mod tests {
             position: usize,
             order: &[(Quantifier, usize)],
             residual: &ResidualCnf,
-            problem: &CnfProblem,
         ) -> bool {
             if residual.is_empty() {
                 return true;
@@ -1362,15 +1446,15 @@ mod tests {
             let (quantifier, variable) = order[position];
             let (low, _) = simplify_residual(residual, variable, false).unwrap();
             let (high, _) = simplify_residual(residual, variable, true).unwrap();
-            let low = visit(position + 1, order, &low, problem);
-            let high = visit(position + 1, order, &high, problem);
+            let low = visit(position + 1, order, &low);
+            let high = visit(position + 1, order, &high);
             match quantifier {
                 Quantifier::Exists => low || high,
                 Quantifier::ForAll => low && high,
             }
         }
         let (residual, _) = source_residual(problem).unwrap();
-        visit(0, &order, &residual, problem)
+        visit(0, &order, &residual)
     }
 
     #[test]
