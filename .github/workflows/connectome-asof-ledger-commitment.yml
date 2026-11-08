@@ -54,5 +54,10 @@ jobs:
             docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json
       - name: Format standalone Rust crate
         run: cargo fmt --manifest-path tools/connectome-asof-filtration/Cargo.toml -- --check
-      - name: Test standalone Rust verifier with locked dependencies
+      - name: Diagnostic lockfile resolution
+        run: |
+          cargo generate-lockfile --manifest-path tools/connectome-asof-filtration/Cargo.toml
+          echo "=== GENERATED CONNECTOME AS-OF CARGO LOCK ==="
+          cat tools/connectome-asof-filtration/Cargo.lock
+      - name: Test standalone Rust verifier with generated locked dependencies
         run: cargo test --manifest-path tools/connectome-asof-filtration/Cargo.toml --locked
