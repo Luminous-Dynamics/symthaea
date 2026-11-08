@@ -128,7 +128,7 @@ struct AggregateMetrics {
     oov_recall: Option<f64>,
     oov_f1: Option<f64>,
     oov_accuracy: Option<f64>,
-    confidence_brier_score: Option<f64>,
+    confidence_calibration: Option<ConfidenceCalibration>,
 }
 
 #[derive(Debug, Serialize)]
@@ -146,6 +146,7 @@ struct LanguageMetrics {
     oov_false_negative: usize,
     oov_precision: Option<f64>,
     oov_recall: Option<f64>,
+    confidence_calibration: Option<ConfidenceCalibration>,
 }
 
 #[derive(Debug, Serialize)]
@@ -163,6 +164,7 @@ struct ProfileMetrics {
     oov_false_negative: usize,
     oov_precision: Option<f64>,
     oov_recall: Option<f64>,
+    confidence_calibration: Option<ConfidenceCalibration>,
 }
 
 #[derive(Debug, Serialize)]
@@ -189,6 +191,61 @@ struct LanguageTotals {
 fn invalid(message: impl Into<String>) -> String {
     message.into()
 }
+
+fn confidence_calibration(samples: &[(f64, bool)]) -> Option<ConfidenceCalibration> {
+    if samples.is_empty() {
+        return None;
+    }
+    const BIN_COUNT: usize = 10;
+    let mut sums = [0.0f64; BIN_COUNT];
+    let mut correct = [0usize; BIN_COUNT];
+    let mut counts = [0usize; BIN_COUNT];
+    let mut squared_error = 0.0f64;
+
+    for &(confidence, is_correct) in samples {
+        if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
+            continue;
+        }
+        let bin = ((confidence * BIN_COUNT as f64).floor() as usize).min(BIN_COUNT - 1);
+        sums[bin] += confidence;
+        correct[bin] += usize::from(is_correct);
+        counts[bin] += 1;
+        let outcome = if is_correct { 1.0 } else { 0.0 };
+        squared_error += (confidence - outcome).powi(2);
+    }
+
+    let observations = counts.iter().sum::<usize>();
+    if observations == 0 {
+        return None;
+    }
+    let mut expected_calibration_error = 0.0f64;
+    let bins = (0..BIN_COUNT)
+        .map(|index| {
+            let count = counts[index];
+            let mean_confidence = (count > 0).then(|| sums[index] / count as f64);
+            let observed_accuracy = (count > 0).then(|| correct[index] as f64 / count as f64);
+            if let (Some(confidence), Some(accuracy)) = (mean_confidence, observed_accuracy) {
+                expected_calibration_error +=
+                    (count as f64 / observations as f64) * (confidence - accuracy).abs();
+            }
+            CalibrationBin {
+                lower_bound: index as f64 / BIN_COUNT as f64,
+                upper_bound: (index + 1) as f64 / BIN_COUNT as f64,
+                observations: count,
+                mean_confidence,
+                observed_accuracy,
+            }
+        })
+        .collect();
+
+    Some(ConfidenceCalibration {
+        observations,
+        brier_score: Some(squared_error / observations as f64),
+        expected_calibration_error: Some(expected_calibration_error),
+        bins,
+    })
+}
+
 
 fn validate_candidate_syllable_info(
     phone_count: usize,
@@ -672,8 +729,9 @@ fn evaluate(
     let mut oov_fp = 0usize;
     let mut oov_fn = 0usize;
     let mut oov_correct = 0usize;
-    let mut confidence_squared_error = 0.0f64;
-    let mut confidence_count = 0usize;
+    let mut confidence_samples: Vec<(f64, bool)> = Vec::new();
+    let mut language_confidence: BTreeMap<String, Vec<(f64, bool)>> = BTreeMap::new();
+    let mut profile_confidence: BTreeMap<String, Vec<(f64, bool)>> = BTreeMap::new();
 
     for reference in references {
         let language = language_totals
@@ -788,9 +846,15 @@ fn evaluate(
             0
         };
         if let (Some(confidence), Some(exact)) = (candidate.confidence_exact, exact) {
-            let observed = if exact { 1.0 } else { 0.0 };
-            confidence_squared_error += (confidence - observed).powi(2);
-            confidence_count += 1;
+            confidence_samples.push((confidence, exact));
+            language_confidence
+                .entry(reference.language.clone())
+                .or_default()
+                .push((confidence, exact));
+            profile_confidence
+                .entry(reference.profile_id.clone())
+                .or_default()
+                .push((confidence, exact));
         }
         cases.push(CaseScore {
             case_id: reference.case_id.clone(),
@@ -854,6 +918,9 @@ fn evaluate(
                 oov_false_negative: totals.oov_false_negative,
                 oov_precision,
                 oov_recall,
+                confidence_calibration: language_confidence
+                    .get(&language)
+                    .and_then(|samples| confidence_calibration(samples)),
             }
         })
         .collect();
@@ -885,6 +952,9 @@ fn evaluate(
                 oov_false_negative: totals.oov_false_negative,
                 oov_precision,
                 oov_recall,
+                confidence_calibration: profile_confidence
+                    .get(&profile_id)
+                    .and_then(|samples| confidence_calibration(samples)),
             }
         })
         .collect();
@@ -920,8 +990,7 @@ fn evaluate(
             oov_recall,
             oov_f1: f1(oov_precision, oov_recall),
             oov_accuracy: ratio(oov_correct, cases.len()),
-            confidence_brier_score: (confidence_count > 0)
-                .then(|| confidence_squared_error / confidence_count as f64),
+            confidence_calibration: confidence_calibration(&confidence_samples),
         },
         by_language,
         by_profile,
@@ -1238,6 +1307,33 @@ mod tests {
     }
 
     #[test]
+    fn confidence_calibration_reports_brier_ece_and_reliability_bins() {
+        let refs = vec![
+            reference(
+                "correct",
+                false,
+                vec![variant("v1", &["w", "ɜ", "d"], &[3], &[1])],
+            ),
+            reference(
+                "incorrect",
+                false,
+                vec![variant("v1", &["k", "æ", "t"], &[3], &[1])],
+            ),
+        ];
+        let mut correct = candidate("correct", &["w", "ɜ", "d"], &[3], &[1], false);
+        correct.confidence_exact = Some(0.8);
+        let mut incorrect = candidate("incorrect", &["k", "ɛ", "t"], &[3], &[1], false);
+        incorrect.confidence_exact = Some(0.2);
+        let report = evaluate(&refs, &[correct, incorrect]).unwrap();
+        let calibration = report.metrics.confidence_calibration.unwrap();
+        assert_eq!(calibration.observations, 2);
+        assert!((calibration.brier_score.unwrap() - 0.04).abs() < 1e-12);
+        assert!((calibration.expected_calibration_error.unwrap() - 0.2).abs() < 1e-12);
+        assert_eq!(calibration.bins.iter().map(|bin| bin.observations).sum::<usize>(), 2);
+        assert!(report.by_profile[0].confidence_calibration.is_some());
+    }
+
+    #[test]
     fn exact_confidence_brier_score_is_computed_only_when_supplied() {
         let refs = vec![reference(
             "word",
@@ -1247,6 +1343,8 @@ mod tests {
         let mut pred = candidate("word", &["w", "ɜ", "d"], &[3], &[1], false);
         pred.confidence_exact = Some(0.8);
         let report = evaluate(&refs, &[pred]).unwrap();
-        assert!((report.metrics.confidence_brier_score.unwrap() - 0.04).abs() < 1e-12);
+        let calibration = report.metrics.confidence_calibration.unwrap();
+        assert!((calibration.brier_score.unwrap() - 0.04).abs() < 1e-12);
+        assert!((calibration.expected_calibration_error.unwrap() - 0.2).abs() < 1e-12);
     }
 }
