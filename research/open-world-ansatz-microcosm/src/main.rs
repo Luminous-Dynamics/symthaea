@@ -2,8 +2,8 @@ use std::env;
 use std::process::ExitCode;
 
 use open_world_ansatz_microcosm::{
-    discover, oracle_equivalence_classes, DiscoveryReport, HiddenWorld, MeasurementMap,
-    Mechanism, ObservationLog, StructureAccess,
+    DiscoveryReport, HiddenWorld, MeasurementMap, Mechanism, ObservationLog, StructureAccess,
+    discover, oracle_equivalence_classes,
 };
 use serde::Serialize;
 
@@ -36,17 +36,24 @@ fn parse_initial_state(value: &str) -> Result<Option<bool>, String> {
         "-" => Ok(None),
         "0" => Ok(Some(false)),
         "1" => Ok(Some(true)),
-        _ => Err(format!("initial hidden state must be -, 0 or 1; got {value}")),
+        _ => Err(format!(
+            "initial hidden state must be -, 0 or 1; got {value}"
+        )),
     }
 }
 
 fn parse_interventions(value: &str) -> Result<Vec<bool>, String> {
-    let values = value.split(',').map(|item| match item.trim() {
-        "0" => Ok(false),
-        "1" => Ok(true),
-        other => Err(format!("intervention bits must be 0 or 1; got {other}")),
-    }).collect::<Result<Vec<_>, _>>()?;
-    if values.is_empty() { return Err("at least one intervention is required".to_owned()); }
+    let values = value
+        .split(',')
+        .map(|item| match item.trim() {
+            "0" => Ok(false),
+            "1" => Ok(true),
+            other => Err(format!("intervention bits must be 0 or 1; got {other}")),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if values.is_empty() {
+        return Err("at least one intervention is required".to_owned());
+    }
     Ok(values)
 }
 
@@ -73,11 +80,19 @@ fn run() -> Result<(), String> {
     };
     let discovery = discover(&observations, access).map_err(|error| error.to_string())?;
     let oracle_equivalence_class_count = oracle_equivalence_classes(interventions.len())
-        .map_err(|error| error.to_string())?.len();
+        .map_err(|error| error.to_string())?
+        .len();
 
-    let output = OperatorOutput { observations, discovery, oracle_equivalence_class_count };
-    println!("{}", serde_json::to_string_pretty(&output)
-        .map_err(|error| format!("cannot serialize operator report: {error}"))?);
+    let output = OperatorOutput {
+        observations,
+        discovery,
+        oracle_equivalence_class_count,
+    };
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output)
+            .map_err(|error| format!("cannot serialize operator report: {error}"))?
+    );
     Ok(())
 }
 
