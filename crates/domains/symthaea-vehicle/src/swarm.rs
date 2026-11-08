@@ -316,7 +316,7 @@ mod tests {
         let config = SwarmConfig::convoy_straight(2);
         let swarm = SwarmSimulator::new(config);
         let mut ego = VehicleState::cruising(13.4);
-        swarm.aggregate_mesh(&mut ego);
+        swarm.aggregate_simulator_oracle_into_state(&mut ego);
         // First peer is at ~30m ahead
         assert!(
             ego.nearest_peer_distance < 40.0,
@@ -336,7 +336,7 @@ mod tests {
         let mut swarm = SwarmSimulator::new(config);
         // No braking initially
         let mut ego = VehicleState::cruising(13.4);
-        swarm.aggregate_mesh(&mut ego);
+        swarm.aggregate_simulator_oracle_into_state(&mut ego);
         assert!(
             ego.mesh_brake_density < 0.01,
             "No braking: {}",
@@ -350,7 +350,7 @@ mod tests {
         for _ in 0..100 {
             swarm.step(0.005);
         }
-        swarm.aggregate_mesh(&mut ego);
+        swarm.aggregate_simulator_oracle_into_state(&mut ego);
         assert!(
             ego.mesh_brake_density > 0.4,
             "Should have ~50% braking: {}",
@@ -383,7 +383,7 @@ mod tests {
             swarm.peers()[0].sim.state().brake_pressure > 0.3,
             "precondition: live peer must actually be braking"
         );
-        let signals = swarm.mesh_signals(&ego);
+        let signals = swarm.simulator_oracle_snapshots(&ego);
         assert!(
             !signals[0].peer_braking,
             "mesh must not see the brake before mesh_latency elapses"
@@ -393,7 +393,7 @@ mod tests {
         for _ in 0..120 {
             swarm.step(dt);
         }
-        let signals = swarm.mesh_signals(&ego);
+        let signals = swarm.simulator_oracle_snapshots(&ego);
         assert!(
             signals[0].peer_braking,
             "mesh must see the brake after mesh_latency elapses"
@@ -408,7 +408,7 @@ mod tests {
         let ego = VehicleState::cruising(13.4);
         swarm.trigger_lead_brake(0);
         swarm.step(0.005);
-        let signals = swarm.mesh_signals(&ego);
+        let signals = swarm.simulator_oracle_snapshots(&ego);
         assert!(
             signals[0].peer_braking,
             "zero latency must behave like the old live read"
@@ -422,7 +422,7 @@ mod tests {
         config.confidence_decay_per_meter = 0.01;
         let swarm = SwarmSimulator::new(config);
         let ego = VehicleState::cruising(13.4);
-        let signals = swarm.mesh_signals(&ego);
+        let signals = swarm.simulator_oracle_snapshots(&ego);
         assert_eq!(signals.len(), 1);
         // Peer at ~50m: confidence = 1 - 50*0.01 = 0.5
         assert!(
@@ -443,7 +443,7 @@ mod tests {
         config.num_peers = 0;
         let swarm = SwarmSimulator::new(config);
         let mut ego = VehicleState::cruising(13.4);
-        swarm.aggregate_mesh(&mut ego);
+        swarm.aggregate_simulator_oracle_into_state(&mut ego);
         assert!(
             (ego.nearest_peer_distance - 200.0).abs() < 0.01,
             "No peers: {}",
@@ -471,7 +471,7 @@ mod tests {
             swarm.step(0.005);
         }
         let mut ego = VehicleState::cruising(13.4);
-        swarm.aggregate_mesh(&mut ego);
+        swarm.aggregate_simulator_oracle_into_state(&mut ego);
         assert!(
             ego.mesh_brake_density > 0.2,
             "Lead brake should register: {}",
@@ -492,7 +492,7 @@ mod tests {
         let config = SwarmConfig::convoy_straight(1);
         let swarm = SwarmSimulator::new(config);
         let ego = VehicleState::cruising(13.4); // heading=0, at origin
-        let signals = swarm.mesh_signals(&ego);
+        let signals = swarm.simulator_oracle_snapshots(&ego);
         // Peer is ahead (positive x): should have positive longitudinal in body frame
         assert!(
             signals[0].relative_position[0] > 0.0,
@@ -512,7 +512,7 @@ mod tests {
         let config = SwarmConfig::convoy_straight(1);
         let swarm = SwarmSimulator::new(config);
         let mut ego = VehicleState::cruising(13.4);
-        swarm.aggregate_mesh(&mut ego);
+        swarm.aggregate_simulator_oracle_into_state(&mut ego);
         // Both at same speed → relative speed near 0
         assert!(
             ego.peer_relative_speed.abs() < 1.0,
@@ -558,16 +558,16 @@ mod tests {
     }
 
     #[test]
-    fn test_mesh_signal_fields() {
+    fn test_simulator_oracle_snapshot_fields() {
         let config = SwarmConfig::convoy_straight(1);
         let swarm = SwarmSimulator::new(config);
         let ego = VehicleState::cruising(13.4);
-        let signals = swarm.mesh_signals(&ego);
+        let signals = swarm.simulator_oracle_snapshots(&ego);
         assert_eq!(signals.len(), 1);
         assert_eq!(signals[0].peer_id, 1);
-        assert!(signals[0].peer_speed > 0.0);
+        assert!(signals[0].peer_speed_mps > 0.0);
         assert!(!signals[0].peer_braking);
         assert!(!signals[0].peer_abs_engaged);
-        assert!((signals[0].latency - 0.01).abs() < 0.001);
+        assert!((signals[0].observation_age_s - 0.01).abs() < 0.001);
     }
 }
