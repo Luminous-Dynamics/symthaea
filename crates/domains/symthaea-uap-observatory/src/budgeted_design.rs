@@ -440,7 +440,6 @@ pub fn exhaustive_budgeted_design(
         options[*left].option_id.cmp(&options[*right].option_id)
     });
     report_from_selection(
-        scenarios,
         options,
         config,
         &best_selection,
@@ -692,7 +691,6 @@ fn weighted_gain(scores: &[ScenarioDesignScore], weights: &[f64]) -> f64 {
 }
 
 fn report_from_selection(
-    scenarios: &[DesignScenario],
     options: &[ExperimentOption],
     config: &BudgetedDesignConfig,
     selected: &[usize],
