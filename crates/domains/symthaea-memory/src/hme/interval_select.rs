@@ -1738,6 +1738,48 @@ mod tests {
     }
 
     #[test]
+    fn group_selector_rejects_overlapping_member_sets_even_when_counts_balance() {
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let shared = ContinuousHV::from_vec(vec![0.8; 8]);
+        let only_a = ContinuousHV::from_vec(vec![0.7; 8]);
+        let only_b = ContinuousHV::from_vec(vec![-0.7; 8]);
+        let first = ContinuousHVGroupEnvelope::from_original_members(
+            44,
+            9,
+            &[("shared".to_owned(), shared.clone()), ("a".to_owned(), only_a)],
+        )
+        .unwrap();
+        let second = ContinuousHVGroupEnvelope::from_original_members(
+            44,
+            9,
+            &[("shared".to_owned(), shared), ("b".to_owned(), only_b)],
+        )
+        .unwrap();
+        let groups = vec![
+            build_group_record(&first, &query),
+            build_group_record(&second, &query),
+        ];
+        assert!(matches!(
+            select_group_refinement_set(&groups, 1, complete_group_coverage(&groups)),
+            Err(GroupIntervalSelectionError::DuplicateMemberAcrossGroups {
+                member_id,
+                ..
+            }) if member_id == "shared"
+        ));
+    }
+
+    #[test]
+    fn group_selector_rejects_inconsistent_member_payload_digest_count() {
+        let mut group = synthetic_group("malformed", 2, 0.0, 1.0);
+        group.member_payload_digests.pop();
+        let groups = vec![group];
+        assert!(matches!(
+            select_group_refinement_set(&groups, 1, complete_group_coverage(&groups)),
+            Err(GroupIntervalSelectionError::InvalidGroupMembership { group_index: 0 })
+        ));
+    }
+
+    #[test]
     fn generated_weighted_group_selection_matches_full_exact_top_k() {
         let mut state = 0x6A09_E667u32;
         let mut next = || {
