@@ -36,6 +36,10 @@ on:
       - "scripts/validate_ceb_review_preservation_aware_pack.py"
       - "docs/research/CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md"
       - "scripts/validate_ceb_review_risk_controlled_selective_acceptance.py"
+      - "docs/research/CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md"
+      - "docs/research/CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md"
+      - "docs/research/CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md"
+      - "scripts/validate_ceb_review_claim_support_closure_pack.py"
       - "docs/research/CEB_ENGINEERING_QUALITY_SCORECARD_V0_2026-11-04.md"
       - "scripts/validate_ceb_review_research_pack.py"
       - ".github/workflows/ceb-contract-validation-v0.yml"
@@ -620,6 +624,12 @@ jobs:
           set -euo pipefail
           python scripts/validate_ceb_review_risk_controlled_selective_acceptance.py --self-test --repo-root .
           python scripts/validate_ceb_review_risk_controlled_selective_acceptance.py --repo-root .
+      - name: Validate CEB claim-support closure development pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_ceb_review_claim_support_closure_pack.py --self-test --repo-root .
+          python scripts/validate_ceb_review_claim_support_closure_pack.py --repo-root .
       - name: Validate CEB causal-topology development pack
         shell: bash
         run: |
