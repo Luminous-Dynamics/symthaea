@@ -265,6 +265,14 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
 /// Validate that the public development input and grader-only labels are
 /// separated, mutually consistent, and free of hidden-outcome leakage.
 pub fn validate_split_corpus() -> Result<(), FixtureError> {
+    let agent: Value = serde_json::from_str(AGENT_VIEW)
+        .map_err(|error| FixtureError(format!("agent-view fixture parse failed: {error}")))?;
+    let grader: Value = serde_json::from_str(GRADER_VIEW)
+        .map_err(|error| FixtureError(format!("grader fixture parse failed: {error}")))?;
+    validate_split_values(&agent, &grader)
+}
+
+fn validate_split_values(agent: &Value, grader: &Value) -> Result<(), FixtureError> {
     let agent_schema: Value = serde_json::from_str(AGENT_SCHEMA)
         .map_err(|error| FixtureError(format!("agent schema JSON parse failed: {error}")))?;
     draft202012::meta::validate(&agent_schema).map_err(|error| {
@@ -276,14 +284,9 @@ pub fn validate_split_corpus() -> Result<(), FixtureError> {
         FixtureError(format!("grader Draft 2020-12 schema is invalid: {error}"))
     })?;
 
-    let agent: Value = serde_json::from_str(AGENT_VIEW)
-        .map_err(|error| FixtureError(format!("agent-view fixture parse failed: {error}")))?;
-    let grader: Value = serde_json::from_str(GRADER_VIEW)
-        .map_err(|error| FixtureError(format!("grader fixture parse failed: {error}")))?;
-
     for (label, schema, instance) in [
-        ("agent-view", &agent_schema, &agent),
-        ("grader", &grader_schema, &grader),
+        ("agent-view", &agent_schema, agent),
+        ("grader", &grader_schema, grader),
     ] {
         let validator = draft202012::options()
             .build(schema)
@@ -300,18 +303,18 @@ pub fn validate_split_corpus() -> Result<(), FixtureError> {
         }
     }
 
-    if string_at(&agent, &["use"])? != "agent_visible_development_input_only"
-        || string_at(&grader, &["access_policy"])? != "never_mount_in_agent_workspace"
-        || bool_at(&agent, &["not_human_adjudicated"])? != true
-        || bool_at(&grader, &["not_human_adjudicated"])? != true
+    if string_at(agent, &["use"])? != "agent_visible_development_input_only"
+        || string_at(grader, &["access_policy"])? != "never_mount_in_agent_workspace"
+        || bool_at(agent, &["not_human_adjudicated"])? != true
+        || bool_at(grader, &["not_human_adjudicated"])? != true
     {
         return Err(FixtureError(
             "agent/grader views must remain development-only, non-adjudicated, and access-separated".into(),
         ));
     }
 
-    let agent_cases = array_at(&agent, &["cases"])?;
-    let grader_cases = array_at(&grader, &["cases"])?;
+    let agent_cases = array_at(agent, &["cases"])?;
+    let grader_cases = array_at(grader, &["cases"])?;
     if agent_cases.len() != EXPECTED_CASES || grader_cases.len() != EXPECTED_CASES {
         return Err(FixtureError(format!(
             "agent and grader views must each contain {EXPECTED_CASES} cases"
@@ -593,9 +596,10 @@ mod tests {
 
     #[test]
     fn agent_view_cannot_contain_world_state_oracle_labels() {
-        let mut value: Value = serde_json::from_str(AGENT_VIEW).unwrap();
-        value["cases"][0]["world_state_oracle"] = Value::String("vulnerable".to_owned());
-        assert!(validate_split_mutation(&value, &serde_json::from_str(GRADER_VIEW).unwrap()).is_err());
+        let mut agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        agent["cases"][0]["world_state_oracle"] = Value::String("vulnerable".to_owned());
+        assert!(validate_split_values(&agent, &grader).is_err());
     }
 
     #[test]
@@ -604,41 +608,29 @@ mod tests {
         let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
         agent["cases"][0]["candidates"][0]["effects"] =
             serde_json::json!([{"outcome":"leaked","obligation_id":"artifact_identity"}]);
-        assert!(validate_split_mutation(&agent, &grader).is_err());
+        assert!(validate_split_values(&agent, &grader).is_err());
     }
 
     #[test]
     fn grader_cannot_upgrade_obligation_with_inadmissible_evidence() {
         let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
         let mut grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
-        let case = grader["cases"].as_array_mut().unwrap().iter_mut()
-            .find(|case| case["case_id"] == "REA-POA-008").unwrap();
+        let case = grader["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-008")
+            .unwrap();
         case["candidate_effects"][0]["effects"][0]["resulting_status"] =
             Value::String("satisfied".to_owned());
-        assert!(validate_split_mutation(&agent, &grader).is_err());
+        assert!(validate_split_values(&agent, &grader).is_err());
     }
 
-    fn validate_split_mutation(agent: &Value, grader: &Value) -> Result<(), FixtureError> {
-        // Reuse the production split validator's referential and admissibility
-        // checks through a small serialized replacement hook.
-        let mut agent_text = AGENT_VIEW.to_owned();
-        let mut grader_text = GRADER_VIEW.to_owned();
-        let _ = (&mut agent_text, &mut grader_text);
-        if agent.get("cases").and_then(Value::as_array).is_none()
-            || grader.get("cases").and_then(Value::as_array).is_none()
-        {
-            return Err(FixtureError("agent/grader cases missing".into()));
-        }
-        if agent["cases"][0].get("world_state_oracle").is_some()
-            || agent["cases"][0]["candidates"][0].get("effects").is_some()
-        {
-            return Err(FixtureError("agent view contains grader-only fields".into()));
-        }
-        // Validate every mutation against the same structural rules by
-        // temporarily applying it to the checked-in corpus is handled by the
-        // public JSON Schema additionalProperties policy in the tests below.
-        let _ = (agent, grader);
-        Ok(())
+    #[test]
+    fn agent_and_grader_case_sets_must_match() {
+        let mut grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        grader["cases"][0]["case_id"] = Value::String("REA-POA-999".to_owned());
+        assert!(validate_split_values(&serde_json::from_str(AGENT_VIEW).unwrap(), &grader).is_err());
     }
 
 }
