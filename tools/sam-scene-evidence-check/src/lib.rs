@@ -97,9 +97,9 @@ pub fn validate_bundle_values(
             .and_then(|snapshot| snapshot.get("reference_frames"))
             .and_then(Value::as_array)
             .and_then(|frames| {
-                frames.iter().find(|frame| {
-                    frame.get("frame_id").and_then(Value::as_str) == profile_frame_id
-                })
+                frames
+                    .iter()
+                    .find(|frame| frame.get("frame_id").and_then(Value::as_str) == profile_frame_id)
             });
         if frame.is_none() {
             errors.push(format!(
