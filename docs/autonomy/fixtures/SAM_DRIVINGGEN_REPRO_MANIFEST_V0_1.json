@@ -70,7 +70,16 @@
         "reconcile paper sample IDs vs hosted dataset card IDs",
         "retain missing/extra IDs as typed outcomes",
         "compare exact files and parent commit for pinned HF revision 935e0a40cd489305a206abe89f31d8854495098b"
-      ]
+      ],
+      "row_count_diagnostic": {
+        "hosted_page_rows": 22866,
+        "hosted_card_eval_examples_per_track": 222,
+        "exact_ratio_rows_per_track_card_example": 103,
+        "arithmetic_observation": "22,866 / 222 = 103 exactly.",
+        "hypothesis": "The viewer's 22,866 rows may represent flattened frame-level or row-level data associated with 222 clip-level examples; this is not established by the card metadata or directory listing.",
+        "relationship_to_paper_video_example": "The upstream repository shows a 101-frame generation example; the numerical difference is not explained and must not be silently attributed to two extra frames.",
+        "resolution": "Inspect the pinned ZIP/dataset builder and HF viewer feature schema to determine row units and whether rows are clips, frames, image entries, or a flattened representation."
+      }
     },
     "generation_example": {
       "video_frames": 101,
