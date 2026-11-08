@@ -1,0 +1,324 @@
+{
+  "schema_version": "0.1.0",
+  "program_id": "luminous.voice.african_historical_speech.2026q4",
+  "evidence_state": "RESEARCH_DRAFT",
+  "governance": {
+    "governor_issue": 5352,
+    "admission_issue": 10942,
+    "external_comparison_issue": 10970,
+    "south_africa_programme_issue": 10913,
+    "statement": "This manifest defines benchmark lanes and data-admission requirements. It does not authorize data ingestion, training, publication of examples, or capability promotion."
+  },
+  "scoring_policy": {
+    "preserve_original_audio": true,
+    "preserve_original_reference_text": true,
+    "normalization_must_be_versioned": true,
+    "never_strip_diacritics_implicitly": true,
+    "report_per_language_and_worst_qualified_group": true,
+    "paired_clustered_uncertainty": true,
+    "unsupported_no_access_or_policy_blocked_is_not_zero_error": true,
+    "no_single_composite_score": true
+  },
+  "tracks": [
+    {
+      "id": "sa_monolingual_asr",
+      "name": "South African monolingual speech recognition",
+      "task": "ASR",
+      "parent_issue": 10913,
+      "admission_issue": 10942,
+      "metrics": [
+        "strict_WER",
+        "strict_CER",
+        "versioned_normalized_WER_CER",
+        "PER_if_expert_labels_exist",
+        "critical_entity_exactness",
+        "number_unit_date_negation_exactness",
+        "RTFx"
+      ],
+      "split_units": [
+        "speaker",
+        "session",
+        "source_collection",
+        "source_program",
+        "domain"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afrivox_v1",
+          "status": "REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/afrivox",
+          "note": "Current card reports 64.26h / 18 languages / CC BY-NC-SA 4.0 / gated access; pin immutable revision and rights."
+        },
+        {
+          "id": "afrivox_v2",
+          "status": "EVALUATION_ONLY_REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/afrivox-v2",
+          "note": "Current card reports 24 languages / 10 domains and evaluation-only intended use; aggregates multiple sources; do not train."
+        },
+        {
+          "id": "nchlt_auxiliary",
+          "status": "SOURCE_LEVEL_ADMISSION_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/dsfsi-anv/multilingual-nchlt-dataset"
+        },
+        {
+          "id": "lwazi",
+          "status": "SOURCE_LEVEL_ADMISSION_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/dsfsi/lwazi-asr-corpus-compressed"
+        }
+      ]
+    },
+    {
+      "id": "african_natural_code_switch",
+      "name": "Natural African code-switching",
+      "task": "CODE_SWITCH_ASR",
+      "parent_issue": 10999,
+      "scorer_issue": 11056,
+      "implementation_pr": 11058,
+      "metrics": [
+        "strict_WER",
+        "strict_CER",
+        "PIER",
+        "embedded_span_deletion_rate",
+        "switch_boundary_precision_recall_f1",
+        "inter_word_switch_accuracy",
+        "intra_word_switch_accuracy_when_annotated"
+      ],
+      "complexity_axes": [
+        "CMI",
+        "switch_count",
+        "switch_density_per_second",
+        "switch_density_per_token",
+        "embedded_span_length",
+        "matrix_language",
+        "acoustic_domain"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afriswitch",
+          "status": "REVIEW_REQUIRED_RESTRICTED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/AfriSwitch",
+          "paper_url": "https://arxiv.org/abs/2608.26434",
+          "note": "Paper and current card differ in duration, utterance count, languages and licence; exact artifact and permission unresolved."
+        },
+        {
+          "id": "sa_soap_opera_five_language",
+          "status": "RESEARCH_ONLY_SOURCE_TERMS_REQUIRED",
+          "url": "https://hdl.handle.net/20.500.12185/545"
+        }
+      ]
+    },
+    {
+      "id": "speech_grounded_semantics",
+      "name": "Audio-grounded semantic extraction and spoken QA",
+      "task": "SPEECH_SEMANTIC_UNDERSTANDING",
+      "issue": 11057,
+      "parent_issues": [
+        10913,
+        9661,
+        10970
+      ],
+      "metrics": [
+        "slot_precision_recall_f1",
+        "entity_exactness",
+        "number_unit_exactness",
+        "negation_exactness",
+        "role_and_temporal_relation_accuracy",
+        "audio_evidence_span_overlap",
+        "unsupported_answer_rate",
+        "abstention_precision_recall",
+        "calibration",
+        "native_reviewer_correction_time"
+      ],
+      "required_outputs": [
+        "typed_slots",
+        "source_audio_spans",
+        "transcript_spans_when_available",
+        "uncertainty",
+        "unsupported_or_unknown_state"
+      ],
+      "system_arms": [
+        "ASR_then_Broca",
+        "speech_native_model",
+        "hybrid_audio_transcript_semantic"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afrivox_v2_entity_number_subsets",
+          "status": "EVALUATION_ONLY_REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/afrivox-v2",
+          "note": "Entity/number flags are strata, not complete semantic gold; independently adjudicated audio-grounded references required."
+        }
+      ]
+    },
+    {
+      "id": "namibian_click_phonetics",
+      "name": "Namibian click-language acoustic and phonetic perception",
+      "task": "PHONETIC_CONTRAST_RECOGNITION",
+      "issue": 11038,
+      "parent_issues": [
+        10913,
+        10942,
+        10976,
+        11020
+      ],
+      "language_profiles": [
+        "Ju|'hoan",
+        "Khoekhoegowab_variety_scoped",
+        "≠Akhoe_Hai//om"
+      ],
+      "metrics": [
+        "click_place_accuracy",
+        "click_accompaniment_accuracy",
+        "phonation_contrast_accuracy",
+        "tone_contrast_accuracy",
+        "minimal_pair_accuracy",
+        "per_feature_confusion_matrix",
+        "calibration",
+        "unknown_class_recall"
+      ],
+      "candidate_sources": [
+        {
+          "id": "dobes_akhoe_haiom",
+          "status": "METADATA_ONLY_SOURCE_AUDIT",
+          "url": "https://dobes.mpi.nl/projects/akhoe/"
+        },
+        {
+          "id": "ela_juhoan",
+          "status": "METADATA_ONLY_SOURCE_AUDIT",
+          "url": "https://www.language-archives.org/item.php/oai:soas.ac.uk:MPI1031468"
+        },
+        {
+          "id": "dammann_khoekhoegowab_archive",
+          "status": "METADATA_ONLY_SOURCE_AUDIT",
+          "url": "https://researchspace.bathspa.ac.uk/14159/"
+        }
+      ],
+      "exclusions": [
+        "Do_not_call_archival_20th_century_audio_ancient_speech",
+        "N_uu_is_separate_South_African_Kalahari_cohort_not_current_Namibia_denominator"
+      ]
+    },
+    {
+      "id": "egyptian_historical_phonology",
+      "name": "Evidence-qualified Egyptian phonology and pronunciation",
+      "task": "HISTORICAL_PHONOLOGY_RECONSTRUCTION",
+      "issue": 11039,
+      "parent_issues": [
+        9694,
+        9661,
+        5352
+      ],
+      "profiles": [
+        "Old_Egyptian",
+        "Middle_Egyptian",
+        "Late_Egyptian",
+        "Demotic",
+        "Coptic_dialect_scoped"
+      ],
+      "evidence_classes": [
+        "direct_modern_audio",
+        "orthographic_attestation",
+        "named_transliteration_convention",
+        "comparative_evidence",
+        "attributed_scholarly_reconstruction",
+        "conventional_Egyptological_reading",
+        "synthetic_realization"
+      ],
+      "metrics": [
+        "sign_layout_accuracy",
+        "transliteration_accuracy",
+        "lexical_morphological_accuracy",
+        "evidence_traceability",
+        "expert_agreement",
+        "uncertainty_calibration",
+        "unsupported_phonetic_insertion_rate",
+        "period_dialect_leakage"
+      ],
+      "candidate_sources": [
+        {
+          "id": "thesaurus_linguae_aegyptiae",
+          "status": "METADATA_AND_TERMS_REVIEW",
+          "url": "https://tla.digital/home?lang=en"
+        },
+        {
+          "id": "coptic_scriptorium",
+          "status": "PER_DOCUMENT_LICENSE_REVIEW",
+          "url": "https://github.com/CopticScriptorium/corpora"
+        }
+      ],
+      "forbidden_inferences": [
+        "synthetic_audio_is_historical_recording",
+        "conventional_reading_is_proven_historic_pronunciation",
+        "Coptic_is_direct_acoustic_ground_truth_for_middle_egyptian"
+      ]
+    },
+    {
+      "id": "streaming_dialogue",
+      "name": "Streaming multilingual dialogue",
+      "task": "STREAMING_SPEECH_INTERACTION",
+      "parent_issues": [
+        10788,
+        10873,
+        10913
+      ],
+      "metrics": [
+        "first_partial_latency_p50_p95_p99",
+        "stable_partial_latency_p50_p95_p99",
+        "final_latency_p50_p95_p99",
+        "revision_churn",
+        "timestamp_tolerance",
+        "audio_gap_detection",
+        "interruption_recovery",
+        "selective_risk",
+        "clarification_burden",
+        "false_action_execution"
+      ],
+      "required_controls": [
+        "identical_pcm",
+        "identical_chunk_schedule",
+        "known_gap_injection",
+        "overlap_and_interruption"
+      ]
+    },
+    {
+      "id": "data_efficiency",
+      "name": "Active data selection and low-resource adaptation",
+      "task": "DATA_EFFICIENCY",
+      "issue": 9661,
+      "candidate_labelled_hour_budgets": [
+        1,
+        5,
+        10,
+        20,
+        50,
+        100
+      ],
+      "selection_arms": [
+        "random",
+        "language_domain_diversity",
+        "uncertainty",
+        "expected_value_of_information"
+      ],
+      "metrics": [
+        "WER_CER_PIER_learning_curve",
+        "semantic_slot_exactness",
+        "annotation_minutes",
+        "cost_per_error_reduction",
+        "performance_per_labelled_hour",
+        "worst_group_quality",
+        "prior_language_retention"
+      ],
+      "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds."
+    }
+  ],
+  "promotion_gates": [
+    "exact_source_revision_and_file_digest",
+    "source_level_license_consent_and_permitted_purpose",
+    "speaker_source_and_derivative_leakage_audit",
+    "frozen_scoring_and_normalization_revision",
+    "qualified_native_or_expert_reference_and_disagreement",
+    "paired_clustered_confidence_intervals",
+    "exact_head_executed_build_test_and_benchmark_receipts",
+    "no_capability_promotion_from_skipped_ci_or_synthetic_fixtures"
+  ]
+}
