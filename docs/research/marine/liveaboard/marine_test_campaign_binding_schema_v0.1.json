@@ -401,7 +401,8 @@
             "required_claim_bandwidth_hz",
             "sensor_response_lag_ms",
             "anti_alias_profile_ref",
-            "sampling_adequacy_review_ref"
+            "sampling_adequacy_review_ref",
+            "minimum_required_sample_rate_hz"
           ],
           "properties": {
             "sample_rate_hz": {
@@ -434,6 +435,10 @@
                 "string",
                 "null"
               ]
+            },
+            "minimum_required_sample_rate_hz": {
+              "type": "number",
+              "exclusiveMinimum": 0
             }
           }
         },
