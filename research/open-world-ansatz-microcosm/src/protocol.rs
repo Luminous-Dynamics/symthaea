@@ -309,7 +309,9 @@ impl BlindEpisode {
             episode_id: episode_id.into(),
             world_family: WorldFamily::TwoInputResponse,
             structure_access: access,
-            intervention_domain: InterventionDomain::IntegerPair(interaction::INPUT_LEVELS.to_vec()),
+            intervention_domain: InterventionDomain::IntegerPair(
+                interaction::INPUT_LEVELS.to_vec(),
+            ),
             dynamics: DynamicsContract::IndependentProbes,
             max_probe_actions,
             world: WorldState::Interaction(world),
@@ -729,8 +731,7 @@ impl BlindEpisode {
         };
         let abstained = disposition == ClaimDisposition::Abstain;
         let exact_version_space = set_score.exact_version_space_match;
-        let safe_abstention =
-            abstained && exact_version_space && set_score.oracle_model_count > 1;
+        let safe_abstention = abstained && exact_version_space && set_score.oracle_model_count > 1;
         let unnecessary_abstention =
             abstained && exact_version_space && set_score.oracle_model_count == 1;
         let decision_correct = if abstained {
@@ -1100,13 +1101,9 @@ fn compare_structure_sets<T, S>(
 where
     S: Ord,
 {
-    let claimed_structures: BTreeSet<S> =
-        claimed.iter().map(|model| structure_of(model)).collect();
-    let oracle_structures: BTreeSet<S> =
-        oracle.iter().map(|model| structure_of(model)).collect();
-    let correct_structure_count = claimed_structures
-        .intersection(&oracle_structures)
-        .count();
+    let claimed_structures: BTreeSet<S> = claimed.iter().map(|model| structure_of(model)).collect();
+    let oracle_structures: BTreeSet<S> = oracle.iter().map(|model| structure_of(model)).collect();
+    let correct_structure_count = claimed_structures.intersection(&oracle_structures).count();
 
     StructureScore {
         claimed_structure_count: claimed_structures.len(),
@@ -1355,9 +1352,11 @@ mod tests {
             .unwrap()
             .compatible_models;
         assert!(compatible_models.len() > 1);
-        assert!(compatible_models.iter().all(|model| {
-            model.mechanism == numeric::Mechanism::DirectResponse
-        }));
+        assert!(
+            compatible_models
+                .iter()
+                .all(|model| { model.mechanism == numeric::Mechanism::DirectResponse })
+        );
 
         let view = episode.view().unwrap();
         let submission = AgentSubmission {
@@ -1428,7 +1427,9 @@ mod tests {
                 "E0002".to_string(),
                 "E0003".to_string(),
             ],
-            rationale: "The constant sensor makes direct and leaky mechanisms observationally equivalent.".to_string(),
+            rationale:
+                "The constant sensor makes direct and leaky mechanisms observationally equivalent."
+                    .to_string(),
         };
         episode.apply(AgentAction::Submit { submission }).unwrap();
 
@@ -1540,7 +1541,8 @@ mod tests {
                 "E0002".to_string(),
                 "E0003".to_string(),
             ],
-            rationale: "Deliberately abstain despite unique identification as a negative control.".to_string(),
+            rationale: "Deliberately abstain despite unique identification as a negative control."
+                .to_string(),
         };
         episode.apply(AgentAction::Submit { submission }).unwrap();
 
