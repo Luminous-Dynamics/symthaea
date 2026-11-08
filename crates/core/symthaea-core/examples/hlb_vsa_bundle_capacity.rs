@@ -27,7 +27,7 @@ struct TrialMetrics {
 
 fn main() {
     println!(
-        "load,mean_member_cosine,mean_nonmember_cosine,mean_auc,mean_tpr_at_empirical_1pct_fpr,mean_evaluation_fpr,trial_count,negative_calibration_queries,negative_evaluation_queries"
+        "load,mean_member_cosine,theoretical_member_cosine,empirical_minus_theory,mean_nonmember_cosine,mean_auc,mean_tpr_at_empirical_1pct_fpr,mean_evaluation_fpr,trial_count,negative_calibration_queries,negative_evaluation_queries"
     );
     for &load in LOADS {
         let metrics = (0..TRIALS)
@@ -46,8 +46,10 @@ fn main() {
                 .iter()
                 .map(|m| m.empirical_false_positive_rate),
         );
+        let theory_member = theoretical_member_cosine(load);
+        let empirical_minus_theory = mean_member - theory_member;
         println!(
-            "{load},{mean_member:.8},{mean_nonmember:.8},{mean_auc:.8},{mean_tpr:.8},{mean_fpr:.8},{TRIALS},{NEGATIVE_CALIBRATION_QUERIES},{NEGATIVE_EVALUATION_QUERIES}"
+            "{load},{mean_member:.8},{theory_member:.8},{empirical_minus_theory:.8},{mean_nonmember:.8},{mean_auc:.8},{mean_tpr:.8},{mean_fpr:.8},{TRIALS},{NEGATIVE_CALIBRATION_QUERIES},{NEGATIVE_EVALUATION_QUERIES}"
         );
     }
 }
@@ -103,6 +105,17 @@ fn run_trial(load: usize, trial: usize) -> TrialMetrics {
     }
 }
 
+/// Expected bipolar cosine between one stored member and an odd-load
+/// independent majority bundle. For load N = 2m + 1 this is
+/// C(2m, m) / 4^m; the asymptotic approximation is sqrt(2 / (pi * N)).
+fn theoretical_member_cosine(load: usize) -> f64 {
+    assert!(load > 0 && load % 2 == 1, "majority-bundle load must be positive and odd");
+    let pairs = (load - 1) / 2;
+    (1..=pairs).fold(1.0, |value, k| {
+        value * (2 * k - 1) as f64 / (2 * k) as f64
+    })
+}
+
 fn pairwise_auc(positive: &[f64], negative: &[f64]) -> f64 {
     let mut wins = 0.0;
     for positive_score in positive {
@@ -149,6 +162,13 @@ mod tests {
         assert!(metrics.mean_member_cosine > metrics.mean_nonmember_cosine);
         assert!(metrics.auc > 0.95);
         assert!(metrics.empirical_false_positive_rate <= 0.06);
+    }
+
+    #[test]
+    fn theoretical_majority_member_similarity_matches_exact_small_loads() {
+        assert!((theoretical_member_cosine(1) - 1.0).abs() < 1e-12);
+        assert!((theoretical_member_cosine(3) - 0.5).abs() < 1e-12);
+        assert!((theoretical_member_cosine(5) - 0.375).abs() < 1e-12);
     }
 
     #[test]
