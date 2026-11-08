@@ -1,0 +1,697 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/package-signature-evaluation-v0.schema.json",
+  "title": "Package Signature Evaluation v0",
+  "description": "Versioned, package-digest-bound multi-claim evaluation. Content integrity, signature cryptography, signer identity, trust policy, app authorization and runtime behavior are distinct propositions; there is no aggregate trusted/safe boolean.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "package",
+    "content_receipt",
+    "platform",
+    "evaluator",
+    "policy_context",
+    "claim_results",
+    "signers",
+    "scheme_results",
+    "authorization",
+    "runtime_context",
+    "attestation",
+    "not_established"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "package_sha256",
+        "package_size_bytes"
+      ],
+      "properties": {
+        "format": {
+          "enum": [
+            "apk",
+            "ipa"
+          ]
+        },
+        "package_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "package_size_bytes": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "application_identifier": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        }
+      }
+    },
+    "content_receipt": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "package_sha256",
+        "receipt_schema_version"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "package_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "receipt_schema_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "version",
+        "build",
+        "architecture"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "android",
+            "apple"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "build": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "architecture": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "api_level": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "device_class": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "version",
+        "source_commit",
+        "toolchain",
+        "target",
+        "cargo_lock_sha256"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "cargo_lock_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "policy_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluation_status",
+        "policy_id",
+        "policy_version",
+        "trust_anchor_set_sha256",
+        "revocation_mode",
+        "checked_at",
+        "network_mode",
+        "target_platform_version"
+      ],
+      "properties": {
+        "evaluation_status": {
+          "enum": [
+            "not_evaluated",
+            "evaluated"
+          ]
+        },
+        "policy_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "policy_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "trust_anchor_set_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revocation_mode": {
+          "enum": [
+            "not_checked",
+            "offline_crl",
+            "online_ocsp",
+            "online_crl",
+            "platform_managed",
+            "custom"
+          ]
+        },
+        "checked_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "network_mode": {
+          "enum": [
+            "not_used",
+            "offline",
+            "online"
+          ]
+        },
+        "target_platform_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "claim_results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content_integrity",
+        "signature_cryptographic",
+        "signer_identity",
+        "trust_policy",
+        "application_authorization",
+        "runtime_behavior"
+      ],
+      "properties": {
+        "content_integrity": {
+          "$ref": "#/$defs/claim"
+        },
+        "signature_cryptographic": {
+          "$ref": "#/$defs/claim"
+        },
+        "signer_identity": {
+          "$ref": "#/$defs/claim"
+        },
+        "trust_policy": {
+          "$ref": "#/$defs/claim"
+        },
+        "application_authorization": {
+          "$ref": "#/$defs/claim"
+        },
+        "runtime_behavior": {
+          "$ref": "#/$defs/claim"
+        }
+      }
+    },
+    "signers": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheme",
+          "public_key_spki_sha256",
+          "certificate_der_sha256",
+          "signature_algorithm",
+          "digest_algorithm"
+        ],
+        "properties": {
+          "scheme": {
+            "enum": [
+              "apk-v1",
+              "apk-v2",
+              "apk-v3",
+              "apk-v3.1",
+              "apk-v4",
+              "apple-code-signing"
+            ]
+          },
+          "public_key_spki_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "certificate_der_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "signature_algorithm": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "digest_algorithm": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "subject_display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1024
+          },
+          "issuer_display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1024
+          },
+          "rotation_lineage_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "scheme_results": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheme",
+          "status",
+          "coverage_scope",
+          "content_digest_sha256",
+          "companion_sha256",
+          "supporting_schemes",
+          "limitations"
+        ],
+        "properties": {
+          "scheme": {
+            "enum": [
+              "apk-v1",
+              "apk-v2",
+              "apk-v3",
+              "apk-v3.1",
+              "apk-v4",
+              "apple-code-signing"
+            ]
+          },
+          "status": {
+            "$ref": "#/$defs/status"
+          },
+          "coverage_scope": {
+            "enum": [
+              "jar_entries",
+              "protected_package_sections",
+              "whole_package",
+              "merkle_tree",
+              "code_directory_pages",
+              "resource_envelope",
+              "signature_only",
+              "unknown"
+            ]
+          },
+          "content_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "companion_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "supporting_schemes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "apk-v1",
+                "apk-v2",
+                "apk-v3",
+                "apk-v3.1",
+                "apk-v4"
+              ]
+            }
+          },
+          "min_sdk": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "max_sdk": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "code_directory_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "cms_signature_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "resource_envelope_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "maxItems": 64
+          }
+        }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_application_id",
+        "observed_application_id",
+        "expected_bundle_id",
+        "observed_bundle_id",
+        "expected_team_id",
+        "observed_team_id",
+        "expected_signer_spki_sha256",
+        "observed_signer_spki_sha256",
+        "provisioning_profile_sha256",
+        "entitlement_evaluation",
+        "device_distribution_policy"
+      ],
+      "properties": {
+        "expected_application_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "observed_application_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "expected_bundle_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "observed_bundle_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "expected_team_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "observed_team_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "expected_signer_spki_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "observed_signer_spki_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provisioning_profile_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "entitlement_evaluation": {
+          "$ref": "#/$defs/status"
+        },
+        "device_distribution_policy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "runtime_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_suite_id",
+        "execution_evidence_sha256",
+        "platform_build",
+        "device_class"
+      ],
+      "properties": {
+        "test_suite_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "execution_evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "platform_build": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "device_class": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "envelope_reference",
+        "envelope_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_provided",
+            "separate_dsse_reference"
+          ]
+        },
+        "envelope_reference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048
+        },
+        "envelope_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "not_established": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "publisher_benevolence",
+          "human_or_organization_identity_attribution",
+          "absence_of_malicious_code",
+          "safe_runtime_behavior",
+          "user_intent_alignment",
+          "uninspected_component_semantics",
+          "future_update_safety",
+          "complete_platform_policy_compliance"
+        ]
+      },
+      "minItems": 8,
+      "maxItems": 8
+    }
+  },
+  "$defs": {
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown",
+        "unsupported",
+        "not_evaluated"
+      ]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence_refs",
+        "evaluator",
+        "limitations"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "evaluator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        }
+      }
+    }
+  }
+}
