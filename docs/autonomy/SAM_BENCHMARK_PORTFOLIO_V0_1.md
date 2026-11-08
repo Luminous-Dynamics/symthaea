@@ -1,6 +1,6 @@
 # SAM Benchmark Portfolio Registry v0.1
 
-**Snapshot:** 2026-11-04  
+**Snapshot:** 2026-11-08  
 **Parent programme:** [TRANSPORT-ROAD-BENCH-001 #6256](https://github.com/Luminous-Dynamics/symthaea/issues/6256)  
 **Purpose:** freeze task-specific external comparison evidence; no universal autonomy score.
 
@@ -112,6 +112,26 @@ These descriptors describe the system; the four coordinates describe the evidenc
 - **Claim boundary:** simulated agent realism does not validate human behavior generally or certify an ego planner.
 - **Source:** [SOTA2 research board](https://www.sota2.com/research/sota/motion-simulation-on-waymo-open-sim-agents-challenge-2025).
 
+### NAVSIM v2 / EPDMS — pseudo-simulation, not fully interactive closed loop
+
+- **Role:** scalable planning evaluation using real driving scenes plus pseudo-simulated follow-up scenes.
+- **Official implementation:** NAVSIM main branch describes the CoRL 2025 NAVSIM v2 code; official release v2.1.2 added the `navhard_two_stage` dataset and updated EPDMS for the Warmup leaderboard. Pin exact devkit, data split, metric implementation and checkpoint.
+- **Protocol nuance:** NAVSIM v2's two-stage procedure evaluates a first 4-second plan, then weights precomputed follow-up scenes according to how closely their starting states match the planner's first-stage endpoint. This is designed to approximate closed-loop relevance, but the surrounding environment does not interact online with the ego policy as a full reciprocal traffic simulator would.
+- **Metric panel:** report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC alongside EPDMS. Do not report EPDMS alone: the component and multiplier terms have distinct meanings, masks and denominators.
+- **Secondary leaderboard snapshot (not independently verified by SAM):** the SOTA2 planning board currently shows Human Agent EPDMS 90.3, LWDrive 89.6, ExploreVLA 88.8 and DriveWorld-VLA 86.8 on its displayed NAVSIM v2 comparison. These values are discovery references only; verify leaderboard split, evaluator revision, score correction, sensor privilege and model artifact before any reproduced comparison.
+- **Claim boundary:** pseudo-simulation is not equivalent to fully interactive closed-loop driving, not a human counterfactual oracle, and not real-road safety evidence.
+- **Sources:** [official NAVSIM repository](https://github.com/autonomousvision/navsim), [official v2.1.2 release](https://github.com/autonomousvision/navsim/releases), [NAVSIM paper](https://papers.nips.cc/paper_files/paper/2024/file/32768f7faf1995026ef9821c696f3404-Abstract-Datasets_and_Benchmarks_Track.html), [secondary leaderboard snapshot](https://www.sota2.com/research/sota/autonomous-driving-planning-on-navsim-v2).
+
+### ReactSim-Bench — reactive surrounding-agent behavior
+
+- **Role:** evaluate whether a behavior world model generates feasible responses by surrounding agents when the ego vehicle follows an input trajectory that deviates from the logged path.
+- **Protocol:** 2,636 nuPlan test scenarios across longitudinal (937), directional (799) and lateral (900) deviations; 9 seconds per scenario (1 second history + 8 seconds future) at 10 Hz in the paper. The AV is controlled separately from the simulated surrounding agents.
+- **Metric family:** AV–agent collision count, AV–agent risky count, agent–agent collision rate, off-road rate, driving-direction violations, acceleration infeasibility and steering infeasibility. Preserve the exact upstream names and denominators; do not average these into an invented universal score.
+- **Author-reported baseline snapshot:** the upstream repository reports Log Replay, MTR, CTG, VBD, SMART, CATK and TrajTok results. In particular, the published baseline table shows SMART at 0.1419 AV–agent collision count, 0.3976 risky count, 2.23% agent–agent collisions, 0.68% off-road, 1.09% direction violation, 9.74% acceleration infeasibility and 4.83% steering infeasibility. These are benchmark-author-reported values, not SAM reproductions.
+- **Protocol limitation:** the benchmark feeds pre-generated ego deviations into surrounding-agent simulation. It directly tests reactive response to ego inputs, but does not by itself close a joint online loop where the ego planner and surrounding-agent policies both replan and influence each other at every tick. Compose with Symtropy #3532 for that stronger reciprocal-policy experiment.
+- **Claim boundary:** reactive agent-model quality does not certify ego-vehicle safety, human behavioral realism generally, or real-world generalization.
+- **Sources:** [official ReactSim-Bench repository](https://github.com/Thinklab-SJTU/ReactSim-Bench), [paper](https://arxiv.org/abs/2606.14058), [dataset](https://huggingface.co/datasets/zzzy0729/ReactSim-Bench-Data).
+
 ### CARLA Leaderboard 2.1
 
 - **Role:** closed-loop route completion / infraction comparison.
@@ -155,6 +175,14 @@ These descriptors describe the system; the four coordinates describe the evidenc
 - **Claim boundary:** different evaluation/task; do not compare raw values to Bench2Drive, Fail2Drive or Waymo Motion. Match observation, compute, checkpoint, horizon and evaluator before black-box comparison.
 - **Sources:** [NVIDIA release](https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/), [downloads](https://developer.nvidia.com/drive/downloads).
 
+### Autoware 2.0.0 — open-source system architecture reference (not a benchmark)
+
+- **Release:** Autoware 2.0.0 was published 29 October 2026; the Foundation's announcement is dated 2 November 2026.
+- **Architecture:** generator–selector design permits rule-based, optimization, learned, diffusion and end-to-end trajectory generators to share a candidate interface; the selector is intended to check safety/traffic-rule/drivable-area constraints before ranking admissible candidates.
+- **Implementation maturity nuance:** in Autoware 2.0.0 the rule-based stack remains the default. A learned Diffusion Planner can be selected at launch, but only one generator is launched at a time and the selector node is not yet launched in the released configuration; the documentation describes the selector as a planned integration point.
+- **SAM implication:** this validates generator–selector as a competitive architectural direction, not as an already-completed independent selector in the released Autoware stack. SAM should compare a frozen rule-based baseline, MPC/optimization, learned/VLA and multiple-proposal variants, while measuring the independence and correctness of its own safety selector.
+- **Sources:** [Autoware 2.0 release](https://github.com/autowarefoundation/autoware/releases), [Autoware 2.0 announcement](https://autoware.org/autoware-foundation-releases-autoware-2-0-to-expand-ai-support-for-open-source-autonomous-driving/), [Architecture 2.0 documentation](https://docs.autoware.org/main/design/autoware-architecture-v2/).
+
 ### MRS.Q
 
 - **Role:** external model-based RL/search baseline, not an AV leaderboard.
@@ -190,6 +218,8 @@ The September 3, 2026 survey characterizes model design through state abstractio
 
 | Track | Baseline | Prospective SAM target | Hard comparability requirement |
 |---|---|---|---|
+| NAVSIM v2 / EPDMS | Official NAVSIM v2.1.2 implementation; SOTA2 secondary snapshot: Human Agent 90.3, LWDrive 89.6 | Reproduce the strongest matched score first; then improve EPDMS and component metrics on sealed slices without worsening the weakest metric | Exact v2.1.2 devkit, split, two-stage manifest, EPDMS evaluator, data privilege and checkpoint |
+| ReactSim-Bench | Author-reported SMART baseline; 2,636 nuPlan deviation scenarios | Beat reproduced response baselines across collision/risk/map/kinematic families; report each metric and worst deviation category separately | Exact scenario/cache version, ego deviation input, actor model, data split and per-metric denominator |
 | Bench2Drive v0.0.4 | LEAD 95.59 DS / 87.28 SR | Exceed strongest reproduced DS while preserving SR, efficiency, comfort and failure-family outcomes | Same 220-route manifest, CARLA/ScenarioRunner, sensor privilege, checkpoint and scoring |
 | HiDrive | KnowVal 46.6 DS / RC 73.8 / LS 69.3 / ES 97.4 | Improve DS without regressing any of RC/LS/ES; publish all 30 abilities | Exact asset rights, 330-route release, UE5 build, scenario/ability splits |
 | Fail2Drive | Paper result: 22.8% average paired SR degradation | At least 25% lower relative paired OOD degradation than strongest reproduced baseline while ID SR is within 1 percentage point | Paper-faithful 200 routes, 17 shift classes, paired model/compute setup |
