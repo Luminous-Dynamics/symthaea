@@ -11,6 +11,8 @@ pub struct ScenarioReport {
     pub information_gain_bits: f64,
     pub outcome_probabilities: Vec<f64>,
     pub posterior_impact_probabilities: Vec<f64>,
+    pub conditional_bayes_risks: Vec<f64>,
+    pub bayes_actions: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -27,9 +29,12 @@ pub struct VerificationReport {
 fn number<'a>(root: &'a Value, path: &[&str]) -> Result<f64, String> {
     let mut node = root;
     for part in path {
-        node = node
-            .get(*part)
-            .ok_or_else(|| format!("missing fixture field: {}", path.join(".")))?;
+        node = if let Ok(index) = part.parse::<usize>() {
+            node.get(index)
+        } else {
+            node.get(*part)
+        }
+        .ok_or_else(|| format!("missing fixture field: {}", path.join(".")))?;
     }
     node.as_f64()
         .ok_or_else(|| format!("fixture field is not numeric: {}", path.join(".")))
@@ -63,6 +68,24 @@ fn close(actual: f64, expected: f64, tolerance: f64, label: &str) -> Result<(), 
     Ok(())
 }
 
+fn conditional_decision(
+    posterior_impact: f64,
+    protect_impact: f64,
+    protect_safe: f64,
+    no_protect_impact: f64,
+    no_protect_safe: f64,
+) -> (f64, &'static str) {
+    let protect = posterior_impact * protect_impact
+        + (1.0 - posterior_impact) * protect_safe;
+    let no_protect = posterior_impact * no_protect_impact
+        + (1.0 - posterior_impact) * no_protect_safe;
+    if protect <= no_protect {
+        (protect, "protect")
+    } else {
+        (no_protect, "no_protect")
+    }
+}
+
 fn conditional_risk(
     posterior_impact: f64,
     protect_impact: f64,
@@ -70,11 +93,14 @@ fn conditional_risk(
     no_protect_impact: f64,
     no_protect_safe: f64,
 ) -> f64 {
-    let protect = posterior_impact * protect_impact
-        + (1.0 - posterior_impact) * protect_safe;
-    let no_protect = posterior_impact * no_protect_impact
-        + (1.0 - posterior_impact) * no_protect_safe;
-    protect.min(no_protect)
+    conditional_decision(
+        posterior_impact,
+        protect_impact,
+        protect_safe,
+        no_protect_impact,
+        no_protect_safe,
+    )
+    .0
 }
 
 fn scenario(
@@ -89,6 +115,8 @@ fn scenario(
     let mut joint = Vec::with_capacity(conditional_impact.len());
     let mut posterior = Vec::with_capacity(conditional_impact.len());
     let mut expected_risk = 0.0;
+    let mut conditional_risks = Vec::with_capacity(conditional_impact.len());
+    let mut bayes_actions = Vec::with_capacity(conditional_impact.len());
     for (&impact_likelihood, &safe_likelihood) in
         conditional_impact.iter().zip(conditional_safe.iter())
     {
@@ -98,7 +126,7 @@ fn scenario(
             return Err("zero-probability outcome cannot be scored".to_owned());
         }
         let p_impact_given_outcome = prior_impact * impact_likelihood / p_outcome;
-        let risk = conditional_risk(
+        let (risk, action) = conditional_decision(
             p_impact_given_outcome,
             losses[0],
             losses[1],
@@ -107,6 +135,8 @@ fn scenario(
         );
         joint.push(p_outcome);
         posterior.push(p_impact_given_outcome);
+        conditional_risks.push(risk);
+        bayes_actions.push(action.to_owned());
         expected_risk += p_outcome * risk;
     }
     let probability_sum: f64 = joint.iter().sum();
@@ -127,6 +157,8 @@ fn scenario(
         information_gain_bits: information_gain.max(0.0),
         outcome_probabilities: joint,
         posterior_impact_probabilities: posterior,
+        conditional_bayes_risks: conditional_risks,
+        bayes_actions,
     })
 }
 
@@ -198,6 +230,55 @@ fn independent_source_pair(
     )
 }
 
+fn verify_outcome_rows(
+    report: &ScenarioReport,
+    fixture: &Value,
+    path: &[&str],
+) -> Result<(), String> {
+    let mut node = fixture;
+    for part in path {
+        node = if let Ok(index) = part.parse::<usize>() {
+            node.get(index)
+        } else {
+            node.get(*part)
+        }
+        .ok_or_else(|| format!("missing outcome table: {}", path.join(".")))?;
+    }
+    let rows = node
+        .as_array()
+        .ok_or_else(|| format!("outcome table is not an array: {}", path.join(".")))?;
+    if rows.len() != report.outcome_probabilities.len() {
+        return Err(format!("outcome row count mismatch: {}", path.join(".")));
+    }
+    let tolerance = number(fixture, &["numerical_tolerance"])?;
+    for (index, row) in rows.iter().enumerate() {
+        let prefix = format!("{}[{index}]", path.join("."));
+        let expected_probability = row
+            .get("probability")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| format!("missing {prefix}.probability"))?;
+        let expected_posterior = row
+            .get("posterior_impact_probability")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| format!("missing {prefix}.posterior_impact_probability"))?;
+        let expected_risk = row
+            .get("conditional_bayes_risk")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| format!("missing {prefix}.conditional_bayes_risk"))?;
+        let expected_action = row
+            .get("bayes_action")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("missing {prefix}.bayes_action"))?;
+        close(report.outcome_probabilities[index], expected_probability, tolerance, &format!("{prefix}.probability"))?;
+        close(report.posterior_impact_probabilities[index], expected_posterior, tolerance, &format!("{prefix}.posterior"))?;
+        close(report.conditional_bayes_risks[index], expected_risk, tolerance, &format!("{prefix}.risk"))?;
+        if report.bayes_actions[index] != expected_action {
+            return Err(format!("{prefix}.action mismatch: actual={}, expected={expected_action}", report.bayes_actions[index]));
+        }
+    }
+    Ok(())
+}
+
 fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Result<(), String> {
     let tolerance = number(fixture, &["numerical_tolerance"])?;
     let close_fixture = |actual: f64, path: &[&str]| -> Result<(), String> {
@@ -262,6 +343,42 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
         &["correlated_observation_control", "naive_independence_failure", "evsi_overstatement"],
     )?;
 
+    verify_outcome_rows(
+        &report.single_reading,
+        fixture,
+        &["correlated_observation_control", "single_reading", "outcomes"],
+    )?;
+    verify_outcome_rows(
+        &report.same_source_pair,
+        fixture,
+        &["correlated_observation_control", "two_readings_same_source", "outcome_table"],
+    )?;
+    verify_outcome_rows(
+        &report.independent_source_pair,
+        fixture,
+        &["correlated_observation_control", "two_readings_independent_sources", "outcome_table"],
+    )?;
+
+    let nuisance_prior = fixture
+        .get("exact_information_value_controls")
+        .and_then(|items| items.get(0))
+        .and_then(|item| item.get("nuisance_prior"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| "missing nuisance prior".to_owned())?
+        .iter()
+        .map(|value| value.as_f64().ok_or_else(|| "invalid nuisance prior probability".to_owned()))
+        .collect::<Result<Vec<_>, _>>()?;
+    close(
+        entropy(&nuisance_prior),
+        report.nuisance_entropy_bits,
+        tolerance,
+        "nuisance entropy fixture",
+    )?;
+    let nuisance_mi = number(
+        fixture,
+        &["exact_information_value_controls", "0", "expected_mutual_information_with_decision_state_bits"],
+    )?;
+    close(nuisance_mi, 0.0, tolerance, "nuisance mutual information")?;
     let nuisance_value = number(
         fixture,
         &["exact_information_value_controls", "0", "expected_value_of_sample_information"],
