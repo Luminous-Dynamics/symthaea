@@ -674,6 +674,112 @@ fn digest_cfc_projection_noise_calibration(
     hasher.finalize().to_hex().to_string()
 }
 
+/// Revalidate calibration statistics, digest, and binding to the current model pair.
+fn validate_cfc_projection_noise_calibration(
+    calibration: &CfCProjectionNoiseCalibration,
+    source_model_digest: &str,
+    candidate_model_digest: &str,
+    architecture_digest: &str,
+    manifest_digest: &str,
+    layer_index: usize,
+    projection_digest: &str,
+) -> Result<(), CfCPermutationAlignmentError> {
+    if calibration.format_version != 1 {
+        return Err(CfCPermutationAlignmentError::MalformedNoiseCalibration {
+            field: "format_version",
+        });
+    }
+    for (field, value) in [
+        ("source_model_digest", calibration.source_model_digest.as_str()),
+        ("candidate_model_digest", calibration.candidate_model_digest.as_str()),
+        ("architecture_digest", calibration.architecture_digest.as_str()),
+        ("manifest_digest", calibration.manifest_digest.as_str()),
+        ("projection_digest", calibration.projection_digest.as_str()),
+        ("calibration_probe_digest", calibration.calibration_probe_digest.as_str()),
+        ("calibration_digest", calibration.calibration_digest.as_str()),
+    ] {
+        if !is_lowercase_hex_digest(value) {
+            return Err(CfCPermutationAlignmentError::InvalidNoiseCalibrationDigest { field });
+        }
+    }
+    for (field, expected, actual) in [
+        ("source model digest", source_model_digest, calibration.source_model_digest.as_str()),
+        ("candidate model digest", candidate_model_digest, calibration.candidate_model_digest.as_str()),
+        ("architecture digest", architecture_digest, calibration.architecture_digest.as_str()),
+        ("manifest digest", manifest_digest, calibration.manifest_digest.as_str()),
+        ("projection digest", projection_digest, calibration.projection_digest.as_str()),
+    ] {
+        if expected != actual {
+            return Err(CfCPermutationAlignmentError::StaleNoiseCalibration { field });
+        }
+    }
+    if calibration.layer_index != layer_index {
+        return Err(CfCPermutationAlignmentError::StaleNoiseCalibration {
+            field: "layer index",
+        });
+    }
+    if calibration.sample_count != calibration.repeated_projection_samples.len()
+        || calibration.sample_count < 2
+        || calibration.sample_count > MAX_NOISE_CALIBRATION_SAMPLES
+    {
+        return Err(CfCPermutationAlignmentError::MalformedNoiseCalibration {
+            field: "sample_count",
+        });
+    }
+    if let Some(index) = calibration
+        .repeated_projection_samples
+        .iter()
+        .position(|sample| !sample.is_finite())
+    {
+        return Err(CfCPermutationAlignmentError::NonFiniteNoiseCalibrationSample { index });
+    }
+
+    let recomputed_mean = calibration
+        .repeated_projection_samples
+        .iter()
+        .sum::<f64>()
+        / calibration.sample_count as f64;
+    let recomputed_variance = calibration
+        .repeated_projection_samples
+        .iter()
+        .map(|sample| (sample - recomputed_mean).powi(2))
+        .sum::<f64>()
+        / (calibration.sample_count - 1) as f64;
+    let recomputed_std_dev = recomputed_variance.sqrt();
+    let mean_tolerance = 1e-12 * recomputed_mean.abs().max(1.0);
+    let std_tolerance = 1e-12 * recomputed_std_dev.abs().max(1.0);
+    if !calibration.sample_mean.is_finite()
+        || !calibration.observation_std_dev.is_finite()
+        || calibration.observation_std_dev <= 0.0
+        || (calibration.sample_mean - recomputed_mean).abs() > mean_tolerance
+        || (calibration.observation_std_dev - recomputed_std_dev).abs() > std_tolerance
+    {
+        return Err(CfCPermutationAlignmentError::MalformedNoiseCalibration {
+            field: "sample statistics",
+        });
+    }
+
+    let expected_digest = digest_cfc_projection_noise_calibration(
+        &calibration.source_model_digest,
+        &calibration.candidate_model_digest,
+        &calibration.architecture_digest,
+        &calibration.manifest_digest,
+        calibration.layer_index,
+        &calibration.projection_digest,
+        &calibration.calibration_probe_digest,
+        calibration.method,
+        &calibration.repeated_projection_samples,
+        calibration.sample_mean,
+        calibration.observation_std_dev,
+    );
+    if expected_digest != calibration.calibration_digest {
+        return Err(CfCPermutationAlignmentError::MalformedNoiseCalibration {
+            field: "calibration_digest",
+        });
+    }
+    Ok(())
+}
+
 /// Source-bound receipt for Gaussian-channel EIG over an exact small permutation space.
 ///
 /// The likelihood is a scalar Gaussian observation: a deterministic projection of
