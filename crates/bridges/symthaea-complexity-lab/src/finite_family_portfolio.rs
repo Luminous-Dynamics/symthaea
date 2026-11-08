@@ -692,14 +692,50 @@ pub fn solve_finite_family_policy_portfolio(
 
     let value_bytes = evaluations.checked_mul(std::mem::size_of::<CheckedRational>())
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    if value_bytes > budget.max_output_memory_bytes {
+    let policy_entries = horizon.checked_mul(states).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let policy_buffer_bytes = policy_entries.checked_mul(std::mem::size_of::<usize>())
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<usize>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let dp_buffer_bytes = states.checked_mul(2)
+        .and_then(|value| value.checked_mul(std::mem::size_of::<CheckedRational>()))
+        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<CheckedRational>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let combination_buffer_bytes = k.checked_mul(std::mem::size_of::<usize>())
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<usize>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let model_value_headers = models.checked_mul(std::mem::size_of::<Vec<CheckedRational>>())
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<Vec<CheckedRational>>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let model_optimum_bytes = models.checked_mul(std::mem::size_of::<CheckedRational>())
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<CheckedRational>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    // Peak temporary candidate state: one witness per model, its tied-best
+    // policy-index vector (capacity k), and the worst-case model-index vector.
+    let candidate_witness_bytes = models.checked_mul(std::mem::size_of::<PortfolioModelWitness>())
+        .and_then(|value| value.checked_add(models.checked_mul(k.checked_mul(std::mem::size_of::<usize>())?)?))
+        .and_then(|value| value.checked_add(models.checked_mul(std::mem::size_of::<usize>())?))
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<PortfolioModelWitness>>()))
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<usize>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let base_peak_bytes = value_bytes
+        .checked_add(model_value_headers)
+        .and_then(|value| value.checked_add(model_optimum_bytes))
+        .and_then(|value| value.checked_add(policy_buffer_bytes))
+        .and_then(|value| value.checked_add(dp_buffer_bytes))
+        .and_then(|value| value.checked_add(combination_buffer_bytes))
+        .and_then(|value| value.checked_add(candidate_witness_bytes))
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<OptimalPolicyPortfolio>>()))
+        .and_then(|value| value.checked_add(std::mem::size_of::<FiniteFamilyPolicyPortfolioResult>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if base_peak_bytes > budget.max_output_memory_bytes {
         return Err(PolicyPortfolioError::BudgetExceeded {
-            resource: "policy value matrix bytes", required: value_bytes, limit: budget.max_output_memory_bytes,
+            resource: "estimated peak memory bytes",
+            required: base_peak_bytes,
+            limit: budget.max_output_memory_bytes,
         });
     }
 
     let mut policy = Vec::new();
-    let policy_entries = horizon.checked_mul(states).ok_or(PolicyPortfolioError::DimensionOverflow)?;
     policy.try_reserve_exact(policy_entries).map_err(|_| PolicyPortfolioError::AllocationFailed {
         resource: "policy action buffer", entries: policy_entries,
     })?;
@@ -749,7 +785,7 @@ pub fn solve_finite_family_policy_portfolio(
     let mut optimal_portfolios = Vec::new();
     let mut stored_policy_indices = 0usize;
     let mut stored_witnesses = 0usize;
-    let mut output_bytes = value_bytes;
+    let mut output_bytes = base_peak_bytes;
     let mut candidates_evaluated = 0usize;
 
     for size in 1..=k {
@@ -760,7 +796,8 @@ pub fn solve_finite_family_policy_portfolio(
         combination.extend(0..size);
 
         loop {
-            candidates_evaluated += 1;
+            candidates_evaluated = candidates_evaluated.checked_add(1)
+                .ok_or(PolicyPortfolioError::DimensionOverflow)?;
             let mut witnesses = Vec::new();
             witnesses.try_reserve_exact(models).map_err(|_| PolicyPortfolioError::AllocationFailed {
                 resource: "portfolio model witnesses", entries: models,
@@ -816,7 +853,7 @@ pub fn solve_finite_family_policy_portfolio(
                 optimal_portfolios.clear();
                 stored_policy_indices = 0;
                 stored_witnesses = 0;
-                output_bytes = value_bytes;
+                output_bytes = base_peak_bytes;
             }
             if order == Ordering::Less || order == Ordering::Equal {
                 let new_portfolios = optimal_portfolios.len() + 1;
@@ -825,10 +862,20 @@ pub fn solve_finite_family_policy_portfolio(
                         resource: "tied optimal portfolios", required: new_portfolios, limit: budget.max_optimal_portfolios,
                     });
                 }
-                let new_indices = stored_policy_indices.checked_add(size).ok_or(PolicyPortfolioError::DimensionOverflow)?;
-                if new_indices > budget.max_stored_policy_indices {
+                let model_best_indices = witnesses.iter().try_fold(0usize, |total, witness| {
+                    total.checked_add(witness.best_policy_indices.len())
+                        .ok_or(PolicyPortfolioError::DimensionOverflow)
+                })?;
+                let next_stored_indices = stored_policy_indices
+                    .checked_add(size)
+                    .and_then(|value| value.checked_add(model_best_indices))
+                    .and_then(|value| value.checked_add(worst_models.len()))
+                    .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+                if next_stored_indices > budget.max_stored_policy_indices {
                     return Err(PolicyPortfolioError::BudgetExceeded {
-                        resource: "stored portfolio policy indices", required: new_indices, limit: budget.max_stored_policy_indices,
+                        resource: "stored portfolio and witness indices",
+                        required: next_stored_indices,
+                        limit: budget.max_stored_policy_indices,
                     });
                 }
                 let new_witnesses = stored_witnesses.checked_add(models).ok_or(PolicyPortfolioError::DimensionOverflow)?;
@@ -838,15 +885,20 @@ pub fn solve_finite_family_policy_portfolio(
                     });
                 }
                 let estimate = size.checked_mul(std::mem::size_of::<usize>())
-                    .and_then(|v| v.checked_add(models.checked_mul(std::mem::size_of::<PortfolioModelWitness>())?))
-                    .and_then(|v| v.checked_add(models.checked_mul(size.checked_mul(std::mem::size_of::<usize>())?)?))
-                    .and_then(|v| v.checked_add(worst_models.len().checked_mul(std::mem::size_of::<usize>())?))
-                    .and_then(|v| v.checked_add(std::mem::size_of::<OptimalPolicyPortfolio>()))
+                    .and_then(|value| value.checked_add(std::mem::size_of::<Vec<usize>>()))
+                    .and_then(|value| value.checked_add(models.checked_mul(std::mem::size_of::<PortfolioModelWitness>())?))
+                    .and_then(|value| value.checked_add(std::mem::size_of::<Vec<PortfolioModelWitness>>()))
+                    .and_then(|value| value.checked_add(models.checked_mul(size.checked_mul(std::mem::size_of::<usize>())?)?))
+                    .and_then(|value| value.checked_add(worst_models.len().checked_mul(std::mem::size_of::<usize>())?))
+                    .and_then(|value| value.checked_add(std::mem::size_of::<Vec<usize>>()))
+                    .and_then(|value| value.checked_add(std::mem::size_of::<OptimalPolicyPortfolio>()))
                     .ok_or(PolicyPortfolioError::DimensionOverflow)?;
                 let new_bytes = output_bytes.checked_add(estimate).ok_or(PolicyPortfolioError::DimensionOverflow)?;
                 if new_bytes > budget.max_output_memory_bytes {
                     return Err(PolicyPortfolioError::BudgetExceeded {
-                        resource: "optimal portfolio output bytes", required: new_bytes, limit: budget.max_output_memory_bytes,
+                        resource: "estimated peak memory bytes",
+                        required: new_bytes,
+                        limit: budget.max_output_memory_bytes,
                     });
                 }
 
@@ -873,7 +925,7 @@ pub fn solve_finite_family_policy_portfolio(
                     model_witnesses: stored_models,
                     worst_case_model_indices: stored_worst,
                 });
-                stored_policy_indices = new_indices;
+                stored_policy_indices = next_stored_indices;
                 stored_witnesses = new_witnesses;
                 output_bytes = new_bytes;
             }
