@@ -254,9 +254,9 @@ impl SwarmSimulator {
                 left.relative_position[0].total_cmp(&right.relative_position[0])
             })
             .map(|signal| {
-                let gap_m = (signal.relative_position[0].powi(2)
-                    + signal.relative_position[1].powi(2))
-                .sqrt();
+                // Follow distance is the longitudinal road-frame gap, not Euclidean
+                // range. Lateral separation belongs in lane/association admission.
+                let gap_m = signal.relative_position[0];
                 FollowTargetEvidence::SimulatorOracle {
                     scenario_id: scenario_id.to_owned(),
                     actor_id: signal.peer_id.to_string(),
