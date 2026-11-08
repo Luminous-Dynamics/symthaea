@@ -30,7 +30,7 @@
       "diffusion_field_ref": "ou1d_diffusion_sqrt2",
       "target_covariance_ref": "standard_brownian_increment_covariance_dt",
       "target_power_spectral_density_ref": "unit_white_noise_two_sided_psd_convention_v1",
-      "target_autocorrelation_ref": "unit_intensity_delta_autocorrelation_v1",
+      "target_noise_autocorrelation_ref": "unit_intensity_delta_autocorrelation_v1",
       "target_correlation_time_s": 0.0,
       "stationarity": "stationary",
       "evidence_status": "derived",
@@ -58,6 +58,13 @@
         "threshold": 0.05,
         "unit": "relative",
         "notes": "Compare normalized autocorrelation at preregistered lags; do not fit lags on held-out samples."
+      },
+      {
+        "metric": "psd_weighted_relative_error",
+        "comparator": "<=",
+        "threshold": 0.05,
+        "unit": "relative",
+        "notes": "Evaluate noise/state PSD discrepancy with the preregistered frequency weighting and estimator."
       },
       {
         "metric": "path_distribution_wasserstein",
