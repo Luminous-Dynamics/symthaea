@@ -1502,4 +1502,114 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn conditional_posterior_family_map_differs_from_joint_mass_credal_map() {
+        let prior_rows = [
+            [q(1, 5), q(4, 5)],
+            [q(4, 5), q(1, 5)],
+        ];
+        let b1_given_a0 = [q(1, 10), q(9, 10)];
+        let b0_given_a0 = [q(9, 10), q(1, 10)];
+        let b1_given_a1 = [q(1, 5), q(7, 10)];
+        let b0_given_a1 = [q(4, 5), q(3, 10)];
+
+        let mut owned_models = Vec::new();
+        for prior_index in 0..2 {
+            for row_a0_index in 0..2 {
+                for row_a1_index in 0..2 {
+                    let mut model = ExactFactorGraph::new(
+                        vec![2, 2],
+                        CheckedRational::zero(),
+                        CheckedRational::one(),
+                    ).unwrap();
+                    model.add_factor(
+                        vec![0],
+                        prior_rows[prior_index].to_vec(),
+                    ).unwrap();
+                    // Scope [A, B]: B is the fastest-changing table coordinate.
+                    model.add_factor(
+                        vec![0, 1],
+                        vec![
+                            b0_given_a0[row_a0_index].clone(),
+                            b1_given_a0[row_a0_index].clone(),
+                            b0_given_a1[row_a1_index].clone(),
+                            b1_given_a1[row_a1_index].clone(),
+                        ],
+                    ).unwrap();
+                    // Evidence B = 1.
+                    model.add_factor(
+                        vec![1],
+                        vec![CheckedRational::zero(), CheckedRational::one()],
+                    ).unwrap();
+                    owned_models.push(model);
+                }
+            }
+        }
+
+        assert_eq!(owned_models.len(), 8);
+        let digests = owned_models.iter().map(digest).collect::<Vec<_>>();
+        let model_refs = owned_models
+            .iter()
+            .zip(digests.iter())
+            .map(|(model, model_digest)| FiniteModelRef {
+                model_digest: model_digest,
+                graph: model,
+            })
+            .collect::<Vec<_>>();
+
+        // The finite-family API computes extrema of P(A | B=1) across models.
+        let conditional = evaluate_finite_family_credal_map(
+            &model_refs,
+            &[0],
+            &[0, 1],
+            4,
+        ).unwrap();
+        let maximax = conditional.maximax.as_ref().unwrap();
+        let maximin = conditional.maximin.as_ref().unwrap();
+        assert_eq!(maximax.assignment, vec![1]);
+        assert_eq!(maximax.probability, q(28, 29));
+        assert_eq!(maximin.assignment, vec![1]);
+        assert_eq!(maximin.probability, q(1, 19));
+
+        // Independently recompute the joint assignment masses P(A=a, B=1).
+        let mut lower = [None::<CheckedRational>, None];
+        let mut upper = [None::<CheckedRational>, None];
+        for model in &owned_models {
+            for state in 0..2 {
+                let mut event_model = model.clone();
+                let mut indicator = vec![
+                    CheckedRational::zero(),
+                    CheckedRational::zero(),
+                ];
+                indicator[state] = CheckedRational::one();
+                event_model.add_factor(vec![0], indicator).unwrap();
+                let (joint_mass, _) = event_model.evaluate(&[0, 1]).unwrap();
+
+                if lower[state]
+                    .as_ref()
+                    .map_or(true, |current| &joint_mass < current)
+                {
+                    lower[state] = Some(joint_mass.clone());
+                }
+                if upper[state]
+                    .as_ref()
+                    .map_or(true, |current| &joint_mass > current)
+                {
+                    upper[state] = Some(joint_mass);
+                }
+            }
+        }
+
+        assert_eq!(lower[0].as_ref().unwrap(), &q(1, 50));
+        assert_eq!(upper[0].as_ref().unwrap(), &q(18, 25));
+        assert_eq!(lower[1].as_ref().unwrap(), &q(1, 25));
+        assert_eq!(upper[1].as_ref().unwrap(), &q(14, 25));
+
+        // Joint-mass maximax selects A=0, unlike conditional-posterior maximax.
+        assert!(upper[0].as_ref().unwrap() > upper[1].as_ref().unwrap());
+        // Joint-mass maximin selects A=1.
+        assert!(lower[1].as_ref().unwrap() > lower[0].as_ref().unwrap());
+    }
+
 }
