@@ -106,6 +106,26 @@ Use ensembles of model instances to separate variation of theoretical interest f
 
 The compiler must make the plan executable and reviewable; it does not autonomously operate physical equipment in this phase.
 
+## 5.1 Executable Gaussian predictive-discrepancy reference
+
+The science-evidence crate now exports:
+
+`gaussian_predictive_kl_nats(left_mean, left_predictive_sigma, right_mean, right_predictive_sigma, measurement_sigma)`
+
+It computes the analytic directed KL divergence between the two scalar predictive Gaussians after adding the same independent, calibrated Gaussian measurement noise to both:
+
+    s_left  = sqrt(predictive_sigma_left^2  + measurement_sigma^2)
+    s_right = sqrt(predictive_sigma_right^2 + measurement_sigma^2)
+
+    D_KL(p || q)
+      = log(s_right / s_left)
+        + [s_left^2 + (mean_left - mean_right)^2] / (2 s_right^2)
+        - 1/2
+
+The function is a reference for **expected predictive discrepancy**, not model-identity EIG. It checks finite arithmetic and positive uncertainty parameters; it does not replace the model ledger's derivation/comparability validation, nor does it support correlated, non-Gaussian or vector observations yet. The caller must ensure the inputs originate from validated, same-observable predictive distributions.
+
+The corresponding tests cover the equal-variance closed form, directed asymmetry, identical-distribution zero, and invalid/overflow inputs. Next, compare this analytic function against independent high-precision quadrature and use it to construct a held-out maximin KL design alongside (not instead of) the current EIG scorer.
+
 ## 6. Benchmark matrix
 
 ### Synthetic model families
