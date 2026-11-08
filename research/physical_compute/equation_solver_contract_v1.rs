@@ -624,7 +624,10 @@ impl DiagonalDecayOde {
         let mut state = Vec::new();
         state.try_reserve_exact(self.dimension()).map_err(|_| MatrixError::AllocationFailed)?;
         state.extend_from_slice(initial);
-        trajectory.push(state.clone());
+        let mut initial_saved = Vec::new();
+        initial_saved.try_reserve_exact(state.len()).map_err(|_| MatrixError::AllocationFailed)?;
+        initial_saved.extend_from_slice(&state);
+        trajectory.push(initial_saved);
 
         for _ in 0..steps {
             let mut next = Vec::new();
