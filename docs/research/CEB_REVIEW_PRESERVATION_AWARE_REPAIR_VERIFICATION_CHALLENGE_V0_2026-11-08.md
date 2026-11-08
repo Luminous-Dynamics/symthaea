@@ -210,4 +210,4 @@ fn load_object(id: Id, store: &Store) -> Result<Object, Error> {
 
 ## Development boundary
 
-Six paired cases are six development anchors, not a sample for reliability estimates. The challenge and answer key are public and permanently ineligible as a sealed CEB holdout. No candidate code, compiler, test, PoC, benchmark runner, hidden grader or production system is executed. The existing three primary CEB-REVIEW measures remain unchanged.
+Six paired cases are six development anchors, not a sample for reliability estimates. The challenge and answer key are public and permanently ineligible as a sealed CEB holdout. This is not a sealed holdout. No candidate code, compiler, test, PoC, benchmark runner, hidden grader or production system is executed. The existing three primary CEB-REVIEW measures remain unchanged.
