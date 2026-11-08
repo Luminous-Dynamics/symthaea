@@ -364,7 +364,7 @@ This is a design proposal, not a current CEB risk guarantee or a registered conf
 
 ## 12.9 Claim-support closure extension to CEB-CONTINUITY
 
-Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its [six-case public challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and [separate public key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) as an evaluation extension to existing CEB-CONTINUITY-001 (#10630). Do not create another continuity lane, evidence graph, receipt or task schema.
+Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its [eight-case public challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and [separate public key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) as an evaluation extension to existing CEB-CONTINUITY-001 (#10630). Do not create another continuity lane, evidence graph, receipt or task schema.
 
 The extension asks whether every consequential claim has a complete enough support closure to justify selective retain/revalidate/invalidate/supersede/unresolved decisions after a change event. It requires an impact witness for affected claims and an unaffectedness witness for retained claims, with the open-world remainder explicit. The static validator checks only document structure; it does not implement a repository graph or prove real claim invalidation.
 
