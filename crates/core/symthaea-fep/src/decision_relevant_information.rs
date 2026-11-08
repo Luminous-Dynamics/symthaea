@@ -611,6 +611,8 @@ mod tests {
         );
         assert!(result.actions[0].expected_value_of_sample_information.abs() < 1e-12);
         assert!((result.actions[1].expected_value_of_sample_information - 0.2).abs() < 1e-12);
+        assert!(result.actions[0].decision_information_gain_nats.abs() < 1e-12);
+        assert!(result.actions[1].decision_information_gain_nats > 0.0);
         assert_eq!(result.selected_action_index, Some(1));
     }
 
@@ -629,6 +631,7 @@ mod tests {
             (result.actions[0].model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10
         );
         assert!(result.actions[0].expected_value_of_sample_information.abs() < 1e-12);
+        assert!(result.actions[0].decision_information_gain_nats.abs() < 1e-12);
     }
 
     #[test]
