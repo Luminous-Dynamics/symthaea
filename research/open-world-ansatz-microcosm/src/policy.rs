@@ -46,8 +46,8 @@ impl FiniteEnumeratorBaseline {
             return Ok(submit(
                 view,
                 AgentClaim::Boolean {
-                    compatible_models: report.compatible_hypotheses,
                     disposition: disposition(report.compatible_hypotheses.len()),
+                    compatible_models: report.compatible_hypotheses,
                 },
             ));
         }
@@ -59,8 +59,8 @@ impl FiniteEnumeratorBaseline {
             None => Ok(submit(
                 view,
                 AgentClaim::Boolean {
-                    compatible_models: report.compatible_hypotheses,
                     disposition: disposition(report.compatible_hypotheses.len()),
+                    compatible_models: report.compatible_hypotheses,
                 },
             )),
         }
@@ -84,8 +84,8 @@ impl FiniteEnumeratorBaseline {
             return Ok(submit(
                 view,
                 AgentClaim::Numeric {
-                    compatible_models: report.compatible_models,
                     disposition: disposition(report.compatible_models.len()),
+                    compatible_models: report.compatible_models,
                 },
             ));
         }
@@ -97,8 +97,8 @@ impl FiniteEnumeratorBaseline {
             None => Ok(submit(
                 view,
                 AgentClaim::Numeric {
-                    compatible_models: report.compatible_models,
                     disposition: disposition(report.compatible_models.len()),
+                    compatible_models: report.compatible_models,
                 },
             )),
         }
@@ -122,8 +122,8 @@ impl FiniteEnumeratorBaseline {
             return Ok(submit(
                 view,
                 AgentClaim::Interaction {
-                    compatible_models: report.compatible_models,
                     disposition: disposition(report.compatible_models.len()),
+                    compatible_models: report.compatible_models,
                 },
             ));
         }
@@ -134,8 +134,8 @@ impl FiniteEnumeratorBaseline {
             None => Ok(submit(
                 view,
                 AgentClaim::Interaction {
-                    compatible_models: report.compatible_models,
                     disposition: disposition(report.compatible_models.len()),
+                    compatible_models: report.compatible_models,
                 },
             )),
         }
@@ -325,12 +325,24 @@ mod tests {
             StructureAccess::BooleanWithheld,
             2,
         ).unwrap();
+        episode.apply(AgentAction::Probe {
+            intervention: AgentIntervention::Boolean(true),
+        }).unwrap();
         let view = episode.view().unwrap();
-        let action = FiniteEnumeratorBaseline::next_action(&view).unwrap();
-        episode.apply(action).unwrap();
-        let view = episode.view().unwrap();
-        assert_ne!(view.status, EpisodeStatus::Submitted);
-        // The baseline must only receive a live view; the runner rejects all
-        // actions once an episode has reached its terminal submission.
+        let submission = AgentSubmission {
+            claim: AgentClaim::Boolean {
+                compatible_models: crate::candidate_hypotheses(crate::StructureAccess::Withheld),
+                disposition: ClaimDisposition::Ambiguous,
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec!["E0001".to_string()],
+            rationale: "Terminal-state control.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        let terminal_view = episode.view().unwrap();
+        assert_eq!(
+            FiniteEnumeratorBaseline::next_action(&terminal_view),
+            Err(PolicyError::EpisodeNotOpen)
+        );
     }
 }
