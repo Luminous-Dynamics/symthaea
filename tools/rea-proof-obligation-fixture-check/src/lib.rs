@@ -82,6 +82,13 @@ fn candidate_has_admissible_obligation_update(
     candidate: &Value,
     obligations: &BTreeMap<String, &Value>,
 ) -> Result<bool, FixtureError> {
+    let eligible = string_at(candidate, &["authorization"])? == "authorized"
+        && bool_at(candidate, &["reversible"])?
+        && !bool_at(candidate, &["destructive"])?;
+    if !eligible {
+        return Ok(false);
+    }
+
     for effect in array_at(candidate, &["effects"])? {
         let obligation_id = string_at(effect, &["obligation_id"])?;
         let Some(obligation) = obligations.get(obligation_id) else {
@@ -246,9 +253,8 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
 
                 let initial_status = string_at(obligation, &["status"])?;
 
-                // An inadmissible observation may preserve the existing
-                // disposition or leave it unknown; it cannot change an
-                // obligation into a stronger/newly resolved state.
+                // Inadmissible evidence cannot transition an obligation in
+                // either direction; the state is unchanged.
                 if !class_is_admissible
                     && resulting_status != initial_status
                 {
@@ -259,9 +265,9 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
 
                 // An unauthorized, irreversible or destructive proposal may
                 // be recorded as rejected, but may never satisfy an obligation.
-                if !eligible && resulting_status == "satisfied" {
+                if !eligible && resulting_status != initial_status {
                     return Err(FixtureError(format!(
-                        "ineligible experiment {experiment_id} attempts to satisfy {obligation_id} in {case_id}"
+                        "ineligible experiment {experiment_id} attempts to change obligation {obligation_id} in {case_id}"
                     )));
                 }
 
@@ -860,6 +866,22 @@ mod tests {
         case["obligations"][0]["status"] = Value::String("satisfied".to_owned());
         case["candidates"][0]["effects"][0]["resulting_status"] =
             Value::String("unknown".to_owned());
+        assert!(validate_fixture(&value).is_err());
+    }
+
+
+    #[test]
+    fn ineligible_candidates_cannot_change_any_obligation_state() {
+        let mut value = fixture();
+        let case = value["cases"].as_array_mut().unwrap().iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-013").unwrap();
+        case["candidates"][0]["effects"] = serde_json::json!([{
+            "outcome":"recovered",
+            "obligation_id":"fault_reproduction",
+            "resulting_status":"unknown",
+            "evidence_class":"authorized_controlled_reproduction",
+            "source_family_id":"synthetic:unauthorized-observation"
+        }]);
         assert!(validate_fixture(&value).is_err());
     }
 
