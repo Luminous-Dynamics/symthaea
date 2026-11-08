@@ -81,7 +81,7 @@ impl FormantSingingEngine {
                 capability(
                     SingingControl::Language,
                     CapabilitySupport::Conditional,
-                    "only language='en' is accepted by the calibrated legacy formant inventory",
+                    "only language='en' or 'en-US' is accepted by the calibrated legacy formant inventory",
                 ),
                 capability(
                     SingingControl::ExactPhoneSequence,
@@ -585,9 +585,9 @@ impl FormantSingingEngine {
 
 
 fn validate_formant_language(language: &str) -> Result<()> {
-    if language != "en" {
+    if !matches!(language, "en" | "en-US") {
         bail!(
-            "FormantSingingEngine resolved-plan renderer currently supports language='en' only; got {language:?}"
+            "FormantSingingEngine resolved-plan renderer currently supports language='en' or 'en-US' only; got {language:?}"
         );
     }
     Ok(())
@@ -1958,6 +1958,6 @@ mod tests {
             .resolved_plan_frames(&pronunciation, &alignment)
             .unwrap_err()
             .to_string();
-        assert!(error.contains("language='en' only"), "{error}");
+        assert!(error.contains("language='en' or 'en-US' only"), "{error}");
     }
 }
