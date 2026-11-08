@@ -23,6 +23,9 @@ This is a nested Cargo workspace and is intentionally not part of the root works
 3. SAM semantic checks that JSON Schema alone cannot express:
    - source, frame and track references must resolve;
    - source IDs and hypothesis IDs must be unique; alternate hypotheses may share a track-lineage ID;
+   - source role, modality and evidence kind must be internally compatible;
+   - object tracks, HDC proposals and observed-free regions can cite only local or explicitly synthetic sensor observations;
+   - remote V2X claims and simulator oracle truth must remain in separate typed reference collections;
    - snapshot event/receive/processing ticks must be ordered;
    - diagonal covariance dimensions must match state ordering and units;
    - diagonal covariance entries must be finite and non-negative;
