@@ -211,11 +211,11 @@ mod tests {
         let summary = compose_error_budget(
             &contributions,
             1.0,
-            &DependenceEvidence::UnknownOrCorrelated,
+            &DependenceAssumption::UnknownOrCorrelated,
         ).unwrap();
         assert!((summary.stochastic_sigma_l1_upper - 0.7).abs() < 1.0e-12);
-        assert!((summary.stochastic_sigma_rss_under_independence_assumption.unwrap_or(0.0) - 0.7).abs() < 1.0e-12);
-        assert!(!summary.independence_was_established);
+        assert!((summary.stochastic_sigma_rss_under_independence_assumption.is_none()).abs() < 1.0e-12);
+        assert!(!summary.independence_assumption_declared);
     }
 
     #[test]
@@ -240,7 +240,7 @@ mod tests {
         let summary = compose_error_budget(&contributions, 2.0, &evidence).unwrap();
         assert!((summary.stochastic_sigma_rss_under_independence_assumption.unwrap() - 0.5).abs() < 1.0e-12);
         assert!((summary.task_sigma_rss_under_independence_assumption.unwrap() - 1.0).abs() < 1.0e-12);
-        assert!(summary.independence_was_established);
+        assert!(summary.independence_assumption_declared);
         assert!((summary.stochastic_sigma_l1_upper - 0.7).abs() < 1.0e-12);
     }
 
@@ -257,7 +257,7 @@ mod tests {
             Err(BudgetError::InvalidMagnitude)
         );
 
-        let invalid_digest = DependenceEvidence::Independent {
+        let invalid_digest = DependenceAssumption::IndependentDeclared {
             evidence_sha256: "sha256:not-a-digest".into(),
         };
         assert_eq!(
