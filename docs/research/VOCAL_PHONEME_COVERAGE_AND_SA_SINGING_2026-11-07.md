@@ -320,3 +320,12 @@ Sources:
 - GTSinger dataset licence: https://huggingface.co/datasets/GTSinger/GTSinger/blob/main/dataset_license.md
 - GTSinger NeurIPS 2024 paper: https://proceedings.neurips.cc/paper_files/paper/2024/hash/023d2c1a17cf35b11a0cbb43a0677c91-Abstract-Datasets_and_Benchmarks_Track.html
 - SoulX-Singer-Eval protocol: https://github.com/Soul-AILab/SoulX-Singer-Eval
+
+
+### South African speech resource clarification
+
+The **CSIR SAMA Speech Corpus Manual Datasets** and the **NCHLT Speech Corpus** are distinct collections and must not be described as one resource. The CSIR SAMA SADiLaR record lists orthographically transcribed broadband speech across Afrikaans, isiXhosa, isiZulu, Sepedi, Sesotho and Tshivenḓa, with a **CC BY 4.0** licence. NCHLT is a separate corpus covering all 11 official languages, described in the ML-SUPERB data catalogue as approximately 10 minutes of speech per language, with **CC BY 3.0**. Neither is a singing dataset; NCHLT's per-language duration is only a smoke-test resource, not evidence of production G2P coverage.
+
+- CSIR SAMA corpus metadata and licence: https://repo.sadilar.org/items/e44a1b0c-34c5-4957-9560-4266ca17c7d2
+- NCHLT description, per-language coverage and licence: https://multilingual.superbbenchmark.org/challenge-interspeech2025/data_description
+- NCHLT speech-corpus project and phone-set/dictionary resources: https://sites.google.com/site/nchltspeechcorpus
