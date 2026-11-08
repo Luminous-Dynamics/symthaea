@@ -13,11 +13,14 @@
 #![forbid(unsafe_code)]
 
 pub mod causal_set_nd;
+pub mod curved_frw_1p1;
 
 use std::collections::HashSet;
 use std::error::Error;
 use std::f64::consts::PI;
 use std::fmt;
+
+pub use curved_frw_1p1::{ConformalFrw1p1, CurvedFrwError};
 
 /// Count the number of order intervals containing k interior events.
 ///
