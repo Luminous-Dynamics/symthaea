@@ -1023,9 +1023,9 @@ pub fn plan_next_experiment_decision_aware(
 #[cfg(test)]
 mod tests {
     use super::super::robust::{
-        LikelihoodModelScenario, RobustExperimentProposal, ScenarioExperimentLikelihood,
+        LikelihoodModelScenario, RobustExperimentProposal, RobustPlannerConfig,
+        ScenarioExperimentLikelihood,
     };
-    use super::super::robust::RobustPlannerConfig;
     use super::super::{
         Authorization, EvidenceOrigin, EvidenceProvenance, Hypothesis, LikelihoodRow, TargetImpact,
     };
