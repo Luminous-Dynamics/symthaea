@@ -87,25 +87,33 @@ pub enum DiagnosticBenchmarkError {
     EmptyEpisodeSet,
     #[error("ground-truth hypothesis count {actual} does not match {expected}")]
     TruthHypothesisCount { expected: usize, actual: usize },
-    #[error("ground-truth action count for hypothesis {hypothesis_index}: {actual}, expected {expected}")]
+    #[error(
+        "ground-truth action count for hypothesis {hypothesis_index}: {actual}, expected {expected}"
+    )]
     TruthActionCount {
         hypothesis_index: usize,
         expected: usize,
         actual: usize,
     },
-    #[error("ground-truth outcome count for hypothesis {hypothesis_index}, action {action_index}: {actual}, expected {expected}")]
+    #[error(
+        "ground-truth outcome count for hypothesis {hypothesis_index}, action {action_index}: {actual}, expected {expected}"
+    )]
     TruthOutcomeCount {
         hypothesis_index: usize,
         action_index: usize,
         expected: usize,
         actual: usize,
     },
-    #[error("ground-truth distribution is invalid for hypothesis {hypothesis_index}, action {action_index}")]
+    #[error(
+        "ground-truth distribution is invalid for hypothesis {hypothesis_index}, action {action_index}"
+    )]
     InvalidTruthDistribution {
         hypothesis_index: usize,
         action_index: usize,
     },
-    #[error("ground-truth model assigns mass outside the agent's likelihood support for hypothesis {hypothesis_index}, action {action_index}, outcome {outcome_index}")]
+    #[error(
+        "ground-truth model assigns mass outside the agent's likelihood support for hypothesis {hypothesis_index}, action {action_index}, outcome {outcome_index}"
+    )]
     TruthOutsideModelSupport {
         hypothesis_index: usize,
         action_index: usize,
@@ -159,10 +167,16 @@ fn validate_scenario(
     evaluate_decision_focused_diagnostics(&scenario.hypotheses, &scenario.actions, config)?;
 
     let expected_hypotheses = scenario.hypotheses.len();
-    if scenario.true_outcome_probabilities_by_hypothesis_action.len() != expected_hypotheses {
+    if scenario
+        .true_outcome_probabilities_by_hypothesis_action
+        .len()
+        != expected_hypotheses
+    {
         return Err(DiagnosticBenchmarkError::TruthHypothesisCount {
             expected: expected_hypotheses,
-            actual: scenario.true_outcome_probabilities_by_hypothesis_action.len(),
+            actual: scenario
+                .true_outcome_probabilities_by_hypothesis_action
+                .len(),
         });
     }
 
@@ -180,8 +194,7 @@ fn validate_scenario(
             });
         }
         for (action_index, truth_outcomes) in truth_actions.iter().enumerate() {
-            let model_outcomes =
-                &hypothesis.outcome_probabilities_by_action[action_index];
+            let model_outcomes = &hypothesis.outcome_probabilities_by_action[action_index];
             if truth_outcomes.len() != model_outcomes.len() {
                 return Err(DiagnosticBenchmarkError::TruthOutcomeCount {
                     hypothesis_index,
@@ -249,9 +262,8 @@ fn run_policy(
     for episode_index in 0..episodes {
         // Reinitialize per episode so every policy sees the same hidden model
         // and the same outcome quantile, independent of earlier probe choices.
-        let episode_seed = seed.wrapping_add(
-            (episode_index as u64).wrapping_mul(0x9E3779B97F4A7C15),
-        );
+        let episode_seed =
+            seed.wrapping_add((episode_index as u64).wrapping_mul(0x9E3779B97F4A7C15));
         let mut rng = DeterministicRng::new(episode_seed);
         let true_hypothesis = sample_categorical(&prior, &mut rng);
         let mut posterior = prior.clone();
@@ -261,14 +273,11 @@ fn run_policy(
         if let Some(action_index) = selected_action {
             let action = &scenario.actions[action_index];
             let predicted = &information[action_index];
-            let truth = &scenario.true_outcome_probabilities_by_hypothesis_action
-                [true_hypothesis][action_index];
+            let truth = &scenario.true_outcome_probabilities_by_hypothesis_action[true_hypothesis]
+                [action_index];
             let outcome_index = sample_categorical(truth, &mut rng);
-            posterior = posterior_model_probabilities(
-                &scenario.hypotheses,
-                action_index,
-                outcome_index,
-            )?;
+            posterior =
+                posterior_model_probabilities(&scenario.hypotheses, action_index, outcome_index)?;
             action_cost = action.observation_cost;
             action_risk = action.safety_risk;
             predicted_eig_sum += predicted.model_information_gain_nats;
@@ -340,7 +349,9 @@ fn select_action(
                     selected = Some((index, eig));
                 }
             }
-            Ok(selected.filter(|(_, eig)| *eig > 0.0).map(|(index, _)| index))
+            Ok(selected
+                .filter(|(_, eig)| *eig > 0.0)
+                .map(|(index, _)| index))
         }
         DiagnosticPolicy::CostAwareEvsi => Ok(evaluate_decision_focused_diagnostics(
             &scenario.hypotheses,
@@ -433,11 +444,7 @@ struct DeterministicRng {
 impl DeterministicRng {
     fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 {
-                0x9E3779B97F4A7C15
-            } else {
-                seed
-            },
+            state: if seed == 0 { 0x9E3779B97F4A7C15 } else { seed },
         }
     }
 
@@ -555,9 +562,8 @@ mod tests {
             };
         }
 
-        let matched_result =
-            run_diagnostic_policy_benchmark(&matched, 20_000, 0xCA11B, config())
-                .expect("matched likelihood benchmark");
+        let matched_result = run_diagnostic_policy_benchmark(&matched, 20_000, 0xCA11B, config())
+            .expect("matched likelihood benchmark");
         let misspecified_result =
             run_diagnostic_policy_benchmark(&misspecified, 20_000, 0xCA11B, config())
                 .expect("misspecified likelihood benchmark");
@@ -573,8 +579,8 @@ mod tests {
     #[test]
     fn paired_policy_results_are_reproducible() {
         let scenario = irrelevant_vs_relevant_scenario();
-        let first = run_diagnostic_policy_benchmark(&scenario, 512, 42, config())
-            .expect("first benchmark");
+        let first =
+            run_diagnostic_policy_benchmark(&scenario, 512, 42, config()).expect("first benchmark");
         let second = run_diagnostic_policy_benchmark(&scenario, 512, 42, config())
             .expect("second benchmark");
         assert_eq!(first, second);
