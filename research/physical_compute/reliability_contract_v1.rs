@@ -9,7 +9,7 @@ pub enum Cell { Healthy, StuckOff, StuckOn }
 pub enum Domain { Power, Clock, Reset, Controller, Interconnect }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Error { Empty, Overflow, OutOfRange, InvalidRate, InvalidRectangle }
+pub enum Error { Empty, Overflow, AllocationFailed, OutOfRange, InvalidRate, InvalidRectangle }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Infrastructure {
@@ -55,11 +55,19 @@ impl FaultMap {
     pub fn new(rows: usize, cols: usize) -> Result<Self, Error> {
         if rows == 0 || cols == 0 { return Err(Error::Empty); }
         let n = rows.checked_mul(cols).ok_or(Error::Overflow)?;
-        Ok(Self {
-            rows, cols, cells: vec![Cell::Healthy; n],
-            failed_rows: vec![false; rows], failed_cols: vec![false; cols],
-            infrastructure: Infrastructure::default(),
-        })
+        // Fallible reservations avoid an unconditional allocator panic for a
+        // non-overflowing but unreasonable synthetic map.
+        let mut cells = Vec::new();
+        cells.try_reserve_exact(n).map_err(|_| Error::AllocationFailed)?;
+        cells.resize(n, Cell::Healthy);
+        let mut failed_rows = Vec::new();
+        failed_rows.try_reserve_exact(rows).map_err(|_| Error::AllocationFailed)?;
+        failed_rows.resize(rows, false);
+        let mut failed_cols = Vec::new();
+        failed_cols.try_reserve_exact(cols).map_err(|_| Error::AllocationFailed)?;
+        failed_cols.resize(cols, false);
+        Ok(Self { rows, cols, cells, failed_rows, failed_cols,
+            infrastructure: Infrastructure::default() })
     }
 
     fn index(&self, row: usize, col: usize) -> Result<usize, Error> {
@@ -109,7 +117,7 @@ impl FaultMap {
             || u32::from(stuck_off) + u32::from(stuck_on) > 1000 {
             return Err(Error::InvalidRate);
         }
-        let mut rng = Rng(seed);
+        let mut rng = Rng::new(seed);
         for cell in &mut self.cells {
             let draw = (rng.next() % 1000) as u16;
             *cell = if draw < stuck_off { Cell::StuckOff }
@@ -152,9 +160,9 @@ pub struct Contract {
 }
 
 impl Contract {
-    pub fn can_attempt(self, map: &FaultMap) -> bool {
-        map.infrastructure.available()
-            && map.healthy_cells() >= self.minimum_healthy_cells
+    /// Resource-only preflight. This does not prove that a workload can be mapped.
+    pub fn resources_sufficient(self, map: &FaultMap) -> bool {
+        map.healthy_cells() >= self.minimum_healthy_cells
             && (!self.require_all_rows || map.rows_intact())
             && (!self.require_all_columns || map.columns_intact())
     }
@@ -164,17 +172,37 @@ impl Contract {
 pub enum Verification { Passed, Rejected, Unavailable }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Recovery { NotAttempted, Succeeded, Failed }
+pub enum AbstentionReason {
+    NoQualifiedMapping,
+    EvidenceStale,
+    RiskBudgetExceeded,
+    UnsupportedWorkload,
+    OperatorRequested,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AttemptDisposition {
+    Attempted,
+    Abstained(AbstentionReason),
+}
+
+/// Evaluator-only label. It is deliberately separate from verifier-facing data.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EvaluatorLabel {
+    pub ground_truth_correct: bool,
+}
+
+/// Verifier-facing output and timing. No evaluator ground truth is carried here.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Observation {
-    pub attempted: bool,
-    /// Evaluator-only ground truth; it must not be exposed to the verifier.
-    pub ground_truth_correct: Option<bool>,
+    pub disposition: AttemptDisposition,
     pub verification: Verification,
     pub elapsed_ticks: u64,
     pub recovery: Recovery,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Recovery { NotAttempted, Succeeded, Failed }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Outcome {
@@ -184,18 +212,29 @@ pub enum Outcome {
     VerificationUnavailable,
     DeadlineMiss,
     HardwareUnavailable,
+    ResourceInfeasible,
+    Abstained,
     Unverifiable,
 }
 
-pub fn classify(contract: Contract, map: &FaultMap, o: Observation) -> Outcome {
-    if !o.attempted || !contract.can_attempt(map) { return Outcome::HardwareUnavailable; }
+pub fn classify(
+    contract: Contract,
+    map: &FaultMap,
+    o: Observation,
+    evaluator_label: Option<EvaluatorLabel>,
+) -> Outcome {
+    if matches!(o.disposition, AttemptDisposition::Abstained(_)) {
+        return Outcome::Abstained;
+    }
+    if !map.infrastructure.available() { return Outcome::HardwareUnavailable; }
+    if !contract.resources_sufficient(map) { return Outcome::ResourceInfeasible; }
     if o.elapsed_ticks > contract.deadline_ticks { return Outcome::DeadlineMiss; }
     match o.verification {
         Verification::Rejected => Outcome::DetectedRejected,
         Verification::Unavailable => Outcome::VerificationUnavailable,
-        Verification::Passed => match o.ground_truth_correct {
-            Some(true) => Outcome::CorrectAcceptedOnTime,
-            Some(false) => Outcome::SilentCorruptionAccepted,
+        Verification::Passed => match evaluator_label {
+            Some(label) if label.ground_truth_correct => Outcome::CorrectAcceptedOnTime,
+            Some(_) => Outcome::SilentCorruptionAccepted,
             None => Outcome::Unverifiable,
         },
     }
@@ -209,6 +248,8 @@ pub struct Counts {
     pub verification_unavailable: u64,
     pub deadline_miss: u64,
     pub hardware_unavailable: u64,
+    pub resource_infeasible: u64,
+    pub abstained: u64,
     pub unverifiable: u64,
     pub recovery_succeeded: u64,
     pub recovery_failed: u64,
@@ -224,6 +265,8 @@ impl Counts {
             Outcome::VerificationUnavailable => self.verification_unavailable += 1,
             Outcome::DeadlineMiss => self.deadline_miss += 1,
             Outcome::HardwareUnavailable => self.hardware_unavailable += 1,
+            Outcome::ResourceInfeasible => self.resource_infeasible += 1,
+            Outcome::Abstained => self.abstained += 1,
             Outcome::Unverifiable => self.unverifiable += 1,
         }
         match recovery {
@@ -236,10 +279,13 @@ impl Counts {
     pub fn total(&self) -> u64 {
         self.correct_accepted + self.silent_corruption + self.detected_rejected
             + self.verification_unavailable + self.deadline_miss
-            + self.hardware_unavailable + self.unverifiable
+            + self.hardware_unavailable + self.resource_infeasible
+            + self.abstained + self.unverifiable
     }
 
-    pub fn correct_accepted_fraction(&self) -> Option<f64> {
+    /// Correct accepted results per recorded scheduled trial. Callers must
+    /// record every scheduled trial exactly once, including abstentions.
+    pub fn correct_accepted_per_scheduled_trial(&self) -> Option<f64> {
         let n = self.total();
         if n == 0 { None } else { Some(self.correct_accepted as f64 / n as f64) }
     }
@@ -249,7 +295,8 @@ impl Counts {
 /// Bernoulli experimental units at confidence 1-alpha.
 pub fn zero_failure_upper_bound(n: u64, alpha: f64) -> Option<f64> {
     if n == 0 || !(alpha > 0.0 && alpha < 1.0) { return None; }
-    Some(1.0 - alpha.powf(1.0 / n as f64))
+    // exp_m1 avoids catastrophic cancellation when the true bound is tiny.
+    Some(-((alpha.ln() / n as f64).exp_m1()))
 }
 
 struct Rng(u64);
@@ -271,9 +318,13 @@ mod tests {
             require_all_rows: true, require_all_columns: true }
     }
 
-    fn observation(correct: bool, v: Verification, elapsed: u64) -> Observation {
-        Observation { attempted: true, ground_truth_correct: Some(correct),
+    fn observation(v: Verification, elapsed: u64) -> Observation {
+        Observation { disposition: AttemptDisposition::Attempted,
             verification: v, elapsed_ticks: elapsed, recovery: Recovery::NotAttempted }
+    }
+
+    fn label(correct: bool) -> Option<EvaluatorLabel> {
+        Some(EvaluatorLabel { ground_truth_correct: correct })
     }
 
     #[test]
@@ -318,26 +369,29 @@ mod tests {
     fn shared_domain_failure_cannot_be_fixed_by_more_cells() {
         let mut m = FaultMap::new(8, 8).unwrap();
         m.infrastructure.fail(Domain::Power);
-        let o = classify(contract(), &m, observation(true, Verification::Passed, 1));
+        let o = classify(contract(), &m, observation(Verification::Passed, 1), label(true));
         assert_eq!(o, Outcome::HardwareUnavailable);
     }
 
     #[test]
     fn rejection_and_silent_corruption_are_not_conflated() {
         let m = FaultMap::new(4, 4).unwrap();
-        assert_eq!(classify(contract(), &m, observation(false, Verification::Rejected, 5)),
+        assert_eq!(classify(contract(), &m, observation(Verification::Rejected, 5), label(false)),
             Outcome::DetectedRejected);
-        assert_eq!(classify(contract(), &m, observation(false, Verification::Passed, 5)),
+        assert_eq!(classify(contract(), &m, observation(Verification::Passed, 5), label(false)),
             Outcome::SilentCorruptionAccepted);
     }
 
     #[test]
     fn verifier_unavailable_and_deadline_miss_fail_the_contract() {
         let m = FaultMap::new(4, 4).unwrap();
-        assert_eq!(classify(contract(), &m, observation(true, Verification::Unavailable, 5)),
+        assert_eq!(classify(contract(), &m, observation(Verification::Unavailable, 5), label(true)),
             Outcome::VerificationUnavailable);
-        assert_eq!(classify(contract(), &m, observation(true, Verification::Passed, 101)),
+        assert_eq!(classify(contract(), &m, observation(Verification::Passed, 101), label(true)),
             Outcome::DeadlineMiss);
+        // The deadline boundary itself is accepted.
+        assert_eq!(classify(contract(), &m, observation(Verification::Passed, 100), label(true)),
+            Outcome::CorrectAcceptedOnTime);
     }
 
     #[test]
@@ -346,7 +400,7 @@ mod tests {
         c.record(Outcome::CorrectAcceptedOnTime, Recovery::Succeeded);
         c.record(Outcome::SilentCorruptionAccepted, Recovery::Failed);
         assert_eq!(c.total(), 2);
-        assert_eq!(c.correct_accepted_fraction(), Some(0.5));
+        assert_eq!(c.correct_accepted_per_scheduled_trial(), Some(0.5));
         assert_eq!(c.recovery_succeeded, 1);
         assert_eq!(c.recovery_failed, 1);
     }
@@ -358,5 +412,35 @@ mod tests {
         assert!((p299 - 0.00997).abs() < 0.00002);
         assert!((p2995 - 0.001).abs() < 0.00001);
         assert!(zero_failure_upper_bound(0, 0.05).is_none());
+        assert!(zero_failure_upper_bound(10, 1.0).is_none());
+        assert!(zero_failure_upper_bound(10, 0.0).is_none());
+        assert!(zero_failure_upper_bound(u64::MAX, 0.05).unwrap() > 0.0);
+    }
+
+    #[test]
+    fn zero_seed_is_non_degenerate_and_reproducible() {
+        let mut a = FaultMap::new(16, 16).unwrap();
+        let mut b = FaultMap::new(16, 16).unwrap();
+        a.inject_independent(500, 0, 0).unwrap();
+        b.inject_independent(500, 0, 0).unwrap();
+        assert_eq!(a, b);
+        assert!(a.healthy_cells() > 0);
+        assert!(a.healthy_cells() < 256);
+    }
+
+    #[test]
+    fn abstention_and_resource_infeasibility_are_not_hardware_failure() {
+        let m = FaultMap::new(4, 4).unwrap();
+        let abstained = Observation {
+            disposition: AttemptDisposition::Abstained(AbstentionReason::EvidenceStale),
+            verification: Verification::Unavailable, elapsed_ticks: 0,
+            recovery: Recovery::NotAttempted,
+        };
+        assert_eq!(classify(contract(), &m, abstained, None), Outcome::Abstained);
+
+        let mut c = contract();
+        c.minimum_healthy_cells = 17;
+        assert_eq!(classify(c, &m, observation(Verification::Passed, 1), label(true)),
+            Outcome::ResourceInfeasible);
     }
 }
