@@ -58,15 +58,18 @@
       "safety_preconditions": [
         {
           "hazard_domain": "fluid_flooding",
-          "procedure_or_evidence_ref": "synthetic:precondition:fluid_flooding"
+          "procedure_or_evidence_ref": "synthetic:precondition:fluid_flooding",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "pressure",
-          "procedure_or_evidence_ref": "synthetic:precondition:pressure"
+          "procedure_or_evidence_ref": "synthetic:precondition:pressure",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "spill_residual",
-          "procedure_or_evidence_ref": "synthetic:precondition:spill_residual"
+          "procedure_or_evidence_ref": "synthetic:precondition:spill_residual",
+          "status": "satisfied"
         }
       ],
       "access": {
@@ -170,7 +173,8 @@
         ],
         "completed_tests": [
           "leak_check",
-          "flow_check"
+          "flow_check",
+          "quality_requalification"
         ],
         "independent_authorization_ref": "synthetic:independent-review",
         "configuration_update_ref": "synthetic:configuration-update",
@@ -247,19 +251,23 @@
       "safety_preconditions": [
         {
           "hazard_domain": "electrical_isolation",
-          "procedure_or_evidence_ref": "synthetic:precondition:electrical_isolation"
+          "procedure_or_evidence_ref": "synthetic:precondition:electrical_isolation",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "pressure",
-          "procedure_or_evidence_ref": "synthetic:precondition:pressure"
+          "procedure_or_evidence_ref": "synthetic:precondition:pressure",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "fluid_flooding",
-          "procedure_or_evidence_ref": "synthetic:precondition:fluid_flooding"
+          "procedure_or_evidence_ref": "synthetic:precondition:fluid_flooding",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "mechanical_load",
-          "procedure_or_evidence_ref": "synthetic:precondition:mechanical_load"
+          "procedure_or_evidence_ref": "synthetic:precondition:mechanical_load",
+          "status": "satisfied"
         }
       ],
       "access": {
@@ -421,7 +429,8 @@
         },
         {
           "hazard_domain": "mechanical_load",
-          "procedure_or_evidence_ref": "synthetic:precondition:mechanical_load"
+          "procedure_or_evidence_ref": "synthetic:precondition:mechanical_load",
+          "status": "satisfied"
         }
       ],
       "access": {
@@ -550,19 +559,23 @@
       "safety_preconditions": [
         {
           "hazard_domain": "electrical_isolation",
-          "procedure_or_evidence_ref": "synthetic:precondition:electrical_isolation"
+          "procedure_or_evidence_ref": "synthetic:precondition:electrical_isolation",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "refrigerant",
-          "procedure_or_evidence_ref": "synthetic:precondition:refrigerant"
+          "procedure_or_evidence_ref": "synthetic:precondition:refrigerant",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "stored_energy",
-          "procedure_or_evidence_ref": "synthetic:precondition:stored_energy"
+          "procedure_or_evidence_ref": "synthetic:precondition:stored_energy",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "thermal",
-          "procedure_or_evidence_ref": "synthetic:precondition:thermal"
+          "procedure_or_evidence_ref": "synthetic:precondition:thermal",
+          "status": "satisfied"
         }
       ],
       "access": {
@@ -752,11 +765,13 @@
         },
         {
           "hazard_domain": "thermal",
-          "procedure_or_evidence_ref": "synthetic:precondition:thermal"
+          "procedure_or_evidence_ref": "synthetic:precondition:thermal",
+          "status": "satisfied"
         },
         {
           "hazard_domain": "fire_containment",
-          "procedure_or_evidence_ref": "synthetic:precondition:fire_containment"
+          "procedure_or_evidence_ref": "synthetic:precondition:fire_containment",
+          "status": "satisfied"
         }
       ],
       "access": {
