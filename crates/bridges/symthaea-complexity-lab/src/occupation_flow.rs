@@ -2325,7 +2325,6 @@ mod tests {
                 limit: 1,
             })
         );
-    }
 
         assert_eq!(
             verify_shared_dynamics_minimax_regret(
@@ -2362,6 +2361,7 @@ mod tests {
                 ..
             })
         ));
+    }
 
     #[test]
     fn rejects_infeasible_interval_rows_and_invalid_dimensions() {
