@@ -50,7 +50,7 @@ impl Tolerances {
             self.complementarity,
             self.certificate_margin,
         ];
-        if values.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+        if values.iter().any(|v| !v.is_finite() || *v <= 0.0 || *v > 1.0) {
             return Err(VerifyError::InvalidTolerance);
         }
         Ok(())
@@ -662,6 +662,29 @@ mod tests {
         assert_eq!(
             verify_infeasible(&problem, &certificate, tolerances()),
             Err(VerifyError::NonFiniteInput)
+        );
+    }
+
+    #[test]
+    fn rejects_tolerances_above_one() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 1,
+            a: vec![1.0],
+            b: vec![1.0],
+            c: vec![-1.0],
+        };
+        let certificate = OptimalCertificate {
+            primal: vec![1.0],
+            dual: vec![-1.0],
+        };
+        let invalid = Tolerances {
+            relative_gap: 1.01,
+            ..tolerances()
+        };
+        assert_eq!(
+            verify_optimal(&problem, &certificate, invalid),
+            Err(VerifyError::InvalidTolerance)
         );
     }
 
