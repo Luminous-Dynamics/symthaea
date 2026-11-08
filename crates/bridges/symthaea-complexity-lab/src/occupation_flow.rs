@@ -182,6 +182,15 @@ pub struct VerifiedOccupationFlowOptimum {
     pub utility: CheckedRational,
 }
 
+/// Proof material bound to one source model and one compiled LP.
+/// Mutating either digest invalidates replay against the corresponding LP.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OccupationFlowCertificate {
+    pub source_model_sha256: [u8; 32],
+    pub compiled_lp_sha256: [u8; 32],
+    pub primal_dual: PrimalDualCertificate,
+}
+
 /// Verified original-utility bracket for maximize or minimize queries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerifiedOccupationFlowGap {
@@ -210,6 +219,51 @@ impl OccupationFlowLp {
     /// SHA-256 of the versioned canonical compiled LP transcript, including
     /// the source model digest, direction, matrix, RHS and objective.
     pub fn compiled_lp_sha256(&self) -> [u8; 32] { self.compiled_lp_sha256 }
+
+    /// Attach the source and compiled-LP identities to candidate proof
+    /// material. This does not validate the candidate; call a verify method.
+    pub fn bind_certificate(
+        &self,
+        primal_dual: PrimalDualCertificate,
+    ) -> OccupationFlowCertificate {
+        OccupationFlowCertificate {
+            source_model_sha256: self.source_model_sha256,
+            compiled_lp_sha256: self.compiled_lp_sha256,
+            primal_dual,
+        }
+    }
+
+    /// Verify a digest-bound exact primal/dual certificate.
+    pub fn verify_bound_optimality(
+        &self,
+        certificate: &OccupationFlowCertificate,
+    ) -> Result<VerifiedOccupationFlowOptimum, OccupationFlowError> {
+        self.verify_certificate_identity(certificate)?;
+        self.verify_primal_dual_optimality(&certificate.primal_dual)
+    }
+
+    /// Verify a digest-bound primal/dual interval certificate.
+    pub fn verify_bound_gap(
+        &self,
+        certificate: &OccupationFlowCertificate,
+        requested_gap: CheckedRational,
+    ) -> Result<VerifiedOccupationFlowGap, OccupationFlowError> {
+        self.verify_certificate_identity(certificate)?;
+        self.verify_primal_dual_gap(&certificate.primal_dual, requested_gap)
+    }
+
+    fn verify_certificate_identity(
+        &self,
+        certificate: &OccupationFlowCertificate,
+    ) -> Result<(), OccupationFlowError> {
+        if certificate.source_model_sha256 != self.source_model_sha256 {
+            return Err(OccupationFlowError::CertificateSourceDigestMismatch);
+        }
+        if certificate.compiled_lp_sha256 != self.compiled_lp_sha256 {
+            return Err(OccupationFlowError::CertificateCompiledLpDigestMismatch);
+        }
+        Ok(())
+    }
 
     /// Verify exact primal/dual optimality and return a result bound to the
     /// source-model and compiled-LP SHA-256 identities.
@@ -294,6 +348,8 @@ pub enum OccupationFlowError {
         resource: &'static str,
         requested: usize,
     },
+    CertificateSourceDigestMismatch,
+    CertificateCompiledLpDigestMismatch,
     Lp(LpCertificateError),
 }
 
@@ -319,6 +375,12 @@ impl fmt::Display for OccupationFlowError {
                 f,
                 "unable to reserve occupation-flow {resource} capacity {requested}"
             ),
+            Self::CertificateSourceDigestMismatch => {
+                write!(f, "occupation-flow source-model digest mismatch")
+            }
+            Self::CertificateCompiledLpDigestMismatch => {
+                write!(f, "occupation-flow compiled-LP digest mismatch")
+            }
             Self::Lp(error) => write!(f, "LP construction failed: {error}"),
         }
     }
@@ -1096,6 +1158,50 @@ mod tests {
         assert_ne!(
             model_digest,
             canonical_interval_model_sha256(&altered_model)
+        );
+    }
+
+    #[test]
+    fn bound_certificates_reject_source_and_compiled_lp_digest_mutations() {
+        let model = fixture();
+        let scores = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let built = build_occupation_flow_lp(
+            &model,
+            &scores,
+            UtilityDirection::Maximize,
+            budget(504),
+        ).unwrap();
+        let certificate = built.bind_certificate(PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,32,25),(2,9,5),(4,1,2),(6,9,5),(8,1,2),(10,9,5),(15,13,10),(26,1,1),(31,1,1),(35,1,1)],
+            ),
+        });
+        let verified = built.verify_bound_optimality(&certificate).unwrap();
+        assert_eq!(verified.utility, q(32, 25));
+        assert_eq!(verified.source_model_sha256, built.source_model_sha256());
+        assert_eq!(verified.compiled_lp_sha256, built.compiled_lp_sha256());
+
+        let mut altered_source = certificate.clone();
+        altered_source.source_model_sha256[0] ^= 1;
+        assert_eq!(
+            built.verify_bound_optimality(&altered_source),
+            Err(OccupationFlowError::CertificateSourceDigestMismatch)
+        );
+
+        let mut altered_lp = certificate;
+        altered_lp.compiled_lp_sha256[31] ^= 1;
+        assert_eq!(
+            built.verify_bound_optimality(&altered_lp),
+            Err(OccupationFlowError::CertificateCompiledLpDigestMismatch)
         );
     }
 
