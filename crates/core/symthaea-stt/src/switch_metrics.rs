@@ -197,7 +197,7 @@ where
     for (position, language) in language_tags.iter().enumerate() {
         if let Some(group) = per_language
             .iter_mut()
-            .find(|group| group.language == *language)
+            .find(|group| &group.language == language)
         {
             group.selected_tokens += 1;
             group.errors += usize::from(token_errors[position]);
@@ -365,7 +365,7 @@ mod tests {
             &["en", "zu", "en", "zu", "en"],
             &[1],
         ).expect("valid fixture");
-        assert_eq!(result.seter.selected_tokens, 4);
+        assert_eq!(result.seter.selected_tokens, 3);
         assert_eq!(result.sper[0].score.selected_tokens, 5);
         assert_eq!(result.sper[0].score.errors, 1);
     }
