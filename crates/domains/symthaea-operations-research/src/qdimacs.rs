@@ -532,6 +532,12 @@ fn clauses_len(problem: &CnfProblem) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::quantified_proof::{
+        build_qbf_game_proof, verify_qbf_game_proof, QuantifiedProofBudget,
+    };
+    use super::super::quantified_strategy::{
+        evaluate_qbf_with_strategy, QuantifiedEvaluationBudget, StrategyOwner,
+    };
 
     fn budget() -> QdimacsParseBudget {
         QdimacsParseBudget {
@@ -575,6 +581,61 @@ mod tests {
         );
         assert_eq!(parsed.stats.parsed_literals, 4);
         assert_eq!(parsed.stats.max_literal_variable_id, 2);
+    }
+
+    #[test]
+    fn parsed_qdimacs_flows_through_independent_qbf_strategy_and_proof_verifiers() {
+        let source = "p cnf 2 2\na 1 0\ne 2 0\n-1 2 0\n1 -2 0\n";
+        let parsed = parse_qdimacs(source, budget()).unwrap();
+
+        let result = evaluate_qbf_with_strategy(
+            &parsed.problem,
+            &parsed.prefix,
+            QuantifiedEvaluationBudget::default(),
+        )
+        .unwrap();
+        assert!(result.value);
+        assert_eq!(result.strategy.owner, StrategyOwner::Existential);
+
+        let (proof, _) = build_qbf_game_proof(
+            &parsed.problem,
+            &parsed.prefix,
+            QuantifiedProofBudget::default(),
+        )
+        .unwrap();
+        let proof_report = verify_qbf_game_proof(
+            &parsed.problem,
+            &parsed.prefix,
+            &proof,
+            QuantifiedProofBudget::default(),
+        )
+        .unwrap();
+        assert!(proof_report.root_value);
+        assert_eq!(proof_report.root_value, result.value);
+    }
+
+    #[test]
+    fn implicit_existential_variables_are_used_as_innermost_skolem_dependencies() {
+        // The omitted variable y is existentially closed after forall x.
+        // forall x exists y: (x OR y) is true, with y(x) = !x.
+        let parsed = parse_qdimacs("p cnf 2 1\na 1 0\n1 2 0\n", budget()).unwrap();
+        let result = evaluate_qbf_with_strategy(
+            &parsed.problem,
+            &parsed.prefix,
+            QuantifiedEvaluationBudget::default(),
+        )
+        .unwrap();
+        assert!(result.value);
+        assert_eq!(result.strategy.owner, StrategyOwner::Existential);
+        let y = result
+            .strategy
+            .functions
+            .iter()
+            .find(|function| function.variable == 1)
+            .unwrap();
+        assert_eq!(y.dependencies, vec![0]);
+        assert_eq!(y.table.get(&vec![false]), Some(&true));
+        assert_eq!(y.table.get(&vec![true]), Some(&false));
     }
 
     #[test]
