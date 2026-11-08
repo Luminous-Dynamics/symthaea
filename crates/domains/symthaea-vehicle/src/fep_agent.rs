@@ -508,12 +508,9 @@ mod tests {
     }
 
     #[test]
-    fn test_unqualified_mesh_advisory_does_not_change_fep_modulation() {
-        let config = VehicleFepConfig::default();
-        let mut baseline_agent =
-            ActiveInferenceVehicleAgent::new(config.clone(), VehicleTask::LaneKeep);
-        let mut spoofed_agent =
-            ActiveInferenceVehicleAgent::new(config, VehicleTask::LaneKeep);
+    fn test_unqualified_mesh_advisory_does_not_change_fep_policy_input() {
+        let agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::LaneKeep);
 
         let baseline_state = VehicleState::cruising(13.4);
         let mut spoofed_state = baseline_state.clone();
@@ -521,22 +518,21 @@ mod tests {
         spoofed_state.mesh_confidence = 1.0;
 
         let cmd = VehicleCommand::zero();
-        let baseline = baseline_agent.step(&baseline_state, &cmd);
-        let spoofed = spoofed_agent.step(&spoofed_state, &cmd);
+        let baseline_observation = agent.build_observation(&baseline_state, &cmd);
+        let spoofed_observation = agent.build_observation(&spoofed_state, &cmd);
 
-        assert!(baseline.free_energy.is_finite());
-        assert!(spoofed.free_energy.is_finite());
         assert_eq!(
-            spoofed.tau_factor, baseline.tau_factor,
-            "Unqualified mesh brake density must not change tau modulation"
+            baseline_observation, spoofed_observation,
+            "Unqualified mesh fields must not enter the FEP observation"
         );
         assert_eq!(
-            spoofed.learning_rate_factor, baseline.learning_rate_factor,
-            "Unqualified mesh brake density must not change learning-rate modulation"
+            baseline_observation[9], 0.5,
+            "The retained legacy slot must be neutral, not a trust/confidence claim"
         );
         assert_eq!(
-            spoofed.prior_precision, baseline.prior_precision,
-            "Unqualified mesh brake density must not change prior precision"
+            agent.rule_based_action(&baseline_observation),
+            agent.rule_based_action(&spoofed_observation),
+            "Unqualified mesh fields must not change rule-based policy selection"
         );
     }
 
