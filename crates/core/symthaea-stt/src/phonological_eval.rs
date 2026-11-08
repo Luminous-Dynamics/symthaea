@@ -322,15 +322,19 @@ pub fn phonological_feature_error_rates(
     let m = hypothesis.len();
     let mut dp = vec![vec![0.0_f64; m + 1]; n + 1];
 
-    for i in 1..=n { dp[i][0] = dp[i - 1][0] + config.gap_penalty; }
-    for j in 1..=m { dp[0][j] = dp[0][j - 1] + config.gap_penalty; }
+    for i in 1..=n {
+        dp[i][0] = dp[i - 1][0] + full_gap_cost(&reference[i - 1], config.gap_penalty);
+    }
+    for j in 1..=m {
+        dp[0][j] = dp[0][j - 1] + full_gap_cost(&hypothesis[j - 1], config.gap_penalty);
+    }
 
     for i in 1..=n {
         for j in 1..=m {
             let sub_cost = masked_cost(&reference[i - 1], &hypothesis[j - 1], 0..config.dimension_count).0;
             let substitution = dp[i - 1][j - 1] + sub_cost;
-            let deletion = dp[i - 1][j] + config.gap_penalty;
-            let insertion = dp[i][j - 1] + config.gap_penalty;
+            let deletion = dp[i - 1][j] + full_gap_cost(&reference[i - 1], config.gap_penalty);
+            let insertion = dp[i][j - 1] + full_gap_cost(&hypothesis[j - 1], config.gap_penalty);
             dp[i][j] = substitution.min(deletion).min(insertion);
         }
     }
@@ -365,8 +369,10 @@ pub fn phonological_feature_error_rates(
             }
         }
 
-        if i > 0 && close(dp[i][j], dp[i - 1][j] + config.gap_penalty) {
+        if i > 0 {
             let segment = &reference[i - 1];
+            let feature_gap_cost = full_gap_cost(segment, config.gap_penalty);
+            if close(dp[i][j], dp[i - 1][j] + feature_gap_cost) {
             let active_feature_dimensions =
                 segment.values.iter().filter(|&&value| value != 0).count();
             let active_tone_dimensions = config.tone_dimensions.iter()
@@ -376,17 +382,20 @@ pub fn phonological_feature_error_rates(
                 reference_index: Some(i - 1),
                 hypothesis_index: None,
                 operation: FeatureAlignmentOp::Deletion,
-                feature_cost: if active_feature_dimensions > 0 { config.gap_penalty } else { 0.0 },
+                feature_cost: feature_gap_cost,
                 tone_cost: if active_tone_dimensions > 0 { config.gap_penalty } else { 0.0 },
                 active_feature_dimensions,
                 active_tone_dimensions,
             });
             i -= 1;
             continue;
+            }
         }
 
-        if j > 0 && close(dp[i][j], dp[i][j - 1] + config.gap_penalty) {
+        if j > 0 {
             let segment = &hypothesis[j - 1];
+            let feature_gap_cost = full_gap_cost(segment, config.gap_penalty);
+            if close(dp[i][j], dp[i][j - 1] + feature_gap_cost) {
             let active_feature_dimensions =
                 segment.values.iter().filter(|&&value| value != 0).count();
             let active_tone_dimensions = config.tone_dimensions.iter()
@@ -396,13 +405,14 @@ pub fn phonological_feature_error_rates(
                 reference_index: None,
                 hypothesis_index: Some(j - 1),
                 operation: FeatureAlignmentOp::Insertion,
-                feature_cost: if active_feature_dimensions > 0 { config.gap_penalty } else { 0.0 },
+                feature_cost: feature_gap_cost,
                 tone_cost: if active_tone_dimensions > 0 { config.gap_penalty } else { 0.0 },
                 active_feature_dimensions,
                 active_tone_dimensions,
             });
             j -= 1;
             continue;
+            }
         }
 
         unreachable!("Needleman-Wunsch backtrace has no predecessor");
@@ -484,6 +494,14 @@ pub fn phonological_feature_error_rates(
         ter_non_estimable,
         alignment: reverse_columns,
     })
+}
+
+fn full_gap_cost(segment: &PhonologicalFeatureVector, gap_penalty: f64) -> f64 {
+    if segment.values.iter().any(|&value| value != 0) {
+        gap_penalty
+    } else {
+        0.0
+    }
 }
 
 fn validate_widths(
