@@ -26,6 +26,12 @@ fn main() {
                     "evsi": report.independent_source_pair.evsi,
                     "information_gain_bits": report.independent_source_pair.information_gain_bits
                 },
+                "unknown_dependence_control": {
+                    "assessment": "unknown",
+                    "decision": "ABSTAIN_DEPENDENCE_UNRESOLVED",
+                    "numeric_evsi": null,
+                    "independent_product_permitted": false
+                },
                 "claim_ceiling": "SYNTHETIC_ANALYTIC_ORACLE_ONLY"
             });
             println!("{}", serde_json::to_string_pretty(&receipt).expect("receipt serializes"));
