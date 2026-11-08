@@ -403,4 +403,54 @@ mod tests {
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
         assert_eq!(out.services[0].rejected_release_attempts,1);
     }
+
+    #[test]
+    fn surplus_in_one_service_cannot_compensate_for_another_service_breach() {
+        let mut input = case(vec![
+            event("power_failure", 10, EventKind::CommonDependencyFailure, 0.0)
+        ], vec![], 3_610);
+        input.services.push(ServiceContract {
+            service_id: "electrical_distribution".into(),
+            unit: "kW".into(),
+            minimum_rate: 2.0,
+            nominal_rate: 5.0,
+            initial_rate: 5.0,
+        });
+        input.events[0].service_id = "electrical_distribution".into();
+        input.events[0].component_id = "dc_controller".into();
+        let out = evaluate_service_continuity(&input).unwrap();
+        assert_eq!(out.disposition, ContinuityDisposition::FloorBreach);
+        assert_eq!(out.services[0].time_below_floor_seconds, 0);
+        assert_eq!(out.services[1].time_below_floor_seconds, 3_600);
+        assert!((out.services[1].shortfall_rate_hours - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn procedure_and_personnel_gates_block_release() {
+        let events = vec![
+            event("failure", 10, EventKind::ComponentFailure, 0.0),
+            event("repair", 20, EventKind::RepairCompleted, 0.0),
+            event("test", 30, EventKind::PostTestPassed, 0.0),
+            event("config", 40, EventKind::ConfigurationUpdated, 0.0),
+            event("release", 50, EventKind::AuthorizedRelease, 80.0),
+        ];
+        let mut unapproved = task();
+        unapproved.procedure_approved = false;
+        let out = evaluate_service_continuity(&case(events.clone(), vec![unapproved], 100)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds, None);
+        let mut unqualified = task();
+        unqualified.qualified_personnel_present = false;
+        let out = evaluate_service_continuity(&case(events, vec![unqualified], 100)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds, None);
+    }
+
+    #[test]
+    fn duplicate_event_ids_are_rejected() {
+        let err = evaluate_service_continuity(&case(vec![
+            event("same", 10, EventKind::ComponentFailure, 0.0),
+            event("same", 20, EventKind::ServiceUnavailable, 0.0),
+        ], vec![], 100)).unwrap_err();
+        assert_eq!(err, EvaluationError::DuplicateEventId("same".into()));
+    }
+
 }
