@@ -775,7 +775,7 @@ The schema explicitly distinguishes:
 
 Its QUALIFIED state structurally requires at least two reviewers and EXPERT_NATIVE_PHONETIC_ANNOTATION. This is a structural gate, not proof that a review occurred or that a language profile is scientifically correct.
 
-The FER/TER receipt now records the feature-profile schema version and profile status alongside profile ID/revision/digest, tone dimensions, annotation authority and alignment policy. The current design receipt marks it NOT_USED.
+The FER/TER receipt now records the feature-profile schema version and profile status alongside profile ID/revision/digest, tone dimensions, annotation authority and alignment policy. It also pins a digest of the per-feature diagnostic artifact so the dimension-level active-pair/mismatch breakdown can be replayed separately from aggregate FER/TER. The current design receipt marks it NOT_USED.
 
 
 ### 19.1 Synthetic conformance vector inventory
