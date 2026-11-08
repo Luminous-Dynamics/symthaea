@@ -219,7 +219,8 @@
     "alignment_tie_policy": null,
     "unscorable_segment_count": 0,
     "feature_profile_schema_version": null,
-    "feature_profile_status": "NOT_APPLICABLE"
+    "feature_profile_status": "NOT_APPLICABLE",
+    "feature_dimension_diagnostics_sha256": null
   },
   "acoustic_faithfulness": {
     "mode": "NOT_USED",
