@@ -353,7 +353,7 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
             ],
         }
         events = flatten_performance_phones(performance)
-        self.assertEqual([event[0] for event in events], ["a", "k", "ah"])
+        self.assertEqual([event[0] for event in events], ["ah", "k", "ah"])
         self.assertAlmostEqual(events[0][1], 480.0, places=3)
         self.assertAlmostEqual(events[1][1], 20.0, places=3)
         self.assertAlmostEqual(self._event_total_ms(events), 1_000.0, places=3)
@@ -399,11 +399,11 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
                     0.0,
                     0.5,
                     [("a", True, 0.12)],
-                    melisma=((0.55, 0.5, 246.94),),
+                    melisma=((0.45, 0.5, 246.94),),
                 )
             ],
         }
-        with self.assertRaisesRegex(ValueError, "overlaps|timeline"):
+        with self.assertRaisesRegex(ValueError, "overlaps the preceding score event"):
             flatten_performance_phones(invalid_gap)
 
         invalid_language = {"language": "zu", "syllables": []}
