@@ -143,7 +143,7 @@ A graph traversal is a candidate generator, not the final semantic verdict. For 
 
 ## 6. Six public development cases
 
-Use the [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and its separate [public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md).
+Use the [eight-case Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and its separate [public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md).
 
 The six cases cover:
 - direct source anchor edit with a derived claim;
