@@ -28,6 +28,9 @@ With prior P(vulnerable)=0.5, utility matrix mitigate=(3,-6), no_action=(-20,0),
 | Conservative EIG (bits) | 0.0002885582 | 0 | 0.1887218755 |
 | Expected scenario EIG (bits) | 0.2656464823 | 0 | 0.2333968903 |
 | Lower-tail CVaR-EIG, alpha=0.25 | 0.0002885582 | 0 | 0.1887218755 |
+| Normalized planner cost | 0.3833333333 | 0.1033333333 | 0.7333333333 |
+| Point planner utility (EIG / cost) | 1.3852288863 | 0 | 0.3791889615 |
+| Robust lower-tail utility (CVaR-EIG / cost) | 0.0007527606 | 0 | 0.2573480121 |
 | Expected EVSI (synthetic utility units) | 0.775 | 0 | 0.05 |
 | Mandatory obligation updates | 0 | 1 | 1 |
 
