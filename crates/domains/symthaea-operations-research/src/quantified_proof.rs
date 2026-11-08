@@ -972,8 +972,8 @@ mod tests {
         let (proof, _) = build_qbf_game_proof(&problem, &prefix, budget()).unwrap();
         let mut tampered = proof.clone();
         let root = tampered.root;
-        let low_child = match tampered.nodes[root].kind {
-            QbfProofNodeKind::ForAllDecision { low_child, .. } => low_child,
+        let low_child = match &tampered.nodes[root].kind {
+            QbfProofNodeKind::ForAllDecision { low_child, .. } => *low_child,
             _ => unreachable!(),
         };
         tampered.nodes[low_child].kind =
