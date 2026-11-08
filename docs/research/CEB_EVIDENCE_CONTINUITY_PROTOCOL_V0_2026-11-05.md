@@ -30,6 +30,19 @@ Continuous software evolution is an emerging benchmark direction:
 
 CEB should learn from these designs, not claim direct score equivalence. Its distinct research question is the continuity of **evidence validity and assurance** across changes. A sequence can preserve functional behavior but invalidate a performance claim because the workload changed; an API refactor can invalidate a source anchor while preserving a behavioral contract; a security-policy change can revoke prior authorization even when all tests still pass.
 
+
+### 2.1 Evidence provenance and incremental-impact research
+
+The claim-continuity problem sits at the intersection of provenance, incremental analysis and selective verification:
+
+- **Incremental Program Analysis in the Wild (ASE 2025)** builds a real-change benchmark from 4,084 commits across 20 Java projects. It reports that incremental analysis can improve efficiency, but the two evaluated tools show inconsistencies and higher peak memory. CEB should measure correctness of invalidation and resource use together, not just speed. [ASE 2025 paper](https://doi.org/10.1109/ase63991.2025.00194).
+- **DiffCI Open Evidence Study 2026** reports 2,000 historical commit deltas across 20 repositories. Only 29.8% offered a selective-test opportunity; the reported whole-corpus test reduction against a path rule was 4.2%, while job-level recall of 280 historical CI failures was 96.4% versus 70.7% for the path rule. Its own limitations matter: the study is self-published, reports no production CI runs skipped, and says its 32 measurable mutation cases do not support a reliability estimate. Treat it as a useful methodological comparator, not a universal baseline. [Study and raw evidence](https://diffci.com/research/diffci-open-evidence-2026).
+- **SLSA Build Provenance v1** binds artifact subjects to build definitions and run details, and models resolvedDependencies as URI/digest pairs. Its current specification says dependency completeness is best-effort through Build L3 and platform-enforced at L4. Thus a provenance record should be treated according to its declared assurance level; it is not automatically a complete semantic dependency closure. [SLSA Build Provenance](https://slsa.dev/spec/v1.2/provenance).
+- **in-toto Attestation v1.2** separates predicate, subject-binding statement, authentication envelope and bundle. Reuse its artifact-identity and predicate-typing principles through existing CEB receipt/attestation ownership; do not create another envelope. [in-toto Attestation Framework](https://github.com/in-toto/attestation).
+- **From Agent Traces to Trust (June 2026)** surveys evidence and execution provenance for agents and identifies claim-level/semantic provenance, realistic execution-trace benchmarks and provenance-aware safety as open research challenges. CEB's differentiator is to connect claim semantics and decision-use validity to repository evolution, not merely log tool calls. [Survey](https://arxiv.org/abs/2606.04990).
+
+**Design consequence:** a dependency graph may be useful but does not itself prove completeness, causality or non-impact. A file-path diff is a cheap candidate generator; an artifact digest is identity evidence; an attestation is authenticated provenance within its contract; and a claim-support closure is the semantic argument connecting those records to a particular engineering proposition. Keep these layers separate.
+
 ## 3. Evaluation unit and event model
 
 The evaluation unit is a frozen sequence:
@@ -266,6 +279,20 @@ Do not conflate these questions:
 
 A single change may affect one, several, or none of these dimensions. For example, a grader-only correction may require a regrade under #10610, update a previously published comparison under #10619, and leave the engineering source claim unchanged. A dependency update may invalidate a compiler-resolved API claim and require a new run, without changing the benchmark's official grader.
 
+
+### 14.3 Claim-support closure extension
+
+The [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its [six-case public challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md), and its [separate public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) refine the existing continuity disposition contract. They require a bounded support closure for each consequential claim, an impact witness for revalidate/invalidate/supersede, and an unaffectedness witness for retain.
+
+The extension is an annotation/evaluation adapter over #10173 graph facts, #9112 decision-use validity, #10314 canonical evidence/receipts and #10630 continuity. It introduces no second repository graph, persistent evidence ledger, task schema, receipt, DSSE envelope or generic invalidation engine. It does not change the seven CEB-CONTINUITY primary metrics registered by #10632; closure completeness and impact/unaffectedness witnesses are diagnostic adjudication annotations within the existing lane.
+
+The public six-case challenge is development-only and not a sealed holdout. It distinguishes source/documentation claims from conformance claims, shared upstream dependencies, build-world selection, verifier-only changes, authority revocation, and metadata-only changes with an already-incomplete closure. The static validator checks document coverage and ownership links only; it does not build a claim graph or infer a real disposition.
+
+**Integration experiment:** compare C0 changed-path heuristic, C1 existing #10630 continuity disposition process, and C2 #10630 plus support-closure witnesses on matched sequences. Use the already registered continuity measures: evidence-disposition macro-F1, stale-evidence use, false invalidation, revalidation cost per accepted sequence, sequence-complete rate, repair survival and evidence-lineage completeness. Preserve resource measurements, including peak memory and graph/closure size, as diagnostic cost. Never reward a blanket invalidate-everything policy or a blanket rerun-everything policy.
+
+The original prospective targets remain: reduce revalidation cost by at least 20% versus reset-and-recheck while keeping stale-evidence false use at zero on declared high-severity controls. Freeze any confirmatory threshold through #10619 after a blinded pilot; do not register post-hoc targets from the public six cases.
+
+
 ### 14.2 Required integration tests for a later executable release
 
 The static design should eventually be represented by paired cases where:
@@ -280,3 +307,12 @@ The static design should eventually be represented by paired cases where:
 - a statistical claim is downgraded when its cluster count, power evidence, or matched-input conditions fail.
 
 These are future qualification cases, not executed tests or admitted task records.
+
+
+## 15. Additional references for claim-support closure
+
+- Wang et al., [Incremental Program Analysis in the Wild: An Empirical Study on Real-World Program Changes](https://doi.org/10.1109/ase63991.2025.00194), ASE 2025.
+- DiffCI, [Open Evidence Study 2026](https://diffci.com/research/diffci-open-evidence-2026), published September 3, updated September 25, 2026; self-published methodological comparator with disclosed limitations and raw-data links.
+- SLSA, [Build Provenance v1](https://slsa.dev/spec/v1.2/provenance), current specification; buildDefinition, runDetails and resolvedDependencies.
+- in-toto, [Attestation Framework v1.2](https://github.com/in-toto/attestation), subject-bound typed statements with distinct predicate, envelope and bundle layers.
+- Wang et al., [From Agent Traces to Trust: A Survey of Evidence Tracing and Execution Provenance in LLM Agents](https://arxiv.org/abs/2606.04990), June 3, 2026.
