@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea adaptive orchestration counterfactual fixture pack v0",
+  "description": "Synthetic known-policy branch controls. Structural validity does not establish model capability or scientific performance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_issue",
+    "purpose",
+    "semantics",
+    "cases",
+    "evaluation_policy",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-orchestration-counterfactual-v0"
+    },
+    "status": {
+      "const": "SYNTHETIC_POLICY_FIXTURES_NOT_BENCHMARK_RESULTS"
+    },
+    "source_issue": {
+      "const": "#11012"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relevant_evidence",
+        "irrelevant_evidence",
+        "invariant_requirement",
+        "claim_boundary"
+      ],
+      "properties": {
+        "relevant_evidence": {
+          "type": "string"
+        },
+        "irrelevant_evidence": {
+          "type": "string"
+        },
+        "invariant_requirement": {
+          "type": "string"
+        },
+        "claim_boundary": {
+          "type": "string"
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "family",
+          "status",
+          "initial_state",
+          "counterfactual_state",
+          "decision_relevance",
+          "expected_transition",
+          "permitted_actions",
+          "expected_action",
+          "required_response",
+          "prohibited_inferences",
+          "evidence_to_bind"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "SYNTHETIC_KNOWN_DECISION"
+          },
+          "initial_state": {
+            "type": "object",
+            "required": [
+              "state_id",
+              "evidence_prefix_id",
+              "preferred_action"
+            ],
+            "properties": {
+              "state_id": {
+                "type": "string"
+              },
+              "evidence_prefix_id": {
+                "type": "string"
+              },
+              "preferred_action": {
+                "type": "string"
+              }
+            }
+          },
+          "counterfactual_state": {
+            "type": "object",
+            "required": [
+              "state_id",
+              "evidence_prefix_id",
+              "new_observation",
+              "observation_effect"
+            ],
+            "properties": {
+              "state_id": {
+                "type": "string"
+              },
+              "evidence_prefix_id": {
+                "type": "string"
+              },
+              "new_observation": {
+                "type": "string"
+              },
+              "observation_effect": {
+                "type": "string"
+              }
+            }
+          },
+          "decision_relevance": {
+            "enum": [
+              "relevant",
+              "irrelevant"
+            ]
+          },
+          "expected_transition": {
+            "enum": [
+              "change",
+              "invariant"
+            ]
+          },
+          "permitted_actions": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "expected_action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_response": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "prohibited_inferences": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_to_bind": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "denominator",
+        "response_contract",
+        "score_separation",
+        "no_single_scalar"
+      ],
+      "properties": {
+        "denominator": {
+          "type": "string"
+        },
+        "response_contract": {
+          "type": "string"
+        },
+        "score_separation": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "no_single_scalar": {
+          "type": "string"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

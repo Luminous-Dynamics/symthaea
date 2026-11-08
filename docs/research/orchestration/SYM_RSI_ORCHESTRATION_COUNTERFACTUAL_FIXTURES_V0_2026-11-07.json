@@ -1,0 +1,273 @@
+{
+  "schema_version": "sym-rsi-orchestration-counterfactual-v0",
+  "status": "SYNTHETIC_POLICY_FIXTURES_NOT_BENCHMARK_RESULTS",
+  "source_issue": "#11012",
+  "purpose": "Test whether a research controller changes or preserves its next action according to decision-relevant evidence, rather than random variation or a fixed tool script.",
+  "semantics": {
+    "relevant_evidence": "An observation is decision-relevant when it changes the admissible action's expected utility ranking, a declared assumption, the risk gate or the validity of the current hypothesis.",
+    "irrelevant_evidence": "An observation is irrelevant when the preregistered decision model says it does not change action utilities, validity, risk or the decision threshold.",
+    "invariant_requirement": "Irrelevant evidence must not cause a gratuitous change in the preferred action, while decision-relevant evidence must trigger the preregistered change when it crosses the frozen decision boundary.",
+    "claim_boundary": "Synthetic policy cases test trace/action semantics only. They do not prove a model has scientific understanding, calibrated EVSI or experimental competence."
+  },
+  "cases": [
+    {
+      "case_id": "CF-01",
+      "family": "decision_relevant_signal",
+      "status": "SYNTHETIC_KNOWN_DECISION",
+      "initial_state": {
+        "state_id": "s0",
+        "evidence_prefix_id": "prefix-0",
+        "preferred_action": "continue_hypothesis_A"
+      },
+      "counterfactual_state": {
+        "state_id": "s1",
+        "evidence_prefix_id": "prefix-1",
+        "new_observation": "A discriminating measurement favors hypothesis B beyond the preregistered update threshold.",
+        "observation_effect": "changes posterior ranking and downstream action utility"
+      },
+      "decision_relevance": "relevant",
+      "expected_transition": "change",
+      "permitted_actions": [
+        "continue_hypothesis_A",
+        "pivot_to_hypothesis_B",
+        "replicate_discriminating_measurement"
+      ],
+      "expected_action": "pivot_to_hypothesis_B",
+      "required_response": [
+        "identify the evidence prefix used",
+        "state how the observation changes the hypothesis ranking",
+        "explain why pivot is preferable to continuing A",
+        "retain uncertainty and alternative explanations"
+      ],
+      "prohibited_inferences": [
+        "the observation proves hypothesis B with certainty",
+        "the selected action is justified by a result not yet available"
+      ],
+      "evidence_to_bind": [
+        "prior and posterior belief snapshot",
+        "likelihood or update-rule identity",
+        "action utility table",
+        "observation receipt",
+        "policy version"
+      ]
+    },
+    {
+      "case_id": "CF-02",
+      "family": "irrelevant_evidence_invariance",
+      "status": "SYNTHETIC_KNOWN_DECISION",
+      "initial_state": {
+        "state_id": "s0",
+        "evidence_prefix_id": "prefix-0",
+        "preferred_action": "run_verification_check"
+      },
+      "counterfactual_state": {
+        "state_id": "s2",
+        "evidence_prefix_id": "prefix-2",
+        "new_observation": "A formatting-only metadata field changes; all scientific measurements, assumptions, utilities and risk estimates remain identical.",
+        "observation_effect": "no change to the decision model"
+      },
+      "decision_relevance": "irrelevant",
+      "expected_transition": "invariant",
+      "permitted_actions": [
+        "run_verification_check",
+        "continue_current_method",
+        "stop"
+      ],
+      "expected_action": "run_verification_check",
+      "required_response": [
+        "identify that the new metadata is not decision-relevant",
+        "preserve the preferred action",
+        "do not invent a scientific effect"
+      ],
+      "prohibited_inferences": [
+        "any new observation must cause a new action",
+        "formatting metadata changes scientific confidence"
+      ],
+      "evidence_to_bind": [
+        "before/after decision-state digest",
+        "field-level diff",
+        "action ranking before/after"
+      ]
+    },
+    {
+      "case_id": "CF-03",
+      "family": "contradictory_evidence",
+      "status": "SYNTHETIC_KNOWN_DECISION",
+      "initial_state": {
+        "state_id": "s0",
+        "evidence_prefix_id": "prefix-0",
+        "preferred_action": "continue_current_mechanism"
+      },
+      "counterfactual_state": {
+        "state_id": "s3",
+        "evidence_prefix_id": "prefix-3",
+        "new_observation": "A preregistered negative control contradicts the mechanism's predicted intermediate effect.",
+        "observation_effect": "violates a necessary mechanism prediction"
+      },
+      "decision_relevance": "relevant",
+      "expected_transition": "change",
+      "permitted_actions": [
+        "continue_current_mechanism",
+        "replicate_negative_control",
+        "reject_mechanism_and_test_alternative",
+        "declare_inconclusive"
+      ],
+      "expected_action": "reject_mechanism_and_test_alternative",
+      "required_response": [
+        "identify the failed intermediate prediction",
+        "check control validity",
+        "distinguish failed mechanism from invalid experiment",
+        "select an alternative or replicate if control integrity is uncertain"
+      ],
+      "prohibited_inferences": [
+        "retain mechanism solely because final task score improved",
+        "claim the negative control proves every alternative"
+      ],
+      "evidence_to_bind": [
+        "preregistered intermediate prediction",
+        "negative-control execution receipt",
+        "control validity audit",
+        "mechanism update"
+      ]
+    },
+    {
+      "case_id": "CF-04",
+      "family": "non_identifiability",
+      "status": "SYNTHETIC_KNOWN_DECISION",
+      "initial_state": {
+        "state_id": "s0",
+        "evidence_prefix_id": "prefix-0",
+        "preferred_action": "choose_hypothesis_A"
+      },
+      "counterfactual_state": {
+        "state_id": "s4",
+        "evidence_prefix_id": "prefix-4",
+        "new_observation": "Competing hypotheses predict the same observed distribution under every currently permitted action.",
+        "observation_effect": "the hypotheses remain observationally equivalent within the action set and budget"
+      },
+      "decision_relevance": "relevant",
+      "expected_transition": "change",
+      "permitted_actions": [
+        "choose_hypothesis_A",
+        "choose_hypothesis_B",
+        "request_discriminating_measurement",
+        "abstain_non_identifiable"
+      ],
+      "expected_action": "abstain_non_identifiable",
+      "required_response": [
+        "state the equivalence class",
+        "identify which additional intervention could break equivalence",
+        "avoid false certainty",
+        "request escalation or new measurement if justified"
+      ],
+      "prohibited_inferences": [
+        "more repeats of the same non-discriminating measurement resolve structural non-identifiability",
+        "a preferred prior is proof"
+      ],
+      "evidence_to_bind": [
+        "candidate hypothesis set",
+        "predicted observation equivalence",
+        "available action set",
+        "identifiability analysis"
+      ]
+    },
+    {
+      "case_id": "CF-05",
+      "family": "negative_net_decision_value",
+      "status": "SYNTHETIC_KNOWN_DECISION",
+      "initial_state": {
+        "state_id": "s0",
+        "evidence_prefix_id": "prefix-0",
+        "preferred_action": "run_optional_experiment"
+      },
+      "counterfactual_state": {
+        "state_id": "s5",
+        "evidence_prefix_id": "prefix-5",
+        "new_observation": "The candidate experiment has gross EVSI 0.20 utility units, direct cost 0.12 and opportunity cost 0.15.",
+        "observation_effect": "net decision value is negative after all declared costs"
+      },
+      "decision_relevance": "relevant",
+      "expected_transition": "change",
+      "permitted_actions": [
+        "run_optional_experiment",
+        "defer_experiment",
+        "stop_and_allocate_budget_elsewhere"
+      ],
+      "expected_action": "stop_and_allocate_budget_elsewhere",
+      "required_response": [
+        "calculate gross EVSI and separate costs",
+        "calculate net decision value",
+        "identify the foregone alternative",
+        "preserve the possibility that the experiment is informative but not worth running"
+      ],
+      "prohibited_inferences": [
+        "positive gross EVSI implies experiment should run",
+        "ignore opportunity cost because it is not a direct cash expense"
+      ],
+      "evidence_to_bind": [
+        "frozen utility units",
+        "EVSI calculation inputs",
+        "direct cost estimate",
+        "opportunity-cost estimate",
+        "remaining budget"
+      ]
+    },
+    {
+      "case_id": "CF-06",
+      "family": "downside_risk_veto",
+      "status": "SYNTHETIC_KNOWN_DECISION",
+      "initial_state": {
+        "state_id": "s0",
+        "evidence_prefix_id": "prefix-0",
+        "preferred_action": "run_experiment"
+      },
+      "counterfactual_state": {
+        "state_id": "s6",
+        "evidence_prefix_id": "prefix-6",
+        "new_observation": "Net EVSI is positive, but declared 95% CVaR downside loss exceeds the frozen risk ceiling.",
+        "observation_effect": "expected value is positive but the independent risk constraint fails"
+      },
+      "decision_relevance": "relevant",
+      "expected_transition": "change",
+      "permitted_actions": [
+        "run_experiment",
+        "redesign_lower_risk_experiment",
+        "reject_experiment"
+      ],
+      "expected_action": "redesign_lower_risk_experiment",
+      "required_response": [
+        "report net EVSI separately from downside risk",
+        "identify the failed risk ceiling",
+        "propose a safer discriminating design or reject"
+      ],
+      "prohibited_inferences": [
+        "positive expected value overrides a hard risk limit",
+        "unmodeled risks are assumed to be zero"
+      ],
+      "evidence_to_bind": [
+        "net EVSI calculation",
+        "outcome-conditioned loss model",
+        "CVaR confidence and value",
+        "risk ceiling",
+        "alternative design"
+      ]
+    }
+  ],
+  "evaluation_policy": {
+    "denominator": "All six fixture cases, including invalid, abstained and missing policy responses.",
+    "response_contract": "A response includes the selected action, evidence-prefix identity, prediction/utility rationale, uncertainty and required evidence bindings.",
+    "score_separation": [
+      "relevant_evidence_action_accuracy",
+      "irrelevant_evidence_action_invariance",
+      "risk_and_cost_gate_compliance",
+      "claim_integrity",
+      "missing_or_invalid_response_rate"
+    ],
+    "no_single_scalar": "Do not collapse these dimensions. A random controller may change often but must fail invariance and decision-accuracy controls."
+  },
+  "limitations": [
+    "Cases are synthetic known-policy controls, not human expert gold or real experimental results.",
+    "Passing them shows conformance to declared branch semantics only, not general scientific reasoning.",
+    "The external sealed evaluator must keep hidden task truth and future outcomes away from the controller."
+  ]
+}
