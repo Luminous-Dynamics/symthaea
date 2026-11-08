@@ -77,6 +77,34 @@ fn array_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Vec<Value>, Fixtu
 /// Check semantic relationships that JSON Schema alone cannot express:
 /// unique identities, referential integrity, evidence admissibility, and
 /// hard authorization/reversibility gates.
+
+fn candidate_has_admissible_obligation_update(
+    candidate: &Value,
+    obligations: &BTreeMap<String, &Value>,
+) -> Result<bool, FixtureError> {
+    for effect in array_at(candidate, &["effects"])? {
+        let obligation_id = string_at(effect, &["obligation_id"])?;
+        let Some(obligation) = obligations.get(obligation_id) else {
+            return Err(FixtureError(format!(
+                "effect references undeclared obligation {obligation_id}"
+            )));
+        };
+        if !bool_at(obligation, &["required"])? {
+            continue;
+        }
+        let evidence_class = string_at(effect, &["evidence_class"])?;
+        let resulting_status = string_at(effect, &["resulting_status"])?;
+        let initial_status = string_at(obligation, &["status"])?;
+        let admissible = array_at(obligation, &["admissible_evidence_classes"])?
+            .iter()
+            .any(|item| item.as_str() == Some(evidence_class));
+        if admissible && resulting_status != initial_status && resulting_status != "unknown" {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
     if string_at(value, &["schema_version"])? != "0.1.0"
         || string_at(value, &["dataset_id"])? != "rea-proof-obligation-acquisition"
@@ -227,8 +255,20 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
             }
         }
 
+        let mut any_candidate_can_update = false;
+        for candidate in candidate_by_id.values() {
+            any_candidate_can_update |=
+                candidate_has_admissible_obligation_update(candidate, &obligation_by_id)?;
+        }
+
         let preferred = string_at(case, &["expected_policy", "preferred_candidate_id"])?;
-        if preferred != "abstain" {
+        if preferred == "abstain" {
+            if any_candidate_can_update {
+                return Err(FixtureError(format!(
+                    "case {case_id} abstains although an admissible candidate can update a mandatory obligation"
+                )));
+            }
+        } else {
             let candidate = candidate_by_id.get(preferred).ok_or_else(|| {
                 FixtureError(format!(
                     "preferred candidate {preferred} is not declared in {case_id}"
@@ -240,6 +280,11 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
             if !eligible {
                 return Err(FixtureError(format!(
                     "preferred candidate {preferred} is not eligible in {case_id}"
+                )));
+            }
+            if !candidate_has_admissible_obligation_update(candidate, &obligation_by_id)? {
+                return Err(FixtureError(format!(
+                    "preferred candidate {preferred} cannot update a mandatory obligation with admissible evidence in {case_id}"
                 )));
             }
         }
@@ -729,6 +774,31 @@ mod tests {
         let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
         agent["cases"][0]["claim_text"] = Value::String("silently changed claim".to_owned());
         assert!(validate_split_matches_authoring(&authoring, &agent, &grader).is_err());
+    }
+
+
+    #[test]
+    fn preferred_candidate_must_have_an_admissible_mandatory_obligation_update() {
+        let mut value = fixture();
+        let case = value["cases"].as_array_mut().unwrap().iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-001").unwrap();
+        case["candidates"][1]["effects"] = serde_json::json!([]);
+        assert!(validate_fixture(&value).is_err());
+    }
+
+    #[test]
+    fn abstention_is_rejected_when_an_admissible_candidate_can_update_an_obligation() {
+        let mut value = fixture();
+        let case = value["cases"].as_array_mut().unwrap().iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-012").unwrap();
+        case["candidates"][0]["effects"] = serde_json::json!([{
+            "outcome":"no_network_event",
+            "obligation_id":"complete_network_observation",
+            "resulting_status":"satisfied",
+            "evidence_class":"instrumented_full_session",
+            "source_family_id":"synthetic:session-control-012"
+        }]);
+        assert!(validate_fixture(&value).is_err());
     }
 
 }
