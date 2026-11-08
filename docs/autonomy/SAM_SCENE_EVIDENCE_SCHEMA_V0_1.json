@@ -480,7 +480,8 @@
         "unresolved",
         "traffic_convention_profile_id",
         "cooperative_advisory_refs",
-        "simulator_truth_refs"
+        "simulator_truth_refs",
+        "follow_target_context"
       ],
       "properties": {
         "snapshot_id": {
@@ -926,6 +927,99 @@
           "items": {
             "$ref": "#/$defs/nonEmptyString"
           }
+        },
+        "follow_target_context": {
+          "$ref": "#/$defs/followTargetContext"
+        }
+      }
+    },
+    "followTargetContext": {
+      "type": "object",
+      "required": [
+        "consumer_profile",
+        "status",
+        "evidence_source_ref",
+        "scenario_id",
+        "actor_id",
+        "coordinate_frame_id",
+        "observation_tick_ns",
+        "max_age_ns",
+        "gap_m",
+        "relative_speed_mps",
+        "distance_uncertainty_m"
+      ],
+      "properties": {
+        "consumer_profile": {
+          "enum": [
+            "simulation_benchmark",
+            "local_perception",
+            "deployment"
+          ]
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unknown",
+            "rejected"
+          ]
+        },
+        "evidence_source_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scenario_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "actor_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coordinate_frame_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation_tick_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_age_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "gap_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "relative_speed_mps": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "distance_uncertainty_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     }
