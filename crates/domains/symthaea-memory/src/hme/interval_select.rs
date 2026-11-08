@@ -18,7 +18,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::group_envelope::{ContinuousHVGroupEnvelope, GroupEnvelopeError};
+use super::group_envelope::{
+    ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
+};
 
 use symthaea_core::hdc::continuous_hv_interval::{
     ContinuousHVIntervalError, ContinuousHVScoreInterval, ResidualCertificateError,
@@ -177,6 +179,7 @@ pub struct GroupScoreIntervalIdentity {
 pub struct GroupScoreIntervalRecord {
     identity: GroupScoreIntervalIdentity,
     member_ids: Vec<String>,
+    member_payload_digests: Vec<[u8; 32]>,
     member_count: usize,
     interval: ContinuousHVScoreInterval,
 }
@@ -239,6 +242,7 @@ impl GroupScoreIntervalRecord {
                 content_digest: expected_content_digest,
             },
             member_ids: envelope.member_ids().to_vec(),
+            member_payload_digests: envelope.member_payload_digests().to_vec(),
             member_count,
             interval,
         })
@@ -314,6 +318,8 @@ pub struct GroupMemberScoreIntervalRecord {
 pub enum GroupMemberScoreIntervalBuildError {
     /// The requested stable ID is not a member of the supplied group envelope.
     MemberNotInGroup,
+    /// The original payload bytes do not match the member payload bound to the group.
+    OriginalPayloadDigestMismatch,
     /// Original/reconstruction residual or score interval validation failed.
     ScoreInterval(ScoreIntervalBuildError),
 }
@@ -322,6 +328,7 @@ impl std::fmt::Display for GroupMemberScoreIntervalBuildError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MemberNotInGroup => write!(f, "record ID is not in the pinned parent group"),
+            Self::OriginalPayloadDigestMismatch => write!(f, "original payload does not match the group-bound member bytes"),
             Self::ScoreInterval(error) => write!(f, "member score interval rejected: {error}"),
         }
     }
@@ -340,8 +347,17 @@ impl GroupMemberScoreIntervalRecord {
         reconstruction: &ContinuousHV,
         residual_l2_upper: f32,
     ) -> Result<Self, GroupMemberScoreIntervalBuildError> {
-        if group.member_ids.binary_search(&id).is_err() {
-            return Err(GroupMemberScoreIntervalBuildError::MemberNotInGroup);
+        let member_index = group
+            .member_ids
+            .binary_search(&id)
+            .map_err(|_| GroupMemberScoreIntervalBuildError::MemberNotInGroup)?;
+        let expected_payload_digest = group
+            .member_payload_digests
+            .get(member_index)
+            .copied()
+            .ok_or(GroupMemberScoreIntervalBuildError::OriginalPayloadDigestMismatch)?;
+        if continuous_hv_member_payload_digest(&id, original) != expected_payload_digest {
+            return Err(GroupMemberScoreIntervalBuildError::OriginalPayloadDigestMismatch);
         }
         let record = ScoreIntervalRecord::from_verified_l2_residual(
             id,
