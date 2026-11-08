@@ -623,16 +623,135 @@
       "snapshot": {
         "secondary_board": "SOTA2",
         "snapshot_date": "2026-11-08",
-        "human_agent_EPDMS": 90.3,
-        "LWDrive_EPDMS": 89.6,
-        "ExploreVLA_EPDMS": 88.8,
-        "DriveWorld_VLA_EPDMS": 86.8
+        "leaderboard_version": "NAVSIM v2 as displayed by SOTA2; evaluator/split identity not independently confirmed",
+        "methods": [
+          {
+            "name": "Human Agent",
+            "NC": 100,
+            "DAC": 100,
+            "DDC": 99.8,
+            "TLC": 100,
+            "EP": 87.4,
+            "TTC": 100,
+            "LK": 100,
+            "HC": 98.1,
+            "EC": 90.1,
+            "EPDMS": 90.3
+          },
+          {
+            "name": "LWDrive",
+            "NC": 98.8,
+            "DAC": 98.4,
+            "DDC": 99,
+            "TLC": 99.7,
+            "EP": 90.3,
+            "TTC": 98.6,
+            "LK": 96.3,
+            "HC": 97.9,
+            "EC": 73.3,
+            "EPDMS": 89.6
+          },
+          {
+            "name": "ExploreVLA",
+            "NC": 98.8,
+            "DAC": 96.2,
+            "DDC": 99.6,
+            "TLC": 99.8,
+            "EP": 87.1,
+            "TTC": 98.2,
+            "LK": 97.8,
+            "HC": 98.3,
+            "EC": 86.8,
+            "EPDMS": 88.8
+          },
+          {
+            "name": "ELF-VLA-8B",
+            "NC": 98.9,
+            "DAC": 98.1,
+            "DDC": 99.4,
+            "TLC": 99.8,
+            "EP": 88.5,
+            "TTC": 98.4,
+            "LK": 96.9,
+            "HC": 98.3,
+            "EC": 87.2,
+            "EPDMS": 87.1
+          },
+          {
+            "name": "DriveWorld-VLA",
+            "NC": 98.6,
+            "DAC": 99.1,
+            "DDC": 99.6,
+            "TLC": 99.8,
+            "EP": 87.4,
+            "TTC": 97.9,
+            "LK": 97,
+            "HC": 97.8,
+            "EC": 78.6,
+            "EPDMS": 86.8
+          },
+          {
+            "name": "TPS-Drive",
+            "NC": 98.5,
+            "DAC": 98.6,
+            "DDC": 99.7,
+            "TLC": 99.8,
+            "EP": 87.6,
+            "TTC": 98,
+            "LK": 97.1,
+            "HC": 98.3,
+            "EC": 82.5,
+            "EPDMS": 86.7
+          },
+          {
+            "name": "CdDrive",
+            "NC": 98.3,
+            "DAC": 97.4,
+            "DDC": 99.6,
+            "TLC": 99.8,
+            "EP": 88.4,
+            "TTC": 97.9,
+            "LK": 97.5,
+            "HC": 98.4,
+            "EC": 88.2,
+            "EPDMS": 86.4
+          },
+          {
+            "name": "HydraMDP++",
+            "NC": 98.5,
+            "DAC": 98.5,
+            "DDC": 99.5,
+            "TLC": 99.7,
+            "EP": 87.4,
+            "TTC": 97.9,
+            "LK": 95.8,
+            "HC": 98.2,
+            "EC": 75.7,
+            "EPDMS": 85.6
+          },
+          {
+            "name": "ARTEMIS",
+            "NC": 98.3,
+            "DAC": 95.1,
+            "DDC": 98.6,
+            "TLC": 99.8,
+            "EP": 81.5,
+            "TTC": 97.4,
+            "LK": 96.5,
+            "HC": 98.3,
+            "EC": null,
+            "EPDMS": 83.1
+          }
+        ],
+        "unit": "percentage points unless the upstream table defines otherwise; use upstream evaluator for exact semantics"
       },
       "caveats": [
         "SOTA2 is a secondary leaderboard and these values are not independently verified by SAM.",
         "The official NAVSIM v2 protocol is pseudo-simulation with precomputed follow-up scenes; it is not a fully reciprocal online traffic simulator.",
         "EPDMS aggregates multiple component metrics; report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC separately.",
-        "Exact data split, evaluator revision, filtering, model checkpoint and sensor privilege must be pinned before reproducing or comparing numbers."
+        "Exact data split, evaluator revision, filtering, model checkpoint and sensor privilege must be pinned before reproducing or comparing numbers.",
+        "The leaderboard table has displayed version/timestamp labels for methods; model artifact, evaluator and split identity must be pinned before reproduction.",
+        "Do not treat any missing component as zero or collapse the component panel into a single explanation of model quality."
       ],
       "sources": [
         "https://github.com/autonomousvision/navsim",
