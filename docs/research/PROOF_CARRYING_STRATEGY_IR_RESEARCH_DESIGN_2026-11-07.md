@@ -431,3 +431,27 @@ The implementation boundary is tracked in #11036. Before coding:
 - preserve the distinction between #SAT, projected #SAT, weighted/algebraic counting, QBF truth, QBF strategies and #QBF strategy counting.
 
 The CPOG simulation result is a proof-complexity relation, not an empirical runtime guarantee. Measure proof size/generation and independent checking on held-out exact #SAT families before promoting it as the practical common target.
+
+
+## 17. Arithmetic coupling as an additional ROBDD ordering signal
+
+The GF(2) interaction graph remains an exact description of non-zero second Boolean mixed derivatives. It has a known limitation as an ordering heuristic: affine XOR functions have zero pairwise GF(2) mixed derivatives even though their arithmetic (0/1)-embedded truth tables have non-zero mixed finite differences.
+
+A separate weighted graph now defines
+[
+w_{ij}=\sum_{x\in\{0,1\}^{n-2}}
+\left|f_{00}(x)-f_{01}(x)-f_{10}(x)+f_{11}(x)\right|.
+]
+This is a representation heuristic, never a support/dependency claim. It must not replace the original quantifier-derived dependency scope.
+
+Weighted min-fill uses a deterministic lexicographic score: weighted induced fill cost, fill-edge count, weighted degree, active degree, then variable index. A newly induced fill edge receives the checked product of the two current coupling weights through the eliminated variable. Its weight is propagated to later elimination steps. Arithmetic overflow or context-budget exhaustion is an error; it cannot silently produce a partial matrix.
+
+Multi-start ordering now preserves both GF(2) and arithmetic-weighted seeds, their reverse orders and frontier-refined variants. Each unique seed shares the same global BDD-order evaluation budget. The best candidate is selected only by actual ROBDD node count and deterministic tie-breaks, then exhaustively checked against the exact reduced truth table.
+
+### Finite evidence and limitation
+
+- Exhaustive oracle: all 256 three-input truth tables are checked against an independently written integer mixed-difference calculation.
+- XOR3: pairwise GF(2) interaction graph is empty; arithmetic pair weights are 4, 4, 4.
+- Four-variable witness: natural and GF(2) min-fill produce 7 BDD nodes; arithmetic weighted min-fill order ([2,3,0,1]) produces 6; exact permutation search finds 5; multi-start sifting reaches 5.
+
+This is a finite known-answer demonstration, not evidence that the weighted heuristic wins on average. The next experiment is a preregistered ablation on held-out generated and application-derived strategy functions. Record source support, both interaction signals, candidate seeds, total search budget, peak construction size, final node count and checker cost. Include functions where weighted ordering is worse than the baseline, and require the multi-start selector to preserve the best already-verified candidate under budget exhaustion.
