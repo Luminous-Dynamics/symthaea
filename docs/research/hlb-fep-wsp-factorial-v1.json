@@ -166,22 +166,45 @@
   "tasks": [
     {
       "id": "information_selective_diagnosis",
-      "environment": "Seeded partially observable environment with multiple model/fault hypotheses and diagnostic probes that differ in observation distributions, cost, and downstream consequence",
+      "environment": "Seeded partially observable environment with multiple model/fault hypotheses and diagnostic probes that differ in observation distributions, cost, and downstream consequence; belief-side action-conditioned likelihoods are kept distinct from truth-side observation distributions, with paired per-episode hidden-model seeds, a one-shot probe/observe/final-decision loop, and explicit model-misspecification stress",
       "primary_outcomes": [
         "diagnosis_accuracy",
         "normalized_regret",
-        "diagnostic_observation_cost"
+        "diagnostic_observation_cost",
+        "expected_value_of_sample_information",
+        "prior_bayes_risk",
+        "expected_posterior_bayes_risk",
+        "diagnostic_policy_regret",
+        "decision_cost_including_probe"
       ],
       "diagnostics": [
         "prospective_expected_information_gain_nats",
         "realized_posterior_entropy_reduction",
         "posterior_brier_score",
         "probes_to_diagnosis",
-        "decision_change_after_probe"
+        "decision_change_after_probe",
+        "model_information_gain_nats",
+        "expected_value_of_sample_information",
+        "prior_bayes_risk",
+        "expected_posterior_bayes_risk",
+        "information_gain_vs_decision_value_gap",
+        "realized_model_entropy_reduction_nats",
+        "multiclass_model_brier_score",
+        "agent_likelihood_misspecification",
+        "paired_policy_seed_identity",
+        "selected_diagnostic_action_counts",
+        "no_probe_selected_when_net_value_nonpositive"
       ],
       "negative_controls": [
         "identical_outcome_distributions_across_hypotheses",
-        "information_channel_disabled_with_reward_cost_and_novelty_fixed"
+        "information_channel_disabled_with_reward_cost_and_novelty_fixed",
+        "high_eig_zero_evsi_irrelevant_probe",
+        "lower_eig_higher_evsi_decision_relevant_probe",
+        "belief_vs_truth_likelihood_misspecification",
+        "truth_mass_outside_model_support_rejected",
+        "same_hidden_hypothesis_draw_across_paired_policies",
+        "all_diagnostic_costs_exceed_expected_decision_value",
+        "no_probe_option"
       ]
     },
     {
@@ -561,6 +584,34 @@
         "one_trial_only",
         "mislabelled_planted_rule"
       ]
+    },
+    {
+      "id": "decision_relevant_diagnostic_policy_comparison",
+      "environment": "Deterministic synthetic finite-hypothesis diagnosis fixture with four competing models, an irrelevant high-information probe, a lower-information decision-relevant probe, explicit probe costs, and separate agent likelihoods vs truth-side outcome distributions. Paired per-episode seeds ensure all policies see identical hidden hypotheses and coupled observation quantiles. A model-misspecification stress arm reduces the true diagnostic reliability while leaving the agent likelihood unchanged.",
+      "primary_outcomes": [
+        "mean_decision_loss",
+        "mean_decision_regret",
+        "mean_total_cost",
+        "probes_taken",
+        "probe_cost"
+      ],
+      "diagnostics": [
+        "selected_action_counts",
+        "predicted_model_eig_nats",
+        "expected_value_of_sample_information",
+        "realized_model_entropy_reduction_nats",
+        "multiclass_model_brier_score",
+        "likelihood_misspecification_sensitivity",
+        "paired_episode_seed_identity"
+      ],
+      "negative_controls": [
+        "high_eig_zero_evsi_irrelevant_probe",
+        "lower_eig_higher_evsi_decision_relevant_probe",
+        "no_probe_when_cost_exceeds_evsi",
+        "truth_outside_agent_likelihood_support_rejected",
+        "matched_vs_misspecified_likelihood"
+      ],
+      "scope_note": "Current executable implementation is a deterministic synthetic fixture and four-policy harness; it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
     }
   ],
   "baselines": [
@@ -959,7 +1010,12 @@
     {
       "id": "gaussian_permutation_hypothesis_eig_probe_selector",
       "scope": "Exact finite permutation posterior with explicit scalar Gaussian projection-observation likelihood; prospective I(Permutation; projected activation | candidate input probe), limited to at most 120 permutations and 32 candidate probes per call; noise scale must be empirically calibrated before claiming diagnostic efficiency"
-    }
+    },
+    "decision_focused_evsi_cost_aware",
+    "pure_model_eig_only",
+    "no_probe_bayes_decision",
+    "always_inspect_first_safe",
+    "paired_truth_separated_diagnostic_policy_harness"
   ],
   "seeds": {
     "development": [
