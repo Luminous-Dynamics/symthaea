@@ -305,8 +305,8 @@ fn validate_split_values(agent: &Value, grader: &Value) -> Result<(), FixtureErr
 
     if string_at(agent, &["use"])? != "agent_visible_development_input_only"
         || string_at(grader, &["access_policy"])? != "never_mount_in_agent_workspace"
-        || bool_at(agent, &["not_human_adjudicated"])? != true
-        || bool_at(grader, &["not_human_adjudicated"])? != true
+        || !bool_at(agent, &["not_human_adjudicated"])?
+        || !bool_at(grader, &["not_human_adjudicated"])?
     {
         return Err(FixtureError(
             "agent/grader views must remain development-only, non-adjudicated, and access-separated".into(),
