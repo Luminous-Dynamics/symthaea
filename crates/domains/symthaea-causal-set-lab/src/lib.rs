@@ -17,6 +17,7 @@ pub mod curved_frw_1p1;
 pub mod curved_order_statistics;
 pub mod interval_profile;
 pub mod link_matrix;
+pub mod link_sampling_bias;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -35,6 +36,12 @@ pub use interval_profile::{
 pub use link_matrix::{
     LinkMatrix, LinkMatrixError, MAX_LINK_MATRIX_BYTES, MAX_LINK_MATRIX_EVENTS,
     MAX_LINK_ORACLE_EVENTS,
+};
+pub use link_sampling_bias::{
+    DoubleScalingProductWindow, FiniteConeLinkProfile, LinkSamplingBiasError,
+    MAX_LINK_SPATIAL_DIMENSION, MIN_LINK_SPATIAL_DIMENSION, MIN_ROOT_ADMISSIBILITY_SCALE,
+    ProductWindowLinkProfile, alexandrov_volume_coefficient, double_scaling_product_window,
+    hyperbolic_ball_volume, link_intensity_profile, log_hyperbolic_ball_volume,
 };
 
 /// Count the number of order intervals containing k interior events.
