@@ -126,6 +126,8 @@ pub struct FrequencyLockingPoint {
     pub peak: SubharmonicPeak,
     pub frequency_error: f64,
     pub demodulated_sign_coherence: f64,
+    /// Whether the observation duration supports the configured frequency tolerance.
+    pub frequency_resolution_sufficient: bool,
     pub is_locked: bool,
 }
 
@@ -318,7 +320,10 @@ pub fn assess_frequency_locking(
         let response = analyze_subharmonic_response(trace.signal, config.analysis_start)
             .ok_or(FrequencyLockingError::InvalidTrace { index })?;
         let frequency_error = (peak.frequency - config.target_frequency).abs();
-        let is_locked = frequency_error <= config.frequency_tolerance
+        let frequency_resolution_sufficient =
+            config.frequency_tolerance >= peak.observation_frequency_resolution;
+        let is_locked = frequency_resolution_sufficient
+            && frequency_error <= config.frequency_tolerance
             && peak.amplitude >= config.minimum_peak_amplitude
             && peak.spectral_prominence >= config.minimum_spectral_prominence
             && response.sign_coherence >= config.minimum_sign_coherence;
@@ -328,6 +333,7 @@ pub fn assess_frequency_locking(
             peak,
             frequency_error,
             demodulated_sign_coherence: response.sign_coherence,
+            frequency_resolution_sufficient,
             is_locked,
         });
     }
@@ -461,6 +467,28 @@ mod tests {
         .unwrap();
         assert!(!report.frequency_locking_detected);
         assert!(report.longest_contiguous_points < 3);
+    }
+
+    #[test]
+    fn finite_trace_cannot_claim_tolerance_below_observation_resolution() {
+        let signal = stable_period_two_signal(64, 0.8);
+        let traces = [-0.1, 0.0, 0.1].map(|pulse_detuning_rad| PulseSweepTrace {
+            pulse_detuning_rad,
+            signal: &signal,
+        });
+        let report = assess_frequency_locking(
+            &traces,
+            FrequencyLockingConfig {
+                analysis_start: 0,
+                frequency_tolerance: 0.005,
+                ..FrequencyLockingConfig::default()
+            },
+        )
+        .unwrap();
+
+        assert!(report.points.iter().all(|point| !point.frequency_resolution_sufficient));
+        assert!(report.points.iter().all(|point| !point.is_locked));
+        assert!(!report.frequency_locking_detected);
     }
 
     #[test]
