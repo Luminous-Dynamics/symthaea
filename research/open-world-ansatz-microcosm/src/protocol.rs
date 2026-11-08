@@ -176,6 +176,10 @@ pub struct EvaluatorScore {
     pub set_score: SetScore,
     /// Scores structural-family recovery independently of coefficients and sensor parameters.
     pub structure_score: StructureScore,
+    /// Whether an exact reported version space makes abstention epistemically warranted.
+    pub safe_abstention: bool,
+    /// Whether the agent abstained despite an exactly identified parameterized model.
+    pub unnecessary_abstention: bool,
     pub decision_correct: bool,
     pub abstained: bool,
     pub evidence_references_valid: bool,
@@ -723,11 +727,24 @@ impl BlindEpisode {
             1 => ClaimDisposition::Identified,
             _ => ClaimDisposition::Ambiguous,
         };
+        let abstained = disposition == ClaimDisposition::Abstain;
+        let exact_version_space = set_score.exact_version_space_match;
+        let safe_abstention =
+            abstained && exact_version_space && set_score.oracle_model_count > 1;
+        let unnecessary_abstention =
+            abstained && exact_version_space && set_score.oracle_model_count == 1;
+        let decision_correct = if abstained {
+            safe_abstention
+        } else {
+            disposition == expected
+        };
         Ok(EvaluatorScore {
             evidence_prefix_sha256: submission.evidence_prefix_sha256.clone(),
             generating_model_in_version_space,
-            decision_correct: disposition == expected,
-            abstained: disposition == ClaimDisposition::Abstain,
+            safe_abstention,
+            unnecessary_abstention,
+            decision_correct,
+            abstained,
             set_score,
             structure_score,
             evidence_references_valid,
@@ -1420,6 +1437,119 @@ mod tests {
         assert!(score.structure_score.exact_structure_set_match);
         assert!(!score.structure_score.oracle_structure_identified);
         assert_eq!(score.structure_score.oracle_structure_count, 2);
+    }
+
+    #[test]
+    fn exact_abstention_on_non_identifiable_version_space_is_scored_as_safe() {
+        let truth = numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::ConstantZero,
+        };
+        let mut episode = BlindEpisode::new_numeric(
+            "numeric-safe-abstention",
+            truth,
+            StructureAccess::NumericWithheld,
+            4,
+        )
+        .unwrap();
+
+        for intervention in [1, -1, 1] {
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Numeric(intervention),
+                })
+                .unwrap();
+        }
+
+        let log = numeric::ObservationLog {
+            interventions: vec![1, -1, 1],
+            measurements: vec![0, 0, 0],
+        };
+        let compatible_models = numeric::discover(&log, numeric::StructureAccess::Withheld)
+            .unwrap()
+            .compatible_models;
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                disposition: ClaimDisposition::Abstain,
+                compatible_models,
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![
+                "E0001".to_string(),
+                "E0002".to_string(),
+                "E0003".to_string(),
+            ],
+            rationale: "The exact surviving model set spans distinct structures under an uninformative sensor.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.safe_abstention);
+        assert!(!score.unnecessary_abstention);
+        assert!(score.abstained);
+        assert!(score.decision_correct);
+    }
+
+    #[test]
+    fn abstention_on_uniquely_identified_model_is_not_scored_as_safe() {
+        let truth = numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::Double,
+        };
+        let mut episode = BlindEpisode::new_numeric(
+            "numeric-unnecessary-abstention",
+            truth,
+            StructureAccess::NumericWithheld,
+            4,
+        )
+        .unwrap();
+
+        for intervention in [1, -1, 1] {
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Numeric(intervention),
+                })
+                .unwrap();
+        }
+
+        let log = numeric::ObservationLog {
+            interventions: vec![1, -1, 1],
+            measurements: vec![4, -4, 4],
+        };
+        let compatible_models = numeric::discover(&log, numeric::StructureAccess::Withheld)
+            .unwrap()
+            .compatible_models;
+        assert_eq!(compatible_models.len(), 1);
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                disposition: ClaimDisposition::Abstain,
+                compatible_models,
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![
+                "E0001".to_string(),
+                "E0002".to_string(),
+                "E0003".to_string(),
+            ],
+            rationale: "Deliberately abstain despite unique identification as a negative control.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(score.set_score.exact_version_space_match);
+        assert!(!score.safe_abstention);
+        assert!(score.unnecessary_abstention);
+        assert!(score.abstained);
+        assert!(!score.decision_correct);
     }
 
     #[test]
