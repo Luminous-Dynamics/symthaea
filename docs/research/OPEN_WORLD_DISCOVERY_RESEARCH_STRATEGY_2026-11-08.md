@@ -71,7 +71,7 @@ A system with multiple controllable variables can look additive when experiments
 
 Use factorial and orthogonal designs where feasible; explicitly audit design-matrix rank, aliasing and intervention support before interpreting a recovered term. A model should report that interaction structure remains ambiguous when the performed experiments cannot separate main effects, bias and cross-terms.
 
-The two-input microcosm in PR #11060 includes a concrete aliasing control: two collinear interventions leave single-input, additive and bilinear structures compatible, while a selected off-axis intervention separates them.
+The two-input microcosm in PR #11060 includes a concrete aliasing control: two collinear interventions leave u-only, v-only, additive and bilinear structures compatible. An adaptive selector excludes already-consumed input pairs and chooses successive off-axis interventions until the remaining model class is separated.
 
 ### 1.4 Let representation discovery be an explicit action
 
