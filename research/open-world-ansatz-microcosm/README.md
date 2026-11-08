@@ -30,7 +30,28 @@ Both arms consume the same ObservationLog and therefore the same observations, i
 
 The only intended treatment is access to the mechanism. The reference implementation does not train an AI agent; it provides the executable world and exact finite hypothesis filter needed to test one.
 
-**A0 limitation:** this first slice is a structure-known identification control, not yet a coefficient-fitting benchmark. It has no free numerical coefficient family. Add bounded gains/decay parameters next, then require the A0 arm to recover them with structure supplied before interpreting A2 performance.
+**Binary v1 limitation:** the original boolean microcosm is a structure-known identification control, not a coefficient-fitting benchmark. The numeric extension below adds the first bounded gain/decay family and matched coefficient-bearing A0/A2 control.
+
+## Coefficient-bearing numeric extension
+
+The public Rust module numeric adds a second finite world that corrects the first slice's A0 limitation.
+
+Its intervention alphabet is {-1, 0, 1}; candidate gains are {1, 2, 3}; leaky-memory decay values are {0, 1, 2}; initial hidden states are {-1, 0, 1}. Sensor maps are identity, negate, double and constant-zero.
+
+Two structures are available:
+
+- Direct response: x_t = gain * u_t.
+- Leaky memory: y_t = h_t, followed by h_(t+1) = decay * h_t + gain * u_t.
+
+Measurements pass through a separately unknown sensor map.
+
+A0 receives the mechanism but must recover gain, decay (where applicable), initial state and sensor from the trace. A2 receives the same trace and must also discover the mechanism. This is the first coefficient-bearing matched A0/A2 control in this crate.
+
+The finite exact enumerator deliberately preserves parameter ambiguity: direct gain 2 with an identity sensor is observationally equivalent to direct gain 1 with a double sensor. A unique structural answer must not be presented as unique coefficients or a uniquely identified measurement instrument.
+
+The numeric exhaustive oracle uses a closed-form state response and enumerates all intervention sequences in {-1,0,1} for horizons 1–6. The finite probe selector ranks predicted outcome partitions, worst-case remaining models and query cost. It remains a partition baseline, not EVSI or a globally optimal adaptive strategy.
+
+This model family is intentionally small and integer-valued. It is a protocol/control benchmark, not yet a continuous, stochastic, delayed, spatial or empirical scientific world.
 
 ## Independent structural oracle
 
@@ -61,9 +82,9 @@ For the matched A0 control, use the same world and intervention sequence, changi
 
 ## Authored tests
 
-Twelve Rust tests cover hidden-lag transitions, A2 structure recovery, matched A0/A2 access, passive non-identifiability, finite partition probe selection, uninformative sensors, oracle equivalence classes, distorted measurement maps, inconsistent evidence, exhaustive direct-versus-hidden separation, invalid state bindings and horizon bounds.
+Twenty-three Rust tests cover the binary and numeric worlds: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, partition probe selection, exhaustive oracle equivalence classes, distorted measurements, inconsistent evidence, invalid parameter bindings and horizon bounds.
 
-Tests are authored but have not been compiled or executed in the current editing environment.
+Tests are authored. The binary v1 implementation has passed the focused Rust format, Clippy and test workflow on commit f40e2dd. The numeric extension is newer and awaits its own exact-head workflow result.
 
 ## Claim boundaries
 
@@ -73,4 +94,4 @@ Tests are authored but have not been compiled or executed in the current editing
 - No AI agent has been evaluated.
 - No empirical physical system, unknown natural law or published scientific result has been reproduced.
 - No Unsatz, Scientist World or FrontierPhysics benchmark score is claimed.
-- No Rust compilation, test, formatting, Clippy or CI pass is claimed by this PR.
+- The numeric extension's exact-head Rust compilation, tests, formatting and Clippy status must be read from its focused workflow; do not infer it from the earlier binary-v1 pass.
