@@ -559,3 +559,25 @@ QBFGallery's documented 2026 command-line protocol returns exit 10 for TRUE and 
 The 2026 Gallery's PCNF, crafted, random, 2QBF, prenex non-CNF and DQBF tracks are distinct. DQBF cannot be collapsed into the prenex dependency validator. The 2023 results can serve as a historical, track-specific calibration point, but current 2026 numerical SOTA must wait until the exact public benchmark and score artifacts are pinned.
 
 The long-term scientific breakthrough remains proof-derived synthesis: the SAT 2026 synthesis proof system proposes extracting Skolem/Herbrand functions and intermediate game values in polynomial time from proofs in that system. The finite recursive engine is the oracle for small cases; the research workstream must study and implement an exact published rule subset, then compare proof-derived extraction against the finite oracle without letting the proof producer certify itself.
+
+
+## 17. Residual-state proof DAGs and #QBF research boundary
+
+The current proof tree deliberately rejects multiple parents and therefore cannot share equal contextual subproofs. Workstream #11130 adds a different proof representation, not a mutation of the trusted tree:
+
+- each node is bound to an exact prefix position and canonical residual CNF;
+- the canonicalizer removes satisfied clauses, assigned-false literals, duplicate literals/clauses and tautologies, while preserving empty clauses;
+- identical `(position, residual)` pairs are interned into one node;
+- the independent verifier recomputes both child residuals from the parent and the next quantified variable, checks the local OR/AND recurrence and validates the entire reachable DAG;
+- multiple parents and identical low/high child references are valid and expected.
+
+This is a direct research experiment in light of Chede, Krishan & Shukla, *On Knowledge Compilation Languages for QBFs*, ECCC TR26-279 (published 27 October 2026). That work already studies tree-based and DAG-based knowledge-compilation languages for QBF, including proof-system consequences for #QBF and an initial compiled #QBF solver compared against d4-QBF. Therefore the novelty claim is limited to our specific residual-CNF state identity, proof/checker contract, and its integration with independently verified Skolem/Herbrand strategy plus BDD/AIG compilation. General QBF tree-to-DAG compilation is not claimed as new.
+
+The same paper makes a separate frontier visible: **#QBF counts winning strategies**, and should have a distinct task type. The initial Symthaea #QBF oracle should enumerate all bounded Skolem strategy profiles and independently count those that satisfy the source matrix for every universal assignment. It must not confuse the number of satisfying full assignments with the number of distinct winning functions, and it must not be folded into QBF truth or #SAT.
+
+The research sequence is:
+1. qualify the bounded residual-DAG producer and checker;
+2. measure tree-vs-DAG reduction on exhaustive small CNF and held-out generated QBFs;
+3. integrate verified DAG evidence into the existing strategy portfolio without duplicating formats;
+4. build a distinct finite #QBF reference/counting lane;
+5. only then compare with QBF Gallery benchmarks and #QBF knowledge-compilation / d4-QBF baselines.
