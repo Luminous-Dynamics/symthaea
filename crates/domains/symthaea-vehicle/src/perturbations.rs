@@ -182,6 +182,7 @@ impl PerturbationSchedule {
         if let Some(clear) = self.clear_step {
             if step == clear {
                 sim.set_friction_scale(1.0);
+                sim.set_axle_friction(1.0, 1.0);
                 return;
             }
         }
@@ -311,6 +312,23 @@ mod tests {
     fn test_gauntlet_schedule() {
         let schedule = PerturbationSchedule::gauntlet();
         assert_eq!(schedule.events.len(), 3);
+    }
+
+    #[test]
+    fn clear_step_restores_global_and_per_axle_friction() {
+        let mut sim = BicycleModelSimulator::at_speed(13.4);
+        let initial_digest = sim.dynamics_profile_digest();
+        let schedule = PerturbationSchedule {
+            events: vec![(0, VehiclePerturbation::TireBlowout {
+                tire: "front_left".to_string(),
+                grip_reduction: 0.3,
+            })],
+            clear_step: Some(1),
+        };
+        schedule.apply(0, &mut sim);
+        assert_ne!(sim.dynamics_profile_digest(), initial_digest);
+        schedule.apply(1, &mut sim);
+        assert_eq!(sim.dynamics_profile_digest(), initial_digest);
     }
 
     #[test]
