@@ -110,13 +110,10 @@ impl SingingVoiceEngine for KokoroSingingEngine {
             let source =
                 &voiced[source_boundaries[syllable_index]..source_boundaries[syllable_index + 1]];
             let mut syllable = source_syllable.clone();
-            if let Some((phrase_energy, base_energy)) = phrase_energy_target(
-                performance,
-                syllable_index,
-                syllable.note.start_time,
-            ) {
-                syllable.energy =
-                    (syllable.energy * phrase_energy / base_energy).clamp(0.0, 1.0);
+            if let Some((phrase_energy, base_energy)) =
+                phrase_energy_target(performance, syllable_index, syllable.note.start_time)
+            {
+                syllable.energy = (syllable.energy * phrase_energy / base_energy).clamp(0.0, 1.0);
             }
             let sung = render_syllable(source, &syllable, sample_rate);
             rendered.push((
@@ -188,11 +185,14 @@ pub fn sing_with_kokoro(lyrics: &str, melody: &[Note], voice: &str) -> Result<(V
     Ok((stem.samples, stem.sample_rate))
 }
 
-fn phrase_energy_target(performance: &VocalPerformance, syllable_index: usize, time_s: f32) -> Option<(f32, f32)> {
-    let phrase = performance
-        .phrases
-        .iter()
-        .find(|phrase| syllable_index >= phrase.syllable_start && syllable_index < phrase.syllable_end)?;
+fn phrase_energy_target(
+    performance: &VocalPerformance,
+    syllable_index: usize,
+    time_s: f32,
+) -> Option<(f32, f32)> {
+    let phrase = performance.phrases.iter().find(|phrase| {
+        syllable_index >= phrase.syllable_start && syllable_index < phrase.syllable_end
+    })?;
     let first = *phrase.expression_curve.first()?;
     let last = *phrase.expression_curve.last()?;
     let target = if time_s <= first.time_s {
