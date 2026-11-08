@@ -601,6 +601,21 @@ fn score_choice(
 ) -> Result<ThreeBallChoiceActionScore, ThreeBallPartialObservationError> {
     let likelihoods = feedback_likelihoods(space, belief, choice)?;
     let information = evaluate_information_gain(belief, &likelihoods, 3)?;
+    // Preferences are relative log probabilities (the source task supplies
+    // [0, 2, -6]), not necessarily normalized log probabilities. Convert them
+    // to log C(o) before computing D_KL[Q(o) || C(o)]. Omitting this
+    // log-normalizer adds a negative constant and can make a valid KL appear
+    // negative; clipping that value changes action rankings.
+    let preference_max = preferences.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let log_preference_normalizer = preference_max
+        + preferences
+            .iter()
+            .map(|value| (value - preference_max).exp())
+            .sum::<f64>()
+            .ln();
+    if !log_preference_normalizer.is_finite() {
+        return Err(ThreeBallPartialObservationError::InvalidPreferences);
+    }
     let mut pragmatic_risk = 0.0;
     let feedback = [
         ThreeBallFeedback::NoFeedback,
@@ -614,12 +629,15 @@ fn score_choice(
         .enumerate()
     {
         if probability > 0.0 {
-            pragmatic_risk += probability * (probability.ln() - preferences[index]);
+            let log_preference = preferences[index] - log_preference_normalizer;
+            pragmatic_risk += probability * (probability.ln() - log_preference);
         }
     }
     if !pragmatic_risk.is_finite() || pragmatic_risk < -1e-9 {
         return Err(ThreeBallPartialObservationError::InvalidConfiguration);
     }
+    // The exact KL is non-negative; tolerate and clamp only round-off scale
+    // negatives, never an unnormalized-preference offset.
     let pragmatic_risk = pragmatic_risk.max(0.0);
     let epistemic_value = config.model_information_weight * information.model_information_gain_nats
         + config.conditional_state_information_weight
@@ -1066,6 +1084,47 @@ mod tests {
             } else {
                 assert!(action.contingencies.is_empty());
             }
+        }
+    }
+
+    #[test]
+    fn relative_log_preference_shift_does_not_change_kl_risk_or_policy_scores() {
+        let space = build_three_ball_rule_space();
+        let belief = ThreeBallJointBelief::uniform_source_prior(&space).expect("prior");
+        let base = ThreeBallPartialObservationConfig::default();
+        let shifted = ThreeBallPartialObservationConfig {
+            feedback_log_preferences_nats: [
+                base.feedback_log_preferences_nats[0] + 13.0,
+                base.feedback_log_preferences_nats[1] + 13.0,
+                base.feedback_log_preferences_nats[2] + 13.0,
+            ],
+            ..base
+        };
+        let base_scores = score_three_ball_choice_actions(&space, &belief, base)
+            .expect("base relative preferences");
+        let shifted_scores = score_three_ball_choice_actions(&space, &belief, shifted)
+            .expect("shifted relative preferences");
+
+        assert_eq!(base_scores.len(), shifted_scores.len());
+        for (left, right) in base_scores.iter().zip(shifted_scores.iter()) {
+            assert!(left.pragmatic_risk_nats >= 0.0);
+            assert!((left.pragmatic_risk_nats - right.pragmatic_risk_nats).abs() < 1e-12);
+            assert!(
+                (left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-12
+            );
+        }
+
+        let base_policy = score_three_ball_gaze_policies(&space, &belief, base)
+            .expect("base policy");
+        let shifted_policy = score_three_ball_gaze_policies(&space, &belief, shifted)
+            .expect("shifted policy");
+        assert_eq!(base_policy.selected_action_index, shifted_policy.selected_action_index);
+        for (left, right) in base_policy
+            .action_scores
+            .iter()
+            .zip(shifted_policy.action_scores.iter())
+        {
+            assert!((left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-12);
         }
     }
 
