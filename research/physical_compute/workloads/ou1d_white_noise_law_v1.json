@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "workload_id": "ou1d-white-noise-law-v1",
+  "name": "1-D Ornstein-Uhlenbeck target law with white Gaussian driving noise",
+  "problem": {
+    "family": "sde",
+    "formulation": "state_space_dynamics",
+    "representation": "continuous_state_space",
+    "spatial_dimension": 0,
+    "state_dimension": 1,
+    "discretization": "continuous_time",
+    "coefficient_structure": "not_applicable",
+    "rhs_or_initial_state": {
+      "fixture_id": "ou1d-x0-zero-v1",
+      "spectrum": "not_applicable",
+      "seed": 20261108,
+      "generator": "deterministic_zero_initial_state"
+    },
+    "time_horizon": {
+      "start": 0.0,
+      "end": 10.0,
+      "sample_count": 1000,
+      "sampling_semantics": "fixed_grid"
+    },
+    "stochastic_contract": {
+      "calculus_interpretation": "ito",
+      "target_noise_process": "white_gaussian",
+      "noise_channel_count": 1,
+      "drift_field_ref": "ou1d_drift_dx_dt_equals_minus_2x",
+      "diffusion_field_ref": "ou1d_diffusion_sqrt2",
+      "target_covariance_ref": "standard_brownian_increment_covariance_dt",
+      "target_power_spectral_density_ref": "unit_white_noise_two_sided_psd_convention_v1",
+      "target_autocorrelation_ref": "unit_intensity_delta_autocorrelation_v1",
+      "target_correlation_time_s": 0.0,
+      "stationarity": "stationary",
+      "evidence_status": "derived",
+      "notes": "Target SDE: dx = -2x dt + sqrt(2) dW_t. Stationary target is N(0, 0.5), with normalized autocorrelation exp(-2|lag|). White-noise PSD and delta-autocorrelation use the declared two-sided unit-intensity Brownian-derivative convention."
+    }
+  },
+  "task_contract": {
+    "objective": "sample_distribution",
+    "acceptance_metrics": [
+      {
+        "metric": "stationary_mean_absolute_error",
+        "comparator": "<=",
+        "threshold": 0.02,
+        "unit": "state_units"
+      },
+      {
+        "metric": "stationary_variance_relative_error",
+        "comparator": "<=",
+        "threshold": 0.05,
+        "unit": "relative"
+      },
+      {
+        "metric": "autocorrelation_relative_error",
+        "comparator": "<=",
+        "threshold": 0.05,
+        "unit": "relative",
+        "notes": "Compare normalized autocorrelation at preregistered lags; do not fit lags on held-out samples."
+      },
+      {
+        "metric": "path_distribution_wasserstein",
+        "comparator": "<=",
+        "threshold": 0.05,
+        "unit": "normalized"
+      }
+    ],
+    "verification": {
+      "required": true,
+      "independent": true,
+      "evaluator_truth_visible_to_solver": false,
+      "method": "independent_stationary_moment_autocorrelation_and_distribution_verifier",
+      "failure_policy": "reject_or_fallback"
+    },
+    "deadline_ms": null,
+    "minimum_success_probability": 0.99,
+    "statistical_protocol": {
+      "sample_count": 10000,
+      "independent_replicates": 10,
+      "confidence_level": 0.95,
+      "bootstrap_replicates": 2000,
+      "preregistered": true,
+      "held_out_noise_calibration": true,
+      "notes": "These are benchmark protocol targets, not observed sample counts or results. Estimate physical noise parameters on separate calibration traces and freeze them before held-out evaluation."
+    }
+  },
+  "resource_constraints": {
+    "energy_budget_j": null,
+    "memory_budget_bytes": 67108864,
+    "area_budget_mm2": null,
+    "max_physical_tiles": null
+  },
+  "provenance": {
+    "evidence_refs": [
+      "analytic_ou_stationary_law_v1",
+      "analytic_ou_autocorrelation_v1"
+    ],
+    "notes": "Solver-visible target contract. This fixture contains no physical device noise measurements; backend noise is described separately by a backend capability profile."
+  },
+  "tags": ["sde", "ornstein-uhlenbeck", "white-noise", "stochastic-law", "noise-matching"]
+}
