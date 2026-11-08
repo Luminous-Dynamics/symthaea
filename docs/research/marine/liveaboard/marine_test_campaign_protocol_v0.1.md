@@ -77,14 +77,14 @@ Every channel carries:
 - measured quantity kind, unit and frame/location ref;
 - mounting/transform identity;
 - range, resolution and saturation behavior;
-- sampling rate and analogue bandwidth;
+- actual sample rate, method-declared minimum sample rate, analogue bandwidth and claim bandwidth;
 - sensor response/lag where material;
 - anti-alias filter identity and acquisition chain;
 - calibration identity/epoch/currentness and uncertainty profile;
 - source/DAQ/receive clock identities and synchronization uncertainty;
 - raw observation ref/digest and decoder/parser identity.
 
-**No universal sample-rate constant is prescribed.** The required bandwidth and sampling plan depend on the exact observable, event dynamics, sensor/probe response, DAQ, anti-aliasing and analysis. The responsible test engineer must issue a channel-specific sampling-adequacy review. A slow aggregate cannot support a fast-transient absence claim.
+**No universal sample-rate constant is prescribed.** The required bandwidth and sampling plan depend on the exact observable, event dynamics, sensor/probe response, DAQ, anti-aliasing and analysis. The responsible test engineer must issue a channel-specific sampling-adequacy review and declare the method-specific minimum sample rate. The semantic verifier rejects a sample rate below that minimum; it also rejects analogue bandwidth below the claimed observable bandwidth. A slow aggregate cannot support a fast-transient absence claim.
 
 Preserve distinct timestamps:
 - device/source timestamp;
