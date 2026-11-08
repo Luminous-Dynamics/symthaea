@@ -78,7 +78,7 @@ Do not claim the signature never existed. Do not continue treating it as current
 
 ## 9. CCL-S08 — omitted contradictory trace
 
-**C1 — broad “all valid attempts” claim:** expected disposition is **invalidate** for current decision use. The integration trace is within the claim's declared supported horizon and contradicts the universal claim. The original source anchor and unit-test result remain historically true but cannot override the qualifying counterexample.
+**C1 — broad “all valid attempts” claim:** expected disposition is **invalidate** for current decision use. The integration trace is within the claim's declared supported horizon and contradicts the universal claim. The original source anchor and unit-test result remain historically true but cannot override the qualifying counterexample. **C2 — exact ordinary-retry unit-test scenario:** may be **retained** only for that exact tested input pair and environment if its receipt and source/build identity are valid. It must not be generalized to the broader redelivery-horizon claim.
 
 **Narrower successor claim:** a restricted claim about the ordinary retry path may be considered only after its scope is explicitly reduced and the trace's boundary condition is independently adjudicated. The narrower claim is a new scoped proposition; it is not an automatic retain of C1.
 
