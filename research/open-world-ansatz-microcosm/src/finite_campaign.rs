@@ -39,7 +39,7 @@ impl GeneratingModel {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct PolicySpec {
     name: &'static str,
     strategy: ProbeStrategy,
@@ -485,7 +485,7 @@ mod tests {
         );
         assert_ne!(
             first.strategy,
-            strategy_for_pair(policy, WorldFamily::Interaction, 0).strategy
+            strategy_for_pair(policy, WorldFamily::TwoInputResponse, 0).strategy
         );
     }
 
