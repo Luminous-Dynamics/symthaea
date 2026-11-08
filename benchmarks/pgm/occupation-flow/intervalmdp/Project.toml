@@ -1,0 +1,10 @@
+name = "SymthaeaOccupationFlowComparator"
+uuid = "f39f4f68-1f90-4d1f-85a8-16ac1f2b3d91"
+version = "0.1.0"
+
+[deps]
+IntervalMDP = "051c988a-e73c-45a4-90ec-875cac0402c7"
+
+[compat]
+IntervalMDP = "0.7"
+julia = "1.11"
