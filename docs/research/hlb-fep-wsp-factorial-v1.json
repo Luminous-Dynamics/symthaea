@@ -343,7 +343,9 @@
         "known_state_feedback_action_cost_nats",
         "known_state_feedback_selected_action_id",
         "known_state_feedback_posterior_support_size",
-        "known_state_feedback_zero_posterior_model_count"
+        "known_state_feedback_zero_posterior_model_count",
+        "within_trial_policy_horizon",
+        "dirichlet_parameter_information_gain_nats"
       ],
       "negative_controls": [
         "random_partial_observation_policy",
@@ -357,7 +359,8 @@
         "constant_criterion_mapping_duplicate_across_context_factor_labels",
         "feedback_only_known_state_quotient_fixture",
         "source_labelled_81_vs_semantic_75_prospective_model_eig_invariance",
-        "no_choice_feedback_only_zero_information_control"
+        "no_choice_feedback_only_zero_information_control",
+        "common_log_preference_shift_policy_invariance"
       ]
     },
     {
@@ -1075,7 +1078,9 @@
       "three_ball_duplicate_partition_count",
       "three_ball_constant_context_duplicate_partition_exactness",
       "three_ball_paper_count_discrepancy_preserved_without_forced_deduplication",
-      "native_cfc_sequential_candidate_boundary_receipt_chain_integrity"
+      "native_cfc_sequential_candidate_boundary_receipt_chain_integrity",
+      "feedback_preference_shift_invariance_error_nats",
+      "negative_pragmatic_kl_risk_rejection_count"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1186,7 +1191,8 @@
     "Paired three-ball policy arms must use a domain-separated environment RNG and policy RNG so all policies receive identical hidden-scene sequences for matched seeds regardless of policy random draw count.",
     "Policy ablation runs must preserve the same model family, true rule, scene seeds, scene reset schedule, trial horizon, action costs, and evaluator information; only the declared policy component may change.",
     "The pinned SPM rule generator fixture must retain all 81 labelled hypotheses and their source prior mass, and must verify that the only exact feedback-tensor duplicate groups are the three triplicate constant-criterion mappings (75 exact tensors). The paper-reported 79-unique count must remain an explicit unresolved discrepancy; no relabeling or silent replacement is allowed.",
-    "The native CfC sequential WSP integration fixture must materialize two consecutive frozen-template evidence batches through candidate-only native snapshots, prove verifier rejection does not advance the session, prove accepted batches bind to the prior accepted native fingerprint and advance exactly once, and prove the original live/source network fingerprint remains unchanged."
+    "The native CfC sequential WSP integration fixture must materialize two consecutive frozen-template evidence batches through candidate-only native snapshots, prove verifier rejection does not advance the session, prove accepted batches bind to the prior accepted native fingerprint and advance exactly once, and prove the original live/source network fingerprint remains unchanged.",
+    "Feedback log preferences are treated as relative log weights: normalize with a stable log-sum-exp before evaluating KL pragmatic risk, and verify that adding a common constant to all preference logits leaves every action's risk and policy ranking invariant."
   ],
   "research_references": [
     {
