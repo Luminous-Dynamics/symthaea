@@ -31,15 +31,13 @@ fn main() -> ExitCode {
         }
     };
 
-    println!("canonical_manifest_digest={}", report.canonical_sha256);
     if !report.is_valid() {
         for error in report.errors {
             eprintln!("ERROR: {error}");
         }
-        println!("SEMANTIC_INVALID");
+        eprintln!("SEMANTIC_INVALID");
         return ExitCode::FAILURE;
     }
-    println!("SEMANTIC_VALID");
 
     let value: serde_json::Value = match serde_json::from_str(&input) {
         Ok(value) => value,
@@ -56,11 +54,38 @@ fn main() -> ExitCode {
         }
     };
 
-    println!("preflight_failed_domains={}", replay.failed_domain_ids.join(","));
-    println!("preflight_failed_components={}", replay.failed_component_ids.join(","));
-    println!("candidate_available={}", replay.candidate_available);
-    println!("verifier_available={}", replay.verifier_available);
-    println!("preflight_classification={}", replay.classification);
-    println!("PREFLIGHT_ONLY: no task arithmetic, correctness, timing, energy or physical behavior was simulated");
+    let scenario_id = match value.get("scenario_id").and_then(serde_json::Value::as_str) {
+        Some(id) => id,
+        None => {
+            eprintln!("validated manifest unexpectedly lacks scenario_id");
+            return ExitCode::FAILURE;
+        }
+    };
+    let receipt = serde_json::json!({
+        "receipt_version": "1.0.0",
+        "result_kind": "preflight_only",
+        "scenario_id": scenario_id,
+        "manifest_sha256": report.canonical_sha256,
+        "replay_engine_version": "domain-outage-preflight/0.1.0",
+        "failed_domain_ids": replay.failed_domain_ids,
+        "failed_component_ids": replay.failed_component_ids,
+        "candidate_available": replay.candidate_available,
+        "verifier_available": replay.verifier_available,
+        "preflight_classification": replay.classification,
+        "correctness": "not_evaluated",
+        "latency": "not_measured",
+        "energy": "not_measured"
+    });
+    match serde_json::to_string_pretty(&receipt) {
+        Ok(encoded) => println!("{encoded}"),
+        Err(error) => {
+            eprintln!("could not encode preflight receipt: {error}");
+            return ExitCode::FAILURE;
+        }
+    }
+
+    // A preflight receipt is not an execution result and must never be scored
+    // as a correct accepted task.
+    eprintln!("PREFLIGHT_ONLY: correctness, latency, energy and physical behavior were not evaluated");
     ExitCode::SUCCESS
 }
