@@ -630,6 +630,97 @@ mod tests {
     }
 
     #[test]
+    fn endpoint_enumeration_confirms_utility_intervals_and_minimax_regret() {
+        let lower = [
+            [q(1, 5), q(3, 10)],
+            [q(1, 10), q(2, 5)],
+        ];
+        let upper = [
+            [q(3, 5), q(7, 10)],
+            [q(1, 2), q(4, 5)],
+        ];
+
+        let one_minus = |value: CheckedRational| {
+            let negative = CheckedRational::new(
+                value.numerator().checked_neg().unwrap(),
+                value.denominator(),
+            ).unwrap();
+            CheckedRational::one().checked_add(negative).unwrap()
+        };
+
+        let mut min_a: Option<CheckedRational> = None;
+        let mut max_a: Option<CheckedRational> = None;
+        let mut min_b: Option<CheckedRational> = None;
+        let mut max_b: Option<CheckedRational> = None;
+        let mut max_regret_a: Option<CheckedRational> = None;
+        let mut max_regret_b: Option<CheckedRational> = None;
+
+        // Four independently selectable local rows, each at one of its two
+        // endpoints: 2^4 = 16 complete stagewise transition selections.
+        for mask in 0usize..16 {
+            let selected = |stage: usize, row: usize, bit: usize| {
+                if mask & (1usize << bit) == 0 {
+                    lower[stage][row]
+                } else {
+                    upper[stage][row]
+                }
+            };
+
+            let p01_stage0 = selected(0, 0, 0);
+            let _p11_stage0 = selected(0, 1, 1);
+            let p01_stage1 = selected(1, 0, 2);
+            let p11_stage1 = selected(1, 1, 3);
+
+            let occupancy_t2_state1 = p01_stage0;
+            let occupancy_t2_state0 = one_minus(occupancy_t2_state1);
+            let occupancy_t3_state1 = occupancy_t2_state0
+                .checked_mul(p01_stage1).unwrap()
+                .checked_add(occupancy_t2_state1.checked_mul(p11_stage1).unwrap())
+                .unwrap();
+
+            let utility_a = occupancy_t2_state1
+                .checked_add(occupancy_t3_state1).unwrap();
+            let utility_b = occupancy_t2_state0;
+
+            min_a = Some(min_a.map_or(utility_a, |v| if compare_nonnegative(utility_a, v) == Ordering::Less { utility_a } else { v }));
+            max_a = Some(max_a.map_or(utility_a, |v| if compare_nonnegative(utility_a, v) == Ordering::Greater { utility_a } else { v }));
+            min_b = Some(min_b.map_or(utility_b, |v| if compare_nonnegative(utility_b, v) == Ordering::Less { utility_b } else { v }));
+            max_b = Some(max_b.map_or(utility_b, |v| if compare_nonnegative(utility_b, v) == Ordering::Greater { utility_b } else { v }));
+
+            let (regret_a, regret_b) = match compare_nonnegative(utility_a, utility_b) {
+                Ordering::Less => (
+                    CheckedRational::new(
+                        utility_b.numerator().checked_mul(utility_a.denominator())
+                            .and_then(|v| v.checked_sub(utility_a.numerator().checked_mul(utility_b.denominator())?))
+                            .unwrap(),
+                        utility_b.denominator().checked_mul(utility_a.denominator()).unwrap(),
+                    ).unwrap(),
+                    CheckedRational::zero(),
+                ),
+                Ordering::Greater => (
+                    CheckedRational::zero(),
+                    CheckedRational::new(
+                        utility_a.numerator().checked_mul(utility_b.denominator())
+                            .and_then(|v| v.checked_sub(utility_b.numerator().checked_mul(utility_a.denominator())?))
+                            .unwrap(),
+                        utility_a.denominator().checked_mul(utility_b.denominator()).unwrap(),
+                    ).unwrap(),
+                ),
+                Ordering::Equal => (CheckedRational::zero(), CheckedRational::zero()),
+            };
+            max_regret_a = Some(max_regret_a.map_or(regret_a, |v| if compare_nonnegative(regret_a, v) == Ordering::Greater { regret_a } else { v }));
+            max_regret_b = Some(max_regret_b.map_or(regret_b, |v| if compare_nonnegative(regret_b, v) == Ordering::Greater { regret_b } else { v }));
+        }
+
+        assert_eq!(min_a.unwrap(), q(9, 25));
+        assert_eq!(max_a.unwrap(), q(32, 25));
+        assert_eq!(min_b.unwrap(), q(2, 5));
+        assert_eq!(max_b.unwrap(), q(4, 5));
+        assert_eq!(max_regret_a.unwrap(), q(11, 25));
+        assert_eq!(max_regret_b.unwrap(), q(22, 25));
+    }
+
+    #[test]
     fn rejects_infeasible_interval_rows_and_invalid_dimensions() {
         let infeasible = StagewiseIntervalMarkovModel::new(
             vec![q(1, 1), q(0, 1)],
