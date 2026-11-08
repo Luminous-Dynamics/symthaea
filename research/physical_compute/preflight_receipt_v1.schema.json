@@ -18,7 +18,10 @@
     "preflight_classification",
     "correctness",
     "latency",
-    "energy"
+    "energy",
+    "json_schema_validation",
+    "semantic_validation",
+    "replay_scope"
   ],
   "properties": {
     "receipt_version": {
@@ -77,6 +80,15 @@
     },
     "energy": {
       "const": "not_measured"
+    },
+    "json_schema_validation": {
+      "const": "not_performed_by_rust_cli"
+    },
+    "semantic_validation": {
+      "const": "passed_subset"
+    },
+    "replay_scope": {
+      "const": "domain_outage_only"
     }
   }
 }
