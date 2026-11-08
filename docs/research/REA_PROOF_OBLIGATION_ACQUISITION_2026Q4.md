@@ -388,6 +388,56 @@ Do not claim superiority from one mean score. Report:
 
 For pairwise comparisons, freeze the task/artifact cohort and system configurations, then use paired cluster bootstrap intervals over artifacts/programs or independent source families. Model attempts nested inside one artifact are repeated measurements, not independent samples. If a cohort has a high refusal/ungraded rate, report it as a separate capability/coverage outcome rather than silently comparing only its answered subset.
 
+## 6.2 Reverse-engineering tool ecosystem: compose, do not clone
+
+The incumbent tools already provide deep specialist analysis:
+
+| System | Native strength | REA/Symthaea relationship |
+|---|---|---|
+| Ghidra | Multi-platform SRE framework: disassembly, assembly, decompilation, graphing, scripting, extension points and interactive/headless use | Import typed observations and exact source locations; do not recreate its processor/lifter/decompiler stack |
+| IDA Pro | Broad processor support, mature disassemblers/decompilers, debugging, plugins, IDAPython/C++ SDK, headless/library automation | Treat decompiler, signatures, debugger and plugins as distinct operation/provider evidence with exact version and configuration |
+| Binary Ninja | Interactive disassembler/decompiler/debugger, BNIL family, automation and APIs including Rust bindings | Use its IL and analysis outputs as alternate derived observations; retain engine/version and transformation lineage |
+| angr | Scriptable binary analysis with CFG recovery, IR lifting, symbolic/concolic execution, data-dependency analysis and path constraints | Use symbolic reachability and counterexample traces as experiment proposals or observations, not as proof without exact path/target binding |
+
+Official capability references:
+- Ghidra: https://github.com/NationalSecurityAgency/ghidra
+- IDA Pro: https://hex-rays.com/ida-pro
+- Binary Ninja: https://binary.ninja/
+- angr: https://angr.io/
+
+### What REA should add around these tools
+
+REA is not another decompiler. It should provide a common evidence and claim layer:
+1. **Artifact binding:** exact subject digest, container/format, architecture, build and target identity.
+2. **Operation binding:** provider/tool version, executable or container digest where available, operation, configuration/profile digest, environment and limits.
+3. **Observation binding:** raw output bytes/digest, source-native location (file offset, VA/RVA, function/block, instruction range, log/session span), extraction/normalization lineage and limitations.
+4. **Claim binding:** typed predicate, scope, evidence IDs, required obligations, falsification conditions and explicit non-implications.
+5. **Independent replay:** recompute supported claim derivations from request and exact Evidence without calling the producer evaluator.
+6. **Dependency-aware corroboration:** track shared disassembler/lifter, parser, signature database, emulator, runtime, acquisition session or model roots. Different tool names do not prove independent observations.
+
+### Competitive implementation strategy
+
+Use an adapter portfolio rather than build a proprietary analysis engine:
+
+- Static lane: Ghidra, IDA Pro, Binary Ninja and format-specific readers.
+- Program-analysis lane: angr and other symbolic/dataflow tools.
+- Dynamic lane: authorized debuggers, emulators, instrumented runtime and device observations.
+- Evidence lane: REA admission, artifact/operation scope, lineage, numeric intent, population completeness, typed claims and replay.
+- Decision lane: Symthaea point-EIG, robust-EIG and decision-aware EVSI/minimax selection, constrained by proof obligations and authorization.
+
+An adapter's output is not automatically an independent corroboration source. For example, two decompilers using shared lift/decoder dependencies may share failure modes; two reports from one mounted acquisition session remain one acquisition root. Unknown dependency ancestry stays unknown.
+
+### Fair comparison arms
+
+On the same held-out binaries, budgets and oracles, compare:
+
+A. One specialist tool + expert/operator.
+B. Multi-tool union without lineage or independent replay.
+C. Multi-tool + artifact/operation binding and claim evaluation.
+D. Full REA + Symthaea: source lineage, independent replay, proof-obligation gap detection and decision-aware next-observation selection.
+
+Report tool-native output quality and the added REA layer separately. The goal is to outperform the best tool-only and agent-only baselines on source-grounded, reproducible conclusions and investigation efficiency—not to claim that REA itself disassembles better than Ghidra or IDA.
+
 ## 7. Industry boundary
 
 REA composes rather than replaces:
