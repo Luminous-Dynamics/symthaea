@@ -70,6 +70,12 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
         "support cycle",
         "impact witness",
         "unaffectedness witness",
+        "clean full-recomputation",
+        "incremental closure update",
+        "peak memory",
+        "at least 20% lower revalidation cost",
+        "existing seven CEB-CONTINUITY measures",
+        "false-retain/stale-evidence use",
         "shared upstream dependency",
         "historical truth",
         "current decision-use",
@@ -131,7 +137,7 @@ def self_test() -> list[str]:
         "historical truth",
         "current decision-use",
         "#10630 #10173 #9112 #10610 #10619 #10314 #10064 #10369",
-        "no second repository graph not a new metric lane not a sealed holdout counter-evidence non-circular support support cycle",
+        "no second repository graph not a new metric lane not a sealed holdout counter-evidence non-circular support support cycle clean full-recomputation incremental closure update peak memory at least 20% lower revalidation cost existing seven CEB-CONTINUITY measures false-retain/stale-evidence use",
         *DISPOSITIONS,
         *EDGE_KINDS,
         "no candidate code",
@@ -173,6 +179,7 @@ def self_test() -> list[str]:
         ("disposition removed", challenge, key, protocol.replace("supersede", "missing")),
         ("execution boundary removed", challenge, key, protocol.replace("no candidate code", "candidate code run")),
         ("counter-evidence requirement removed", challenge, key, protocol.replace("counter-evidence", "supporting evidence")),
+        ("clean recomputation oracle removed", challenge, key, protocol.replace("clean full-recomputation", "incremental only")),
     )
     for label, mutated_challenge, mutated_key, mutated_protocol in mutations:
         if not validate(mutated_protocol, mutated_challenge, mutated_key):
