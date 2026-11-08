@@ -30,6 +30,8 @@ Both arms consume the same ObservationLog and therefore the same observations, i
 
 The only intended treatment is access to the mechanism. The reference implementation does not train an AI agent; it provides the executable world and exact finite hypothesis filter needed to test one.
 
+**A0 limitation:** this first slice is a structure-known identification control, not yet a coefficient-fitting benchmark. It has no free numerical coefficient family. Add bounded gains/decay parameters next, then require the A0 arm to recover them with structure supplied before interpreting A2 performance.
+
 ## Independent structural oracle
 
 The world simulator advances an explicit hidden state. The exhaustive oracle does not call the simulator or the hypothesis transition method. Instead, it uses a closed-form trace relation and enumerates every binary intervention sequence at the requested horizon.
