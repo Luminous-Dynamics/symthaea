@@ -49,26 +49,41 @@
         "kind": "vendor_named_evaluations",
         "parameter_count_billions": 34,
         "backbone_billions": 32,
-        "action_expert_billions": 2
+        "action_expert_billions": 2,
+        "camera_count_max": 7,
+        "camera_coverage": "360_degree",
+        "open_loop_samples": 1434,
+        "closed_loop_reconstructed_scenes": 913
       },
       "metrics": [
         "minADE6_at_6_4s",
         "reasoning_score",
-        "LingoQA"
+        "LingoQA",
+        "AlpaSimScore"
       ],
       "source_status": "upstream_reported",
       "rights_status": "source_terms_to_check",
       "snapshot": {
         "minADE6_m": 0.911,
         "reasoning_score": 0.433,
-        "LingoQA": 79.2
+        "LingoQA": 79.2,
+        "AlpaSimScore": 1.5,
+        "AlpaSimScore_std": 0.13,
+        "AlpaSimScore_sample_count": 913,
+        "reasoning_comparator_GPT_5_5": 0.502,
+        "Alpamayo_1_5_Nano_AlpaSimScore": 1.37,
+        "Alpamayo_1_5_Nano_AlpaSimScore_std": 0.1
       },
       "caveats": [
-        "Vendor-reported results on a named 1434-sample evaluation.",
-        "Not directly comparable to Bench2Drive, Fail2Drive or Waymo Motion."
+        "Vendor-reported open-loop results on 1,434 named challenging samples and a separate AlpaSim closed-loop result on 913 reconstructed scenes; do not mix denominators.",
+        "The vendor table lists GPT-5.5 at 0.502 versus Alpamayo 2 Super at 0.433 on the OOD reasoning benchmark; it does not lead every reasoning metric.",
+        "AlpaSim Score is a distinct evaluator and is not directly comparable to NAVSIM EPDMS, Bench2Drive DS or real-world crash rates.",
+        "Published inference path is BF16 for a 34B model; compare compute, precision, hardware, sensor privilege and latency before treating it as a deployment baseline.",
+        "Not directly comparable to Bench2Drive, Fail2Drive, Waymo Motion or Waymo operational outcome data."
       ],
       "sources": [
         "https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/",
+        "https://www.nvidia.com/en-us/solutions/autonomous-vehicles/alpamayo/llm-info/",
         "https://developer.nvidia.com/drive/downloads"
       ]
     },
