@@ -1071,6 +1071,96 @@
       "sources": [
         "https://www.sota2.com/research/sota/motion-simulation-on-waymo-open-sim-agents-challenge-2025"
       ]
+    },
+    {
+      "id": "nuplan-r-2026",
+      "name": "nuPlan-R: Reactive Multi-Agent Closed-Loop Planning",
+      "category": "closed_loop_reactive_multi_agent_planning",
+      "capability_target": [
+        "online_ego_agent_feedback",
+        "reactive_multi_agent_simulation",
+        "interaction_realism_and_diversity",
+        "long_tail_closed_loop_planning"
+      ],
+      "protocol": {
+        "kind": "reciprocal_reactive_closed_loop",
+        "base_benchmark": "nuPlan",
+        "splits": [
+          "Test14-Random",
+          "Test14-Hard"
+        ],
+        "ego_policy_update_hz": 10,
+        "surrounding_agent_update_hz": 10,
+        "reactive_agents": "noise-decoupled diffusion agent for interaction-selected top-k actors",
+        "background_agents": "log-replay for actors outside selected top-k",
+        "vehicle_tracking": "LQR controller with kinematic bicycle model",
+        "agent_model_realism_horizon_seconds": 8
+      },
+      "metrics": [
+        "TTC_JSD",
+        "Cluster_Trajectory_FID",
+        "Trajectory_Geometry_Shannon_Entropy",
+        "Offroad_Percent",
+        "Other_Other_Collision_Percent",
+        "Ego_Other_Collision_Percent",
+        "Closed_Loop_Score",
+        "Success_Rate",
+        "All_Core_Pass_Rate"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "date": "2026-11-08",
+        "agent_model_test14_hard": {
+          "nuPlan_R": {
+            "TTC_JSD_x1e_minus_2": 1.49,
+            "Cluster_Trajectory_FID": 1.84,
+            "Shannon_Entropy": 0.987,
+            "Offroad_Percent": 4.79,
+            "Other_Other_Collision_Percent": 0.44,
+            "Ego_Other_Collision_Percent": 1.45
+          },
+          "IDM": {
+            "TTC_JSD_x1e_minus_2": 6.15,
+            "Cluster_Trajectory_FID": 2.52,
+            "Shannon_Entropy": 0.841,
+            "Offroad_Percent": 0,
+            "Other_Other_Collision_Percent": 0.17,
+            "Ego_Other_Collision_Percent": 2.33
+          },
+          "Nexus": {
+            "TTC_JSD_x1e_minus_2": 1.8,
+            "Cluster_Trajectory_FID": 2.17,
+            "Shannon_Entropy": 0.975,
+            "Offroad_Percent": 5.53,
+            "Other_Other_Collision_Percent": 0.42,
+            "Ego_Other_Collision_Percent": 1.75
+          }
+        },
+        "planner_test14_hard": {
+          "Diffusion_Planner_nuPlan_R": {
+            "Closed_Loop_Score": 75.7,
+            "Success_Rate_Percent": 84.19,
+            "All_Core_Pass_Rate_Percent": 64.7
+          },
+          "Diffusion_Planner_original_nuPlan_IDM": {
+            "Closed_Loop_Score": 68.83
+          }
+        }
+      },
+      "caveats": [
+        "Values are author-reported from arXiv:2511.10403 / IEEE IV 2026 and have not been independently reproduced by SAM.",
+        "nuPlan-R uses top-k interaction selection for full reactive rollouts; other surrounding actors follow log replay.",
+        "The planner benchmark uses LQR trajectory tracking and a kinematic bicycle model; it is not a complete perception-to-actuation physical vehicle qualification.",
+        "The agent-model realism scores do not establish human behavioral fidelity or physical simulator validity.",
+        "The author-linked GitHub URL was not retrievable through the current GitHub file connector; pin the repository commit and verify access/license directly before attempting reproduction."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2511.10403",
+        "https://doi.org/10.1109/IV66570.2026.11623929",
+        "https://github.com/Pemixing/nuPlan-R",
+        "https://www.nuscenes.org/nuplan"
+      ]
     }
   ],
   "prospective_targets": {
@@ -1083,7 +1173,8 @@
     "navsim_v2_epdms_2026": "Reproduce the current strongest matched EPDMS baseline first; then improve the aggregate and individual NC/DAC/DDC/TLC/EP/TTC/LK/HC/EC dimensions on sealed slices without worsening worst-family results.",
     "reactsim_bench_2026": "Beat strongest reproduced actor-world-model baselines on matched ego-deviation inputs, preserving AV-agent risk, agent-agent collision, off-road, direction and kinematic feasibility metrics separately; qualify reciprocal online interaction separately.",
     "sam-traffic-convention-mirror-v0.1": "100% of exact paired geometric/control sign invariants; 100% of missing/stale/map-rule-mismatch negatives reject or remain unresolved; 0 silent inference of traffic side from steering-wheel layout, GPS, map appearance or image pixel orientation.",
-    "drivinggen_iclr_2026": "Reproduce the exact 400-paper-sample or separately frozen hosted-card release with pinned sample IDs, then improve worst-stratum scene/agent temporal consistency, automotive imaging quality, trajectory feasibility and ego-control alignment without regressions. Add a distinct decision-value experiment: counterfactual planner outcome and reactive-agent response under matched action/call budgets; do not treat visual scores as downstream safety."
+    "drivinggen_iclr_2026": "Reproduce the exact 400-paper-sample or separately frozen hosted-card release with pinned sample IDs, then improve worst-stratum scene/agent temporal consistency, automotive imaging quality, trajectory feasibility and ego-control alignment without regressions. Add a distinct decision-value experiment: counterfactual planner outcome and reactive-agent response under matched action/call budgets; do not treat visual scores as downstream safety.",
+    "nuplan_r_2026": "Reproduce the exact nuPlan-R Diffusion-Planner Test14-Hard baseline first, then improve CLS, SR and PR separately while preserving or improving TTC JSD, cluster-trajectory FID, entropy and agent collision/off-road plausibility; extend to branch-synchronized reciprocal policies with exact actor observation and replay receipts."
   },
   "global_rules": [
     "No composite score across non-comparable benchmark families.",
@@ -1095,7 +1186,8 @@
     "NAVSIM v2 is a non-reactive pseudo-simulation profile; do not describe it as fully interactive closed-loop traffic simulation.",
     "ReactSim-Bench evaluates surrounding-agent responses to pre-generated ego deviations; it is not a complete reciprocal online ego/actor policy loop.",
     "System architecture references (for example Autoware 2.0) are not benchmark results and are stored separately from benchmark entries.",
-    "SAM-developed synthetic conformance crucibles are stored separately from external benchmark leaderboard records; a passing synthetic suite is not external benchmark reproduction or physical-safety evidence."
+    "SAM-developed synthetic conformance crucibles are stored separately from external benchmark leaderboard records; a passing synthetic suite is not external benchmark reproduction or physical-safety evidence.",
+    "nuPlan-R is a reciprocal reactive loop at the planner/actor layer, but interaction-selected top-k agents receive diffusion rollouts while remaining agents follow log replay; distinguish this from all-agent reciprocal re-planning and from physical vehicle validation."
   ],
   "system_references": [
     {
