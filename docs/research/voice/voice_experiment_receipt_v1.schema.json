@@ -1489,7 +1489,9 @@
         "alignment_algorithm",
         "alignment_gap_penalty",
         "alignment_tie_policy",
-        "unscorable_segment_count"
+        "unscorable_segment_count",
+        "feature_profile_schema_version",
+        "feature_profile_status"
       ],
       "properties": {
         "mode": {
@@ -1590,6 +1592,22 @@
         "unscorable_segment_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "feature_profile_schema_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feature_profile_status": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "SYNTHETIC_ONLY",
+            "RESEARCH_DRAFT",
+            "NATIVE_REVIEWED",
+            "QUALIFIED",
+            "RETIRED"
+          ]
         }
       },
       "allOf": [
@@ -1638,6 +1656,12 @@
               },
               "alignment_tie_policy": {
                 "type": "null"
+              },
+              "feature_profile_schema_version": {
+                "type": "null"
+              },
+              "feature_profile_status": {
+                "const": "NOT_APPLICABLE"
               }
             }
           }
@@ -1695,6 +1719,19 @@
               "alignment_tie_policy": {
                 "type": "string",
                 "minLength": 1
+              },
+              "feature_profile_schema_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "feature_profile_status": {
+                "enum": [
+                  "SYNTHETIC_ONLY",
+                  "RESEARCH_DRAFT",
+                  "NATIVE_REVIEWED",
+                  "QUALIFIED",
+                  "RETIRED"
+                ]
               }
             }
           }
