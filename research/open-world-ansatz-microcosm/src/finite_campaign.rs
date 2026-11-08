@@ -230,6 +230,30 @@ fn default_budget(family: WorldFamily) -> usize {
     }
 }
 
+fn strategy_for_pair(
+    policy: PolicySpec,
+    family: WorldFamily,
+    pair_index: usize,
+) -> PolicySpec {
+    let family_salt = match family {
+        WorldFamily::BooleanMechanism => 0xB001_EA01_u64,
+        WorldFamily::NumericMechanism => 0xA11C_0C02_u64,
+        WorldFamily::TwoInputResponse => 0x1A2C_7E03_u64,
+    };
+    let strategy = match policy.strategy {
+        ProbeStrategy::Random { seed } => ProbeStrategy::Random {
+            seed: seed
+                ^ family_salt
+                ^ (pair_index as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93),
+        },
+        other => other,
+    };
+    PolicySpec {
+        name: policy.name,
+        strategy,
+    }
+}
+
 fn run_arm(
     truth: GeneratingModel,
     arm: CampaignArm,
@@ -334,17 +358,18 @@ pub fn run_exhaustive_finite_policy_campaign(
 
             for (index, truth) in family_truths.iter().copied().enumerate() {
                 let pair = format!("{}-{}-{:04}", truth.family_alias(), policy.name, index);
+                let paired_policy = strategy_for_pair(policy, family, index);
                 let score_a0 = run_arm(
                     truth,
                     CampaignArm::A0,
-                    policy,
+                    paired_policy,
                     budget,
                     &format!("{pair}-a0"),
                 )?;
                 let score_a2 = run_arm(
                     truth,
                     CampaignArm::A2,
-                    policy,
+                    paired_policy,
                     budget,
                     &format!("{pair}-a2"),
                 )?;
@@ -378,6 +403,7 @@ pub fn run_exhaustive_finite_policy_campaign(
             "This is a deterministic census over the three declared finite reference grammars, not a sample of natural-science systems.".to_owned(),
             "The evaluated policy is the transparent exact finite inference baseline, not the learned Symthaea research orchestrator.".to_owned(),
             "A0 and A2 share world truth, empty starting evidence and maximum action budgets; post-start adaptive traces may differ.".to_owned(),
+            "Random arm uses base seed 23, deterministically salted by world family and pair index; each next action uses a step-specific seed. The same derived seed schedule is paired across A0 and A2.".to_owned(),
             "Probe cost units use the reference worlds' declared unit cost; inference runtime, hardware and human-review costs are not included.".to_owned(),
             "No external benchmark, physical law or SOTA performance claim follows from this report.".to_owned(),
         ],
@@ -425,6 +451,24 @@ mod tests {
         assert!(a2.set_score.exact_version_space_match);
         assert!(a0.probe_count <= 6);
         assert!(a2.probe_count <= 6);
+    }
+
+    #[test]
+    fn random_policy_pair_seeds_are_stable_and_vary_across_worlds() {
+        let policy = policies()[6];
+        let first = strategy_for_pair(policy, WorldFamily::NumericMechanism, 0);
+        assert_eq!(
+            first,
+            strategy_for_pair(policy, WorldFamily::NumericMechanism, 0)
+        );
+        assert_ne!(
+            first.strategy,
+            strategy_for_pair(policy, WorldFamily::NumericMechanism, 1).strategy
+        );
+        assert_ne!(
+            first.strategy,
+            strategy_for_pair(policy, WorldFamily::Interaction, 0).strategy
+        );
     }
 
     #[test]

@@ -243,9 +243,25 @@ impl StrategyEnumeratorBaseline {
                 }
             }
         }
-        let intervention = crate::strategies::choose_probe(view, strategy)
+        let action_strategy = strategy_for_decision_step(strategy, view.observations.len());
+        let intervention = crate::strategies::choose_probe(view, action_strategy)
             .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
         Ok(probe(intervention))
+    }
+}
+
+fn strategy_for_decision_step(
+    strategy: crate::strategies::ProbeStrategy,
+    observed_steps: usize,
+) -> crate::strategies::ProbeStrategy {
+    match strategy {
+        crate::strategies::ProbeStrategy::Random { seed } => {
+            let step = (observed_steps as u64).wrapping_add(1);
+            crate::strategies::ProbeStrategy::Random {
+                seed: seed ^ step.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+            }
+        }
+        other => other,
     }
 }
 
@@ -548,6 +564,19 @@ mod tests {
             assert!(interaction_score.set_score.exact_version_space_match);
             assert!(interaction_score.generating_model_in_version_space);
         }
+    }
+
+    #[test]
+    fn random_strategy_uses_a_deterministic_distinct_seed_per_decision_step() {
+        let policy = crate::strategies::ProbeStrategy::Random { seed: 23 };
+        let first = strategy_for_decision_step(policy, 0);
+        let second = strategy_for_decision_step(policy, 1);
+        assert_eq!(first, strategy_for_decision_step(policy, 0));
+        assert_ne!(first, second);
+        assert_eq!(
+            strategy_for_decision_step(crate::strategies::ProbeStrategy::FixedGrid, 1),
+            crate::strategies::ProbeStrategy::FixedGrid
+        );
     }
 
     #[test]
