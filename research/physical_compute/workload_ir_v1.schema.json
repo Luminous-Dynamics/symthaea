@@ -207,7 +207,7 @@
             "diffusion_field_ref": { "type": ["string", "null"], "maxLength": 200 },
             "target_covariance_ref": { "type": ["string", "null"], "maxLength": 200 },
             "target_power_spectral_density_ref": { "type": ["string", "null"], "maxLength": 200 },
-            "target_autocorrelation_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "target_noise_autocorrelation_ref": { "type": ["string", "null"], "maxLength": 200 },
             "target_cross_channel_covariance_ref": { "type": ["string", "null"], "maxLength": 200 },
             "target_correlation_time_s": { "type": ["number", "null"], "minimum": 0 },
             "stationarity": { "enum": ["stationary", "nonstationary", "conditionally_stationary", "unknown"] },
@@ -221,12 +221,12 @@
                 "required": ["target_noise_process"]
               },
               "then": {
-                "required": ["noise_channel_count", "target_covariance_ref", "target_power_spectral_density_ref", "target_autocorrelation_ref"],
+                "required": ["noise_channel_count", "target_covariance_ref", "target_power_spectral_density_ref", "target_noise_autocorrelation_ref"],
                 "properties": {
                   "noise_channel_count": { "type": "integer", "minimum": 1 },
                   "target_covariance_ref": { "type": "string", "minLength": 1 },
                   "target_power_spectral_density_ref": { "type": "string", "minLength": 1 },
-                  "target_autocorrelation_ref": { "type": "string", "minLength": 1 }
+                  "target_noise_autocorrelation_ref": { "type": "string", "minLength": 1 }
                 }
               }
             },
@@ -236,10 +236,10 @@
                 "required": ["target_noise_process"]
               },
               "then": {
-                "required": ["target_power_spectral_density_ref", "target_autocorrelation_ref"],
+                "required": ["target_power_spectral_density_ref", "target_noise_autocorrelation_ref"],
                 "properties": {
                   "target_power_spectral_density_ref": { "type": "string", "minLength": 1 },
-                  "target_autocorrelation_ref": { "type": "string", "minLength": 1 }
+                  "target_noise_autocorrelation_ref": { "type": "string", "minLength": 1 }
                 }
               }
             },
@@ -251,7 +251,7 @@
               "then": {
                 "anyOf": [
                   { "required": ["target_power_spectral_density_ref"] },
-                  { "required": ["target_autocorrelation_ref"] },
+                  { "required": ["target_noise_autocorrelation_ref"] },
                   { "required": ["target_covariance_ref"] }
                 ]
               }
