@@ -94,7 +94,7 @@ The limits must remain attached to these figures: the aggregate test-reduction c
 
 Source: https://diffci.com/research/diffci-open-evidence-2026
 
-The structured registry now contains **51 sources, 56 comparator records and 162 atomic observations**. The 56-row metric correspondence crosswalk is unchanged; the new observations are not mapped as direct equivalents to CEB-CONTINUITY primary metrics.
+At the 2026-11-07 snapshot, the structured registry contained **51 sources, 56 comparator records and 162 atomic observations**. The 56-row metric correspondence crosswalk is unchanged; the new observations are not mapped as direct equivalents to CEB-CONTINUITY primary metrics.
 
 
 ## Branch and merge-history comparators — November 8, 2026
@@ -126,7 +126,7 @@ Sources:
 - Official leaderboard: https://swe-milestone.com/
 - ICML 2026 paper: https://proceedings.mlr.press/v306/deng26d.html
 
-The latest structured external-observation registry snapshot contains 51 external sources, 56 comparator records and 162 atomic observations. The figures in earlier dated sections above are preserved as historical captures; the current machine-readable snapshot is authoritative for registry totals. All remain contextual references; no direct CEB superiority claim is enabled.
+The 2026-11-07 structured external-observation snapshot contained 51 external sources, 56 comparator records and 162 atomic observations. The figures in earlier dated sections above are preserved as historical captures; the current machine-readable snapshot is authoritative for registry totals. All remain contextual references; no direct CEB superiority claim is enabled.
 
 ## Executable-verifier and benchmark-integrity frontiers — November 8, 2026
 
