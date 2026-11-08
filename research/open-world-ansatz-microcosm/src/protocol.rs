@@ -851,6 +851,50 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_evidence_prefix_is_rejected_without_closing_episode() {
+        let mut episode = BlindEpisode::new_boolean(
+            "blind-prefix-mismatch-01",
+            Mechanism::Direct,
+            MeasurementMap::Identity,
+            None,
+            StructureAccess::BooleanWithheld,
+            2,
+        ).unwrap();
+        episode.apply(AgentAction::Probe {
+            intervention: AgentIntervention::Boolean(true),
+        }).unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Boolean {
+                compatible_models: crate::candidate_hypotheses(crate::StructureAccess::Withheld),
+                disposition: ClaimDisposition::Ambiguous,
+            },
+            evidence_prefix_sha256: "sha256:stale-prefix".to_string(),
+            cited_evidence_ids: vec!["E0001".to_string()],
+            rationale: "This deliberately cites a stale evidence prefix.".to_string(),
+        };
+        assert_eq!(
+            episode.apply(AgentAction::Submit { submission }),
+            Err(ProtocolError::EvidencePrefixMismatch)
+        );
+        assert_eq!(episode.status(), EpisodeStatus::Open);
+    }
+
+    #[test]
+    fn supplied_structure_must_match_the_evaluator_world() {
+        assert_eq!(
+            BlindEpisode::new_boolean(
+                "blind-a0-mismatch-01",
+                Mechanism::Direct,
+                MeasurementMap::Identity,
+                None,
+                StructureAccess::BooleanSupplied(Mechanism::HiddenLag),
+                2,
+            ).err(),
+            Some(ProtocolError::SuppliedStructureMismatch)
+        );
+    }
+
+    #[test]
     fn evidence_prefix_digest_changes_when_public_evidence_changes() {
         let mut episode = BlindEpisode::new_boolean(
             "blind-digest-01",
