@@ -14,6 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`service_continuity`]: evidence-gated service-floor and accepted-restoration evaluation.
 //!
 //! ## Example
 //!
@@ -26,6 +27,7 @@
 pub mod graph;
 pub mod inventory;
 pub mod queue;
+pub mod service_continuity;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
