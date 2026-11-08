@@ -134,6 +134,14 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
                 "profiles[{index}]: traffic-side signs do not match the declared travel-frame convention"
             ));
         }
+        if traffic_side == Some("unknown")
+            && (profile.get("passing_side_sign") != Some(&Value::Null)
+                || profile.get("applicability").and_then(Value::as_str) != Some("unknown"))
+        {
+            errors.push(format!(
+                "profiles[{index}]: unknown traffic side must have no passing-side authority and unknown applicability"
+            ));
+        }
         if profile
             .get("passing_rule_profile_id")
             .and_then(Value::as_str)
@@ -901,5 +909,17 @@ mod tests {
         let (schema, _, mut mirrored) = load_traffic_fixtures();
         mirrored["paired_scenes"][0]["declared_passing_side_sign"] = Value::from(1);
         assert!(validate_traffic_values(&schema, &mirrored).is_err());
+    }
+
+    #[test]
+    fn unknown_traffic_side_cannot_retain_passing_authority() {
+        let (schema, mut profiles, _) = load_traffic_fixtures();
+        profiles["profiles"][0]["traffic_side"] = Value::String("unknown".into());
+        profiles["profiles"][0]["passing_side_sign"] = Value::Null;
+        profiles["profiles"][0]["applicability"] = Value::String("unknown".into());
+        assert!(validate_traffic_values(&schema, &profiles).is_ok());
+
+        profiles["profiles"][0]["passing_side_sign"] = Value::from(-1);
+        assert!(validate_traffic_values(&schema, &profiles).is_err());
     }
 }
