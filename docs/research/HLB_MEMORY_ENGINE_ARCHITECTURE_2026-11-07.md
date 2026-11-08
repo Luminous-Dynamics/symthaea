@@ -774,3 +774,22 @@ Current leaderboard evidence is mixed:
 - A SOTA2 LongMemEval retrieval listing shows 92.9 Recall@5 for an RRF retrieval configuration but 24.8 strict answer accuracy under its configured answerer/judge.
 
 Do not compare these raw scores across different k, reader, judge, split and protocol. HME's downstream goal is to improve retrieval *and* actual answer correctness, with source, temporal and governance quality reported separately.
+
+
+## 2026-11-08: group-envelope pruning and workload-adaptive cascades
+
+A first in-memory group-envelope prototype now exists:
+
+- core numeric method: `ContinuousHV::similarity_interval_full_resolution_for_component_bounds(lower, upper)`;
+- memory builder: `ContinuousHVGroupEnvelope::from_original_members(...)`;
+- query: `score_interval_for_snapshot(...)`;
+- strict pruning: `can_prune_for_top_k(...)`;
+- source protocol: [HME_GROUP_ENVELOPE_REFERENCE_2026-11-08.md](HME_GROUP_ENVELOPE_REFERENCE_2026-11-08.md).
+
+The builder scans all original members to compute coordinate extrema itself. Its BLAKE3 content identity binds the score-contract ID, manifest/eligibility generations, sorted member IDs, vector f32 bit patterns and extrema. Query use checks pinned generation, member-set digest and content digest. The interval encloses all member scores in the coordinate box, and the group is excluded only if its upper endpoint is strictly below the exact kth threshold. Equality remains unresolved.
+
+This is still in-memory only. The memory object cannot by itself prove that the caller has partitioned the entire eligible corpus into groups or that the expected eligibility metadata is authoritative. Mixed-eligibility groups need separate envelopes for exact eligible subsets. Segment persistence, checksummed headers, reopen-time binding and physical page-I/O measurements remain #10917 work. Rust tests are authored but unexecuted; no speed result is claimed.
+
+A separate benchmark direction follows AgentIR (arXiv:2605.25092, 2026-05-24): workload-adaptive cascades can skip expensive retrieval channels on queries where they add little utility. AgentIR reports skipping the dense channel on 63% of LongMemEval queries at parity LLM-judged accuracy and much higher skip rates on LoCoMo under its own benchmark configuration. HME should compare cheap-first eligibility/metadata/lexical/BinaryHV/ContinuousHV channels. Classify each skip as proof-skipped, policy-skipped or model-skipped. A BM25 margin or learned router score cannot authorize exact HDC-cosine pruning; only an admissible score bound over all eligible records can do so.
+
+Current long-memory leaderboards also show why a storage benchmark and an answer benchmark are different: Supermemory's May 2026 report self-reports 97% LongMemEval-S Recall@20, while one SOTA2 RRF listing reports 92.9 Recall@5 alongside 24.8 strict answer accuracy under its own configured reader/judge. AML Cycle 1 has separate textual/coding and commercial/open-source divisions; Cycle 2 is expected mid-November 2026. These scores cannot be compared directly. HME must report retrieval Recall@k, strict downstream answer accuracy, knowledge-update/temporal correctness, abstention, source attribution, governance, token/context budget and cost separately.
