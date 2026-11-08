@@ -34,7 +34,7 @@ The former `symthaea-perception` crate is archived and workspace-excluded. It is
 
 ## Traffic convention context
 
-Every road-scene snapshot carries an explicit `traffic_convention_profile_id` sidecar reference. The profile separately binds traffic side (left/right), steering-wheel position, travel-frame identity, keep/kerbside and median-side signs, passing-rule profile/version and lane-ordering profile. The reference must be resolved before rule-sensitive lane selection or passing decisions; no country, GPS, pixel-side or steering-wheel-layout inference is allowed.
+Every road-scene snapshot carries an explicit `traffic_convention_profile_id` sidecar reference. The profile separately binds traffic side (left/right), steering-wheel position, travel-frame identity, keep/kerbside and median-side signs, passing-rule profile/version and lane-ordering profile. The reference must be resolved before rule-sensitive lane selection or passing decisions. Its `travel_frame_id` must resolve to a `local_road` reference frame in the same scene snapshot and must match both the ego-state and road-geometry frame IDs. No country, GPS, pixel-side or steering-wheel-layout inference is allowed.
 
 See `SAM_TRAFFIC_CONVENTION_METAMORPHIC_V0_1.md`, the companion profile schema and paired synthetic LHT/RHT fixtures. A mirror transform changes lateral/yaw/curvature/steering signs but does not infer steering-wheel position or replace the jurisdiction rule profile.
 
