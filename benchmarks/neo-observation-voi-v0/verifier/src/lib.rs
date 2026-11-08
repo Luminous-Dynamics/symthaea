@@ -447,13 +447,50 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
         ],
     )?;
     close(nuisance_mi, 0.0, tolerance, "nuisance mutual information")?;
+    let nuisance_risk = number(
+        fixture,
+        &[
+            "exact_information_value_controls",
+            "0",
+            "expected_post_observation_bayes_risk",
+        ],
+    )?;
+    close(
+        nuisance_risk,
+        report.baseline_risk,
+        tolerance,
+        "nuisance observation leaves decision risk unchanged",
+    )?;
     let nuisance_value = number(
         fixture,
-        &["exact_information_value_controls", "0", "expected_value_of_sample_information"],
+        &[
+            "exact_information_value_controls",
+            "0",
+            "expected_value_of_sample_information",
+        ],
+    )?;
+    close(nuisance_value, 0.0, tolerance, "nuisance observation EVSI")?;
+    let perfect_information_risk = number(
+        fixture,
+        &[
+            "exact_information_value_controls",
+            "1",
+            "expected_post_observation_bayes_risk",
+        ],
+    )?;
+    close(
+        perfect_information_risk,
+        report.baseline_risk - report.perfect_information_evsi,
+        tolerance,
+        "perfect-information post-observation risk",
     )?;
     let decision_relevant_value = number(
         fixture,
-        &["exact_information_value_controls", "1", "expected_value_of_sample_information"],
+        &[
+            "exact_information_value_controls",
+            "1",
+            "expected_value_of_sample_information",
+        ],
     )?;
     if !(nuisance_value < decision_relevant_value) {
         return Err("decision-value ranking invariant failed".to_owned());
@@ -756,6 +793,15 @@ mod tests {
             )
             .unwrap();
         }
+    }
+
+    #[test]
+    fn nuisance_information_cannot_be_counted_as_decision_value() {
+        let invalid = FIXTURE.replace(
+            "\"expected_value_of_sample_information\": 0.0",
+            "\"expected_value_of_sample_information\": 0.01",
+        );
+        assert!(verify_fixture_text(&invalid).is_err());
     }
 
     #[test]
