@@ -920,6 +920,20 @@ mod tests {
         array(matrix, "likelihoods").unwrap()
     }
 
+
+    fn normalized_planner_cost(experiment: &Value, base_config: &Value) -> f64 {
+        let weights = &base_config["cost_weights"];
+        weights["time"].as_f64().unwrap()
+            * experiment["estimated_time_seconds"].as_f64().unwrap()
+            / base_config["max_time_seconds"].as_f64().unwrap()
+            + weights["energy"].as_f64().unwrap()
+                * experiment["estimated_energy_joules"].as_f64().unwrap()
+                / base_config["max_energy_joules"].as_f64().unwrap()
+            + weights["risk"].as_f64().unwrap()
+                * experiment["estimated_risk"].as_f64().unwrap()
+                / base_config["max_risk"].as_f64().unwrap()
+    }
+
     fn scenario_named<'a>(agent: &'a Value, id: &str) -> &'a Value {
         array(agent, "likelihood_scenarios")
             .unwrap()
@@ -1016,6 +1030,30 @@ mod tests {
         assert_eq!(max_key(&expected_scenario_eig), "static_function_probe");
         assert_eq!(max_key(&robust_lower_tail_eig), "controlled_reproduction");
         assert_eq!(max_key(&expected_evsi), "static_function_probe");
+
+        // Existing point/robust planners divide the selected information gain
+        // by this normalized cost. The expected winners remain distinct after
+        // applying the exact implementation's cost normalization.
+        let point_base = &agent["planner_configs"]["point"];
+        let robust_base = &agent["planner_configs"]["robust"]["base"];
+        let point_utility = |id: &str| {
+            let cost = normalized_planner_cost(experiment(&agent, id), point_base);
+            point_eig[id] / cost
+        };
+        let robust_utility = |id: &str| {
+            let cost = normalized_planner_cost(experiment(&agent, id), robust_base);
+            robust_lower_tail_eig[id] / cost
+        };
+        assert!(point_utility("static_function_probe") > point_utility("controlled_reproduction"));
+        assert!(point_utility("static_function_probe") > point_utility("verify_deployment_manifest"));
+        assert!(robust_utility("controlled_reproduction") > robust_utility("static_function_probe"));
+        assert!(robust_utility("controlled_reproduction") > robust_utility("verify_deployment_manifest"));
+        assert!((normalized_planner_cost(experiment(&agent, "static_function_probe"), point_base)
+            - 0.383_333_333_333_333_3).abs() < 1.0e-12);
+        assert!((normalized_planner_cost(experiment(&agent, "verify_deployment_manifest"), point_base)
+            - 0.103_333_333_333_333_35).abs() < 1.0e-12);
+        assert!((normalized_planner_cost(experiment(&agent, "controlled_reproduction"), point_base)
+            - 0.733_333_333_333_333_4).abs() < 1.0e-12);
 
         assert!((point_eig["static_function_probe"] - 0.531_004_406_410_718_9).abs() < 1.0e-12);
         assert!((point_eig["controlled_reproduction"] - 0.278_071_905_112_637_7).abs() < 1.0e-12);
