@@ -50,10 +50,10 @@ The evaluator-only ground-truth field must not be visible to the verifier being 
 The machine-readable v1 contract and semantic validator are:
 
 - `research/physical_compute/scenario_manifest_v1.schema.json`
-- `research/physical_compute/scenarios/v1/common_cause_controller_outage.json`
+- `research/physical_compute/scenarios/v1/common_cause_controller_outage.json`\n- `research/physical_compute/scenarios/v1/common_cause_shared_power_outage.json`
 - `research/physical_compute/manifest-validator/`: isolated Rust CLI and semantic validation library (uses `serde_json` and `sha2`; not a Symthaea workspace member).
 
-The example is a deterministic **negative-control fixture**, not a probability estimate. It injects a controller-domain outage and declares that adding healthy cells must not make the workload executable.
+The examples are deterministic **negative-control fixtures**, not probability estimates. One injects a controller-domain outage; the other injects a shared power outage that affects the array, controller and verifier. Both declare that increasing healthy cell count must not make the workload executable or make a co-failed verifier independent.
 
 The JSON Schema validates structure and primitive types. A semantic validator is still required to check:
 - uniqueness of component and domain identifiers;
@@ -73,7 +73,7 @@ cargo run --manifest-path research/physical_compute/manifest-validator/Cargo.tom
   research/physical_compute/scenarios/v1/common_cause_controller_outage.json
 ```
 
-The CLI prints a canonical SHA-256 digest and `SEMANTIC_VALID` or `SEMANTIC_INVALID`. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs and canonical key ordering.
+The CLI prints a canonical SHA-256 digest and `SEMANTIC_VALID` or `SEMANTIC_INVALID`. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both checked-in common-cause fixtures and canonical key ordering.
 
 The crate and tests are authored but have not been compiled in this environment because `rustc` / `cargo` are unavailable. Until the JSON Schema and semantic passes have both executed on an exact head, a manifest is not a qualified scenario.
 
