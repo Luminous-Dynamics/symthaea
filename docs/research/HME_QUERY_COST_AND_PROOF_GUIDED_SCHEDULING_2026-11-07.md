@@ -300,3 +300,12 @@ A query cost prediction may allocate a budget or choose an order while exact upp
 No query-cost model, PG-VoC scheduler, OOD detector or HME adaptive runtime is implemented by this research protocol. The published QBAT, ANNiE, DARTH+, Ada-ef, OctopusANN and SVFusion results are not HME results. No SOTA win, theorem or runtime speedup is claimed.
 
 All learned and heuristic outputs remain advisory. The exact score contract, conservative interval bounds, eligibility generation and typed completion state remain the authorities for exact-mode claims.
+
+
+## 2026-11-08 score-contract binding
+
+Cost models and scheduling receipts must bind the exact score semantics used to produce their observed margins, bounds and completion cost. For ContinuousHV/cosine, use `continuous_hv_cosine_full_f32_group8_v1`.
+
+The profile admits only finite components in [-1, 1] and pins full-coordinate f32 eight-coordinate grouped accumulation plus ordered tail and the near-zero denominator rule. A model trained against a different metric, reduction order, range or dimension profile is not interchangeable; invalidate/recalibrate its model receipt when these semantics change.
+
+The source now contains the versioned contract ID and admission checks, but they are not yet integrated into segment storage or the cost-model runtime.
