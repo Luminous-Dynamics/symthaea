@@ -22,6 +22,7 @@ fn main() {
         std::process::exit(2);
     }
 
+    let has_traffic = traffic_schema.is_some();
     let result = match (traffic_schema, traffic_fixture) {
         (Some(traffic_schema), Some(traffic_fixture)) => validate_bundle_files(
             &schema,
@@ -40,7 +41,7 @@ fn main() {
                 fixture.display(),
                 schema.display()
             );
-            if args_count_has_traffic_args() {
+            if has_traffic {
                 println!("PASS: scene traffic_convention_profile_id resolves in the validated traffic profile registry");
             }
         }
@@ -52,10 +53,4 @@ fn main() {
             std::process::exit(1);
         }
     }
-}
-
-// The CLI always consumes its optional traffic pair before calling this function;
-// this helper is avoided by keeping the mode as an explicit value instead.
-fn args_count_has_traffic_args() -> bool {
-    std::env::args_os().count() >= 5
 }
