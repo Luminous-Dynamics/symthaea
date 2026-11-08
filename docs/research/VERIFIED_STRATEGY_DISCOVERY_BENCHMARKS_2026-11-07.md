@@ -645,3 +645,48 @@ The AIG/ROBDD checker validates only that the compiled circuit is equivalent to 
 - On application-derived QBF strategies, report strategy extraction time separately from AIG/ROBDD compilation and checking.
 
 The promotion objective is a lower verified serialized artifact cost at equal total construction plus verification budget, with held-out families and unchanged semantic acceptance. A smaller representation is useful only when it remains independently equivalent and the original strategy remains a winning strategy.
+
+
+## 20. Portable QBF game proofs and end-to-end evidence portfolios
+
+The finite QBF reference lane now adds a second certificate alongside the winning Skolem/Herbrand strategy: a post-order game-proof tree. It records matrix leaves, all-clauses-satisfied early-TRUE rules, falsified-clause early-FALSE witnesses, and quantified decision nodes with their EXISTS/OR or FORALL/AND recurrence.
+
+The proof is bound to the ordered prefix and source CNF by an independent verifier. The in-memory proof is serialized as canonical `LD-QBFPROOF1` bytes, decoded under variable/node/byte limits, and independently reverified after decoding. The portfolio assembler then combines:
+1. independently validated game-proof bytes;
+2. independently validated winning strategy;
+3. support-minimized ROBDD;
+4. AIG with complemented edges;
+5. exact BDD/AIG verification reports and aggregate artifact sizes.
+
+The source game proof, source winning strategy and compiled graph equivalence are three separate trust checks. Passing one does not imply the others.
+
+### New proof/portfolio metrics
+
+| Layer | Metric |
+|---|---|
+| Game proof | Post-order node count by node kind |
+| Pruning | Early-TRUE count, early-FALSE clause witnesses, complete matrix leaves |
+| Expansion baseline | Full binary prefix-tree node bound (2^{n+1}-1) |
+| Proof construction | Builder visits and time |
+| Proof checking | Independent verifier visits/time, source-clause inspections |
+| Serialization | LD-QBFPROOF1 byte length, decode time, malformed-input rejects |
+| Strategy | Opponent assignments checked and strategy table entries |
+| Compiled graphs | ROBDD nodes/bytes, AIG AND nodes/bytes |
+| End-to-end | Total proof + BDD + AIG bytes and time to full verified bundle |
+
+For the expansion comparison, report the full-tree bound and actual proof-tree count, but do not call the node reduction a polynomial proof-size guarantee. Early pruning is input-dependent; worst-case proof size remains exponential in prefix length for this tree reference. The verifier's clause-evaluation work also depends on formula size, not only proof nodes.
+
+### Known external certificate practice
+
+- The QBFcert framework includes DepQBF, QRPcheck, QRPcert and CertCheck. It offers a real external syntactic-proof and certificate-extraction baseline, rather than assuming every QBF solver emits the same certificate type: https://fmv.jku.at/qbfcert/.
+- CAQE's public QDIMACS interface distinguishes decision output from `--qdo` partial-assignment output. The latter is not automatically a complete strategy; Symthaea must check function completeness, prefix-legal dependencies and the original matrix: https://github.com/ltentrup/caqe.
+- The SAT 2026 QBF synthesis proof-system paper explicitly frames intermediate game values and Skolem/Herbrand extraction as an alternative target, with a sound/complete system and polynomial-time extraction for proofs in that system: https://doi.org/10.4230/LIPIcs.SAT.2026.3.
+- #QBF is a further distinct task: counting winning Skolem functions. The Q-MICE work is a proof-system reference for that counting task, not a QBF truth-decision baseline: https://doi.org/10.4230/LIPIcs.SAT.2026.32.
+
+### Promotion and comparison rules
+
+- Compare our finite game-tree proof size against our own exhaustive full-expansion tree first; do not compare its node count directly with QRP lines, Q-res proof bytes, or the SAT 2026 synthesis proof system without an explicit translation and common semantics.
+- Benchmark syntactic certificates, semantic strategy functions, and game-value traces as separate certificate classes.
+- A serialized proof is accepted only after bounded decode, source/prefix verification and deterministic re-encoding equality.
+- Report proof-check time separately from strategy-check time and BDD/AIG equivalence time.
+- Confirm results on QBFGallery 2026 instances after pinning its actual public benchmark archive, selected tracks, solver builds and licenses. The gallery advertises PCNF main, crafted, random, 2QBF, prenex non-CNF and DQBF tracks; no numeric external solved-count target is claimed here.
