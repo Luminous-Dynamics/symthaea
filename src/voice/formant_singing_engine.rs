@@ -8,6 +8,10 @@
 use anyhow::{Result, bail};
 
 use symthaea_muse::singing_bridge::{render_sung_frames, sing};
+use symthaea_pronunciation_plan::{
+    Phone, PhoneKind as ResolvedPhoneKind, PronunciationPlan, ScoreEventKind, VocalScoreAlignment,
+};
+use symthaea_vocal_tract::speech::formants::formant_target_pub;
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
 use super::singing_engine::{
@@ -56,6 +60,198 @@ impl FormantSingingEngine {
 
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
+    }
+
+    /// Render a fully selected pronunciation and explicit score/alignment graph.
+    ///
+    /// Unlike the compatibility VocalPerformance path, this method does not
+    /// call Muse G2P. The caller must supply a validated, selected pronunciation
+    /// plan and a score alignment that assigns each note interval exactly once.
+    /// Unsupported formant phones fail closed rather than taking the legacy
+    /// formant table's default-vowel branch.
+    pub fn render_resolved_plan(
+        &mut self,
+        pronunciation: &PronunciationPlan,
+        alignment: &VocalScoreAlignment,
+    ) -> Result<VocalStem> {
+        let frames = self.resolved_plan_frames(pronunciation, alignment)?;
+        let samples = self.vocoder.synthesize(&frames);
+        let stem = VocalStem {
+            samples,
+            sample_rate: self.sample_rate,
+            backend: format!("{BACKEND_ID}-resolved-plan-v1"),
+        };
+        stem.validate()?;
+        Ok(stem)
+    }
+
+    fn resolved_plan_frames(
+        &self,
+        pronunciation: &PronunciationPlan,
+        alignment: &VocalScoreAlignment,
+    ) -> Result<Vec<FormantFrame>> {
+        pronunciation
+            .validate_renderable()
+            .map_err(anyhow::Error::msg)?;
+        alignment
+            .validate_against(pronunciation)
+            .map_err(anyhow::Error::msg)?;
+
+        let final_event = alignment
+            .events
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("resolved score has no events"))?;
+        let duration_s = final_event.start_s + final_event.duration_s;
+        if !duration_s.is_finite() || duration_s <= 0.0 || duration_s > 3_600.0 {
+            bail!("resolved score duration must be finite and within (0, 3600] seconds");
+        }
+
+        let mut segments = Vec::new();
+        for (binding_index, binding) in alignment.syllable_bindings.iter().enumerate() {
+            let word = pronunciation
+                .words
+                .get(binding.word_index)
+                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} references missing word"))?;
+            let selected_id = word
+                .selected_candidate_id
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} has no selected candidate"))?;
+            let candidate = word
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == selected_id)
+                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} selects a missing candidate"))?;
+            let syllable = candidate
+                .syllables
+                .get(binding.syllable_index)
+                .ok_or_else(|| anyhow::anyhow!("binding {binding_index} has no pronunciation syllable"))?;
+
+            for (span_index, span) in binding.spans.iter().enumerate() {
+                let event = alignment.events.get(span.event_index).ok_or_else(|| {
+                    anyhow::anyhow!("binding {binding_index} references missing score event")
+                })?;
+                let (frequency_hz, velocity) = match event.kind {
+                    ScoreEventKind::SungNote {
+                        frequency_hz,
+                        velocity,
+                    } => (frequency_hz, velocity),
+                    ScoreEventKind::Rest => {
+                        bail!("binding {binding_index} attempted to render a Rest event")
+                    }
+                };
+                let start_s = event.start_s + span.start_offset_s;
+                let end_s = event.start_s + span.end_offset_s;
+                let span_duration_s = end_s - start_s;
+                if !start_s.is_finite()
+                    || !end_s.is_finite()
+                    || !span_duration_s.is_finite()
+                    || span_duration_s <= 0.0
+                {
+                    bail!("binding {binding_index} has invalid materialized timing");
+                }
+
+                let phones: Vec<&Phone> = if span_index == 0 {
+                    syllable.phones.iter().collect()
+                } else {
+                    let phone_index = binding.melisma_phone_index.ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "binding {binding_index} has additional note spans without a designated melisma vowel"
+                        )
+                    })?;
+                    vec![&syllable.phones[phone_index]]
+                };
+                let durations = allocate_resolved_phone_durations(
+                    &phones,
+                    span_duration_s,
+                    syllable.stress,
+                    binding_index,
+                )?;
+                let mut phone_start_s = start_s;
+                for (phone, phone_duration_s) in phones.iter().zip(durations) {
+                    let (f1, f2, f3, source_type) = strict_formant_target(phone)?;
+                    let phone_end_s = phone_start_s + phone_duration_s;
+                    let stress_gain = match syllable.stress {
+                        1 => 1.08,
+                        2 => 1.04,
+                        _ => 1.0,
+                    };
+                    let voiced = match source_type {
+                        SourceType::Vowel | SourceType::Nasal | SourceType::Liquid => 0.92,
+                        SourceType::Stop | SourceType::Fricative | SourceType::Affricate => {
+                            if is_voiced_consonant(&phone.ipa) {
+                                0.58
+                            } else {
+                                0.0
+                            }
+                        }
+                        SourceType::Silent => 0.0,
+                    };
+                    let base_energy = (velocity * stress_gain).clamp(0.0, 1.0);
+                    segments.push(ResolvedPhoneSegment {
+                        start_s: phone_start_s,
+                        end_s: phone_end_s,
+                        f1,
+                        f2,
+                        f3,
+                        f0: frequency_hz,
+                        energy: base_energy,
+                        voicing: voiced,
+                        source_type,
+                    });
+                    phone_start_s = phone_end_s;
+                }
+                if (phone_start_s - end_s).abs() > 0.000_01 {
+                    bail!("binding {binding_index} phone durations do not cover its score span");
+                }
+            }
+        }
+
+        segments.sort_by(|left, right| left.start_s.total_cmp(&right.start_s));
+        for (index, segment) in segments.iter().enumerate() {
+            if index > 0 && segment.start_s < segments[index - 1].end_s - 0.000_01 {
+                bail!("resolved phone segments overlap after materialization");
+            }
+        }
+
+        let frame_intervals = (duration_s * FRAME_RATE_HZ).ceil().max(1.0) as usize;
+        if frame_intervals > 720_000 {
+            bail!("resolved score exceeds the one-hour formant-frame limit");
+        }
+        let mut frames = Vec::with_capacity(frame_intervals + 1);
+        let mut segment_index = 0usize;
+        for frame_index in 0..=frame_intervals {
+            let time_s = frame_index as f32 * FRAME_DT_S;
+            while segment_index < segments.len() && segments[segment_index].end_s <= time_s {
+                segment_index += 1;
+            }
+            let frame = if let Some(segment) = segments.get(segment_index)
+                && time_s >= segment.start_s
+                && time_s < segment.end_s
+            {
+                let attack = ((time_s - segment.start_s) / 0.015).clamp(0.0, 1.0);
+                let release = ((segment.end_s - time_s) / 0.015).clamp(0.0, 1.0);
+                let envelope = attack.min(release);
+                FormantFrame {
+                    f1: segment.f1,
+                    f2: segment.f2,
+                    f3: segment.f3,
+                    b1: 60.0,
+                    b2: 80.0,
+                    b3: 100.0,
+                    f0: segment.f0,
+                    energy: segment.energy * envelope,
+                    voicing: segment.voicing,
+                    time: time_s,
+                    source_type: segment.source_type,
+                    nasal_zero_freq: 0.0,
+                    nasal_zero_bw: 0.0,
+                }
+            } else {
+                FormantFrame::silent(time_s)
+            };
+            frames.push(frame);
+        }
+        Ok(frames)
     }
 
     fn aligned_syllables(
@@ -145,6 +341,124 @@ impl FormantSingingEngine {
         }
         Ok(aligned)
     }
+}
+
+#[derive(Clone, Copy)]
+struct ResolvedPhoneSegment {
+    start_s: f32,
+    end_s: f32,
+    f1: f32,
+    f2: f32,
+    f3: f32,
+    f0: f32,
+    energy: f32,
+    voicing: f32,
+    source_type: SourceType,
+}
+
+fn allocate_resolved_phone_durations(
+    phones: &[&Phone],
+    total_duration_s: f32,
+    stress: u8,
+    binding_index: usize,
+) -> Result<Vec<f32>> {
+    if phones.is_empty() || !total_duration_s.is_finite() || total_duration_s <= 0.0 {
+        bail!("binding {binding_index} requires phones and a positive finite duration");
+    }
+    let consonants = phones
+        .iter()
+        .filter(|phone| phone.kind == ResolvedPhoneKind::Consonant)
+        .count();
+    let nuclei: Vec<_> = phones
+        .iter()
+        .filter(|phone| {
+            matches!(
+                phone.kind,
+                ResolvedPhoneKind::Vowel | ResolvedPhoneKind::SyllabicConsonant
+            )
+        })
+        .collect();
+    if nuclei.is_empty() {
+        bail!("binding {binding_index} has no vowel or syllabic nucleus");
+    }
+
+    const CONSONANT_DURATION_S: f32 = 0.045;
+    const MIN_NUCLEUS_DURATION_S: f32 = 0.025;
+    let consonant_budget = consonants as f32 * CONSONANT_DURATION_S;
+    let nucleus_budget = total_duration_s - consonant_budget;
+    if nucleus_budget < nuclei.len() as f32 * MIN_NUCLEUS_DURATION_S {
+        bail!(
+            "binding {binding_index} is too short to preserve its consonants and vowel nucleus"
+        );
+    }
+    let nucleus_weights: Vec<f32> = nuclei
+        .iter()
+        .map(|phone| {
+            let kind_weight = if phone.kind == ResolvedPhoneKind::SyllabicConsonant {
+                0.8
+            } else {
+                1.0
+            };
+            let stress_weight = match stress {
+                1 => 1.1,
+                2 => 1.05,
+                _ => 1.0,
+            };
+            kind_weight * stress_weight
+        })
+        .collect();
+    let total_nucleus_weight = nucleus_weights.iter().sum::<f32>();
+    let mut nucleus_index = 0usize;
+    let mut durations = Vec::with_capacity(phones.len());
+    for phone in phones {
+        if phone.kind == ResolvedPhoneKind::Consonant {
+            durations.push(CONSONANT_DURATION_S);
+        } else {
+            let duration = nucleus_budget * nucleus_weights[nucleus_index] / total_nucleus_weight;
+            durations.push(duration);
+            nucleus_index += 1;
+        }
+    }
+    Ok(durations)
+}
+
+fn strict_formant_target(phone: &Phone) -> Result<(f32, f32, f32, SourceType)> {
+    let supported = matches!(
+        phone.ipa.as_str(),
+        "iː" | "i" | "ɪ" | "ɛ" | "æ" | "ɑ" | "ɑː" | "ɒ" | "ɔ" | "ɔː" | "ʌ" | "ʊ"
+            | "uː" | "u" | "ə" | "ɜː" | "eɪ" | "aɪ" | "oʊ" | "aʊ" | "m" | "n" | "ŋ"
+            | "p" | "b" | "t" | "d" | "k" | "ɡ" | "f" | "v" | "θ" | "ð" | "s" | "z"
+            | "ʃ" | "ʒ" | "h" | "tʃ" | "dʒ" | "l" | "ɹ" | "w" | "j" | "ks"
+    );
+    if !supported {
+        bail!(
+            "resolved IPA phone {:?} is outside the calibrated legacy formant inventory",
+            phone.ipa
+        );
+    }
+    let (f1, f2, f3, source) = formant_target_pub(&phone.ipa);
+    match phone.kind {
+        ResolvedPhoneKind::Vowel if source != SourceType::Vowel => {
+            bail!("resolved vowel {:?} maps to a non-vowel formant source", phone.ipa)
+        }
+        ResolvedPhoneKind::SyllabicConsonant
+            if !matches!(source, SourceType::Nasal | SourceType::Liquid) =>
+        {
+            bail!(
+                "syllabic consonant {:?} has no supported syllabic source type",
+                phone.ipa
+            )
+        }
+        ResolvedPhoneKind::Consonant if source == SourceType::Vowel => {
+            bail!("resolved consonant {:?} maps to a vowel source", phone.ipa)
+        }
+        _ => {}
+    }
+    Ok((f1, f2, f3, source))
+}
+
+fn is_voiced_consonant(ipa: &str) -> bool {
+    matches!(ipa, "b" | "d" | "ɡ" | "v" | "ð" | "z" | "ʒ" | "dʒ")
 }
 
 fn same_note(left: &symthaea_muse::Note, right: &symthaea_muse::Note) -> bool {
