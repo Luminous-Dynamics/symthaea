@@ -701,6 +701,10 @@ pub fn build_qbf_game_proof_dag(
     Ok((proof, report))
 }
 
+/// Check canonical residual structure directly, without invoking the
+/// builder's canonicalizer. Each clause must have strictly increasing
+/// literals, no complementary pair, and the clause list must be strictly
+/// ordered (which also excludes duplicate clauses).
 fn validate_canonical_residual(
     node_id: usize,
     position: usize,
@@ -709,21 +713,28 @@ fn validate_canonical_residual(
     budget: QbfGameDagBudget,
     literal_visits: &mut u128,
 ) -> Result<(), QbfGameDagError> {
-    let (canonical, work) = canonicalize_residual(residual.clone())?;
-    *literal_visits = literal_visits
-        .checked_add(work)
-        .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
-    if *literal_visits > budget.max_residual_literal_visits {
-        return Err(QbfGameDagError::ResidualLiteralVisitBudgetExceeded {
-            required: *literal_visits,
-            limit: budget.max_residual_literal_visits,
-        });
-    }
-    if canonical != *residual {
-        return Err(QbfGameDagError::NonCanonicalResidual { node: node_id });
-    }
-
     for clause in residual {
+        *literal_visits = literal_visits
+            .checked_add(
+                u128::try_from(clause.len())
+                    .map_err(|_| QbfGameDagError::ResourceAccountingOverflow)?,
+            )
+            .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+
+        if clause.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(QbfGameDagError::NonCanonicalResidual { node: node_id });
+        }
+
+        let mut polarity_by_variable = BTreeMap::new();
+        for literal in clause {
+            if let Some(previous) = polarity_by_variable.insert(literal.variable, literal.positive)
+            {
+                if previous != literal.positive {
+                    return Err(QbfGameDagError::NonCanonicalResidual { node: node_id });
+                }
+            }
+        }
+
         for literal in clause {
             let Some(&variable_position) = variable_positions.get(literal.variable) else {
                 return Err(QbfGameDagError::ResidualVariableOutOfRange {
@@ -742,15 +753,126 @@ fn validate_canonical_residual(
             }
         }
     }
+
+    if residual.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(QbfGameDagError::NonCanonicalResidual { node: node_id });
+    }
+    if *literal_visits > budget.max_residual_literal_visits {
+        return Err(QbfGameDagError::ResidualLiteralVisitBudgetExceeded {
+            required: *literal_visits,
+            limit: budget.max_residual_literal_visits,
+        });
+    }
     Ok(())
 }
 
-fn simplify_for_verification(
+/// Re-derive a child residual using a deliberately separate verifier
+/// algorithm: first detect a satisfied clause, then filter the decision
+/// variable, then independently normalize the resulting clause set.
+fn derive_child_residual_for_verification(
     residual: &ResidualCnf,
     variable: usize,
     value: bool,
 ) -> Result<(ResidualCnf, u128), QbfGameDagError> {
-    simplify_residual(residual, variable, value)
+    let mut work = 0u128;
+    let mut derived = Vec::with_capacity(residual.len());
+
+    for clause in residual {
+        let mut satisfied = false;
+        for literal in clause {
+            work = work
+                .checked_add(1)
+                .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+            if literal.variable == variable && literal.positive == value {
+                satisfied = true;
+                break;
+            }
+        }
+        if satisfied {
+            continue;
+        }
+
+        let mut reduced = Vec::with_capacity(clause.len());
+        for literal in clause {
+            work = work
+                .checked_add(1)
+                .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+            if literal.variable != variable {
+                reduced.push(*literal);
+            }
+        }
+        reduced.sort_unstable();
+        reduced.dedup();
+
+        let mut polarity_by_variable = BTreeMap::new();
+        let mut tautological = false;
+        for literal in &reduced {
+            work = work
+                .checked_add(1)
+                .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+            if let Some(previous) =
+                polarity_by_variable.insert(literal.variable, literal.positive)
+            {
+                if previous != literal.positive {
+                    tautological = true;
+                    break;
+                }
+            }
+        }
+        if !tautological {
+            derived.push(reduced);
+        }
+    }
+
+    derived.sort_unstable();
+    derived.dedup();
+    Ok((derived, work))
+}
+
+/// Independently canonicalize the original source matrix for root binding.
+/// This uses set-based polarity detection rather than the builder's
+/// sort/window canonicalizer.
+fn verifier_source_residual(
+    problem: &CnfProblem,
+) -> Result<(ResidualCnf, u128), QbfGameDagError> {
+    let mut work = 0u128;
+    let mut clauses = Vec::with_capacity(problem.clauses.len());
+    for clause in &problem.clauses {
+        let mut literals = Vec::with_capacity(clause.len());
+        for literal in clause {
+            work = work
+                .checked_add(1)
+                .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+            literals.push(ResidualLiteral {
+                variable: literal.variable,
+                positive: literal.positive,
+            });
+        }
+        literals.sort_unstable();
+        literals.dedup();
+
+        let mut polarity_by_variable = BTreeMap::new();
+        let mut tautological = false;
+        for literal in &literals {
+            work = work
+                .checked_add(1)
+                .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+            if let Some(previous) =
+                polarity_by_variable.insert(literal.variable, literal.positive)
+            {
+                if previous != literal.positive {
+                    tautological = true;
+                    break;
+                }
+            }
+        }
+        if !tautological {
+            clauses.push(literals);
+        }
+    }
+    clauses.sort_unstable();
+    clauses.dedup();
+    Ok((clauses, work))
 }
 
 /// Independently verify a residual-CNF proof DAG against the original source.
@@ -802,7 +924,7 @@ pub fn verify_qbf_game_proof_dag(
         });
     }
 
-    let (source, source_work) = source_residual(problem)?;
+    let (source, source_work) = verifier_source_residual(problem)?;
     if proof.nodes[proof.root].residual != source {
         return Err(QbfGameDagError::MatrixResidualMismatch);
     }
@@ -956,7 +1078,7 @@ pub fn verify_qbf_game_proof_dag(
                 });
             }
             let (expected_residual, work) =
-                simplify_for_verification(&node.residual, variable, branch_value)?;
+                derive_child_residual_for_verification(&node.residual, variable, branch_value)?;
             residual_literal_visits = residual_literal_visits
                 .checked_add(work)
                 .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
@@ -1007,11 +1129,6 @@ pub fn verify_qbf_game_proof_dag(
                 .checked_add(1)
                 .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
         }
-    }
-
-    let (root_residual, _) = source_residual(problem)?;
-    if proof.nodes[proof.root].residual != root_residual {
-        return Err(QbfGameDagError::MatrixResidualMismatch);
     }
 
     Ok(QbfGameDagVerificationReport {
