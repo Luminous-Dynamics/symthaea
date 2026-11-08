@@ -16,7 +16,13 @@
       "passing_rule_profile_id": "synthetic-lht-passing-v1",
       "passing_rule_profile_version": "1.0.0",
       "lane_ordering_profile_id": "kerb-to-median-lht-v1",
-      "applicability": "synthetic_fixture"
+      "applicability": "synthetic_fixture",
+      "jurisdiction_profile_version": "synthetic-1.0.0",
+      "verification_evidence_refs": [],
+      "verification_method_id": null,
+      "verification_record_id": null,
+      "verification_valid_from": null,
+      "verification_valid_until": null
     },
     {
       "profile_id": "synthetic-rht-lhd-v1",
@@ -31,7 +37,13 @@
       "passing_rule_profile_id": "synthetic-rht-passing-v1",
       "passing_rule_profile_version": "1.0.0",
       "lane_ordering_profile_id": "kerb-to-median-rht-v1",
-      "applicability": "synthetic_fixture"
+      "applicability": "synthetic_fixture",
+      "jurisdiction_profile_version": "synthetic-1.0.0",
+      "verification_evidence_refs": [],
+      "verification_method_id": null,
+      "verification_record_id": null,
+      "verification_valid_from": null,
+      "verification_valid_until": null
     },
     {
       "profile_id": "synthetic-lht-lhd-layout-control-v1",
@@ -46,7 +58,13 @@
       "passing_rule_profile_id": "synthetic-lht-passing-v1",
       "passing_rule_profile_version": "1.0.0",
       "lane_ordering_profile_id": "kerb-to-median-lht-v1",
-      "applicability": "synthetic_fixture"
+      "applicability": "synthetic_fixture",
+      "jurisdiction_profile_version": "synthetic-1.0.0",
+      "verification_evidence_refs": [],
+      "verification_method_id": null,
+      "verification_record_id": null,
+      "verification_valid_from": null,
+      "verification_valid_until": null
     }
   ]
 }
