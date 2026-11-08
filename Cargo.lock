@@ -18821,6 +18821,7 @@ dependencies = [
  "criterion",
  "proptest",
  "serde",
+ "sha2",
  "symthaea-core",
  "tracing",
 ]
