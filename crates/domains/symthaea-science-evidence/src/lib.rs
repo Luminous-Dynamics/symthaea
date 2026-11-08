@@ -33,6 +33,7 @@ pub const SCIENCE_EVIDENCE_SCHEMA: &str = "symthaea-science-evidence-v2";
 
 /// Theory prediction completeness and cross-model comparability contracts.
 pub mod model_discrimination;
+pub mod model_recovery;
 pub mod theory_prediction;
 
 pub use model_discrimination::{
@@ -42,6 +43,10 @@ pub use model_discrimination::{
     MAX_MODEL_PRIOR_SCENARIOS, ModelDiscriminationConfig, ModelDiscriminationError,
     ModelDiscriminationReport, ModelPriorScenario, ModelUniverseCoverage, PriorScenarioEIG,
     gaussian_predictive_kl_nats, rank_model_discriminating_experiments,
+};
+pub use model_recovery::{
+    MAX_MODEL_RECOVERY_GENERATORS, MAX_MODEL_RECOVERY_TRIALS, ModelRecoveryError,
+    ModelRecoveryReport, RecoveryGenerator, evaluate_model_recovery,
 };
 pub use theory_prediction::{
     ComparisonBlocker, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
