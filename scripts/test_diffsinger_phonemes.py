@@ -287,6 +287,129 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no mapped vowel"):
             flatten_performance_phones(consonant_only)
 
+    @staticmethod
+    def _syllable(start: float, duration: float, phones, melisma=(), advance: float = 0.0):
+        return {
+            "note": {"start_time": start, "duration": duration, "frequency": 220.0, "velocity": 0.7},
+            "phonemes": [
+                {
+                    "ipa": ipa,
+                    "is_vowel": is_vowel,
+                    "natural_duration_s": natural_duration,
+                }
+                for ipa, is_vowel, natural_duration in phones
+            ],
+            "melisma_notes": [
+                {"start_time": note_start, "duration": note_duration, "frequency": frequency, "velocity": 0.7}
+                for note_start, note_duration, frequency in melisma
+            ],
+            "consonant_advance_s": advance,
+        }
+
+    @staticmethod
+    def _event_total_ms(events):
+        return sum(duration_ms for _phone, duration_ms, _frequency in events)
+
+    def test_diff_singer_flattening_conserves_note_and_coda_timeline(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                self._syllable(
+                    0.0,
+                    0.5,
+                    [("l", False, 0.04), ("aɪ", True, 0.14), ("t", False, 0.04)],
+                )
+            ],
+        }
+        events = flatten_performance_phones(performance)
+        self.assertEqual([event[0] for event in events], ["l", "ay", "t"])
+        self.assertAlmostEqual(self._event_total_ms(events), 500.0, places=3)
+
+    def test_diff_singer_absolute_gaps_are_explicit_sp_events(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                self._syllable(0.0, 0.5, [("a", True, 0.12)]),
+                self._syllable(0.6, 0.5, [("k", False, 0.04), ("a", True, 0.12)]),
+            ],
+        }
+        events = flatten_performance_phones(performance)
+        silence = [duration for phone, duration, _frequency in events if phone == "SP"]
+        self.assertEqual(len(silence), 1)
+        self.assertAlmostEqual(silence[0], 100.0, places=3)
+        self.assertAlmostEqual(self._event_total_ms(events), 1_100.0, places=3)
+
+    def test_diff_singer_consonant_anticipation_borrows_from_prior_vowel(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                self._syllable(0.0, 0.5, [("a", True, 0.12)]),
+                self._syllable(
+                    0.5,
+                    0.5,
+                    [("k", False, 0.04), ("a", True, 0.12)],
+                    advance=0.02,
+                ),
+            ],
+        }
+        events = flatten_performance_phones(performance)
+        self.assertEqual([event[0] for event in events], ["a", "k", "ah"])
+        self.assertAlmostEqual(events[0][1], 480.0, places=3)
+        self.assertAlmostEqual(events[1][1], 20.0, places=3)
+        self.assertAlmostEqual(self._event_total_ms(events), 1_000.0, places=3)
+
+    def test_diff_singer_melisma_is_a_sustained_vowel_with_coda_after_final_note(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                self._syllable(
+                    0.0,
+                    0.5,
+                    [("l", False, 0.04), ("aɪ", True, 0.14), ("t", False, 0.04)],
+                    melisma=((0.5, 0.5, 246.94),),
+                )
+            ],
+        }
+        events = flatten_performance_phones(performance)
+        self.assertEqual([event[0] for event in events], ["l", "ay", "ay", "t"])
+        self.assertAlmostEqual(events[-1][1], 40.0, places=3)
+        self.assertAlmostEqual(self._event_total_ms(events), 1_000.0, places=3)
+
+    def test_diff_singer_rejects_overlaps_without_safe_vowel_borrow(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                self._syllable(0.0, 0.05, [("a", True, 0.05)]),
+                self._syllable(
+                    0.05,
+                    0.5,
+                    [("k", False, 0.04), ("a", True, 0.12)],
+                    advance=0.05,
+                ),
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "shorten the preceding vowel"):
+            flatten_performance_phones(performance)
+
+    def test_diff_singer_rejects_implicit_gaps_inside_melisma_and_non_english(self) -> None:
+        invalid_gap = {
+            "language": "en",
+            "syllables": [
+                self._syllable(
+                    0.0,
+                    0.5,
+                    [("a", True, 0.12)],
+                    melisma=((0.55, 0.5, 246.94),),
+                )
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "overlaps|timeline"):
+            flatten_performance_phones(invalid_gap)
+
+        invalid_language = {"language": "zu", "syllables": []}
+        with self.assertRaisesRegex(ValueError, "supports language='en' only"):
+            flatten_performance_phones(invalid_language)
+
     def test_duration_and_language_contracts_reject_invalid_values(self) -> None:
         for duration, count in ((0.0, 1), (float("nan"), 1), (40.0, 0)):
             with self.subTest(duration=duration, count=count):
