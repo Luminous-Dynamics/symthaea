@@ -72,14 +72,22 @@ pub struct TimingMetrics {
     pub onset_mae_ms: Option<f64>,
     pub onset_median_ms: Option<f64>,
     pub onset_p95_ms: Option<f64>,
-    /// Fraction of exact-phone pairs whose absolute onset error is <= 20 ms.
+    /// Fraction of strict identity pairs whose absolute onset error is <= 20 ms.
     pub onset_within_20ms_fraction: Option<f64>,
-    /// Fraction of exact-phone pairs whose absolute onset error is <= 50 ms.
+    /// Jointly correct phone identity and onset <= 20 ms / all reference phones.
+    /// Unlike conditional timing fractions, missed or wrongly named phones remain
+    /// in the denominator and cannot disappear from the score.
+    pub joint_onset_within_20ms_fraction: f64,
+    /// Fraction of strict identity pairs whose absolute onset error is <= 50 ms.
     pub onset_within_50ms_fraction: Option<f64>,
+    /// Jointly correct phone identity and onset <= 50 ms / all reference phones.
+    pub joint_onset_within_50ms_fraction: f64,
     /// Fraction of exact vowel-identity pairs whose onset error is <= 50 ms.
     pub vowel_onset_within_50ms_fraction: Option<f64>,
-    /// Fraction of exact-phone pairs whose absolute onset error is <= 100 ms.
+    /// Fraction of strict identity pairs whose absolute onset error is <= 100 ms.
     pub onset_within_100ms_fraction: Option<f64>,
+    /// Jointly correct phone identity and onset <= 100 ms / all reference phones.
+    pub joint_onset_within_100ms_fraction: f64,
     pub offset_mae_ms: Option<f64>,
     pub offset_p95_ms: Option<f64>,
     pub duration_mae_ms: Option<f64>,
@@ -105,10 +113,14 @@ pub struct AlignmentMetrics {
     pub edits: EditCounts,
     /// (S + D + I) / reference phone count. May exceed 1.0 due to insertions.
     pub phone_error_rate: f64,
-    /// Exact matches / reference phone count.
-    pub reference_exact_match_fraction: f64,
-    /// Exact matches / predicted phone count.
-    pub prediction_exact_precision: Option<f64>,
+    /// Canonical phone-symbol matches / reference phone count. This is the
+    /// complement of PER and does not include lexical slot/boundary correctness.
+    pub reference_phone_match_fraction: f64,
+    /// Strict identity matches / reference phone count. Requires symbol,
+    /// word index, syllable index, and vowel/consonant class to agree.
+    pub reference_identity_match_fraction: f64,
+    /// Canonical phone-symbol matches / predicted phone count.
+    pub prediction_phone_precision: Option<f64>,
     pub timing: TimingMetrics,
     pub melisma: MelismaMetrics,
 }
@@ -148,8 +160,11 @@ pub fn score_alignment(
         deletions: 0,
         insertions: 0,
     };
-    let mut exact_prediction_for_reference = vec![None; reference.len()];
+    let mut identity_prediction_for_reference = vec![None; reference.len()];
     let mut onset_errors_ms = Vec::new();
+    let mut joint_onset_hits_20 = 0usize;
+    let mut joint_onset_hits_50 = 0usize;
+    let mut joint_onset_hits_100 = 0usize;
     let mut offset_errors_ms = Vec::new();
     let mut duration_errors_ms = Vec::new();
     let mut vowel_onset_errors_ms = Vec::new();
@@ -164,23 +179,35 @@ pub fn score_alignment(
                 predicted: p,
             } => {
                 counts.exact_matches += 1;
-                exact_prediction_for_reference[r] = Some(p);
                 let expected = &reference[r];
                 let observed = &predicted[p];
-                let onset_error_ms =
-                    expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms;
-                onset_errors_ms.push(onset_error_ms);
-                if expected.is_vowel {
-                    vowel_onset_errors_ms.push(onset_error_ms);
-                }
-                offset_errors_ms
+                if same_phone_identity(expected, observed) {
+                    identity_prediction_for_reference[r] = Some(p);
+                    let onset_error_ms =
+                        expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms;
+                    onset_errors_ms.push(onset_error_ms);
+                    if onset_error_ms <= 20.0 {
+                        joint_onset_hits_20 += 1;
+                    }
+                    if onset_error_ms <= 50.0 {
+                        joint_onset_hits_50 += 1;
+                    }
+                    if onset_error_ms <= 100.0 {
+                        joint_onset_hits_100 += 1;
+                    }
+                    if expected.is_vowel {
+                        vowel_onset_errors_ms.push(onset_error_ms);
+                    }
+                    offset_errors_ms
                     .push(expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms);
-                let expected_duration = expected.end_frame - expected.start_frame;
-                let observed_duration = observed.end_frame - observed.start_frame;
-                exact_reference_duration_frames += u128::from(expected_duration);
-                exact_predicted_duration_frames += u128::from(observed_duration);
-                duration_errors_ms
-                    .push(expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms);
+                    let expected_duration = expected.end_frame - expected.start_frame;
+                    let observed_duration = observed.end_frame - observed.start_frame;
+                    exact_reference_duration_frames += u128::from(expected_duration);
+                    exact_predicted_duration_frames += u128::from(observed_duration);
+                    duration_errors_ms.push(
+                        expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms,
+                    );
+                }
             }
             Edit::Substitute => counts.substitutions += 1,
             Edit::Delete => counts.deletions += 1,
@@ -191,13 +218,18 @@ pub fn score_alignment(
     let reference_count = reference.len();
     let predicted_count = predicted.len();
     let phone_error_rate = counts.errors() as f64 / reference_count as f64;
-    let reference_exact_match_fraction = counts.exact_matches as f64 / reference_count as f64;
-    let prediction_exact_precision =
+    let reference_phone_match_fraction = counts.exact_matches as f64 / reference_count as f64;
+    let identity_match_count = identity_prediction_for_reference
+        .iter()
+        .filter(|prediction_index| prediction_index.is_some())
+        .count();
+    let reference_identity_match_fraction = identity_match_count as f64 / reference_count as f64;
+    let prediction_phone_precision =
         (predicted_count > 0).then(|| counts.exact_matches as f64 / predicted_count as f64);
 
     let mut covered_melismas = 0usize;
     for span in melismas {
-        if let Some(predicted_index) = exact_prediction_for_reference[span.reference_phone_index] {
+        if let Some(predicted_index) = identity_prediction_for_reference[span.reference_phone_index] {
             let phone = &predicted[predicted_index];
             if phone.is_vowel
                 && phone.syllable_index == span.syllable_index
@@ -217,17 +249,21 @@ pub fn score_alignment(
         predicted_phone_count: predicted_count,
         edits: counts.clone(),
         phone_error_rate,
-        reference_exact_match_fraction,
-        prediction_exact_precision,
+        reference_phone_match_fraction,
+        reference_identity_match_fraction,
+        prediction_phone_precision,
         timing: TimingMetrics {
             exact_phone_pairs: counts.exact_matches,
             onset_mae_ms: mean(&onset_errors_ms),
             onset_median_ms: median(&onset_errors_ms),
             onset_p95_ms: percentile(&onset_errors_ms, 0.95),
             onset_within_20ms_fraction: fraction_at_or_below(&onset_errors_ms, 20.0),
+            joint_onset_within_20ms_fraction: joint_onset_hits_20 as f64 / reference_count as f64,
             onset_within_50ms_fraction: fraction_at_or_below(&onset_errors_ms, 50.0),
+            joint_onset_within_50ms_fraction: joint_onset_hits_50 as f64 / reference_count as f64,
             vowel_onset_within_50ms_fraction: fraction_at_or_below(&vowel_onset_errors_ms, 50.0),
             onset_within_100ms_fraction: fraction_at_or_below(&onset_errors_ms, 100.0),
+            joint_onset_within_100ms_fraction: joint_onset_hits_100 as f64 / reference_count as f64,
             offset_mae_ms: mean(&offset_errors_ms),
             offset_p95_ms: percentile(&offset_errors_ms, 0.95),
             duration_mae_ms: mean(&duration_errors_ms),
