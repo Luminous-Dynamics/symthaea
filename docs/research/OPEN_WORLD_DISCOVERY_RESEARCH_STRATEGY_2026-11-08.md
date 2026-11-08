@@ -65,6 +65,14 @@ Required controls:
 
 A correct response to an uninformative channel may be to redesign the instrument, not to search harder over equations.
 
+### 1.3a From one-factor-at-a-time to factorial identifiability
+
+A system with multiple controllable variables can look additive when experiments vary them together. Collinear input designs may make an interaction term observationally equivalent to a bias or another main effect. The experiment design itself therefore determines which structures are identifiable.
+
+Use factorial and orthogonal designs where feasible; explicitly audit design-matrix rank, aliasing and intervention support before interpreting a recovered term. A model should report that interaction structure remains ambiguous when the performed experiments cannot separate main effects, bias and cross-terms.
+
+The two-input microcosm in PR #11060 includes a concrete aliasing control: two collinear interventions leave single-input, additive and bilinear structures compatible, while a selected off-axis intervention separates them.
+
 ### 1.4 Let representation discovery be an explicit action
 
 The agent should be allowed to revise its representation:
