@@ -69,7 +69,7 @@
       "publication_date": "2026-02-06",
       "status": "published",
       "scope": "AC/DC electrical systems used for electrical propulsion and hybrid propulsion on small craft up to 24 m LH; DC below 1500 V, single-phase AC up to 1000 V, and three-phase AC up to 1000 V.",
-      "applicability_note": "Directly relevant to LOS-18 electrical propulsion if vessel type, voltage and system scope match. Obtain the licensed standard and have applicability reviewed before compliance claims.",
+      "applicability_note": "Relevant to LOS-18 if within the small-craft <=24 m LH scope and using AC/DC electrical propulsion or the electrical part of a hybrid propulsion system. Edition 2 (published 2026-02-06) specifies system design/installation within its stated voltage scope; ISO's public metadata notes clarified overcurrent protection and revised fault monitoring for isolated DC systems. Obtain the licensed edition, determine exact applicability, and have a qualified marine electrical engineer map the selected architecture and test evidence to its requirements. This record is not a clause-by-clause compliance matrix or approval.",
       "source": "https://www.iso.org/standard/84203.html"
     },
     {
@@ -175,6 +175,16 @@
       "applicability_note": "Useful for the LOS electrical test ladder and laboratory/real-time integration planning. It does not provide LOS-18 equipment limits, test settings or vessel approval.",
       "doi": "10.3390/en19092016",
       "source": "https://doi.org/10.3390/en19092016"
+    },
+    {
+      "id": "ITTC Recommended Procedures and Guidelines Register — Revision 10",
+      "document_type": "international_towing_tank_conference_test_procedure_register",
+      "revision": 10,
+      "effective_year": 2024,
+      "status": "published_register",
+      "scope": "Procedure families include ship resistance tests, general guidelines and examples for uncertainty analysis of resistance tests, propulsion tests and related model-test methods.",
+      "applicability_note": "Use the current applicable ITTC procedure for towing-tank/model-test claims and uncertainty analysis. Does not by itself validate a specific facility, instrument chain, model scale correction or LOS design.",
+      "source": "https://ittc.info/downloads/quality-systems-manual/recommended-procedures-and-guidelines/"
     }
   ]
 }
