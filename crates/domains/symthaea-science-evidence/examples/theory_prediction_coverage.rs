@@ -10,7 +10,7 @@ use symthaea_science_evidence::{
 };
 
 // Commit that introduced the exact model-specification descriptors below.
-const SOURCE_REVISION: &str = "2cd49378256c17cf1bfb20b22ee65b521c29111b";
+const SOURCE_REVISION: &str = "7b105b52199bdd404a51b647ebe6d715d7edad8e";
 
 fn model(
     id: &str,
