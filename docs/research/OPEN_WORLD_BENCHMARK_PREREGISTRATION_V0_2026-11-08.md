@@ -68,7 +68,8 @@ Compare:
 4. maximum partition count;
 5. minimax worst-case survivors;
 6. maximum entropy and minimum expected survivors under their declared uniform grammar prior;
-7. exact small-world dynamic-programming oracle for a declared terminal utility (diagnostic upper bound only);
+7. structure-balanced information gain, with equal prior mass per surviving structural family and a uniform conditional prior over that family's compatible parameterizations (a prior-sensitivity control, not a calibrated posterior);
+8. exact small-world dynamic-programming oracle for a declared terminal utility (diagnostic upper bound only);
 8. existing Symthaea incumbent;
 9. a versioned challenger;
 10. decision-focused prospective value-of-computation / EVSI policy adapted from existing owners.
@@ -85,6 +86,8 @@ A finite grammar can have many syntactic parameterizations of one functional mec
 - **Measurement process:** sensor transform, delay, censoring, missingness and calibration state.
 
 Do not use uniform probability over raw syntax as a scientific prior without an explicit justification. A grammar with 100 equivalent expressions must not gain 100 times the prior mass of a one-expression family. Use #8669's class-level posterior and prior-splitting controls when integrating probabilities. The microcosm now includes a structure-balanced one-step information-gain control: equal prior over the surviving structural families, with a uniform conditional distribution over the surviving parameterizations in each family. It is a transparent ablation, not a replacement for #8669's calibrated class-level posterior.
+
+A numeric reference-world control demonstrates why the distinction matters: with 120 parameterized hypotheses across direct and leaky-memory structures, a zero-input probe has structure-balanced information gain 0.3113 bits while nonzero input has 0.2279 bits. Uniform-over-model predictive entropy instead prefers nonzero input (2.1971 bits vs 1.8560 bits at zero). This is a deterministic objective comparison under the declared candidate grammar, not evidence that one policy is universally better.
 
 Information gain is not decision value. For each decision-focused probe, pre-register:
 - current public evidence-prefix digest;
