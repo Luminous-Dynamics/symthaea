@@ -776,6 +776,47 @@ mod tests {
     }
 
     #[test]
+    fn group_selection_record_is_bound_to_the_verified_envelope_identity() {
+        let members = vec![
+            ("memory-a".to_owned(), ContinuousHV::from_vec(vec![0.8; 8])),
+            ("memory-b".to_owned(), ContinuousHV::from_vec(vec![0.7; 8])),
+        ];
+        let envelope = ContinuousHVGroupEnvelope::from_original_members(12, 4, &members).unwrap();
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let record = GroupScoreIntervalRecord::from_group_envelope(
+            &envelope,
+            &query,
+            12,
+            4,
+            envelope.member_set_digest(),
+            envelope.content_digest(),
+        )
+        .unwrap();
+
+        assert_eq!(record.member_count(), 2);
+        assert_eq!(record.identity().manifest_generation, 12);
+        assert_eq!(record.identity().eligibility_generation, 4);
+        assert_eq!(record.identity().member_set_digest, envelope.member_set_digest());
+        assert_eq!(record.identity().content_digest, envelope.content_digest());
+        assert!(record.interval().is_well_formed());
+
+        let stale = GroupScoreIntervalRecord::from_group_envelope(
+            &envelope,
+            &query,
+            11,
+            4,
+            envelope.member_set_digest(),
+            envelope.content_digest(),
+        );
+        assert!(matches!(
+            stale,
+            Err(GroupScoreIntervalBuildError::GroupEnvelope(
+                GroupEnvelopeError::ManifestGenerationMismatch { .. }
+            ))
+        ));
+    }
+
+    #[test]
     fn weighted_group_selection_counts_each_member_in_the_lower_threshold() {
         let groups = vec![
             synthetic_group("near", 2, 0.80, 0.95),
