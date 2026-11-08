@@ -114,3 +114,48 @@ unassigned model to one cluster, with symmetry breaking for empty/new
 clusters. Maintain a global incumbent upper bound and the minimum bound over
 the complete live frontier. Exact optimality is claimed only when those
 bounds meet exactly or the frontier is exhausted.
+
+## Exact single-cluster branch-and-bound
+
+`solve_exact_cluster_policy_bnb` is the first search consumer of the mask
+lower bound. It starts with the lexicographically least deterministic policy
+as a valid incumbent, then traverses masks depth-first in action-index order.
+At each mask:
+1. Recompute or reuse the exact per-model unrestricted/masked Bellman values.
+2. Prune only if the maximum exact modelwise regret gap is greater than or
+   equal to the current incumbent regret.
+3. If not a leaf, split the first non-singleton (time,state) slot into
+   force-lowest-action and forbid-lowest-action children.
+4. At a leaf, the action mask identifies a unique policy and the modelwise
+   masked values/gaps are its exact value/regret witnesses.
+
+The complete frontier must be exhausted before the function returns a
+`VerifiedClusterPolicyOptimum`. A node, aggregate rational-work, frontier
+count, frontier-byte or total-memory cap returns an explicit error. It does
+not return an unproven incumbent with an optimality label.
+
+The returned witness binds the exact family, cluster, discount, selected
+policy index and action vector, each model's optimal/policy value/regret,
+worst-case model set, search-node count, pruned-node count, and total
+rational Bellman work into a canonical SHA-256. The verifier reruns the whole
+deterministic cluster search and compares the complete result.
+
+The search currently returns the single lexicographically least optimum,
+not every tied cluster policy. That is sufficient as a deterministic
+partition subproblem oracle; complete portfolio tie enumeration remains the
+responsibility of the finite-family exhaustive reference.
+
+### Cluster search known answers
+
+- Two specialist models (M0 rewards [1,0], M1 rewards [0,1]), cluster [0,1],
+  discount 1/2: policy index 0, actions [0], model values [1,0], regrets
+  [0,1], worst model [1], cluster regret 1; 3 masks visited, 2 pruned,
+  54 rational DP multiply/add terms.
+- One model with rewards [0,1], cluster [0], discount 1/2: initial policy 0
+  is suboptimal; B&B finds policy index 1/actions [1], value 1, regret 0;
+  3 masks visited, 1 pruned, 27 rational DP multiply/add terms.
+
+This is an exact **inner cluster solver**, not yet the outer partition
+search. It is not evidence of a runtime win over KAPS. The outer search must
+still assign all environments to at most k clusters, maintain a complete
+frontier lower bound, and prove global portfolio optimality.
