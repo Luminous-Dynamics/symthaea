@@ -161,7 +161,6 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
     }
 
     let Some(scenes) = fixture.get("paired_scenes").and_then(Value::as_array) else {
-        errors.push("paired_scenes must be an array".into());
         return errors;
     };
     let mut pairs: std::collections::BTreeMap<String, Vec<&Value>> =
@@ -179,14 +178,55 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
             errors.push(format!(
                 "paired_scenes[{index}]: traffic convention profile reference is unresolved"
             ));
-        } else if let Some(profile) = profile_index.get(profile_id.unwrap()) {
-            if scene.get("declared_passing_side_sign")
-                != profile.get("passing_side_sign")
-            {
-                errors.push(format!(
-                    "paired_scenes[{index}]: declared passing side conflicts with the versioned rule profile"
-                ));
+            continue;
+        }
+        let profile = profile_index.get(profile_id.unwrap()).unwrap();
+        if scene.get("declared_passing_side_sign") != profile.get("passing_side_sign") {
+            errors.push(format!(
+                "paired_scenes[{index}]: declared passing side conflicts with the versioned rule profile"
+            ));
+        }
+        if scene.get("map_traffic_convention_profile_id") != scene.get("traffic_convention_profile_id") {
+            errors.push(format!(
+                "paired_scenes[{index}]: map and scene traffic convention profiles disagree"
+            ));
+        }
+        if scene.get("travel_frame_id") != profile.get("travel_frame_id") {
+            errors.push(format!(
+                "paired_scenes[{index}]: scene travel frame does not match the traffic profile frame"
+            ));
+        }
+        let keep_sign = profile.get("keep_side_sign");
+        let median_sign = profile.get("median_side_sign");
+        let mut ego_lanes = 0usize;
+        let mut oncoming_lanes = 0usize;
+        if let Some(lanes) = scene.get("lanes").and_then(Value::as_array) {
+            for lane in lanes {
+                match lane.get("role").and_then(Value::as_str) {
+                    Some("ego_travel_lane") => {
+                        ego_lanes += 1;
+                        if lane.get("relative_lateral_sign") != keep_sign {
+                            errors.push(format!(
+                                "paired_scenes[{index}]: ego lane side conflicts with the traffic keep-side sign"
+                            ));
+                        }
+                    }
+                    Some("oncoming_lane") => {
+                        oncoming_lanes += 1;
+                        if lane.get("relative_lateral_sign") != median_sign {
+                            errors.push(format!(
+                                "paired_scenes[{index}]: oncoming lane side conflicts with the median-side sign"
+                            ));
+                        }
+                    }
+                    _ => {}
+                }
             }
+        }
+        if ego_lanes != 1 || oncoming_lanes != 1 {
+            errors.push(format!(
+                "paired_scenes[{index}]: expected exactly one ego travel lane and one oncoming lane"
+            ));
         }
     }
 
