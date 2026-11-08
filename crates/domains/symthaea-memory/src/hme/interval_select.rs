@@ -218,6 +218,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     fn record(id: &str, lower: f32, upper: f32) -> ScoreIntervalRecord<String> {
