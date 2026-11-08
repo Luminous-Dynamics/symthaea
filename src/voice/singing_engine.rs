@@ -190,7 +190,11 @@ impl VocalPerformance {
             .map(|(index, syllable_end)| VocalPhraseSpec {
                 syllable_end,
                 breath_before_s: if index == 0 { 0.0 } else { 0.12 },
-                breath_after_s: if index + 1 == phrase_ends.len() { 0.10 } else { 0.12 },
+                breath_after_s: if index + 1 == phrase_ends.len() {
+                    0.10
+                } else {
+                    0.12
+                },
                 expression: PhraseExpressionProfile::default(),
             })
             .collect();
@@ -247,16 +251,22 @@ impl VocalPerformance {
                 || !spec.breath_after_s.is_finite()
                 || !(0.0..=5.0).contains(&spec.breath_after_s)
             {
-                bail!("phrase {phrase_index} breath durations must be finite and within [0, 5] seconds");
+                bail!(
+                    "phrase {phrase_index} breath durations must be finite and within [0, 5] seconds"
+                );
             }
             for value in spec.expression.energy_multiplier {
                 if !value.is_finite() || !(0.0..=2.0).contains(&value) {
-                    bail!("phrase {phrase_index} energy multipliers must be finite and within [0, 2]");
+                    bail!(
+                        "phrase {phrase_index} energy multipliers must be finite and within [0, 2]"
+                    );
                 }
             }
             for value in spec.expression.breathiness_offset {
                 if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
-                    bail!("phrase {phrase_index} breathiness offsets must be finite and within [-1, 1]");
+                    bail!(
+                        "phrase {phrase_index} breathiness offsets must be finite and within [-1, 1]"
+                    );
                 }
             }
             for value in spec.expression.tension {
@@ -385,20 +395,26 @@ impl VocalPerformance {
                 expression_curve: vec![
                     ExpressionPoint {
                         time_s: start,
-                        energy: (base_energy * phrase_spec.expression.energy_multiplier[0]).clamp(0.0, 1.0),
-                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[0]).clamp(0.0, 1.0),
+                        energy: (base_energy * phrase_spec.expression.energy_multiplier[0])
+                            .clamp(0.0, 1.0),
+                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[0])
+                            .clamp(0.0, 1.0),
                         tension: phrase_spec.expression.tension[0],
                     },
                     ExpressionPoint {
                         time_s: start + (end - start) * 0.68,
-                        energy: (base_energy * phrase_spec.expression.energy_multiplier[1]).clamp(0.0, 1.0),
-                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[1]).clamp(0.0, 1.0),
+                        energy: (base_energy * phrase_spec.expression.energy_multiplier[1])
+                            .clamp(0.0, 1.0),
+                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[1])
+                            .clamp(0.0, 1.0),
                         tension: phrase_spec.expression.tension[1],
                     },
                     ExpressionPoint {
                         time_s: end,
-                        energy: (base_energy * phrase_spec.expression.energy_multiplier[2]).clamp(0.0, 1.0),
-                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[2]).clamp(0.0, 1.0),
+                        energy: (base_energy * phrase_spec.expression.energy_multiplier[2])
+                            .clamp(0.0, 1.0),
+                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[2])
+                            .clamp(0.0, 1.0),
                         tension: phrase_spec.expression.tension[2],
                     },
                 ],
@@ -1163,8 +1179,7 @@ mod tests {
         let first_end = performance.syllables[0].melisma_notes[0].start_time
             + performance.syllables[0].melisma_notes[0].duration;
         assert!(
-            (performance.syllables[0].melisma_notes[1].start_time - first_end - 0.03).abs()
-                < 1e-5
+            (performance.syllables[0].melisma_notes[1].start_time - first_end - 0.03).abs() < 1e-5
         );
     }
 
