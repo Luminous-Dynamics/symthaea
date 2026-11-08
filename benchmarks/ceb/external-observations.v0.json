@@ -6558,7 +6558,7 @@
     {
       "observation_id": "llm-se-guidelines-contributor-count",
       "comparator_id": "llm-se-empirical-reproducibility-guidelines",
-      "source_locator": "",
+      "source_locator": "Baltes et al., Empirical Software Engineering, author list and abstract, DOI 10.1007/s10664-026-10922-3; accessed 2026-11-08",
       "system": {
         "system_id": "llm-se-guidelines-22-authors",
         "model": "22 researchers",
