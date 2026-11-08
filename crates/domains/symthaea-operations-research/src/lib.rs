@@ -31,6 +31,7 @@ pub mod quantified_proof;
 pub mod quantified_game_dag;
 pub mod quantified_scope;
 pub mod quantified_strategy;
+pub mod qbf_strategy_count;
 pub mod qdimacs;
 pub mod strategy_bdd;
 pub mod strategy_aig;
