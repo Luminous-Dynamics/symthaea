@@ -16,7 +16,7 @@
 //! before passing intervals here. An approximate candidate index may order
 //! work, but it cannot be substituted for the complete interval set.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use symthaea_core::hdc::continuous_hv_interval::ContinuousHVScoreInterval;
 
@@ -169,22 +169,19 @@ where
         });
     }
 
-    let mut seen = BTreeSet::new();
+    let mut first_index_by_id = BTreeMap::new();
     let mut lower_order: Vec<&ScoreIntervalRecord<Id>> = Vec::with_capacity(record_count);
     for (record_index, record) in records.iter().enumerate() {
         if !record.interval.is_well_formed() {
             return Err(IntervalSelectionError::InvalidInterval { record_index });
         }
-        if !seen.insert(record.id.clone()) {
-            let first_index = records[..record_index]
-                .iter()
-                .position(|prior| prior.id == record.id)
-                .expect("duplicate was detected in the already-validated prefix");
+        if let Some(first_index) = first_index_by_id.get(&record.id).copied() {
             return Err(IntervalSelectionError::DuplicateId {
                 first_index,
                 duplicate_index: record_index,
             });
         }
+        first_index_by_id.insert(record.id.clone(), record_index);
         lower_order.push(record);
     }
 
@@ -305,6 +302,74 @@ mod tests {
             select_refinement_set(&records, 1, unbounded_partition),
             Err(IntervalSelectionError::IncompleteCoverage { .. })
         ));
+    }
+
+    #[test]
+    fn generated_interval_refinement_matches_full_exact_top_k() {
+        let mut state = 0x5EED_1234u32;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+
+        for case_index in 0..4096usize {
+            let count = 1 + (next() as usize % 32);
+            let top_k = 1 + (next() as usize % count);
+            let mut exact_scores = Vec::with_capacity(count);
+            let mut intervals = Vec::with_capacity(count);
+
+            for item_index in 0..count {
+                let score_raw = (next() % 2001) as i32 - 1000;
+                let score = score_raw as f32 / 1000.0;
+                let lower_slack = (next() % 501) as f32 / 1000.0;
+                let upper_slack = (next() % 501) as f32 / 1000.0;
+                let lower = (score - lower_slack).max(-1.0);
+                let upper = (score + upper_slack).min(1.0);
+                let id = format!("{item_index:04}");
+                exact_scores.push((id.clone(), score));
+                intervals.push(record(&id, lower, upper));
+            }
+
+            let plan = select_refinement_set(
+                &intervals,
+                top_k,
+                complete_coverage(count),
+            )
+            .unwrap();
+
+            let mut full_order = exact_scores.clone();
+            full_order.sort_by(|left, right| {
+                right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+            });
+            let expected: Vec<String> = full_order
+                .iter()
+                .take(top_k)
+                .map(|(id, _)| id.clone())
+                .collect();
+
+            let refinement_members: BTreeSet<String> =
+                plan.refinement_ids.iter().cloned().collect();
+            let mut refined_order: Vec<(String, f32)> = exact_scores
+                .iter()
+                .filter(|(id, _)| refinement_members.contains(id))
+                .cloned()
+                .collect();
+            refined_order.sort_by(|left, right| {
+                right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+            });
+            let actual: Vec<String> = refined_order
+                .iter()
+                .take(top_k)
+                .map(|(id, _)| id.clone())
+                .collect();
+
+            assert_eq!(
+                actual, expected,
+                "false-prune disagreement in generated case {case_index}"
+            );
+        }
     }
 
     #[test]
