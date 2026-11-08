@@ -1144,6 +1144,34 @@ mod tests {
     }
 
     #[test]
+    fn contextual_heteronym_reference_rejects_the_wrong_read_pronunciation() {
+        let mut past = reference(
+            "read-past",
+            false,
+            vec![variant("past", &["ɹ", "ɛ", "d"], &[3], &[1])],
+        );
+        past.text = "read".into();
+        past.context = "I read it yesterday".into();
+
+        let refs = vec![past];
+        let preds = vec![candidate(
+            "read-past",
+            &["ɹ", "iː", "d"],
+            &[3],
+            &[1],
+            false,
+        )];
+        let report = evaluate(&refs, &preds).unwrap();
+        assert_eq!(
+            report.cases[0].selected_reference_variant.as_deref(),
+            Some("past")
+        );
+        assert_eq!(report.cases[0].edits.substitutions, 1);
+        assert_eq!(report.cases[0].phone_error_rate, Some(1.0 / 3.0));
+        assert_eq!(report.cases[0].exact_pronunciation, Some(false));
+    }
+
+    #[test]
     fn edit_counts_and_phone_error_rate_expose_substitutions_insertions_and_deletions() {
         let refs = vec![reference(
             "case",
