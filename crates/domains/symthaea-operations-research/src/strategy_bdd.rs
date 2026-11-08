@@ -53,6 +53,7 @@ pub struct StrategyBddBudget {
     pub max_support_checks: u128,
     pub max_interaction_checks: u128,
     pub max_weighted_interaction_checks: u128,
+    pub max_anf_transform_checks: u128,
     pub max_frontier_order_evaluations: usize,
     pub max_frontier_refinement_passes: usize,
     pub max_variable_order_evaluations: usize,
@@ -68,6 +69,7 @@ impl Default for StrategyBddBudget {
             max_support_checks: 1 << 22,
             max_interaction_checks: 1 << 26,
             max_weighted_interaction_checks: 1 << 26,
+            max_anf_transform_checks: 1 << 26,
             max_frontier_order_evaluations: 1 << 12,
             max_frontier_refinement_passes: 2,
             max_variable_order_evaluations: 1 << 13,
@@ -160,6 +162,14 @@ pub enum StrategyBddError {
         neighbor: usize,
     },
     WeightedInteractionGraphCheckBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    AnfHypergraphInvalidEdge {
+        dependency_count: usize,
+        edge: Vec<usize>,
+    },
+    AnfTransformCheckBudgetExceeded {
         required: u128,
         limit: u128,
     },
@@ -264,6 +274,8 @@ pub enum StrategyBddOrderSeed {
     ArithmeticWeightedMinFillReverse,
     ArithmeticWeightedFrontierRefined,
     ArithmeticWeightedFrontierRefinedReverse,
+    AnfHypergraphMinFill,
+    AnfHypergraphMinFillReverse,
 }
 
 /// A bounded multi-start sifting result. The interaction graph is a heuristic
@@ -277,6 +289,9 @@ pub struct StrategyBddMultiStartReport {
     pub interaction_pair_checks: u128,
     pub arithmetic_interaction_context_checks: u128,
     pub arithmetic_interaction_total_weight: u128,
+    pub anf_hyperedge_count: usize,
+    pub anf_transform_checks: u128,
+    pub anf_max_hyperedge_rank: usize,
     pub weighted_min_fill_max_frontier: usize,
     pub weighted_refined_max_frontier: usize,
     pub frontier_refinement_evaluations: usize,
@@ -297,6 +312,18 @@ pub struct StrategyBddWeightedInteractionReport {
     pub weights: Vec<Vec<u128>>,
     pub contexts_checked: u128,
     pub total_interaction_weight: u128,
+}
+
+/// Exact algebraic-normal-form interactions recovered by the Boolean Möbius
+/// transform. Each hyperedge is the support of one nonzero ANF monomial of
+/// degree >= 2; singleton linear terms are represented separately.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyBddAnfHypergraphReport {
+    pub hyperedges: Vec<Vec<usize>>,
+    pub linear_variables: Vec<usize>,
+    pub constant_term: bool,
+    pub transform_checks: u128,
+    pub max_hyperedge_rank: usize,
 }
 
 /// Evidence from bounded insertion refinement of an interaction-graph order.
@@ -1092,6 +1119,185 @@ pub fn strategy_interaction_graph(
     Ok((graph, checks))
 }
 
+/// Recover the algebraic normal form (ANF) of a Boolean truth table using
+/// the in-place Boolean Möbius transform.
+///
+/// If f(x) = XOR_S a_S * product_{i in S} x_i, the transformed coefficient
+/// at mask S is a_S. This representation retains higher-order interactions
+/// which a pairwise graph can obscure.
+pub fn strategy_anf_interaction_hypergraph(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddAnfHypergraphReport, StrategyBddError> {
+    let entries = validate_truth_table(function, budget)?;
+    let dependency_count = function.dependencies.len();
+    let values = strategy_table_values(function)?;
+    let required_checks = (dependency_count as u128)
+        .checked_mul(entries / 2)
+        .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+    if required_checks > budget.max_anf_transform_checks {
+        return Err(StrategyBddError::AnfTransformCheckBudgetExceeded {
+            required: required_checks,
+            limit: budget.max_anf_transform_checks,
+        });
+    }
+
+    let mut coefficients = values;
+    let mut transform_checks = 0u128;
+    for variable in 0..dependency_count {
+        let bit = 1usize
+            .checked_shl(variable as u32)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        for mask in 0..coefficients.len() {
+            if mask & bit != 0 {
+                coefficients[mask] ^= coefficients[mask ^ bit];
+                transform_checks = transform_checks
+                    .checked_add(1)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+            }
+        }
+    }
+
+    let mut hyperedges = Vec::new();
+    let mut linear_variables = Vec::new();
+    let mut constant_term = false;
+    let mut max_hyperedge_rank = 0usize;
+    for (mask, coefficient) in coefficients.into_iter().enumerate() {
+        if !coefficient {
+            continue;
+        }
+        if mask == 0 {
+            constant_term = true;
+            continue;
+        }
+        let rank = mask.count_ones() as usize;
+        let support: Vec<usize> = (0..dependency_count)
+            .filter(|variable| (mask & (1usize << variable)) != 0)
+            .map(|index| function.dependencies[index])
+            .collect();
+        if rank == 1 {
+            linear_variables.extend(support);
+        } else {
+            max_hyperedge_rank = max_hyperedge_rank.max(rank);
+            hyperedges.push(support);
+        }
+    }
+    hyperedges.sort();
+    linear_variables.sort_unstable();
+
+    Ok(StrategyBddAnfHypergraphReport {
+        hyperedges,
+        linear_variables,
+        constant_term,
+        transform_checks,
+        max_hyperedge_rank,
+    })
+}
+
+/// Deterministic hypergraph min-fill order over ANF monomial supports.
+///
+/// Eliminating a vertex removes all incident hyperedges and introduces one
+/// fill hyperedge over the union of their remaining vertices. Candidate
+/// elimination is scored by introduced pair couplings, resulting hyperedge
+/// rank, incident hyperedge count and then the semantic dependency index.
+pub fn anf_hypergraph_min_fill_order(
+    dependency_count: usize,
+    hyperedges: &[Vec<usize>],
+) -> Result<Vec<usize>, StrategyBddError> {
+    let mut normalized = Vec::with_capacity(hyperedges.len());
+    let mut seen_edges = BTreeSet::new();
+    for edge in hyperedges {
+        let mut sorted = edge.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        if sorted.len() < 2 || sorted.iter().any(|&vertex| vertex >= dependency_count) {
+            return Err(StrategyBddError::AnfHypergraphInvalidEdge {
+                dependency_count,
+                edge: edge.clone(),
+            });
+        }
+        if seen_edges.insert(sorted.clone()) {
+            normalized.push(sorted);
+        }
+    }
+
+    let mut active = vec![true; dependency_count];
+    let mut current_edges = normalized;
+    let mut order = Vec::with_capacity(dependency_count);
+
+    for _ in 0..dependency_count {
+        let mut best: Option<(u128, usize, usize, usize)> = None;
+        for variable in 0..dependency_count {
+            if !active[variable] {
+                continue;
+            }
+            let mut union = BTreeSet::new();
+            let mut incident_count = 0usize;
+            for edge in &current_edges {
+                if edge.contains(&variable) {
+                    incident_count = incident_count
+                        .checked_add(1)
+                        .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                    union.extend(edge.iter().copied().filter(|&vertex| vertex != variable));
+                }
+            }
+            let neighbors: Vec<usize> = union.into_iter().collect();
+            let possible_pairs = (neighbors.len() as u128)
+                .checked_mul(neighbors.len().saturating_sub(1) as u128)
+                .ok_or(StrategyBddError::ResourceAccountingOverflow)?
+                / 2;
+            let mut already_coupled = 0u128;
+            for left in 0..neighbors.len() {
+                for right in left + 1..neighbors.len() {
+                    if current_edges.iter().any(|edge| {
+                        edge.binary_search(&neighbors[left]).is_ok()
+                            && edge.binary_search(&neighbors[right]).is_ok()
+                    }) {
+                        already_coupled = already_coupled
+                            .checked_add(1)
+                            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                    }
+                }
+            }
+            let fill_pairs = possible_pairs.saturating_sub(already_coupled);
+            let candidate = (
+                fill_pairs,
+                neighbors.len(),
+                incident_count,
+                variable,
+            );
+            if best.is_none_or(|current| candidate < current) {
+                best = Some(candidate);
+            }
+        }
+
+        let Some((_, _, _, selected)) = best else {
+            break;
+        };
+        let mut remaining_edges = Vec::new();
+        let mut fill_union = BTreeSet::new();
+        for edge in current_edges {
+            if edge.contains(&selected) {
+                fill_union.extend(edge.into_iter().filter(|&vertex| vertex != selected));
+            } else {
+                remaining_edges.push(edge);
+            }
+        }
+        if fill_union.len() >= 2 {
+            let fill_edge: Vec<usize> = fill_union.into_iter().collect();
+            if !remaining_edges.contains(&fill_edge) {
+                remaining_edges.push(fill_edge);
+            }
+        }
+        remaining_edges.sort();
+        remaining_edges.dedup();
+        current_edges = remaining_edges;
+        active[selected] = false;
+        order.push(selected);
+    }
+    Ok(order)
+}
+
 /// Validate a symmetric, non-negative, zero-diagonal weighted interaction matrix.
 fn validate_weighted_interaction_matrix(weights: &[Vec<u128>]) -> Result<(), StrategyBddError> {
     let variable_count = weights.len();
@@ -1520,6 +1726,12 @@ pub fn multi_start_sift_strategy_function_robdd(
     let weighted_min_fill = weighted_interaction_min_fill_order(&weighted_report.weights)?;
     let weighted_frontier_report =
         refine_interaction_order_by_frontier(&weighted_graph, &weighted_min_fill, budget)?;
+
+    let anf_report = strategy_anf_interaction_hypergraph(function, budget)?;
+    let anf_min_fill = anf_hypergraph_min_fill_order(
+        dependency_count,
+        &anf_report.hyperedges,
+    )?;
     let weighted_min_fill_profile =
         interaction_graph_frontier_profile(&weighted_graph, &weighted_min_fill)?;
     let weighted_min_fill_max_frontier =
@@ -1581,6 +1793,14 @@ pub fn multi_start_sift_strategy_function_robdd(
                 .into_iter()
                 .rev()
                 .collect::<Vec<_>>(),
+        ),
+        (
+            StrategyBddOrderSeed::AnfHypergraphMinFill,
+            anf_min_fill.clone(),
+        ),
+        (
+            StrategyBddOrderSeed::AnfHypergraphMinFillReverse,
+            anf_min_fill.into_iter().rev().collect::<Vec<_>>(),
         ),
     ];
 
@@ -1651,6 +1871,9 @@ pub fn multi_start_sift_strategy_function_robdd(
         interaction_pair_checks,
         arithmetic_interaction_context_checks: weighted_report.contexts_checked,
         arithmetic_interaction_total_weight: weighted_report.total_interaction_weight,
+        anf_hyperedge_count: anf_report.hyperedges.len(),
+        anf_transform_checks: anf_report.transform_checks,
+        anf_max_hyperedge_rank: anf_report.max_hyperedge_rank,
         weighted_min_fill_max_frontier,
         weighted_refined_max_frontier,
         frontier_refinement_evaluations,
@@ -2035,6 +2258,7 @@ mod tests {
             max_support_checks: 1 << 12,
             max_interaction_checks: 1 << 12,
             max_weighted_interaction_checks: 1 << 12,
+            max_anf_transform_checks: 1 << 12,
             max_frontier_order_evaluations: 1 << 12,
             max_frontier_refinement_passes: 2,
             max_variable_order_evaluations: 1 << 13,
@@ -2562,6 +2786,47 @@ mod tests {
     }
 
     #[test]
+    fn anf_hypergraph_recovers_high_order_xor_monomial() {
+        // f = x0 XOR x1 XOR x2 XOR (x0*x1*x2). The cubic term must
+        // survive as a rank-three hyperedge, not be flattened away.
+        let source = function(
+            &[10, 11, 12],
+            &[false, true, true, true, true, false, false, false],
+        );
+        let report = strategy_anf_interaction_hypergraph(&source, budget()).unwrap();
+        assert!(report.hyperedges.contains(&vec![10, 11, 12]));
+        assert_eq!(report.max_hyperedge_rank, 3);
+        assert_eq!(report.linear_variables, vec![10, 11, 12]);
+        assert_eq!(report.transform_checks, 12);
+    }
+
+    #[test]
+    fn anf_hypergraph_min_fill_is_deterministic_and_covers_all_variables() {
+        let edges = vec![vec![0, 1, 2], vec![2, 3], vec![3, 4, 5]];
+        let first = anf_hypergraph_min_fill_order(6, &edges).unwrap();
+        let second = anf_hypergraph_min_fill_order(6, &edges).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 6);
+        assert_eq!(first.iter().copied().collect::<BTreeSet<_>>(), (0..6).collect());
+    }
+
+    #[test]
+    fn anf_transform_budget_is_fail_closed() {
+        let source = function(&[0, 1, 2], &[false, true, true, false, true, false, false, true]);
+        let tight = StrategyBddBudget {
+            max_anf_transform_checks: 11,
+            ..budget()
+        };
+        assert!(matches!(
+            strategy_anf_interaction_hypergraph(&source, tight),
+            Err(StrategyBddError::AnfTransformCheckBudgetExceeded {
+                required: 12,
+                limit: 11
+            })
+        ));
+    }
+
+    #[test]
     fn interaction_graph_detects_mixed_boolean_interaction() {
         let source = function(
             &[0, 1, 2],
@@ -2598,6 +2863,29 @@ mod tests {
             strategy_interaction_graph(&source, tight),
             Err(StrategyBddError::InteractionGraphCheckBudgetExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn multi_start_includes_algebraic_hypergraph_seeds() {
+        let source = function(
+            &[0, 1, 2, 3],
+            &[
+                false, true, true, false, true, false, false, true,
+                true, false, false, true, false, true, true, false,
+            ],
+        );
+        let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
+        assert!(report.anf_transform_checks > 0);
+        assert!(report.anf_hyperedge_count > 0);
+        assert!(report
+            .seed_orders
+            .iter()
+            .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFill));
+        assert!(report
+            .seed_orders
+            .iter()
+            .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFillReverse));
+        verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
     }
 
     #[test]
