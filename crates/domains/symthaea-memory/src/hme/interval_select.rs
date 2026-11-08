@@ -16,7 +16,7 @@
 //! before passing intervals here. An approximate candidate index may order
 //! work, but it cannot be substituted for the complete interval set.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::group_envelope::{ContinuousHVGroupEnvelope, GroupEnvelopeError};
 
@@ -176,6 +176,7 @@ pub struct GroupScoreIntervalIdentity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroupScoreIntervalRecord {
     identity: GroupScoreIntervalIdentity,
+    member_ids: Vec<String>,
     member_count: usize,
     interval: ContinuousHVScoreInterval,
 }
@@ -237,6 +238,7 @@ impl GroupScoreIntervalRecord {
                 member_set_digest: expected_member_set_digest,
                 content_digest: expected_content_digest,
             },
+            member_ids: envelope.member_ids().to_vec(),
             member_count,
             interval,
         })
@@ -245,6 +247,11 @@ impl GroupScoreIntervalRecord {
     /// Exact group identity carried into the selection plan.
     pub fn identity(&self) -> GroupScoreIntervalIdentity {
         self.identity
+    }
+
+    /// Stable member IDs covered by this envelope, sorted ascending.
+    pub fn member_ids(&self) -> &[String] {
+        &self.member_ids
     }
 
     /// Number of eligible records represented by this interval.
@@ -293,6 +300,150 @@ pub struct GroupIntervalSelectionPlan {
     /// Number of records avoided by excluding whole groups.
     pub excluded_record_count: usize,
 }
+
+
+/// One verified per-record interval tied to its parent group identity.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupMemberScoreIntervalRecord {
+    group_identity: GroupScoreIntervalIdentity,
+    record: ScoreIntervalRecord<String>,
+}
+
+/// Error while constructing a per-record interval within a verified group.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GroupMemberScoreIntervalBuildError {
+    /// The requested stable ID is not a member of the supplied group envelope.
+    MemberNotInGroup,
+    /// Original/reconstruction residual or score interval validation failed.
+    ScoreInterval(ScoreIntervalBuildError),
+}
+
+impl std::fmt::Display for GroupMemberScoreIntervalBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MemberNotInGroup => write!(f, "record ID is not in the pinned parent group"),
+            Self::ScoreInterval(error) => write!(f, "member score interval rejected: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for GroupMemberScoreIntervalBuildError {}
+
+impl GroupMemberScoreIntervalRecord {
+    /// Build a member interval after checking both its residual and membership
+    /// in the exact group whose envelope survived the first selection stage.
+    pub fn from_verified_l2_residual(
+        group: &GroupScoreIntervalRecord,
+        id: String,
+        query: &ContinuousHV,
+        original: &ContinuousHV,
+        reconstruction: &ContinuousHV,
+        residual_l2_upper: f32,
+    ) -> Result<Self, GroupMemberScoreIntervalBuildError> {
+        if group.member_ids.binary_search(&id).is_err() {
+            return Err(GroupMemberScoreIntervalBuildError::MemberNotInGroup);
+        }
+        let record = ScoreIntervalRecord::from_verified_l2_residual(
+            id,
+            query,
+            original,
+            reconstruction,
+            residual_l2_upper,
+        )
+        .map_err(GroupMemberScoreIntervalBuildError::ScoreInterval)?;
+        Ok(Self {
+            group_identity: group.identity,
+            record,
+        })
+    }
+
+    /// Parent group identity; binds manifest, eligibility, membership and content.
+    pub fn group_identity(&self) -> GroupScoreIntervalIdentity {
+        self.group_identity
+    }
+
+    /// Stable member ID.
+    pub fn id(&self) -> &str {
+        self.record.id()
+    }
+
+    /// Per-record canonical score interval before intersection with the group.
+    pub fn interval(&self) -> ContinuousHVScoreInterval {
+        self.record.interval()
+    }
+}
+
+/// Two-stage exact refinement plan: first select whole groups, then select
+/// per-record payloads within the surviving groups.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HierarchicalIntervalSelectionPlan {
+    /// First-stage group selection and its safe exclusions.
+    pub group_plan: GroupIntervalSelectionPlan,
+    /// Second-stage per-record selection within the surviving groups.
+    pub member_plan: IntervalSelectionPlan<String>,
+}
+
+/// Errors that prevent hierarchical exact interval selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HierarchicalIntervalSelectionError {
+    /// The first-stage group selector rejected coverage or metadata.
+    GroupSelection(GroupIntervalSelectionError),
+    /// A supplied member interval belongs to an unselected or mismatched group.
+    UnexpectedMemberGroup {
+        /// The supplied parent identity.
+        group_identity: GroupScoreIntervalIdentity,
+    },
+    /// A member ID appears more than once in the second-stage metadata.
+    DuplicateMemberRecord {
+        /// Duplicate member identifier.
+        member_id: String,
+    },
+    /// Not every member of a selected group has per-record interval metadata.
+    IncompleteMemberCoverage {
+        /// Parent group identity.
+        group_identity: GroupScoreIntervalIdentity,
+        /// Number of records expected in this group.
+        expected_members: usize,
+        /// Number of distinct member intervals supplied.
+        supplied_members: usize,
+    },
+    /// A per-record interval and its parent group interval do not intersect.
+    DisjointMemberAndGroupIntervals {
+        /// Member whose intervals are disjoint.
+        member_id: String,
+    },
+    /// The second-stage per-record selector rejected its input.
+    MemberSelection(IntervalSelectionError),
+}
+
+impl std::fmt::Display for HierarchicalIntervalSelectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GroupSelection(error) => write!(f, "group selection failed: {error}"),
+            Self::UnexpectedMemberGroup { .. } => {
+                write!(f, "member interval belongs to an unexpected group snapshot")
+            }
+            Self::DuplicateMemberRecord { member_id } => {
+                write!(f, "duplicate member interval for {member_id}")
+            }
+            Self::IncompleteMemberCoverage {
+                expected_members,
+                supplied_members,
+                ..
+            } => write!(
+                f,
+                "member interval coverage incomplete: expected={expected_members}, supplied={supplied_members}"
+            ),
+            Self::DisjointMemberAndGroupIntervals { member_id } => write!(
+                f,
+                "member and parent-group intervals are disjoint for {member_id}"
+            ),
+            Self::MemberSelection(error) => write!(f, "member selection failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for HierarchicalIntervalSelectionError {}
 
 /// Errors that prevent weighted group-level exact selection.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -654,6 +805,128 @@ pub fn select_group_refinement_set(
         excluded_groups,
         refinement_record_count,
         excluded_record_count,
+    })
+}
+
+
+
+/// Perform hierarchical interval-first refinement.
+///
+/// Stage 1 scans one verified interval per group and uses weighted lower
+/// endpoints to exclude entire groups. Stage 2 requires per-record intervals
+/// only for surviving groups. Each member interval is intersected with its
+/// parent group interval before the existing global member selector is run.
+///
+/// The group lower endpoint is a valid lower bound for every group member.
+/// Thus at least top_k members have exact scores >= the first-stage threshold
+/// and are all in surviving groups. Intersecting valid member/group intervals
+/// preserves containment and raises every affected member lower endpoint to at
+/// least its group lower endpoint. The second-stage kth lower threshold is
+/// therefore no smaller than the first-stage threshold. Exact reranking only
+/// the final member refinement IDs is sufficient for whole-corpus top-k.
+///
+/// The caller must read per-record interval metadata for every member of every
+/// surviving group, but it need not load original vector payloads until the
+/// final member refinement set is known. Incomplete membership coverage or a
+/// disjoint intersection fails closed.
+pub fn select_hierarchical_refinement_set(
+    groups: &[GroupScoreIntervalRecord],
+    member_records: &[GroupMemberScoreIntervalRecord],
+    top_k: usize,
+    coverage: GroupIntervalCoverageCounts,
+) -> Result<HierarchicalIntervalSelectionPlan, HierarchicalIntervalSelectionError> {
+    let group_plan = select_group_refinement_set(groups, top_k, coverage)
+        .map_err(HierarchicalIntervalSelectionError::GroupSelection)?;
+
+    let selected_identities: BTreeSet<GroupScoreIntervalIdentity> =
+        group_plan.refinement_groups.iter().copied().collect();
+    let selected_groups: BTreeMap<GroupScoreIntervalIdentity, &GroupScoreIntervalRecord> = groups
+        .iter()
+        .filter(|group| selected_identities.contains(&group.identity))
+        .map(|group| (group.identity, group))
+        .collect();
+
+    let mut records_by_group: BTreeMap<
+        GroupScoreIntervalIdentity,
+        BTreeMap<String, &GroupMemberScoreIntervalRecord>,
+    > = BTreeMap::new();
+
+    for member in member_records {
+        let Some(group) = selected_groups.get(&member.group_identity).copied() else {
+            return Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup {
+                group_identity: member.group_identity,
+            });
+        };
+        if group.member_ids.binary_search_by(|id| id.as_str().cmp(member.id())).is_err() {
+            return Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup {
+                group_identity: member.group_identity,
+            });
+        }
+        let group_records = records_by_group.entry(member.group_identity).or_default();
+        if group_records.insert(member.id().to_owned(), member).is_some() {
+            return Err(HierarchicalIntervalSelectionError::DuplicateMemberRecord {
+                member_id: member.id().to_owned(),
+            });
+        }
+    }
+
+    let mut effective_records = Vec::with_capacity(group_plan.refinement_record_count);
+    for identity in &group_plan.refinement_groups {
+        let group = selected_groups.get(identity).copied().ok_or(
+            HierarchicalIntervalSelectionError::UnexpectedMemberGroup {
+                group_identity: *identity,
+            },
+        )?;
+        let supplied = records_by_group.get(identity);
+        let supplied_count = supplied.map_or(0, BTreeMap::len);
+        if supplied_count != group.member_count {
+            return Err(HierarchicalIntervalSelectionError::IncompleteMemberCoverage {
+                group_identity: *identity,
+                expected_members: group.member_count,
+                supplied_members: supplied_count,
+            });
+        }
+        let supplied = supplied.expect("validated nonzero group coverage above");
+        for member_id in &group.member_ids {
+            let member = supplied.get(member_id).ok_or(
+                HierarchicalIntervalSelectionError::IncompleteMemberCoverage {
+                    group_identity: *identity,
+                    expected_members: group.member_count,
+                    supplied_members: supplied_count,
+                },
+            )?;
+            let member_interval = member.record.interval;
+            let lower = member_interval.lower.max(group.interval.lower);
+            let upper = member_interval.upper.min(group.interval.upper);
+            if lower > upper {
+                return Err(
+                    HierarchicalIntervalSelectionError::DisjointMemberAndGroupIntervals {
+                        member_id: member_id.clone(),
+                    },
+                );
+            }
+            effective_records.push(ScoreIntervalRecord {
+                id: member.record.id.clone(),
+                interval: ContinuousHVScoreInterval { lower, upper },
+                certificate_check: member.record.certificate_check,
+            });
+        }
+    }
+
+    let member_plan = select_refinement_set(
+        &effective_records,
+        top_k,
+        IntervalCoverageCounts {
+            eligible_records: group_plan.refinement_record_count,
+            interval_records: effective_records.len(),
+            unbounded_unopened_partitions: 0,
+        },
+    )
+    .map_err(HierarchicalIntervalSelectionError::MemberSelection)?;
+
+    Ok(HierarchicalIntervalSelectionPlan {
+        group_plan,
+        member_plan,
     })
 }
 
