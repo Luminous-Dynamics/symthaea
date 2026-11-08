@@ -8,8 +8,8 @@
 //! recurrent mixing so cross-coordinate coupling can be tested at controlled
 //! compute budgets.
 
-use serde::{Deserialize, Serialize};
 use super::unified_hv::ContinuousHV;
+use serde::{Deserialize, Serialize};
 
 /// Structured transform applied to a continuous hypervector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,10 +48,9 @@ impl std::fmt::Display for HdcStructuredMixerError {
                 f,
                 "orthogonal butterfly mixer expected {expected} angles, received {actual}"
             ),
-            Self::NonFiniteButterflyParameter { index } => write!(
-                f,
-                "orthogonal butterfly mixer angle {index} is not finite"
-            ),
+            Self::NonFiniteButterflyParameter { index } => {
+                write!(f, "orthogonal butterfly mixer angle {index} is not finite")
+            }
         }
     }
 }
@@ -74,9 +73,7 @@ impl HdcStructuredMixer {
         if dimension == 0 {
             return Err(HdcStructuredMixerError::ZeroDimension);
         }
-        if matches!(kind, HdcStructuredMixerKind::WalshHadamard)
-            && !dimension.is_power_of_two()
-        {
+        if matches!(kind, HdcStructuredMixerKind::WalshHadamard) && !dimension.is_power_of_two() {
             return Err(HdcStructuredMixerError::NonPowerOfTwo { dimension });
         }
         Ok(Self { kind, dimension })
@@ -91,10 +88,7 @@ impl HdcStructuredMixer {
     }
 
     /// Apply the configured orthogonal transform.
-    pub fn apply(
-        &self,
-        input: &ContinuousHV,
-    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+    pub fn apply(&self, input: &ContinuousHV) -> Result<ContinuousHV, HdcStructuredMixerError> {
         self.validate_input(input)?;
         let values = match self.kind {
             HdcStructuredMixerKind::Identity => input.values.clone(),
@@ -106,18 +100,13 @@ impl HdcStructuredMixer {
                 }
                 output
             }
-            HdcStructuredMixerKind::WalshHadamard => {
-                normalized_walsh_hadamard(&input.values)
-            }
+            HdcStructuredMixerKind::WalshHadamard => normalized_walsh_hadamard(&input.values),
         };
         Ok(ContinuousHV::from_values(values))
     }
 
     /// Apply the exact inverse of the configured transform.
-    pub fn inverse(
-        &self,
-        input: &ContinuousHV,
-    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+    pub fn inverse(&self, input: &ContinuousHV) -> Result<ContinuousHV, HdcStructuredMixerError> {
         self.validate_input(input)?;
         let values = match self.kind {
             HdcStructuredMixerKind::Identity => input.values.clone(),
@@ -207,18 +196,12 @@ impl HdcButterflyMixer {
     }
 
     /// Apply the factorized orthogonal transform.
-    pub fn apply(
-        &self,
-        input: &ContinuousHV,
-    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+    pub fn apply(&self, input: &ContinuousHV) -> Result<ContinuousHV, HdcStructuredMixerError> {
         self.apply_with_direction(input, 1.0, false)
     }
 
     /// Apply the exact transpose/inverse of the configured transform.
-    pub fn inverse(
-        &self,
-        input: &ContinuousHV,
-    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+    pub fn inverse(&self, input: &ContinuousHV) -> Result<ContinuousHV, HdcStructuredMixerError> {
         self.apply_with_direction(input, -1.0, true)
     }
 
@@ -336,8 +319,7 @@ mod tests {
         for dimension in [1, 2, 16, 256, 16_384] {
             let input = sample(dimension, 11);
             let mixer =
-                HdcStructuredMixer::new(HdcStructuredMixerKind::WalshHadamard, dimension)
-                    .unwrap();
+                HdcStructuredMixer::new(HdcStructuredMixerKind::WalshHadamard, dimension).unwrap();
             let mixed = mixer.apply(&input).unwrap();
             let restored = mixer.inverse(&mixed).unwrap();
 
@@ -370,21 +352,33 @@ mod tests {
             }),
             "a one-hot input should spread across every mixed coordinate"
         );
-        assert!(mixed.values.iter().filter(|value| value.abs() > 1e-6).count() == dimension);
+        assert!(
+            mixed
+                .values
+                .iter()
+                .filter(|value| value.abs() > 1e-6)
+                .count()
+                == dimension
+        );
     }
 
     #[test]
     fn butterfly_parameter_count_is_linearithmic_not_quadratic() {
-        assert_eq!(HdcButterflyMixer::parameter_count_for_dimension(16_384), 114_688);
-        assert_eq!(HdcButterflyMixer::parameter_count_for_dimension(1_024), 5_120);
+        assert_eq!(
+            HdcButterflyMixer::parameter_count_for_dimension(16_384),
+            114_688
+        );
+        assert_eq!(
+            HdcButterflyMixer::parameter_count_for_dimension(1_024),
+            5_120
+        );
         assert_eq!(HdcButterflyMixer::parameter_count_for_dimension(12), 0);
     }
 
     #[test]
     fn parameterized_butterfly_is_orthogonal_and_invertible() {
         for dimension in [2, 8, 64, 256, 16_384] {
-            let parameter_count =
-                HdcButterflyMixer::parameter_count_for_dimension(dimension);
+            let parameter_count = HdcButterflyMixer::parameter_count_for_dimension(dimension);
             let angles = (0..parameter_count)
                 .map(|index| ((index as f32 * 0.017).sin()) * 0.6)
                 .collect::<Vec<_>>();
@@ -420,11 +414,15 @@ mod tests {
     fn parameterized_butterfly_spreads_a_single_coordinate() {
         let dimension = 256;
         let count = HdcButterflyMixer::parameter_count_for_dimension(dimension);
-        let mixer = HdcButterflyMixer::new(dimension, vec![std::f32::consts::FRAC_PI_4; count])
-            .unwrap();
+        let mixer =
+            HdcButterflyMixer::new(dimension, vec![std::f32::consts::FRAC_PI_4; count]).unwrap();
         let input = ContinuousHV::basis(7, dimension);
         let mixed = mixer.apply(&input).unwrap();
-        let active = mixed.values.iter().filter(|value| value.abs() > 1e-6).count();
+        let active = mixed
+            .values
+            .iter()
+            .filter(|value| value.abs() > 1e-6)
+            .count();
 
         assert_eq!(active, dimension);
         assert!((mixed.norm() - input.norm()).abs() < 1e-4);
