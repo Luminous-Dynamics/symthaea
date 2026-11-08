@@ -19,6 +19,8 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 pub const DEFAULT_MAX_FRAME_BYTES: usize = 1_048_576;
+pub const MAX_PROCESS_FRAME_BYTES: usize = 16 * 1_048_576;
+pub const MAX_PROCESS_PROBES: usize = 1_024;
 
 #[derive(Debug, Clone)]
 pub struct ProcessAgentConfig {
@@ -118,11 +120,10 @@ pub struct ProcessAgent {
 
 impl ProcessAgent {
     pub fn spawn(config: ProcessAgentConfig) -> Result<Self, ProcessError> {
-        if config.max_input_frame_bytes == 0 || config.max_output_frame_bytes == 0 {
-            return Err(ProcessError::InvalidConfiguration(
-                "frame limits must be greater than zero".to_owned(),
-            ));
-        }
+        validate_frame_limits(
+            config.max_input_frame_bytes,
+            config.max_output_frame_bytes,
+        )?;
 
         let executable = fs::canonicalize(&config.executable)
             .map_err(|error| ProcessError::Io(format!("cannot resolve agent executable: {error}")))?;
@@ -323,6 +324,19 @@ impl Drop for ProcessAgent {
     }
 }
 
+fn validate_frame_limits(input_bytes: usize, output_bytes: usize) -> Result<(), ProcessError> {
+    if input_bytes == 0
+        || output_bytes == 0
+        || input_bytes > MAX_PROCESS_FRAME_BYTES
+        || output_bytes > MAX_PROCESS_FRAME_BYTES
+    {
+        return Err(ProcessError::InvalidConfiguration(format!(
+            "input and output frame limits must be within 1..={MAX_PROCESS_FRAME_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
 fn sha256_frame(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
@@ -382,9 +396,21 @@ pub fn run_process_episode(
     let episode_id = initial_view.task.episode_id.clone();
     let world_family = initial_view.task.world_family;
     let maximum_actions = initial_view.task.max_probe_actions;
+    if maximum_actions > MAX_PROCESS_PROBES {
+        return Err(ProcessError::ProbeBudgetTooLarge {
+            requested: maximum_actions,
+            limit: MAX_PROCESS_PROBES,
+        });
+    }
+    let maximum_action_count = maximum_actions
+        .checked_add(1)
+        .ok_or(ProcessError::ProbeBudgetTooLarge {
+            requested: maximum_actions,
+            limit: MAX_PROCESS_PROBES,
+        })?;
 
     let mut action_records = Vec::new();
-    for action_index in 1..=(maximum_actions + 1) {
+    for action_index in 1..=maximum_action_count {
         if episode.status() == EpisodeStatus::Submitted {
             break;
         }
@@ -453,6 +479,7 @@ pub enum ProcessError {
     FrameTooLarge { direction: &'static str, limit: usize },
     AgentExited(String),
     AgentNonZeroExit(i32),
+    ProbeBudgetTooLarge { requested: usize, limit: usize },
     MalformedAction(String),
 }
 
@@ -468,6 +495,23 @@ impl std::error::Error for ProcessError {}
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn frame_limits_reject_zero_and_unbounded_values() {
+        assert!(validate_frame_limits(1, 1).is_ok());
+        assert!(matches!(
+            validate_frame_limits(0, 1),
+            Err(ProcessError::InvalidConfiguration(_))
+        ));
+        assert!(matches!(
+            validate_frame_limits(MAX_PROCESS_FRAME_BYTES + 1, 1),
+            Err(ProcessError::InvalidConfiguration(_))
+        ));
+        assert!(matches!(
+            validate_frame_limits(1, MAX_PROCESS_FRAME_BYTES + 1),
+            Err(ProcessError::InvalidConfiguration(_))
+        ));
+    }
 
     #[test]
     fn frame_digest_commits_to_jsonl_delimiter_bytes() {
