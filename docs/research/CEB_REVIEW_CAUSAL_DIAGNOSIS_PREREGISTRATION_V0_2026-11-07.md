@@ -352,6 +352,15 @@ This is an exploratory P0/P1/P2 development contrast: P0 verdict only; P1 verdic
 
 Use the dual-annotator addendum to lock canonical/mutant verdicts, both witnesses, oracle independence and claim ceilings separately. If the contract is ambiguous or the preservation boundary is not qualified, the repair remains unverified even when a target failure is plausible. Candidate-controlled executable validation remains gated by #10064 and independent pristine regrade by #10369.
 
+
+## 12.8 Risk-controlled selective claim acceptance
+
+Use [CEB Review Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md) as an exploratory design for acceptance, evidence routing, human escalation and abstention. It distinguishes false-discovery risk among accepted claims from false-positive rate among false claims, and requires disjoint development, calibration and confirmatory data roles.
+
+The protocol's four development policy arms (S0 accept-all, S1 verbal-confidence threshold, S2 disagreement/evidence route, S3 calibrated selective policy) compose with the existing sequential evidence policy and human escalation. They add no scheduler, primary metric, task schema, receipt or oracle authority. Report risk/coverage with absolute counts, one-sided bounds, claim-kind/severity strata, and the exchangeability/cluster assumptions. Where calibration is inadequate, automatic acceptance remains uncertified and claims are escalated.
+
+This is a design proposal, not a current CEB risk guarantee or a registered confirmatory Phase A/B/C hypothesis. The example sample sizes (59 for a 5% bound and 299 for a 1% bound with zero errors at one-sided 95% confidence) are planning illustrations under independent/exchangeable Bernoulli assumptions; do not apply them to correlated prompt variants or clustered defects without a valid analysis.
+
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
