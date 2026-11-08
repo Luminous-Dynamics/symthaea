@@ -68,6 +68,44 @@ pub fn get_cognitive_stride() -> usize {
     STRIDE.load(Ordering::Relaxed)
 }
 
+/// Stable identifier for the full-resolution scalar cosine score contract.
+///
+/// Contract v1 uses f32 arithmetic, contiguous groups of eight coordinates,
+/// then an ordered tail; it preserves the legacy scalar near-zero denominator
+/// threshold. Inputs admitted for this profile must be finite and in [-1, 1].
+pub const CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1: &str =
+    "continuous_hv_cosine_full_f32_group8_v1";
+
+/// Errors returned when a vector is not admissible for the full-resolution
+/// continuous-HV score contract.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ContinuousHVProfileError {
+    /// Query and candidate dimensions differ.
+    #[error("continuous-HV dimension mismatch: query={query_dim}, candidate={candidate_dim}")]
+    DimensionMismatch {
+        /// Query dimension.
+        query_dim: usize,
+        /// Candidate dimension.
+        candidate_dim: usize,
+    },
+    /// A component is NaN or infinite.
+    #[error("{operand} component at index {index} is not finite")]
+    NonFiniteComponent {
+        /// Which input failed validation (for example, "query" or "candidate").
+        operand: &'static str,
+        /// Component index.
+        index: usize,
+    },
+    /// A component is outside the admitted closed interval [-1, 1].
+    #[error("{operand} component at index {index} is outside the admitted [-1, 1] range")]
+    OutOfRangeComponent {
+        /// Which input failed validation (for example, "query" or "candidate").
+        operand: &'static str,
+        /// Component index.
+        index: usize,
+    },
+}
+
 /// Standard HDC dimension (2^14 = 16,384)
 /// This is SIMD-optimized and matches research consensus.
 pub const HDC_DIMENSION: usize = 16_384;
@@ -510,6 +548,52 @@ impl ContinuousHV {
 
             (dot / denom).clamp(-1.0, 1.0)
         }
+    }
+
+    /// Validate this vector for the full-resolution continuous-HV cosine profile.
+    ///
+    /// This is intended for segment/query admission, not for every scoring
+    /// operation. Validate persisted vectors once when admitting an immutable
+    /// segment, and validate each query before searching. The named profile
+    /// requires finite f32 components in the closed interval [-1, 1].
+    pub fn validate_full_resolution_profile(
+        &self,
+        operand: &'static str,
+    ) -> Result<(), ContinuousHVProfileError> {
+        for (index, &value) in self.values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ContinuousHVProfileError::NonFiniteComponent {
+                    operand,
+                    index,
+                });
+            }
+            if !(-1.0..=1.0).contains(&value) {
+                return Err(ContinuousHVProfileError::OutOfRangeComponent {
+                    operand,
+                    index,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate both operands for the full-resolution continuous-HV profile.
+    ///
+    /// This checks equal dimensions and finite, in-range components. It does
+    /// not compute a score or alter either vector.
+    pub fn validate_full_resolution_pair(
+        &self,
+        candidate: &Self,
+    ) -> Result<(), ContinuousHVProfileError> {
+        if self.values.len() != candidate.values.len() {
+            return Err(ContinuousHVProfileError::DimensionMismatch {
+                query_dim: self.values.len(),
+                candidate_dim: candidate.values.len(),
+            });
+        }
+        self.validate_full_resolution_profile("query")?;
+        candidate.validate_full_resolution_profile("candidate")?;
+        Ok(())
     }
 
     /// Full-resolution scalar cosine similarity, independent of cognitive stride.
@@ -1212,6 +1296,62 @@ impl HV {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_full_resolution_profile_accepts_closed_unit_interval() {
+        let hv = ContinuousHV::from_values(vec![-1.0, 0.0, 1.0]);
+        assert!(hv.validate_full_resolution_profile("candidate").is_ok());
+    }
+
+    #[test]
+    fn test_full_resolution_profile_rejects_nan_and_infinities() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let hv = ContinuousHV::from_values(vec![0.0, invalid, 1.0]);
+            assert!(matches!(
+                hv.validate_full_resolution_profile("candidate"),
+                Err(ContinuousHVProfileError::NonFiniteComponent {
+                    operand: "candidate",
+                    index: 1
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn test_full_resolution_profile_rejects_out_of_range_components() {
+        for invalid in [-1.000_001, 1.000_001] {
+            let hv = ContinuousHV::from_values(vec![invalid]);
+            assert!(matches!(
+                hv.validate_full_resolution_profile("query"),
+                Err(ContinuousHVProfileError::OutOfRangeComponent {
+                    operand: "query",
+                    index: 0
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn test_full_resolution_pair_checks_dimensions_and_both_inputs() {
+        let query = ContinuousHV::from_values(vec![0.0, 0.0]);
+        let wrong_dimension = ContinuousHV::from_values(vec![0.0]);
+        assert!(matches!(
+            query.validate_full_resolution_pair(&wrong_dimension),
+            Err(ContinuousHVProfileError::DimensionMismatch {
+                query_dim: 2,
+                candidate_dim: 1
+            })
+        ));
+
+        let invalid_candidate = ContinuousHV::from_values(vec![0.0, f32::NAN]);
+        assert!(matches!(
+            query.validate_full_resolution_pair(&invalid_candidate),
+            Err(ContinuousHVProfileError::NonFiniteComponent {
+                operand: "candidate",
+                index: 1
+            })
+        ));
+    }
 
     #[test]
     fn test_full_resolution_similarity_reads_all_coordinates() {
