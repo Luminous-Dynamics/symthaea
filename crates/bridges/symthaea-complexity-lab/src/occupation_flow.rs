@@ -423,7 +423,7 @@ pub fn build_occupation_flow_lp(
 
     // Initial occupancy: omega[0,i] = initial[i].
     for state in 0..states {
-        let mut row = zero_row(variable_count)?;
+        let mut row = zero_row(layout.variable_count())?;
         row[layout.occupancy_variable(0, state).unwrap()] = CheckedRational::one();
         add_equality(&mut matrix, &mut rhs, row, model.initial[state])?;
     }
@@ -431,7 +431,7 @@ pub fn build_occupation_flow_lp(
     for stage in 0..model.transitions.len() {
         // Outflow from each source state equals its current occupancy.
         for source in 0..states {
-            let mut row = zero_row(variable_count)?;
+            let mut row = zero_row(layout.variable_count())?;
             row[layout.occupancy_variable(stage, source).unwrap()] =
                 CheckedRational::from_integer(-1);
             for destination in 0..states {
@@ -443,7 +443,7 @@ pub fn build_occupation_flow_lp(
 
         // Inflow to each destination state equals next-period occupancy.
         for destination in 0..states {
-            let mut row = zero_row(variable_count)?;
+            let mut row = zero_row(layout.variable_count())?;
             row[layout.occupancy_variable(stage + 1, destination).unwrap()] =
                 CheckedRational::one();
             for source in 0..states {
@@ -460,12 +460,12 @@ pub fn build_occupation_flow_lp(
                 let occupancy = layout.occupancy_variable(stage, source).unwrap();
                 let flow = layout.flow_variable(stage, source, destination).unwrap();
 
-                let mut lower_row = zero_row(variable_count)?;
+                let mut lower_row = zero_row(layout.variable_count())?;
                 lower_row[occupancy] = interval.lower;
                 lower_row[flow] = CheckedRational::from_integer(-1);
                 add_inequality(&mut matrix, &mut rhs, lower_row, CheckedRational::zero());
 
-                let mut upper_row = zero_row(variable_count)?;
+                let mut upper_row = zero_row(layout.variable_count())?;
                 upper_row[flow] = CheckedRational::one();
                 upper_row[occupancy] = CheckedRational::new(
                     interval.upper.numerator().checked_neg()
@@ -477,7 +477,7 @@ pub fn build_occupation_flow_lp(
         }
     }
 
-    let mut objective = zero_row(variable_count)?;
+    let mut objective = zero_row(layout.variable_count())?;
     for time in 0..periods {
         for state in 0..states {
             let score = state_scores[time][state];
