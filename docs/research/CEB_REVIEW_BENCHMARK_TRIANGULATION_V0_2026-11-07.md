@@ -213,7 +213,7 @@ The SCOPE work summarized by the HyperMatrix Research Lab uses bidirectional pre
 
 **Scope and limitation:** SCOPE concerns pairwise LLM judging, not code review or causal diagnosis. Its risk guarantee depends on the calibration assumptions and task population; it cannot be imported unaltered across repositories, languages, severities or claim kinds.
 
-**CEB extension:** calibrate acceptance/abstention separately by claim type and severity on a repository-/defect-family-disjoint calibration set. Measure selective risk versus coverage and report group-wise gaps. A judge's confidence, consensus or stable rationale is not itself a finite-sample guarantee.
+**CEB extension:** calibrate acceptance/abstention separately by claim type and severity on a repository-/defect-family-disjoint calibration set. Measure selective risk versus coverage and report group-wise gaps. A judge's confidence, consensus or stable rationale is not itself a finite-sample guarantee. See [Risk-Controlled Selective Claim Acceptance Protocol V0](CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md) for disjoint development/calibration/confirmatory roles, a one-sided Clopper–Pearson risk bound, sample-size illustrations and escalation rules. It makes no current CEB risk guarantee.
 
 
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
