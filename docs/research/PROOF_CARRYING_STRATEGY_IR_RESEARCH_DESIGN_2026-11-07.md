@@ -455,3 +455,20 @@ Multi-start ordering now preserves both GF(2) and arithmetic-weighted seeds, the
 - Four-variable witness: natural and GF(2) min-fill produce 7 BDD nodes; arithmetic weighted min-fill order ([2,3,0,1]) produces 6; exact permutation search finds 5; multi-start sifting reaches 5.
 
 This is a finite known-answer demonstration, not evidence that the weighted heuristic wins on average. The next experiment is a preregistered ablation on held-out generated and application-derived strategy functions. Record source support, both interaction signals, candidate seeds, total search budget, peak construction size, final node count and checker cost. Include functions where weighted ordering is worse than the baseline, and require the multi-start selector to preserve the best already-verified candidate under budget exhaustion.
+
+
+## 18. External QBF comparison: pin the output contract, not just the solver name
+
+The first competitive baseline is CAQE, which SAT 2026 proof-theoretic work characterizes as the most successful practice-wise QBF algorithmic paradigm. Keep that description separate from any specific leaderboard score or build/version result.
+
+CAQE's public interface exposes prenex-CNF/QDIMACS decision solving, a `--qdo` partial-assignment output mode, and a separate `dcaqe` executable for DQBF/DQDIMACS. This leads to a required adapter distinction:
+
+- a QBF truth decision is not a full Skolem/Herbrand strategy;
+- a partial assignment is not a total strategy function;
+- a proof object is not a checked proof until a compatible independent checker accepts it;
+- a proof is not an extracted strategy until a supported extractor returns functions and an independent strategy checker validates them against the original matrix/prefix;
+- DQBF is not prenex QBF and must retain its explicit dependency semantics.
+
+For each external run, bind solver version/configuration, input digest, track/format, command line, resource envelope, output capability class and checker identity. Separate decision, proof, extraction and independent validation times. This avoids overstating the external baseline and yields a fair time-to-verified-strategy metric.
+
+The long-term production route should study the SAT 2026 synthesis proof system as an independent extraction adapter. Its reported contribution is a sound/complete proof system with polynomial-time extraction of Skolem/Herbrand functions and intermediate game values for proofs in that system; that theoretical claim does not automatically transfer to arbitrary existing QBF proof formats.
