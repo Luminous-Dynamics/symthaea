@@ -6,5 +6,5 @@ version = "0.1.0"
 IntervalMDP = "051c988a-e73c-45a4-90ec-875cac0402c7"
 
 [compat]
-IntervalMDP = "0.7"
+IntervalMDP = "=0.7.0"
 julia = "1.11"
