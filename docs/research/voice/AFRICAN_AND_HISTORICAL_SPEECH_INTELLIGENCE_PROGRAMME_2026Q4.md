@@ -855,8 +855,11 @@ The experiment receipt now has an optional counterfactual_pairs section recordin
 - condition-manifest schema version;
 - changed-dimension annotation revision;
 - pair count and intervention kinds;
-- pair split revision;
-- source-lineage manifest digest.
+- pair split revision and source-lineage manifest digest;
+- preference-training and held-out evaluation pair-manifest digests;
+- disjointness-audit digest, exact overlap count and status.
+
+An admitted confirmatory evaluation requires VERIFIED_DISJOINT, a disjointness-audit digest and zero pair overlap. Synthetic-only/NOT_USED runs cannot claim this gate.
 
 The design receipt marks this section NOT_USED. Presence of the schema does not establish an executed paired experiment.
 
@@ -927,3 +930,7 @@ FA-Bench is already incorporated in #10871 and should be reused rather than dupl
 ### 22.4 Competitive objective
 
 Target a measurable advantage on the intersection of natural African code-switching, phonological fidelity and evidence-grounded interpretation while remaining on the latency/cost Pareto frontier. Do not claim universal superiority over a provider from an isolated paper table.
+
+### 20.6 Preference/evaluation leakage gate
+
+AHA-style counterfactual preference data is a training resource, not ground truth. The receipt schema now requires separate preference-training and held-out evaluation pair manifests for an admitted run, plus a disjointness-audit digest, exact overlap count and status. Confirmatory qualification requires zero overlap and VERIFIED_DISJOINT. The synthetic example has no preference-training manifest and keeps the gate NOT_APPLICABLE.
