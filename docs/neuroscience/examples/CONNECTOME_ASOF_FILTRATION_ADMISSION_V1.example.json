@@ -7,7 +7,7 @@
   "entries": [
     {
       "sequence": 1,
-      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "entry_commitment_sha256": "e442705181993139b33ba92b6cf6c120cc8cdc86d2376c191e7600760d060c0e",
       "kind": "EVIDENCE",
       "payload": {
         "event_id": "S1",
@@ -27,16 +27,16 @@
     },
     {
       "sequence": 2,
-      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "entry_commitment_sha256": "7bb9b3849019e76e3c373a8388f74debbbd32a6f28c48c0d4c71af11546a3f7f",
       "kind": "DECISION",
       "payload": {
         "decision_id": "D1",
         "campaign_id": "campaign-1",
         "kind": "DISCOVERY",
         "policy_version_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "input_prefix_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "input_prefix_sha256": "b2c88b9b42d5201da2bbf1d9dd971c121532c61aea8d6dc312c4e71b1ee38fa0",
         "driver_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "history_prefix_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "history_prefix_sha256": "532d9f8a138aed0bf835d7ab2553211eff21871eede5e84807be7139791464bd",
         "action_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "feasibility_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
         "available_event_ids": [
@@ -50,7 +50,7 @@
     },
     {
       "sequence": 3,
-      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "entry_commitment_sha256": "6c44641d58d72bf7bed3c30202b5546d30c42f335905bec521df84f8a331f6cd",
       "kind": "EVIDENCE",
       "payload": {
         "event_id": "T7",
@@ -70,16 +70,16 @@
     },
     {
       "sequence": 4,
-      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "entry_commitment_sha256": "50aa7f28baaad2999acabfcdced58f3fbe35e8a0b4eeb7e633390b6572b1922d",
       "kind": "DECISION",
       "payload": {
         "decision_id": "D2",
         "campaign_id": "campaign-1",
         "kind": "DISCOVERY",
         "policy_version_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "input_prefix_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "input_prefix_sha256": "4cb7e39fdcf74b8ea9f553eb0675573a020ddd87540ab3c7148f98a6410822e9",
         "driver_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "history_prefix_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "history_prefix_sha256": "3c24abd27b52a9622dd6b67e7ed10ebcbfc80ec5fe6c5b094f50dbf655c9f9d7",
         "action_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
         "feasibility_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
         "available_event_ids": [
@@ -95,7 +95,7 @@
     },
     {
       "sequence": 5,
-      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "entry_commitment_sha256": "72b817994fd6bac8db7f3130b6b733f4375b3a735416dbab3815180c3982b9ee",
       "kind": "EVIDENCE",
       "payload": {
         "event_id": "T8-failed",
@@ -193,6 +193,27 @@
       "NOT_COMBINABLE_LOCAL_ONLY",
       "ADMITTED_AFTER_LIFT"
     ],
-    "final_sequence": 5
-  }
+    "final_sequence": 5,
+    "entry_commitment_sha256": [
+      "e442705181993139b33ba92b6cf6c120cc8cdc86d2376c191e7600760d060c0e",
+      "7bb9b3849019e76e3c373a8388f74debbbd32a6f28c48c0d4c71af11546a3f7f",
+      "6c44641d58d72bf7bed3c30202b5546d30c42f335905bec521df84f8a331f6cd",
+      "50aa7f28baaad2999acabfcdced58f3fbe35e8a0b4eeb7e633390b6572b1922d",
+      "72b817994fd6bac8db7f3130b6b733f4375b3a735416dbab3815180c3982b9ee"
+    ],
+    "decision_input_prefix_sha256": [
+      "b2c88b9b42d5201da2bbf1d9dd971c121532c61aea8d6dc312c4e71b1ee38fa0",
+      "4cb7e39fdcf74b8ea9f553eb0675573a020ddd87540ab3c7148f98a6410822e9"
+    ],
+    "decision_history_prefix_sha256": [
+      "532d9f8a138aed0bf835d7ab2553211eff21871eede5e84807be7139791464bd",
+      "3c24abd27b52a9622dd6b67e7ed10ebcbfc80ec5fe6c5b094f50dbf655c9f9d7"
+    ],
+    "ledger_chain_root_sha256": "72b817994fd6bac8db7f3130b6b733f4375b3a735416dbab3815180c3982b9ee",
+    "terminal_checkpoint_sha256": "03a0309a3b06ef1818780156af53f15fb2f0da0ac70b1e3bb3d40a6780bc5fca",
+    "sha256_empty": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sha256_abc": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  "ledger_epoch_id": "epoch-1",
+  "ledger_chain_root_sha256": "72b817994fd6bac8db7f3130b6b733f4375b3a735416dbab3815180c3982b9ee"
 }

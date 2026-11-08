@@ -10,4 +10,7 @@ description = "As-of event replay and filtration admission audit for connectomic
 path = "src/lib.rs"
 
 # Standalone validation crate: intentionally outside the root workspace.
+[dependencies]
+sha2 = { version = "=0.10.9", default-features = false }
+
 [workspace]

@@ -1,0 +1,63 @@
+name: Connectome as-of ledger commitment contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/connectome-asof-filtration/**"
+      - "docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json"
+      - ".github/workflows/connectome-asof-ledger-commitment.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectome-asof-filtration/**"
+      - "docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json"
+      - ".github/workflows/connectome-asof-ledger-commitment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-asof-ledger-commitments:
+    name: Verify canonical bytes, SHA-256 chain and independent replay
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Validate schema and synthetic ledger manifest
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert fixture["ledger_epoch_id"] == "epoch-1"
+          assert len(fixture["entries"]) == fixture["oracle_expectations"]["final_sequence"]
+          print("as-of ledger schema/fixture: PASS")
+          PY
+      - name: Independent Python canonical-byte and SHA-256 replay
+        run: |
+          python3 tools/connectome-asof-filtration/reference/verify_ledger_commitments.py \
+            docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json
+      - name: Format standalone Rust crate
+        run: cargo fmt --manifest-path tools/connectome-asof-filtration/Cargo.toml -- --check
+      - name: Diagnostic lockfile resolution
+        run: |
+          cargo generate-lockfile --manifest-path tools/connectome-asof-filtration/Cargo.toml
+          echo "=== GENERATED CONNECTOME AS-OF CARGO LOCK ==="
+          cat tools/connectome-asof-filtration/Cargo.lock
+      - name: Test standalone Rust verifier with generated locked dependencies
+        run: cargo test --manifest-path tools/connectome-asof-filtration/Cargo.toml --locked
