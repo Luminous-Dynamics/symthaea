@@ -468,6 +468,104 @@ mod tests {
         }
     }
 
+    fn independent_profile_count(
+        problem: &CnfProblem,
+        prefix: &ValidatedQuantifierPrefix,
+    ) -> u128 {
+        let mut layouts = Vec::new();
+        let mut universal_variables = Vec::new();
+        for block in prefix.blocks() {
+            for &variable in &block.variables {
+                match block.quantifier {
+                    Quantifier::ForAll => universal_variables.push(variable),
+                    Quantifier::Exists => layouts.push((
+                        variable,
+                        prefix.existential_dependencies(variable).unwrap(),
+                    )),
+                }
+            }
+        }
+
+        fn check_profile(
+            problem: &CnfProblem,
+            prefix: &ValidatedQuantifierPrefix,
+            layouts: &[(usize, Vec<usize>)],
+            tables: &[Vec<bool>],
+            universal_variables: &[usize],
+        ) -> bool {
+            let universal_rows = 1usize << universal_variables.len();
+            for universal_mask in 0..universal_rows {
+                let mut assignment = vec![false; problem.variables.len()];
+                for (bit, &variable) in universal_variables.iter().enumerate() {
+                    assignment[variable] = ((universal_mask >> bit) & 1) != 0;
+                }
+                for (function_index, (variable, dependencies)) in layouts.iter().enumerate() {
+                    let mut row_index = 0usize;
+                    for (bit, &dependency) in dependencies.iter().enumerate() {
+                        if assignment[dependency] {
+                            row_index |= 1usize << bit;
+                        }
+                    }
+                    assignment[*variable] = tables[function_index][row_index];
+                }
+                if !problem.clauses.iter().all(|clause| {
+                    clause
+                        .iter()
+                        .any(|literal| assignment[literal.variable] == literal.positive)
+                }) {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn enumerate(
+            function_index: usize,
+            problem: &CnfProblem,
+            prefix: &ValidatedQuantifierPrefix,
+            layouts: &[(usize, Vec<usize>)],
+            universal_variables: &[usize],
+            tables: &mut Vec<Vec<bool>>,
+        ) -> u128 {
+            if function_index == layouts.len() {
+                return u128::from(check_profile(
+                    problem,
+                    prefix,
+                    layouts,
+                    tables,
+                    universal_variables,
+                ));
+            }
+            let entries = 1usize << layouts[function_index].1.len();
+            let mut winning = 0u128;
+            for function_mask in 0..(1usize << entries) {
+                let table: Vec<bool> = (0..entries)
+                    .map(|row| ((function_mask >> row) & 1) != 0)
+                    .collect();
+                tables.push(table);
+                winning += enumerate(
+                    function_index + 1,
+                    problem,
+                    prefix,
+                    layouts,
+                    universal_variables,
+                    tables,
+                );
+                tables.pop();
+            }
+            winning
+        }
+
+        enumerate(
+            0,
+            problem,
+            prefix,
+            &layouts,
+            &universal_variables,
+            &mut Vec::new(),
+        )
+    }
+
     fn assert_count(problem: &CnfProblem, prefix: &ValidatedQuantifierPrefix, expected: u128) {
         let report = count_qbf_winning_strategy_profiles(problem, prefix, budget()).unwrap();
         assert_eq!(report.winning_strategy_profiles, expected);
@@ -678,6 +776,71 @@ mod tests {
                 limit: 4
             }
         );
+    }
+
+    #[test]
+    fn exhaustive_two_variable_exact_counts_match_independent_profile_enumerator() {
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+        ];
+        let mut formulas = vec![CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![],
+        }];
+        for left_mask in 0..16usize {
+            let left: Vec<_> = (0..4)
+                .filter(|index| ((left_mask >> index) & 1) != 0)
+                .map(|index| literals[index])
+                .collect();
+            formulas.push(CnfProblem {
+                variables: vec!["x".into(), "y".into()],
+                clauses: vec![left.clone()],
+            });
+            for right_mask in 0..16usize {
+                let right: Vec<_> = (0..4)
+                    .filter(|index| ((right_mask >> index) & 1) != 0)
+                    .map(|index| literals[index])
+                    .collect();
+                formulas.push(CnfProblem {
+                    variables: vec!["x".into(), "y".into()],
+                    clauses: vec![left.clone(), right],
+                });
+            }
+        }
+        assert_eq!(formulas.len(), 273);
+
+        for (formula_index, problem) in formulas.iter().enumerate() {
+            for order in [[0usize, 1usize], [1usize, 0usize]] {
+                for quantifier_mask in 0..4usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = prefix(2, blocks);
+                    let actual =
+                        count_qbf_winning_strategy_profiles(problem, &prefix, budget()).unwrap();
+                    let expected = independent_profile_count(problem, &prefix);
+                    assert_eq!(
+                        actual.winning_strategy_profiles,
+                        expected,
+                        "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
