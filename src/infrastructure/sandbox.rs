@@ -877,6 +877,7 @@ mod tests {
             );
         }
     }
+
     #[test]
     fn test_run_in_rejects_missing_working_directory() {
         let mut sandbox = Sandbox::new().simulation_only();
