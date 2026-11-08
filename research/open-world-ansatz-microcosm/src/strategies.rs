@@ -20,6 +20,9 @@ pub enum ProbeStrategy {
     MaximumEntropy,
     /// Minimize expected remaining candidate count under a uniform prior.
     MinimumExpectedRemaining,
+    /// Maximize information gain over structural families with equal family prior.
+    /// Parameterizations are weighted uniformly only within each family.
+    MaximumStructureInformationGain,
     /// Choose the first action in the declared canonical domain ordering.
     FixedGrid,
     /// Choose a reproducible pseudo-random legal action.
@@ -36,6 +39,12 @@ pub struct ProbeMetrics {
     pub expected_remaining_numerator: u64,
     pub expected_remaining_denominator: usize,
     pub entropy_bits: f64,
+    /// Mutual information between the next observation and structural family,
+    /// using equal prior mass per surviving family and a uniform conditional
+    /// prior over its surviving parameterizations.
+    pub structure_information_gain_bits: f64,
+    /// Maximum number of structural families compatible with any one outcome.
+    pub worst_case_remaining_structures: usize,
     pub probe_cost_units: u64,
 }
 
@@ -101,6 +110,9 @@ fn compare_metrics(left: &ProbeMetrics, right: &ProbeMetrics, strategy: ProbeStr
         ProbeStrategy::MinimumExpectedRemaining => right
             .expected_remaining_numerator
             .cmp(&left.expected_remaining_numerator),
+        ProbeStrategy::MaximumStructureInformationGain => left
+            .structure_information_gain_bits
+            .total_cmp(&right.structure_information_gain_bits),
         ProbeStrategy::FixedGrid | ProbeStrategy::Random { .. } => Ordering::Equal,
     };
 
@@ -161,8 +173,90 @@ fn metrics<T: Ord>(
         expected_remaining_numerator,
         expected_remaining_denominator: denominator,
         entropy_bits,
+        structure_information_gain_bits: 0.0,
+        worst_case_remaining_structures: 0,
         probe_cost_units: 1,
     })
+}
+
+/// Attach structure-balanced one-step mutual information to ordinary
+/// parameterized-model partition metrics. The prior is uniform over the
+/// structural families that still have support, then uniform over the
+/// surviving parameterizations within each family. This avoids letting a
+/// larger syntactic family dominate merely because it has more parameters.
+fn attach_structure_metrics<T, S>(
+    mut score: ProbeMetrics,
+    predictions: impl IntoIterator<Item = (T, S)>,
+) -> Result<ProbeMetrics, StrategyError>
+where
+    T: Ord + Clone,
+    S: Ord,
+{
+    let mut by_structure: BTreeMap<S, BTreeMap<T, usize>> = BTreeMap::new();
+    let mut total_predictions = 0usize;
+    for (outcome, structure) in predictions {
+        *by_structure
+            .entry(structure)
+            .or_default()
+            .entry(outcome)
+            .or_default() += 1;
+        total_predictions += 1;
+    }
+    if total_predictions == 0 {
+        return Err(StrategyError::NoCompatibleModels);
+    }
+    if total_predictions != score.expected_remaining_denominator {
+        return Err(StrategyError::PredictionCardinalityMismatch);
+    }
+
+    let family_count = by_structure.len();
+    let family_prior = 1.0 / family_count as f64;
+    let mut outcome_probability: BTreeMap<T, f64> = BTreeMap::new();
+    let mut family_sizes = BTreeMap::new();
+
+    for (structure, outcomes) in &by_structure {
+        let family_size: usize = outcomes.values().sum();
+        if family_size == 0 {
+            return Err(StrategyError::PredictionCardinalityMismatch);
+        }
+        family_sizes.insert(structure, family_size);
+        for (outcome, count) in outcomes {
+            *outcome_probability.entry(outcome.clone()).or_default() +=
+                family_prior * (*count as f64 / family_size as f64);
+        }
+    }
+
+    let prior_entropy = (family_count as f64).log2();
+    let mut expected_posterior_entropy = 0.0;
+    let mut worst_case_remaining_structures = 0usize;
+
+    for (outcome, probability) in &outcome_probability {
+        if *probability <= 0.0 {
+            return Err(StrategyError::InvalidOutcomeProbability);
+        }
+        let mut posterior_entropy = 0.0;
+        let mut compatible_families = 0usize;
+
+        for (structure, outcomes) in &by_structure {
+            let count = outcomes.get(outcome).copied().unwrap_or(0);
+            if count == 0 {
+                continue;
+            }
+            compatible_families += 1;
+            let family_size = family_sizes[structure];
+            let posterior = family_prior * (count as f64 / family_size as f64) / probability;
+            posterior_entropy -= posterior * posterior.log2();
+        }
+
+        worst_case_remaining_structures =
+            worst_case_remaining_structures.max(compatible_families);
+        expected_posterior_entropy += probability * posterior_entropy;
+    }
+
+    score.structure_information_gain_bits =
+        (prior_entropy - expected_posterior_entropy).max(0.0);
+    score.worst_case_remaining_structures = worst_case_remaining_structures;
+    Ok(score)
 }
 
 fn score_boolean(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyError> {
@@ -193,7 +287,18 @@ fn score_boolean(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyError> {
                     .map_err(|error| StrategyError::PredictionFailure(error.to_string()))
             });
             let values = predictions.collect::<Result<Vec<_>, _>>()?;
-            metrics(AgentIntervention::Boolean(input), values, hypotheses.len())
+            let score = metrics(
+                AgentIntervention::Boolean(input),
+                values.iter().copied(),
+                hypotheses.len(),
+            )?;
+            attach_structure_metrics(
+                score,
+                hypotheses
+                    .iter()
+                    .zip(values)
+                    .map(|(hypothesis, output)| (output, hypothesis.mechanism)),
+            )
         })
         .collect()
 }
@@ -228,7 +333,18 @@ fn score_numeric(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyError> {
                     .map_err(|error| StrategyError::PredictionFailure(error.to_string()))
             });
             let values = predictions.collect::<Result<Vec<_>, _>>()?;
-            metrics(AgentIntervention::Numeric(input), values, hypotheses.len())
+            let score = metrics(
+                AgentIntervention::Numeric(input),
+                values.iter().copied(),
+                hypotheses.len(),
+            )?;
+            attach_structure_metrics(
+                score,
+                hypotheses
+                    .iter()
+                    .zip(values)
+                    .map(|(hypothesis, output)| (output, hypothesis.mechanism)),
+            )
         })
         .collect()
 }
@@ -264,7 +380,18 @@ fn score_interaction(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyErro
                     .map_err(|error| StrategyError::PredictionFailure(error.to_string()))
             });
             let values = predictions.collect::<Result<Vec<_>, _>>()?;
-            metrics(AgentIntervention::Pair(input), values, hypotheses.len())
+            let score = metrics(
+                AgentIntervention::Pair(input),
+                values.iter().copied(),
+                hypotheses.len(),
+            )?;
+            attach_structure_metrics(
+                score,
+                hypotheses
+                    .iter()
+                    .zip(values)
+                    .map(|(hypothesis, output)| (output, hypothesis.structure)),
+            )
         })
         .collect()
 }
@@ -332,6 +459,7 @@ pub enum StrategyError {
     NoCompatibleModels,
     NoLegalProbe,
     PredictionCardinalityMismatch,
+    InvalidOutcomeProbability,
     DiscoveryFailure(String),
     PredictionFailure(String),
 }
@@ -356,6 +484,7 @@ mod tests {
             ProbeStrategy::Minimax,
             ProbeStrategy::MaximumEntropy,
             ProbeStrategy::MinimumExpectedRemaining,
+            ProbeStrategy::MaximumStructureInformationGain,
             ProbeStrategy::FixedGrid,
             ProbeStrategy::Random { seed: 17 },
         ];
@@ -454,6 +583,64 @@ mod tests {
         assert_eq!(result.expected_remaining_denominator, 6);
         assert!((result.expected_remaining_models() - (14.0 / 6.0)).abs() < 1e-12);
         assert!((result.entropy_bits - (1.4591479170272448)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn structure_information_gain_is_invariant_to_parameterization_count() {
+        let balanced = vec![
+            (0_i64, 0_usize),
+            (0_i64, 0_usize),
+            (0_i64, 1_usize),
+            (1_i64, 1_usize),
+        ];
+        let overparameterized = std::iter::once((0_i64, 1_usize))
+            .chain(std::iter::once((1_i64, 1_usize)))
+            .chain(std::iter::repeat_n((0_i64, 0_usize), 100))
+            .collect::<Vec<_>>();
+
+        let score = metrics(
+            AgentIntervention::Numeric(0),
+            balanced.iter().map(|(outcome, _)| *outcome),
+            balanced.len(),
+        )
+        .unwrap();
+        let balanced_score = attach_structure_metrics(score, balanced).unwrap();
+
+        let expanded = metrics(
+            AgentIntervention::Numeric(0),
+            overparameterized.iter().map(|(outcome, _)| *outcome),
+            overparameterized.len(),
+        )
+        .unwrap();
+        let expanded_score = attach_structure_metrics(expanded, overparameterized).unwrap();
+
+        assert!((balanced_score.structure_information_gain_bits - 0.31127812445913283).abs() < 1e-12);
+        assert!(
+            (balanced_score.structure_information_gain_bits
+                - expanded_score.structure_information_gain_bits)
+                .abs()
+                < 1e-12
+        );
+        assert_eq!(balanced_score.worst_case_remaining_structures, 2);
+        assert_eq!(expanded_score.worst_case_remaining_structures, 2);
+        assert!(
+            expanded_score.structure_information_gain_bits
+                > expanded_score.entropy_bits
+        );
+    }
+
+    #[test]
+    fn structure_information_gain_is_zero_when_only_one_family_remains() {
+        let score = metrics(
+            AgentIntervention::Numeric(1),
+            [0_i64, 1, 1, 2],
+            4,
+        )
+        .unwrap();
+        let score = attach_structure_metrics(score, [(0_i64, 7_usize), (1, 7), (1, 7), (2, 7)])
+            .unwrap();
+        assert_eq!(score.structure_information_gain_bits, 0.0);
+        assert_eq!(score.worst_case_remaining_structures, 1);
     }
 
     #[test]
