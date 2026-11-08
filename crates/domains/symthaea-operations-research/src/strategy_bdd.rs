@@ -1212,6 +1212,9 @@ pub fn weighted_interaction_min_fill_order(
     validate_weighted_interaction_matrix(weights)?;
     let variable_count = weights.len();
     let mut adjacency = weighted_interaction_adjacency(weights)?;
+    // Fill edges retain the induced coupling generated at their introduction.
+    // This makes later weighted-degree/fill scores account for prior eliminations.
+    let mut induced_weights = weights.to_vec();
     let mut active = vec![true; variable_count];
     let mut order = Vec::with_capacity(variable_count);
 
@@ -1232,7 +1235,7 @@ pub fn weighted_interaction_min_fill_order(
 
             for &neighbor in &neighbors {
                 weighted_degree = weighted_degree
-                    .checked_add(weights[variable][neighbor])
+                    .checked_add(induced_weights[variable][neighbor])
                     .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
             }
             for left in 0..neighbors.len() {
@@ -1243,8 +1246,8 @@ pub fn weighted_interaction_min_fill_order(
                         fill_edges = fill_edges
                             .checked_add(1)
                             .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
-                        let product = weights[variable][a]
-                            .checked_mul(weights[variable][b])
+                        let product = induced_weights[variable][a]
+                            .checked_mul(induced_weights[variable][b])
                             .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
                         weighted_fill_cost = weighted_fill_cost
                             .checked_add(product)
@@ -1275,8 +1278,17 @@ pub fn weighted_interaction_min_fill_order(
             .collect();
         for left in 0..neighbors.len() {
             for right in left + 1..neighbors.len() {
-                adjacency[neighbors[left]].insert(neighbors[right]);
-                adjacency[neighbors[right]].insert(neighbors[left]);
+                let a = neighbors[left];
+                let b = neighbors[right];
+                if !adjacency[a].contains(&b) {
+                    let induced_weight = induced_weights[selected][a]
+                        .checked_mul(induced_weights[selected][b])
+                        .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                    adjacency[a].insert(b);
+                    adjacency[b].insert(a);
+                    induced_weights[a][b] = induced_weight;
+                    induced_weights[b][a] = induced_weight;
+                }
             }
         }
         active[selected] = false;
