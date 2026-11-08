@@ -1121,6 +1121,93 @@ mod tests {
     }
 
     #[test]
+    fn policy_index_decoding_and_known_answer_hashes_are_canonical() {
+        let decoded = decode_deterministic_markov_policy(2, 1, 2, 2).unwrap();
+        assert_eq!(decoded.actions, vec![1, 0]);
+        assert_eq!(decoded.action_at(0, 0), Some(1));
+        assert_eq!(decoded.action_at(0, 1), Some(0));
+        assert_eq!(decoded.action_at(1, 0), None);
+        assert_eq!(
+            decode_deterministic_markov_policy(4, 1, 2, 2),
+            Err(PolicyPortfolioError::InvalidPolicyIndex { index: 4, policy_count: 4 })
+        );
+
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let result = solve_finite_family_policy_portfolio(
+            &family, q(1, 2), 2, budget(2, 3),
+        ).unwrap();
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.policy_manifest_sha256),
+            "b94e4bd36c0c1ed1c42e1de6f8bf7937a671a08c1e0b2f8b105e4a7262481b2e"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.policy_values_sha256),
+            "51fd183735d11af0356fd806260b5fe717ae67a36593054f50720abb8760796b"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.decision_certificate_sha256),
+            "22d3c82a607b2d3dc1861e7ceeb0ddd94a6e652f3deb06a68d1326e3d59b9c2c"
+        );
+    }
+
+    #[test]
+    fn rational_width_budget_covers_generated_dynamic_programming_intermediates() {
+        let model = FiniteHorizonUmdpModel::new(
+            vec![q(1, 1), q(0, 1)],
+            vec![
+                vec![vec![q(0, 1)], vec![q(0, 1)]],
+                vec![vec![q(0, 1)], vec![q(1, 1)]],
+            ],
+            vec![vec![
+                vec![vec![q(1, 2), q(1, 2)]],
+                vec![vec![q(0, 1), q(1, 1)]],
+            ]],
+        ).unwrap();
+        let family = FiniteUmdpModelFamily::new(vec![model]).unwrap();
+        let mut tight = budget(1, 1);
+        tight.max_rational_bit_width = 2;
+        assert_eq!(
+            solve_finite_family_policy_portfolio(&family, q(1, 2), 1, tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "rational bit width",
+                required: 3,
+                limit: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn peak_memory_and_all_nested_policy_indices_are_preflighted() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let mut memory_tight = budget(2, 3);
+        memory_tight.max_output_memory_bytes = 1;
+        assert!(matches!(
+            solve_finite_family_policy_portfolio(&family, q(1, 2), 2, memory_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "estimated peak memory bytes",
+                ..
+            })
+        ));
+
+        let mut index_tight = budget(2, 3);
+        index_tight.max_stored_policy_indices = 5;
+        assert_eq!(
+            solve_finite_family_policy_portfolio(&family, q(1, 2), 2, index_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "stored portfolio and witness indices",
+                required: 6,
+                limit: 5,
+            })
+        );
+    }
+
+    #[test]
     fn two_specialist_models_have_zero_regret_with_two_policy_portfolio() {
         let family = FiniteUmdpModelFamily::new(vec![
             one_state_model(&[1, 0]),
