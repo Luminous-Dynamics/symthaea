@@ -51,6 +51,7 @@ Unit tests mutate the canonical fixture to test rejection of:
 - untransformed steering under road reflection;
 - map/profile identity mismatch;
 - passing-side / rule-profile mismatch;
+- unknown traffic-side profiles that attempt to retain a passing-side authority;
 - steering-wheel-layout-only changes that must preserve road semantics.
 
 A PASS means structural and declared SAM semantic conformance for this interface version. It does not establish calibration accuracy, source independence, physical truth, sensor validity, ODD applicability, model safety, or vehicle authority.
