@@ -7,6 +7,8 @@ GitHub signature status: verified; repository licence: MIT.
 
 This document records what the pinned public source actually implements. It does not claim an executed reproduction, access to private benchmark tasks, or a Symthaea result.
 
+Machine-readable companion receipt: [DISCOVERPHYSICS_PROTOCOL_AUDIT_V0_2026-11-08.json](DISCOVERPHYSICS_PROTOCOL_AUDIT_V0_2026-11-08.json) and [schema](DISCOVERPHYSICS_PROTOCOL_AUDIT_V0_2026-11-08.schema.json). The receipt stores exact Git blob SHAs for each audited source file and sets `benchmark_claim_allowed` to false until parity is resolved.
+
 ## 1. Protocol entry point and output contract
 
 The documented benchmark path is **scripts/run_benchmark.py**, configured by YAML. Each trial starts a DiscoverPhysics science agent in an altered simulated world. The agent iteratively designs experiments, observes particle trajectories, then submits both:
