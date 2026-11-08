@@ -333,7 +333,8 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
                         ));
                         continue;
                     };
-                    if evidence.get("jurisdiction_profile_id") != profile.get("jurisdiction_profile_id")
+                    if evidence.get("jurisdiction_profile_id")
+                        != profile.get("jurisdiction_profile_id")
                         || evidence.get("jurisdiction_profile_version")
                             != profile.get("jurisdiction_profile_version")
                     {
