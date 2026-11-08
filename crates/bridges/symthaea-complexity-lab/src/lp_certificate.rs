@@ -84,6 +84,16 @@ pub struct VerifiedLpOptimum {
     pub objective: CheckedRational,
 }
 
+/// Sound rational objective bracket from a feasible primal/dual certificate.
+/// For maximization, the primal objective is a lower bound and the dual
+/// objective is an upper bound on the true optimum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerifiedLpGap {
+    pub lower_bound: CheckedRational,
+    pub upper_bound: CheckedRational,
+    pub absolute_gap: CheckedRational,
+}
+
 /// Farkas infeasibility witness for A x <= b, x >= 0.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FarkasCertificate {
@@ -123,6 +133,12 @@ pub enum LpCertificateError {
         column: usize,
     },
     PrimalDualObjectiveMismatch,
+    NegativeRequestedGap,
+    InvertedPrimalDualBounds,
+    GapExceedsRequested {
+        actual: CheckedRational,
+        requested: CheckedRational,
+    },
     FarkasDoesNotContradict,
     ArithmeticOverflow,
     ComparisonOverflow,
@@ -161,6 +177,16 @@ impl fmt::Display for LpCertificateError {
             Self::PrimalDualObjectiveMismatch => {
                 write!(f, "primal and dual rational objectives do not match")
             }
+            Self::NegativeRequestedGap => {
+                write!(f, "requested LP objective gap must be nonnegative")
+            }
+            Self::InvertedPrimalDualBounds => {
+                write!(f, "dual upper bound is below the primal lower bound")
+            }
+            Self::GapExceedsRequested { actual, requested } => write!(
+                f,
+                "verified LP objective gap {actual} exceeds requested gap {requested}"
+            ),
             Self::FarkasDoesNotContradict => {
                 write!(f, "Farkas multipliers do not certify infeasibility")
             }
@@ -185,6 +211,52 @@ pub fn verify_primal_dual_optimality(
     lp: &RationalLp,
     certificate: &PrimalDualCertificate,
 ) -> Result<VerifiedLpOptimum, LpCertificateError> {
+    let (primal_objective, dual_objective) =
+        verify_primal_dual_feasibility(lp, certificate)?;
+    if primal_objective != dual_objective {
+        return Err(LpCertificateError::PrimalDualObjectiveMismatch);
+    }
+    Ok(VerifiedLpOptimum {
+        objective: primal_objective,
+    })
+}
+
+/// Verify a rational primal/dual bracket whose gap is no greater than delta.
+///
+/// This is useful for anytime LP solvers: the primal vector gives a valid
+/// lower bound, the dual vector a valid upper bound, and exact arithmetic
+/// verifies their distance without claiming the optimum has been reached.
+pub fn verify_primal_dual_gap(
+    lp: &RationalLp,
+    certificate: &PrimalDualCertificate,
+    requested_gap: CheckedRational,
+) -> Result<VerifiedLpGap, LpCertificateError> {
+    if requested_gap.is_negative() {
+        return Err(LpCertificateError::NegativeRequestedGap);
+    }
+    let (lower_bound, upper_bound) =
+        verify_primal_dual_feasibility(lp, certificate)?;
+    if compare_rational(upper_bound, lower_bound)? == Ordering::Less {
+        return Err(LpCertificateError::InvertedPrimalDualBounds);
+    }
+    let absolute_gap = subtract_rational(upper_bound, lower_bound)?;
+    if compare_rational(absolute_gap, requested_gap)? == Ordering::Greater {
+        return Err(LpCertificateError::GapExceedsRequested {
+            actual: absolute_gap,
+            requested: requested_gap,
+        });
+    }
+    Ok(VerifiedLpGap {
+        lower_bound,
+        upper_bound,
+        absolute_gap,
+    })
+}
+
+fn verify_primal_dual_feasibility(
+    lp: &RationalLp,
+    certificate: &PrimalDualCertificate,
+) -> Result<(CheckedRational, CheckedRational), LpCertificateError> {
     let rows = lp.row_count();
     let columns = lp.column_count();
     if certificate.primal.len() != columns {
@@ -236,13 +308,7 @@ pub fn verify_primal_dual_optimality(
 
     let primal_objective = dot(&lp.c, &certificate.primal)?;
     let dual_objective = dot(&lp.b, &certificate.dual)?;
-    if primal_objective != dual_objective {
-        return Err(LpCertificateError::PrimalDualObjectiveMismatch);
-    }
-
-    Ok(VerifiedLpOptimum {
-        objective: primal_objective,
-    })
+    Ok((primal_objective, dual_objective))
 }
 
 /// Verify a Farkas witness for infeasibility of A x <= b, x >= 0.
@@ -309,6 +375,19 @@ fn dot(
             .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
     }
     Ok(sum)
+}
+
+fn subtract_rational(
+    left: CheckedRational,
+    right: CheckedRational,
+) -> Result<CheckedRational, LpCertificateError> {
+    let negative_numerator = right.numerator()
+        .checked_neg()
+        .ok_or(LpCertificateError::ArithmeticOverflow)?;
+    let negative_right = CheckedRational::new(negative_numerator, right.denominator())
+        .map_err(|_| LpCertificateError::ArithmeticOverflow)?;
+    left.checked_add(negative_right)
+        .map_err(|_| LpCertificateError::ArithmeticOverflow)
 }
 
 fn compare_rational(
@@ -384,6 +463,61 @@ mod tests {
             verify_primal_dual_optimality(&lp, &bad_dual),
             Err(LpCertificateError::DualConstraintViolation { .. })
         ));
+    }
+
+
+    #[test]
+    fn verifies_exact_rational_primal_dual_gap() {
+        let lp = RationalLp::new(
+            vec![
+                vec![q(1, 1), q(1, 1)],
+                vec![q(1, 1), q(0, 1)],
+                vec![q(0, 1), q(1, 1)],
+            ],
+            vec![q(4, 1), q(2, 1), q(3, 1)],
+            vec![q(3, 1), q(2, 1)],
+        ).unwrap();
+        let certificate = PrimalDualCertificate {
+            primal: vec![q(2, 1), q(1, 1)],
+            dual: vec![q(2, 1), q(1, 1), q(0, 1)],
+        };
+        let verified = verify_primal_dual_gap(&lp, &certificate, q(2, 1)).unwrap();
+        assert_eq!(verified.lower_bound, q(8, 1));
+        assert_eq!(verified.upper_bound, q(10, 1));
+        assert_eq!(verified.absolute_gap, q(2, 1));
+        assert!(matches!(
+            verify_primal_dual_gap(&lp, &certificate, q(1, 1)),
+            Err(LpCertificateError::GapExceedsRequested { actual, requested })
+                if actual == q(2, 1) && requested == q(1, 1)
+        ));
+    }
+
+    #[test]
+    fn rejects_negative_or_inverted_primal_dual_gap_requests() {
+        let lp = RationalLp::new(
+            vec![vec![q(1, 1)]],
+            vec![q(2, 1)],
+            vec![q(1, 1)],
+        ).unwrap();
+        let exact = PrimalDualCertificate {
+            primal: vec![q(1, 1)],
+            dual: vec![q(1, 1)],
+        };
+        assert_eq!(
+            verify_primal_dual_gap(&lp, &exact, q(-1, 1)),
+            Err(LpCertificateError::NegativeRequestedGap)
+        );
+
+        // Both vectors are feasible, but this deliberately gives a dual
+        // objective below the primal objective, violating weak duality.
+        let inverted = PrimalDualCertificate {
+            primal: vec![q(2, 1)],
+            dual: vec![q(1, 2)],
+        };
+        assert_eq!(
+            verify_primal_dual_gap(&lp, &inverted, q(10, 1)),
+            Err(LpCertificateError::InvertedPrimalDualBounds)
+        );
     }
 
     #[test]
