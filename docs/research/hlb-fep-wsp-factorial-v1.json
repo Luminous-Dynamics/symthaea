@@ -281,7 +281,12 @@
         "layerwise_alignment_receipt_count",
         "adjacent_layer_permutation_consistency",
         "multilayer_canonicalization_operation_count",
-        "multilayer_candidate_native_digest"
+        "multilayer_candidate_native_digest",
+        "source_to_candidate_permutation_accuracy",
+        "canonicalization_native_digest_recovery_rate",
+        "cross_layer_permutation_coupling_error",
+        "activation_margin_vs_alignment_error_pareto",
+        "alignment_cost_vs_hidden_dimension"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
@@ -905,6 +910,14 @@
     {
       "id": "three_ball_uniform_random_legal_action",
       "scope": "Uniform random choice among immediate response or one of three gaze locations, then uniform random response among three colours or no response; independent policy RNG"
+    },
+    {
+      "id": "dayan_eitan_maron_icml_2026_permutation_equivariant_wsn",
+      "scope": "Published permutation-equivariant weight-space network family from Dayan, Eitan and Maron (ICML 2026); implement or reproduce on identical architecture/task families where supported; compare parameter- and function-space generalization, symmetry handling, compute and capacity"
+    },
+    {
+      "id": "navon_et_al_icml_2024_deep_align",
+      "scope": "Deep-Align learned weight alignment baseline from Navon et al. (ICML 2024), restricted to supported architecture/layer families; report unsupported topologies and alignment quality separately"
     }
   ],
   "seeds": {
@@ -1004,7 +1017,10 @@
       "trials_to_correct_rule_commitment",
       "mean_true_class_brier_score",
       "mean_true_class_negative_log_probability",
-      "model_entropy_trajectory"
+      "model_entropy_trajectory",
+      "source_to_candidate_permutation_accuracy",
+      "canonicalization_native_digest_recovery_rate",
+      "cross_layer_permutation_coupling_error"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1080,7 +1096,10 @@
       "three_ball_paper_count_discrepancy_preserved_without_forced_deduplication",
       "native_cfc_sequential_candidate_boundary_receipt_chain_integrity",
       "feedback_preference_shift_invariance_error_nats",
-      "negative_pragmatic_kl_risk_rejection_count"
+      "negative_pragmatic_kl_risk_rejection_count",
+      "dayan_2026_wsn_protocol_fidelity",
+      "deep_align_2024_protocol_fidelity",
+      "canonicalization_native_digest_mismatch_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
