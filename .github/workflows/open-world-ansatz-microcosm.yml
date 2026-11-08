@@ -68,12 +68,18 @@ jobs:
             .a2.evaluator_score.evidence_references_valid and
             .a0.evaluator_score.probe_count <= 6 and
             .a2.evaluator_score.probe_count <= 6 and
-            (.a0.action_records | length) > 0 and
-            (.a2.action_records | length) > 0 and
+            (.a0.action_records | length) == (.a0.observation_count + 1) and
+            (.a2.action_records | length) == (.a2.observation_count + 1) and
+            .a0.initial_evidence_prefix == .a0.action_records[0].evidence_prefix_before and
+            .a2.initial_evidence_prefix == .a2.action_records[0].evidence_prefix_before and
+            .a0.final_evidence_prefix == .a0.action_records[-1].evidence_prefix_after and
+            .a2.final_evidence_prefix == .a2.action_records[-1].evidence_prefix_after and
+            .a0.action_records[-1].resulting_status == "submitted" and
+            .a2.action_records[-1].resulting_status == "submitted" and
             all(.a0.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$"))) and
             all(.a2.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")))
           ' "$report"
-          printf '%s\\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-process-pair-smoke.source-sha"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-process-pair-smoke.source-sha"
           sha256sum "$report" | tee "$report.sha256"
 
       - name: Run exhaustive finite A0/A2 policy census
@@ -118,10 +124,10 @@ jobs:
           sha256sum "$report" | tee "$report.sha256"
           cat "$report"
 
-      - name: Upload finite policy census receipt
+      - name: Upload finite campaign and child-process receipts
         uses: actions/upload-artifact@v4
         with:
-          name: open-world-finite-policy-census-${{ github.event.pull_request.head.sha || github.sha }}
+          name: open-world-finite-campaign-receipts-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/open-world-finite-policy-census.json
             ${{ runner.temp }}/open-world-finite-policy-census.json.sha256
