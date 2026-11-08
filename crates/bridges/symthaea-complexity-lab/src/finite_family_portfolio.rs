@@ -71,9 +71,15 @@ impl FiniteHorizonUmdpModel {
             }
         }
 
-        if transitions.len() + 1 != rewards.len() {
+        let expected_transition_layers = rewards.len()
+            .checked_sub(1)
+            .ok_or(PolicyPortfolioError::ZeroHorizon)?;
+        let actual_reward_layers = transitions.len()
+            .checked_add(1)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if actual_reward_layers != rewards.len() {
             return Err(PolicyPortfolioError::TransitionHorizonMismatch {
-                expected: rewards.len() - 1,
+                expected: expected_transition_layers,
                 actual: transitions.len(),
             });
         }
@@ -1191,6 +1197,94 @@ mod tests {
             vec![vec![rewards.iter().map(|reward| q(*reward, 1)).collect()]],
             vec![],
         ).unwrap()
+    }
+
+    #[test]
+    fn invalid_initial_and_transition_probabilities_are_rejected() {
+        let invalid_initial = FiniteHorizonUmdpModel::new(
+            vec![q(-1, 2), q(3, 2)],
+            vec![vec![vec![q(0, 1)], vec![q(0, 1)]]],
+            vec![],
+        );
+        assert_eq!(
+            invalid_initial,
+            Err(PolicyPortfolioError::InvalidInitialProbability { state: 0 })
+        );
+
+        let initial_not_normalized = FiniteHorizonUmdpModel::new(
+            vec![q(1, 2), q(1, 4)],
+            vec![vec![vec![q(0, 1)], vec![q(0, 1)]]],
+            vec![],
+        );
+        assert_eq!(
+            initial_not_normalized,
+            Err(PolicyPortfolioError::InitialDistributionDoesNotSumToOne)
+        );
+
+        let negative_transition = FiniteHorizonUmdpModel::new(
+            vec![q(1, 1)],
+            vec![
+                vec![vec![q(0, 1)]],
+                vec![vec![q(0, 1)]],
+            ],
+            vec![vec![vec![vec![q(-1, 1)]]]],
+        );
+        assert_eq!(
+            negative_transition,
+            Err(PolicyPortfolioError::InvalidTransitionProbability {
+                time: 0,
+                state: 0,
+                action: 0,
+                destination: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn action_shapes_and_family_initial_distributions_are_checked() {
+        let inconsistent_rewards = FiniteHorizonUmdpModel::new(
+            vec![q(1, 1), q(0, 1)],
+            vec![vec![vec![q(0, 1)], vec![q(0, 1), q(1, 1)]]],
+            vec![],
+        );
+        assert_eq!(
+            inconsistent_rewards,
+            Err(PolicyPortfolioError::RewardActionCountMismatch {
+                time: 0,
+                state: 1,
+                expected: 1,
+                actual: 2,
+            })
+        );
+
+        let model_a = FiniteHorizonUmdpModel::new(
+            vec![q(1, 1), q(0, 1)],
+            vec![vec![vec![q(1, 1)], vec![q(0, 1)]]],
+            vec![],
+        ).unwrap();
+        let model_b = FiniteHorizonUmdpModel::new(
+            vec![q(0, 1), q(1, 1)],
+            vec![vec![vec![q(0, 1)], vec![q(1, 1)]]],
+            vec![],
+        ).unwrap();
+        assert_eq!(
+            FiniteUmdpModelFamily::new(vec![model_a, model_b]),
+            Err(PolicyPortfolioError::InconsistentInitialDistribution { model: 1 })
+        );
+    }
+
+    #[test]
+    fn policy_count_and_binomial_preflights_are_checked_and_logarithmic() {
+        assert_eq!(checked_policy_count(usize::MAX, 1, 1), Ok(1));
+        assert_eq!(
+            checked_policy_count(usize::MAX, 2, 2),
+            Err(PolicyPortfolioError::PolicySpaceOverflow)
+        );
+        assert_eq!(binomial(usize::MAX, 1), Ok(usize::MAX));
+        assert_eq!(
+            binomial(100, 50),
+            Err(PolicyPortfolioError::DimensionOverflow)
+        );
     }
 
     #[test]
