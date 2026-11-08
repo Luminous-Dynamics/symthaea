@@ -63,7 +63,9 @@ fn string_set(values: &[Value], context: &str) -> Result<BTreeSet<String>, Contr
             .as_str()
             .ok_or_else(|| ContractError(format!("{context} must contain only strings")))?;
         if !result.insert(value.to_owned()) {
-            return Err(ContractError(format!("{context} contains duplicate {value}")));
+            return Err(ContractError(format!(
+                "{context} contains duplicate {value}"
+            )));
         }
     }
     Ok(result)
