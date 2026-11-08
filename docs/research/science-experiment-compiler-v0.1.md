@@ -126,6 +126,22 @@ The function is a reference for **expected predictive discrepancy**, not model-i
 
 The corresponding tests cover the equal-variance closed form, directed asymmetry, identical-distribution zero, and invalid/overflow inputs. Next, compare this analytic function against independent high-precision quadrature and use it to construct a held-out maximin KL design alongside (not instead of) the current EIG scorer.
 
+## 5.2 Executable planted-model recovery
+
+The crate now also exports `model_recovery::evaluate_model_recovery`, a deterministic, bounded scalar-Gaussian simulation of the *frozen MAP/abstention analysis procedure*.
+
+For each supplied generator, it:
+1. draws a fixed number of synthetic observations from the generator's predictive Gaussian plus calibrated measurement noise;
+2. evaluates the named candidate likelihoods under the declared prior;
+3. chooses the maximum-posterior candidate only when its posterior reaches a predeclared threshold, otherwise abstains;
+4. records a generator-by-inference-model confusion matrix with a separate abstention column.
+
+It reports equal-weight named-model accuracy, prior-weighted named-model accuracy, coverage and selective accuracy. An optional `OTHER_UNRESOLVED` generator is used only to create M-open test observations; it is **not** an inference candidate and is not assigned a numeric likelihood. Its false-confident assignment rate measures how often the frozen named-model procedure nevertheless forces a named answer when the true generating distribution is outside that set.
+
+The harness is capped at one million total draws and requires a fully comparable, calibrated scalar Gaussian experiment. It does not simulate fitting model parameters, non-Gaussian/vector/correlated measurements or physical observations. Its accuracy is conditional on the provided synthetic generator family and frozen classifier; it is not an estimate of real-world theory truth.
+
+The executable `model_recovery_reference` is now registered in the science-evidence crate and run by the CTGP workflow. It complements rather than replaces EIG and KL.
+
 ## 6. Benchmark matrix
 
 ### Synthetic model families
