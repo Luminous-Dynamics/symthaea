@@ -161,7 +161,8 @@
             "type": "object",
             "required": [
               "fer",
-              "ter"
+              "ter",
+              "feature_dimension_diagnostics"
             ],
             "properties": {
               "matches": {
@@ -189,6 +190,42 @@
               },
               "ter": {
                 "$ref": "#/$defs/metric"
+              },
+              "feature_dimension_diagnostics": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "dimension_index",
+                    "active_pairs",
+                    "mismatches",
+                    "error_rate"
+                  ],
+                  "properties": {
+                    "dimension_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "active_pairs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "mismatches": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "error_rate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
               }
             },
             "additionalProperties": true
