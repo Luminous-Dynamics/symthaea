@@ -222,7 +222,9 @@ pub enum TheoryPredictionError {
         theory_id: String,
         observable_id: String,
     },
-    #[error("quantitative prediction for {theory_id}/{observable_id} cannot mark predictive uncertainty as not applicable")]
+    #[error(
+        "quantitative prediction for {theory_id}/{observable_id} cannot mark predictive uncertainty as not applicable"
+    )]
     QuantitativePredictionUncertaintyNotApplicable {
         theory_id: String,
         observable_id: String,
@@ -949,27 +951,37 @@ mod tests {
     #[test]
     fn quantitative_prediction_cannot_mark_uncertainty_not_applicable() {
         let mut ledger = fixture();
-        let record = ledger.predictions.iter_mut().find(|record| {
-            record.theory_id == "causal-set-minkowski"
-                && record.observable_id == "ordering-fraction-1p1"
-        }).unwrap();
+        let record = ledger
+            .predictions
+            .iter_mut()
+            .find(|record| {
+                record.theory_id == "causal-set-minkowski"
+                    && record.observable_id == "ordering-fraction-1p1"
+            })
+            .unwrap();
         record.uncertainty_status = PredictiveUncertaintyStatus::NotApplicable;
         assert_eq!(
             ledger.validate(),
-            Err(TheoryPredictionError::QuantitativePredictionUncertaintyNotApplicable {
-                theory_id: "causal-set-minkowski".to_string(),
-                observable_id: "ordering-fraction-1p1".to_string(),
-            })
+            Err(
+                TheoryPredictionError::QuantitativePredictionUncertaintyNotApplicable {
+                    theory_id: "causal-set-minkowski".to_string(),
+                    observable_id: "ordering-fraction-1p1".to_string(),
+                }
+            )
         );
     }
 
     #[test]
     fn unspecified_model_predictive_uncertainty_blocks_comparison() {
         let mut ledger = fixture();
-        let record = ledger.predictions.iter_mut().find(|record| {
-            record.theory_id == "causal-set-minkowski"
-                && record.observable_id == "ordering-fraction-1p1"
-        }).unwrap();
+        let record = ledger
+            .predictions
+            .iter_mut()
+            .find(|record| {
+                record.theory_id == "causal-set-minkowski"
+                    && record.observable_id == "ordering-fraction-1p1"
+            })
+            .unwrap();
         record.uncertainty_status = PredictiveUncertaintyStatus::Unspecified;
         let comparison = ledger
             .compare_models(
@@ -981,9 +993,7 @@ mod tests {
         let ModelPredictionComparison::NotComparable { blockers, .. } = comparison else {
             panic!("unspecified model-prediction uncertainty must block comparison");
         };
-        assert!(blockers.contains(
-            &ComparisonBlocker::LeftPredictiveUncertaintyUnspecified
-        ));
+        assert!(blockers.contains(&ComparisonBlocker::LeftPredictiveUncertaintyUnspecified));
     }
 
     #[test]
