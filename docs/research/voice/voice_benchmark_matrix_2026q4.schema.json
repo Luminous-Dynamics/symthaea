@@ -255,6 +255,58 @@
         "type": "string"
       },
       "minItems": 1
+    },
+    "test_vector_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "path",
+          "schema_path",
+          "cases",
+          "linked_issue",
+          "metrics"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schema_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cases": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "linked_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
     }
   },
   "additionalProperties": false
