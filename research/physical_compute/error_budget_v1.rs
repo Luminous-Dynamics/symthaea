@@ -37,24 +37,25 @@ pub struct ErrorContribution {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DependenceEvidence {
+pub enum DependenceAssumption {
     /// Default: assume errors may be correlated; use the conservative L1
     /// standard-deviation bound rather than root-sum-square.
     UnknownOrCorrelated,
-    /// Pairwise/collective independence is supported by a cited measurement
-    /// or design argument. Digest must identify that evidence.
-    Independent { evidence_sha256: String },
+    /// The caller DECLARES pairwise/collective independence based on external
+    /// evidence. This function checks digest syntax only; it cannot verify the
+    /// evidence or establish physical independence.
+    IndependentDeclared { evidence_sha256: String },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ErrorBudgetSummary {
     pub deterministic_output_bound: f64,
     pub stochastic_sigma_l1_upper: f64,
-    pub stochastic_sigma_rss_if_independent: f64,
+    pub stochastic_sigma_rss_under_independence_assumption: Option<f64>,
     pub task_deterministic_bound: f64,
     pub task_sigma_l1_upper: f64,
-    pub task_sigma_rss_if_independent: f64,
-    pub independence_was_established: bool,
+    pub task_sigma_rss_under_independence_assumption: Option<f64>,
+    pub independence_assumption_declared: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,7 +71,7 @@ pub enum BudgetError {
 ///
 /// Deterministic norm bounds always add linearly. Standard-deviation terms
 /// also add linearly unless explicit independence evidence is supplied; only
-/// then is an RSS value exposed. RSS is a variance-combination estimate, not
+/// then an RSS value is exposed under that declared assumption. RSS is a variance-combination estimate, not
 /// an upper bound without the corresponding distributional assumptions.
 ///
 /// The task_sensitivity_bound must be independently justified for the
@@ -80,15 +81,15 @@ pub enum BudgetError {
 pub fn compose_error_budget(
     contributions: &[ErrorContribution],
     task_sensitivity_bound: f64,
-    dependence: &DependenceEvidence,
+    dependence: &DependenceAssumption,
 ) -> Result<ErrorBudgetSummary, BudgetError> {
     if !task_sensitivity_bound.is_finite() || task_sensitivity_bound < 0.0 {
         return Err(BudgetError::InvalidSensitivity);
     }
 
     let independent = match dependence {
-        DependenceEvidence::UnknownOrCorrelated => false,
-        DependenceEvidence::Independent { evidence_sha256 } => {
+        DependenceAssumption::UnknownOrCorrelated => false,
+        DependenceAssumption::IndependentDeclared { evidence_sha256 } => {
             let valid = evidence_sha256.len() == 71
                 && evidence_sha256.starts_with("sha256:")
                 && evidence_sha256[7..]
@@ -136,16 +137,16 @@ pub fn compose_error_budget(
     }
 
     let stochastic_rss = if independent {
-        stochastic_squares.sqrt()
+        Some(stochastic_squares.sqrt())
     } else {
-        stochastic_l1
+        None
     };
     let task_deterministic = deterministic * task_sensitivity_bound;
     let task_sigma_l1 = stochastic_l1 * task_sensitivity_bound;
-    let task_sigma_rss = stochastic_rss * task_sensitivity_bound;
+    let task_sigma_rss = stochastic_rss.map(|sigma| sigma * task_sensitivity_bound);
     if !task_deterministic.is_finite()
         || !task_sigma_l1.is_finite()
-        || !task_sigma_rss.is_finite()
+        || task_sigma_rss.is_some_and(|value| !value.is_finite())
     {
         return Err(BudgetError::NumericOverflow);
     }
@@ -153,11 +154,11 @@ pub fn compose_error_budget(
     Ok(ErrorBudgetSummary {
         deterministic_output_bound: deterministic,
         stochastic_sigma_l1_upper: stochastic_l1,
-        stochastic_sigma_rss_if_independent: stochastic_rss,
+        stochastic_sigma_rss_under_independence_assumption: stochastic_rss,
         task_deterministic_bound: task_deterministic,
         task_sigma_l1_upper: task_sigma_l1,
-        task_sigma_rss_if_independent: task_sigma_rss,
-        independence_was_established: independent,
+        task_sigma_rss_under_independence_assumption: task_sigma_rss,
+        independence_assumption_declared: independent,
     })
 }
 
@@ -184,11 +185,11 @@ mod tests {
         let summary = compose_error_budget(
             &contributions,
             3.0,
-            &DependenceEvidence::UnknownOrCorrelated,
+            &DependenceAssumption::UnknownOrCorrelated,
         ).unwrap();
         assert!((summary.deterministic_output_bound - 0.4).abs() < 1.0e-12);
         assert!((summary.task_deterministic_bound - 1.2).abs() < 1.0e-12);
-        assert!(!summary.independence_was_established);
+        assert!(!summary.independence_assumption_declared);
     }
 
     #[test]
@@ -213,7 +214,7 @@ mod tests {
             &DependenceEvidence::UnknownOrCorrelated,
         ).unwrap();
         assert!((summary.stochastic_sigma_l1_upper - 0.7).abs() < 1.0e-12);
-        assert!((summary.stochastic_sigma_rss_if_independent - 0.7).abs() < 1.0e-12);
+        assert!((summary.stochastic_sigma_rss_under_independence_assumption.unwrap_or(0.0) - 0.7).abs() < 1.0e-12);
         assert!(!summary.independence_was_established);
     }
 
@@ -233,12 +234,12 @@ mod tests {
                 magnitude_kind: MagnitudeKind::StandardDeviation,
             },
         ];
-        let evidence = DependenceEvidence::Independent {
+        let evidence = DependenceAssumption::IndependentDeclared {
             evidence_sha256: format!("sha256:{}", "a".repeat(64)),
         };
         let summary = compose_error_budget(&contributions, 2.0, &evidence).unwrap();
-        assert!((summary.stochastic_sigma_rss_if_independent - 0.5).abs() < 1.0e-12);
-        assert!((summary.task_sigma_rss_if_independent - 1.0).abs() < 1.0e-12);
+        assert!((summary.stochastic_sigma_rss_under_independence_assumption.unwrap() - 0.5).abs() < 1.0e-12);
+        assert!((summary.task_sigma_rss_under_independence_assumption.unwrap() - 1.0).abs() < 1.0e-12);
         assert!(summary.independence_was_established);
         assert!((summary.stochastic_sigma_l1_upper - 0.7).abs() < 1.0e-12);
     }
@@ -279,5 +280,6 @@ mod tests {
         assert_eq!(summary.deterministic_output_bound, 0.0);
         assert_eq!(summary.task_deterministic_bound, 0.0);
         assert_eq!(summary.stochastic_sigma_l1_upper, 0.0);
+        assert!(summary.stochastic_sigma_rss_under_independence_assumption.is_none());
     }
 }
