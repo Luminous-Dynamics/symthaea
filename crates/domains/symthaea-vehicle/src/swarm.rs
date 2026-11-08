@@ -1,18 +1,21 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Swarm mesh simulator: peer vehicles broadcasting Wisdom Vectors.
+//! Synthetic peer swarm simulator for vehicle training and evaluation.
 //!
-//! Provides `SwarmSimulator` which manages N peer vehicles on a shared road,
-//! stepping them with PD cruise control and computing the 4 mesh channels
-//! (nearest_peer_distance, peer_relative_speed, mesh_brake_density, mesh_confidence)
-//! in the ego vehicle's body frame.
+//! The simulator exposes delayed peer state through the explicitly typed
+//! SimulatorOraclePeerSnapshot API. These snapshots are simulator truth for
+//! synthetic episodes, not remote V2V messages or local sensor observations.
+//! The legacy 20D VehicleState channels remain for training compatibility; they
+//! must not be treated as production perception or network evidence.
 
 use std::collections::VecDeque;
 
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
-use crate::types::{MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road};
+use crate::types::{
+    SimulatorOraclePeerSnapshot, VehicleCommand, VehicleState, pd_cruise_baseline_with_road,
+};
 
 /// Configuration for a swarm simulation.
 #[derive(Debug, Clone)]
@@ -73,19 +76,19 @@ pub struct PeerVehicle {
 }
 
 impl PeerVehicle {
-    /// The peer state as seen over the mesh at `now`: the newest snapshot
-    /// that is at least `latency` old. Before any snapshot is old enough
-    /// (start-up), the oldest available one is used — a radio that has
-    /// broadcast anything reports its earliest frame, never the live state.
-    fn broadcast_state(&self, now: f64, latency: f64) -> &VehicleState {
+    /// Return the exact delayed simulator sample available at the declared clock.
+    ///
+    /// The timestamp travels with the state so consumers can compute actual sample
+    /// age instead of treating configured radio latency as observed age.
+    fn broadcast_sample(&self, now: f64, latency: f64) -> (f64, &VehicleState) {
         let cutoff = now - latency;
         self.history
             .iter()
             .rev()
-            .find(|(t, _)| *t <= cutoff)
+            .find(|(time, _)| *time <= cutoff)
             .or_else(|| self.history.front())
-            .map(|(_, s)| s)
-            .unwrap_or_else(|| self.sim.state())
+            .map(|(time, state)| (*time, state))
+            .unwrap_or((now, self.sim.state()))
     }
 }
 
@@ -187,44 +190,54 @@ impl SwarmSimulator {
         }
     }
 
-    /// Compute mesh signals from all peers relative to the ego vehicle.
+    /// Build delayed simulator-oracle peer snapshots relative to the ego vehicle.
     ///
-    /// Peer states are read through the latency buffer — the ego sees each
-    /// peer's broadcast from `mesh_latency` seconds ago, not its live state.
-    pub fn mesh_signals(&self, ego_state: &VehicleState) -> Vec<MeshSignal> {
+    /// The returned type is intentionally distinct from MeshSignal, which is the
+    /// shape for untrusted remote cooperative claims. Every snapshot carries its
+    /// exact source simulation time and computed age in the simulator clock domain.
+    pub fn simulator_oracle_snapshots(
+        &self,
+        ego_state: &VehicleState,
+    ) -> Vec<SimulatorOraclePeerSnapshot> {
         self.peers
             .iter()
             .map(|peer| {
-                let ps = peer.broadcast_state(self.sim_time, self.config.mesh_latency);
-                let dx = ps.position_x - ego_state.position_x;
-                let dy = ps.position_y - ego_state.position_y;
-                let dist = (dx * dx + dy * dy).sqrt();
+                let (source_sim_time_s, state) =
+                    peer.broadcast_sample(self.sim_time, self.config.mesh_latency);
+                let dx = state.position_x - ego_state.position_x;
+                let dy = state.position_y - ego_state.position_y;
+                let distance_m = (dx * dx + dy * dy).sqrt();
 
-                // Transform to ego body frame
-                let cos_h = ego_state.heading.cos();
-                let sin_h = ego_state.heading.sin();
-                let lon = dx * cos_h + dy * sin_h;
-                let lat = -dx * sin_h + dy * cos_h;
+                // Transform to ego body frame.
+                let cos_heading = ego_state.heading.cos();
+                let sin_heading = ego_state.heading.sin();
+                let longitudinal_m = dx * cos_heading + dy * sin_heading;
+                let lateral_m = -dx * sin_heading + dy * cos_heading;
+                let observation_age_s = (self.sim_time - source_sim_time_s).max(0.0);
 
-                let confidence =
-                    (1.0 - dist * self.config.confidence_decay_per_meter).clamp(0.0, 1.0);
-
-                MeshSignal {
+                SimulatorOraclePeerSnapshot {
                     peer_id: peer.id,
-                    relative_position: [lon, lat],
-                    peer_speed: ps.speed,
-                    peer_yaw_rate: ps.yaw_rate,
-                    peer_braking: ps.brake_pressure > 0.3,
-                    peer_abs_engaged: ps.brake_pressure > 0.8,
-                    latency: self.config.mesh_latency,
-                    confidence,
+                    relative_position_m: [longitudinal_m, lateral_m],
+                    peer_speed_mps: state.speed,
+                    peer_yaw_rate_rad_s: state.yaw_rate,
+                    peer_braking: state.brake_pressure > 0.3,
+                    peer_abs_engaged: state.brake_pressure > 0.8,
+                    source_sim_time_s,
+                    simulator_time_s: self.sim_time,
+                    observation_age_s,
+                    distance_attenuation: (1.0
+                        - distance_m * self.config.confidence_decay_per_meter)
+                        .clamp(0.0, 1.0),
                 }
             })
             .collect()
     }
 
-    /// Compute the 4 aggregate mesh channels and write them onto the ego state.
-    pub fn aggregate_mesh(&self, ego_state: &mut VehicleState) {
+    /// Aggregate simulator-oracle peer state into the legacy 20D training slots.
+    ///
+    /// This adapter is for synthetic training/evaluation only. It must not be used
+    /// as a local sensor tracker or as an adapter for remote cooperative messages.
+    pub fn aggregate_simulator_oracle_into_state(&self, ego_state: &mut VehicleState) {
         if self.peers.is_empty() {
             ego_state.nearest_peer_distance = 200.0;
             ego_state.peer_relative_speed = 0.0;
@@ -233,30 +246,32 @@ impl SwarmSimulator {
             return;
         }
 
-        let signals = self.mesh_signals(ego_state);
+        let snapshots = self.simulator_oracle_snapshots(ego_state);
+        let mut min_distance_m = f64::MAX;
+        let mut nearest_speed_mps = 0.0;
+        let mut braking_count = 0usize;
+        let mut total_distance_attenuation = 0.0;
 
-        // Nearest peer distance
-        let mut min_dist = f64::MAX;
-        let mut nearest_speed = 0.0;
-        let mut brake_count = 0usize;
-        let mut total_confidence = 0.0;
-
-        for sig in &signals {
-            let dist = (sig.relative_position[0].powi(2) + sig.relative_position[1].powi(2)).sqrt();
-            if dist < min_dist {
-                min_dist = dist;
-                nearest_speed = sig.peer_speed;
+        for snapshot in &snapshots {
+            let distance_m = (snapshot.relative_position_m[0].powi(2)
+                + snapshot.relative_position_m[1].powi(2))
+            .sqrt();
+            if distance_m < min_distance_m {
+                min_distance_m = distance_m;
+                nearest_speed_mps = snapshot.peer_speed_mps;
             }
-            if sig.peer_braking {
-                brake_count += 1;
+            if snapshot.peer_braking {
+                braking_count += 1;
             }
-            total_confidence += sig.confidence;
+            total_distance_attenuation += snapshot.distance_attenuation;
         }
 
-        ego_state.nearest_peer_distance = min_dist.min(200.0);
-        ego_state.peer_relative_speed = nearest_speed - ego_state.speed;
-        ego_state.mesh_brake_density = brake_count as f64 / signals.len() as f64;
-        ego_state.mesh_confidence = total_confidence / signals.len() as f64;
+        ego_state.nearest_peer_distance = min_distance_m.min(200.0);
+        ego_state.peer_relative_speed = nearest_speed_mps - ego_state.speed;
+        ego_state.mesh_brake_density = braking_count as f64 / snapshots.len() as f64;
+        // Preserve the legacy field name/layout; the value is explicitly a
+        // simulator distance-attenuation proxy, not confidence or trust.
+        ego_state.mesh_confidence = total_distance_attenuation / snapshots.len() as f64;
     }
 
     /// Access peers (read-only).
