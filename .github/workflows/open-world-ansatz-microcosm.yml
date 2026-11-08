@@ -63,4 +63,17 @@ jobs:
               .a2.false_unique_structure_claims == 0
             )
           ' "$report"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-finite-policy-census.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
           cat "$report"
+
+      - name: Upload finite policy census receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-world-finite-policy-census-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/open-world-finite-policy-census.json
+            ${{ runner.temp }}/open-world-finite-policy-census.json.sha256
+            ${{ runner.temp }}/open-world-finite-policy-census.source-sha
+          if-no-files-found: error
+          retention-days: 90
