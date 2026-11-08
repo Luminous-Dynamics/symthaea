@@ -12,7 +12,9 @@ use std::collections::VecDeque;
 
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
-use crate::types::{MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road};
+use crate::types::{
+    FollowTargetEvidence, MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road,
+};
 
 /// Configuration for a swarm simulation.
 #[derive(Debug, Clone)]
@@ -73,19 +75,19 @@ pub struct PeerVehicle {
 }
 
 impl PeerVehicle {
-    /// The peer state as seen over the mesh at `now`: the newest snapshot
-    /// that is at least `latency` old. Before any snapshot is old enough
-    /// (start-up), the oldest available one is used — a radio that has
-    /// broadcast anything reports its earliest frame, never the live state.
-    fn broadcast_state(&self, now: f64, latency: f64) -> &VehicleState {
+    /// The peer snapshot delivered at `now`, including its actual source tick.
+    ///
+    /// During startup the oldest available broadcast is returned; its actual age may be
+    /// greater than the configured radio latency and is preserved in the returned tick.
+    fn broadcast_snapshot(&self, now: f64, latency: f64) -> (f64, &VehicleState) {
         let cutoff = now - latency;
         self.history
             .iter()
             .rev()
-            .find(|(t, _)| *t <= cutoff)
+            .find(|(tick, _)| *tick <= cutoff)
             .or_else(|| self.history.front())
-            .map(|(_, s)| s)
-            .unwrap_or_else(|| self.sim.state())
+            .map(|(tick, state)| (*tick, state))
+            .unwrap_or_else(|| (now, self.sim.state()))
     }
 }
 
@@ -195,7 +197,9 @@ impl SwarmSimulator {
         self.peers
             .iter()
             .map(|peer| {
-                let ps = peer.broadcast_state(self.sim_time, self.config.mesh_latency);
+                let (broadcast_tick, ps) =
+                    peer.broadcast_snapshot(self.sim_time, self.config.mesh_latency);
+                let actual_age_s = (self.sim_time - broadcast_tick).max(0.0);
                 let dx = ps.position_x - ego_state.position_x;
                 let dy = ps.position_y - ego_state.position_y;
                 let dist = (dx * dx + dy * dy).sqrt();
@@ -216,11 +220,52 @@ impl SwarmSimulator {
                     peer_yaw_rate: ps.yaw_rate,
                     peer_braking: ps.brake_pressure > 0.3,
                     peer_abs_engaged: ps.brake_pressure > 0.8,
-                    latency: self.config.mesh_latency,
+                    // Preserve actual sample age; startup may exceed configured latency.
+                    latency: actual_age_s,
                     confidence,
                 }
             })
             .collect()
+    }
+
+    /// Return the nearest simulated lead actor as explicit simulator-oracle evidence.
+    ///
+    /// Only actors ahead of the ego vehicle are candidates. The returned evidence is tagged
+    /// with the scenario identity and ego-body frame and carries the actual delayed-sample age.
+    /// This is a synthetic benchmark input, not a local perception track or V2X admission.
+    pub fn nearest_follow_target(
+        &self,
+        ego_state: &VehicleState,
+        scenario_id: &str,
+    ) -> Option<FollowTargetEvidence> {
+        if scenario_id.is_empty() {
+            return None;
+        }
+
+        self.mesh_signals(ego_state)
+            .into_iter()
+            .filter(|signal| {
+                signal.relative_position[0] > 0.0
+                    && signal.relative_position.iter().all(|value| value.is_finite())
+                    && signal.peer_speed.is_finite()
+                    && signal.latency.is_finite()
+            })
+            .min_by(|left, right| {
+                left.relative_position[0].total_cmp(&right.relative_position[0])
+            })
+            .map(|signal| {
+                let gap_m = (signal.relative_position[0].powi(2)
+                    + signal.relative_position[1].powi(2))
+                .sqrt();
+                FollowTargetEvidence::SimulatorOracle {
+                    scenario_id: scenario_id.to_owned(),
+                    actor_id: signal.peer_id.to_string(),
+                    frame_id: "ego_body".to_owned(),
+                    observation_age_s: signal.latency,
+                    gap_m,
+                    relative_speed_mps: signal.peer_speed - ego_state.speed,
+                }
+            })
     }
 
     /// Compute the 4 aggregate mesh channels and write them onto the ego state.
