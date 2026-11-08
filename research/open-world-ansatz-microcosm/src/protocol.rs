@@ -160,6 +160,9 @@ pub struct SetScore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluatorScore {
     pub evidence_prefix_sha256: String,
+    /// Evaluator-only check that the generating model survived the independent
+    /// trace filter. This catches a candidate-family omission or verifier bug.
+    pub generating_model_in_version_space: bool,
     pub set_score: SetScore,
     pub decision_correct: bool,
     pub abstained: bool,
@@ -177,11 +180,19 @@ enum WorldState {
     Interaction(interaction::InteractionWorld),
 }
 
+#[derive(Clone, Copy)]
+enum GeneratingTruth {
+    Boolean(Hypothesis),
+    Numeric(numeric::ModelHypothesis),
+    Interaction(interaction::ModelHypothesis),
+}
+
 /// A runner owns one hidden reference world. Give an agent only AgentView
 /// values and accept AgentAction values over a process boundary.
 pub struct BlindEpisode {
     manifest: PublicTaskManifest,
     world: WorldState,
+    generating_truth: GeneratingTruth,
     observations: Vec<ObservationRecord>,
     submission: Option<AgentSubmission>,
 }
@@ -203,6 +214,8 @@ impl BlindEpisode {
             StructureAccess::BooleanSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
+        let truth = Hypothesis::new(mechanism, measurement_map, initial_hidden_state)
+            .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
         let world = HiddenWorld::new(mechanism, measurement_map, initial_hidden_state)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
         Self::new_internal(
@@ -213,6 +226,7 @@ impl BlindEpisode {
             DynamicsContract::StatefulAcrossProbes,
             max_probe_actions,
             WorldState::Boolean(world),
+            GeneratingTruth::Boolean(truth),
         )
     }
 
@@ -239,6 +253,7 @@ impl BlindEpisode {
             DynamicsContract::StatefulAcrossProbes,
             max_probe_actions,
             WorldState::Numeric(world),
+            GeneratingTruth::Numeric(truth),
         )
     }
 
@@ -265,6 +280,7 @@ impl BlindEpisode {
             DynamicsContract::IndependentProbes,
             max_probe_actions,
             WorldState::Interaction(world),
+            GeneratingTruth::Interaction(truth),
         )
     }
 
@@ -276,6 +292,7 @@ impl BlindEpisode {
         dynamics: DynamicsContract,
         max_probe_actions: usize,
         world: WorldState,
+        generating_truth: GeneratingTruth,
     ) -> Result<Self, ProtocolError> {
         if episode_id.trim().is_empty() || max_probe_actions == 0 {
             return Err(ProtocolError::InvalidManifest);
@@ -293,6 +310,7 @@ impl BlindEpisode {
         Ok(Self {
             manifest,
             world,
+            generating_truth,
             observations: Vec::new(),
             submission: None,
         })
@@ -447,8 +465,9 @@ impl BlindEpisode {
                     .all(|reference| known.contains(reference.as_str()))
         };
 
-        let (set_score, disposition) = match (&self.world, &submission.claim) {
-            (WorldState::Boolean(_), AgentClaim::Boolean { compatible_models, disposition }) => {
+        let (set_score, disposition, generating_model_in_version_space) =
+            match (&self.world, &self.generating_truth, &submission.claim) {
+            (WorldState::Boolean(_), GeneratingTruth::Boolean(truth), AgentClaim::Boolean { compatible_models, disposition }) => {
                 let log = ObservationLog {
                     interventions: self.observations.iter().map(|record| record.intervention).map(|intervention| match intervention {
                         AgentIntervention::Boolean(value) => value,
@@ -465,9 +484,13 @@ impl BlindEpisode {
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
                 let oracle_models = reference_boolean_version_space(&log, model_access)?;
-                (compare_model_sets(compatible_models, &oracle_models)?, *disposition)
+                let truth_present = oracle_models.contains(truth);
+                if !truth_present {
+                    return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                }
+                (compare_model_sets(compatible_models, &oracle_models)?, *disposition, truth_present)
             }
-            (WorldState::Numeric(_), AgentClaim::Numeric { compatible_models, disposition }) => {
+            (WorldState::Numeric(_), GeneratingTruth::Numeric(truth), AgentClaim::Numeric { compatible_models, disposition }) => {
                 let log = numeric::ObservationLog {
                     interventions: self.observations.iter().map(|record| record.intervention).map(|intervention| match intervention {
                         AgentIntervention::Numeric(value) => value,
@@ -484,9 +507,13 @@ impl BlindEpisode {
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
                 let oracle_models = reference_numeric_version_space(&log, access);
-                (compare_model_sets(compatible_models, &oracle_models)?, *disposition)
+                let truth_present = oracle_models.contains(truth);
+                if !truth_present {
+                    return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                }
+                (compare_model_sets(compatible_models, &oracle_models)?, *disposition, truth_present)
             }
-            (WorldState::Interaction(_), AgentClaim::Interaction { compatible_models, disposition }) => {
+            (WorldState::Interaction(_), GeneratingTruth::Interaction(truth), AgentClaim::Interaction { compatible_models, disposition }) => {
                 let log = interaction::ObservationLog {
                     interventions: self.observations.iter().map(|record| record.intervention).map(|intervention| match intervention {
                         AgentIntervention::Pair(value) => value,
@@ -503,7 +530,11 @@ impl BlindEpisode {
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
                 let oracle_models = reference_interaction_version_space(&log, access);
-                (compare_model_sets(compatible_models, &oracle_models)?, *disposition)
+                let truth_present = oracle_models.contains(truth);
+                if !truth_present {
+                    return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                }
+                (compare_model_sets(compatible_models, &oracle_models)?, *disposition, truth_present)
             }
             _ => return Err(ProtocolError::ClaimFamilyMismatch),
         };
@@ -515,6 +546,7 @@ impl BlindEpisode {
         };
         Ok(EvaluatorScore {
             evidence_prefix_sha256: submission.evidence_prefix_sha256.clone(),
+            generating_model_in_version_space,
             decision_correct: disposition == expected,
             abstained: disposition == ClaimDisposition::Abstain,
             set_score,
@@ -900,6 +932,7 @@ pub enum ProtocolError {
     WorldFailure(String),
     SerializationFailure(String),
     InvalidEvaluatorTrace,
+    GeneratingTruthMissingFromOracle,
 }
 
 impl fmt::Display for ProtocolError {
