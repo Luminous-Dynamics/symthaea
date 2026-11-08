@@ -28,6 +28,8 @@ pub enum HdcStructuredMixerError {
     ZeroDimension,
     NonPowerOfTwo { dimension: usize },
     DimensionMismatch { expected: usize, actual: usize },
+    InvalidButterflyParameterCount { expected: usize, actual: usize },
+    NonFiniteButterflyParameter { index: usize },
 }
 
 impl std::fmt::Display for HdcStructuredMixerError {
@@ -41,6 +43,14 @@ impl std::fmt::Display for HdcStructuredMixerError {
             Self::DimensionMismatch { expected, actual } => write!(
                 f,
                 "structured HDC mixer dimension mismatch: expected {expected}, received {actual}"
+            ),
+            Self::InvalidButterflyParameterCount { expected, actual } => write!(
+                f,
+                "orthogonal butterfly mixer expected {expected} angles, received {actual}"
+            ),
+            Self::NonFiniteButterflyParameter { index } => write!(
+                f,
+                "orthogonal butterfly mixer angle {index} is not finite"
             ),
         }
     }
@@ -135,6 +145,129 @@ impl HdcStructuredMixer {
             });
         }
         Ok(())
+    }
+}
+
+/// Parameterized orthogonal butterfly transform with a learned-parameter-ready
+/// angle vector.
+///
+/// For dimension D=2^L this operator uses (D/2)*L rotation angles and
+/// O(D log D) arithmetic. Each stage applies disjoint Givens rotations across
+/// pairs separated by a power-of-two stride. The inverse applies the transpose
+/// rotations in reverse stage order. Parameters are supplied by the caller;
+/// this type does not train them or integrate into HDC-LTC automatically.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcButterflyMixer {
+    dimension: usize,
+    angles: Vec<f32>,
+}
+
+impl HdcButterflyMixer {
+    /// Construct a parameterized orthogonal butterfly mixer.
+    ///
+    /// The angle order is stage-major, then pair-major within each stage.
+    pub fn new(dimension: usize, angles: Vec<f32>) -> Result<Self, HdcStructuredMixerError> {
+        if dimension == 0 {
+            return Err(HdcStructuredMixerError::ZeroDimension);
+        }
+        if !dimension.is_power_of_two() {
+            return Err(HdcStructuredMixerError::NonPowerOfTwo { dimension });
+        }
+        let expected = Self::parameter_count_for_dimension(dimension);
+        if angles.len() != expected {
+            return Err(HdcStructuredMixerError::InvalidButterflyParameterCount {
+                expected,
+                actual: angles.len(),
+            });
+        }
+        if let Some(index) = angles.iter().position(|angle| !angle.is_finite()) {
+            return Err(HdcStructuredMixerError::NonFiniteButterflyParameter { index });
+        }
+        Ok(Self { dimension, angles })
+    }
+
+    /// Number of trainable rotation angles for the selected dimension.
+    pub fn parameter_count_for_dimension(dimension: usize) -> usize {
+        if dimension == 0 || !dimension.is_power_of_two() {
+            return 0;
+        }
+        (dimension / 2) * (dimension.trailing_zeros() as usize)
+    }
+
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    pub fn angles(&self) -> &[f32] {
+        &self.angles
+    }
+
+    pub fn parameter_count(&self) -> usize {
+        self.angles.len()
+    }
+
+    /// Apply the factorized orthogonal transform.
+    pub fn apply(
+        &self,
+        input: &ContinuousHV,
+    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+        self.apply_with_direction(input, 1.0, false)
+    }
+
+    /// Apply the exact transpose/inverse of the configured transform.
+    pub fn inverse(
+        &self,
+        input: &ContinuousHV,
+    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+        self.apply_with_direction(input, -1.0, true)
+    }
+
+    fn apply_with_direction(
+        &self,
+        input: &ContinuousHV,
+        direction: f32,
+        reverse_stages: bool,
+    ) -> Result<ContinuousHV, HdcStructuredMixerError> {
+        if input.dim() != self.dimension {
+            return Err(HdcStructuredMixerError::DimensionMismatch {
+                expected: self.dimension,
+                actual: input.dim(),
+            });
+        }
+
+        let mut values = input.values.clone();
+        let stages = self.dimension.trailing_zeros() as usize;
+        let pairs_per_stage = self.dimension / 2;
+        let stage_order: Box<dyn Iterator<Item = usize>> = if reverse_stages {
+            Box::new((0..stages).rev())
+        } else {
+            Box::new(0..stages)
+        };
+
+        for stage in stage_order {
+            let half_width = 1usize << stage;
+            let block_width = half_width * 2;
+            let mut pair_index = 0usize;
+
+            for block_start in (0..self.dimension).step_by(block_width) {
+                for offset in 0..half_width {
+                    let left_index = block_start + offset;
+                    let right_index = left_index + half_width;
+                    let angle_index = stage * pairs_per_stage + pair_index;
+                    let angle = direction * self.angles[angle_index];
+                    let cosine = angle.cos();
+                    let sine = angle.sin();
+                    let left = values[left_index];
+                    let right = values[right_index];
+
+                    values[left_index] = cosine * left - sine * right;
+                    values[right_index] = sine * left + cosine * right;
+                    pair_index += 1;
+                }
+            }
+        }
+
+        Ok(ContinuousHV::from_values(values))
     }
 }
 
@@ -234,6 +367,58 @@ mod tests {
             "a one-hot input should spread across every mixed coordinate"
         );
         assert!(mixed.values.iter().filter(|value| value.abs() > 1e-6).count() == dimension);
+    }
+
+    #[test]
+    fn parameterized_butterfly_is_orthogonal_and_invertible() {
+        for dimension in [2, 8, 64, 256, 16_384] {
+            let parameter_count =
+                HdcButterflyMixer::parameter_count_for_dimension(dimension);
+            let angles = (0..parameter_count)
+                .map(|index| ((index as f32 * 0.017).sin()) * 0.6)
+                .collect::<Vec<_>>();
+            let mixer = HdcButterflyMixer::new(dimension, angles).unwrap();
+            let input = sample(dimension, 0xB077 + dimension as u64);
+            let mixed = mixer.apply(&input).unwrap();
+            let restored = mixer.inverse(&mixed).unwrap();
+
+            assert!(
+                max_abs_difference(&input, &restored) < 5e-5,
+                "round-trip failed at dimension {dimension}"
+            );
+            assert!(
+                (input.norm() - mixed.norm()).abs() < 5e-4,
+                "orthogonality failed at dimension {dimension}"
+            );
+        }
+    }
+
+    #[test]
+    fn parameterized_butterfly_spreads_a_single_coordinate() {
+        let dimension = 256;
+        let count = HdcButterflyMixer::parameter_count_for_dimension(dimension);
+        let mixer = HdcButterflyMixer::new(dimension, vec![std::f32::consts::FRAC_PI_4; count])
+            .unwrap();
+        let input = ContinuousHV::basis(7, dimension);
+        let mixed = mixer.apply(&input).unwrap();
+        let active = mixed.values.iter().filter(|value| value.abs() > 1e-6).count();
+
+        assert_eq!(active, dimension);
+        assert!((mixed.norm() - input.norm()).abs() < 1e-4);
+    }
+
+    #[test]
+    fn butterfly_rejects_wrong_parameter_count_and_nonfinite_angles() {
+        assert!(matches!(
+            HdcButterflyMixer::new(64, vec![0.0; 10]),
+            Err(HdcStructuredMixerError::InvalidButterflyParameterCount { .. })
+        ));
+        let mut angles = vec![0.0; HdcButterflyMixer::parameter_count_for_dimension(8)];
+        angles[1] = f32::NAN;
+        assert!(matches!(
+            HdcButterflyMixer::new(8, angles),
+            Err(HdcStructuredMixerError::NonFiniteButterflyParameter { index: 1 })
+        ));
     }
 
     #[test]
