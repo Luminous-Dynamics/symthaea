@@ -452,11 +452,30 @@ fn compare_signed(a: CheckedRational, b: CheckedRational) -> Ordering {
 
 fn checked_policy_count(states: usize, horizon: usize, actions: usize) -> Result<usize, PolicyPortfolioError> {
     let exponent = states.checked_mul(horizon).ok_or(PolicyPortfolioError::PolicySpaceOverflow)?;
+    // Exponentiation by squaring avoids a linear-time loop for large dimensions
+    // (notably the one-action policy space, whose cardinality is always one).
+    let mut power = exponent;
+    let mut factor = actions;
     let mut count = 1usize;
-    for _ in 0..exponent {
-        count = count.checked_mul(actions).ok_or(PolicyPortfolioError::PolicySpaceOverflow)?;
+    while power > 0 {
+        if power & 1 == 1 {
+            count = count.checked_mul(factor).ok_or(PolicyPortfolioError::PolicySpaceOverflow)?;
+        }
+        power >>= 1;
+        if power > 0 {
+            factor = factor.checked_mul(factor).ok_or(PolicyPortfolioError::PolicySpaceOverflow)?;
+        }
     }
     Ok(count)
+}
+
+fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.max(1)
 }
 
 fn binomial(n: usize, k: usize) -> Result<usize, PolicyPortfolioError> {
@@ -464,13 +483,18 @@ fn binomial(n: usize, k: usize) -> Result<usize, PolicyPortfolioError> {
     let k = k.min(n - k);
     let mut value = 1u128;
     for i in 1..=k {
-        let numerator = (n - k + i) as u128;
-        let denominator = i as u128;
-        let product = value.checked_mul(numerator).ok_or(PolicyPortfolioError::DimensionOverflow)?;
-        if product % denominator != 0 {
+        let mut numerator = (n - k + i) as u128;
+        let mut denominator = i as u128;
+        let first_gcd = gcd_u128(numerator, denominator);
+        numerator /= first_gcd;
+        denominator /= first_gcd;
+        let second_gcd = gcd_u128(value, denominator);
+        value /= second_gcd;
+        denominator /= second_gcd;
+        if denominator != 1 {
             return Err(PolicyPortfolioError::DimensionOverflow);
         }
-        value = product / denominator;
+        value = value.checked_mul(numerator).ok_or(PolicyPortfolioError::DimensionOverflow)?;
         if value > usize::MAX as u128 {
             return Err(PolicyPortfolioError::DimensionOverflow);
         }
@@ -802,7 +826,11 @@ pub fn solve_finite_family_policy_portfolio(
             resource: "DP current vector", entries: states,
         })?;
         current.resize(states, CheckedRational::zero());
-        let mut next = current.clone();
+        let mut next = Vec::new();
+        next.try_reserve_exact(states).map_err(|_| PolicyPortfolioError::AllocationFailed {
+            resource: "DP next vector", entries: states,
+        })?;
+        next.resize(states, CheckedRational::zero());
 
         model_optima.push(optimal_value(model, discount, &mut current, &mut next, budget.max_rational_bit_width)?);
         for policy_index in 0..policy_count {
@@ -892,7 +920,9 @@ pub fn solve_finite_family_policy_portfolio(
             let order = incumbent.map_or(Ordering::Less, |value| compare_signed(worst_regret, value));
             if order == Ordering::Less {
                 incumbent = Some(worst_regret);
-                optimal_portfolios.clear();
+                // Drop the old tied-output allocation as well as its elements;
+                // retaining Vec capacity would invalidate the peak-memory model.
+                optimal_portfolios = Vec::new();
                 stored_policy_indices = 0;
                 stored_witnesses = 0;
                 output_bytes = base_peak_bytes;
