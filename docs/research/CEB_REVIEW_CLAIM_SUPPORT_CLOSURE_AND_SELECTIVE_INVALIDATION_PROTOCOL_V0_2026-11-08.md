@@ -49,7 +49,7 @@ The graph is an annotation/evaluation view over existing CEB evidence and reposi
 For claim C, the support closure Cl(C) is the set of all dependency nodes reachable by following edges that are necessary for the claim's declared meaning and current decision use.
 
 The closure must include:
-1. terminal evidence items and their exact content identity;
+1. terminal evidence items and their exact content identity, including supporting evidence, counter-evidence, contradicted premises and rejected material alternatives;
 2. source revision/tree and relevant source anchors;
 3. all assumptions and applicability boundaries;
 4. contract/policy versions that define the expected behavior;
@@ -71,6 +71,15 @@ A system cannot prove non-impact merely by failing to find an edge. A retain dec
 - any uninspected dependency or unknown caller is retained as an open-world remainder.
 
 If closure completeness is not defensible, do not infer retain. Use revalidate or unresolved according to the existing #10630 rules.
+
+### 2.3 Counter-evidence and non-circular support
+
+The closure is not a bibliography of evidence that agrees with the claim. It must include known material counter-evidence, failed checks, contradictory observations, rejected alternatives and the rationale for excluding any item from the claim's scope. A finding that omits a known disconfirming source is not closure-complete.
+
+A support path must terminate in evidence/authority whose identity and provenance do not depend on the claim being justified. Do not accept a claim as its own evidence, two claims that only cite each other, or an evaluator result whose oracle was defined solely by the candidate's own assertion. If a support cycle is discovered, collapse it only when an independent root evidence set and derivation rule are established; otherwise mark the affected claim unresolved. Rebuttal/contradiction edges may form cycles in the broader graph, but they are not positive support.
+
+Version each support closure against the exact claim text/scope, source tree, evidence digests, contract/policy versions and relevant method/authority identities. A later edit to the dependency graph does not rewrite the historical closure; it creates a new event-bound assessment.
+
 
 ## 3. Event-to-claim impact analysis
 
