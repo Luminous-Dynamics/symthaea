@@ -91,7 +91,7 @@ mod tests {
     fn english_phonemizer_initializes_and_produces_tokens() {
         let phonemizer = EnglishPhonemizer::new_bundled()
             .expect("bundled English phonemizer must initialize");
-        let (tokens, _prosody) = phonemizer
+        let (tokens, prosody) = phonemizer
             .phonemize_with_prosody("hello world")
             .expect("known words should produce an output");
         assert!(!tokens.is_empty(), "known words must not return no phones");
@@ -114,6 +114,12 @@ mod tests {
             _prosody.len(),
             "prosody entries must remain aligned one-to-one with IPA character tokens"
         );
+        let normalized = normalize_piper_english(&tokens, &prosody)
+            .expect("raw Piper output must satisfy the loss-preserving adapter");
+        assert_eq!(normalized.words.len(), 2);
+        assert_eq!(normalized.words[0].resolution_status, "needs_review");
+        assert_eq!(normalized.words[0].syllable_boundaries, None);
+        assert_eq!(normalized.words[0].oov_status, "not_assessed");
     }
 
     #[test]
