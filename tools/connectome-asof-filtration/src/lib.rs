@@ -302,7 +302,10 @@ pub fn seal_ledger(ledger: &mut GlobalLedger) -> Result<(), AuditError> {
         let root = entry_root(&context, entry.sequence, &previous_root, &entry.payload)?;
         entry.entry_commitment_sha256.clone_from(&root);
         if let LedgerPayload::Evidence(event) = &entry.payload {
-            if event_roots.insert(event.event_id.clone(), root.clone()).is_some() {
+            if event_roots
+                .insert(event.event_id.clone(), root.clone())
+                .is_some()
+            {
                 return Err(AuditError(format!(
                     "duplicate evidence event ID {} during ledger sealing",
                     event.event_id
@@ -516,7 +519,9 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
         ));
     }
     if ledger.entries.is_empty() {
-        return Err(AuditError("global ledger must contain at least one entry".into()));
+        return Err(AuditError(
+            "global ledger must contain at least one entry".into(),
+        ));
     }
 
     let mut evidence: BTreeMap<String, (u64, EvidenceEvent)> = BTreeMap::new();
@@ -779,8 +784,7 @@ pub fn audit_ledger_against_external_checkpoint(
     let computed = expected_terminal_checkpoint_sha256(checkpoint)?;
     if computed != independently_pinned_checkpoint_sha256 {
         return Err(AuditError(
-            "terminal checkpoint does not match the independently pinned checkpoint digest"
-                .into(),
+            "terminal checkpoint does not match the independently pinned checkpoint digest".into(),
         ));
     }
     if checkpoint.campaign_id != ledger.campaign_id
@@ -1502,11 +1506,20 @@ mod tests {
     fn ledger_audit_recomputes_each_entry_and_terminal_root() {
         let ledger = fixture();
         let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.integrity_disposition, LedgerIntegrityDisposition::InternallyCommittedUnanchored);
+        assert_eq!(
+            audit.integrity_disposition,
+            LedgerIntegrityDisposition::InternallyCommittedUnanchored
+        );
         assert_eq!(audit.ledger_epoch_id, "epoch-1");
         assert_eq!(audit.global_filtration_sha256, d('8'));
-        assert_eq!(audit.ledger_chain_root_sha256, ledger.ledger_chain_root_sha256);
-        assert_ne!(audit.ledger_chain_root_sha256, audit.global_filtration_sha256);
+        assert_eq!(
+            audit.ledger_chain_root_sha256,
+            ledger.ledger_chain_root_sha256
+        );
+        assert_ne!(
+            audit.ledger_chain_root_sha256,
+            audit.global_filtration_sha256
+        );
 
         let mut entry_tamper = ledger.clone();
         entry_tamper.entries[0].entry_commitment_sha256 = d('9');
