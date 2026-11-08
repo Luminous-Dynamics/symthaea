@@ -18,7 +18,7 @@ jobs:
       - name: Check out exact PR revision
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact source revision
@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "VOICE_ARTIFACT_REVISION=$actual" >> "$GITHUB_ENV"
 
@@ -72,7 +72,7 @@ jobs:
       - name: Upload canonical source and dependency lock
         uses: actions/upload-artifact@v4
         with:
-          name: voice-artifact-manifest-\${{ github.event.pull_request.head.sha || github.sha }}
+          name: voice-artifact-manifest-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             tools/voice-artifact-manifest/src/main.rs
             tools/voice-artifact-manifest/Cargo.lock
