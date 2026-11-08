@@ -303,3 +303,64 @@ A separate singing corpus must be assembled with explicit, documented consent fo
 ## Claim boundary
 
 This benchmark spec is not a test result. A successful compiler run establishes buildability, not singing quality. A successful renderer run establishes valid output, not naturalness. A good preference score establishes listener preference on its tested population, not linguistic coverage, editability or general intelligence.
+
+
+## Multilingual profile qualification — 8 November 2026
+
+### Profile identity is part of the benchmark input
+
+Every pronunciation reference and candidate result must carry a versioned `profile_id` in addition to a broad language tag. A profile binds the orthography normalization, canonical phone inventory, dialect/variety, syllabification policy, stress/tone model, loanword policy and profile version. A candidate generated for one profile must not be scored against a different profile's references. The standalone `tools/g2p-eval` scorer now enforces profile equality and reports aggregate metrics by both language and profile.
+
+Examples of future profiles (names are identifiers to be specified and reviewed, not claims of support):
+- `en-US-general-v1`
+- `en-ZA-general-v1`
+- `af-ZA-standard-v1`
+- `zu-ZA-standard-v1`
+- `xh-ZA-standard-v1`
+- `st-ZA-standard-v1`
+
+A profile is not qualified by a language label or by successful tokenization. It requires an explicitly versioned phone inventory, annotation guide, independent references, and a test split. For tonal languages, tone realization must be scored as a separate dimension from lexical stress; never map tone categories onto English-style stress values.
+
+### New external evaluation references
+
+- **mPhonBench (EMNLP 2026)** spans 10 phonological tasks, 58 languages and 19 scripts, combining text-only phonological tasks with word-level phone recognition for speech-augmented models. Its findings report that mid-sized open models can match or exceed specialist G2P systems on some tasks while underrepresented languages remain disadvantaged. Use it as a broad multilingual phonology benchmark where the released language/task manifest overlaps; the paper abstract does not establish that isiZulu or isiXhosa are included, so verify the manifest before making either claim. It is text-centric and does not assess singing or note alignment.
+- **SoulX-Singer-Eval** is the closest open zero-shot singing benchmark identified in this review. Its public protocol evaluates aesthetics (SingMOS-Pro and Sheet-SSQA), spectral quality (MCD), lyric intelligibility (ASR WER/CER), speaker similarity and melodic accuracy (FFE/GPE/VDE). Its README describes GMO-SVS (802 samples) and a separate unseen-speaker test set of 100 segments from 50 speakers, with 25 Mandarin and 25 English speakers. Reproduce the same tasks, but add exact supplied-phone and score-interval compliance because ASR WER and pitch metrics do not prove correct phoneme-to-note alignment.
+- **GTSinger** provides 80.59 hours of singing, 20 singers, nine languages, six technique labels, manual phoneme-to-audio alignments, realistic score data and 16.16 hours of paired speech. Its currently documented language set is Chinese, English, Japanese, Korean, Russian, Spanish, French, German and Italian; it is not a South African singing corpus. Its published dataset licence is CC BY-NC-SA 4.0, and the dataset licence file carries additional indemnity/authorization language. Do not put its audio into a commercial training pipeline or assume commercial redistribution is permitted. Use only in work reviewed as compatible with all of its licence and agreement terms.
+- **MzansiBench** is a promising South African NLP evaluation project covering 13 tasks and 16 datasets across the country's 11 official written languages. It can inform local text/NLP evaluation and profile design, but it is not a G2P or singing benchmark and should not be presented as one.
+
+### South African profile pilot
+
+The first language pilot should be annotation-first rather than model-first. Candidate resources have different task and rights scopes:
+- The **CSIR SAMA speech corpus** is described as transcribed speech across South African languages with a CC BY 3.0 licence. Use it for speech/orthography pipeline smoke tests after verifying the exact collection and per-file terms; it is not singing data or a phoneme-level singing gold set.
+- The **Corpus of spoken isiXhosa** provides transcribed and linguistically annotated Eastern Cape recordings, including morpheme-level glosses, POS tags and English translations. This can support lexical segmentation and contextual analysis; it does not by itself provide a singing score/phone alignment corpus.
+- The **isiZulu Second Language Learner Speech Corpus** is described as containing teacher reference recordings and learner recordings annotated by isiZulu teachers for phonemic and tonal pronunciation errors, under CC BY-SA 4.0. It may support a separate speech pronunciation-feedback evaluation track after checking the data card, consent and share-alike implications. It is not a singer-cloning or singing-synthesis dataset.
+- **African Next Voices** covers seven South African languages and over 3,000 hours of speech, but its published terms prohibit text-to-speech, voice cloning and voice-synthesis use. Keep it outside singing synthesis training, speaker identity modelling and any synthetic voice generation. Do not repurpose its audio for those prohibited tasks.
+
+The first singing-quality set for these profiles must be collected from singers with explicit consent covering recording, phonetic annotation, model training, evaluation, identity use, commercial licensing and redistribution as separate permissions. Community-language reviewers should define canonical phones, click accompaniments, tone/prosody conventions, conjunctive orthography segmentation, code-switching and loanword policies. For each profile, annotate pronunciation variants and contextual forms rather than forcing every written word into one dictionary pronunciation.
+
+### Profile-specific qualification gates
+
+For each qualified profile, report:
+- exact word-pronunciation rate and phone error rate (PER), with macro-average across words as well as phone-weighted aggregate;
+- accepted-variant selection accuracy on context-conditioned heteronyms and inflectional forms;
+- OOV false-acceptance and false-rejection rates separately;
+- syllable-boundary precision/recall/F1, with undefined values when the phone sequence cannot be aligned;
+- stress accuracy for stress languages, and tone-category / tone-contour accuracy for tonal profiles;
+- grapheme-span coverage, morpheme boundary accuracy where relevant, and explicit unknown/unsupported rate;
+- calibration (Brier score and reliability/ECE) only where the model supplies confidence that is calibrated on held-out references;
+- per-phone confusion and phonological-feature error, especially for clicks, aspiration, voicing, place and manner contrasts.
+
+Initial dataset targets are proposed, not achieved: at least 500 independently adjudicated lexical items per profile for a first development slice, a separate 200-item locked test slice, at least two annotators per test item and an adjudicator for disagreements. Keep all word-family/morphological variants and contextual duplicates in the same split to prevent leakage. Increase the sample size after measuring disagreement and confidence intervals. A separate singing subset must have score, syllable/phone alignment, singer consent and held-out songs/singers; speech references must not be described as singing validation.
+
+### Research sources
+
+- mPhonBench, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.2456/
+- SoulX-Singer-Eval metrics and datasets: https://github.com/Soul-AILab/SoulX-Singer-Eval
+- SoulX-Singer inference: https://github.com/Soul-AILab/SoulX-Singer
+- GTSinger dataset: https://huggingface.co/datasets/GTSinger/GTSinger
+- GTSinger licence: https://huggingface.co/datasets/GTSinger/GTSinger/blob/main/dataset_license.md
+- CSIR SAMA speech corpus: https://repo.sadilar.org/items/e44a1b0c-34c5-4957-9560-4266ca17c7d2
+- Corpus of spoken isiXhosa: https://sprakbanken.se/en/resources/xhosa
+- isiZulu learner pronunciation corpus: https://mozilladatacollective.com/datasets/cmo1y8vrv006ol207lc86hc13
+- African Next Voices terms: https://capstone.aims.ac.za/datasets/african-next-voices/
+- MzansiBench overview: https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36
