@@ -163,7 +163,7 @@ def self_test() -> list[str]:
             [f"| {state} |" for state in STATES]
         )
         for i, case_id in enumerate(CASE_IDS, 1)
-    )
+    ) + "\nnot secure blinding"
     preregistration = "\n".join((
         "CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md",
         "CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md",
