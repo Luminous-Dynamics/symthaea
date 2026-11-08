@@ -136,6 +136,8 @@ pub enum AgentClaim {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentSubmission {
     pub claim: AgentClaim,
+    /// Pins the submission to the exact public task/evidence prefix it consumed.
+    pub evidence_prefix_sha256: String,
     /// References must resolve to observations actually returned in this episode.
     pub cited_evidence_ids: Vec<String>,
     pub rationale: String,
@@ -157,6 +159,7 @@ pub struct SetScore {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluatorScore {
+    pub evidence_prefix_sha256: String,
     pub set_score: SetScore,
     pub decision_correct: bool,
     pub abstained: bool,
@@ -377,6 +380,9 @@ impl BlindEpisode {
     }
 
     fn validate_submission(&self, submission: &AgentSubmission) -> Result<(), ProtocolError> {
+        if submission.evidence_prefix_sha256 != self.view()?.evidence_prefix_sha256 {
+            return Err(ProtocolError::EvidencePrefixMismatch);
+        }
         if self.observations.is_empty() || submission.cited_evidence_ids.is_empty() {
             return Err(ProtocolError::EmptyEvidenceReferences);
         }
@@ -511,6 +517,7 @@ impl BlindEpisode {
             _ => ClaimDisposition::Ambiguous,
         };
         Ok(EvaluatorScore {
+            evidence_prefix_sha256: submission.evidence_prefix_sha256.clone(),
             decision_correct: disposition == expected,
             abstained: disposition == ClaimDisposition::Abstain,
             set_score,
@@ -591,6 +598,7 @@ pub enum ProtocolError {
     EmptyEvidenceReferences,
     DuplicateEvidenceReference,
     UnknownEvidenceReference,
+    EvidencePrefixMismatch,
     NotSubmitted,
     WorldFailure(String),
     SerializationFailure(String),
@@ -693,6 +701,7 @@ mod tests {
                 compatible_models: hypotheses,
                 disposition: ClaimDisposition::Ambiguous,
             },
+            evidence_prefix_sha256: view.evidence_prefix_sha256.clone(),
             cited_evidence_ids: vec!["E0001".to_string()],
             rationale: "One observation does not identify the mechanism.".to_string(),
         };
@@ -751,6 +760,7 @@ mod tests {
                 compatible_models: oracle.compatible_models,
                 disposition: claim_disposition(count),
             },
+            evidence_prefix_sha256: episode.view().unwrap().evidence_prefix_sha256,
             cited_evidence_ids: vec!["E0001".to_string(), "E0002".to_string(), "E0003".to_string()],
             rationale: "The evidence identifies a compatible version space.".to_string(),
         };
@@ -781,6 +791,7 @@ mod tests {
                 compatible_models: crate::candidate_hypotheses(crate::StructureAccess::Withheld),
                 disposition: ClaimDisposition::Ambiguous,
             },
+            evidence_prefix_sha256: episode.view().unwrap().evidence_prefix_sha256,
             cited_evidence_ids: vec!["E9999".to_string()],
             rationale: "Invalid reference control.".to_string(),
         };
@@ -829,6 +840,7 @@ mod tests {
                 compatible_models: oracle.compatible_models,
                 disposition: claim_disposition(count),
             },
+            evidence_prefix_sha256: current.evidence_prefix_sha256.clone(),
             cited_evidence_ids: current.observations.iter().map(|record| record.evidence_id.clone()).collect(),
             rationale: "The factorial design distinguishes variable relevance and interaction.".to_string(),
         };
