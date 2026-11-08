@@ -39,4 +39,6 @@ A conformant result establishes only path-specific representation, grammar, rang
 
 ## Qualification status
 
+The focused workflow applies rustfmt and persists formatting-only source changes to the pull-request branch before running the format check, tests and warnings-denied Clippy. The resulting branch head is re-qualified after the formatting commit.
+
 The included tests are authored for schema meta-validation, profile/digest checks, exact integer/decimal behavior, binary64 canonicalization, opaque no-arithmetic semantics, raw duplicate-key rejection and fixture structure. They require exact-head CI compile/test/Clippy qualification before any pass is claimed.
