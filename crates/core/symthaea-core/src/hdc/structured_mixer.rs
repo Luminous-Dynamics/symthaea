@@ -398,6 +398,18 @@ mod tests {
     }
 
     #[test]
+    fn zero_angle_butterfly_is_identity() {
+        let dimension = 64;
+        let parameter_count = HdcButterflyMixer::parameter_count_for_dimension(dimension);
+        let mixer = HdcButterflyMixer::new(dimension, vec![0.0; parameter_count]).unwrap();
+        let input = sample(dimension, 0x1D3A71);
+        let output = mixer.apply(&input).unwrap();
+
+        assert!(max_abs_difference(&input, &output) < 1e-7);
+        assert!((input.norm() - output.norm()).abs() < 1e-7);
+    }
+
+    #[test]
     fn parameterized_butterfly_spreads_a_single_coordinate() {
         let dimension = 256;
         let count = HdcButterflyMixer::parameter_count_for_dimension(dimension);
@@ -413,6 +425,10 @@ mod tests {
 
     #[test]
     fn butterfly_rejects_wrong_parameter_count_and_nonfinite_angles() {
+        assert!(matches!(
+            HdcButterflyMixer::new(12, Vec::new()),
+            Err(HdcStructuredMixerError::NonPowerOfTwo { dimension: 12 })
+        ));
         assert!(matches!(
             HdcButterflyMixer::new(64, vec![0.0; 10]),
             Err(HdcStructuredMixerError::InvalidButterflyParameterCount { .. })
