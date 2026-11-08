@@ -903,6 +903,32 @@ The frequency-locking primitive deliberately cannot promote a spectral peak to a
 
 The full CTGP matrix and lockfile checks passed on `03dce1aab380b7493bf91d0a46cd5da076c84d92`: all seven focused packages passed formatting, library tests and example compilation; the UAP placement example and anisotropic-Heisenberg sweep also ran; the committed lockfile passed `cargo metadata --locked` and all six focused library tests. Later commits add the direct SVD, frequency-resolution guard, rank-reversal fixture, author CSV differential check and active-design documentation. Those later changes require a new exact-head matrix; older success does not qualify them.
 
+## 2026-11-08 extension: finite-volume causal-set link sampling
+
+New workstream: [CAUSAL-LINK-BIAS-001 #11167](https://github.com/Luminous-Dynamics/symthaea/issues/11167), motivated by Boguñá & Krioukov, *Sampling biases in sprinkled causal sets* (arXiv:2610.03247, 2026-10-02).
+
+The paper shows that a root-centred finite constant-time cone can bias the normalized proper-time distribution of links in spatial dimension d>=2, because the available hyperbolic rapidity volume depends on proper time. This is a regulator/exhaustion bias, not simply a finite-event-count error. The sigma-finite Lorentz-invariant intensity per unit hyperbolic volume and the probability distribution of a link chosen from a finite sampling window are distinct mathematical objects.
+
+The causal-set crate now has a first analytical reference module, `link_sampling_bias`, with:
+- dimensionless link-intensity profile `q_d(tau_hat)=(d+1) tau_hat^d exp(-tau_hat^(d+1))`;
+- hyperbolic-ball volume and log-volume for spatial dimensions 1, 2 and 3;
+- finite-cone normalized proper-time profile;
+- product-window normalized profile;
+- the paper's double-scaling cutoffs and a declared finite root-admissibility diagnostic.
+
+An executable report is registered as `link_sampling_bias_reference` and run by the CTGP causal-set workflow. It is an analytic formula reproduction, not yet a finite sprinkling experiment or a causal-set quantum-dynamics implementation.
+
+**Independent reproduction discrepancy retained:** the first independent quadrature for the printed finite-cone equations does not match the finite-cone means transcribed from Table I. The product-window means are close to the printed values, but that does not validate the finite-cone branch. The report deliberately prints both values and their deltas and carries the status `FINITE_CONE_TABLE_I_DISCREPANCY_REQUIRES_CONVENTION_AUDIT`. The root location, time cutoff convention, hyperbolic angular multiplicity, density normalization and table-column interpretation must be reconciled before these values can become golden regression fixtures. No coefficient has been adjusted to force agreement.
+
+Next gates:
+1. reproduce the finite-cone normalization and mean using two independent quadrature paths and the source paper's exact convention;
+2. reconcile the Table I finite-cone mean link degrees and proper-time means, including the root placement and cutoff definition;
+3. implement an independent event-centred future-cone generator and exact open-interval link test, keeping fixed-cardinality and Poisson semantics separate;
+4. compare finite-cone and product-window histograms under the paper's double-scaling conditions with confidence intervals;
+5. only then connect these corrected link statistics to the existing link-matrix/path-sum propagator workstream (#11054).
+
+The claim ceiling remains finite-order-statistic and sampling-estimator reproduction. This does not establish a continuum spacetime limit, quantum dynamics, or quantum gravity.
+
 ## Scientific non-claims
 
 This programme does not claim that:
