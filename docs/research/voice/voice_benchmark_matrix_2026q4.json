@@ -956,7 +956,12 @@
         "audio_sensitivity_requires_both_outputs_match_distinct_truths",
         "acoustic_nuisance_stability_conditioned_on_joint_answer_coverage",
         "preference_training_pairs_disjoint_from_held_out_evaluation_pairs",
-        "zero_preference_training_to_held_out_evaluation_pair_overlap_audited_by_manifest"
+        "zero_preference_training_to_held_out_evaluation_pair_overlap_audited_by_manifest",
+        "clean_admitted_text_nuisance_joint_correct_rate_at_least_95_percent_with_pair_answer_coverage_at_least_95_percent",
+        "audio_relevant_joint_counterfactual_sensitivity_at_least_95_percent",
+        "audio_relevant_false_invariance_at_most_1_percent_among_pairs_with_two_claims",
+        "audio_nuisance_semantic_stability_at_least_95_percent_with_joint_claim_coverage_at_least_90_percent",
+        "speaker_session_source_clustered_paired_confidence_intervals_and_worst_group_reporting"
       ],
       "profile_requirements": [
         "PAIR_MANIFEST_SHA256",
