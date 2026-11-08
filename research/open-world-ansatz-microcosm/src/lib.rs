@@ -5,6 +5,7 @@
 
 pub mod interaction;
 pub mod numeric;
+pub mod protocol;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
