@@ -118,6 +118,19 @@ jobs:
             cat theory-prediction-coverage.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run planted-model recovery and open-world abstention reference
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example model_recovery_reference | tee model-recovery-reference.txt
+          grep -q 'epistemic_status=DETERMINISTIC_SYNTHETIC_MODEL_RECOVERY_NOT_PHYSICAL_VALIDATION' model-recovery-reference.txt
+          grep -q 'open_world_false_confident_assignment_rate=' model-recovery-reference.txt
+          {
+            echo "## Planted-model recovery and open-world abstention"
+            cat model-recovery-reference.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run model-discriminating experiment EIG reference
         if: matrix.package == 'symthaea-science-evidence'
         shell: bash
