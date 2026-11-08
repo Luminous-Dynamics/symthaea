@@ -73,6 +73,11 @@ jobs:
           assert metrics["oov_f1"] == 1.0, metrics
           assert metrics["syllable_boundary_f1"] == 1.0, metrics
           assert metrics["stress_accuracy"] == 1.0, metrics
+          assert len(report["by_language"]) == 1, report["by_language"]
+          assert len(report["by_profile"]) == 1, report["by_profile"]
+          assert report["by_profile"][0]["profile_id"] == "en-US-general-v1"
+          assert report["by_profile"][0]["phone_error_rate"] == 0.0
+          assert all(case["profile_id"] == "en-US-general-v1" for case in report["cases"])
           PY
 
       - name: Upload synthetic scorer receipt
