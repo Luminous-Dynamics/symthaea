@@ -214,7 +214,7 @@ mod tests {
             &DependenceAssumption::UnknownOrCorrelated,
         ).unwrap();
         assert!((summary.stochastic_sigma_l1_upper - 0.7).abs() < 1.0e-12);
-        assert!((summary.stochastic_sigma_rss_under_independence_assumption.is_none()).abs() < 1.0e-12);
+        assert!(summary.stochastic_sigma_rss_under_independence_assumption.is_none());
         assert!(!summary.independence_assumption_declared);
     }
 
@@ -253,7 +253,7 @@ mod tests {
             magnitude_kind: MagnitudeKind::DeterministicUpperBound,
         }];
         assert_eq!(
-            compose_error_budget(&negative, 1.0, &DependenceEvidence::UnknownOrCorrelated),
+            compose_error_budget(&negative, 1.0, &DependenceAssumption::UnknownOrCorrelated),
             Err(BudgetError::InvalidMagnitude)
         );
 
@@ -265,7 +265,7 @@ mod tests {
             Err(BudgetError::InvalidIndependenceDigest)
         );
         assert_eq!(
-            compose_error_budget(&[], f64::NAN, &DependenceEvidence::UnknownOrCorrelated),
+            compose_error_budget(&[], f64::NAN, &DependenceAssumption::UnknownOrCorrelated),
             Err(BudgetError::InvalidSensitivity)
         );
     }
@@ -275,7 +275,7 @@ mod tests {
         let summary = compose_error_budget(
             &[],
             9.0,
-            &DependenceEvidence::UnknownOrCorrelated,
+            &DependenceAssumption::UnknownOrCorrelated,
         ).unwrap();
         assert_eq!(summary.deterministic_output_bound, 0.0);
         assert_eq!(summary.task_deterministic_bound, 0.0);
