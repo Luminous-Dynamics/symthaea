@@ -81,7 +81,12 @@
         "embedded_span_deletion_rate",
         "switch_boundary_precision_recall_f1",
         "inter_word_switch_accuracy",
-        "intra_word_switch_accuracy_when_annotated"
+        "intra_word_switch_accuracy_when_annotated",
+        "SETER",
+        "SPER_at_1",
+        "SPER_at_3",
+        "per_language_masked_error_rate",
+        "switch_direction_error_rate"
       ],
       "complexity_axes": [
         "CMI",
@@ -104,6 +109,12 @@
           "id": "sa_soap_opera_five_language",
           "status": "RESEARCH_ONLY_SOURCE_TERMS_REQUIRED",
           "url": "https://hdl.handle.net/20.500.12185/545"
+        },
+        {
+          "id": "africode_switch_english_yoruba",
+          "status": "METADATA_AND_RIGHTS_REVIEW_REQUIRED",
+          "paper_url": "https://arxiv.org/abs/2609.11786",
+          "note": "The 2026 switch-aware study audits 8,181 audio-available rows / 9.54h from 9,966 AfriCodeSwitch validation metadata rows and uses a deterministic 2,000-utterance manifest. Its exact artifact, manifest, license, speaker split and permission must be pinned before use; no download or ingestion is authorized."
         }
       ]
     },
@@ -191,6 +202,12 @@
           "id": "dammann_khoekhoegowab_archive",
           "status": "METADATA_ONLY_SOURCE_AUDIT",
           "url": "https://researchspace.bathspa.ac.uk/14159/"
+        },
+        {
+          "id": "afrispeech_african_speech_ipa",
+          "status": "METADATA_ONLY_G2P_PROVENANCE_AUDIT_NOT_CLICK_GOLD",
+          "card_url": "https://huggingface.co/datasets/AfriSpeech/african-speech-ipa",
+          "note": "Current card describes 141 language configurations with 70 native, 13 equivalent and 58 donor rule mappings; Damara is explicitly excluded because click-letter orthography is unsupported. Rule-based IPA reflects orthography, not actual pronunciation. Do not treat donor mappings as expert acoustic gold or infer click coverage for Namibian languages."
         }
       ],
       "exclusions": [
@@ -309,6 +326,96 @@
         "prior_language_retention"
       ],
       "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds."
+    },
+    {
+      "id": "phonetic_supervision_provenance",
+      "name": "Phonetic supervision provenance and G2P tier audit",
+      "task": "PHONETIC_SUPERVISION_PROVENANCE",
+      "issue": 11077,
+      "parent_issues": [
+        11038,
+        10942,
+        10976,
+        11020,
+        10913
+      ],
+      "metrics": [
+        "native_rule_mapping_coverage",
+        "donor_rule_proportion",
+        "expert_phonological_agreement",
+        "acoustic_phone_label_agreement",
+        "click_contrast_preservation",
+        "tone_diacritic_preservation",
+        "unsupported_feature_rate",
+        "source_and_rule_lineage_completeness"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afrispeech_african_speech_ipa",
+          "status": "METADATA_ONLY_G2P_PROVENANCE_AUDIT",
+          "card_url": "https://huggingface.co/datasets/AfriSpeech/african-speech-ipa",
+          "note": "Current card says 141 configs: 70 native, 13 equivalent-code, 58 donor; Damara excluded due unsupported click-letter orthography. It warns rule-based IPA reflects orthography, not speaker pronunciation, and donor character coverage does not prove phonological correctness."
+        }
+      ],
+      "required_outputs": [
+        "rule_mapping_tier",
+        "rule_set_version",
+        "character_coverage",
+        "orthography_version",
+        "phonetic_label_authority",
+        "acoustic_reference_status",
+        "source_lineage"
+      ],
+      "exclusions": [
+        "donor_G2P_is_not_native_gold",
+        "orthography_derived_IPA_is_not_acoustic_ground_truth",
+        "dataset_language_count_is_not_capability_qualification"
+      ]
+    },
+    {
+      "id": "depth_aware_adaptation",
+      "name": "Depth-aware multilingual speech adaptation and retention",
+      "task": "LOW_RESOURCE_ADAPTATION",
+      "issue": 11076,
+      "parent_issues": [
+        9607,
+        9661,
+        10913,
+        10942,
+        10970,
+        5352
+      ],
+      "adaptation_arms": [
+        "frozen_multilingual_baseline",
+        "full_finetuning",
+        "uniform_LoRA",
+        "DAMA_depth_aware",
+        "HDC_language_conditioned_projection",
+        "hybrid_depth_adapter_HDC"
+      ],
+      "metrics": [
+        "target_WER_CER_PIER",
+        "SETER_SPER_when_applicable",
+        "trainable_parameter_count",
+        "training_FLOPs",
+        "optimizer_memory",
+        "peak_memory",
+        "training_time",
+        "inference_latency",
+        "prior_language_retention",
+        "worst_language_regression",
+        "calibration",
+        "performance_per_labelled_hour"
+      ],
+      "candidate_labelled_hour_budgets": [
+        1,
+        5,
+        10,
+        20,
+        50,
+        100
+      ],
+      "note": "DAMA (Findings ACL 2026) reports depth-aware adaptation, 80% fewer trainable parameters and 29% error reduction in its own setting. Reproduce on matched South African data/compute; published gains are not assumed to transfer."
     }
   ],
   "promotion_gates": [
@@ -319,6 +426,9 @@
     "qualified_native_or_expert_reference_and_disagreement",
     "paired_clustered_confidence_intervals",
     "exact_head_executed_build_test_and_benchmark_receipts",
-    "no_capability_promotion_from_skipped_ci_or_synthetic_fixtures"
+    "no_capability_promotion_from_skipped_ci_or_synthetic_fixtures",
+    "phonetic_supervision_tier_verified",
+    "native_acoustic_label_distinguished_from_rule_derived_phones",
+    "depth_adapter_retention_noninferiority_on_prior_languages"
   ]
 }
