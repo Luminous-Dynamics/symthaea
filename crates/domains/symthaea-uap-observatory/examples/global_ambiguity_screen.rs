@@ -3,8 +3,7 @@
 
 use std::error::Error;
 use symthaea_uap_observatory::{
-    CandidateSolution, GlobalIdentifiabilityConfig, analyze_jacobian,
-    screen_global_ambiguities,
+    CandidateSolution, GlobalIdentifiabilityConfig, analyze_jacobian, screen_global_ambiguities,
 };
 
 #[derive(Clone, Copy)]
@@ -85,7 +84,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("fixture=three_non_collinear_range_anchors_in_z0");
     println!("local_jacobian_rank={}", local.numerical_rank);
     println!("local_jacobian_parameter_count={}", local.parameter_count);
-    println!("admissible_candidate_count={}", global.admissible_candidate_count);
+    println!(
+        "admissible_candidate_count={}",
+        global.admissible_candidate_count
+    );
     println!("ambiguous_pair_count={}", global.ambiguous_pairs.len());
     for pair in &global.ambiguous_pairs {
         println!(
@@ -108,13 +110,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         candidate("target-above-plane", target, &spatially_anchored),
         candidate("mirror-below-plane", mirror, &spatially_anchored),
     ];
-    let anchored = screen_global_ambiguities(
-        &anchored_observations,
-        &anchored_candidates,
-        &config(4),
-    )?;
+    let anchored =
+        screen_global_ambiguities(&anchored_observations, &anchored_candidates, &config(4))?;
     println!("fixture=one_non_coplanar_range_anchor_added");
-    println!("admissible_candidate_count={}", anchored.admissible_candidate_count);
+    println!(
+        "admissible_candidate_count={}",
+        anchored.admissible_candidate_count
+    );
     println!("ambiguous_pair_count={}", anchored.ambiguous_pairs.len());
 
     println!("near_planar_anchor_height_m,admissible_candidates,ambiguous_pairs");
