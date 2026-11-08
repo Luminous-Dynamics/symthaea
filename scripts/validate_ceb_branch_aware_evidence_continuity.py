@@ -120,7 +120,7 @@ def validate(protocol: str, challenge: str, key: str, worksheet: str) -> list[st
 
 
 def minimal_pack() -> tuple[str, str, str, str]:
-    protocol = " ".join(PROTOCOL_PHRASES + DISPOSITIONS) + " no candidate-controlled code"
+    protocol = " ".join(PROTOCOL_PHRASES + DISPOSITIONS)
     challenge_blocks = []
     key_blocks = []
     worksheet_blocks = []
