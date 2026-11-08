@@ -196,6 +196,10 @@ def semantic_errors(payload: dict) -> list[str]:
         "verifierbench-project-source-defect-exclusions": ("verifierbench-executable-verifier-generation", "source_defect_exclusion_count", 45),
         "verifierbench-attack-case-count": ("verifierbench-executable-verifier-generation", "attack_case_count", 798),
         "verifierbench-v4v-check-count": ("verifierbench-executable-verifier-generation", "v4v_check_count", 6),
+        "verifierbench-positive-case-count": ("verifierbench-executable-verifier-generation", "positive_case_count", 1566),
+        "verifierbench-negative-case-count": ("verifierbench-executable-verifier-generation", "negative_case_count", 3427),
+        "verifierbench-alternative-positive-count": ("verifierbench-executable-verifier-generation", "alternate_positive_case_count", 1344),
+        "verifierbench-reference-mutation-configuration-count": ("verifierbench-executable-verifier-generation", "mutation_test_configuration_count", 1410),
         "benchmark-maintenance-audited-trajectory-count": ("benchmark-maintenance-pass-audit", "passing_trajectory_count", 3810),
         "benchmark-maintenance-cohort-count": ("benchmark-maintenance-pass-audit", "model_benchmark_cohort_count", 29),
         "benchmark-maintenance-opus47-unearned-pass-rate": ("benchmark-maintenance-unearned-pass-rates", "confirmed_unearned_pass_rate", 24),
@@ -223,9 +227,33 @@ def semantic_errors(payload: dict) -> list[str]:
     if verifier_asymmetry is None or (
         verifier_asymmetry["metric"]["value_status"] != "qualitative"
         or verifier_asymmetry["metric"]["metric_id"] != "verifier_lifecycle_policy"
-        or "10.6 to 62.1" not in verifier_asymmetry["metric"]["raw_display"]
+        or "10.6" not in verifier_asymmetry["metric"]["raw_display"]
+        or "62.1" not in verifier_asymmetry["metric"]["raw_display"]
+        or not any("reject every case" in note for note in verifier_asymmetry["notes"])
     ):
-        errors.append("VerifierBench balanced-accuracy range must remain a qualitative range, not a single-model score")
+        errors.append("VerifierBench class-rate and all-reject findings must remain qualitative, not single-model scores")
+
+    verifier_case_rows = {
+        row["observation_id"]: row
+        for row in observations
+        if row["observation_id"] in {
+            "verifierbench-hidden-case-count",
+            "verifierbench-positive-case-count",
+            "verifierbench-negative-case-count",
+            "verifierbench-alternative-positive-count",
+            "verifierbench-attack-case-count",
+        }
+    }
+    if len(verifier_case_rows) == 5:
+        hidden = verifier_case_rows["verifierbench-hidden-case-count"]["metric"]["value"]
+        positive = verifier_case_rows["verifierbench-positive-case-count"]["metric"]["value"]
+        negative = verifier_case_rows["verifierbench-negative-case-count"]["metric"]["value"]
+        alternatives = verifier_case_rows["verifierbench-alternative-positive-count"]["metric"]["value"]
+        attacks = verifier_case_rows["verifierbench-attack-case-count"]["metric"]["value"]
+        if positive + negative != hidden:
+            errors.append("VerifierBench PASS and FAIL labels do not sum to the hidden-case count")
+        if alternatives > positive or attacks > negative:
+            errors.append("VerifierBench alternative positives or attacks exceed their parent class")
 
     if "verifierbench-executable-verifier-generation" in comparators:
         caveats = " ".join(comparators["verifierbench-executable-verifier-generation"]["caveats"]).lower()
@@ -846,6 +874,11 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
         if row["observation_id"] != "verifierbench-v4v-check-count"
     ]
     must_reject(mutant, "VerifierBench V4V audit-size observation removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "verifierbench-positive-case-count")
+    row["metric"]["value"] = 1565
+    must_reject(mutant, "VerifierBench positive-case denominator changed")
 
     mutant = copy.deepcopy(payload)
     row = next(row for row in mutant["observations"] if row["observation_id"] == "verifierbench-project-model-harness-config-count")
