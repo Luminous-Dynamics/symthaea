@@ -18,6 +18,8 @@
 
 use std::collections::BTreeMap;
 
+use super::group_envelope::{ContinuousHVGroupEnvelope, GroupEnvelopeError};
+
 use symthaea_core::hdc::continuous_hv_interval::{
     ContinuousHVIntervalError, ContinuousHVScoreInterval, ResidualCertificateError,
     ResidualCertificateVerification, verify_l2_residual_certificate,
@@ -148,6 +150,207 @@ pub struct IntervalSelectionPlan<Id> {
     /// IDs proven unable to enter the exact top-k, assuming valid intervals.
     pub excluded_ids: Vec<Id>,
 }
+
+
+/// One group whose interval encloses every eligible member in that group.
+///
+/// Group records can only be built from a validated in-memory group envelope;
+/// this prevents arbitrary caller-supplied intervals from entering the
+/// weighted exact selector through the public API.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupScoreIntervalRecord<Id> {
+    id: Id,
+    member_count: usize,
+    interval: ContinuousHVScoreInterval,
+}
+
+/// Error while converting a verified group envelope into a selection record.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GroupScoreIntervalBuildError {
+    /// The backing group envelope rejected its snapshot bindings.
+    GroupEnvelope(GroupEnvelopeError),
+    /// The envelope has no members.
+    EmptyGroup,
+    /// The envelope interval failed its structural invariant.
+    InvalidInterval,
+}
+
+impl std::fmt::Display for GroupScoreIntervalBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GroupEnvelope(error) => write!(f, "group envelope rejected: {error}"),
+            Self::EmptyGroup => write!(f, "cannot select an empty group"),
+            Self::InvalidInterval => write!(f, "group score interval is malformed"),
+        }
+    }
+}
+
+impl std::error::Error for GroupScoreIntervalBuildError {}
+
+impl<Id> GroupScoreIntervalRecord<Id> {
+    /// Construct from an in-memory group envelope after its pinned snapshot is
+    /// revalidated and its query-specific interval is computed.
+    pub fn from_group_envelope(
+        id: Id,
+        envelope: &ContinuousHVGroupEnvelope,
+        query: &ContinuousHV,
+        expected_manifest_generation: u64,
+        expected_eligibility_generation: u64,
+        expected_member_set_digest: [u8; 32],
+        expected_content_digest: [u8; 32],
+    ) -> Result<Self, GroupScoreIntervalBuildError> {
+        let member_count = envelope.member_ids().len();
+        if member_count == 0 {
+            return Err(GroupScoreIntervalBuildError::EmptyGroup);
+        }
+        let interval = envelope
+            .score_interval_for_snapshot(
+                query,
+                expected_manifest_generation,
+                expected_eligibility_generation,
+                expected_member_set_digest,
+                expected_content_digest,
+            )
+            .map_err(GroupScoreIntervalBuildError::GroupEnvelope)?;
+        if !interval.is_well_formed() {
+            return Err(GroupScoreIntervalBuildError::InvalidInterval);
+        }
+        Ok(Self {
+            id,
+            member_count,
+            interval,
+        })
+    }
+
+    /// Stable group identifier.
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+
+    /// Number of eligible records represented by this interval.
+    pub fn member_count(&self) -> usize {
+        self.member_count
+    }
+
+    /// Query-specific interval enclosing every eligible member score.
+    pub fn interval(&self) -> ContinuousHVScoreInterval {
+        self.interval
+    }
+}
+
+/// Coverage counters for weighted group interval selection.
+///
+/// These counters must be derived from the same pinned eligibility snapshot as
+/// the group envelopes. They are consistency checks, not cryptographic proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GroupIntervalCoverageCounts {
+    /// Number of eligible records in the pinned snapshot.
+    pub eligible_records: usize,
+    /// Number of eligible records represented by the supplied group intervals.
+    pub covered_records: usize,
+    /// Number of group intervals supplied.
+    pub interval_groups: usize,
+    /// Number of unopened groups without an admissible aggregate interval.
+    pub unbounded_unopened_groups: usize,
+}
+
+/// Exact group-level refinement plan obtained from weighted lower endpoints.
+///
+/// The kth-largest lower endpoint is computed with each group's lower value
+/// repeated once per eligible member. Every group whose upper endpoint reaches
+/// the threshold remains for refinement; only groups with upper < threshold
+/// may be excluded.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupIntervalSelectionPlan<Id> {
+    /// kth-largest weighted lower endpoint over the complete eligible corpus.
+    pub threshold: f32,
+    /// Groups whose members must be visited or refined.
+    pub refinement_group_ids: Vec<Id>,
+    /// Groups proven unable to contain a member in the exact top-k.
+    pub excluded_group_ids: Vec<Id>,
+    /// Number of records represented by the refinement groups.
+    pub refinement_record_count: usize,
+    /// Number of records avoided by excluding whole groups.
+    pub excluded_record_count: usize,
+}
+
+/// Errors that prevent weighted group-level exact selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupIntervalSelectionError {
+    /// top_k must be in [1, eligible_records].
+    InvalidTopK {
+        /// Requested result count.
+        top_k: usize,
+        /// Eligible records in the snapshot.
+        eligible_records: usize,
+    },
+    /// Group intervals do not cover the complete eligible population.
+    IncompleteCoverage {
+        /// Expected eligible record count.
+        eligible_records: usize,
+        /// Sum of supplied group member counts.
+        covered_records: usize,
+        /// Expected number of group intervals.
+        interval_groups: usize,
+        /// Number of groups supplied.
+        supplied_groups: usize,
+        /// Unopened groups without safe aggregate bounds.
+        unbounded_unopened_groups: usize,
+    },
+    /// A group has no members.
+    EmptyGroup {
+        /// Index of the invalid group.
+        group_index: usize,
+    },
+    /// A group interval is malformed.
+    InvalidInterval {
+        /// Index of the invalid group.
+        group_index: usize,
+    },
+    /// Group IDs are not unique.
+    DuplicateGroupId {
+        /// First occurrence index.
+        first_index: usize,
+        /// Later duplicate index.
+        duplicate_index: usize,
+    },
+    /// Summing group member counts overflowed usize.
+    MemberCountOverflow,
+}
+
+impl std::fmt::Display for GroupIntervalSelectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidTopK { top_k, eligible_records } => write!(
+                f,
+                "top_k {top_k} is invalid for {eligible_records} eligible records"
+            ),
+            Self::IncompleteCoverage {
+                eligible_records,
+                covered_records,
+                interval_groups,
+                supplied_groups,
+                unbounded_unopened_groups,
+            } => write!(
+                f,
+                "group interval coverage incomplete: eligible={eligible_records}, covered={covered_records}, expected_groups={interval_groups}, supplied_groups={supplied_groups}, unbounded_unopened_groups={unbounded_unopened_groups}"
+            ),
+            Self::EmptyGroup { group_index } => {
+                write!(f, "group {group_index} has no eligible members")
+            }
+            Self::InvalidInterval { group_index } => {
+                write!(f, "group {group_index} has an invalid score interval")
+            }
+            Self::DuplicateGroupId { first_index, duplicate_index } => write!(
+                f,
+                "duplicate group ID at indices {first_index} and {duplicate_index}"
+            ),
+            Self::MemberCountOverflow => write!(f, "group member count overflow"),
+        }
+    }
+}
+
+impl std::error::Error for GroupIntervalSelectionError {}
 
 /// Structural errors that prevent interval-first selection.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -315,6 +518,129 @@ where
     })
 }
 
+
+/// Select whole groups using their conservative intervals and member counts.
+///
+/// If each group g contains m_g eligible records and every member score lies in
+/// [L_g, U_g], compute theta as the kth-largest value in the multiset that
+/// repeats L_g exactly m_g times. At least k eligible records therefore have
+/// exact score >= theta. Any group with U_g < theta cannot contain a top-k
+/// member and may be excluded. Equality is retained.
+///
+/// This reduces global synopsis scanning from one interval per memory to one
+/// interval per group. It is exact only with complete eligible-group coverage,
+/// a pinned membership/eligibility snapshot, and a genuine group enclosure.
+/// The public constructor for GroupScoreIntervalRecord revalidates the
+/// ContinuousHVGroupEnvelope snapshot before it supplies the interval.
+pub fn select_group_refinement_set<Id>(
+    groups: &[GroupScoreIntervalRecord<Id>],
+    top_k: usize,
+    coverage: GroupIntervalCoverageCounts,
+) -> Result<GroupIntervalSelectionPlan<Id>, GroupIntervalSelectionError>
+where
+    Id: Ord + Clone,
+{
+    let mut covered_records = 0usize;
+    let mut first_index_by_id = BTreeMap::new();
+    let mut lower_order: Vec<&GroupScoreIntervalRecord<Id>> =
+        Vec::with_capacity(groups.len());
+
+    for (group_index, group) in groups.iter().enumerate() {
+        if group.member_count == 0 {
+            return Err(GroupIntervalSelectionError::EmptyGroup { group_index });
+        }
+        if !group.interval.is_well_formed() {
+            return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
+        }
+        if let Some(first_index) = first_index_by_id.get(&group.id).copied() {
+            return Err(GroupIntervalSelectionError::DuplicateGroupId {
+                first_index,
+                duplicate_index: group_index,
+            });
+        }
+        first_index_by_id.insert(group.id.clone(), group_index);
+        covered_records = covered_records
+            .checked_add(group.member_count)
+            .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
+        lower_order.push(group);
+    }
+
+    if coverage.unbounded_unopened_groups != 0
+        || coverage.interval_groups != groups.len()
+        || coverage.eligible_records != covered_records
+        || coverage.covered_records != covered_records
+    {
+        return Err(GroupIntervalSelectionError::IncompleteCoverage {
+            eligible_records: coverage.eligible_records,
+            covered_records,
+            interval_groups: coverage.interval_groups,
+            supplied_groups: groups.len(),
+            unbounded_unopened_groups: coverage.unbounded_unopened_groups,
+        });
+    }
+
+    if top_k == 0 || top_k > covered_records {
+        return Err(GroupIntervalSelectionError::InvalidTopK {
+            top_k,
+            eligible_records: covered_records,
+        });
+    }
+
+    lower_order.sort_by(|left, right| {
+        let lower_order = if left.interval.lower == right.interval.lower {
+            std::cmp::Ordering::Equal
+        } else {
+            right.interval.lower.total_cmp(&left.interval.lower)
+        };
+        lower_order.then_with(|| left.id.cmp(&right.id))
+    });
+
+    let mut cumulative_members = 0usize;
+    let mut threshold = None;
+    for group in &lower_order {
+        cumulative_members = cumulative_members
+            .checked_add(group.member_count)
+            .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
+        if cumulative_members >= top_k {
+            threshold = Some(group.interval.lower);
+            break;
+        }
+    }
+    let threshold = threshold.ok_or(GroupIntervalSelectionError::InvalidTopK {
+        top_k,
+        eligible_records: covered_records,
+    })?;
+
+    let mut refinement_group_ids = Vec::new();
+    let mut excluded_group_ids = Vec::new();
+    let mut refinement_record_count = 0usize;
+    let mut excluded_record_count = 0usize;
+    for group in groups {
+        if group.interval.upper >= threshold {
+            refinement_group_ids.push(group.id.clone());
+            refinement_record_count = refinement_record_count
+                .checked_add(group.member_count)
+                .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
+        } else {
+            excluded_group_ids.push(group.id.clone());
+            excluded_record_count = excluded_record_count
+                .checked_add(group.member_count)
+                .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
+        }
+    }
+    refinement_group_ids.sort();
+    excluded_group_ids.sort();
+
+    Ok(GroupIntervalSelectionPlan {
+        threshold,
+        refinement_group_ids,
+        excluded_group_ids,
+        refinement_record_count,
+        excluded_record_count,
+    })
+}
+
+
 /// Apply the canonical score-descending / stable-ID-ascending top-k order.
 ///
 /// Numerically equal scores use the ID tiebreak; in particular, +0.0 and -0.0
@@ -392,6 +718,204 @@ mod tests {
             eligible_records: count,
             interval_records: count,
             unbounded_unopened_partitions: 0,
+        }
+    }
+
+
+    fn synthetic_group(
+        id: &str,
+        member_count: usize,
+        lower: f32,
+        upper: f32,
+    ) -> GroupScoreIntervalRecord<String> {
+        GroupScoreIntervalRecord {
+            id: id.to_owned(),
+            member_count,
+            interval: ContinuousHVScoreInterval { lower, upper },
+        }
+    }
+
+    fn complete_group_coverage(
+        groups: &[GroupScoreIntervalRecord<String>],
+    ) -> GroupIntervalCoverageCounts {
+        let members = groups.iter().map(|group| group.member_count).sum();
+        GroupIntervalCoverageCounts {
+            eligible_records: members,
+            covered_records: members,
+            interval_groups: groups.len(),
+            unbounded_unopened_groups: 0,
+        }
+    }
+
+    #[test]
+    fn weighted_group_selection_counts_each_member_in_the_lower_threshold() {
+        let groups = vec![
+            synthetic_group("near", 2, 0.80, 0.95),
+            synthetic_group("middle", 3, 0.40, 0.70),
+            synthetic_group("far", 5, -0.10, 0.30),
+        ];
+        let plan = select_group_refinement_set(
+            &groups,
+            3,
+            complete_group_coverage(&groups),
+        )
+        .unwrap();
+        assert_eq!(plan.threshold, 0.40);
+        assert_eq!(plan.refinement_group_ids, vec!["middle".to_owned(), "near".to_owned()]);
+        assert_eq!(plan.excluded_group_ids, vec!["far".to_owned()]);
+        assert_eq!(plan.refinement_record_count, 5);
+        assert_eq!(plan.excluded_record_count, 5);
+    }
+
+    #[test]
+    fn group_boundary_equality_is_retained_and_output_is_order_independent() {
+        let first = vec![
+            synthetic_group("a", 1, 0.8, 0.9),
+            synthetic_group("b", 1, 0.2, 0.8),
+            synthetic_group("c", 2, -0.5, 0.1),
+        ];
+        let second = vec![first[2].clone(), first[1].clone(), first[0].clone()];
+        let first_plan = select_group_refinement_set(
+            &first,
+            1,
+            complete_group_coverage(&first),
+        )
+        .unwrap();
+        let second_plan = select_group_refinement_set(
+            &second,
+            1,
+            complete_group_coverage(&second),
+        )
+        .unwrap();
+        assert_eq!(first_plan, second_plan);
+        assert!(first_plan.refinement_group_ids.contains(&"b".to_owned()));
+        assert!(!first_plan.excluded_group_ids.contains(&"b".to_owned()));
+    }
+
+    #[test]
+    fn group_selection_rejects_incomplete_coverage_empty_groups_and_duplicate_ids() {
+        let groups = vec![
+            synthetic_group("a", 2, 0.2, 0.8),
+            synthetic_group("b", 1, -0.2, 0.1),
+        ];
+        let mut incomplete = complete_group_coverage(&groups);
+        incomplete.covered_records -= 1;
+        assert!(matches!(
+            select_group_refinement_set(&groups, 1, incomplete),
+            Err(GroupIntervalSelectionError::IncompleteCoverage { .. })
+        ));
+
+        let empty = vec![synthetic_group("empty", 0, -1.0, 1.0)];
+        assert!(matches!(
+            select_group_refinement_set(&empty, 1, complete_group_coverage(&empty)),
+            Err(GroupIntervalSelectionError::EmptyGroup { .. })
+        ));
+
+        let duplicate = vec![
+            synthetic_group("same", 1, 0.0, 1.0),
+            synthetic_group("same", 1, -1.0, 0.5),
+        ];
+        assert!(matches!(
+            select_group_refinement_set(&duplicate, 1, complete_group_coverage(&duplicate)),
+            Err(GroupIntervalSelectionError::DuplicateGroupId { .. })
+        ));
+    }
+
+    #[test]
+    fn generated_weighted_group_selection_matches_full_exact_top_k() {
+        let mut state = 0x6A09_E667u32;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+
+        for case_index in 0..4096usize {
+            let count = 1 + (next() as usize % 48);
+            let top_k = 1 + (next() as usize % count);
+            let mut exact_scores = Vec::with_capacity(count);
+            let mut item_intervals = Vec::with_capacity(count);
+
+            for item_index in 0..count {
+                let score_raw = (next() % 2001) as i32 - 1000;
+                let score = score_raw as f32 / 1000.0;
+                let lower_slack = (next() % 401) as f32 / 1000.0;
+                let upper_slack = (next() % 401) as f32 / 1000.0;
+                let lower = (score - lower_slack).max(-1.0);
+                let upper = (score + upper_slack).min(1.0);
+                let id = format!("item-{item_index:04}");
+                exact_scores.push((id.clone(), score));
+                item_intervals.push((lower, upper));
+            }
+
+            // Deterministic variable-size partitions. The group interval is the
+            // conservative hull of all member intervals in that group.
+            let mut groups = Vec::new();
+            let mut start = 0usize;
+            let mut group_index = 0usize;
+            while start < count {
+                let size = (1 + (next() as usize % 6)).min(count - start);
+                let mut lower = 1.0f32;
+                let mut upper = -1.0f32;
+                for &(member_lower, member_upper) in &item_intervals[start..start + size] {
+                    lower = lower.min(member_lower);
+                    upper = upper.max(member_upper);
+                }
+                groups.push(synthetic_group(
+                    &format!("group-{group_index:04}"),
+                    size,
+                    lower,
+                    upper,
+                ));
+                group_index += 1;
+                start += size;
+            }
+
+            let plan = select_group_refinement_set(
+                &groups,
+                top_k,
+                complete_group_coverage(&groups),
+            )
+            .unwrap();
+            let selected: BTreeSet<String> =
+                plan.refinement_group_ids.iter().cloned().collect();
+            let mut selected_ids = Vec::new();
+            let mut start = 0usize;
+            for (group_index, group) in groups.iter().enumerate() {
+                let size = group.member_count;
+                if selected.contains(&format!("group-{group_index:04}")) {
+                    selected_ids.extend(
+                        exact_scores[start..start + size]
+                            .iter()
+                            .map(|(id, _)| id.clone()),
+                    );
+                }
+                start += size;
+            }
+
+            let full: Vec<ExactScoreRecord<String>> = exact_scores
+                .iter()
+                .map(|(id, score)| ExactScoreRecord {
+                    id: id.clone(),
+                    score: *score,
+                })
+                .collect();
+            let expected = stable_exact_top_k(&full, top_k).unwrap();
+            let selected_set: BTreeSet<String> = selected_ids.into_iter().collect();
+            let refined: Vec<ExactScoreRecord<String>> = exact_scores
+                .iter()
+                .filter(|(id, _)| selected_set.contains(id))
+                .map(|(id, score)| ExactScoreRecord {
+                    id: id.clone(),
+                    score: *score,
+                })
+                .collect();
+            let actual = stable_exact_top_k(&refined, top_k).unwrap();
+            assert_eq!(
+                actual, expected,
+                "weighted group selector false-pruned in case {case_index}"
+            );
         }
     }
 
