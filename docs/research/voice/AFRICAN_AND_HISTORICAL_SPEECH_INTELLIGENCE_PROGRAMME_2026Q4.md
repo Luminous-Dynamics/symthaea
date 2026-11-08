@@ -644,8 +644,10 @@ Important limitation: its 24-dimensional inventory was designed around Edoid/Yor
 
 - [#11137 — VOICE-PHON-FER-001](https://github.com/Luminous-Dynamics/symthaea/issues/11137) owns the scorer contract.
 - [Draft PR #11139](https://github.com/Luminous-Dynamics/symthaea/pull/11139) adds `phonological_eval.rs`, a generic language-profiled Rust scorer.
-- Eighteen synthetic test functions are authored but not executed.
+- Nineteen synthetic test functions are authored but not executed.
+- Ten synthetic FER/TER golden vectors and a Draft 2020-12 schema are registered in the benchmark matrix. A separate JavaScript implementation of the stated NA-aware Needleman–Wunsch policy recomputed all ten expected cases with no mismatches; this is arithmetic fixture validation only.
 - The scorer accepts feature-profile ID/revision, signed feature vectors, explicit tone-dimension indices and a declared gap penalty.
+- The dynamic-programming recurrence and backtrace both use the same NA-aware gap cost; an all-NA segment does not influence alignment cost or reported FER.
 - It returns FER/TER numerators, reference denominators, alignment columns and explicit non-estimability states.
 - It performs no G2P, tokenization, Unicode normalization or inventory construction.
 
@@ -734,3 +736,12 @@ Files:
 - `voice_benchmark_matrix_2026q4.schema.json`
 
 The new track schemas distinguish external paper comparators, language-profile authority, counterfactual controls, source evidence and prospective qualification. Registry structure does not establish dataset rights, model capability or benchmark PASS.
+
+
+### 17.4 FER/TER golden vectors
+
+The shared synthetic conformance set is:
+- `phonological_feature_golden_v0.1.json` (10 vectors);
+- `phonological_feature_golden_v0.1.schema.json` (JSON Schema Draft 2020-12).
+
+Cases cover exact match, fractional feature substitutions, NA masking, separate tone/segmental errors, tone non-estimability, tone-bearing deletion, custom gap penalties, all-NA insertions and no-active-reference non-estimability. The expected arithmetic was independently recomputed in JavaScript against the declared scoring policy with no mismatches. This does not execute the Rust scorer or establish reference-implementation parity.
