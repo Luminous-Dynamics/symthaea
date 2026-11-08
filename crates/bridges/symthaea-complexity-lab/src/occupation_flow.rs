@@ -7,8 +7,9 @@
 //! primal/dual verification through `lp_certificate`.
 
 use crate::lp_certificate::{
-    verify_primal_dual_gap, verify_primal_dual_optimality, LpCertificateError,
-    PrimalDualCertificate, RationalLp, VerifiedLpGap, VerifiedLpOptimum,
+    verify_sparse_primal_dual_gap, verify_sparse_primal_dual_optimality,
+    LpCertificateError, PrimalDualCertificate, SparseRationalLp, VerifiedLpGap,
+    VerifiedLpOptimum,
 };
 use crate::semiring::CheckedRational;
 use std::error::Error;
@@ -131,7 +132,7 @@ pub enum UtilityDirection {
 pub struct OccupationFlowBudget {
     pub max_variables: usize,
     pub max_constraints: usize,
-    pub max_matrix_entries: usize,
+    pub max_nonzero_entries: usize,
     /// Maximum bit width of any rational numerator or denominator.
     pub max_rational_bit_width: usize,
     /// Maximum number of rational entries in a primal/dual certificate.
@@ -211,7 +212,7 @@ pub struct VerifiedOccupationFlowGap {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OccupationFlowLp {
-    lp: RationalLp,
+    lp: SparseRationalLp,
     layout: OccupationFlowLayout,
     direction: UtilityDirection,
     budget: OccupationFlowBudget,
@@ -220,7 +221,7 @@ pub struct OccupationFlowLp {
 }
 
 impl OccupationFlowLp {
-    pub fn problem(&self) -> &RationalLp { &self.lp }
+    pub fn problem(&self) -> &SparseRationalLp { &self.lp }
     pub fn layout(&self) -> OccupationFlowLayout { self.layout }
     pub fn direction(&self) -> UtilityDirection { self.direction }
     /// SHA-256 of the versioned canonical source interval-model transcript.
@@ -297,11 +298,11 @@ impl OccupationFlowLp {
             check_rational_bit_width(*value, self.budget)?;
         }
 
-        let matrix_products = self.lp.row_count()
-            .checked_mul(self.lp.column_count())
+        let sparse_products = self.lp.nonzero_count()
+            .checked_mul(2)
             .ok_or(OccupationFlowError::DimensionOverflow)?;
-        let work = matrix_products.checked_mul(2)
-            .and_then(|value| value.checked_add(self.lp.row_count())) 
+        let work = sparse_products
+            .checked_add(self.lp.row_count())
             .and_then(|value| value.checked_add(self.lp.column_count()))
             .ok_or(OccupationFlowError::DimensionOverflow)?;
         if work > self.budget.max_verifier_multiply_adds {
@@ -335,7 +336,7 @@ impl OccupationFlowLp {
     ) -> Result<VerifiedOccupationFlowOptimum, OccupationFlowError> {
         self.verify_certificate_budget(certificate)?;
         let VerifiedLpOptimum { objective } =
-            verify_primal_dual_optimality(&self.lp, certificate)?;
+            verify_sparse_primal_dual_optimality(&self.lp, certificate)?;
         Ok(VerifiedOccupationFlowOptimum {
             source_model_sha256: self.source_model_sha256,
             compiled_lp_sha256: self.compiled_lp_sha256,
@@ -357,7 +358,7 @@ impl OccupationFlowLp {
             lower_bound,
             upper_bound,
             absolute_gap,
-        } = verify_primal_dual_gap(&self.lp, certificate, requested_gap)?;
+        } = verify_sparse_primal_dual_gap(&self.lp, certificate, requested_gap)?;
         let (lower_utility, upper_utility) = match self.direction {
             UtilityDirection::Maximize => (lower_bound, upper_bound),
             UtilityDirection::Minimize => (
@@ -514,7 +515,7 @@ fn validate_score_matrix(
 fn preflight_dimensions(
     model: &StagewiseIntervalMarkovModel,
     budget: OccupationFlowBudget,
-) -> Result<(OccupationFlowLayout, usize), OccupationFlowError> {
+) -> Result<(OccupationFlowLayout, usize, usize), OccupationFlowError> {
     let periods = model.period_count();
     let states = model.state_count();
 
@@ -546,13 +547,21 @@ fn preflight_dimensions(
                 .checked_add(initial_rows)
         })
         .ok_or(OccupationFlowError::DimensionOverflow)?;
-    let matrix_entries = constraint_count.checked_mul(variable_count)
+    let initial_nonzeros = states.checked_mul(2)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let per_stage_nonzeros = states.checked_mul(states)
+        .and_then(|value| value.checked_mul(8))
+        .and_then(|value| value.checked_add(states.checked_mul(4)?))
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let nonzero_count = model.transitions.len()
+        .checked_mul(per_stage_nonzeros)
+        .and_then(|value| value.checked_add(initial_nonzeros))
         .ok_or(OccupationFlowError::DimensionOverflow)?;
 
     for (resource, required, limit) in [
         ("variables", variable_count, budget.max_variables),
         ("constraints", constraint_count, budget.max_constraints),
-        ("dense matrix entries", matrix_entries, budget.max_matrix_entries),
+        ("sparse nonzero entries", nonzero_count, budget.max_nonzero_entries),
     ] {
         if required > limit {
             return Err(OccupationFlowError::BudgetExceeded { resource, required, limit });
@@ -567,6 +576,7 @@ fn preflight_dimensions(
             variable_count,
         },
         constraint_count,
+        nonzero_count,
     ))
 }
 
@@ -663,14 +673,14 @@ pub fn build_occupation_flow_lp(
     budget: OccupationFlowBudget,
 ) -> Result<OccupationFlowLp, OccupationFlowError> {
     validate_score_matrix(model, state_scores, budget)?;
-    let (layout, constraint_count) = preflight_dimensions(model, budget)?;
+    let (layout, constraint_count, nonzero_count) = preflight_dimensions(model, budget)?;
     let periods = model.period_count();
     let states = model.state_count();
 
-    let mut matrix: Vec<Vec<CheckedRational>> = Vec::new();
+    let mut matrix: Vec<Vec<(usize, CheckedRational)>> = Vec::new();
     matrix.try_reserve_exact(constraint_count).map_err(|_| {
         OccupationFlowError::AllocationFailed {
-            resource: "constraint rows",
+            resource: "sparse constraint rows",
             requested: constraint_count,
         }
     })?;
@@ -684,56 +694,87 @@ pub fn build_occupation_flow_lp(
 
     // Initial occupancy: omega[0,i] = initial[i].
     for state in 0..states {
-        let mut row = zero_row(layout.variable_count())?;
-        row[layout.occupancy_variable(0, state).unwrap()] = CheckedRational::one();
-        add_equality(&mut matrix, &mut rhs, row, model.initial[state])?;
+        let row = sparse_row(&[
+            (layout.occupancy_variable(0, state).unwrap(), CheckedRational::one()),
+        ])?;
+        add_sparse_equality(&mut matrix, &mut rhs, row, model.initial[state])?;
     }
 
     for stage in 0..model.transitions.len() {
         // Outflow from each source state equals its current occupancy.
         for source in 0..states {
-            let mut row = zero_row(layout.variable_count())?;
-            row[layout.occupancy_variable(stage, source).unwrap()] =
-                CheckedRational::from_integer(-1);
+            let mut row = sparse_row(&[
+                (
+                    layout.occupancy_variable(stage, source).unwrap(),
+                    CheckedRational::from_integer(-1),
+                ),
+            ])?;
+            row.try_reserve_exact(states).map_err(|_| {
+                OccupationFlowError::AllocationFailed {
+                    resource: "outflow sparse row entries",
+                    requested: states,
+                }
+            })?;
             for destination in 0..states {
-                row[layout.flow_variable(stage, source, destination).unwrap()] =
-                    CheckedRational::one();
+                row.push((
+                    layout.flow_variable(stage, source, destination).unwrap(),
+                    CheckedRational::one(),
+                ));
             }
-            add_equality(&mut matrix, &mut rhs, row, CheckedRational::zero())?;
+            add_sparse_equality(&mut matrix, &mut rhs, row, CheckedRational::zero())?;
         }
 
         // Inflow to each destination state equals next-period occupancy.
         for destination in 0..states {
-            let mut row = zero_row(layout.variable_count())?;
-            row[layout.occupancy_variable(stage + 1, destination).unwrap()] =
-                CheckedRational::one();
+            let mut row = sparse_row(&[
+                (
+                    layout.occupancy_variable(stage + 1, destination).unwrap(),
+                    CheckedRational::one(),
+                ),
+            ])?;
+            row.try_reserve_exact(states).map_err(|_| {
+                OccupationFlowError::AllocationFailed {
+                    resource: "inflow sparse row entries",
+                    requested: states,
+                }
+            })?;
             for source in 0..states {
-                row[layout.flow_variable(stage, source, destination).unwrap()] =
-                    CheckedRational::from_integer(-1);
+                row.push((
+                    layout.flow_variable(stage, source, destination).unwrap(),
+                    CheckedRational::from_integer(-1),
+                ));
             }
-            add_equality(&mut matrix, &mut rhs, row, CheckedRational::zero())?;
+            add_sparse_equality(&mut matrix, &mut rhs, row, CheckedRational::zero())?;
         }
 
-        // Each row's local transition bounds: lower*omega <= flow <= upper*omega.
+        // Each interval bound touches exactly occupancy and one flow variable.
         for source in 0..states {
             for destination in 0..states {
                 let interval = model.transitions[stage][source][destination];
                 let occupancy = layout.occupancy_variable(stage, source).unwrap();
                 let flow = layout.flow_variable(stage, source, destination).unwrap();
 
-                let mut lower_row = zero_row(layout.variable_count())?;
-                lower_row[occupancy] = interval.lower;
-                lower_row[flow] = CheckedRational::from_integer(-1);
-                add_inequality(&mut matrix, &mut rhs, lower_row, CheckedRational::zero());
+                let lower_row = sparse_row(&[
+                    (occupancy, interval.lower),
+                    (flow, CheckedRational::from_integer(-1)),
+                ])?;
+                add_sparse_inequality(
+                    &mut matrix,
+                    &mut rhs,
+                    lower_row,
+                    CheckedRational::zero(),
+                );
 
-                let mut upper_row = zero_row(layout.variable_count())?;
-                upper_row[flow] = CheckedRational::one();
-                upper_row[occupancy] = CheckedRational::new(
-                    interval.upper.numerator().checked_neg()
-                        .ok_or(OccupationFlowError::ArithmeticOverflow)?,
-                    interval.upper.denominator(),
-                ).map_err(|_| OccupationFlowError::ArithmeticOverflow)?;
-                add_inequality(&mut matrix, &mut rhs, upper_row, CheckedRational::zero());
+                let upper_row = sparse_row(&[
+                    (occupancy, negate_rational(interval.upper)?),
+                    (flow, CheckedRational::one()),
+                ])?;
+                add_sparse_inequality(
+                    &mut matrix,
+                    &mut rhs,
+                    upper_row,
+                    CheckedRational::zero(),
+                );
             }
         }
     }
@@ -753,9 +794,12 @@ pub fn build_occupation_flow_lp(
         }
     }
 
-    let lp = RationalLp::new(matrix, rhs, objective)?;
+    let lp = SparseRationalLp::new(matrix, rhs, objective)?;
+    if lp.nonzero_count() != nonzero_count {
+        return Err(OccupationFlowError::DimensionOverflow);
+    }
     let source_model_sha256 = canonical_interval_model_sha256(model);
-    let compiled_lp_sha256 = canonical_occupation_lp_sha256(
+    let compiled_lp_sha256 = canonical_occupation_sparse_lp_sha256(
         &lp,
         layout,
         direction,
@@ -799,28 +843,30 @@ pub fn canonical_interval_model_sha256(
     hasher.finalize().into()
 }
 
-/// Versioned canonical identity of the compiled standard-form LP.
-/// Source digest and direction are included to bind the semantics, not just
-/// the dimensions and resulting coefficient matrix.
-fn canonical_occupation_lp_sha256(
-    lp: &RationalLp,
+/// Versioned canonical sparse LP identity. Every row length, sorted
+/// column coordinate and rational coefficient is committed in stream order.
+fn canonical_occupation_sparse_lp_sha256(
+    lp: &SparseRationalLp,
     layout: OccupationFlowLayout,
     direction: UtilityDirection,
     source_model_sha256: [u8; 32],
 ) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(b"SYMPGM-OCCUPATION-LP\0\x01");
+    hasher.update(b"SYMPGM-OCCUPATION-SPARSE-LP\\0\\x01");
     hasher.update(source_model_sha256);
     hasher.update((layout.period_count() as u64).to_le_bytes());
     hasher.update((layout.state_count() as u64).to_le_bytes());
     hasher.update((lp.row_count() as u64).to_le_bytes());
     hasher.update((lp.column_count() as u64).to_le_bytes());
+    hasher.update((lp.nonzero_count() as u64).to_le_bytes());
     hasher.update([match direction {
         UtilityDirection::Maximize => 0,
         UtilityDirection::Minimize => 1,
     }]);
-    for row in lp.matrix() {
-        for coefficient in row {
+    for row in lp.rows() {
+        hasher.update((row.len() as u64).to_le_bytes());
+        for (column, coefficient) in row {
+            hasher.update((*column as u64).to_le_bytes());
             hash_rational(&mut hasher, *coefficient);
         }
     }
@@ -832,7 +878,6 @@ fn canonical_occupation_lp_sha256(
     }
     hasher.finalize().into()
 }
-
 fn hash_rational(hasher: &mut Sha256, value: CheckedRational) {
     hasher.update(value.numerator().to_le_bytes());
     hasher.update(value.denominator().to_le_bytes());
@@ -845,6 +890,53 @@ pub fn sha256_hex(digest: [u8; 32]) -> String {
         let _ = write!(&mut output, "{byte:02x}");
     }
     output
+}
+
+fn sparse_row(
+    entries: &[(usize, CheckedRational)],
+) -> Result<Vec<(usize, CheckedRational)>, OccupationFlowError> {
+    let mut row = Vec::new();
+    row.try_reserve_exact(entries.len()).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "sparse constraint row entries",
+            requested: entries.len(),
+        }
+    })?;
+    row.extend_from_slice(entries);
+    Ok(row)
+}
+
+fn add_sparse_inequality(
+    matrix: &mut Vec<Vec<(usize, CheckedRational)>>,
+    rhs: &mut Vec<CheckedRational>,
+    row: Vec<(usize, CheckedRational)>,
+    bound: CheckedRational,
+) {
+    matrix.push(row);
+    rhs.push(bound);
+}
+
+fn add_sparse_equality(
+    matrix: &mut Vec<Vec<(usize, CheckedRational)>>,
+    rhs: &mut Vec<CheckedRational>,
+    row: Vec<(usize, CheckedRational)>,
+    value: CheckedRational,
+) -> Result<(), OccupationFlowError> {
+    let mut negated = Vec::new();
+    negated.try_reserve_exact(row.len()).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "negated sparse equality row",
+            requested: row.len(),
+        }
+    })?;
+    for &(column, coefficient) in &row {
+        negated.push((column, negate_rational(coefficient)?));
+    }
+    matrix.push(row);
+    rhs.push(value);
+    matrix.push(negated);
+    rhs.push(negate_rational(value)?);
+    Ok(())
 }
 
 fn zero_row(length: usize) -> Result<Vec<CheckedRational>, OccupationFlowError> {
@@ -974,7 +1066,7 @@ mod tests {
         OccupationFlowBudget {
             max_variables: 14,
             max_constraints: 36,
-            max_matrix_entries: max_entries,
+            max_nonzero_entries: max_entries,
             max_rational_bit_width: 64,
             max_certificate_entries: 64,
             max_certificate_memory_bytes: 1_000_000,
@@ -1479,7 +1571,7 @@ mod tests {
                 budget(503),
             ),
             Err(OccupationFlowError::BudgetExceeded {
-                resource: "dense matrix entries",
+                resource: "sparse nonzero entries",
                 required: 504,
                 limit: 503,
             })
@@ -1497,7 +1589,7 @@ mod tests {
         let tight = OccupationFlowBudget {
             max_variables: 14,
             max_constraints: 36,
-            max_matrix_entries: 504,
+            max_nonzero_entries: 504,
             max_rational_bit_width: 3,
             max_certificate_entries: 64,
             max_certificate_memory_bytes: 1_000_000,
@@ -1530,7 +1622,7 @@ mod tests {
             OccupationFlowBudget {
                 max_variables: 6,
                 max_constraints: 20,
-                max_matrix_entries: 120,
+                max_nonzero_entries: 120,
                 max_rational_bit_width: 64,
                 max_certificate_entries: 64,
                 max_certificate_memory_bytes: 1_000_000,
