@@ -1,0 +1,764 @@
+{
+  "schema": "za-lex-resource-audit/v1",
+  "source": {
+    "repository": "https://github.com/NWU-MuST/za_lex",
+    "commit": "59a93768d72b5804f8b87bc3dd409320c8f0c328",
+    "commit_date": "2017-12-14",
+    "source_description": "Pinned upstream metadata snapshot; no resource bytes are vendored in this repository."
+  },
+  "status": {
+    "integration": "not_integrated",
+    "rights_review": "metadata_audited_per_file_not_legal_opinion",
+    "model_training_rights": "not_assessed_and_not_inferred",
+    "speech_synthesis_rights": "not_assessed_and_not_inferred",
+    "singing_synthesis_rights": "not_assessed_and_not_inferred"
+  },
+  "files": [
+    {
+      "path": "data/afr/COPYRIGHT",
+      "git_blob_sha1": "99de10954edbd118e5d2055698b5d6aeadc4b10d",
+      "size_bytes": 555,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/afr/README.md",
+      "git_blob_sha1": "8ae1f62d43cd808aaa40bd6db821ec5f8c95af2b",
+      "size_bytes": 4771,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/afr/graphemeset.txt",
+      "git_blob_sha1": "deb2eed00e4464e005eaba5ddedd9385b7978a73",
+      "size_bytes": 90,
+      "purpose": "language-specific grapheme inventory fingerprint"
+    },
+    {
+      "path": "data/afr/phonememap.ipa-example.tsv",
+      "git_blob_sha1": "d71e8137e143edb6d34f91a65762eabda35bc4d9",
+      "size_bytes": 367,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/afr/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "f18a5ccd023dc1f3878bbbdd6751691f5cf4ae32",
+      "size_bytes": 259,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/afr/phonememap.ipa-xsampa.tsv",
+      "git_blob_sha1": "13e58b1f1f4f8b3a404c5ed0688290febb00508b",
+      "size_bytes": 248,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/afr/phonemeset.json",
+      "git_blob_sha1": "8d3eceeab40e06c2ecccc1fa4b6f8416c454bfa1",
+      "size_bytes": 3553,
+      "purpose": "language-specific phone inventory fingerprint"
+    },
+    {
+      "path": "data/afr/pronundict.txt",
+      "git_blob_sha1": "44b828de8c2e66bbecc4ec75d72cba6710bad919",
+      "size_bytes": 1126187,
+      "purpose": "third-party pronunciation dictionary fingerprint; source data not copied"
+    },
+    {
+      "path": "data/afr/ref/README.md",
+      "git_blob_sha1": "3668593a8d80db7acc0afe3f13c55c92e8c59ade",
+      "size_bytes": 861,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/afr/ref/rcrl_apd_20110311/LICENCE",
+      "git_blob_sha1": "71ce8dd12f043629c1135fef138ecd7b50f24c56",
+      "size_bytes": 711,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/afr/ref/rcrl_apd_20110311/README.TXT",
+      "git_blob_sha1": "2d89d6abcedd28ca7f8cb54bf89fcc94f1c3ea0c",
+      "size_bytes": 2786,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/eng/COPYRIGHT",
+      "git_blob_sha1": "112b03a59d0eae0fd3a17adad7c4bdac00d484cb",
+      "size_bytes": 717,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/eng/README.md",
+      "git_blob_sha1": "c2e402720942f9ee09af6256d241498ecc24007d",
+      "size_bytes": 4249,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/eng/graphemeset.txt",
+      "git_blob_sha1": "4f3f4c6e2511705daee0a04dfbf6bbf8b816e709",
+      "size_bytes": 54,
+      "purpose": "language-specific grapheme inventory fingerprint"
+    },
+    {
+      "path": "data/eng/phonememap.ipa-example.tsv",
+      "git_blob_sha1": "fba72902cf1b59516840f1284a7b49f96393aa44",
+      "size_bytes": 324,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/eng/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "edfce2107d55952f76c47e6350e8abd4e063359a",
+      "size_bytes": 237,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/eng/phonememap.ipa-xsampa.tsv",
+      "git_blob_sha1": "a787a48cf97b3cd2944a20c9e40b9515f82c194e",
+      "size_bytes": 233,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/eng/phonemeset.json",
+      "git_blob_sha1": "02b1da7dcaf6d0d3411a54bc2f7fbcba35d4614b",
+      "size_bytes": 3854,
+      "purpose": "language-specific phone inventory fingerprint"
+    },
+    {
+      "path": "data/eng/pronundict.txt",
+      "git_blob_sha1": "d8aefd53d498d4cfcca2051f0ed4943cf8a36f8b",
+      "size_bytes": 66890,
+      "purpose": "third-party pronunciation dictionary fingerprint; source data not copied"
+    },
+    {
+      "path": "data/sot/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/sot/g2p.translit.txt",
+      "git_blob_sha1": "5a8c50e46c6857a437cf7ef2a89bb8f390e3c8b4",
+      "size_bytes": 3338,
+      "purpose": "language-specific grapheme-to-phone rule fingerprint"
+    },
+    {
+      "path": "data/sot/graphemeset.txt",
+      "git_blob_sha1": "eb8d979ea4b9b83562d0213b81938f61f23daadc",
+      "size_bytes": 63,
+      "purpose": "language-specific grapheme inventory fingerprint"
+    },
+    {
+      "path": "data/sot/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "e83ed46ffade046a69353cf36c82bdc8c7cd8837",
+      "size_bytes": 287,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/sot/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "b6b68b84efb47f4586be3b4d8272ec3da2eb6bf8",
+      "size_bytes": 317,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/sot/phonememap.ipa-xsampa.tsv",
+      "git_blob_sha1": "ec44cbd695c8707e3bf38e63db76b9166c6cf29f",
+      "size_bytes": 302,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/sot/phonemeset.json",
+      "git_blob_sha1": "c7e7901e5675656a6a04fb701745ad3604a6220c",
+      "size_bytes": 4338,
+      "purpose": "language-specific phone inventory fingerprint"
+    },
+    {
+      "path": "data/sot/ref/README.md",
+      "git_blob_sha1": "2aaba32ed84706bfed76a434a6bbb66edf675349",
+      "size_bytes": 1175,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.dict",
+      "git_blob_sha1": "f431a9f5d047bb8e378421566d8f6fca95b6545b",
+      "size_bytes": 403990,
+      "purpose": "third-party pronunciation dictionary fingerprint; source data not copied"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.map.graphs",
+      "git_blob_sha1": "8c4aa40e1459304689cdfd5bec7f60283f7beba6",
+      "size_bytes": 5,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.map.phones",
+      "git_blob_sha1": "423c63cc6ae460f48365f578b037fe629ca2fcd6",
+      "size_bytes": 220,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.rules",
+      "git_blob_sha1": "2762bcfa8292b05b80537b0a1e671fe684672320",
+      "size_bytes": 910,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/tsn/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/tsn/diacritic.descr.json",
+      "git_blob_sha1": "266098f31eb4429c929da16667477ea14474f437",
+      "size_bytes": 134,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/tsn/g2p.translit.txt",
+      "git_blob_sha1": "563fa242590ead292ff3c2da82ed975145517598",
+      "size_bytes": 1974,
+      "purpose": "language-specific grapheme-to-phone rule fingerprint"
+    },
+    {
+      "path": "data/tsn/graphemeset.txt",
+      "git_blob_sha1": "c2180cf407a1593a1e5c6ecade6c47ff8cd9aa8d",
+      "size_bytes": 63,
+      "purpose": "language-specific grapheme inventory fingerprint"
+    },
+    {
+      "path": "data/tsn/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "26d4f837aef00a812f7911dc340aafb3b2796d20",
+      "size_bytes": 222,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/tsn/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "c92722c923c2a582704858855b551010c6d7b74c",
+      "size_bytes": 236,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/tsn/phonememap.ipa-xsampa.tsv",
+      "git_blob_sha1": "f665676340fefff891db275079a931d943b3b075",
+      "size_bytes": 234,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/tsn/phonemeset.json",
+      "git_blob_sha1": "5d32f9a198c0f5dfbd27fa09fc618423d9dce87c",
+      "size_bytes": 3612,
+      "purpose": "language-specific phone inventory fingerprint"
+    },
+    {
+      "path": "data/tsn/ref/README.md",
+      "git_blob_sha1": "80498063553aa1696c5a0054ec69fe06863ea6aa",
+      "size_bytes": 1175,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.dict",
+      "git_blob_sha1": "32264296797fc6a7b7421338ccce34f4ea00f61b",
+      "size_bytes": 417998,
+      "purpose": "third-party pronunciation dictionary fingerprint; source data not copied"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.map.graphs",
+      "git_blob_sha1": "8c4aa40e1459304689cdfd5bec7f60283f7beba6",
+      "size_bytes": 5,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.map.phones",
+      "git_blob_sha1": "6d8b107b994ae0901f14b9bc26c3b528feac734f",
+      "size_bytes": 174,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.rules",
+      "git_blob_sha1": "62d92d81c971161ba692c382c63716ddcf756740",
+      "size_bytes": 936,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/xho/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/xho/g2p.translit.txt",
+      "git_blob_sha1": "f466a59f29a5c0841d3ad29593cb7cd9f3b5c88c",
+      "size_bytes": 3735,
+      "purpose": "language-specific grapheme-to-phone rule fingerprint"
+    },
+    {
+      "path": "data/xho/graphemeset.txt",
+      "git_blob_sha1": "4f3f4c6e2511705daee0a04dfbf6bbf8b816e709",
+      "size_bytes": 54,
+      "purpose": "language-specific grapheme inventory fingerprint"
+    },
+    {
+      "path": "data/xho/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "7bd23870d8f92aaeca2402bc61691554c2168caf",
+      "size_bytes": 352,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/xho/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "ce25f36b1551244e56e11a23219a386469929b41",
+      "size_bytes": 384,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/xho/phonememap.ipa-xsampa.tsv",
+      "git_blob_sha1": "6a223ba4865ce6897966801199e76deb0940f655",
+      "size_bytes": 385,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/xho/phonemeset.json",
+      "git_blob_sha1": "2216556d0513d9be912f2858180eae3715b50978",
+      "size_bytes": 5307,
+      "purpose": "language-specific phone inventory fingerprint"
+    },
+    {
+      "path": "data/xho/ref/README.md",
+      "git_blob_sha1": "82c66d405103aa87f52e25753d3f40f4368da5e2",
+      "size_bytes": 1175,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.dict",
+      "git_blob_sha1": "e4d66b010112ccb8fd2c5bf1e90a8e0e3e574fd1",
+      "size_bytes": 481451,
+      "purpose": "third-party pronunciation dictionary fingerprint; source data not copied"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.map.graphs",
+      "git_blob_sha1": "525689a19afa51ee731118d227be57dd000b02c1",
+      "size_bytes": 4,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.map.phones",
+      "git_blob_sha1": "58dd01286889375fe0dced94281cfcf19ea5e9f1",
+      "size_bytes": 289,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.rules",
+      "git_blob_sha1": "ce67432dd392cfd6dcf39e89e7150aada5bf9509",
+      "size_bytes": 1099,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/zul/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/zul/g2p.translit.txt",
+      "git_blob_sha1": "84446ac7e1f00b0dc242fdc9c25d9b0096195de7",
+      "size_bytes": 2252,
+      "purpose": "language-specific grapheme-to-phone rule fingerprint"
+    },
+    {
+      "path": "data/zul/graphemeset.txt",
+      "git_blob_sha1": "4f3f4c6e2511705daee0a04dfbf6bbf8b816e709",
+      "size_bytes": 54,
+      "purpose": "language-specific grapheme inventory fingerprint"
+    },
+    {
+      "path": "data/zul/morphrules.dcg.txt",
+      "git_blob_sha1": "c89dad46a392b34cac1a483491b5c1fb524865d6",
+      "size_bytes": 8477,
+      "purpose": "experimental morphology rule fingerprint"
+    },
+    {
+      "path": "data/zul/morphrules.descr.json",
+      "git_blob_sha1": "f6b678d6bb96305d1afaccde19f1f5b4c8fa2f76",
+      "size_bytes": 14205,
+      "purpose": "experimental morphology rule fingerprint"
+    },
+    {
+      "path": "data/zul/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "649c1300b2c3b1f2fd7f3a7be98d66e8a54db276",
+      "size_bytes": 286,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/zul/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "a853c7461f1d60b33c8c11cc1e3953c94335b937",
+      "size_bytes": 309,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/zul/phonememap.ipa-xsampa.tsv",
+      "git_blob_sha1": "1d700b618d4526dc799e74e4b8f731803dcf6718",
+      "size_bytes": 310,
+      "purpose": "language-specific phone mapping fingerprint"
+    },
+    {
+      "path": "data/zul/phonemeset.json",
+      "git_blob_sha1": "cecdc5535315009f8d4efd00ccfbac82f8612d97",
+      "size_bytes": 5154,
+      "purpose": "language-specific phone inventory fingerprint"
+    },
+    {
+      "path": "data/zul/ref/README.md",
+      "git_blob_sha1": "60a17b52a1622e11d3cb0e37114d558b956d6ac5",
+      "size_bytes": 1175,
+      "purpose": "upstream resource documentation fingerprint"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "language-specific rights and attribution notice fingerprint"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.dict",
+      "git_blob_sha1": "bc4af3e3e1648bc43b7464de7450910b9484e967",
+      "size_bytes": 468519,
+      "purpose": "third-party pronunciation dictionary fingerprint; source data not copied"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.map.graphs",
+      "git_blob_sha1": "525689a19afa51ee731118d227be57dd000b02c1",
+      "size_bytes": 4,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.map.phones",
+      "git_blob_sha1": "70a2c4f90e3d1d459b2c068600bf5a28fed8b025",
+      "size_bytes": 238,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.rules",
+      "git_blob_sha1": "bbcc29fb32ba916736bebfd98f66fc995928d214",
+      "size_bytes": 887,
+      "purpose": "upstream linguistic resource fingerprint; source data not copied"
+    },
+    {
+      "path": "scripts/decomp_simple.py",
+      "git_blob_sha1": "86f6782dd9466419de5575d5a4e08a44c64e52b3",
+      "size_bytes": 6591,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/diacritise.py",
+      "git_blob_sha1": "f42aecf7c3636874365c2b1fef9120b645ff284c",
+      "size_bytes": 1114,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/diacritiser.py",
+      "git_blob_sha1": "c15596a9342cee1a8e08519f19af3867eac2847f",
+      "size_bytes": 9534,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/dictconv.py",
+      "git_blob_sha1": "06973b17860967c88422d4082bef0e4eb36135eb",
+      "size_bytes": 4296,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/dictmapphones.py",
+      "git_blob_sha1": "760fccfba1da937b92fd0261811c5513c6dbb71c",
+      "size_bytes": 1689,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/morph_dcg.py",
+      "git_blob_sha1": "34f4b4c135d8a664e02c50d6267e93866c89e29c",
+      "size_bytes": 15272,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/stress_afr.py",
+      "git_blob_sha1": "58d506da435a16ff932091f2dc4c9a58ff09bea3",
+      "size_bytes": 19186,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/syl_sot.py",
+      "git_blob_sha1": "8ee8278583c97c58d2c0a413fb3262e19bbff632",
+      "size_bytes": 8145,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/syl_tsn.py",
+      "git_blob_sha1": "59d5ae676c08fad1cd9eaf53880911b089eae5a3",
+      "size_bytes": 8060,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/syl_xho.py",
+      "git_blob_sha1": "d88f674093b2cc733cf4d5125ac40bb7355051bd",
+      "size_bytes": 9421,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    },
+    {
+      "path": "scripts/syl_zul.py",
+      "git_blob_sha1": "8a5e99d6f6dabeef8ccfc7820d060683ef312864",
+      "size_bytes": 9420,
+      "purpose": "upstream G2P, syllabification or normalization code fingerprint"
+    }
+  ],
+  "language_profiles": [
+    {
+      "id": "af-ZA",
+      "license": "CC-BY-SA-2.5-ZA",
+      "resource_files": [
+        "data/afr/COPYRIGHT",
+        "data/afr/README.md",
+        "data/afr/graphemeset.txt",
+        "data/afr/phonememap.ipa-example.tsv",
+        "data/afr/phonememap.ipa-hts.tsv",
+        "data/afr/phonememap.ipa-xsampa.tsv",
+        "data/afr/phonemeset.json",
+        "data/afr/pronundict.txt",
+        "data/afr/ref/README.md",
+        "data/afr/ref/rcrl_apd_20110311/LICENCE",
+        "data/afr/ref/rcrl_apd_20110311/README.TXT",
+        "scripts/decomp_simple.py",
+        "scripts/diacritise.py",
+        "scripts/diacritiser.py",
+        "scripts/dictconv.py",
+        "scripts/dictmapphones.py",
+        "scripts/stress_afr.py"
+      ],
+      "rights_notes": [
+        "Afrikaans candidate dictionary and phone inventory only; dictionary is derived from the RCRL APD resource.",
+        "CC BY-SA 2.5 South Africa attribution and ShareAlike obligations require review before adaptation or redistribution.",
+        "Stress rules are documented as work-in-progress; no singing, speech synthesis or dialect qualification is claimed."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "graphemes": true,
+        "phoneme_inventory": true,
+        "phoneme_mapping": true,
+        "stress_rules": "experimental",
+        "singing_synthesis": false
+      },
+      "qualification": "research_only_not_integrated_not_singing_qualified"
+    },
+    {
+      "id": "en-ZA",
+      "license": "CC-BY-4.0; derived NCHLT source CC-BY-3.0",
+      "resource_files": [
+        "data/eng/COPYRIGHT",
+        "data/eng/README.md",
+        "data/eng/graphemeset.txt",
+        "data/eng/phonememap.ipa-example.tsv",
+        "data/eng/phonememap.ipa-hts.tsv",
+        "data/eng/phonememap.ipa-xsampa.tsv",
+        "data/eng/phonemeset.json",
+        "data/eng/pronundict.txt",
+        "scripts/decomp_simple.py",
+        "scripts/diacritise.py",
+        "scripts/diacritiser.py",
+        "scripts/dictconv.py",
+        "scripts/dictmapphones.py"
+      ],
+      "rights_notes": [
+        "Limited manually assembled South African English dictionary and inventory; README notes one pronunciation per entry.",
+        "Heteronyms, accent variation and contextual variants need separate annotation.",
+        "Derived NCHLT material has its own attribution and license notice; no voice synthesis permission is inferred."
+      ],
+      "capabilities": {
+        "dictionary": "limited",
+        "graphemes": true,
+        "phoneme_inventory": true,
+        "phoneme_mapping": true,
+        "heteronym_variants": false,
+        "singing_synthesis": false
+      },
+      "qualification": "research_only_not_integrated_not_singing_qualified"
+    },
+    {
+      "id": "st-ZA",
+      "license": "CC-BY-3.0",
+      "resource_files": [
+        "data/sot/COPYRIGHT",
+        "data/sot/g2p.translit.txt",
+        "data/sot/graphemeset.txt",
+        "data/sot/phonememap.ipa-hts.tsv",
+        "data/sot/phonememap.ipa-nchlt.tsv",
+        "data/sot/phonememap.ipa-xsampa.tsv",
+        "data/sot/phonemeset.json",
+        "data/sot/ref/README.md",
+        "data/sot/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.dict",
+        "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.map.graphs",
+        "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.map.phones",
+        "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.rules",
+        "scripts/decomp_simple.py",
+        "scripts/diacritise.py",
+        "scripts/diacritiser.py",
+        "scripts/dictconv.py",
+        "scripts/dictmapphones.py",
+        "scripts/syl_sot.py"
+      ],
+      "rights_notes": [
+        "NCHLT 2013 dictionary and transliteration rules are historical; rule-match counts are not held-out accuracy.",
+        "The phone set does not itself establish tone-aware singing pronunciation.",
+        "Requires current speaker/community review before any language-task qualification."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_rules": true,
+        "phoneme_inventory": true,
+        "tone_prediction": "not encoded by source set",
+        "singing_synthesis": false
+      },
+      "qualification": "research_only_not_integrated_not_singing_qualified"
+    },
+    {
+      "id": "tn-ZA",
+      "license": "CC-BY-3.0",
+      "resource_files": [
+        "data/tsn/COPYRIGHT",
+        "data/tsn/diacritic.descr.json",
+        "data/tsn/g2p.translit.txt",
+        "data/tsn/graphemeset.txt",
+        "data/tsn/phonememap.ipa-hts.tsv",
+        "data/tsn/phonememap.ipa-nchlt.tsv",
+        "data/tsn/phonememap.ipa-xsampa.tsv",
+        "data/tsn/phonemeset.json",
+        "data/tsn/ref/README.md",
+        "data/tsn/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.dict",
+        "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.map.graphs",
+        "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.map.phones",
+        "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.rules",
+        "scripts/decomp_simple.py",
+        "scripts/diacritise.py",
+        "scripts/diacritiser.py",
+        "scripts/dictconv.py",
+        "scripts/dictmapphones.py",
+        "scripts/syl_tsn.py"
+      ],
+      "rights_notes": [
+        "NCHLT 2013 dictionary and transliteration rules are historical; published rule-match notes use simplified vowel-diacritic matching.",
+        "Rule-match notes are not independent held-out pronunciation accuracy or evidence of singing support.",
+        "Requires current speaker/community review before any language-task qualification."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_rules": true,
+        "phoneme_inventory": true,
+        "tone_prediction": "not established by source set",
+        "singing_synthesis": false
+      },
+      "qualification": "research_only_not_integrated_not_singing_qualified"
+    },
+    {
+      "id": "xh-ZA",
+      "license": "CC-BY-3.0",
+      "resource_files": [
+        "data/xho/COPYRIGHT",
+        "data/xho/g2p.translit.txt",
+        "data/xho/graphemeset.txt",
+        "data/xho/phonememap.ipa-hts.tsv",
+        "data/xho/phonememap.ipa-nchlt.tsv",
+        "data/xho/phonememap.ipa-xsampa.tsv",
+        "data/xho/phonemeset.json",
+        "data/xho/ref/README.md",
+        "data/xho/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.dict",
+        "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.map.graphs",
+        "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.map.phones",
+        "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.rules",
+        "scripts/decomp_simple.py",
+        "scripts/diacritise.py",
+        "scripts/diacritiser.py",
+        "scripts/dictconv.py",
+        "scripts/dictmapphones.py",
+        "scripts/syl_xho.py"
+      ],
+      "rights_notes": [
+        "The phone inventory includes click distinctions and must never be reduced to ASCII grapheme splitting.",
+        "NCHLT 2013 source set does not encode tone or vowel length; modern dialect/community review is needed.",
+        "The profile is metadata-only and research-only; no production G2P, speech synthesis, or singing support is claimed."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_rules": true,
+        "phoneme_inventory": true,
+        "click_distinctions": true,
+        "tone_prediction": "not encoded by source set",
+        "singing_synthesis": false
+      },
+      "qualification": "research_only_not_integrated_not_singing_qualified"
+    },
+    {
+      "id": "zu-ZA",
+      "license": "CC-BY-3.0",
+      "resource_files": [
+        "data/zul/COPYRIGHT",
+        "data/zul/g2p.translit.txt",
+        "data/zul/graphemeset.txt",
+        "data/zul/morphrules.dcg.txt",
+        "data/zul/morphrules.descr.json",
+        "data/zul/phonememap.ipa-hts.tsv",
+        "data/zul/phonememap.ipa-nchlt.tsv",
+        "data/zul/phonememap.ipa-xsampa.tsv",
+        "data/zul/phonemeset.json",
+        "data/zul/ref/README.md",
+        "data/zul/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.dict",
+        "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.map.graphs",
+        "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.map.phones",
+        "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.rules",
+        "scripts/decomp_simple.py",
+        "scripts/diacritise.py",
+        "scripts/diacritiser.py",
+        "scripts/dictconv.py",
+        "scripts/dictmapphones.py",
+        "scripts/morph_dcg.py",
+        "scripts/syl_zul.py"
+      ],
+      "rights_notes": [
+        "The inventory includes click-related contrasts; a generic English IPA map is insufficient.",
+        "The upstream transliteration file contains a likely copy/paste header that describes isiXhosa while located in the isiZulu directory.",
+        "Morphology rules are distinct from G2P and require a separate evaluation; the source phone set does not encode tone.",
+        "The profile is metadata-only and research-only; no production G2P or singing support is claimed."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_rules": true,
+        "morphology_rules": "separate experimental resources",
+        "phoneme_inventory": true,
+        "click_distinctions": true,
+        "tone_prediction": "not encoded by source set",
+        "singing_synthesis": false
+      },
+      "qualification": "research_only_not_integrated_not_singing_qualified"
+    }
+  ]
+}
