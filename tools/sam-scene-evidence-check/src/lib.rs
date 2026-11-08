@@ -11,14 +11,20 @@ pub fn validate_files(schema_path: &Path, instance_path: &Path) -> Result<(), Ve
         .map_err(|error| vec![format!("read instance {}: {error}", instance_path.display())])?;
     let schema: Value = serde_json::from_str(&schema_text)
         .map_err(|error| vec![format!("parse schema {}: {error}", schema_path.display())])?;
-    let instance: Value = serde_json::from_str(&instance_text)
-        .map_err(|error| vec![format!("parse instance {}: {error}", instance_path.display())])?;
+    let instance: Value = serde_json::from_str(&instance_text).map_err(|error| {
+        vec![format!(
+            "parse instance {}: {error}",
+            instance_path.display()
+        )]
+    })?;
     validate_values(&schema, &instance)
 }
 
 pub fn validate_values(schema: &Value, instance: &Value) -> Result<(), Vec<String>> {
     if !jsonschema::meta::is_valid(schema) {
-        return Err(vec!["schema is not valid under its declared JSON Schema meta-schema".into()]);
+        return Err(vec![
+            "schema is not valid under its declared JSON Schema meta-schema".into(),
+        ]);
     }
 
     // The scene schema has only local $defs references. Offline mode makes an
@@ -92,8 +98,12 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
     }
 
     let time = snapshot.get("time");
-    let event = time.and_then(|value| value.get("event_tick_ns")).and_then(Value::as_u64);
-    let received = time.and_then(|value| value.get("receive_tick_ns")).and_then(Value::as_u64);
+    let event = time
+        .and_then(|value| value.get("event_tick_ns"))
+        .and_then(Value::as_u64);
+    let received = time
+        .and_then(|value| value.get("receive_tick_ns"))
+        .and_then(Value::as_u64);
     let processed = time
         .and_then(|value| value.get("processing_tick_ns"))
         .and_then(Value::as_u64);
@@ -205,7 +215,10 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         }
     }
 
-    if let Some(proposals) = snapshot.get("vision_hdc_proposals").and_then(Value::as_array) {
+    if let Some(proposals) = snapshot
+        .get("vision_hdc_proposals")
+        .and_then(Value::as_array)
+    {
         for (index, proposal) in proposals.iter().enumerate() {
             let prefix = format!("vision_hdc_proposals[{index}]");
             check_source_ref(
@@ -223,7 +236,10 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         }
     }
 
-    if let Some(predictions) = snapshot.get("prediction_set_refs").and_then(Value::as_array) {
+    if let Some(predictions) = snapshot
+        .get("prediction_set_refs")
+        .and_then(Value::as_array)
+    {
         for (index, prediction) in predictions.iter().enumerate() {
             let prefix = format!("prediction_set_refs[{index}]");
             check_track_ref(
@@ -310,7 +326,10 @@ fn validate_uncertainty(errors: &mut Vec<String>, prefix: &str, uncertainty: Opt
         .map_or(0, Vec::len);
     let diagonal = uncertainty.get("diagonal").and_then(Value::as_array);
 
-    if order_len == 0 || order_len != units_len || diagonal.map_or(true, |values| values.len() != order_len) {
+    if order_len == 0
+        || order_len != units_len
+        || diagonal.map_or(true, |values| values.len() != order_len)
+    {
         errors.push(format!(
             "{prefix}.uncertainty: diagonal covariance dimension must match state_order and units"
         ));
@@ -318,10 +337,11 @@ fn validate_uncertainty(errors: &mut Vec<String>, prefix: &str, uncertainty: Opt
     }
 
     if let Some(values) = diagonal {
-        if values
-            .iter()
-            .any(|value| value.as_f64().is_none_or(|number| !number.is_finite() || number < 0.0))
-        {
+        if values.iter().any(|value| {
+            value
+                .as_f64()
+                .is_none_or(|number| !number.is_finite() || number < 0.0)
+        }) {
             errors.push(format!(
                 "{prefix}.uncertainty: diagonal covariance entries must be finite and non-negative"
             ));
@@ -333,12 +353,15 @@ fn validate_class_distribution(errors: &mut Vec<String>, prefix: &str, classes: 
     let Some(classes) = classes else {
         return;
     };
-    if classes.get("distribution_status").and_then(Value::as_str) != Some("calibrated_probability") {
+    if classes.get("distribution_status").and_then(Value::as_str) != Some("calibrated_probability")
+    {
         return;
     }
     let scores = classes.get("scores").and_then(Value::as_array);
     let Some(scores) = scores else {
-        errors.push(format!("{prefix}.class_hypotheses: calibrated probability requires scores"));
+        errors.push(format!(
+            "{prefix}.class_hypotheses: calibrated probability requires scores"
+        ));
         return;
     };
     let sum: f64 = scores
@@ -438,8 +461,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_hypothesis_identity() {
         let (schema, mut fixture) = load_fixture();
-        let duplicate_id =
-            fixture["snapshot"]["object_hypotheses"][0]["hypothesis_id"].clone();
+        let duplicate_id = fixture["snapshot"]["object_hypotheses"][0]["hypothesis_id"].clone();
         fixture["snapshot"]["object_hypotheses"][1]["hypothesis_id"] = duplicate_id;
         assert!(validate_values(&schema, &fixture).is_err());
     }
