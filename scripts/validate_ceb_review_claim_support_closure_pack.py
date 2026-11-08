@@ -177,6 +177,13 @@ def self_test() -> list[str]:
         ))
         for case_id in CASE_IDS
     ) + "\nnot a sealed holdout"
+    challenge = challenge.replace(
+        "## CCL-S07",
+        "## CCL-S07\\nmutually dependent no independent circular positive-support",
+    ).replace(
+        "## CCL-S08",
+        "## CCL-S08\\nKnown counter-evidence contradictory trace within the stated supported redelivery horizon",
+    )
     key = "\n".join(
         "\n".join((
             f"## {i}. {case_id}",
@@ -191,6 +198,13 @@ def self_test() -> list[str]:
         "historical signed approval bytes current authorized/admissible incomplete closure"
     )
 
+    key = key.replace(
+        "## 7. CCL-S07",
+        "## 7. CCL-S07\\nExpected disposition: unresolved for both C1 and C2; two-node cycle; independent evidence root missing.",
+    ).replace(
+        "## 8. CCL-S08",
+        "## 8. CCL-S08\\nexpected disposition is **invalidate**; counterexample; new scoped proposition.",
+    )
     if validate(protocol, challenge, key):
         return ["valid minimal claim-support pack rejected"]
 
@@ -225,7 +239,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_SELF_TEST_PASS: 6 negative controls")
+        print("CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_SELF_TEST_PASS: 11 negative controls")
 
     documents: list[str] = []
     for relative in (PROTOCOL, CHALLENGE, KEY):
