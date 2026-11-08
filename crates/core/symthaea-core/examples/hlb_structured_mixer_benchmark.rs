@@ -28,8 +28,7 @@ fn main() {
     for &dimension in DIMENSIONS {
         let input = ContinuousHV::random(dimension, 0x51A7 + dimension as u64);
         let basis = ContinuousHV::basis(7, dimension);
-        let butterfly_pairs =
-            (dimension / 2) * (dimension.trailing_zeros() as usize);
+        let butterfly_pairs = (dimension / 2) * (dimension.trailing_zeros() as usize);
         let dense_parameters = dimension * dimension;
         let iterations = if dimension >= 16_384 { 16 } else { 48 };
 
