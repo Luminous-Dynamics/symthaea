@@ -367,14 +367,13 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
                         "pair {pair_id}: lane role / identity changed at index {index}"
                     ));
                 }
-                for field in ["center_lateral_m"] {
-                    let av = a_lane.get(field).and_then(Value::as_f64);
-                    let bv = b_lane.get(field).and_then(Value::as_f64);
-                    if !approx_eq(bv, av.map(|value| -value)) {
-                        errors.push(format!(
-                            "pair {pair_id}: lane {index} field {field} did not reflect"
-                        ));
-                    }
+                let field = "center_lateral_m";
+                let av = a_lane.get(field).and_then(Value::as_f64);
+                let bv = b_lane.get(field).and_then(Value::as_f64);
+                if !approx_eq(bv, av.map(|value| -value)) {
+                    errors.push(format!(
+                        "pair {pair_id}: lane {index} field {field} did not reflect"
+                    ));
                 }
                 if a_lane.get("relative_lateral_sign") == b_lane.get("relative_lateral_sign") {
                     errors.push(format!(
