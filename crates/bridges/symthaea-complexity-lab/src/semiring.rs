@@ -769,15 +769,13 @@ pub fn exhaustive_max_times_map_bounded(
         }
     })?;
     assignment.resize(graph.cardinalities.len(), 0usize);
-    let all_variables = (0..graph.cardinalities.len()).collect::<Vec<_>>();
 
     for full_index in 0..assignment_count {
-        decode_assignment(
-            full_index,
-            &all_variables,
-            &graph.cardinalities,
-            &mut assignment,
-        );
+        let mut remaining_index = full_index;
+        for variable in (0..graph.cardinalities.len()).rev() {
+            assignment[variable] = remaining_index % graph.cardinalities[variable];
+            remaining_index /= graph.cardinalities[variable];
+        }
 
         let mut score = CheckedRational::one();
         for factor in &ordered_factors {
