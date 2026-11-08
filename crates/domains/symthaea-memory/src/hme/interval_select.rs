@@ -306,6 +306,131 @@ pub struct GroupIntervalSelectionPlan {
 }
 
 
+
+/// In-memory admission receipt for one compressed group member.
+///
+/// Constructed only after the original payload/reconstruction residual was
+/// independently checked. Query-time use needs the compact reconstruction and
+/// this receipt, not the original payload. Persistent serialization,
+/// manifest authentication and reopen verification are deliberately not
+/// implemented by this in-memory prototype; #10917 owns that boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedMemberResidualCertificate {
+    group_identity: GroupScoreIntervalIdentity,
+    member_id: String,
+    original_payload_digest: [u8; 32],
+    reconstruction_digest: [u8; 32],
+    transform_profile_digest: [u8; 32],
+    residual_l2_upper: f32,
+    verification: ResidualCertificateVerification,
+}
+
+/// Error while checking an admission receipt against a group and reconstruction.
+#[derive(Debug, Clone, PartialEq)]
+pub enum VerifiedMemberResidualError {
+    /// Receipt was admitted for another immutable group snapshot.
+    GroupIdentityMismatch,
+    /// Receipt member ID is not present in the supplied group.
+    MemberNotInGroup,
+    /// The group does not bind the same original payload bytes.
+    OriginalPayloadDigestMismatch,
+    /// The compact reconstruction differs from the admitted reconstruction.
+    ReconstructionDigestMismatch,
+    /// The transform/codebook profile differs from the admitted profile.
+    TransformProfileMismatch,
+    /// The canonical score interval could not be computed.
+    ScoreInterval(ContinuousHVIntervalError),
+}
+
+impl std::fmt::Display for VerifiedMemberResidualError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GroupIdentityMismatch => write!(f, "residual receipt belongs to another group snapshot"),
+            Self::MemberNotInGroup => write!(f, "residual receipt member is not in the group"),
+            Self::OriginalPayloadDigestMismatch => write!(f, "original payload digest differs from group membership"),
+            Self::ReconstructionDigestMismatch => write!(f, "compact reconstruction differs from admitted reconstruction"),
+            Self::TransformProfileMismatch => write!(f, "transform/codebook profile differs from residual receipt"),
+            Self::ScoreInterval(error) => write!(f, "member score interval failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for VerifiedMemberResidualError {}
+
+impl VerifiedMemberResidualCertificate {
+    /// Independently verify and bind one member residual at ingestion/build time.
+    ///
+    /// The original bytes are read at this stage. The resulting opaque receipt
+    /// binds the residual radius to the parent group, original payload digest,
+    /// reconstruction digest and transform/codebook profile.
+    pub fn verify_at_ingest(
+        group: &GroupScoreIntervalRecord,
+        member_id: String,
+        original: &ContinuousHV,
+        reconstruction: &ContinuousHV,
+        residual_l2_upper: f32,
+        transform_profile_digest: [u8; 32],
+    ) -> Result<Self, GroupMemberScoreIntervalBuildError> {
+        let member_index = group
+            .member_ids
+            .binary_search(&member_id)
+            .map_err(|_| GroupMemberScoreIntervalBuildError::MemberNotInGroup)?;
+        let expected_payload_digest = group
+            .member_payload_digests
+            .get(member_index)
+            .copied()
+            .ok_or(GroupMemberScoreIntervalBuildError::OriginalPayloadDigestMismatch)?;
+        let original_payload_digest =
+            continuous_hv_member_payload_digest(&member_id, original);
+        if original_payload_digest != expected_payload_digest {
+            return Err(GroupMemberScoreIntervalBuildError::OriginalPayloadDigestMismatch);
+        }
+        let verification = verify_l2_residual_certificate(
+            original,
+            reconstruction,
+            residual_l2_upper,
+        )
+        .map_err(|error| {
+            GroupMemberScoreIntervalBuildError::ScoreInterval(
+                ScoreIntervalBuildError::ResidualCertificate(error),
+            )
+        })?;
+        Ok(Self {
+            group_identity: group.identity,
+            member_id,
+            original_payload_digest,
+            reconstruction_digest: continuous_hv_member_payload_digest(
+                group.member_ids[member_index].as_str(),
+                reconstruction,
+            ),
+            transform_profile_digest,
+            residual_l2_upper,
+            verification,
+        })
+    }
+
+    /// Parent group identity bound when the residual was verified.
+    pub fn group_identity(&self) -> GroupScoreIntervalIdentity {
+        self.group_identity
+    }
+
+    /// Stable member identifier bound into the receipt.
+    pub fn member_id(&self) -> &str {
+        &self.member_id
+    }
+
+    /// Upper L2 radius checked at ingestion.
+    pub fn residual_l2_upper(&self) -> f32 {
+        self.residual_l2_upper
+    }
+
+    /// Transform/codebook profile digest bound into the receipt.
+    pub fn transform_profile_digest(&self) -> [u8; 32] {
+        self.transform_profile_digest
+    }
+}
+
+
 /// One verified per-record interval tied to its parent group identity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroupMemberScoreIntervalRecord {
@@ -322,6 +447,8 @@ pub enum GroupMemberScoreIntervalBuildError {
     OriginalPayloadDigestMismatch,
     /// Original/reconstruction residual or score interval validation failed.
     ScoreInterval(ScoreIntervalBuildError),
+    /// The verified receipt does not match the group, reconstruction or transform.
+    VerifiedCertificate(VerifiedMemberResidualError),
 }
 
 impl std::fmt::Display for GroupMemberScoreIntervalBuildError {
@@ -330,6 +457,7 @@ impl std::fmt::Display for GroupMemberScoreIntervalBuildError {
             Self::MemberNotInGroup => write!(f, "record ID is not in the pinned parent group"),
             Self::OriginalPayloadDigestMismatch => write!(f, "original payload does not match the group-bound member bytes"),
             Self::ScoreInterval(error) => write!(f, "member score interval rejected: {error}"),
+            Self::VerifiedCertificate(error) => write!(f, "verified residual receipt rejected: {error}"),
         }
     }
 }
@@ -370,6 +498,80 @@ impl GroupMemberScoreIntervalRecord {
         Ok(Self {
             group_identity: group.identity,
             record,
+        })
+    }
+
+    /// Generate a query-specific member interval from a previously verified
+    /// admission receipt and the compact reconstruction. This path does not
+    /// read the original payload. The caller must authenticate persisted
+    /// receipts against the immutable segment manifest before constructing
+    /// this opaque in-memory receipt after reopen.
+    pub fn from_verified_certificate(
+        group: &GroupScoreIntervalRecord,
+        query: &ContinuousHV,
+        reconstruction: &ContinuousHV,
+        certificate: &VerifiedMemberResidualCertificate,
+        expected_transform_profile_digest: [u8; 32],
+    ) -> Result<Self, GroupMemberScoreIntervalBuildError> {
+        if group.identity != certificate.group_identity {
+            return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::GroupIdentityMismatch,
+            ));
+        }
+        let member_index = group
+            .member_ids
+            .binary_search(&certificate.member_id)
+            .map_err(|_| {
+                GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                    VerifiedMemberResidualError::MemberNotInGroup,
+                )
+            })?;
+        if group.member_payload_digests.get(member_index).copied()
+            != Some(certificate.original_payload_digest)
+        {
+            return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::OriginalPayloadDigestMismatch,
+            ));
+        }
+        let reconstruction_digest = continuous_hv_member_payload_digest(
+            &certificate.member_id,
+            reconstruction,
+        );
+        if reconstruction_digest != certificate.reconstruction_digest {
+            return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::ReconstructionDigestMismatch,
+            ));
+        }
+        if certificate.transform_profile_digest != expected_transform_profile_digest {
+            return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::TransformProfileMismatch,
+            ));
+        }
+
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_residual(
+                reconstruction,
+                certificate.residual_l2_upper,
+            )
+            .map_err(|error| {
+                GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                    VerifiedMemberResidualError::ScoreInterval(error),
+                )
+            })?;
+        if !interval.is_well_formed() {
+            return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::ScoreInterval(
+                    ContinuousHVIntervalError::InvalidResidualBound,
+                ),
+            ));
+        }
+        Ok(Self {
+            group_identity: group.identity,
+            record: ScoreIntervalRecord {
+                id: certificate.member_id.clone(),
+                interval,
+                certificate_check: certificate.verification,
+            },
         })
     }
 
