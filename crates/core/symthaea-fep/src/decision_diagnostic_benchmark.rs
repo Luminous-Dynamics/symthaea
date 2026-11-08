@@ -74,12 +74,40 @@ pub struct DiagnosticPolicyMetrics {
     pub mean_model_brier_score: f64,
 }
 
+/// Paired outcome contrast for a candidate policy against a reference policy.
+///
+/// Differences are candidate minus reference; negative values favor the candidate.
+/// Confidence intervals use a paired normal approximation over the identical
+/// episode seeds and should not be used as a substitute for larger preregistered
+/// replications or a cluster-aware analysis across multiple scenarios.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DiagnosticPolicyContrast {
+    pub reference_policy: DiagnosticPolicy,
+    pub candidate_policy: DiagnosticPolicy,
+    pub episodes: usize,
+    pub mean_task_loss_difference: f64,
+    pub task_loss_difference_ci95: Option<[f64; 2]>,
+    pub mean_decision_regret_difference: f64,
+    pub decision_regret_difference_ci95: Option<[f64; 2]>,
+    pub mean_total_cost_difference: f64,
+    pub total_cost_difference_ci95: Option<[f64; 2]>,
+    pub confidence_interval_method: String,
+}
+
 /// Results for the fixed policy comparison.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiagnosticPolicyBenchmark {
     pub scenario_id: String,
     pub seed: u64,
     pub policies: Vec<DiagnosticPolicyMetrics>,
+    pub paired_evsi_contrasts: Vec<DiagnosticPolicyContrast>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DiagnosticEpisodeMetrics {
+    task_loss: f64,
+    decision_regret: f64,
+    total_cost: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -151,15 +179,43 @@ pub fn run_diagnostic_policy_benchmark(
         DiagnosticPolicy::CostAwareEvsi,
         DiagnosticPolicy::AlwaysInspect,
     ];
-    let metrics = policies
+    let runs = policies
         .into_iter()
         .map(|policy| run_policy(scenario, policy, episodes, seed, config))
         .collect::<Result<Vec<_>, _>>()?;
 
+    let policy_metrics = runs.iter().map(|(metrics, _)| metrics.clone()).collect();
+    let candidate = runs
+        .iter()
+        .find(|(metrics, _)| metrics.policy == DiagnosticPolicy::CostAwareEvsi)
+        .expect("the fixed policy suite includes cost-aware EVSI");
+    let reference_policies = [
+        DiagnosticPolicy::NoProbe,
+        DiagnosticPolicy::PureModelInformationGain,
+        DiagnosticPolicy::OptimalDecisionInformationGain,
+        DiagnosticPolicy::AlwaysInspect,
+    ];
+    let paired_evsi_contrasts = reference_policies
+        .into_iter()
+        .map(|reference_policy| {
+            let reference = runs
+                .iter()
+                .find(|(metrics, _)| metrics.policy == reference_policy)
+                .expect("the fixed policy suite includes every registered reference");
+            paired_policy_contrast(
+                reference_policy,
+                &reference.1,
+                DiagnosticPolicy::CostAwareEvsi,
+                &candidate.1,
+            )
+        })
+        .collect();
+
     Ok(DiagnosticPolicyBenchmark {
         scenario_id: scenario.scenario_id.clone(),
         seed,
-        policies: metrics,
+        policies: policy_metrics,
+        paired_evsi_contrasts,
     })
 }
 
@@ -242,7 +298,7 @@ fn run_policy(
     episodes: usize,
     seed: u64,
     config: DecisionDiagnosticConfig,
-) -> Result<DiagnosticPolicyMetrics, DiagnosticBenchmarkError> {
+) -> Result<(DiagnosticPolicyMetrics, Vec<DiagnosticEpisodeMetrics>), DiagnosticBenchmarkError> {
     let joint = to_joint_hypotheses(&scenario.hypotheses);
     let information = compute_hierarchical_information_gains(&joint)?;
     let decision_evaluation = evaluate_decision_focused_diagnostics(
@@ -271,6 +327,7 @@ fn run_policy(
     let mut predicted_decision_eig_sum = 0.0;
     let mut realized_entropy_reduction_sum = 0.0;
     let mut brier_sum = 0.0;
+    let mut episode_metrics = Vec::with_capacity(episodes);
 
     for episode_index in 0..episodes {
         // Reinitialize per episode so every policy sees the same hidden model
@@ -323,9 +380,14 @@ fn run_policy(
         total_cost_sum += total_cost;
         observation_cost_sum += action_cost;
         safety_risk_sum += action_risk;
+        episode_metrics.push(DiagnosticEpisodeMetrics {
+            task_loss,
+            decision_regret: regret,
+            total_cost,
+        });
     }
 
-    Ok(DiagnosticPolicyMetrics {
+    let metrics = DiagnosticPolicyMetrics {
         scenario_id: scenario.scenario_id.clone(),
         policy,
         episodes,
@@ -343,7 +405,72 @@ fn run_policy(
         mean_realized_model_entropy_reduction_nats: realized_entropy_reduction_sum
             / episodes as f64,
         mean_model_brier_score: brier_sum / episodes as f64,
-    })
+    };
+    Ok((metrics, episode_metrics))
+}
+
+fn paired_policy_contrast(
+    reference_policy: DiagnosticPolicy,
+    reference: &[DiagnosticEpisodeMetrics],
+    candidate_policy: DiagnosticPolicy,
+    candidate: &[DiagnosticEpisodeMetrics],
+) -> DiagnosticPolicyContrast {
+    let episodes = reference.len().min(candidate.len());
+    let task_loss_differences = reference
+        .iter()
+        .zip(candidate)
+        .map(|(reference, candidate)| candidate.task_loss - reference.task_loss)
+        .collect::<Vec<_>>();
+    let regret_differences = reference
+        .iter()
+        .zip(candidate)
+        .map(|(reference, candidate)| candidate.decision_regret - reference.decision_regret)
+        .collect::<Vec<_>>();
+    let cost_differences = reference
+        .iter()
+        .zip(candidate)
+        .map(|(reference, candidate)| candidate.total_cost - reference.total_cost)
+        .collect::<Vec<_>>();
+    let (mean_task_loss_difference, task_loss_difference_ci95) =
+        paired_mean_ci95(&task_loss_differences);
+    let (mean_decision_regret_difference, decision_regret_difference_ci95) =
+        paired_mean_ci95(&regret_differences);
+    let (mean_total_cost_difference, total_cost_difference_ci95) =
+        paired_mean_ci95(&cost_differences);
+
+    DiagnosticPolicyContrast {
+        reference_policy,
+        candidate_policy,
+        episodes,
+        mean_task_loss_difference,
+        task_loss_difference_ci95,
+        mean_decision_regret_difference,
+        decision_regret_difference_ci95,
+        mean_total_cost_difference,
+        total_cost_difference_ci95,
+        confidence_interval_method: "paired_normal_approximation_95".to_owned(),
+    }
+}
+
+/// Mean and normal-approximation 95% interval for paired episode differences.
+/// For one episode the interval is absent rather than falsely reporting zero width.
+fn paired_mean_ci95(values: &[f64]) -> (f64, Option<[f64; 2]>) {
+    if values.is_empty() {
+        return (0.0, None);
+    }
+    let count = values.len() as f64;
+    let mean = values.iter().sum::<f64>() / count;
+    if values.len() < 2 {
+        return (mean, None);
+    }
+    let sample_variance = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / (count - 1.0);
+    let standard_error = (sample_variance / count).sqrt();
+    let half_width = 1.959_963_984_540_054 * standard_error;
+    (mean, Some([mean - half_width, mean + half_width]))
 }
 
 fn select_action(
