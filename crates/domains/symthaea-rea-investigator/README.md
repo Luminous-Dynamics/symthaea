@@ -103,3 +103,19 @@ Run the focused harness:
 ```bash
 cargo test --manifest-path tools/rea-investigator-harness/Cargo.toml --locked
 ```
+
+
+## Minimax-regret interpretation and evaluation boundary
+
+The exact minimax-regret search is exact over the finite deterministic outcome-to-decision policy space that the caller declares, subject to `max_policy_evaluations`. It minimizes the maximum *scenario-specific expected regret* over the supplied finite likelihood scenarios.
+
+This is not a distribution-free or global adversarial guarantee. In particular:
+
+- The true data-generating process may be outside the supplied scenarios.
+- Scenario weights and likelihood matrices remain caller inputs; this crate does not authenticate, calibrate, or establish their coverage.
+- Exact policy enumeration does not make the scenario set complete.
+- The selected policy is a proposal for downstream decision support; the planner does not execute the terminal decision or authorize target changes.
+- The policy-search cap is a hard bound. Exceeding it must remain an explicit rejection, never a silent fallback to scenario-mixture Bayes or point-EIG.
+- Report regret in each supplied scenario and separately measure held-out/out-of-ensemble regret. Do not label the finite-scenario maximum as a universal worst case.
+
+A benchmark comparison must freeze the utility matrix and scenario ensemble before evaluation, keep held-out data-generating processes out of every planner input, and report target-impact/resource constraints identically across policy arms. Utility is caller-owned value judgment, not a property inferred from the model's posterior.
