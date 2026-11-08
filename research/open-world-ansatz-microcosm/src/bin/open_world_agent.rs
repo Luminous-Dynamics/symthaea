@@ -193,6 +193,36 @@ mod tests {
     }
 
     #[test]
+    fn serialized_blind_view_produces_an_action_accepted_by_the_episode_runner() {
+        use open_world_ansatz_microcosm::numeric::{Mechanism, ModelHypothesis, SensorMap};
+        use open_world_ansatz_microcosm::protocol::{StructureAccess, WorldFamily};
+        use open_world_ansatz_microcosm::BlindEpisode;
+
+        let mut episode = BlindEpisode::new_numeric(
+            "stdio-wire-roundtrip",
+            ModelHypothesis {
+                mechanism: Mechanism::DirectResponse,
+                gain: 2,
+                decay: None,
+                initial_state: None,
+                sensor: SensorMap::Identity,
+            },
+            StructureAccess::NumericWithheld,
+            3,
+        )
+        .unwrap();
+        let view = episode.view().unwrap();
+        assert_eq!(view.task.world_family, WorldFamily::NumericMechanism);
+        let input = serde_json::to_vec(&view).unwrap();
+
+        let output = next_action(AgentPolicy::FiniteEnumerator, &input).unwrap();
+        let action: AgentAction = serde_json::from_slice(&output).unwrap();
+        let response = episode.apply(action).unwrap();
+        assert_eq!(response.view.observations.len(), 1);
+        assert_eq!(response.status, EpisodeStatus::Open);
+    }
+
+    #[test]
     fn reads_bounded_jsonl_frames_without_merging_them() {
         let mut reader = BufReader::new(&b"{\"a\":1}\n{\"b\":2}"[..]);
         let mut buffer = Vec::new();
