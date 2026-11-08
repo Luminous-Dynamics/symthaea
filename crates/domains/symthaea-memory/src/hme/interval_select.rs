@@ -352,6 +352,7 @@ impl std::fmt::Display for VerifiedMemberResidualError {
             Self::OriginalPayloadDigestMismatch => write!(f, "original payload digest differs from group membership"),
             Self::ReconstructionDigestMismatch => write!(f, "compact reconstruction differs from admitted reconstruction"),
             Self::TransformProfileMismatch => write!(f, "transform/codebook profile differs from residual receipt"),
+            Self::InvalidIntervalShape => write!(f, "member interval failed its structural invariant"),
             Self::ScoreInterval(error) => write!(f, "member score interval failed: {error}"),
         }
     }
