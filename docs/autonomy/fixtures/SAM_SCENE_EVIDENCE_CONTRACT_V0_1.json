@@ -1,0 +1,580 @@
+{
+  "schema_id": "luminous.sam.scene-evidence",
+  "schema_version": "0.1.0",
+  "claim_ceiling": "synthetic_contract_fixture_only",
+  "snapshot": {
+    "snapshot_id": "sam-synth-crossing-0001-frame-0012",
+    "sequence": 12,
+    "parent_snapshot_id": "sam-synth-crossing-0001-frame-0011",
+    "scenario_id": "sam-synth-crossing-0001",
+    "odd_profile_id": "synthetic-low-speed-crossing-v1",
+    "vehicle_configuration_id": "synthetic-ego-vehicle-v1",
+    "policy_profile_id": "sam-scene-evidence-v0.1",
+    "time": {
+      "clock_domain_id": "sim-clock-01",
+      "event_tick_ns": 12000000000,
+      "receive_tick_ns": 12050000000,
+      "processing_tick_ns": 12100000000,
+      "clock_transform_id": "sim-clock-01-to-scene-clock-v1",
+      "clock_uncertainty_ns": 1000000
+    },
+    "reference_frames": [
+      {
+        "frame_id": "road-local-01",
+        "kind": "local_road",
+        "axes": {
+          "x": "forward",
+          "y": "left",
+          "z": "up"
+        },
+        "handedness": "right",
+        "length_unit": "m",
+        "angle_unit": "rad",
+        "transform_id": "map-origin-0001-to-road-local-01-v1"
+      },
+      {
+        "frame_id": "front-camera-image-01",
+        "kind": "camera_image",
+        "axes": {
+          "u": "right_pixels",
+          "v": "down_pixels"
+        },
+        "length_unit": "px",
+        "transform_id": "camera-optical-frame-v1"
+      }
+    ],
+    "sources": [
+      {
+        "source_id": "front-camera-01",
+        "modality": "rgb_camera",
+        "failure_domain_id": "front-camera-stack-a",
+        "source_event_id": "front-camera-01-frame-0012",
+        "payload_reference": "synthetic-fixture://crossing-0001/front-camera/frame-0012",
+        "acquisition_tick_ns": 12000000000,
+        "receive_tick_ns": 12050000000,
+        "clock_domain_id": "sim-clock-01",
+        "clock_transform_id": "sim-clock-01-to-scene-clock-v1",
+        "calibration_profile_id": "synthetic-front-camera-cal-v1",
+        "extrinsic_profile_id": "synthetic-front-camera-extrinsics-v1",
+        "reference_frame_id": "front-camera-image-01",
+        "evidence_kind": "synthetic_observation",
+        "currentness": "current_for_fixture"
+      },
+      {
+        "source_id": "front-lidar-01",
+        "modality": "lidar",
+        "failure_domain_id": "front-lidar-stack-a",
+        "source_event_id": "front-lidar-01-scan-0012",
+        "payload_reference": "synthetic-fixture://crossing-0001/front-lidar/scan-0012",
+        "acquisition_tick_ns": 11980000000,
+        "receive_tick_ns": 12040000000,
+        "clock_domain_id": "sim-clock-01",
+        "clock_transform_id": "sim-clock-01-to-scene-clock-v1",
+        "calibration_profile_id": "synthetic-lidar-cal-v1",
+        "extrinsic_profile_id": "synthetic-lidar-extrinsics-v1",
+        "reference_frame_id": "road-local-01",
+        "evidence_kind": "synthetic_observation",
+        "currentness": "current_for_fixture"
+      }
+    ],
+    "ego_state": {
+      "state_kind": "estimated",
+      "reference_frame_id": "road-local-01",
+      "estimator_id": "synthetic-ego-state-estimator-v1",
+      "measurement_time_tick_ns": 12000000000,
+      "position_m": [
+        0,
+        0,
+        0
+      ],
+      "orientation_rpy_rad": [
+        0,
+        0,
+        0
+      ],
+      "velocity_mps": [
+        4,
+        0,
+        0
+      ],
+      "acceleration_mps2": [
+        0,
+        0,
+        0
+      ],
+      "uncertainty": {
+        "representation": "diagonal_covariance",
+        "state_order": [
+          "x_m",
+          "y_m",
+          "z_m",
+          "vx_mps",
+          "vy_mps",
+          "vz_mps"
+        ],
+        "units": [
+          "m2",
+          "m2",
+          "m2",
+          "m2_s2",
+          "m2_s2",
+          "m2_s2"
+        ],
+        "diagonal": [
+          0.04,
+          0.04,
+          0.01,
+          0.09,
+          0.09,
+          0.04
+        ]
+      },
+      "source_refs": [
+        "front-lidar-01"
+      ]
+    },
+    "road_geometry": {
+      "state_kind": "estimated",
+      "reference_frame_id": "road-local-01",
+      "map_profile_id": "synthetic-crossing-map-v1",
+      "lane_hypotheses": [
+        {
+          "lane_id": "ego-lane-01",
+          "direction": "forward",
+          "centerline_points_m": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              30,
+              0,
+              0
+            ]
+          ],
+          "left_boundary_points_m": [
+            [
+              0,
+              1.8,
+              0
+            ],
+            [
+              30,
+              1.8,
+              0
+            ]
+          ],
+          "right_boundary_points_m": [
+            [
+              0,
+              -1.8,
+              0
+            ],
+            [
+              30,
+              -1.8,
+              0
+            ]
+          ],
+          "source_refs": [
+            "front-camera-01",
+            "front-lidar-01"
+          ],
+          "applicability": "synthetic_fixture_only"
+        }
+      ]
+    },
+    "object_hypotheses": [
+      {
+        "hypothesis_id": "object-hyp-42",
+        "track_lineage_id": "track-42",
+        "association_state": "provisional",
+        "epistemic_state": "estimated",
+        "reference_frame_id": "road-local-01",
+        "measurement_time_tick_ns": 12000000000,
+        "position_m": [
+          12,
+          1.4,
+          0
+        ],
+        "orientation_yaw_rad": -1.5708,
+        "velocity_mps": [
+          0,
+          -1.2,
+          0
+        ],
+        "acceleration_mps2": [
+          0,
+          0,
+          0
+        ],
+        "extent_m": {
+          "length": 0.45,
+          "width": 0.45,
+          "height": 1.7
+        },
+        "class_hypotheses": {
+          "vocabulary_id": "sam-road-actor-classes-v1",
+          "distribution_status": "uncalibrated_ranking_only",
+          "scores": [
+            {
+              "class": "pedestrian",
+              "score": 0.82
+            },
+            {
+              "class": "cyclist",
+              "score": 0.1
+            },
+            {
+              "class": "unknown",
+              "score": 0.08
+            }
+          ],
+          "model_id": "synthetic-actor-classifier-v1"
+        },
+        "uncertainty": {
+          "representation": "diagonal_covariance",
+          "state_order": [
+            "x_m",
+            "y_m",
+            "z_m",
+            "vx_mps",
+            "vy_mps",
+            "vz_mps"
+          ],
+          "units": [
+            "m2",
+            "m2",
+            "m2",
+            "m2_s2",
+            "m2_s2",
+            "m2_s2"
+          ],
+          "diagonal": [
+            0.25,
+            0.16,
+            0.09,
+            0.36,
+            0.36,
+            0.16
+          ]
+        },
+        "visibility": {
+          "status": "partially_occluded",
+          "last_observed_tick_ns": 12000000000,
+          "occluding_region_id": "occlusion-zone-01"
+        },
+        "source_refs": [
+          "front-camera-01",
+          "front-lidar-01"
+        ],
+        "estimator_id": "synthetic-multi-sensor-track-estimator-v1"
+      },
+      {
+        "hypothesis_id": "object-hyp-51",
+        "track_lineage_id": "track-51",
+        "association_state": "confirmed",
+        "epistemic_state": "observed",
+        "reference_frame_id": "road-local-01",
+        "measurement_time_tick_ns": 11980000000,
+        "position_m": [
+          22,
+          0.2,
+          0
+        ],
+        "orientation_yaw_rad": 0,
+        "velocity_mps": [
+          2,
+          0,
+          0
+        ],
+        "acceleration_mps2": [
+          0,
+          0,
+          0
+        ],
+        "extent_m": {
+          "length": 4.4,
+          "width": 1.8,
+          "height": 1.5
+        },
+        "class_hypotheses": {
+          "vocabulary_id": "sam-road-actor-classes-v1",
+          "distribution_status": "uncalibrated_ranking_only",
+          "scores": [
+            {
+              "class": "vehicle",
+              "score": 0.94
+            },
+            {
+              "class": "unknown",
+              "score": 0.06
+            }
+          ],
+          "model_id": "synthetic-actor-classifier-v1"
+        },
+        "uncertainty": {
+          "representation": "diagonal_covariance",
+          "state_order": [
+            "x_m",
+            "y_m",
+            "z_m",
+            "vx_mps",
+            "vy_mps",
+            "vz_mps"
+          ],
+          "units": [
+            "m2",
+            "m2",
+            "m2",
+            "m2_s2",
+            "m2_s2",
+            "m2_s2"
+          ],
+          "diagonal": [
+            0.09,
+            0.09,
+            0.04,
+            0.16,
+            0.16,
+            0.09
+          ]
+        },
+        "visibility": {
+          "status": "visible",
+          "last_observed_tick_ns": 11980000000,
+          "occluding_region_id": null
+        },
+        "source_refs": [
+          "front-lidar-01",
+          "front-camera-01"
+        ],
+        "estimator_id": "synthetic-multi-sensor-track-estimator-v1"
+      },
+      {
+        "hypothesis_id": "object-hyp-70",
+        "track_lineage_id": "track-70",
+        "association_state": "confirmed",
+        "epistemic_state": "observed",
+        "reference_frame_id": "road-local-01",
+        "measurement_time_tick_ns": 11980000000,
+        "position_m": [
+          5,
+          -1.25,
+          0
+        ],
+        "orientation_yaw_rad": 0,
+        "velocity_mps": [
+          0,
+          0,
+          0
+        ],
+        "acceleration_mps2": [
+          0,
+          0,
+          0
+        ],
+        "extent_m": {
+          "length": 0.8,
+          "width": 0.3,
+          "height": 0.6
+        },
+        "class_hypotheses": {
+          "vocabulary_id": "sam-road-actor-classes-v1",
+          "distribution_status": "uncalibrated_ranking_only",
+          "scores": [
+            {
+              "class": "static_obstacle",
+              "score": 0.9
+            },
+            {
+              "class": "unknown",
+              "score": 0.1
+            }
+          ],
+          "model_id": "synthetic-actor-classifier-v1"
+        },
+        "uncertainty": {
+          "representation": "diagonal_covariance",
+          "state_order": [
+            "x_m",
+            "y_m",
+            "z_m",
+            "vx_mps",
+            "vy_mps",
+            "vz_mps"
+          ],
+          "units": [
+            "m2",
+            "m2",
+            "m2",
+            "m2_s2",
+            "m2_s2",
+            "m2_s2"
+          ],
+          "diagonal": [
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01
+          ]
+        },
+        "visibility": {
+          "status": "visible",
+          "last_observed_tick_ns": 11980000000,
+          "occluding_region_id": null
+        },
+        "source_refs": [
+          "front-lidar-01"
+        ],
+        "estimator_id": "synthetic-obstacle-estimator-v1"
+      }
+    ],
+    "free_space": {
+      "reference_frame_id": "road-local-01",
+      "coverage_profile_id": "synthetic-front-sensor-coverage-v1",
+      "regions": [
+        {
+          "region_id": "free-region-01",
+          "state": "observed_free",
+          "polygon_points_m": [
+            [
+              1,
+              -1,
+              0
+            ],
+            [
+              4,
+              -1,
+              0
+            ],
+            [
+              4,
+              1,
+              0
+            ],
+            [
+              1,
+              1,
+              0
+            ]
+          ],
+          "source_refs": [
+            "front-lidar-01"
+          ],
+          "coverage_note": "synthetic fixture only; within declared lidar range and no modeled occlusion"
+        },
+        {
+          "region_id": "occlusion-zone-01",
+          "state": "occluded",
+          "polygon_points_m": [
+            [
+              10,
+              0.5,
+              0
+            ],
+            [
+              14,
+              0.5,
+              0
+            ],
+            [
+              14,
+              2,
+              0
+            ],
+            [
+              10,
+              2,
+              0
+            ]
+          ],
+          "source_refs": [
+            "front-camera-01",
+            "front-lidar-01"
+          ],
+          "coverage_note": "object occlusion; this region is not free-space evidence"
+        },
+        {
+          "region_id": "unknown-region-01",
+          "state": "unobserved",
+          "polygon_points_m": [
+            [
+              26,
+              -1,
+              0
+            ],
+            [
+              30,
+              -1,
+              0
+            ],
+            [
+              30,
+              1,
+              0
+            ],
+            [
+              26,
+              1,
+              0
+            ]
+          ],
+          "source_refs": [],
+          "coverage_note": "outside the synthetic sensor coverage profile"
+        }
+      ]
+    },
+    "vision_hdc_proposals": [
+      {
+        "proposal_id": "vision-hdc-proposal-09",
+        "source_id": "front-camera-01",
+        "representation_kind": "appearance_and_temporal_association_only",
+        "image_frame_id": "front-camera-image-01",
+        "centroid_px": [
+          240,
+          320
+        ],
+        "appearance_hv_ref": "synthetic-hv-ref-object-42",
+        "candidate_track_lineage_id": "track-42",
+        "metric_geometry_authority": "none",
+        "semantic_class_authority": "none"
+      }
+    ],
+    "prediction_set_refs": [
+      {
+        "prediction_set_id": "synthetic-prediction-set-track-42-v1",
+        "track_lineage_id": "track-42",
+        "predictor_id": "synthetic-interaction-predictor-v1",
+        "horizon_ms": [
+          500,
+          1000,
+          2000
+        ],
+        "evaluation_owner": "symthaea-sam-10256",
+        "status": "synthetic_unqualified"
+      }
+    ],
+    "admission": {
+      "numeric_validity": "admitted_for_fixture",
+      "clock_alignment": "admitted_for_fixture",
+      "reference_frame_transform": "admitted_for_fixture",
+      "calibration_currentness": "admitted_for_fixture",
+      "source_independence": "unknown",
+      "semantic_class_calibration": "not_admitted",
+      "free_space_completeness": "partial",
+      "physical_model_applicability": "not_admitted",
+      "actuator_authority": "none"
+    },
+    "unresolved": [
+      "Actor-class scores are uncalibrated ranking metadata.",
+      "Source independence has not been established by this fixture.",
+      "The occluded and unobserved regions are not clear free space.",
+      "Vision HDC proposals do not supply metric or semantic authority.",
+      "All measurements and predictions are synthetic."
+    ]
+  }
+}
