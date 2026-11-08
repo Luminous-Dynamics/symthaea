@@ -195,22 +195,66 @@ impl MaxTimesRational {
         self.0
     }
 
-    fn checked_cmp(self, other: Self) -> Result<std::cmp::Ordering, SemiringError> {
-        // Denominators are canonical positive values and numerators are
-        // nonnegative. Fail closed if the exact cross-products exceed i128.
-        let left = self.0.numerator()
-            .checked_mul(other.0.denominator())
-            .ok_or(SemiringError::ScoreOverflow)?;
-        let right = other.0.numerator()
-            .checked_mul(self.0.denominator())
-            .ok_or(SemiringError::ScoreOverflow)?;
-        Ok(left.cmp(&right))
+    fn compare(self, other: Self) -> std::cmp::Ordering {
+        compare_nonnegative_rationals(self.0, other.0)
     }
+}
+
+/// Compare nonnegative rationals without cross-multiplication overflow.
+///
+/// Continued-fraction comparison uses only integer division and remainder.
+/// The comparison direction reverses after each reciprocal step.
+fn compare_nonnegative_rationals(
+    left: CheckedRational,
+    right: CheckedRational,
+) -> std::cmp::Ordering {
+    let mut left_numerator = left.numerator() as u128;
+    let mut left_denominator = left.denominator() as u128;
+    let mut right_numerator = right.numerator() as u128;
+    let mut right_denominator = right.denominator() as u128;
+    let mut reversed = false;
+
+    loop {
+        let left_integer = left_numerator / left_denominator;
+        let right_integer = right_numerator / right_denominator;
+        if left_integer != right_integer {
+            let order = left_integer.cmp(&right_integer);
+            return if reversed { order.reverse() } else { order };
+        }
+
+        let left_remainder = left_numerator % left_denominator;
+        let right_remainder = right_numerator % right_denominator;
+        match (left_remainder == 0, right_remainder == 0) {
+            (true, true) => return std::cmp::Ordering::Equal,
+            (true, false) => {
+                return if reversed {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Less
+                };
+            }
+            (false, true) => {
+                return if reversed {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                };
+            }
+            (false, false) => {
+                left_numerator = left_denominator;
+                left_denominator = left_remainder;
+                right_numerator = right_denominator;
+                right_denominator = right_remainder;
+                reversed = !reversed;
+            }
+        }
+    }
+}
 }
 
 impl ExactSemiring for MaxTimesRational {
     fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
-        match (*self).checked_cmp(*other)? {
+        match (*self).compare(*other) {
             std::cmp::Ordering::Less => Ok(*other),
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Ok(*self),
         }
@@ -788,11 +832,18 @@ mod tests {
     }
 
     #[test]
-    fn max_times_comparison_overflow_is_an_explicit_failure() {
+    fn max_times_comparison_handles_large_rationals_without_cross_product_overflow() {
         let max = i128::MAX;
         let a = MaxTimesRational::new(rational(max, max - 1)).unwrap();
         let b = MaxTimesRational::new(rational(max - 1, max - 2)).unwrap();
-        assert!(a.checked_add(&b).is_err());
+        assert_eq!(a.checked_add(&b).unwrap(), b);
+    }
+
+    #[test]
+    fn max_times_multiplication_overflow_is_an_explicit_failure() {
+        let large = max_times(i128::MAX, 1);
+        let two = max_times(2, 1);
+        assert!(large.checked_mul(&two).is_err());
     }
 
     #[test]
