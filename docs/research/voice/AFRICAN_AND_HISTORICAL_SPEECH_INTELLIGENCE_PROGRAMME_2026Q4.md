@@ -277,7 +277,7 @@ The study audits 9,966 AfriCodeSwitch validation metadata rows; 8,181 have audio
 
 Its headline observation is that WER ranking poorly predicts switch-localized performance. PIER and these metrics are complementary: PIER scores tagged points of interest (often embedded-language tokens), while SETER/SPER focus on the switch token and surrounding neighbourhood.
 
-The new Rust switch scorer is [#11075](https://github.com/Luminous-Dynamics/symthaea/issues/11075) / [stacked draft PR #11081](https://github.com/Luminous-Dynamics/symthaea/pull/11081). It implements per-language masked error, SETER and SPER@k using caller-supplied reference language tags. It does not infer language identity. Its sixteen tests are authored but not executed. No AfriCodeSwitch dataset has been ingested.
+The new Rust switch scorer is [#11075](https://github.com/Luminous-Dynamics/symthaea/issues/11075) / [current stacked draft PR #11084](https://github.com/Luminous-Dynamics/symthaea/pull/11084). It implements per-language masked error, SETER and SPER@k using caller-supplied reference language tags. It does not infer language identity. Its sixteen tests are authored but not executed. No AfriCodeSwitch dataset has been ingested.
 
 ### 12.2 Phonetic supervision needs provenance tiers, not a single IPA label
 
