@@ -2074,7 +2074,7 @@
         "mass_accounting_state": "indeterminate",
         "expected_total_mass_kg": null,
         "expected_cg_m": null,
-        "weight_growth_state": "within_reserve",
+        "weight_growth_state": "unknown",
         "expected_disposition": "indeterminate"
       }
     }
