@@ -1070,6 +1070,381 @@
         }
       },
       "additionalProperties": false
+    },
+    "candidate_selection": {
+      "type": "object",
+      "description": "Optional closed-set ASR candidate-selection / MICL receipt. If this is present, it records the exact candidate pool and selector configuration. Candidate-selection output must be a candidate ID or ABSTAIN; a free-form rewrite is a separate experiment.",
+      "required": [
+        "mode",
+        "candidate_set_manifest_sha256",
+        "candidate_count",
+        "candidate_generator_manifest_sha256",
+        "selector_provider",
+        "selector_model_id",
+        "selector_model_revision",
+        "selector_checkpoint_sha256",
+        "selector_prompt_sha256",
+        "demonstrations_manifest_sha256",
+        "demonstration_count",
+        "demonstration_selection_policy",
+        "target_language_demonstration_count",
+        "target_language_supervised_training_used",
+        "decision_type",
+        "selected_candidate_id",
+        "abstention_reason",
+        "rewrite_allowed",
+        "rewrite_count",
+        "candidate_id_integrity_check",
+        "selected_transcript_exact_copy_check",
+        "source_interval_start_frame",
+        "source_interval_end_frame"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "NOT_USED",
+            "ACOUSTIC_BEST",
+            "N_BEST_SCORE",
+            "CONSENSUS",
+            "TEXT_ONLY_MICL",
+            "AUDIO_ONLY_MICL",
+            "AUDIO_TEXT_MICL",
+            "CROSS_LINGUAL_MICL",
+            "RISK_CONTROLLED"
+          ]
+        },
+        "candidate_set_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_generator_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "selector_provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selector_model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selector_model_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selector_checkpoint_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "selector_prompt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "demonstrations_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "demonstration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "demonstration_selection_policy": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "RANDOM",
+            "SAME_LANGUAGE_DOMAIN",
+            "TYPOLOGICAL",
+            "PHONETIC_ORTHOGRAPHIC",
+            "SWITCH_PATTERN",
+            "DIVERSITY_COVERAGE",
+            "EXPECTED_VALUE_OF_INFORMATION",
+            "MIXED"
+          ]
+        },
+        "target_language_demonstration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_language_supervised_training_used": {
+          "type": "boolean"
+        },
+        "decision_type": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "CANDIDATE_ID",
+            "ABSTAIN"
+          ]
+        },
+        "selected_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "abstention_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rewrite_allowed": {
+          "type": "boolean"
+        },
+        "rewrite_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_id_integrity_check": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_RUN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "selected_transcript_exact_copy_check": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_RUN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "source_interval_start_frame": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source_interval_end_frame": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision_type": {
+                "const": "CANDIDATE_ID"
+              }
+            },
+            "required": [
+              "decision_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_candidate_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "abstention_reason": {
+                "type": "null"
+              },
+              "rewrite_allowed": {
+                "const": false
+              },
+              "rewrite_count": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_type": {
+                "const": "ABSTAIN"
+              }
+            },
+            "required": [
+              "decision_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_candidate_id": {
+                "type": "null"
+              },
+              "abstention_reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rewrite_allowed": {
+                "const": false
+              },
+              "rewrite_count": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_type": {
+                "const": "NOT_APPLICABLE"
+              }
+            },
+            "required": [
+              "decision_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "selected_candidate_id": {
+                "type": "null"
+              },
+              "abstention_reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "NOT_USED"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "decision_type": {
+                "const": "NOT_APPLICABLE"
+              },
+              "candidate_count": {
+                "const": 0
+              },
+              "rewrite_count": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "candidate_count": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "candidate_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "candidate_set_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "candidate_generator_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "source_interval_start_frame": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_interval_end_frame": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
     }
   },
   "$defs": {
