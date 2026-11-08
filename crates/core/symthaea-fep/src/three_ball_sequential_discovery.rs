@@ -410,7 +410,7 @@ pub fn run_three_ball_sequential_discovery(
     // arms with the same seed therefore see identical hidden scenes even when
     // a stochastic policy consumes a different number of random draws.
     let mut environment_rng = SplitMix64::new(seed);
-    let mut policy_rng = SplitMix64::new(seed ^ 0xA11C_E5EED_5EED_0001);
+    let mut policy_rng = SplitMix64::new(seed ^ 0x11CE_5EED_5EED_0001);
     let mut trial_receipts = Vec::with_capacity(config.max_trials);
     let mut trials_to_model_commitment = None;
     let mut trials_to_correct_rule_commitment = None;
