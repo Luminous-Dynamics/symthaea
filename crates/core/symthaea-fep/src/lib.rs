@@ -142,6 +142,7 @@ pub mod bayesian_model_reduction;
 mod bridge;
 pub mod dirichlet_model_reduction;
 pub mod free_energy;
+pub mod gaussian_model_information_gain;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
@@ -171,6 +172,12 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use gaussian_model_information_gain::{
+    GaussianModelInformationGain, GaussianModelInformationGainConfig,
+    GaussianModelInformationGainError, GaussianObservationAction,
+    GaussianObservationHypothesis, evaluate_gaussian_model_information_gains,
+};
 
 pub use dirichlet_model_reduction::{
     DirichletActionPrediction, DirichletBayesianModelReductionError,
