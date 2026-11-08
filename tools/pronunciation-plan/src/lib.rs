@@ -375,13 +375,7 @@ pub struct BeatDomainScore {
 impl BeatDomainScore {
     const BEAT_EPSILON: f64 = 1e-9;
 
-    pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1 {
-            return Err(format!(
-                "unsupported beat-domain score schema version {}",
-                self.schema_version
-            ));
-        }
+    fn validate_tempo_map(&self) -> Result<(), String> {
         if self.tempo_map.is_empty() {
             return Err("beat-domain score requires an explicit tempo map".into());
         }
@@ -402,6 +396,17 @@ impl BeatDomainScore {
             }
             previous_beat = change.start_beat;
         }
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != 1 {
+            return Err(format!(
+                "unsupported beat-domain score schema version {}",
+                self.schema_version
+            ));
+        }
+        self.validate_tempo_map()?;
         if self.events.is_empty() {
             return Err("beat-domain score requires at least one score event".into());
         }
@@ -455,12 +460,7 @@ impl BeatDomainScore {
         if !beat.is_finite() || beat < 0.0 {
             return Err("beat position must be finite and non-negative".into());
         }
-        if self.tempo_map.is_empty() {
-            return Err("tempo map is empty".into());
-        }
-        if self.tempo_map[0].start_beat.abs() > Self::BEAT_EPSILON {
-            return Err("tempo map must begin at beat zero".into());
-        }
+        self.validate_tempo_map()?;
 
         let mut seconds = 0.0f64;
         for (index, change) in self.tempo_map.iter().enumerate() {
