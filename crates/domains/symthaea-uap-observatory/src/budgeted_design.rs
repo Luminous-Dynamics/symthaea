@@ -415,7 +415,6 @@ pub fn exhaustive_budgeted_design(
             scenarios,
             options,
             &selected,
-            &weights,
             &config.parameter_scales,
             dimension,
         )?;
