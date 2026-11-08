@@ -1,0 +1,665 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-serviceability-case:v0.1",
+  "title": "Marine serviceability case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "status",
+    "mission_binding",
+    "asset",
+    "task",
+    "operating_context",
+    "personnel",
+    "safety_preconditions",
+    "access",
+    "handling",
+    "spare",
+    "task_phases",
+    "post_maintenance",
+    "residuals",
+    "evidence",
+    "expected_disposition",
+    "claim_limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_fixture_not_real_vessel_evidence"
+    },
+    "mission_binding": {
+      "$ref": "#/$defs/missionBinding"
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "asset_type",
+        "serial",
+        "part_number",
+        "revision",
+        "as_built_geometry_ref",
+        "installed_location",
+        "parent_assembly"
+      ],
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asset_type": {
+          "enum": [
+            "watermaker_prefilter",
+            "watermaker_high_pressure_pump",
+            "seawater_strainer",
+            "hvac_compressor",
+            "power_converter",
+            "battery_module"
+          ]
+        },
+        "serial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "part_number": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "as_built_geometry_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "installed_location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_assembly": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "trigger",
+        "task_type",
+        "approved_procedure_ref",
+        "permission_state"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_type": {
+          "enum": [
+            "inspect",
+            "consumable_replace",
+            "repair",
+            "module_replace",
+            "fault_recovery"
+          ]
+        },
+        "approved_procedure_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permission_state": {
+          "enum": [
+            "permitted_for_declared_context",
+            "not_permitted",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "operating_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location_context",
+        "vessel_state",
+        "environment_evidence",
+        "task_envelope_ref"
+      ],
+      "properties": {
+        "location_context": {
+          "enum": [
+            "afloat_underway",
+            "afloat_secured",
+            "alongside",
+            "drydock_service_yard"
+          ]
+        },
+        "vessel_state": {
+          "enum": [
+            "underway",
+            "stationary_secured",
+            "in_yard",
+            "unknown"
+          ]
+        },
+        "environment_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_envelope_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "personnel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crew_count_min",
+        "required_authorizations",
+        "skills_refs",
+        "tooling_refs"
+      ],
+      "properties": {
+        "crew_count_min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required_authorizations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skills_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tooling_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "safety_preconditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hazard_domain",
+          "status",
+          "procedure_or_evidence_ref"
+        ],
+        "properties": {
+          "hazard_domain": {
+            "enum": [
+              "electrical_isolation",
+              "stored_energy",
+              "pressure",
+              "fluid_flooding",
+              "thermal",
+              "fire_containment",
+              "mechanical_load",
+              "refrigerant",
+              "spill_residual",
+              "other"
+            ]
+          },
+          "status": {
+            "enum": [
+              "satisfied",
+              "missing",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "procedure_or_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "geometry_ref",
+        "coordinate_frame",
+        "access_path_ref",
+        "required_clearance_mm",
+        "available_clearance_mm",
+        "obstructing_assets",
+        "unrelated_critical_removal_required",
+        "temporary_disassembly_steps"
+      ],
+      "properties": {
+        "geometry_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coordinate_frame": {
+          "type": "string",
+          "minLength": 1
+        },
+        "access_path_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "required_clearance_mm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "available_clearance_mm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "obstructing_assets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unrelated_critical_removal_required": {
+          "type": "boolean"
+        },
+        "temporary_disassembly_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_mass_kg",
+        "centre_of_gravity_ref",
+        "lift_or_manual_handling_ref",
+        "handling_capacity_kg",
+        "handling_status"
+      ],
+      "properties": {
+        "module_mass_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "centre_of_gravity_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lift_or_manual_handling_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "handling_capacity_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "handling_status": {
+          "enum": [
+            "qualified_for_declared_task",
+            "not_required",
+            "unknown",
+            "insufficient"
+          ]
+        }
+      }
+    },
+    "spare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spare_id",
+        "revision",
+        "compatibility",
+        "availability",
+        "custody_ref",
+        "lead_time_days"
+      ],
+      "properties": {
+        "spare_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "compatibility": {
+          "enum": [
+            "exact_match",
+            "approved_substitute",
+            "incompatible",
+            "unknown"
+          ]
+        },
+        "availability": {
+          "enum": [
+            "onboard_stock",
+            "available_at_declared_port",
+            "order_required",
+            "unavailable",
+            "unknown"
+          ]
+        },
+        "custody_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lead_time_days": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "task_phases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "phase",
+          "duration_min_estimate",
+          "duration_evidence_class",
+          "evidence_ref"
+        ],
+        "properties": {
+          "phase": {
+            "enum": [
+              "isolate",
+              "diagnose",
+              "prepare",
+              "access_disassemble",
+              "extract",
+              "repair_replace",
+              "reinstall",
+              "reconnect",
+              "test",
+              "configuration_update",
+              "authorized_release"
+            ]
+          },
+          "duration_min_estimate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "duration_evidence_class": {
+            "enum": [
+              "measured",
+              "manufacturer_estimate",
+              "engineering_estimate",
+              "synthetic",
+              "unknown"
+            ]
+          },
+          "evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "post_maintenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_tests",
+        "completed_tests",
+        "independent_authorization_ref",
+        "configuration_update_ref",
+        "return_to_service_state"
+      ],
+      "properties": {
+        "required_tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completed_tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "independent_authorization_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "configuration_update_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "return_to_service_state": {
+          "enum": [
+            "requirements_satisfied_synthetic_only",
+            "blocked",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "residuals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stream",
+          "quantity",
+          "unit",
+          "disposition",
+          "evidence_ref"
+        ],
+        "properties": {
+          "stream": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition": {
+            "enum": [
+              "contained_for_shore_disposal",
+              "treated_onboard",
+              "discharged_under_approved_permission",
+              "retained_onboard",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "evidence": {
+      "$ref": "#/$defs/evidence"
+    },
+    "expected_disposition": {
+      "enum": [
+        "synthetic_task_feasible",
+        "blocked",
+        "indeterminate",
+        "unsupported"
+      ]
+    },
+    "claim_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "missionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "source_ref",
+        "raw_artifact_digest",
+        "measurement_status",
+        "uncertainty_status"
+      ],
+      "properties": {
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "model_estimate",
+            "external_source",
+            "measured"
+          ]
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_artifact_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "measurement_status": {
+          "enum": [
+            "not_measured",
+            "measured",
+            "estimated"
+          ]
+        },
+        "uncertainty_status": {
+          "enum": [
+            "reported_reviewed",
+            "not_reported",
+            "not_reviewed",
+            "not_applicable"
+          ]
+        }
+      }
+    }
+  }
+}
