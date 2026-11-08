@@ -5,8 +5,8 @@
 
 pub mod interaction;
 pub mod numeric;
-pub mod protocol;
 pub mod policy;
+pub mod protocol;
 pub mod strategies;
 
 use serde::{Deserialize, Serialize};
