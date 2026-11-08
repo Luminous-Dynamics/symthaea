@@ -127,6 +127,19 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run global ambiguity mirror-twin regression
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example global_ambiguity_screen | tee global-ambiguity-screen.txt
+          grep -q 'local_jacobian_rank=3' global-ambiguity-screen.txt
+          grep -q 'ambiguous_pair_count=1' global-ambiguity-screen.txt
+          {
+            echo '## Local-versus-global observability regression'
+            cat global-ambiguity-screen.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Additional anisotropic-Heisenberg executable check
         if: matrix.package == 'symthaea-fractal-time-lab'
         run: cargo check --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep
