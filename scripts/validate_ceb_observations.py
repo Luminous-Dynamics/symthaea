@@ -330,6 +330,61 @@ def semantic_errors(payload: dict) -> list[str]:
         if "not software code review" not in caveats or "exchangeability" not in caveats:
             errors.append("SCOPE must retain pairwise-judging and calibration-assumption caveats")
 
+    # Continuity-adjacent incremental-analysis and change-aware test-selection
+    # studies are contextual/methodological comparators, not CEB outcome scores.
+    required_continuity_comparators = {
+        "incremental-program-analysis-ase2025": ("CEB-CONTINUITY", "ase-ipa-2025-paper", "reported", 4084),
+        "diffci-change-aware-test-selection-2026": ("CEB-CONTINUITY", "diffci-open-evidence-study", "reported", 2000),
+    }
+    for comparator_id, expected in required_continuity_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing continuity-adjacent comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        denominator = comparator["sample_denominator"]
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        if denominator["status"] != denominator_status or denominator["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_continuity_observations = {
+        "ase-ipa-real-change-commit-count": ("incremental-program-analysis-ase2025", "program_change_count", 4084),
+        "ase-ipa-project-count": ("incremental-program-analysis-ase2025", "project_count", 20),
+        "ase-ipa-tool-count": ("incremental-program-analysis-ase2025", "evaluated_tool_count", 2),
+        "diffci-historical-delta-count": ("diffci-change-aware-test-selection-2026", "historical_commit_delta_count", 2000),
+        "diffci-repository-count": ("diffci-change-aware-test-selection-2026", "repository_count", 20),
+        "diffci-selective-opportunity-rate": ("diffci-change-aware-test-selection-2026", "selective_test_opportunity_rate", 29.8),
+        "diffci-whole-corpus-test-reduction": ("diffci-change-aware-test-selection-2026", "whole_corpus_test_reduction_vs_path_rule", 4.2),
+        "diffci-job-recall": ("diffci-change-aware-test-selection-2026", "historical_ci_failure_job_recall", 96.4),
+        "diffci-path-rule-job-recall": ("diffci-change-aware-test-selection-2026", "historical_ci_failure_job_recall", 70.7),
+        "diffci-historical-failure-count": ("diffci-change-aware-test-selection-2026", "historical_ci_failure_count", 280),
+        "diffci-measurable-mutation-count": ("diffci-change-aware-test-selection-2026", "measurable_mutation_count", 32),
+    }
+    for observation_id, expected in required_continuity_observations.items():
+        observation = next((row for row in observations if row["observation_id"] == observation_id), None)
+        if observation is None:
+            errors.append(f"missing continuity-adjacent observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            observation["comparator_id"] != comparator_id
+            or observation["metric"]["metric_id"] != metric_id
+            or observation["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    if "incremental-program-analysis-ase2025" in comparators:
+        caveats = " ".join(comparators["incremental-program-analysis-ase2025"]["caveats"]).lower()
+        if "not ceb evidence-disposition" not in caveats or "peak memory" not in caveats:
+            errors.append("incremental program analysis must retain scope and peak-memory caveats")
+    if "diffci-change-aware-test-selection-2026" in comparators:
+        caveats = " ".join(comparators["diffci-change-aware-test-selection-2026"]["caveats"]).lower()
+        if "self-published" not in caveats or "not a reliability estimate" not in caveats:
+            errors.append("DiffCI must retain self-published and mutation-count limitations")
+        if "no production ci runs were skipped" not in caveats:
+            errors.append("DiffCI must retain no-production-skip caveat")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -566,6 +621,28 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     row = next(row for row in mutant["observations"] if row["observation_id"] == "scope-fdr-upper-bound")
     row["metric"]["value"] = 0.25
     must_reject(mutant, "SCOPE FDR bound inflated")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "ase-ipa-real-change-commit-count"
+    ]
+    must_reject(mutant, "incremental program-analysis corpus count removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "diffci-whole-corpus-test-reduction")
+    row["metric"]["value"] = 96.4
+    must_reject(mutant, "DiffCI whole-corpus test reduction conflated with job recall")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "diffci-change-aware-test-selection-2026")
+    comparator["sample_denominator"]["value"] = 280
+    must_reject(mutant, "DiffCI historical commit-delta denominator collapsed into CI failure count")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "diffci-change-aware-test-selection-2026")
+    comparator["caveats"] = [x for x in comparator["caveats"] if "not a reliability estimate" not in x]
+    must_reject(mutant, "DiffCI mutation caveat removed")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
