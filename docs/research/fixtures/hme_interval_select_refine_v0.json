@@ -1,0 +1,136 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-INTERVAL-SELECT-REFINE-2026-11-08",
+  "status": "synthetic_selection_theorem_fixture_not_residual_certificate_or_benchmark",
+  "metric": {
+    "name": "cosine_similarity",
+    "polarity": "larger_is_better",
+    "top_k": 2,
+    "tie_policy": "score_desc_item_id_asc"
+  },
+  "records": [
+    {
+      "id": "a",
+      "exact_score": 0.95,
+      "lower": 0.9,
+      "upper": 0.98,
+      "expected_retained": true
+    },
+    {
+      "id": "b",
+      "exact_score": 0.9,
+      "lower": 0.82,
+      "upper": 0.94,
+      "expected_retained": true
+    },
+    {
+      "id": "c",
+      "exact_score": 0.8,
+      "lower": 0.78,
+      "upper": 0.86,
+      "expected_retained": true
+    },
+    {
+      "id": "d",
+      "exact_score": 0.6,
+      "lower": 0.55,
+      "upper": 0.82,
+      "expected_retained": true
+    },
+    {
+      "id": "e",
+      "exact_score": 0.25,
+      "lower": 0.1,
+      "upper": 0.3,
+      "expected_retained": false
+    },
+    {
+      "id": "f",
+      "exact_score": 0.05,
+      "lower": -0.05,
+      "upper": 0.81,
+      "expected_retained": false
+    },
+    {
+      "id": "g",
+      "exact_score": 0.82,
+      "lower": 0.8,
+      "upper": 0.82,
+      "expected_retained": true
+    }
+  ],
+  "expected_threshold": 0.82,
+  "expected_refinement_ids": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "g"
+  ],
+  "expected_pruned_ids": [
+    "e",
+    "f"
+  ],
+  "expected_exact_top_k": [
+    "a",
+    "b"
+  ],
+  "invariants": [
+    "theta_k is the kth-largest certified lower endpoint across every eligible item.",
+    "Retain every item with upper >= theta_k; exclude only upper < theta_k.",
+    "At least k exact scores are >= theta_k because at least k lower endpoints are >= theta_k.",
+    "An excluded item's exact score is strictly below theta_k and therefore cannot enter exact top-k.",
+    "Exact reranking the retained set under the canonical score and stable-ID order returns the full-scan top-k.",
+    "This proof is valid only if all eligible records are covered by valid conservative intervals.",
+    "A candidate index that omits records without an admissible aggregate bound cannot produce ExactComplete.",
+    "Real-arithmetic interval formulas are not sufficient until outward rounding encloses the canonical f32 score."
+  ],
+  "negative_controls": [
+    {
+      "id": "boundary_equality",
+      "control": "candidate upper endpoint equals theta_k",
+      "expected": "retain candidate"
+    },
+    {
+      "id": "missing_interval",
+      "control": "eligible record has no interval",
+      "expected": "do not return ExactComplete; fallback or invalid"
+    },
+    {
+      "id": "stale_generation",
+      "control": "interval metadata digest belongs to an older manifest",
+      "expected": "reject certificate and fail closed"
+    },
+    {
+      "id": "non_finite",
+      "control": "query or reconstruction contains NaN or infinity",
+      "expected": "invalid/out-of-profile; no pruning"
+    },
+    {
+      "id": "zero_norm",
+      "control": "query norm or candidate norm lower bound is zero",
+      "expected": "use uninformative interval or no pruning"
+    },
+    {
+      "id": "unprobed_partition",
+      "control": "partition lacks per-item or aggregate bound",
+      "expected": "coverage incomplete; do not return ExactComplete"
+    },
+    {
+      "id": "underreported_residual",
+      "control": "stored epsilon is smaller than independently measured residual",
+      "expected": "reject segment certificate"
+    },
+    {
+      "id": "wrong_score_profile",
+      "control": "interval built for another metric/reduction contract",
+      "expected": "reject interval"
+    }
+  ],
+  "nonclaims": [
+    "The intervals are synthetic and their validity is assumed only to test the selection rule.",
+    "No quantizer or residual certificate is implemented.",
+    "No f32 outward interval proof is included.",
+    "No performance or recall result is represented."
+  ]
+}
