@@ -480,6 +480,7 @@ mod tests {
         GameValueProfileBudget, extract_game_value_profile_from_dag,
     };
     use super::super::quantified_scope::QuantifierBlock;
+    use super::super::qdimacs::{parse_qdimacs, QdimacsParseBudget};
 
     fn block(quantifier: Quantifier, variables: &[usize]) -> QuantifierBlock {
         QuantifierBlock {
@@ -637,6 +638,56 @@ mod tests {
         assert_eq!(
             result.report.final_synqbf_verification.representability_instances_checked,
             7
+        );
+    }
+
+    #[test]
+    fn strict_qdimacs_input_reaches_independently_verified_synqbf_proof() {
+        let source = concat!(
+            "c forall x exists y: x iff y\n",
+            "p cnf 2 2\n",
+            "a 1 0\n",
+            "e 2 0\n",
+            "-1 2 0\n",
+            "1 -2 0\n"
+        );
+        let parsed = parse_qdimacs(source, QdimacsParseBudget::default()).unwrap();
+        assert_eq!(parsed.stats.declared_variables, 2);
+        assert_eq!(parsed.stats.parsed_clauses, 2);
+        assert_eq!(parsed.prefix.variable_count(), 2);
+
+        let dag_budget = dag_budget();
+        let (dag, _) =
+            build_qbf_game_proof_dag(&parsed.problem, &parsed.prefix, dag_budget).unwrap();
+        let profile = extract_game_value_profile_from_dag(
+            &parsed.problem,
+            &parsed.prefix,
+            &dag,
+            dag_budget,
+            construction_budget().game_values,
+        )
+        .unwrap();
+        let constructed = construct_synqbf_from_game_value_profile(
+            &parsed.problem,
+            &parsed.prefix,
+            &profile,
+            construction_budget(),
+        )
+        .unwrap();
+        assert!(constructed.proof.claimed_truth_value);
+        assert_eq!(
+            constructed
+                .report
+                .final_synqbf_verification
+                .source_equivalence_assignments_checked,
+            4
+        );
+        assert_eq!(
+            constructed
+                .report
+                .final_synqbf_verification
+                .representability_conditions_checked,
+            3
         );
     }
 
