@@ -37,7 +37,7 @@ rustc --edition=2021 --test reliability_contract_v1.rs -o /tmp/rc
 
 The current authoring environment did not contain rustc. Source compilation and tests are therefore explicitly outstanding. Do not describe this draft as passing tests or CI.
 
-The semantic validator is deliberately narrow: it checks referential integrity, selected experiment/evidence invariants and canonical identity. It does not estimate common-cause probabilities, prove statistical independence, parse calibration timestamps into a mission profile, validate arbitrary JSON Schema constraints, or establish physical device behavior.
+The semantic validator is deliberately narrow: it checks referential integrity, selected experiment/evidence invariants and canonical identity. The preflight replay only propagates declared deterministic domain outages through parent and dependency relations. Neither estimates common-cause probabilities, proves statistical independence, interprets mission profiles, validates arbitrary JSON Schema constraints, nor establishes physical device behavior.
 
 ## Model boundary
 
@@ -54,7 +54,7 @@ The machine-readable v1 contract and semantic validator are:
 - `research/physical_compute/manifest-validator/`: isolated Rust CLI/library for semantic validation, canonical digesting and deterministic domain-outage preflight replay (uses `serde_json` and `sha2`; not a Symthaea workspace member).
 - `docs/engineering/computers/INDEPENDENT_VERIFICATION_V1.md`: verification benchmark families and independence contract.
 
-The examples are deterministic **negative-control fixtures**, not probability estimates. One injects a controller-domain outage; the other injects a shared power outage that affects the array, controller and verifier. Both declare that increasing healthy cell count must not make the workload executable or make a co-failed verifier independent.
+The examples are deterministic **negative-control fixtures**, not probability estimates. The controller-outage case places the verifier in a separate synthetic power/clock/controller island: candidate execution is unavailable while the verifier remains available. The shared-power case deliberately places the verifier, array and controller under one power domain: both candidate and verifier become unavailable. Both also retain the shared system/host as a potential common cause not yet modeled away.
 
 The JSON Schema validates structure and primitive types. The semantic validator checks:
 - uniqueness of component and domain identifiers;
@@ -68,7 +68,7 @@ The JSON Schema validates structure and primitive types. The semantic validator 
 
 The same Rust utility has a deliberately narrow domain-outage replay mode. It propagates a declared failed domain to child domains and to domains whose declared dependencies have failed, then computes whether all required candidate components and the verifier component remain available. Supported injections are only `domain_outage` with `parameters.state = "failed"`; all other mechanisms fail closed. The CLI labels the output `PREFLIGHT_ONLY`. It does not execute workload arithmetic, infer a correct result, model time-dependent device physics, estimate probabilities, or measure energy.
 
-Run the semantic pass after a Draft 2020-12 JSON Schema validator:
+Run the structural Draft 2020-12 JSON Schema validator first, then the Rust semantic validator and domain-outage preflight replay:
 
 ```sh
 cargo test --manifest-path research/physical_compute/manifest-validator/Cargo.toml
@@ -76,7 +76,7 @@ cargo run --manifest-path research/physical_compute/manifest-validator/Cargo.tom
   research/physical_compute/scenarios/v1/common_cause_controller_outage.json
 ```
 
-The CLI prints a canonical SHA-256 digest, `SEMANTIC_VALID` or `SEMANTIC_INVALID`, the failed domain/component sets, candidate/verifier availability and a `preflight_classification`. It finishes with `PREFLIGHT_ONLY` to make the evidence boundary explicit. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both common-cause fixtures, candidate-path component resolution, failed controller/shared-power propagation, verifier co-failure and unsupported replay mechanisms.
+The CLI prints a canonical SHA-256 digest, `SEMANTIC_VALID` or `SEMANTIC_INVALID`, failed domain/component sets, candidate/verifier availability and a `preflight_classification`. It finishes with `PREFLIGHT_ONLY` to make the evidence boundary explicit. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both common-cause fixtures, candidate-path component resolution, failed controller/shared-power propagation, verifier co-failure and unsupported replay mechanisms.
 
 The crate and tests are authored but have not been compiled in this environment because `rustc` / `cargo` are unavailable. Until the JSON Schema and semantic passes have both executed on an exact head, a manifest is not a qualified scenario.
 
