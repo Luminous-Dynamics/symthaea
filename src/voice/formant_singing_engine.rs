@@ -63,6 +63,120 @@ impl FormantSingingEngine {
         self.sample_rate
     }
 
+    /// Capabilities of the explicit pronunciation-plan + score-graph API.
+    ///
+    /// These differ from `capabilities()`, which describes the legacy
+    /// VocalPerformance v2 route. The resolved-plan route consumes selected
+    /// phones and note events directly; it does not receive vibrato,
+    /// portamento, phrase-expression or voice-identity controls.
+    pub fn resolved_plan_capabilities() -> Result<SingingBackendCapabilities> {
+        SingingBackendCapabilities::new(
+            format!("{BACKEND_ID}-resolved-plan-v1"),
+            vec![
+                capability(
+                    SingingControl::LyricText,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route consumes a selected pronunciation plan, not raw lyric text",
+                ),
+                capability(
+                    SingingControl::Language,
+                    CapabilitySupport::Conditional,
+                    "only language='en' is accepted by the calibrated legacy formant inventory",
+                ),
+                capability(
+                    SingingControl::ExactPhoneSequence,
+                    CapabilitySupport::Native,
+                    "selected canonical phone tokens are rendered directly without rerunning G2P",
+                ),
+                capability(
+                    SingingControl::SyllableAlignment,
+                    CapabilitySupport::Native,
+                    "explicit word/syllable-to-score interval bindings are validated before rendering",
+                ),
+                capability(
+                    SingingControl::NotePitch,
+                    CapabilitySupport::Native,
+                    "each score event supplies the exact target F0 for its interval",
+                ),
+                capability(
+                    SingingControl::NoteDuration,
+                    CapabilitySupport::Approximated,
+                    "score intervals are preserved, while phones are allocated by fixed duration heuristics on a 5 ms frame grid",
+                ),
+                capability(
+                    SingingControl::AbsoluteOnsetAndRests,
+                    CapabilitySupport::Approximated,
+                    "absolute score time and explicit rests are materialized on a 5 ms frame grid",
+                ),
+                capability(
+                    SingingControl::ConsonantAnticipation,
+                    CapabilitySupport::Unsupported,
+                    "the resolved score graph does not carry a consonant-anticipation control",
+                ),
+                capability(
+                    SingingControl::Melisma,
+                    CapabilitySupport::Approximated,
+                    "a designated vowel is held across score events with a continuous envelope, while F0 still changes at note boundaries",
+                ),
+                capability(
+                    SingingControl::ContinuousPitchCurve,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route follows discrete score-event F0 targets",
+                ),
+                capability(
+                    SingingControl::PhraseExpressionCurve,
+                    CapabilitySupport::Unsupported,
+                    "no phrase-expression curve is supplied to this route",
+                ),
+                capability(
+                    SingingControl::PhraseBreathTiming,
+                    CapabilitySupport::Unsupported,
+                    "phrase breath-before/after controls are not synthesized",
+                ),
+                capability(
+                    SingingControl::Breathiness,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route has no independent breathiness input",
+                ),
+                capability(
+                    SingingControl::Energy,
+                    CapabilitySupport::Native,
+                    "score-event velocity scales frame energy",
+                ),
+                capability(
+                    SingingControl::Tension,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route has no vocal-fold tension input",
+                ),
+                capability(
+                    SingingControl::Vibrato,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route does not receive a vibrato control",
+                ),
+                capability(
+                    SingingControl::Portamento,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route does not receive a portamento control",
+                ),
+                capability(
+                    SingingControl::Articulation,
+                    CapabilitySupport::Approximated,
+                    "source type distinguishes vowel, nasal, liquid, stop and fricative classes; durations use fixed heuristics",
+                ),
+                capability(
+                    SingingControl::VoiceIdentity,
+                    CapabilitySupport::Unsupported,
+                    "the resolved-plan route uses the default source-filter voice",
+                ),
+                capability(
+                    SingingControl::LocalEdits,
+                    CapabilitySupport::Unsupported,
+                    "the route renders a complete plan and has no localized edit API",
+                ),
+            ],
+        )
+    }
+
     /// Render a fully selected pronunciation and explicit score/alignment graph.
     ///
     /// Unlike the compatibility VocalPerformance path, this method does not
@@ -1452,6 +1566,32 @@ mod tests {
         assert!(
             error.contains("outside the calibrated legacy formant inventory"),
             "{error}"
+        );
+    }
+
+    #[test]
+    fn resolved_plan_capabilities_do_not_inherit_legacy_expression_claims() {
+        let capabilities = FormantSingingEngine::resolved_plan_capabilities().unwrap();
+        capabilities.validate().unwrap();
+        assert_eq!(
+            capabilities.support(SingingControl::Vibrato),
+            CapabilitySupport::Unsupported
+        );
+        assert_eq!(
+            capabilities.support(SingingControl::Portamento),
+            CapabilitySupport::Unsupported
+        );
+        assert_eq!(
+            capabilities.support(SingingControl::PhraseExpressionCurve),
+            CapabilitySupport::Unsupported
+        );
+        SingingRenderPolicy::score_conditioned_comparison()
+            .validate_against(&capabilities)
+            .unwrap();
+        assert!(
+            SingingRenderPolicy::phrase_expression_comparison()
+                .validate_against(&capabilities)
+                .is_err()
         );
     }
 
