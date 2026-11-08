@@ -432,6 +432,8 @@ mod tests {
 
     const FIXTURE: &str =
         include_str!("../../scenarios/v1/common_cause_controller_outage.json");
+    const SHARED_POWER_FIXTURE: &str =
+        include_str!("../../scenarios/v1/common_cause_shared_power_outage.json");
 
     fn fixture_value() -> Value {
         serde_json::from_str(FIXTURE).expect("fixture JSON must parse")
@@ -450,6 +452,18 @@ mod tests {
         let mut value = fixture_value();
         value["scenario_id"] = Value::String("Not A Stable ID".into());
         assert!(validate_manifest(&value).errors.iter().any(|e| e.contains("scenario_id")));
+    }
+
+    #[test]
+    fn shared_power_negative_control_is_semantically_valid() {
+        let value: Value = serde_json::from_str(SHARED_POWER_FIXTURE)
+            .expect("shared-power fixture JSON must parse");
+        let report = validate_manifest(&value);
+        assert!(report.is_valid(), "{:?}", report.errors);
+        assert_eq!(
+            value["fault_injections"][0]["target_id"].as_str(),
+            Some("shared-power-domain-0")
+        );
     }
 
     #[test]
