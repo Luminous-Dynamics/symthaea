@@ -883,3 +883,67 @@ This is a semantic game-value profile and finite table extractor. It is **not** 
 - Held-out multi-variable formulas, quantified planning, synthesis and model-checking instances.
 
 Do not report a full-history synthesis pass merely because the root QBF truth value and its one winning strategy validate. Every game-value layer and both player function families must be checked.
+
+
+## 23. Portable SynQBF artifacts and QDIMACS-to-verifier vertical slice
+
+The finite SynQBF proof is now a portable versioned artifact, not merely an in-memory AIG. Version 1 uses a deterministic little-endian format with:
+- magic and explicit format version;
+- variable count, claimed root truth value and exact ordered quantifier prefix;
+- paired-variable dependency order and AIG decomposition order;
+- tagged input/AND nodes, constants, complemented edges and output reference.
+
+The artifact does not embed or replace the source CNF. Structural decoding is not semantic acceptance. The only acceptance path is decode followed by the independent three-obligation SynQBF verifier against the original CNF and validated prefix.
+
+### Required artifact measurements
+
+| Measure | Why it matters |
+|---|---|
+| Canonical byte length | Storage, transfer and auditability |
+| Encode/decode time and peak memory | End-to-end artifact overhead |
+| Decoder structural checks | Graph validity and malformed-input rejection |
+| Source-equivalence assignments | First SynQBF obligation coverage |
+| Representability conditions | Per-prefix local OR/AND obligations |
+| Root-value check | Truth claim binding |
+| AIG node visits / circuit evaluations | Deterministic verification work |
+| Bytes per independently checked instance | Comparable evidence density |
+
+Record format version, codec implementation revision, source QDIMACS digest, prefix digest, proof-circuit digest and verifier configuration. The proof artifact itself does not self-authenticate the source or certify its own truth. Bind those external digests using the existing benchmark manifest/receipt system.
+
+### New finite vertical slice
+
+The new test path composes:
+1. bounded strict QDIMACS PCNF parsing;
+2. residual-CNF QBF game proof-DAG construction;
+3. independently checked game-value profile extraction;
+4. finite SynQBF circuit construction and three-condition verification;
+5. deterministic SynQBF proof encoding;
+6. artifact decoding and independent verification against the original parsed CNF and prefix.
+
+It includes an exists-x QDIMACS fixture. Separate two-variable construction tests cover 273 CNFs, two variable orders and all four quantifier patterns (2,184 formula/prefix cases), plus empty-prefix TRUE/FALSE constant proofs. These are finite exhaustive/reference checks, not external competition performance results.
+
+### Adversarial artifact corpus
+
+Add malformed-artifact fixtures for:
+- unknown magic/version/tag and invalid booleans/quantifiers;
+- duplicate/out-of-range prefix variables;
+- wrong paired-input and decomposition orders;
+- invalid references, non-topological edges, duplicate/unreachable AIG nodes;
+- truncated records, trailing bytes and impossible count/byte combinations;
+- byte, node, AND-node, variable, circuit-evaluation and verifier-work budget exhaustion;
+- valid, structurally well-formed circuits bound to the wrong source CNF or prefix.
+
+The decoder must reject impossible declared node counts before allocating node storage. Budget failures and malformed artifacts remain errors/UNKNOWN, never a QBF truth value.
+
+### External QBF interface compatibility
+
+QBFGallery 2026 decision-only execution is a distinct interface: its documented command interface accepts one input file, reports TRUE via exit code 10 and FALSE via 20; other return codes are failures. It has PCNF main, crafted, random, 2QBF, prenex non-CNF and DQBF tracks, with QDIMACS, QCIR and DQDIMACS input formats. The current parser supports bounded QDIMACS PCNF only. Do not run the PCNF parser on non-CNF/QCIR or DQBF inputs, and do not treat non-10/20 exits as truth values.
+
+For every external comparison, report separate tracks for:
+1. decision-only QBF;
+2. proof production and independent proof checking;
+3. Skolem/Herbrand or SynQBF proof extraction;
+4. independent strategy/proof verification;
+5. artifact size and serialization overhead.
+
+A decision-only solver is not required to return a proof artifact; its solved count must not be compared to verified strategy coverage as if they were the same output contract.
