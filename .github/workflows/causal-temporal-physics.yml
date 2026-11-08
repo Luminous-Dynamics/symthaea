@@ -176,6 +176,19 @@ jobs:
             echo "- Claim boundary: finite-system signal and numerical convergence only; not thermodynamic DTC phase proof"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run model-generated Floquet frequency-locking sweep
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-fractal-time-lab --example exact_floquet_frequency_locking | tee dtc-frequency-locking.csv
+          grep -q 'all_up,0.000000' dtc-frequency-locking.csv
+          grep -q 'all_up,0.500000' dtc-frequency-locking.csv
+          {
+            echo '## Model-generated finite-sweep frequency locking'
+            cat dtc-frequency-locking.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run curved 1+1D conformal-FRW causal-set sweep
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
