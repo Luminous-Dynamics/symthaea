@@ -30,6 +30,8 @@ For a candidate product C = AB, a Freivalds-style check samples random vector r 
 
 For real-valued / analog arithmetic, do not reuse that finite-field bound. Gaussian projection variants have a measure-zero false-positive result under exact arithmetic, but floating-point roundoff, analog noise, quantization, nonzero acceptance thresholds and correlated faults change the operational false-acceptance probability. Establish it for the actual arithmetic and fault model; otherwise report it as unknown.
 
+For a finite-field exact lane, useful preregistered reference points are **k = 10** (theoretical bound at most 0.09765625%) and **k = 20** (at most 0.00009537%), assuming independent uniform challenges and the standard algorithmic assumptions. These are mathematical bounds for that verifier, not measured silicon rates. Do not apply them to floating-point, photonic or analog execution; there, false acceptance remains unknown until the tolerance and fault distribution are measured.
+
 For a repeated MVM workload y = Ax with fixed A, investigate precomputing a trusted projection qᵀ = rᵀA and checking qᵀx against rᵀy. The one-time preprocessing cost, input immutability, verifier storage and projection refresh cost must be counted. The checker must not derive q from the same faulty execution path as y.
 
 ### V3 — residual, backward-error and condition-aware verification
