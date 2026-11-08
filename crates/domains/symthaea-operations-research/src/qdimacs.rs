@@ -66,44 +66,104 @@ pub struct QdimacsInstance {
 /// Typed, fail-closed parser errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QdimacsError {
-    InputByteBudgetExceeded { required: usize, limit: usize },
-    LineBudgetExceeded { required: usize, limit: usize },
+    InputByteBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    LineBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     MissingHeader,
-    HeaderMustBeFirst { line: usize },
-    DuplicateHeader { line: usize },
-    MalformedHeader { line: usize },
-    UnsupportedFormat { line: usize, format: String },
-    InvalidHeaderVariableCount { line: usize, token: String },
-    InvalidHeaderClauseCount { line: usize, token: String },
-    VariableBudgetExceeded { required: usize, limit: usize },
-    ClauseBudgetExceeded { required: usize, limit: usize },
-    LiteralBudgetExceeded { required: usize, limit: usize },
-    PrefixBlockBudgetExceeded { required: usize, limit: usize },
-    PrefixVariableOccurrenceBudgetExceeded { required: usize, limit: usize },
-    MalformedQuantifierLine { line: usize },
-    EmptyQuantifierBlock { line: usize },
-    InvalidQuantifierVariable { line: usize, token: String },
+    HeaderMustBeFirst {
+        line: usize,
+    },
+    DuplicateHeader {
+        line: usize,
+    },
+    MalformedHeader {
+        line: usize,
+    },
+    UnsupportedFormat {
+        line: usize,
+        format: String,
+    },
+    InvalidHeaderVariableCount {
+        line: usize,
+        token: String,
+    },
+    InvalidHeaderClauseCount {
+        line: usize,
+        token: String,
+    },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ClauseBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    LiteralBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    PrefixBlockBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    PrefixVariableOccurrenceBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    MalformedQuantifierLine {
+        line: usize,
+    },
+    EmptyQuantifierBlock {
+        line: usize,
+    },
+    InvalidQuantifierVariable {
+        line: usize,
+        token: String,
+    },
     QuantifierVariableOutOfRange {
         line: usize,
         variable: usize,
         variable_count: usize,
     },
-    DuplicateQuantifiedVariable { line: usize, variable: usize },
-    QuantifierAfterMatrix { line: usize },
-    UnsupportedDependencyLine { line: usize, marker: String },
-    InvalidLiteral { line: usize, token: String },
+    DuplicateQuantifiedVariable {
+        line: usize,
+        variable: usize,
+    },
+    QuantifierAfterMatrix {
+        line: usize,
+    },
+    UnsupportedDependencyLine {
+        line: usize,
+        marker: String,
+    },
+    InvalidLiteral {
+        line: usize,
+        token: String,
+    },
     LiteralVariableOutOfRange {
         line: usize,
         variable: usize,
         variable_count: usize,
     },
-    UnterminatedClause { line: usize, literals_in_clause: usize },
+    UnterminatedClause {
+        line: usize,
+        literals_in_clause: usize,
+    },
     TooManyClauses {
         line: usize,
         declared: usize,
         observed_at_least: usize,
     },
-    ClauseCountMismatch { declared: usize, actual: usize },
+    ClauseCountMismatch {
+        declared: usize,
+        actual: usize,
+    },
     ResourceAccountingOverflow,
     InvalidQuantifierPrefix(QuantifierScopeError),
 }
@@ -124,24 +184,24 @@ fn parse_header(line_number: usize, tokens: &[&str]) -> Result<Header, QdimacsEr
             format: tokens[1].to_owned(),
         });
     }
-    let variables = tokens[2]
-        .parse::<i32>()
-        .map_err(|_| QdimacsError::InvalidHeaderVariableCount {
-            line: line_number,
-            token: tokens[2].to_owned(),
-        })?;
+    let variables =
+        tokens[2]
+            .parse::<i32>()
+            .map_err(|_| QdimacsError::InvalidHeaderVariableCount {
+                line: line_number,
+                token: tokens[2].to_owned(),
+            })?;
     let clauses = tokens[3]
         .parse::<i32>()
         .map_err(|_| QdimacsError::InvalidHeaderClauseCount {
             line: line_number,
             token: tokens[3].to_owned(),
         })?;
-    let variables = usize::try_from(variables).map_err(|_| {
-        QdimacsError::InvalidHeaderVariableCount {
+    let variables =
+        usize::try_from(variables).map_err(|_| QdimacsError::InvalidHeaderVariableCount {
             line: line_number,
             token: tokens[2].to_owned(),
-        }
-    })?;
+        })?;
     let clauses = usize::try_from(clauses).map_err(|_| {
         QdimacsError::InvalidHeaderClauseCount {
             line: line_number,
@@ -177,12 +237,13 @@ fn parse_quantifier_line(
     }
 
     for token in &tokens[1..tokens.len() - 1] {
-        let variable = token
-            .parse::<i32>()
-            .map_err(|_| QdimacsError::InvalidQuantifierVariable {
-                line: line_number,
-                token: (*token).to_owned(),
-            })?;
+        let variable =
+            token
+                .parse::<i32>()
+                .map_err(|_| QdimacsError::InvalidQuantifierVariable {
+                    line: line_number,
+                    token: (*token).to_owned(),
+                })?;
         if variable <= 0 || usize::try_from(variable).unwrap_or(usize::MAX) > header.variables {
             return Err(QdimacsError::QuantifierVariableOutOfRange {
                 line: line_number,
@@ -190,12 +251,11 @@ fn parse_quantifier_line(
                 variable_count: header.variables,
             });
         }
-        let index = usize::try_from(variable - 1).map_err(|_| {
-            QdimacsError::InvalidQuantifierVariable {
+        let index =
+            usize::try_from(variable - 1).map_err(|_| QdimacsError::InvalidQuantifierVariable {
                 line: line_number,
                 token: (*token).to_owned(),
-            }
-        })?;
+            })?;
         if seen_variables[index] {
             return Err(QdimacsError::DuplicateQuantifiedVariable {
                 line: line_number,
@@ -232,7 +292,11 @@ fn parse_quantifier_line(
                 variables: Vec::new(),
             });
         }
-        blocks.last_mut().expect("block was created or already exists").variables.push(index);
+        blocks
+            .last_mut()
+            .expect("block was created or already exists")
+            .variables
+            .push(index);
         seen_variables[index] = true;
         *occurrences = next_occurrences;
     }
@@ -256,17 +320,18 @@ fn parse_clause_token(
             token: token.to_owned(),
         });
     }
-    let absolute = signed.checked_abs().ok_or_else(|| QdimacsError::InvalidLiteral {
-        line: line_number,
-        token: token.to_owned(),
-    })?;
-    let variable = usize::try_from(absolute).map_err(|_| {
-        QdimacsError::LiteralVariableOutOfRange {
+    let absolute = signed
+        .checked_abs()
+        .ok_or_else(|| QdimacsError::InvalidLiteral {
+            line: line_number,
+            token: token.to_owned(),
+        })?;
+    let variable =
+        usize::try_from(absolute).map_err(|_| QdimacsError::LiteralVariableOutOfRange {
             line: line_number,
             variable: usize::MAX,
             variable_count,
-        }
-    })?;
+        })?;
     if variable == 0 || variable > variable_count {
         return Err(QdimacsError::LiteralVariableOutOfRange {
             line: line_number,
@@ -413,8 +478,7 @@ pub fn parse_qdimacs(
                         continue;
                     }
 
-                    let literal =
-                        parse_clause_token(line_number, token, parsed_header.variables)?;
+                    let literal = parse_clause_token(line_number, token, parsed_header.variables)?;
                     literal_count = literal_count
                         .checked_add(1)
                         .ok_or(QdimacsError::ResourceAccountingOverflow)?;
@@ -492,20 +556,13 @@ pub fn parse_qdimacs(
         }
     }
 
-    let prefix = ValidatedQuantifierPrefix::new(
-        parsed_header.variables,
-        blocks,
-        budget.prefix,
-    )
-    .map_err(QdimacsError::InvalidQuantifierPrefix)?;
+    let prefix = ValidatedQuantifierPrefix::new(parsed_header.variables, blocks, budget.prefix)
+        .map_err(QdimacsError::InvalidQuantifierPrefix)?;
 
     let variables = (1..=parsed_header.variables)
         .map(|id| id.to_string())
         .collect();
-    let problem = CnfProblem {
-        variables,
-        clauses,
-    };
+    let problem = CnfProblem { variables, clauses };
     let stats = QdimacsSourceStats {
         source_bytes: source.len(),
         source_lines,
@@ -531,13 +588,13 @@ fn clauses_len(problem: &CnfProblem) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::quantified_proof::{
-        build_qbf_game_proof, verify_qbf_game_proof, QuantifiedProofBudget,
+        QuantifiedProofBudget, build_qbf_game_proof, verify_qbf_game_proof,
     };
     use super::super::quantified_strategy::{
-        evaluate_qbf_with_strategy, QuantifiedEvaluationBudget, StrategyOwner,
+        QuantifiedEvaluationBudget, StrategyOwner, evaluate_qbf_with_strategy,
     };
+    use super::*;
 
     fn budget() -> QdimacsParseBudget {
         QdimacsParseBudget {
@@ -640,19 +697,14 @@ mod tests {
 
     #[test]
     fn merges_adjacent_quantifier_lines_with_same_quantifier() {
-        let parsed =
-            parse_qdimacs("p cnf 3 0\na 1 0\na 2 0\ne 3 0\n", budget()).unwrap();
+        let parsed = parse_qdimacs("p cnf 3 0\na 1 0\na 2 0\ne 3 0\n", budget()).unwrap();
         assert_eq!(parsed.prefix.blocks().len(), 2);
         assert_eq!(parsed.prefix.blocks()[0].variables, vec![0, 1]);
     }
 
     #[test]
     fn parses_clauses_spanning_lines_and_multiple_clauses_per_line() {
-        let parsed = parse_qdimacs(
-            "p cnf 2 2\ne 1 2 0\n1\n-2 0 2 0\n",
-            budget(),
-        )
-        .unwrap();
+        let parsed = parse_qdimacs("p cnf 2 2\ne 1 2 0\n1\n-2 0 2 0\n", budget()).unwrap();
         assert_eq!(
             parsed.problem.clauses,
             vec![
