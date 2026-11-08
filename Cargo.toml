@@ -15,6 +15,8 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Standalone path dependency with its own Cargo workspace boundary.
+    "tools/pronunciation-plan",
     # Incomplete source-only directories accidentally matched by crates/core/*.
     # They have no Cargo.toml, so keep their source untouched but exclude them
     # from workspace package discovery until the manifests and APIs are complete.
