@@ -772,3 +772,48 @@ The 2026 public Gallery page identifies the 2026 tracks and benchmark collection
 - CAQE proof-theoretic analysis, which describes CAQE as the strongest practice-wise QBF algorithmic paradigm and clearly dominating recent competitions: https://drops.dagstuhl.de/entities/volume/LIPIcs-volume-377
 - Historical 2023 QBFGallery results: https://qbf.pages.sai.jku.at/gallery23/
 - 2026 frontier-aware OBDD refinement on feature interaction graphs: https://www.nature.com/articles/s41598-026-74296-8. It is a CNF/feature-graph result; its numerical results are not transferable directly to QBF strategy functions.
+
+
+## 14. QBF proof trees versus residual-state proof DAGs
+
+A new QBF knowledge-compilation paper is directly relevant: Chede, Krishan & Shukla, *On Knowledge Compilation Languages for QBFs*, ECCC TR26-279, report published 27 October 2026. They study tree-based and DAG-based QBF compilation languages, their proof-system consequences for #QBF, and an initial compiled #QBF solver compared with d4-QBF. They report a minor Q-MICE extension that efficiently simulates the proposed static proof systems and is exponentially stronger than each of them. This establishes that tree-to-DAG knowledge compilation and #QBF are active research directions; Symthaea must not claim the general DAG idea as unprecedented. Source: https://eccc.weizmann.ac.il/report/2026/279/.
+
+### Our narrower experimental hypothesis
+
+The residual-CNF DAG in #11130 uses a specific state identity:
+`(quantifier-prefix position, structurally canonical residual CNF)`.
+
+For each branch, the verifier recomputes the residual CNF after assigning the next quantified variable. A state is shared only when both the remaining prefix and canonical residual formula are identical. This is stronger than a hash-only match: the intern key is compared structurally, so collisions cannot merge non-equivalent games.
+
+The proposed comparison is:
+- existing contextual proof tree with source-matrix terminal witnesses;
+- residual-CNF proof DAG with shared equivalent suffix states;
+- proof tree / proof DAG crossed with strategy extraction and BDD/AIG compilation;
+- decision-only solver output;
+- #QBF counting as a separate target and output type.
+
+### Metrics
+
+- verified instances and root truth values;
+- proof tree nodes versus DAG nodes;
+- unique residual states, memo hits and shared-child references;
+- residual clause/literal storage and bytes;
+- construction visits, canonicalization work, peak memory and time;
+- verifier visits, residual recomputation work, memory and time;
+- time and memory to a verified strategy;
+- strategy and compiled BDD/AIG sizes, reported separately from proof size;
+- count correctness and proof-checking cost for a separate #QBF lane.
+
+A DAG that reduces proof nodes but increases residual storage or checker work is not automatically better. Report the full resource vector and time-to-trusted-result.
+
+### External comparison and limits
+
+QBFGallery 2026 separates PCNF main, crafted, random, 2QBF, prenex non-CNF and DQBF tracks, and supports QDIMACS, QCIR and DQDIMACS benchmark inputs. The first external phase should use the public PCNF/crafted/random/2QBF corpora for which exact source files, licenses, solver versions and outcome artifacts can be pinned. Keep non-CNF and DQBF separate until their semantics are implemented and independently qualified.
+
+CAQE is a strong practical QBF baseline: a 2026 proof-theoretic analysis describes it as the leading practical QBF algorithmic paradigm, and its public implementation supports QDIMACS plus a QDO output mode. DepQBF is an additional search-based baseline, with its exact binary and preprocessing configuration pinned. Do not invent a current ranking from solver availability or mix decision-only execution with strategy/proof output modes.
+
+The QBFGallery page lists results as presented at SAT but does not expose a machine-readable score table in the retrieved page content. Numeric solved-count targets must wait until the official results and exact benchmark artifacts are pinned. Until then, use reproducibility and per-instance verified outcome tables rather than invented aggregate SOTA claims.
+
+### #QBF boundary
+
+The October 2026 knowledge-compilation paper treats #QBF as counting winning strategies and studies proof systems for this task. It is not the same as deciding whether a QBF is true. Any Symthaea #QBF prototype must count distinct Skolem strategy profiles under the exact dependency semantics, independently validate the count on finite instances, and compare with d4-QBF/Q-MICE-related references where compatible. Do not report #QBF values as QBF decision results or ordinary #SAT model counts.
