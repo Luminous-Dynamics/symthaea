@@ -280,6 +280,8 @@ pub enum ModelDiscriminationError {
     InvalidQuadratureIntervals { maximum: usize },
     #[error("quadrature tolerance must be finite and positive")]
     InvalidQuadratureTolerance,
+    #[error("Gaussian KL inputs must be finite with positive predictive and measurement sigmas")]
+    InvalidGaussianKlInputs,
     #[error("numerical overflow while evaluating experiment {0}")]
     NumericalOverflow(String),
 }
@@ -403,6 +405,64 @@ impl ModelDiscriminationConfig {
 /// An open-world run explicitly excludes OTHER_UNRESOLVED from numeric
 /// likelihoods. It therefore ranks discrimination among the supplied named
 /// hypotheses; it cannot prove that the selected hypothesis is true.
+/// Analytic directed KL divergence between two scalar Gaussian predictive
+/// distributions after adding the same independent calibrated measurement
+/// noise to both.
+///
+/// The predictive distributions are
+///
+/// `p = Normal(left_mean, left_predictive_sigma^2 + measurement_sigma^2)`
+///
+/// `q = Normal(right_mean, right_predictive_sigma^2 + measurement_sigma^2)`.
+///
+/// Returns `D_KL(p || q)` in nats. This is an expected log-likelihood-ratio
+/// objective, **not** model-identity EIG, posterior entropy reduction or
+/// model-recovery accuracy. This closed-form reference requires the predictive
+/// and measurement noise sources to be independent and Gaussian.
+pub fn gaussian_predictive_kl_nats(
+    left_mean: f64,
+    left_predictive_sigma: f64,
+    right_mean: f64,
+    right_predictive_sigma: f64,
+    measurement_sigma: f64,
+) -> Result<f64, ModelDiscriminationError> {
+    if !left_mean.is_finite()
+        || !right_mean.is_finite()
+        || !left_predictive_sigma.is_finite()
+        || !right_predictive_sigma.is_finite()
+        || !measurement_sigma.is_finite()
+        || left_predictive_sigma <= 0.0
+        || right_predictive_sigma <= 0.0
+        || measurement_sigma <= 0.0
+    {
+        return Err(ModelDiscriminationError::InvalidGaussianKlInputs);
+    }
+
+    let left_sigma = left_predictive_sigma.hypot(measurement_sigma);
+    let right_sigma = right_predictive_sigma.hypot(measurement_sigma);
+    let mean_difference = left_mean - right_mean;
+    let sigma_ratio = left_sigma / right_sigma;
+    let standardized_difference = mean_difference / right_sigma;
+    let ratio_squared = sigma_ratio * sigma_ratio;
+    let difference_squared = standardized_difference * standardized_difference;
+    let value = right_sigma.ln() - left_sigma.ln()
+        + 0.5 * (ratio_squared + difference_squared - 1.0);
+
+    if !left_sigma.is_finite()
+        || !right_sigma.is_finite()
+        || !mean_difference.is_finite()
+        || !sigma_ratio.is_finite()
+        || !standardized_difference.is_finite()
+        || !value.is_finite()
+    {
+        return Err(ModelDiscriminationError::InvalidGaussianKlInputs);
+    }
+
+    // The analytic value is non-negative; clamp only tiny floating-point
+    // cancellation around identical distributions.
+    Ok(value.max(0.0))
+}
+
 pub fn rank_model_discriminating_experiments(
     hypotheses: &[DiscriminationHypothesis],
     experiments: &[CandidateExperiment],
@@ -947,6 +1007,60 @@ mod tests {
             scenario_weight: 1.0,
             probabilities: vec![0.5, 0.5],
         }
+    }
+
+    #[test]
+    fn gaussian_predictive_kl_matches_equal_variance_closed_form() {
+        let left_mean: f64 = -0.25;
+        let right_mean: f64 = 0.75;
+        let predictive_sigma: f64 = 0.3;
+        let measurement_sigma: f64 = 0.4;
+        let total_sigma = predictive_sigma.hypot(measurement_sigma);
+        let observed = gaussian_predictive_kl_nats(
+            left_mean,
+            predictive_sigma,
+            right_mean,
+            predictive_sigma,
+            measurement_sigma,
+        )
+        .unwrap();
+        let expected = (left_mean - right_mean).powi(2) / (2.0 * total_sigma.powi(2));
+
+        assert!((observed - expected).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn gaussian_predictive_kl_is_directed_and_asymmetric() {
+        let forward = gaussian_predictive_kl_nats(0.0, 0.2, 0.5, 0.8, 0.1).unwrap();
+        let reverse = gaussian_predictive_kl_nats(0.5, 0.8, 0.0, 0.2, 0.1).unwrap();
+
+        assert!(forward >= 0.0);
+        assert!(reverse >= 0.0);
+        assert!((forward - reverse).abs() > 1.0e-3);
+    }
+
+    #[test]
+    fn gaussian_predictive_kl_is_zero_for_identical_distributions() {
+        assert_eq!(
+            gaussian_predictive_kl_nats(0.5, 0.2, 0.5, 0.2, 0.1).unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn gaussian_predictive_kl_rejects_invalid_or_overflowing_inputs() {
+        assert_eq!(
+            gaussian_predictive_kl_nats(0.0, 0.2, 1.0, 0.2, 0.0),
+            Err(ModelDiscriminationError::InvalidGaussianKlInputs)
+        );
+        assert_eq!(
+            gaussian_predictive_kl_nats(f64::NAN, 0.2, 1.0, 0.2, 0.1),
+            Err(ModelDiscriminationError::InvalidGaussianKlInputs)
+        );
+        assert_eq!(
+            gaussian_predictive_kl_nats(1.0e308, 0.2, -1.0e308, 0.2, 0.1),
+            Err(ModelDiscriminationError::InvalidGaussianKlInputs)
+        );
     }
 
     #[test]
