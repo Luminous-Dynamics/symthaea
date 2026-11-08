@@ -4,6 +4,7 @@
 //! a general equation-discovery engine or physical-world simulator.
 
 pub mod campaign;
+pub mod finite_campaign;
 pub mod interaction;
 pub mod numeric;
 pub mod policy;
