@@ -1244,6 +1244,121 @@ mod tests {
     }
 
     #[test]
+    fn finite_region_robust_design_can_reverse_the_nominal_winner() {
+        let centre = Vector3::new(68.939_251_182_1, -41.356_235_699_0, 177.111_904_521_1);
+        let existing = vec![
+            bearing_from_target("north", Vector3::new(0.0, 0.0, 0.0), centre, 1.0e-4),
+            bearing_from_target("east", Vector3::new(100.0, 0.0, 0.0), centre, 1.0e-4),
+        ];
+        let candidates = vec![
+            SensorPlacementCandidate {
+                sensor_id: "candidate-north-far".to_string(),
+                origin_ecef_m: Vector3::new(-100.0, 0.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-south".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 100.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-high".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 0.0, 100.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-west-high".to_string(),
+                origin_ecef_m: Vector3::new(-100.0, -100.0, 100.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-east-high".to_string(),
+                origin_ecef_m: Vector3::new(200.0, 0.0, 100.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-far-south".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 300.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-far-north".to_string(),
+                origin_ecef_m: Vector3::new(0.0, -300.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "candidate-up-far".to_string(),
+                origin_ecef_m: Vector3::new(50.0, 40.0, 500.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+        ];
+
+        let nominal = rank_sensor_placements(&existing, centre, &candidates).unwrap();
+        assert_eq!(nominal[0].sensor_id, "candidate-high");
+        assert!(
+            (nominal[0].log_determinant_information - 29.464_907_952_6).abs() < 1.0e-8
+        );
+
+        let hypotheses = vec![
+            TargetHypothesis {
+                target_ecef_m: centre,
+                weight: 0.4,
+            },
+            TargetHypothesis {
+                target_ecef_m: Vector3::new(
+                    36.446_870_819_9,
+                    -140.999_555_448_6,
+                    525.595_718_451_7,
+                ),
+                weight: 0.2,
+            },
+            TargetHypothesis {
+                target_ecef_m: Vector3::new(
+                    -104.812_634_610_3,
+                    -92.535_157_002_2,
+                    420.957_059_149_5,
+                ),
+                weight: 0.2,
+            },
+            TargetHypothesis {
+                target_ecef_m: Vector3::new(
+                    34.747_607_036_8,
+                    102.310_880_109_4,
+                    510.187_425_811_8,
+                ),
+                weight: 0.2,
+            },
+        ];
+        let robust =
+            rank_sensor_placements_over_target_region(&existing, &hypotheses, &candidates).unwrap();
+
+        assert_eq!(robust[0].sensor_id, "candidate-up-far");
+        assert!(
+            (robust[0].expected_log_determinant_information - 26.409_045_866_2).abs() < 1.0e-8
+        );
+        assert!(
+            (robust[0].worst_case_log_determinant_information - 23.747_323_846_5).abs() < 1.0e-8
+        );
+        assert_ne!(nominal[0].sensor_id, robust[0].sensor_id);
+    }
+
+    #[test]
     fn target_region_ranking_normalizes_weights_and_rejects_invalid_weights() {
         let centre = Vector3::new(50.0, 40.0, 200.0);
         let existing = vec![
