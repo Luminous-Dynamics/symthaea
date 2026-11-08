@@ -595,6 +595,35 @@ Separate deterministic monitor precision/recall from LLM/judge attribution. A ju
 - A late contradiction invalidates a previously satisfied obligation.
 - An agent abstains correctly when the trace cannot establish the target scope.
 
+## 6.5 Supply-chain assurance standards: compose their guarantees
+
+REA should act as a semantic and evidential layer above established supply-chain assurance standards, not replace them.
+
+| Standard / system | What its contract contributes | What REA must not infer |
+|---|---|---|
+| SLSA v1.2 Build / Source tracks | Build/source provenance and graduated controls; Build L1 has provenance, L2 signed hosted-build provenance, L3 hardened build platform | The source is correct, the artifact is safe, or runtime behavior is benign |
+| Sigstore / Rekor | Artifact signature, certificate identity/expected identity verification, transparency-log inclusion and public auditability | The signed statement is true, the signer is factually correct, or the artifact's behavior is safe |
+| SCITT (RFC 9943) | Signed statement registration and verifiable transparency service | A statement is accurate, an issuer registered all statements, or registered order implies issuance order unless policy says so |
+| TUF 1.0.37 | Threshold metadata roles, version/expiry and snapshot consistency checks; protects clients against rollback, freeze, mix-and-match, fast-forward and mirror attacks | The artifact is semantically safe, source code is correct, or an installed program behaves as intended |
+| RFC 8785 JCS | Deterministic JSON canonicalization for cryptographic hashing/signing over I-JSON and ECMAScript-compatible number serialization | Exact decimal intent, arbitrary-width integer intent, domain units or source authenticity |
+
+Primary specifications:
+- SLSA v1.2: https://slsa.dev/spec/v1.2/ and Build track overview https://slsa.dev/spec/v1.2/build-track-basics
+- Sigstore verification: https://docs.sigstore.dev/
+- SCITT RFC 9943: https://www.rfc-editor.org/rfc/rfc9943.html
+- TUF v1.0.37 (8 October 2026): https://theupdateframework.github.io/specification/latest/
+- RFC 8785: https://www.rfc-editor.org/rfc/rfc8785.html
+
+### REA consumption rules
+
+1. Preserve a standard's verification receipt, policy/version, signer identity, subject digest, operation and time scope as exact Evidence.
+2. Evaluate only the predicate that the standard actually establishes. For example, TUF metadata freshness is not runtime safety; Rekor inclusion is not statement truth; a SLSA provenance level is not source correctness.
+3. Keep issuer participation separate from transparency-view completeness. RFC 9943 §9.3 explicitly permits issuers to refuse or selectively submit statements; a complete registered view cannot prove a complete issuer history.
+4. Keep signature validity, signer identity, trust policy, statement accuracy, artifact identity and behavior as separate proof obligations.
+5. Keep JCS identity separate from numeric intent. JCS uses ECMAScript IEEE-754 double serialization, and recommends strings for higher precision/longer integers; application semantics remain separately declared.
+
+The competitive opportunity is the composition: REA can accept mature cryptographic/build/update assurance as typed Evidence while independently checking how far those guarantees actually support a specific engineering or security claim.
+
 ## 7. Industry boundary
 
 REA composes rather than replaces:
