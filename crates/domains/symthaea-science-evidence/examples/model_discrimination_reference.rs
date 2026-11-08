@@ -3,10 +3,9 @@
 
 use std::error::Error;
 use symthaea_science_evidence::{
-    CandidateExperiment, DiscriminationHypothesis, GaussianModelPrediction,
-    MeasurementNoiseModel, ModelDiscriminationConfig, ModelPriorScenario,
-    ModelUniverseCoverage, NoiseCalibrationStatus, PredictionDisposition,
-    rank_model_discriminating_experiments,
+    CandidateExperiment, DiscriminationHypothesis, GaussianModelPrediction, MeasurementNoiseModel,
+    ModelDiscriminationConfig, ModelPriorScenario, ModelUniverseCoverage, NoiseCalibrationStatus,
+    PredictionDisposition, rank_model_discriminating_experiments,
 };
 
 fn hypothesis(id: &str, source_byte: u8) -> DiscriminationHypothesis {
@@ -131,7 +130,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("open_world_unresolved_excluded=true");
     println!("model_count={}", report.model_ids.len());
     println!("prior_scenarios={}", report.prior_scenario_ids.join(";"));
-    println!("experiment,status,worst_case_eig_nats,mean_eig_nats,worst_eig_per_cost,mean_eig_per_cost");
+    println!(
+        "experiment,status,worst_case_eig_nats,mean_eig_nats,worst_eig_per_cost,mean_eig_per_cost"
+    );
 
     for score in &report.experiments {
         let status = match &score.status {
@@ -148,7 +149,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             score.experiment_id,
             status,
             score.worst_case_model_identity_eig_nats.unwrap_or(f64::NAN),
-            score.weighted_mean_model_identity_eig_nats.unwrap_or(f64::NAN),
+            score
+                .weighted_mean_model_identity_eig_nats
+                .unwrap_or(f64::NAN),
             score.worst_case_eig_per_cost.unwrap_or(f64::NAN),
             score.weighted_mean_eig_per_cost.unwrap_or(f64::NAN),
         );
@@ -166,11 +169,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             blockers,
         } = &score.status
         {
-            println!("blocking_reasons={},{}", score.experiment_id, blockers.len());
+            println!(
+                "blocking_reasons={},{}",
+                score.experiment_id,
+                blockers.len()
+            );
         }
     }
 
     println!("claim_boundary=ranking_declared_synthetic_predictive_distributions_only");
-    println!("not_claimed=physical_model_selection,new_law,UAP_origin,parameter_EIG,closed_world_truth");
+    println!(
+        "not_claimed=physical_model_selection,new_law,UAP_origin,parameter_EIG,closed_world_truth"
+    );
     Ok(())
 }
