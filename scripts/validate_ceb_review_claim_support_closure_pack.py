@@ -93,6 +93,7 @@ def validate(protocol: str, challenge: str, key: str, continuity: str) -> list[s
         "support closure",
         "closure completeness",
         "impact witness",
+        "closure-gap witness",
         "unaffectedness witness",
         "open-world remainder",
         "historical truth",
@@ -153,7 +154,7 @@ def validate(protocol: str, challenge: str, key: str, continuity: str) -> list[s
 
 def self_test() -> list[str]:
     protocol = "\n".join((
-        "support closure closure completeness impact witness unaffectedness witness open-world remainder",
+        "support closure closure completeness impact witness closure-gap witness unaffectedness witness open-world remainder",
         "historical truth current decision-use event-to-claim impact",
         "not a second evidence-continuity system #10630 #10173 #9112 #10314 #10610 #10619 #10064 #10369 no new task schema not a sealed holdout",
         *DISPOSITIONS,
