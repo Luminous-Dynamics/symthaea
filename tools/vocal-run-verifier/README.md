@@ -33,14 +33,16 @@ muse_vocal_gate/
 - Exact source revision and run-manifest schema.
 - Contiguous, unique case IDs and finite generation controls.
 - Recomputed score BLAKE3 digest from the serialized note sequence.
+- Recomputed performance BLAKE3 digest from the exact canonical VocalPerformance JSON stored in the private run manifest.
 - One-to-one blind clip/private-key correspondence.
 - Blind identifiers recomputed from private salt, backend ID and case ID.
 - Exact WAV bytes against the blind-manifest BLAKE3 digest.
 - Safe single-component WAV filenames; no traversal or symlinked audio.
 - Performance digest agreement between case receipt, blind clip and private key.
-- Capability-manifest digest agreement between private key and objective report.
+- Recomputed backend capability-manifest digest from its canonical JSON, equality with its structured manifest, and digest agreement with the private key.
 - One objective entry for every generated model clip and none for human references.
 - Human-reference score/audio linkage and presence of pseudonym, consent and license references.
+- Strict directory allowlists: private keys, run receipts, objective reports and release status cannot be placed in the blind listener bundle; unexpected files and symlinks fail.
 - Separation of blind and private directories.
 
 ## What is not verified
