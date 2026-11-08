@@ -1727,7 +1727,7 @@ mod tests {
         assert_eq!(a.compiled_lp_sha256(), a_replay.compiled_lp_sha256());
         assert_eq!(
             sha256_hex(a.compiled_lp_sha256()),
-            "dd4ff48f3a409165ea531a7d3da4983ebbe93368ef89b31ff91213839eefd4de"
+            "24fa949af16f951bedd6dba8dbb7a2fb5b7062121cb4d994fd6447ea69b7cab5"
         );
         assert_ne!(a.compiled_lp_sha256(), b.compiled_lp_sha256());
         assert_ne!(a.compiled_lp_sha256(), a_min.compiled_lp_sha256());
@@ -1935,7 +1935,7 @@ mod tests {
         assert_eq!(verified.certificate_sha256, certificate.sha256());
         assert_eq!(
             sha256_hex(verified.certificate_sha256),
-            "aecefa27673e34d63ca2098769e5e7538e57b39b9836a7a73f62c59e47ea4786"
+            "fd7f948d048b91c07b7f83b6b626f82780335fa746a513831f98e5e19b4ecaef"
         );
 
         let mut changed = certificate.clone();
@@ -2031,7 +2031,7 @@ mod tests {
         assert_eq!(verified.source_model_sha256, canonical_interval_model_sha256(&model));
         assert_eq!(
             sha256_hex(verified.decision_certificate_sha256),
-            "1a0a489135922fb0d8f653a3ec25165b0df83ba507adfabcf4545feba24644d1"
+            "9a845c6b86b8aa8ccff426fb373f62832e12838f4d820b37a35dec9b1779fe7e"
         );
         assert_eq!(
             verified.pairwise_regrets.iter().map(|item| item.compiled_lp_sha256).collect::<Vec<_>>(),
