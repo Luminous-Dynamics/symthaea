@@ -239,5 +239,18 @@
     "scorer_revision": null,
     "claim_label_ontology_revision": null,
     "conflict_axis_annotation_revision": null
+  },
+  "counterfactual_pairs": {
+    "mode": "NOT_USED",
+    "pair_manifest_sha256": null,
+    "intervention_manifest_sha256": null,
+    "trial_manifest_sha256": null,
+    "scorer_revision": null,
+    "condition_manifest_schema_version": null,
+    "changed_dimension_annotation_revision": null,
+    "pair_count": 0,
+    "pair_kinds": [],
+    "pair_split_revision": null,
+    "source_lineage_manifest_sha256": null
   }
 }
