@@ -5,7 +5,10 @@
 //! Reuses adjudicated trials from the acoustic-faithfulness scorer.
 //! No audio decoding, model invocation, speaker identification, or sensitive inference.
 
-use crate::acoustic_faithfulness::{AcousticFaithfulnessTrial, AudioTruth, ModelOutcome};
+use crate::acoustic_faithfulness::{
+    score_acoustic_faithfulness, AcousticFaithfulnessError, AcousticFaithfulnessTrial, AudioTruth,
+    ModelOutcome,
+};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
@@ -73,11 +76,19 @@ pub struct CounterfactualPairResult {
     pub text_response_invariance: PairRate,
     /// Both outputs equal their own unchanged audio truth.
     pub text_joint_correct: PairRate,
+    /// Both members produce claims, divided by all text-nuisance pairs.
+    pub text_nuisance_joint_answer_coverage: PairRate,
+    /// Both outputs are correct, conditioned on both members producing claims.
+    pub text_joint_correct_given_answered: PairRate,
     /// Both outputs abstain under text-only intervention.
     pub text_joint_abstention: PairRate,
     pub audio_relevant_pairs: usize,
     /// Both outputs equal their respective, different audio truths.
     pub audio_counterfactual_sensitivity: PairRate,
+    /// Both members produce claims, divided by all audio-relevant pairs.
+    pub audio_relevant_joint_answer_coverage: PairRate,
+    /// Both outputs are correct, conditioned on both members producing claims.
+    pub audio_relevant_joint_sensitivity_given_answered: PairRate,
     /// Same non-abstaining claim despite a changed audio truth.
     pub audio_false_invariance: PairRate,
     /// Both outputs abstain despite a changed audio truth.
@@ -85,8 +96,12 @@ pub struct CounterfactualPairResult {
     pub audio_nuisance_pairs: usize,
     /// Same claim among pairs where both sides claim.
     pub audio_nuisance_semantic_stability: PairRate,
+    /// Both members produce claims, divided by all acoustic-nuisance pairs.
+    pub audio_nuisance_joint_claim_coverage: PairRate,
     /// Both outputs equal the unchanged audio truth.
     pub audio_nuisance_joint_correct: PairRate,
+    /// Both outputs are correct, conditioned on both members producing claims.
+    pub audio_nuisance_joint_correct_given_answered: PairRate,
     /// Exactly one side abstains.
     pub audio_nuisance_differential_abstention: PairRate,
     /// Both sides abstain under acoustic nuisance.
@@ -102,6 +117,7 @@ pub enum CounterfactualPairError {
     InvalidTrialIndex,
     InvalidTrialMetadata,
     InvalidTrialDigest,
+    InvalidTrialSet(AcousticFaithfulnessError),
     MissingTrial(String),
     SameTrialReference,
     ReusedTrial(String),
@@ -128,6 +144,7 @@ impl fmt::Display for CounterfactualPairError {
             Self::InvalidTrialIndex => write!(f, "trial set contains an empty or duplicate trial ID"),
             Self::InvalidTrialMetadata => write!(f, "trial set contains an empty pair ID"),
             Self::InvalidTrialDigest => write!(f, "trial contains an invalid source-audio SHA-256"),
+            Self::InvalidTrialSet(source) => write!(f, "invalid acoustic-faithfulness trial set: {source}"),
             Self::MissingTrial(id) => write!(f, "missing trial: {id}"),
             Self::SameTrialReference => write!(f, "baseline and variant refer to the same trial"),
             Self::ReusedTrial(id) => write!(f, "trial reused by multiple pair roles: {id}"),
@@ -163,6 +180,11 @@ pub fn score_counterfactual_pairs(
         return Err(CounterfactualPairError::EmptyPairManifests);
     }
 
+    // Pair scoring depends on individually valid adjudicated trial records.
+    // Do not let a malformed conflict annotation bypass the trial-level gate.
+    score_acoustic_faithfulness(trials)
+        .map_err(CounterfactualPairError::InvalidTrialSet)?;
+
     let mut index = HashMap::with_capacity(trials.len());
     for trial in trials {
         if trial.trial_id.trim().is_empty()
@@ -183,6 +205,7 @@ pub fn score_counterfactual_pairs(
     let mut text_n = 0;
     let mut text_invariant = 0;
     let mut text_correct = 0;
+    let mut text_both_claim = 0;
     let mut text_abstain = 0;
     let mut relevant_n = 0;
     let mut relevant_sensitive = 0;
@@ -246,6 +269,9 @@ pub fn score_counterfactual_pairs(
                     return Err(CounterfactualPairError::TextNuisanceConditionsUnchanged);
                 }
                 text_n += 1;
+                let both_claim = matches!(base.outcome, ModelOutcome::Claim(_))
+                    && matches!(variant.outcome, ModelOutcome::Claim(_));
+                if both_claim { text_both_claim += 1; }
                 if base.outcome == variant.outcome { text_invariant += 1; }
                 if both_match_truth(base, variant) { text_correct += 1; }
                 if matches!(base.outcome, ModelOutcome::Abstain) && matches!(variant.outcome, ModelOutcome::Abstain) {
@@ -326,14 +352,20 @@ pub fn score_counterfactual_pairs(
         text_nuisance_pairs: text_n,
         text_response_invariance: PairRate::new(text_invariant, text_n),
         text_joint_correct: PairRate::new(text_correct, text_n),
+        text_nuisance_joint_answer_coverage: PairRate::new(text_both_claim, text_n),
+        text_joint_correct_given_answered: PairRate::new(text_correct, text_both_claim),
         text_joint_abstention: PairRate::new(text_abstain, text_n),
         audio_relevant_pairs: relevant_n,
         audio_counterfactual_sensitivity: PairRate::new(relevant_sensitive, relevant_n),
+        audio_relevant_joint_answer_coverage: PairRate::new(relevant_both_claim, relevant_n),
+        audio_relevant_joint_sensitivity_given_answered: PairRate::new(relevant_sensitive, relevant_both_claim),
         audio_false_invariance: PairRate::new(relevant_false_invariant, relevant_both_claim),
         audio_joint_abstention: PairRate::new(relevant_abstain, relevant_n),
         audio_nuisance_pairs: nuisance_n,
         audio_nuisance_semantic_stability: PairRate::new(nuisance_stable, nuisance_both_claim),
+        audio_nuisance_joint_claim_coverage: PairRate::new(nuisance_both_claim, nuisance_n),
         audio_nuisance_joint_correct: PairRate::new(nuisance_correct, nuisance_n),
+        audio_nuisance_joint_correct_given_answered: PairRate::new(nuisance_correct, nuisance_both_claim),
         audio_nuisance_differential_abstention: PairRate::new(nuisance_differential_abstain, nuisance_n),
         audio_nuisance_joint_abstention: PairRate::new(nuisance_joint_abstain, nuisance_n),
     })
@@ -362,7 +394,7 @@ mod tests {
         ChangedDimension, CounterfactualInterventionKind, CounterfactualPairError,
         CounterfactualPairManifest, score_counterfactual_pairs,
     };
-    use crate::acoustic_faithfulness::{AcousticFaithfulnessTrial, AudioTruth, ConflictAxis, ModelOutcome};
+    use crate::acoustic_faithfulness::{AcousticFaithfulnessError, AcousticFaithfulnessTrial, AudioTruth, ConflictAxis, ModelOutcome};
 
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -539,6 +571,44 @@ mod tests {
         let variant = t("b","p",B,"C",ModelOutcome::Claim("C".into()));
         let pairs = [p("p",CounterfactualInterventionKind::AudioRelevant,"a","b",A,A,vec![ChangedDimension::EventPresence])];
         assert_eq!(score_counterfactual_pairs(&[baseline,variant],&pairs),Err(CounterfactualPairError::AudioRelevantTruthNotChanged));
+    }
+
+    #[test]
+    fn coverage_and_conditional_correctness_are_reported_separately() {
+        let trials = [
+            t("t1", "p1", A, "B", ModelOutcome::Claim("B".into())),
+            t("t2", "p1", A, "B", ModelOutcome::Abstain),
+            t("r1", "p2", B, "C", ModelOutcome::Claim("C".into())),
+            t("r2", "p2", C, "D", ModelOutcome::Claim("D".into())),
+            t("n1", "p3", A, "B", ModelOutcome::Claim("B".into())),
+            t("n2", "p3", B, "B", ModelOutcome::Abstain),
+        ];
+        let pairs = [
+            p("p1", CounterfactualInterventionKind::TextNuisance, "t1", "t2", A, B, vec![ChangedDimension::ContextText]),
+            p("p2", CounterfactualInterventionKind::AudioRelevant, "r1", "r2", A, A, vec![ChangedDimension::LexicalContent]),
+            p("p3", CounterfactualInterventionKind::AudioNuisance, "n1", "n2", A, A, vec![ChangedDimension::AcousticNuisance]),
+        ];
+        let result = score_counterfactual_pairs(&trials, &pairs).unwrap();
+        assert_eq!(result.text_nuisance_joint_answer_coverage.rate, Some(0.0));
+        assert_eq!(result.text_joint_correct_given_answered.rate, None);
+        assert_eq!(result.audio_relevant_joint_answer_coverage.rate, Some(1.0));
+        assert_eq!(result.audio_relevant_joint_sensitivity_given_answered.rate, Some(1.0));
+        assert_eq!(result.audio_nuisance_joint_claim_coverage.rate, Some(0.0));
+        assert_eq!(result.audio_nuisance_semantic_stability.rate, None);
+        assert_eq!(result.audio_nuisance_joint_correct_given_answered.rate, None);
+    }
+
+    #[test]
+    fn rejects_invalid_trial_annotations_before_pair_scoring() {
+        let mut baseline = t("a", "p", A, "B", ModelOutcome::Claim("B".into()));
+        baseline.context_claim = Some("A".into());
+        baseline.conflict_axis = ConflictAxis::None;
+        let variant = t("b", "p", A, "B", ModelOutcome::Claim("B".into()));
+        let pairs = [p("p", CounterfactualInterventionKind::TextNuisance, "a", "b", A, B, vec![ChangedDimension::ContextText])];
+        assert_eq!(
+            score_counterfactual_pairs(&[baseline, variant], &pairs),
+            Err(CounterfactualPairError::InvalidTrialSet(AcousticFaithfulnessError::UndeclaredConflict))
+        );
     }
 
     #[test]
