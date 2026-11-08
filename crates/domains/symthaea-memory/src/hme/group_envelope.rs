@@ -102,6 +102,8 @@ pub enum GroupEnvelopeError {
     ContentDigestMismatch,
     /// A kth threshold is not finite or outside the canonical score range.
     InvalidKthThreshold,
+    /// A centroid radius could not be represented as a finite binary32 value.
+    InvalidRadius,
     /// The core interval kernel rejected the query or box.
     ScoreInterval(ContinuousHVIntervalError),
 }
@@ -138,6 +140,7 @@ impl std::fmt::Display for GroupEnvelopeError {
             Self::MemberSetMismatch => write!(f, "group envelope member set does not match pinned eligible membership"),
             Self::ContentDigestMismatch => write!(f, "group envelope content digest does not match pinned manifest"),
             Self::InvalidKthThreshold => write!(f, "kth threshold must be finite and in [-1, 1]"),
+            Self::InvalidRadius => write!(f, "group centroid radius is not finite"),
             Self::ScoreInterval(error) => write!(f, "group score interval failed: {error}"),
         }
     }
@@ -285,7 +288,7 @@ impl ContinuousHVGroupEnvelope {
         // to f32 for the query-time L2-ball certificate.
         let coarse_radius = (2.0 * (dimension as f64).sqrt() + 1.0) as f32;
         if !coarse_radius.is_finite() {
-            return Err(GroupEnvelopeError::InvalidKthThreshold);
+            return Err(GroupEnvelopeError::InvalidRadius);
         }
         let mut max_residual_norm_squared_upper = 0.0f64;
         for (member_index, (_, vector)) in by_id.values().enumerate() {
@@ -316,7 +319,7 @@ impl ContinuousHVGroupEnvelope {
             radius_l2_upper = next_up_f32_positive(radius_l2_upper);
         }
         if !radius_l2_upper.is_finite() {
-            return Err(GroupEnvelopeError::InvalidKthThreshold);
+            return Err(GroupEnvelopeError::InvalidRadius);
         }
 
         let mut hasher = blake3::Hasher::new();
