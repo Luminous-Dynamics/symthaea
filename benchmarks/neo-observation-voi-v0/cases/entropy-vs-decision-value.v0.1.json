@@ -189,5 +189,16 @@
     "Loss values are dimensionless pedagogical costs, not monetary values or civil-protection recommendations.",
     "The calibration mixture is synthetic and deliberately simple; it does not represent a named observatory, catalogue or instrument.",
     "No physical observation likelihood, telescope performance, or real NEO data is included."
-  ]
+  ],
+  "unknown_dependence_control": {
+    "mycelix_profile_schema": "mycelix.neo_evidence.source_correlation_profile.v0.1",
+    "mycelix_profile_id": "neo-source-correlation-demo-001",
+    "assertion_id": "synthetic-unknown-A-C",
+    "assessment": "unknown",
+    "independent_product_permitted": false,
+    "joint_likelihood_available": false,
+    "numeric_evsi": null,
+    "required_behavior": "ABSTAIN_DEPENDENCE_UNRESOLVED",
+    "rationale": "A different sensor modality is not evidence of statistical independence. Without an evidenced independence assertion or a versioned joint-dependence model, the planner must not multiply marginal likelihoods or report numeric EVSI for this candidate pair."
+  }
 }
