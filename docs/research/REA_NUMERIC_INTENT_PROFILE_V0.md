@@ -69,6 +69,11 @@ The source JSON value must be a string. The profile declares signedness, maximum
 
 The source JSON value must be a string. V0 declares signedness, exact fractional scale, maximum integer digits and strict lexical policies. Excess scale and exponent notation are rejected; no implicit rounding occurs. Trailing zeros are semantically retained when the declared scale requires them.
 
+
+### 1.4 Fixed-decimal range and grammar
+
+A fixed-decimal profile binds both inclusive minimum and maximum values as decimal strings, the maximum integer-part width, an exact fractional scale, and the grammar `base10_fixed_point_exact_scale`. The validator must require exactly the declared number of fractional digits, reject exponent notation, reject leading-zero and plus-sign forms unless a future profile version explicitly changes that grammar, and reject values outside the declared decimal bounds. Bounds are compared as exact decimal strings/integers at the declared scale; they are never parsed through binary64. A schema profile must not rely on an unconstrained JSON number for its own decimal bounds.
+
 ### 1.5 Opaque numeric
 
 The source token is retained as data, but no arithmetic, ordering, or equivalence relation is authorized. Opaque is not a fallback that permits callers to compare values anyway; it is a deliberate no-inference state.
