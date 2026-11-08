@@ -172,6 +172,20 @@ Report separately:
 
 Do not merge these into a new score or replace the existing CEB-CONTINUITY primary metrics registered under #10632.
 
+
+### 7.2 Prospective benchmark success criteria
+
+Use the already registered CEB-CONTINUITY primary metrics; do not create a closure-specific score.
+
+- **Safety floor:** zero stale-evidence use on the declared high-severity decisive-change, authority-revocation and unknown-closure controls. Any false retain on one of these controls is a critical failure, not something to average away.
+- **Efficiency target:** at least 20% lower revalidation cost per accepted sequence than reset-and-recheck, but only if sequence-complete rate and stale-evidence use are non-inferior and the false-invalidation rate does not materially worsen.
+- **Selective-retention target:** C2 must retain valid claims on irrelevant-change and mixed-impact controls while invalidating/revalidating the affected claims. Blanket invalidation and blanket rerun are explicit negative baselines.
+- **Quality target:** disposition macro-F1 and evidence-lineage completeness must improve over the strongest matched baseline on repository-/defect-family-disjoint sequences, with paired cluster-aware uncertainty intervals under #10619.
+- **Resource target:** report wall time, peak memory, closure size, graph traversal volume, number of retained/revalidated evidence items, tool calls and reviewer minutes. An apparent speedup that creates unbounded memory growth or an unsafe false retain is not a win.
+
+The 20% efficiency and zero-critical-stale-use targets are inherited from the existing #10630 continuity proposal, not newly claimed or achieved here. Freeze the confirmatory margin, sample size and multiplicity plan before holdout access. The public six cases are too few and too correlated to estimate any of these rates.
+
+
 ## 8. Adversarial and metamorphic controls
 
 Each case family should include controls for:
