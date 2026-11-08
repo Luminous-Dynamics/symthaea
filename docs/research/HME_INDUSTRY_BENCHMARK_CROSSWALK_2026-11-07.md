@@ -468,3 +468,14 @@ New protocol:
 The differentiating HME hypothesis is **proof-guided value of computation**: predict which candidate/block/page is likely to reduce future exact work per byte, while the predictor only schedules work and conservative score bounds alone authorize pruning. On ExactOnly workloads, an OOD predictor is disabled and a qualified deterministic exact schedule is used; if its budget expires, return Incomplete. On ApproximateAllowed workloads, a calibration breach revokes the model-dependent empirical claim until recalibration or an explicitly permitted exact fallback.
 
 No HME cost estimator, OOD detector, PG-VoC scheduler, Rust engine, SOTA win or performance result is claimed by these protocols.
+
+
+## 2026-11-08 addendum: bind exact retrieval to a versioned finite-precision score contract
+
+The source now defines `continuous_hv_cosine_full_f32_group8_v1` through `CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1` and adds a full-coordinate scalar method that is independent of cognitive `STRIDE` and the `simd` feature.
+
+For fair benchmarks, "exact" means deterministic agreement with the versioned canonical scoring algorithm, not infinite-precision real cosine and not automatic bitwise equality with AVX/FMA implementations. The score contract pins eight-coordinate grouping, ordered tail handling and the existing near-zero denominator rule. A different SIMD reduction may be qualified under a numeric tolerance, but the canonical tie decision must not depend on an unqualified SIMD reduction.
+
+HME exact-profile admission is finite f32 components in [-1, 1], equal dimensions and the matching score-contract ID. This range is not automatically guaranteed by every generic ContinuousHV constructor/operator; segment admission must validate it. Query receipt schemas now bind continuous_f32 + cosine to the versioned ID. Synthetic adversarial cases are in [hme_similarity_admission_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_similarity_admission_v0.json).
+
+The canonical score API and admission checks are source committed, but not yet cargo-built/tested or integrated into the read-only segment prototype. No exact retrieval result or benchmark pass is claimed.
