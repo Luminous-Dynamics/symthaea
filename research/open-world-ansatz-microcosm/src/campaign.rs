@@ -20,6 +20,13 @@ pub enum ComparisonDesign {
     AdaptiveBudget,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccessArm {
+    A0,
+    A2,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CampaignManifest {
     pub schema_version: String,
@@ -43,6 +50,9 @@ pub struct CampaignPair {
     /// Opaque world alias; do not encode the true mechanism or seed here.
     pub world_alias: String,
     pub world_family: WorldFamily,
+    /// v0 compares exactly these two arms, sharing the agent artifact,
+    /// policy configuration, initial evidence and action/compute budgets.
+    pub access_arms: [AccessArm; 2],
     pub design: ComparisonDesign,
     /// Digest of evidence shared by A0 and A2 before the structure-access
     /// treatment is applied.
@@ -77,6 +87,7 @@ impl CampaignManifest {
                 || pair.world_alias.trim().is_empty()
                 || !pair_ids.insert(pair.pair_id.as_str())
                 || !world_aliases.insert(pair.world_alias.as_str())
+                || pair.access_arms != [AccessArm::A0, AccessArm::A2]
                 || pair.action_budget == 0
                 || pair.compute_budget_units == 0
             {
@@ -158,6 +169,7 @@ mod tests {
                 pair_id: "pair-0001".to_owned(),
                 world_alias: "world-0001".to_owned(),
                 world_family: WorldFamily::NumericMechanism,
+                access_arms: [AccessArm::A0, AccessArm::A2],
                 design: ComparisonDesign::MatchedTrace,
                 shared_initial_evidence_sha256: digest('1'),
                 intervention_trace_sha256: Some(digest('2')),
@@ -187,6 +199,13 @@ mod tests {
             manifest.validate(),
             Err(CampaignError::UnexpectedFixedTrace)
         );
+    }
+
+    #[test]
+    fn rejects_non_a0_a2_arm_combinations() {
+        let mut manifest = valid_manifest();
+        manifest.pairs[0].access_arms = [AccessArm::A2, AccessArm::A2];
+        assert_eq!(manifest.validate(), Err(CampaignError::InvalidPair));
     }
 
     #[test]
