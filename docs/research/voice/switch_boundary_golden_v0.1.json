@@ -89,10 +89,11 @@
       "expected": {
         "reference_positions": [],
         "predicted_positions": [
-          1
+          1,
+          2
         ],
         "true_positives": 0,
-        "false_positives": 1,
+        "false_positives": 2,
         "false_negatives": 0,
         "precision": 0,
         "recall": null,
