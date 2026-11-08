@@ -1,0 +1,474 @@
+{
+  "schema_version": "0.1.0",
+  "ledger_id": "HABITAT-MATERIAL-LEDGER-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "evidence_status": "synthetic_contract_only_not_executed",
+  "claim_ceiling": "No physical material quantity, factory throughput, product mass, material yield, or environmental benefit is established. Values are synthetic accounting controls. Textile-fiber mass is tracked as a component stream, not whole-product mass.",
+  "quantity_basis": {
+    "unit": "mg",
+    "semantics": "nonnegative integer milligrams of the tracked synthetic textile-fiber stream",
+    "source_identity_relation": "existing traceability node IDs are reused where possible, but the opening mass is an independent synthetic overlay",
+    "cross_unit_reconciliation_status": "blocked_not_crosswalked",
+    "cross_unit_reconciliation_reason": "The base identity fixture declares 12 piece_equivalent for the source fabric lot; no calibrated conversion from piece_equivalent to milligrams is supplied. The 1,000,000 mg opening balance is not asserted to be derived from that count.",
+    "product_mass_scope": "textile-fiber component only; not full mattress topper, packaging, thread, layer, trim, or total BOM mass",
+    "quantity_authenticity": "synthetic_only",
+    "rounding_policy": "integer quantities only; no floating-point quantity arithmetic",
+    "transformation_policy": "each transaction must conserve the tracked stream exactly across inputs and all outputs/byproduct/disposition accounts",
+    "uncertainty_policy": "unknown quantity, mixed unit, unallocated loss, or unbound conversion is not zero and does not qualify as a pass"
+  },
+  "source_contracts": {
+    "base_fixture": "docs/research/fixtures/habitat-vertical-v0.1.json",
+    "event_fixture": "docs/research/fixtures/habitat-event-replay-v0.1.json",
+    "relation": "operation/source-event references provide identity and chronology context only; synthetic ledger quantities are independently declared and do not prove the source event quantities"
+  },
+  "accounts": [
+    {
+      "account_id": "ACC-RAW-FABRIC",
+      "account_class": "raw_material",
+      "traceability_node_id": "SYN-LOT-FABRIC-001",
+      "unit": "mg",
+      "opening_balance_mg": 1000000,
+      "expected_closing_balance_mg": 400000
+    },
+    {
+      "account_id": "ACC-CUT-PANELS",
+      "account_class": "work_in_process",
+      "traceability_node_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-CUT-OFFCUT",
+      "account_class": "recoverable_offcut",
+      "traceability_node_id": null,
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 20000
+    },
+    {
+      "account_id": "ACC-CUT-SCRAP",
+      "account_class": "scrap",
+      "traceability_node_id": null,
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 100000
+    },
+    {
+      "account_id": "ACC-SEWN-COVER-A",
+      "account_class": "work_in_process",
+      "traceability_node_id": "SYN-WIP-SEWN-COVER-A",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-SEWN-COVER-B",
+      "account_class": "work_in_process",
+      "traceability_node_id": "SYN-WIP-SEWN-COVER-B",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-SEW-SCRAP",
+      "account_class": "scrap",
+      "traceability_node_id": null,
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 20000
+    },
+    {
+      "account_id": "ACC-REWORK-WIP",
+      "account_class": "rework_wip",
+      "traceability_node_id": null,
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-RECOVERED-FEEDSTOCK",
+      "account_class": "recovered_feedstock",
+      "traceability_node_id": null,
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 18000
+    },
+    {
+      "account_id": "ACC-RECOVERY-RESIDUE",
+      "account_class": "residue",
+      "traceability_node_id": null,
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 12000
+    },
+    {
+      "account_id": "ACC-ACCEPTED-A",
+      "account_class": "accepted_component",
+      "traceability_node_id": "SYN-ARTICLE-ACCEPTED-A",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-ACCEPTED-B",
+      "account_class": "accepted_component",
+      "traceability_node_id": "SYN-ARTICLE-ACCEPTED-B",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-PACKED-A",
+      "account_class": "packed_component",
+      "traceability_node_id": "SYN-UNIT-PACKED-A",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-PACKED-B",
+      "account_class": "packed_component",
+      "traceability_node_id": "SYN-UNIT-PACKED-B",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 0
+    },
+    {
+      "account_id": "ACC-DELIVERED-A",
+      "account_class": "delivered_component",
+      "traceability_node_id": "SYN-UNIT-PACKED-A",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 215000
+    },
+    {
+      "account_id": "ACC-DELIVERED-B",
+      "account_class": "delivered_component",
+      "traceability_node_id": "SYN-UNIT-PACKED-B",
+      "unit": "mg",
+      "opening_balance_mg": 0,
+      "expected_closing_balance_mg": 215000
+    }
+  ],
+  "transactions": [
+    {
+      "transaction_id": "ML-01-CUT-FABRIC",
+      "sequence": 1,
+      "kind": "transformation",
+      "unit": "mg",
+      "source_link_status": "context_only",
+      "source_event_ids": [
+        "EV-09-CUT-FABRIC"
+      ],
+      "expected_operation_id": "OP-30-CUT",
+      "inputs": [
+        {
+          "account_id": "ACC-RAW-FABRIC",
+          "quantity_mg": 600000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-CUT-PANELS",
+          "quantity_mg": 480000,
+          "unit": "mg"
+        },
+        {
+          "account_id": "ACC-CUT-OFFCUT",
+          "quantity_mg": 20000,
+          "unit": "mg"
+        },
+        {
+          "account_id": "ACC-CUT-SCRAP",
+          "quantity_mg": 100000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-02-SEW-COVERS",
+      "sequence": 2,
+      "kind": "transformation",
+      "unit": "mg",
+      "source_link_status": "context_only",
+      "source_event_ids": [
+        "EV-10-SEW-COVERS"
+      ],
+      "expected_operation_id": "OP-40-SEW",
+      "inputs": [
+        {
+          "account_id": "ACC-CUT-PANELS",
+          "quantity_mg": 480000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-SEWN-COVER-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        },
+        {
+          "account_id": "ACC-SEWN-COVER-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        },
+        {
+          "account_id": "ACC-SEW-SCRAP",
+          "quantity_mg": 20000,
+          "unit": "mg"
+        },
+        {
+          "account_id": "ACC-REWORK-WIP",
+          "quantity_mg": 30000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-03-REWORK-RECOVERY",
+      "sequence": 3,
+      "kind": "recovery",
+      "unit": "mg",
+      "source_link_status": "unlinked_synthetic_scenario",
+      "source_event_ids": [],
+      "expected_operation_id": null,
+      "inputs": [
+        {
+          "account_id": "ACC-REWORK-WIP",
+          "quantity_mg": 30000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-RECOVERED-FEEDSTOCK",
+          "quantity_mg": 18000,
+          "unit": "mg"
+        },
+        {
+          "account_id": "ACC-RECOVERY-RESIDUE",
+          "quantity_mg": 12000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-04-FINAL-QA-A",
+      "sequence": 4,
+      "kind": "quality_transfer",
+      "unit": "mg",
+      "source_link_status": "context_only_component_mass",
+      "source_event_ids": [
+        "EV-13-FINAL-QA-A"
+      ],
+      "expected_operation_id": "OP-60-FINAL-QA",
+      "inputs": [
+        {
+          "account_id": "ACC-SEWN-COVER-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-ACCEPTED-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-05-FINAL-QA-B",
+      "sequence": 5,
+      "kind": "quality_transfer",
+      "unit": "mg",
+      "source_link_status": "context_only_component_mass",
+      "source_event_ids": [
+        "EV-14-FINAL-QA-B"
+      ],
+      "expected_operation_id": "OP-60-FINAL-QA",
+      "inputs": [
+        {
+          "account_id": "ACC-SEWN-COVER-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-ACCEPTED-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-06-PACK-A",
+      "sequence": 6,
+      "kind": "packing",
+      "unit": "mg",
+      "source_link_status": "context_only_component_mass",
+      "source_event_ids": [
+        "EV-15-PACK-A"
+      ],
+      "expected_operation_id": "OP-70-PACK",
+      "inputs": [
+        {
+          "account_id": "ACC-ACCEPTED-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-PACKED-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-07-PACK-B",
+      "sequence": 7,
+      "kind": "packing",
+      "unit": "mg",
+      "source_link_status": "context_only_component_mass",
+      "source_event_ids": [
+        "EV-16-PACK-B"
+      ],
+      "expected_operation_id": "OP-70-PACK",
+      "inputs": [
+        {
+          "account_id": "ACC-ACCEPTED-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-PACKED-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-08-DISPATCH-A",
+      "sequence": 8,
+      "kind": "dispatch",
+      "unit": "mg",
+      "source_link_status": "context_only_component_mass",
+      "source_event_ids": [
+        "EV-17-DISPATCH-A"
+      ],
+      "expected_operation_id": null,
+      "inputs": [
+        {
+          "account_id": "ACC-PACKED-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-DELIVERED-A",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ]
+    },
+    {
+      "transaction_id": "ML-09-DISPATCH-B",
+      "sequence": 9,
+      "kind": "dispatch",
+      "unit": "mg",
+      "source_link_status": "context_only_component_mass",
+      "source_event_ids": [
+        "EV-18-DISPATCH-B"
+      ],
+      "expected_operation_id": null,
+      "inputs": [
+        {
+          "account_id": "ACC-PACKED-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ],
+      "outputs": [
+        {
+          "account_id": "ACC-DELIVERED-B",
+          "quantity_mg": 215000,
+          "unit": "mg"
+        }
+      ]
+    }
+  ],
+  "expected_known_answer": {
+    "transaction_count": 9,
+    "opening_mass_mg": 1000000,
+    "closing_mass_mg": 1000000,
+    "nonzero_closing_account_count": 8,
+    "accepted_component_mass_mg": 430000,
+    "recoverable_material_mg": 38000,
+    "scrap_and_residue_mg": 132000
+  },
+  "negative_controls": [
+    {
+      "case_id": "NC-ML-01-OVERDRAW",
+      "mutation": "Raise ML-01 input above available ACC-RAW-FABRIC balance.",
+      "expected_finding": "ACCOUNT_OVERDRAW",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-02-MASS-IMBALANCE",
+      "mutation": "Change one ML-01 output by one mg without changing any other line.",
+      "expected_finding": "TRANSACTION_MASS_IMBALANCE",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-03-UNKNOWN-ACCOUNT",
+      "mutation": "Replace a transaction account ID with an undeclared account.",
+      "expected_finding": "UNKNOWN_ACCOUNT",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-04-UNKNOWN-SOURCE-EVENT",
+      "mutation": "Add a nonexistent source event ID.",
+      "expected_finding": "UNKNOWN_SOURCE_EVENT",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-05-UNIT-MISMATCH",
+      "mutation": "Label one quantity line with grams while its account and transaction remain in milligrams.",
+      "expected_finding": "UNIT_MISMATCH",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-06-DUPLICATE-SEQUENCE",
+      "mutation": "Give two transactions the same sequence number.",
+      "expected_finding": "DUPLICATE_SEQUENCE",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-07-CLOSING-BALANCE",
+      "mutation": "Change one account's expected closing balance.",
+      "expected_finding": "CLOSING_BALANCE_MISMATCH",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-08-UNKNOWN-NODE",
+      "mutation": "Map an account to a nonexistent traceability node.",
+      "expected_finding": "UNKNOWN_TRACEABILITY_NODE",
+      "status": "declared_not_executed_by_cli"
+    },
+    {
+      "case_id": "NC-ML-09-DUPLICATE-LINE",
+      "mutation": "Repeat an account on one transaction side to disguise allocation.",
+      "expected_finding": "DUPLICATE_ACCOUNT_LINE",
+      "status": "declared_not_executed_by_cli"
+    }
+  ]
+}

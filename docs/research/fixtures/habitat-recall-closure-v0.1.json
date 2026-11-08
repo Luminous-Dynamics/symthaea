@@ -1,0 +1,95 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "HABITAT-RECALL-CLOSURE-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "evidence_status": "synthetic_rehearsal_contract_only_not_executed",
+  "claim_ceiling": "This synthetic drill does not prove a real recall, source authenticity, physical quarantine, customer contact, or legal/regulatory sufficiency.",
+  "source_lot_id": "SYN-LOT-LAYER-001",
+  "terminal_target_ids": [
+    "SYN-UNIT-PACKED-A",
+    "SYN-UNIT-PACKED-B",
+    "SYN-UNRELATED-PACKED-CONTROL"
+  ],
+  "expected_affected_terminal_ids": [
+    "SYN-UNIT-PACKED-A",
+    "SYN-UNIT-PACKED-B"
+  ],
+  "response_records": [
+    {
+      "response_record_id": "RR-SYN-001",
+      "target_id": "SYN-UNIT-PACKED-A",
+      "disposition": "quarantined_at_facility",
+      "evidence_status": "synthetic_only",
+      "source_record_id": "SYN-RESPONSE-RECORD-A"
+    },
+    {
+      "response_record_id": "RR-SYN-002",
+      "target_id": "SYN-UNIT-PACKED-B",
+      "disposition": "not_located",
+      "evidence_status": "synthetic_only",
+      "source_record_id": "SYN-RESPONSE-RECORD-B"
+    },
+    {
+      "response_record_id": "RR-SYN-003",
+      "target_id": "SYN-UNRELATED-PACKED-CONTROL",
+      "disposition": "confirmed_not_affected",
+      "evidence_status": "synthetic_only",
+      "source_record_id": "SYN-RESPONSE-RECORD-CONTROL"
+    }
+  ],
+  "expected_results": {
+    "target_count": 3,
+    "response_record_count": 3,
+    "confirmed_contained_count": 1,
+    "unresolved_affected_count": 1,
+    "false_positive_control_count": 0,
+    "closure_status": "OPEN_UNRESOLVED"
+  },
+  "benchmark_contract": {
+    "hard_gates": [
+      "100_percent_exact_affected_terminal_set_on_frozen_known_answers",
+      "zero_affected_targets_marked_confirmed_not_affected",
+      "zero_unrelated_control_targets_given_recall_containment_actions",
+      "exactly_one_explicit_response_per_in_scope_terminal_target",
+      "unresolved_or_missing_affected_target_keeps_closure_open"
+    ],
+    "scale_target": {
+      "event_count": 10000,
+      "terminal_target_count": 10000,
+      "proposed_p95_latency_ms": 5000,
+      "status": "proposed_not_measured"
+    }
+  },
+  "negative_controls": [
+    {
+      "case_id": "RC-NC-001",
+      "mutation": "remove an affected target response",
+      "expected_finding": "MISSING_TARGET_RESPONSE"
+    },
+    {
+      "case_id": "RC-NC-002",
+      "mutation": "mark affected target as confirmed_not_affected",
+      "expected_finding": "AFFECTED_TARGET_MISCLASSIFIED"
+    },
+    {
+      "case_id": "RC-NC-003",
+      "mutation": "quarantine unrelated control",
+      "expected_finding": "FALSE_POSITIVE_CONTROL_ACTION"
+    },
+    {
+      "case_id": "RC-NC-004",
+      "mutation": "change the causal event source",
+      "expected_finding": "EVENT_SOURCE_INVALID"
+    },
+    {
+      "case_id": "RC-NC-005",
+      "mutation": "add out-of-scope response target",
+      "expected_finding": "RESPONSE_TARGET_OUT_OF_SCOPE"
+    },
+    {
+      "case_id": "RC-NC-006",
+      "mutation": "tamper the expected impacted target set",
+      "expected_finding": "AFFECTED_TARGET_KNOWN_ANSWER_MISMATCH"
+    }
+  ]
+}

@@ -1,0 +1,914 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "HABITAT-RESILIENCE-OPTIONS-001",
+  "parent_program": "HABITAT-VERTICAL-001",
+  "evidence_class": "synthetic_decision_challenge_not_empirical",
+  "source_campaign_path": "docs/research/fixtures/habitat-vertical-scenarios-v0.1.json",
+  "scenario_ids": [
+    "SC-01-SUPPLIER-REJECTION",
+    "SC-02-GRADE-SUBSTITUTION",
+    "SC-03-TRANSPORT-DELAY",
+    "SC-04-EQUIPMENT-OUTAGE",
+    "SC-05-POWER-COMMON-MODE",
+    "SC-06-SKILL-ABSENCE",
+    "SC-07-DEMAND-MIX-CHANGE",
+    "SC-08-REPAIR-SPARE-SHORTAGE"
+  ],
+  "claim_ceiling": "Synthetic values are an algorithmic challenge oracle only. They do not estimate actual capital expense, disruption probability, lost output, recovery time, supplier capability, physical safety, or operational performance. No strategy is approved or preferred for a real factory.",
+  "decision_paradigm": {
+    "statement": "Evaluate the option value of qualified flexibility across disturbances without inventing probabilities or collapsing cost, service loss, and recovery time into one scalar.",
+    "no_probability_assumption": true,
+    "no_monetization_of_service_losses": true,
+    "qualification_gates_precede_credit": true,
+    "result_method_owner_refs": [
+      "Symthaea SE-OPT robust frontier PR #7788",
+      "Symthaea ICCB-004 issue #8024 / robust decision prototype PR #7987",
+      "Symthaea MFG-VALUE-001 issue #7608",
+      "Symthaea FACTORY-OPS-001 issue #7677",
+      "Symthaea MFG-PROC-000 issue #5686",
+      "Mycelix MFG-EVID-001 issue #3084",
+      "Mycelix MFG-PROC-001 issue #3085"
+    ],
+    "result_comparison": "Use existing interval-aware robust-frontier/minimax-regret owners once exact qualified interfaces are available; do not implement a parallel optimizer here."
+  },
+  "metric_definitions": [
+    {
+      "id": "incremental_investment",
+      "unit": "synthetic minor units",
+      "direction": "minimize",
+      "boundary": "one declared investment decision; no annualization or financing implied"
+    },
+    {
+      "id": "lost_accepted_unit_hours",
+      "unit": "accepted-unit hours",
+      "direction": "minimize",
+      "boundary": "per injected disruption over the frozen synthetic horizon"
+    },
+    {
+      "id": "recovery_hours",
+      "unit": "hours",
+      "direction": "minimize",
+      "boundary": "from intervention start to declared service-restoration condition"
+    },
+    {
+      "id": "hard_gate_violations",
+      "unit": "count",
+      "direction": "must equal zero for a strategy to be feasible",
+      "boundary": "reported as a hard constraint, never weighted against other metrics"
+    }
+  ],
+  "proposed_benchmark_gates": [
+    "100 percent of option-by-scenario cells exist exactly once.",
+    "No missing/unqualified capability may be credited with a resilience improvement.",
+    "No probability, expected annual loss, ROI, or monetized outage benefit is generated from the synthetic interval table.",
+    "No single composite score is allowed to offset a hard-gate violation.",
+    "Permutation of option/scenario input order must not change canonical result or robust-frontier classification.",
+    "Baseline and candidate result artifacts must bind exact option, scenario, evaluator, input, and owner-interface revisions."
+  ],
+  "options": [
+    {
+      "option_id": "LEAN_BASELINE",
+      "class": "reference",
+      "incremental_investment_synthetic_minor_units": 0,
+      "investment_basis": "synthetic arithmetic-control units; not money, capex estimate, quote, or forecast",
+      "mitigated_scenario_ids": [],
+      "qualification_gates": [
+        "baseline_product_process_and_calendar_profile_frozen"
+      ],
+      "state": "hypothetical_option_not_qualified",
+      "note": "Outcome bounds below are deliberately constructed synthetic benchmark truth for exercising interval-frontier logic, not forecasts of real factory outcomes."
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "class": "targeted_flexibility",
+      "incremental_investment_synthetic_minor_units": 12000,
+      "investment_basis": "synthetic arithmetic-control units; not money, capex estimate, quote, or forecast",
+      "mitigated_scenario_ids": [
+        "SC-01-SUPPLIER-REJECTION",
+        "SC-02-GRADE-SUBSTITUTION",
+        "SC-03-TRANSPORT-DELAY"
+      ],
+      "qualification_gates": [
+        "alternate_supplier_identity_and_offer",
+        "material_grade_and_process_qualification",
+        "capacity_and_delivery_window_evidence",
+        "incoming_lot_acceptance_profile"
+      ],
+      "state": "hypothetical_option_not_qualified",
+      "note": "Outcome bounds below are deliberately constructed synthetic benchmark truth for exercising interval-frontier logic, not forecasts of real factory outcomes."
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "class": "targeted_flexibility",
+      "incremental_investment_synthetic_minor_units": 18000,
+      "investment_basis": "synthetic arithmetic-control units; not money, capex estimate, quote, or forecast",
+      "mitigated_scenario_ids": [
+        "SC-04-EQUIPMENT-OUTAGE",
+        "SC-06-SKILL-ABSENCE"
+      ],
+      "qualification_gates": [
+        "qualified_alternate_resource_profile",
+        "worker_skill_and_shift_qualification",
+        "maintenance_and_restart_profile"
+      ],
+      "state": "hypothetical_option_not_qualified",
+      "note": "Outcome bounds below are deliberately constructed synthetic benchmark truth for exercising interval-frontier logic, not forecasts of real factory outcomes."
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "class": "targeted_flexibility",
+      "incremental_investment_synthetic_minor_units": 17000,
+      "investment_basis": "synthetic arithmetic-control units; not money, capex estimate, quote, or forecast",
+      "mitigated_scenario_ids": [
+        "SC-05-POWER-COMMON-MODE"
+      ],
+      "qualification_gates": [
+        "facility_load_and_starting_profile",
+        "independent_power_path_scope",
+        "inspection_calibration_and_restart_requirements"
+      ],
+      "state": "hypothetical_option_not_qualified",
+      "note": "Outcome bounds below are deliberately constructed synthetic benchmark truth for exercising interval-frontier logic, not forecasts of real factory outcomes."
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "class": "targeted_flexibility",
+      "incremental_investment_synthetic_minor_units": 14000,
+      "investment_basis": "synthetic arithmetic-control units; not money, capex estimate, quote, or forecast",
+      "mitigated_scenario_ids": [
+        "SC-07-DEMAND-MIX-CHANGE",
+        "SC-08-REPAIR-SPARE-SHORTAGE"
+      ],
+      "qualification_gates": [
+        "variant_bom_and_changeover_profile",
+        "interchangeability_and_product_requalification",
+        "spare_stock_and_service_capacity_profile",
+        "repair_acceptance_profile"
+      ],
+      "state": "hypothetical_option_not_qualified",
+      "note": "Outcome bounds below are deliberately constructed synthetic benchmark truth for exercising interval-frontier logic, not forecasts of real factory outcomes."
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "class": "combined_flexibility",
+      "incremental_investment_synthetic_minor_units": 61000,
+      "investment_basis": "synthetic arithmetic-control units; not money, capex estimate, quote, or forecast",
+      "mitigated_scenario_ids": [
+        "SC-01-SUPPLIER-REJECTION",
+        "SC-02-GRADE-SUBSTITUTION",
+        "SC-03-TRANSPORT-DELAY",
+        "SC-04-EQUIPMENT-OUTAGE",
+        "SC-05-POWER-COMMON-MODE",
+        "SC-06-SKILL-ABSENCE",
+        "SC-07-DEMAND-MIX-CHANGE",
+        "SC-08-REPAIR-SPARE-SHORTAGE"
+      ],
+      "qualification_gates": [
+        "all_targeted_option_qualification_gates",
+        "shared_resource_and_common_mode_review",
+        "integrated_factory_cost_and_capacity_model"
+      ],
+      "state": "hypothetical_option_not_qualified",
+      "note": "Outcome bounds below are deliberately constructed synthetic benchmark truth for exercising interval-frontier logic, not forecasts of real factory outcomes."
+    }
+  ],
+  "scenario_outcomes": [
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 20,
+        "upper": 100
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 30,
+        "upper": 120
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 40
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 60,
+        "upper": 180
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 72
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 100,
+        "upper": 260
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 96
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 40,
+        "upper": 140
+      },
+      "recovery_hours_bounds": {
+        "lower": 12,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 50,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "LEAN_BASELINE",
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 220
+      },
+      "recovery_hours_bounds": {
+        "lower": 24,
+        "upper": 120
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 36,
+        "upper": 88
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 32
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 9,
+        "upper": 56
+      },
+      "recovery_hours_bounds": {
+        "lower": 4,
+        "upper": 24
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 13,
+        "upper": 66
+      },
+      "recovery_hours_bounds": {
+        "lower": 4,
+        "upper": 26
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 60,
+        "upper": 180
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 72
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 100,
+        "upper": 260
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 96
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 40,
+        "upper": 140
+      },
+      "recovery_hours_bounds": {
+        "lower": 12,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 50,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "QUALIFIED_SUPPLY_ALTERNATIVES",
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 220
+      },
+      "recovery_hours_bounds": {
+        "lower": 24,
+        "upper": 120
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 20,
+        "upper": 100
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 30,
+        "upper": 120
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 40
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 24,
+        "upper": 100
+      },
+      "recovery_hours_bounds": {
+        "lower": 7,
+        "upper": 47
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 100,
+        "upper": 260
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 96
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 16,
+        "upper": 77
+      },
+      "recovery_hours_bounds": {
+        "lower": 5,
+        "upper": 32
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 50,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "WORKCELL_AND_SKILL_REDUNDANCY",
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 220
+      },
+      "recovery_hours_bounds": {
+        "lower": 24,
+        "upper": 120
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 20,
+        "upper": 100
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 30,
+        "upper": 120
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 40
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 60,
+        "upper": 180
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 72
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 35,
+        "upper": 130
+      },
+      "recovery_hours_bounds": {
+        "lower": 6,
+        "upper": 58
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 40,
+        "upper": 140
+      },
+      "recovery_hours_bounds": {
+        "lower": 12,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 50,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "ESSENTIAL_UTILITY_CONTINUITY",
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 220
+      },
+      "recovery_hours_bounds": {
+        "lower": 24,
+        "upper": 120
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 80,
+        "upper": 160
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 20,
+        "upper": 100
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 36
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 30,
+        "upper": 120
+      },
+      "recovery_hours_bounds": {
+        "lower": 8,
+        "upper": 40
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 60,
+        "upper": 180
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 72
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 100,
+        "upper": 260
+      },
+      "recovery_hours_bounds": {
+        "lower": 16,
+        "upper": 96
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 40,
+        "upper": 140
+      },
+      "recovery_hours_bounds": {
+        "lower": 12,
+        "upper": 48
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 20,
+        "upper": 88
+      },
+      "recovery_hours_bounds": {
+        "lower": 3,
+        "upper": 24
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "MODULAR_REPAIR_COMMONALITY",
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 32,
+        "upper": 122
+      },
+      "recovery_hours_bounds": {
+        "lower": 10,
+        "upper": 78
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-01-SUPPLIER-REJECTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 16,
+        "upper": 56
+      },
+      "recovery_hours_bounds": {
+        "lower": 4,
+        "upper": 22
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-02-GRADE-SUBSTITUTION",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 4,
+        "upper": 35
+      },
+      "recovery_hours_bounds": {
+        "lower": 2,
+        "upper": 17
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-03-TRANSPORT-DELAY",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 6,
+        "upper": 42
+      },
+      "recovery_hours_bounds": {
+        "lower": 2,
+        "upper": 18
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-04-EQUIPMENT-OUTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 12,
+        "upper": 63
+      },
+      "recovery_hours_bounds": {
+        "lower": 4,
+        "upper": 33
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-05-POWER-COMMON-MODE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 20,
+        "upper": 91
+      },
+      "recovery_hours_bounds": {
+        "lower": 4,
+        "upper": 44
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-06-SKILL-ABSENCE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 8,
+        "upper": 49
+      },
+      "recovery_hours_bounds": {
+        "lower": 3,
+        "upper": 22
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-07-DEMAND-MIX-CHANGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 10,
+        "upper": 56
+      },
+      "recovery_hours_bounds": {
+        "lower": 2,
+        "upper": 17
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    },
+    {
+      "option_id": "INTEGRATED_FLEXIBLE_MICROFACTORY",
+      "scenario_id": "SC-08-REPAIR-SPARE-SHORTAGE",
+      "precondition_status": "synthetic_gate_conditional_not_observed",
+      "lost_accepted_unit_hours_bounds": {
+        "lower": 16,
+        "upper": 77
+      },
+      "recovery_hours_bounds": {
+        "lower": 6,
+        "upper": 54
+      },
+      "hard_gate_disposition": "must_be_rechecked_by_authoritative_qualifier",
+      "status": "synthetic_known_answer_only"
+    }
+  ],
+  "expected_qualifier_dispositions": {
+    "LEAN_BASELINE": "reference_only",
+    "QUALIFIED_SUPPLY_ALTERNATIVES": "conditional_on_all_declared_supplier_and_grade_gates",
+    "WORKCELL_AND_SKILL_REDUNDANCY": "conditional_on_resource_and_worker_qualification_gates",
+    "ESSENTIAL_UTILITY_CONTINUITY": "conditional_on_independent_load/inspection/restart_gates",
+    "MODULAR_REPAIR_COMMONALITY": "conditional_on_variant_compatibility_and_repair_acceptance_gates",
+    "INTEGRATED_FLEXIBLE_MICROFACTORY": "conditional_on_every_component_gate_and_integrated_review"
+  },
+  "computation_status": {
+    "fixture_validation": "not_yet_executed_in_Rust",
+    "robust_frontier": "not_run",
+    "minimax_regret": "not_run",
+    "expected_cost_or_ROI": "intentionally_not_computed",
+    "policy_revisions": "unbound",
+    "empirical_calibration": "none",
+    "physical_trials": "none"
+  }
+}

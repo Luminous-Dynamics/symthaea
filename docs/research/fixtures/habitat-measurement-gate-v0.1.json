@@ -1,0 +1,356 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "HABITAT-MEASUREMENT-GATE-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "evidence_status": "synthetic_decision_rule_challenge_only",
+  "claim_ceiling": "No measurement here is a physical observation, accredited calibration, verified certificate, product acceptance, or standards conformity result. Values and certificate states are synthetic known-answer controls only.",
+  "decision_rule": {
+    "quantity_unit": "mg",
+    "uncertainty_semantics": "declared nonnegative integer expanded bound; use [value - bound, value + bound] only as a deterministic interval challenge, not a probability distribution or statement of statistical confidence",
+    "conforming": "measurement interval is wholly contained inside the specification interval",
+    "nonconforming": "measurement interval is disjoint from the specification interval",
+    "indeterminate": "measurement interval overlaps the specification interval but is not wholly contained",
+    "blocked": "invalid specification/unit, expired or not-yet-valid calibration interval, or explicitly broken traceability chain",
+    "not_evaluable": "missing or malformed observation, uncertainty, date, or required certificate/validity metadata",
+    "calibration_gate": "synthetic_reference_only certificate and declared_synthetic_chain are acceptable only for the synthetic oracle; never treat these strings as actual calibration evidence",
+    "boundary_policy": "inclusive endpoints; exact interval arithmetic; integer milligrams only; overflow and underflow are not clamped",
+    "time_policy": "ISO YYYY-MM-DD UTC dates; calibration interval endpoints are inclusive"
+  },
+  "cases": [
+    {
+      "case_id": "MM-01-CONFORMING",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Conforming"
+    },
+    {
+      "case_id": "MM-02-NONCONFORMING-HIGH",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1020000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 500
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Nonconforming"
+    },
+    {
+      "case_id": "MM-03-BOUNDARY-INDETERMINATE",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1010000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 2000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Indeterminate"
+    },
+    {
+      "case_id": "MM-04-CALIBRATION-EXPIRED",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-10-17"
+      },
+      "expected_disposition": "Blocked"
+    },
+    {
+      "case_id": "MM-05-MISSING-UNCERTAINTY",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18"
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "NotEvaluable"
+    },
+    {
+      "case_id": "MM-06-UNIT-MISMATCH",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "g",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Blocked"
+    },
+    {
+      "case_id": "MM-07-CERTIFICATE-MISSING",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": null,
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "NotEvaluable"
+    },
+    {
+      "case_id": "MM-08-TRACEABILITY-BROKEN",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "broken",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Blocked"
+    },
+    {
+      "case_id": "MM-09-UPPER-OVERFLOW",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 18446744073709551595,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 100
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "NotEvaluable"
+    },
+    {
+      "case_id": "MM-10-LOWER-UNDERFLOW",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 500,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 700
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 0,
+        "maximum_mg": 5000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "NotEvaluable"
+    },
+    {
+      "case_id": "MM-11-INVALID-MEASUREMENT-DATE",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-02-30",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "NotEvaluable"
+    },
+    {
+      "case_id": "MM-12-INVALID-SPECIFICATION",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 1010000,
+        "maximum_mg": 990000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-01-01",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Blocked"
+    },
+    {
+      "case_id": "MM-13-CALIBRATION-NOT-YET-VALID",
+      "evidence_status": "synthetic_only",
+      "observation": {
+        "unit": "mg",
+        "measured_value_mg": 1000000,
+        "measurement_date_utc": "2026-10-18",
+        "expanded_uncertainty_mg": 1000
+      },
+      "specification": {
+        "unit": "mg",
+        "minimum_mg": 990000,
+        "maximum_mg": 1010000
+      },
+      "instrument": {
+        "instrument_id": "SYNTHETIC-SCALE-01",
+        "certificate_status": "synthetic_reference_only",
+        "traceability_status": "declared_synthetic_chain",
+        "calibration_valid_from_utc_date": "2026-10-19",
+        "calibration_valid_until_utc_date": "2026-12-31"
+      },
+      "expected_disposition": "Blocked"
+    }
+  ],
+  "expected_known_answer": {
+    "case_count": 13,
+    "disposition_counts": {
+      "Conforming": 1,
+      "Nonconforming": 1,
+      "Indeterminate": 1,
+      "Blocked": 5,
+      "NotEvaluable": 5
+    }
+  },
+  "negative_controls": [
+    {
+      "case_id": "NC-MM-01-PROMOTE-INDETERMINATE",
+      "mutation": "Change the boundary-overlap case expected disposition to Conforming.",
+      "expected_finding": "KNOWN_ANSWER_DISPOSITION_MISMATCH"
+    },
+    {
+      "case_id": "NC-MM-02-IGNORE-EXPIRY",
+      "mutation": "Allow an expired calibration case to return Conforming.",
+      "expected_finding": "KNOWN_ANSWER_DISPOSITION_MISMATCH"
+    },
+    {
+      "case_id": "NC-MM-03-PROBABILITY-FROM-INTERVAL",
+      "mutation": "Attach a probability to an interval without a supplied probabilistic model.",
+      "expected_finding": "PROBABILITY_CLAIM_NOT_SUPPORTED"
+    },
+    {
+      "case_id": "NC-MM-04-ROUND-OVERFLOW",
+      "mutation": "Clamp an overflowed interval endpoint to u64::MAX.",
+      "expected_finding": "NOT_EVALUABLE"
+    },
+    {
+      "case_id": "NC-MM-05-UNIT-COERCION",
+      "mutation": "Silently coerce grams to milligrams without a conversion record.",
+      "expected_finding": "BLOCKED"
+    }
+  ]
+}
