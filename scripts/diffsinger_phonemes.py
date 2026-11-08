@@ -179,9 +179,15 @@ def _append_weighted_group(
         source_budget_ms = target_duration_ms * phone_weight_ms / total_weight_ms
         mapped = mapped_groups[index]
         per_token_ms = source_budget_ms / len(mapped)
+        if per_token_ms < 1.0:
+            raise ValueError(
+                f"{context} maps {phoneme['ipa']!r} to {len(mapped)} voicebank tokens, "
+                f"but each would receive only {per_token_ms:.6f} ms; refusing to stretch "
+                "the score event to the 1 ms minimum"
+            )
         for arpabet in mapped:
             event_index = len(events)
-            events.append((arpabet, max(per_token_ms, 1.0), frequency_hz))
+            events.append((arpabet, per_token_ms, frequency_hz))
             if phoneme["is_vowel"]:
                 last_vowel_event = event_index
     return last_vowel_event
