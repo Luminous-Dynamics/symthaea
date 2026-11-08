@@ -873,6 +873,92 @@
       ],
       "implementation_issue": 11140,
       "implementation_pr": 11146
+    },
+    {
+      "id": "paired_causal_counterfactual_evaluation",
+      "name": "Paired counterfactual nuisance invariance and acoustic evidence sensitivity",
+      "task": "PAIRED_AUDIO_CAUSAL_GROUNDING",
+      "issue": 11156,
+      "parent_issues": [
+        11138,
+        11140,
+        11119,
+        11104,
+        10871,
+        11057,
+        5352
+      ],
+      "implementation_pr": null,
+      "candidate_sources": [
+        {
+          "id": "aha_counterfactual_hard_negatives",
+          "status": "PAPER_COMPARATOR_TASK_TRANSFER_NOT_ESTABLISHED",
+          "paper_url": "https://aclanthology.org/2026.findings-acl.1464/",
+          "note": "AHA identifies event omission, false event identity, temporal relation error and quantitative temporal error; uses counterfactual hard negatives and a separate human-verified evaluation set. Its reported Qwen2.5-Omni gains are author-reported for its evaluated audio reasoning tasks, not African speech or Symthaea."
+        },
+        {
+          "id": "deaf_paired_conflicts",
+          "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-aacl.165/",
+          "note": "DEAF varies textual influence over acoustic conflicts. The paired scorer extends this idea with explicit text-nuisance invariance and waveform-relevant sensitivity; do not treat this as an official DEAF reproduction."
+        }
+      ],
+      "metrics": [
+        "text_nuisance_response_invariance",
+        "text_nuisance_joint_correct_rate",
+        "text_nuisance_joint_abstention_rate",
+        "audio_relevant_counterfactual_sensitivity",
+        "audio_relevant_false_invariance_rate",
+        "audio_relevant_joint_abstention_rate",
+        "audio_nuisance_semantic_stability",
+        "audio_nuisance_joint_correct_rate",
+        "audio_nuisance_differential_abstention_rate",
+        "pair_coverage"
+      ],
+      "system_arms": [
+        "trial_level_acoustic_faithfulness_only",
+        "paired_counterfactual_outcome_scorer",
+        "ASR_to_Broca",
+        "speech_native_audio_language_model",
+        "MICL_closed_set_candidate_selector",
+        "SAMA_semantic_anchor_with_acoustic_veto",
+        "hybrid_source_audio_evidence_ledger"
+      ],
+      "required_outputs": [
+        "pair_manifest_sha256",
+        "intervention_manifest_sha256",
+        "trial_manifest_sha256",
+        "condition_manifest_hashes",
+        "scorer_revision",
+        "pair_type_counts",
+        "exact_pair_metric_numerators_and_denominators",
+        "pair_split_revision"
+      ],
+      "required_controls": [
+        "same_audio_same_truth_text_context_changed",
+        "audio_changed_truth_changed_non_audio_conditions_fixed",
+        "audio_nuisance_changed_truth_fixed",
+        "same_wrong_answer_is_not_joint_correct",
+        "both_abstain_is_not_evidence_sensitivity",
+        "differential_abstention_under_acoustic_nuisance",
+        "pair_id_trial_reuse_and_manifest_digest_rejection"
+      ],
+      "prospective_gates": [
+        "100_percent_frozen_pair_relation_validation",
+        "zero_invalid_pair_relation_acceptance",
+        "100_percent_deterministic_synthetic_pair_outcomes",
+        "text_invariance_reported_with_joint_correctness_and_joint_abstention",
+        "audio_sensitivity_requires_both_outputs_match_distinct_truths",
+        "acoustic_nuisance_stability_conditioned_on_joint_answer_coverage",
+        "preference_training_pairs_disjoint_from_held_out_evaluation_pairs"
+      ],
+      "profile_requirements": [
+        "PAIR_MANIFEST_SHA256",
+        "INTERVENTION_SPEC_SHA256",
+        "CONDITION_MANIFEST_SCHEMA",
+        "CLAIM_ONTOLOGY_REVISION",
+        "SOURCE_LINEAGE_REVISION"
+      ]
     }
   ],
   "promotion_gates": [
@@ -891,7 +977,8 @@
     "selector_demonstration_manifest_and_leakage_audit_complete",
     "phonological_feature_profile_authority_and_applicability_verified",
     "acoustic_faithfulness_counterfactual_suite_passed_on_synthetic_controls",
-    "acoustic_faithfulness_unanswerable_and_override_denominators_separately_validated"
+    "acoustic_faithfulness_unanswerable_and_override_denominators_separately_validated",
+    "paired_counterfactual_invariance_and_audio_sensitivity_qualified_separately"
   ],
   "test_vector_sets": [
     {
@@ -960,6 +1047,24 @@
         "evidence_span_coverage"
       ],
       "note": "Ten synthetic trial groups. Independent JavaScript recomputation of every numerator, denominator and rate matches all expected values; this is formula audit only, not Rust execution or DEAF/HalluAudio reproduction."
+    },
+    {
+      "id": "acoustic_counterfactual_pair_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/acoustic_counterfactual_pair_golden_v0.1.json",
+      "schema_path": "docs/research/voice/acoustic_counterfactual_pair_golden_v0.1.schema.json",
+      "cases": 8,
+      "linked_issue": 11156,
+      "linked_pr": null,
+      "metrics": [
+        "text_nuisance_response_invariance",
+        "text_nuisance_joint_correct",
+        "audio_counterfactual_sensitivity",
+        "audio_false_invariance",
+        "audio_nuisance_semantic_stability",
+        "differential_abstention"
+      ],
+      "note": "Eight synthetic pair-level vectors. Independent JS recomputation of all defined pair numerators/denominators/rates matched after correcting the one-pair denominator for false invariance. No Rust execution or real-audio evaluation."
     }
   ]
 }
