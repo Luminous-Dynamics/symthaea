@@ -41,7 +41,13 @@
       "units": null,
       "tie_break": "lowest_stable_candidate_id"
     },
-    "condition_number_range": null
+    "condition_number_range": null,
+    "required_component_ids": [
+      "array-0",
+      "controller-0",
+      "clock-0",
+      "power-0"
+    ]
   },
   "substrate": {
     "kind": "synthetic_array",
