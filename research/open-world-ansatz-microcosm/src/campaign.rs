@@ -118,7 +118,9 @@ fn validate_git_sha(value: &str) -> Result<(), CampaignError> {
 }
 
 fn validate_digest(value: &str) -> Result<(), CampaignError> {
-    let hex = value.strip_prefix("sha256:").ok_or(CampaignError::InvalidDigest)?;
+    let hex = value
+        .strip_prefix("sha256:")
+        .ok_or(CampaignError::InvalidDigest)?;
     if hex.len() != 64 || !hex.bytes().all(is_lower_hex) {
         return Err(CampaignError::InvalidDigest);
     }
