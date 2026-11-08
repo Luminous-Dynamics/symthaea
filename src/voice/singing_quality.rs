@@ -307,26 +307,7 @@ fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
 }
 
 fn expected_pitch_at(performance: &VocalPerformance, time: f32) -> Option<f32> {
-    let points = &performance.pitch_curve;
-    if points.is_empty() {
-        return None;
-    }
-    for pair in points.windows(2) {
-        if time >= pair[0].time_s && time <= pair[1].time_s {
-            let span = pair[1].time_s - pair[0].time_s;
-            if span <= f32::EPSILON {
-                return Some(pair[1].frequency_hz);
-            }
-            let t = ((time - pair[0].time_s) / span).clamp(0.0, 1.0);
-            return Some(pair[0].frequency_hz + (pair[1].frequency_hz - pair[0].frequency_hz) * t);
-        }
-    }
-    performance
-        .syllables
-        .iter()
-        .flat_map(|s| s.notes())
-        .find(|note| time >= note.start_time && time < note.start_time + note.duration)
-        .map(|note| note.frequency)
+    performance.target_pitch_at(time)
 }
 
 fn percentile(values: &[f32], q: f32) -> f32 {
