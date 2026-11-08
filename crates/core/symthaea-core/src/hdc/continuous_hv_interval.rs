@@ -13,6 +13,11 @@
 //! The caller must independently validate the residual certificate and ensure
 //! that the original payload belongs to the admitted [-1, 1] profile. A digest
 //! binding certificate bytes is not proof of the residual inequality.
+//!
+//! Numeric preconditions: IEEE-754 binary32 roundTiesToEven operations, the
+//! default Rust floating-point environment, and no fast-math/reassociation
+//! flags. Every arithmetic endpoint is expanded by one adjacent f32 value;
+//! sqrt is likewise expanded after the correctly-rounded binary32 operation.
 
 use super::unified_hv::{ContinuousHV, ContinuousHVProfileError};
 
@@ -375,6 +380,20 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_value_helpers_cover_signed_zero_subnormals_and_infinities() {
+        let tiny = f32::from_bits(1);
+        assert_eq!(next_up(0.0).to_bits(), 1);
+        assert_eq!(next_up(-0.0).to_bits(), 1);
+        assert_eq!(next_down(0.0).to_bits(), 0x8000_0001);
+        assert_eq!(next_up(-tiny).to_bits(), (-0.0f32).to_bits());
+        assert_eq!(next_down(tiny).to_bits(), 0.0f32.to_bits());
+        assert_eq!(next_up(f32::NEG_INFINITY), -f32::MAX);
+        assert_eq!(next_down(f32::INFINITY), f32::MAX);
+        assert_eq!(next_up(f32::MAX), f32::INFINITY);
+        assert_eq!(next_down(-f32::MAX), f32::NEG_INFINITY);
+    }
+
+    #[test]
     fn zero_residual_is_a_point_at_the_canonical_score() {
         let query = ContinuousHV::from_vec(vec![
             0.25, -0.75, 0.5, 0.125, -0.5, 0.9, 0.3, -0.2, 0.7,
@@ -446,6 +465,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(interval, ContinuousHVScoreInterval::uninformative());
+        assert!(interval.contains(small_query.similarity_full_resolution(&small_reconstruction)));
     }
 
     #[test]
