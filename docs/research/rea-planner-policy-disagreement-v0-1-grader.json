@@ -90,6 +90,13 @@
     "reproduction_lower_tail_eig_bits": 0.18872187554086717,
     "static_probe_expected_evsi_units": 0.775,
     "manifest_expected_evsi_units": 0,
-    "reproduction_expected_evsi_units": 0.05
+    "reproduction_expected_evsi_units": 0.05,
+    "static_probe_normalized_cost": 0.3833333333333333,
+    "manifest_normalized_cost": 0.10333333333333335,
+    "reproduction_normalized_cost": 0.7333333333333334,
+    "static_probe_point_planner_utility": 1.385228886288832,
+    "reproduction_point_planner_utility": 0.3791889615344692,
+    "static_probe_robust_lower_tail_utility": 0.0007527606448437289,
+    "reproduction_robust_lower_tail_utility": 0.25734801211288016
   }
 }
