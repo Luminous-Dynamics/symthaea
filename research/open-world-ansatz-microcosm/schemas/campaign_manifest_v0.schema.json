@@ -35,6 +35,7 @@
           "pair_id",
           "world_alias",
           "world_family",
+          "access_arms",
           "design",
           "shared_initial_evidence_sha256",
           "intervention_trace_sha256",
@@ -45,6 +46,12 @@
           "pair_id": { "type": "string", "minLength": 1 },
           "world_alias": { "type": "string", "minLength": 1 },
           "world_family": { "enum": ["boolean_mechanism", "numeric_mechanism", "two_input_response"] },
+          "access_arms": {
+            "type": "array",
+            "const": ["a0", "a2"],
+            "minItems": 2,
+            "maxItems": 2
+          },
           "design": { "enum": ["matched_trace", "adaptive_budget"] },
           "shared_initial_evidence_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
           "intervention_trace_sha256": {
