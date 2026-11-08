@@ -544,6 +544,42 @@ mod tests {
         }
     }
 
+    fn two_variable_formulas() -> Vec<CnfProblem> {
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+        ];
+        let mut formulas = vec![CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![],
+        }];
+
+        for left_mask in 0..16usize {
+            let left: Vec<_> = (0..4)
+                .filter(|index| ((left_mask >> index) & 1) != 0)
+                .map(|index| literals[index])
+                .collect();
+            formulas.push(CnfProblem {
+                variables: vec!["x".into(), "y".into()],
+                clauses: vec![left.clone()],
+            });
+
+            for right_mask in 0..16usize {
+                let right: Vec<_> = (0..4)
+                    .filter(|index| ((right_mask >> index) & 1) != 0)
+                    .map(|index| literals[index])
+                    .collect();
+                formulas.push(CnfProblem {
+                    variables: vec!["x".into(), "y".into()],
+                    clauses: vec![left.clone(), right],
+                });
+            }
+        }
+        formulas
+    }
+
     fn paper_example() -> (CnfProblem, ValidatedQuantifierPrefix) {
         let problem = CnfProblem {
             variables: vec!["x1".into(), "x2".into(), "x3".into()],
@@ -602,6 +638,131 @@ mod tests {
             result.report.final_synqbf_verification.representability_instances_checked,
             7
         );
+    }
+
+    #[test]
+    fn every_two_variable_cnf_and_quantifier_prefix_constructs_verified_synqbf() {
+        let formulas = two_variable_formulas();
+        assert_eq!(formulas.len(), 273);
+
+        let orders = [[0usize, 1usize], [1usize, 0usize]];
+        for (formula_index, problem) in formulas.iter().enumerate() {
+            for order in orders {
+                for quantifier_mask in 0..4usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = prefix(2, blocks);
+                    let dag_budget = dag_budget();
+                    let (dag, _) =
+                        build_qbf_game_proof_dag(problem, &prefix, dag_budget).unwrap();
+                    let profile = extract_game_value_profile_from_dag(
+                        problem,
+                        &prefix,
+                        &dag,
+                        dag_budget,
+                        construction_budget().game_values,
+                    )
+                    .unwrap();
+                    let constructed = construct_synqbf_from_game_value_profile(
+                        problem,
+                        &prefix,
+                        &profile,
+                        construction_budget(),
+                    )
+                    .unwrap_or_else(|error| {
+                        panic!(
+                            "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}: {error:?}"
+                        )
+                    });
+
+                    assert_eq!(
+                        constructed.proof.claimed_truth_value,
+                        profile.truth_value,
+                        "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
+                    );
+                    assert_eq!(constructed.report.layers.len(), 3);
+                    assert_eq!(
+                        constructed
+                            .report
+                            .final_synqbf_verification
+                            .source_equivalence_assignments_checked,
+                        4
+                    );
+                    assert_eq!(
+                        constructed
+                            .report
+                            .final_synqbf_verification
+                            .representability_instances_checked,
+                        3
+                    );
+                    assert_eq!(
+                        constructed
+                            .report
+                            .final_synqbf_verification
+                            .representability_conditions_checked,
+                        3
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn empty_prefix_constructs_true_and_false_constant_synqbf_proofs() {
+        for (clauses, expected) in [(vec![], true), (vec![vec![]], false)] {
+            let problem = CnfProblem {
+                variables: vec![],
+                clauses,
+            };
+            let prefix = prefix(0, vec![]);
+            let dag_budget = dag_budget();
+            let (dag, _) =
+                build_qbf_game_proof_dag(&problem, &prefix, dag_budget).unwrap();
+            let profile = extract_game_value_profile_from_dag(
+                &problem,
+                &prefix,
+                &dag,
+                dag_budget,
+                construction_budget().game_values,
+            )
+            .unwrap();
+            let constructed = construct_synqbf_from_game_value_profile(
+                &problem,
+                &prefix,
+                &profile,
+                construction_budget(),
+            )
+            .unwrap();
+            assert_eq!(constructed.proof.claimed_truth_value, expected);
+            assert!(constructed.proof.circuit.dependencies.is_empty());
+            assert_eq!(constructed.report.layers.len(), 1);
+            assert_eq!(
+                constructed
+                    .report
+                    .final_synqbf_verification
+                    .source_equivalence_assignments_checked,
+                1
+            );
+            assert_eq!(
+                constructed
+                    .report
+                    .final_synqbf_verification
+                    .root_value_checks,
+                1
+            );
+        }
     }
 
     #[test]
