@@ -233,6 +233,7 @@ fn run_policy(
         .map(|hypothesis| hypothesis.prior_probability)
         .collect::<Vec<_>>();
 
+    let selected_action = select_action(scenario, &information, policy, config)?;
     let mut probes_taken = 0;
     let mut selected_action_counts = vec![0; scenario.actions.len()];
     let mut task_loss_sum = 0.0;
@@ -253,7 +254,6 @@ fn run_policy(
         );
         let mut rng = DeterministicRng::new(episode_seed);
         let true_hypothesis = sample_categorical(&prior, &mut rng);
-        let selected_action = select_action(scenario, &information, policy, config)?;
         let mut posterior = prior.clone();
         let mut action_cost = 0.0;
         let mut action_risk = 0.0;
@@ -537,6 +537,37 @@ mod tests {
         assert!(evsi.mean_decision_regret < pure_eig.mean_decision_regret);
         assert!(evsi.mean_realized_model_entropy_reduction_nats > 0.0);
         assert!((no_probe.mean_task_loss - 0.5).abs() < 0.03);
+    }
+
+    #[test]
+    fn model_misspecification_is_visible_in_decision_and_brier_metrics() {
+        let matched = irrelevant_vs_relevant_scenario();
+        let mut misspecified = irrelevant_vs_relevant_scenario();
+        for (index, truth_actions) in misspecified
+            .true_outcome_probabilities_by_hypothesis_action
+            .iter_mut()
+            .enumerate()
+        {
+            truth_actions[1] = if index < 2 {
+                vec![0.55, 0.45]
+            } else {
+                vec![0.45, 0.55]
+            };
+        }
+
+        let matched_result =
+            run_diagnostic_policy_benchmark(&matched, 20_000, 0xCA11B, config())
+                .expect("matched likelihood benchmark");
+        let misspecified_result =
+            run_diagnostic_policy_benchmark(&misspecified, 20_000, 0xCA11B, config())
+                .expect("misspecified likelihood benchmark");
+        let matched_evsi = &matched_result.policies[2];
+        let misspecified_evsi = &misspecified_result.policies[2];
+
+        assert_eq!(matched_evsi.selected_action_counts, vec![0, 20_000]);
+        assert_eq!(misspecified_evsi.selected_action_counts, vec![0, 20_000]);
+        assert!(misspecified_evsi.mean_task_loss > matched_evsi.mean_task_loss + 0.10);
+        assert!(misspecified_evsi.mean_model_brier_score > matched_evsi.mean_model_brier_score);
     }
 
     #[test]
