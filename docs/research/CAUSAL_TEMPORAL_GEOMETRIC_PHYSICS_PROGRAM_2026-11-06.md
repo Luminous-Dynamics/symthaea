@@ -737,12 +737,26 @@ The programme now has three explicit extensions beyond the initial causal-set / 
 - Its present implementation is a small-block Jacobi eigensolver over the Gram matrix (J^T J), capped at 64 parameters. This is a reference diagnostic, not yet a production SVD or an end-to-end asynchronous tracker. Squaring the condition number in the Gram construction is a known numerical limitation; compare against rank-revealing QR/SVD before using it for high-dynamic-range calibration problems.
 - The current bearing triangulator remains a common-epoch, known-pose local geometry primitive. Clock offset/drift, platform pose, boresight covariance and correlated calibration uncertainty remain unimplemented in the estimator.
 
+### Scientific experiment compiler: three distinct objectives
+
+- [SCIENCE-DESIGN-001 #11132](https://github.com/Luminous-Dynamics/symthaea/issues/11132) now treats experiment design as an end-to-end compilation loop: prediction ledger, comparability, local/global observability, information/discrepancy objectives, resource-bounded selection, frozen execution contract and evidence ingestion.
+- `gaussian_predictive_kl_nats` adds an analytic directed scalar-Gaussian KL reference for expected predictive discrepancy, distinct from the existing discrete model-identity EIG.
+- `model_recovery::evaluate_model_recovery` adds deterministic planted-model Monte Carlo recovery under a frozen MAP/abstention rule, with a confusion matrix, coverage/selective accuracy and an optional unlisted generator. The unlisted generator is only a data source, never an inference candidate.
+- The experiment-compiler specification separates EIG, expected predictive KL, model-recovery accuracy, parameter information and downstream decision utility. A high prior-weighted recovery score can still be misleading when the experiment contains no information; an explicit regression test demonstrates this with identical model likelihoods.
+
 ### Time-crystal frequency locking and sensing
 
 - [DTC-PHASE-001 #11033](https://github.com/Luminous-Dynamics/symthaea/issues/11033) separates a period-two signal from phase rigidity, finite-size lifetime scaling and metastability.
 - `symthaea-fractal-time-lab::frequency_locking` adds a finite-sweep subharmonic peak and frequency-locking diagnostic. It reports FFT grid spacing separately from observation-limited resolution. It is a signal-level diagnostic, never a DTC phase classifier.
 - [DTC-SENSE-001 #11128](https://github.com/Luminous-Dynamics/symthaea/issues/11128) now targets the 2026 interaction-assisted DTC magnetic-sensing literature. The relevant diamond experiment reports 0.5–50 kHz operation and sub-70 mHz linewidths, with an AC-resonant lifetime-extension mechanism. Symthaea has not reproduced that experiment; its exact-state-vector model is capped at 20 spins and its anisotropic-Heisenberg dynamics are second-order Trotterized.
 - The next physics step is to report classical readout Fisher information and total experiment-time-normalized sensitivity, separately from quantum Fisher information and finite-window subharmonic amplitude.
+
+### GravCraft: numerical metric consistency before source claims
+
+- The separate `adm_reference` path constructs a static ADM metric with alpha=1 and gamma_ij=delta_ij from the amplifier shift, computes true Christoffels/geodesics through the metric-geometry kernel, and reconstructs Einstein-implied T_mu_nu=G_mu_nu/(8 pi).
+- A new `adm_derivative_step_sweep` example varies the nested finite-difference step across multiple scales and reports Ricci/Kretschmann invariants, Eulerian energy density, sampled null-energy minimum and adjacent-step differences.
+- [GR-SOURCE-001 #11135](https://github.com/Luminous-Dynamics/symthaea/issues/11135) defines the next stronger gate: independent 3+1 Hamiltonian/momentum constraint checks against 4D Einstein-tensor projections, Bianchi/source-conservation diagnostics, derivative validation with analytic or automatic differentiation, and convergent energy-condition/source integration.
+- The legacy shift-as-acceleration simulator remains a kinematic toy. The ADM path remains a static metric ansatz and an Einstein-implied source calculation; neither supplies matter capable of generating that metric or demonstrates propulsion.
 
 ### Causal interval abundance and finite-geometry comparison
 
