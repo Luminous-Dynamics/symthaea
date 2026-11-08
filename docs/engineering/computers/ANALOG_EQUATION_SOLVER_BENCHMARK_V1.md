@@ -24,7 +24,7 @@ This is a workload-to-primitive-and-substrate selection experiment, not a claim 
 - Reproducible symmetric positive-definite family `A = λI + α11ᵀ`, with a known exact spectrum and condition number.
 - Known-answer RHS generation from a frozen solution vector.
 - Direct Cholesky solve.
-- Unpreconditioned conjugate-gradient solve with explicit tolerance and iteration budget.
+- Unpreconditioned conjugate-gradient solve with explicit tolerance and iteration budget; it recomputes the true residual before acceptance and restarts the recurrence if residual replacement is needed.
 - Separate residual norm, relative residual, relative backward error, absolute forward error and relative forward error.
 - Negative controls for singular/nonsymmetric input, invalid dimensions/tolerances, non-finite values and ill-conditioned residual/forward-error divergence.
 
@@ -33,6 +33,15 @@ The exact condition number of the generated SPD family is:
 `κ₂(A) = (λ + nα) / λ`
 
 The reference solver is not a physical model and does not predict analog noise, conductance, power, settling time, yield or device reliability. It supplies frozen numerical workloads and independent reference values for later substrate comparisons.
+
+Run its dependency-free tests with:
+
+```sh
+rustc --edition=2021 --test research/physical_compute/equation_solver_contract_v1.rs -o /tmp/equation_solver_tests
+/tmp/equation_solver_tests
+```
+
+The tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
 
 ## 3. Workload portfolio
 
