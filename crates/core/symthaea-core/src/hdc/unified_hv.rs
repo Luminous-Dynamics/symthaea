@@ -1354,6 +1354,28 @@ mod tests {
     }
 
     #[test]
+    fn test_full_resolution_similarity_preserves_separate_f32_rounding() {
+        // This cancellation fixture distinguishes a separately rounded
+        // multiply followed by add from a fused multiply-add. The exact real
+        // product is just above the rounded product, and the following term
+        // cancels that rounded product to zero.
+        //
+        // If an optimized build contracts the first multiply/add, the dot
+        // becomes nonzero (~2^-48) and this test fails. Keep this in the
+        // canonical scorer module because the HME interval proofs depend on
+        // the actual compiled operation sequence.
+        let one = 1.0f32;
+        let a0 = one - f32::EPSILON / 2.0;
+        let b1 = one - f32::EPSILON;
+        let query = ContinuousHV::from_values(vec![a0, one, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let candidate =
+            ContinuousHV::from_values(vec![a0, -b1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+
+        assert_eq!(a0 * a0, b1);
+        assert_eq!(query.similarity_full_resolution(&candidate), 0.0);
+    }
+
+    #[test]
     fn test_full_resolution_similarity_reads_all_coordinates() {
         // The only non-zero component is outside the default stride-4 sample.
         let query = ContinuousHV::from_values(vec![0.0, 0.0, 0.0, 1.0]);
