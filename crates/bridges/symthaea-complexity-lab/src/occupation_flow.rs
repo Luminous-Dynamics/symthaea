@@ -785,6 +785,60 @@ mod tests {
     }
 
     #[test]
+    fn pairwise_regret_lp_uses_one_shared_transition_trajectory() {
+        let model = fixture();
+        let scores_a = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let scores_b = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(1, 1), q(0, 1)],
+            vec![q(0, 1), q(0, 1)],
+        ];
+
+        let regret_a = build_pairwise_worst_case_regret_lp(
+            &model,
+            &scores_a,
+            &scores_b,
+            budget(504),
+        ).unwrap();
+        let certificate_a = PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,4,5),(3,1,5),(4,21,25),(5,4,25),(6,4,5),(7,1,5),(10,18,25),(11,2,25),(12,3,25),(13,2,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,11,25),(2,9,10),(4,9,10),(6,9,10),(8,9,10),(11,7,5),(14,23,10),(27,1,1),(30,1,1),(34,1,1)],
+            ),
+        };
+        let verified_a = verify_primal_dual_optimality(regret_a.problem(), &certificate_a).unwrap();
+        assert_eq!(verified_a.objective, q(11, 25));
+
+        let regret_b = build_pairwise_worst_case_regret_lp(
+            &model,
+            &scores_b,
+            &scores_a,
+            budget(504),
+        ).unwrap();
+        let certificate_b = PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,22,25),(2,9,5),(5,1,2),(6,9,5),(9,1,2),(10,9,5),(15,23,10),(26,1,1),(31,1,1),(35,1,1)],
+            ),
+        };
+        let verified_b = verify_primal_dual_optimality(regret_b.problem(), &certificate_b).unwrap();
+        assert_eq!(verified_b.objective, q(22, 25));
+        assert!(verified_a.objective < verified_b.objective);
+    }
+
+    #[test]
     fn rejects_infeasible_interval_rows_and_invalid_dimensions() {
         let infeasible = StagewiseIntervalMarkovModel::new(
             vec![q(1, 1), q(0, 1)],
