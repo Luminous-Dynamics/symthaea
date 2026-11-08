@@ -539,6 +539,53 @@
         }
       ],
       "note": "All scorer implementations should consume identical frozen vectors. Validate metric counts and denominators separately from floating-point presentation; real-corpus results require additional independent evidence."
+    },
+    {
+      "id": "experiment_receipt_conformance",
+      "name": "Reproducible benchmark experiment receipts",
+      "task": "EVIDENCE_AND_REPRODUCIBILITY",
+      "issue": 11107,
+      "metrics": [
+        "receipt_field_completeness",
+        "immutable_model_dataset_scorer_revision_consistency",
+        "language_oracle_mode_disclosure",
+        "split_leakage_audit_completeness",
+        "raw_count_denominator_completeness",
+        "paired_clustered_uncertainty_completeness",
+        "compute_cost_latency_measurement_completeness",
+        "artifact_hash_completeness"
+      ],
+      "required_outputs": [
+        "receipt_id",
+        "evidence_state",
+        "dataset_revision_and_file_manifest",
+        "source_admission_status",
+        "model_revision_and_checkpoint_digest",
+        "language_input_mode",
+        "preprocessing_and_decoder_revision",
+        "scorer_and_normalization_revision",
+        "split_disjointness_audit",
+        "raw_metric_counts_and_denominators",
+        "micro_macro_aggregation_definition",
+        "clustered_confidence_intervals",
+        "hardware_latency_memory_energy_cost",
+        "negative_control_results",
+        "prediction_log_and_output_hashes"
+      ],
+      "candidate_sources": [
+        {
+          "id": "voice_experiment_receipt_v1_schema",
+          "status": "SCHEMA_CONTRACT",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_experiment_receipt_v1.schema.json"
+        },
+        {
+          "id": "voice_experiment_receipt_design_example_v1",
+          "status": "SYNTHETIC_DESIGN_ONLY",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_experiment_receipt_design_example_v1.json",
+          "note": "Synthetic example only; no audio, model, benchmark execution or claim."
+        }
+      ],
+      "note": "A leaderboard result without immutable inputs, model/decode/scorer revisions, data admission, split integrity, denominators, clustered uncertainty and efficiency measures is not reproducible evidence. Schema validity is not proof that the recorded facts are true."
     }
   ],
   "promotion_gates": [
