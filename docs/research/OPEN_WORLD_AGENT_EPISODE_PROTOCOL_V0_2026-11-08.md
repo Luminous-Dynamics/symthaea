@@ -46,6 +46,7 @@ After submission, the trusted runner can compute:
 - projected structural-family set match and structural identifiability, scored independently from coefficient/sensor identifiability;
 - claimed/oracle/intersection counts (supporting precision and recall calculation);
 - disposition correctness;
+- safe abstention when the exact compatible model set is non-singleton, versus unnecessary abstention when the exact model is uniquely identified;
 - evidence-reference validity;
 - action count and cited-evidence count.
 
@@ -75,7 +76,7 @@ Its current policy tests exercise paired numeric A0/A2 episodes using the same g
 
 ## Current limitations / next falsifiable milestones
 
-This is an interface and protocol-conformance layer, not an evaluated research agent. The evaluator score currently uses exact finite candidate sets and reports structural-family recovery separately from full parameterized-model recovery; it is not yet a probabilistic posterior score, decision-focused EVSI, or a continuous-world verifier. It does not add stochastic noise, drift, saturation, unknown delay, hidden spatial state, adaptive instrument selection, or external paper-derived tasks.
+This is an interface and protocol-conformance layer, not an evaluated research agent. The evaluator score currently uses exact finite candidate sets and reports structural-family recovery separately from full parameterized-model recovery. It scores abstention as safe only when the exact reported version space is complete and non-singleton; abstention on a uniquely identified exact model is unnecessary. This is not yet a probabilistic posterior score, decision-focused EVSI, support-omission benchmark or continuous-world verifier. It does not add stochastic noise, drift, saturation, unknown delay, hidden spatial state, adaptive instrument selection, or external paper-derived tasks.
 
 Next milestones:
 1. Connect a Symthaea research-policy adapter that consumes only serialized AgentView messages and emits AgentAction messages.
