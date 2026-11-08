@@ -526,3 +526,20 @@ For ContinuousHV, a residual certificate ||x-x_hat|| <= epsilon gives real-arith
 Exact mode requires a valid interval for every eligible record or an admissible aggregate bound for every unopened segment. ANN/IVF candidate omission remains a separate guarantee problem. Recast-style directional-isotropy intervals belong only in an explicitly probabilistic profile and cannot authorize deterministic ExactComplete.
 
 No interval selector, certified ContinuousHV quantizer, canonical-f32 outward interval proof, Recast reproduction, benchmark result or SOTA win is claimed yet.
+
+
+## 2026-11-08 addendum: PQR-Search's exhaustive-search performance result and ordered exact refinement
+
+The current arXiv v1 of PQR-Search (arXiv:2611.07579, 2026-11-05) reports more than a per-query reliability advantage. The authors state that PQR-Search was faster than FAISS exhaustive search in every evaluated static setting: 26.4x geometric-mean batch throughput, and 69–154x at the 100M scale. It was also 27–76x faster at one thread than PUFFINN, another per-query-guaranteed ANN method.
+
+This is a substantial competitive headwind for HME ExactFull. We must not imply that deterministic exactness automatically yields competitive throughput. The appropriate comparison is a multi-frontier:
+- deterministic ExactFull / ExactProgressive: exact oracle agreement versus exact-scan baseline, with zero false pruning;
+- probabilistic PQR-style profile: compare at a matched (tau, delta) and clearly distinguish the probability space;
+- storage-refinement profile: compare bytes/pages read, total memory/storage and update costs at a matched quality class;
+- downstream cognitive-memory utility and governance: separate from vector-search recall.
+
+PQR-Search also reports **estimate-ordered early exact computation** in selected settings, enabled when its calibration pass is at least 5% faster. This strengthens the case for candidate-order hints: exact evaluations can be scheduled to establish a useful threshold early. HME should compare fixed order against estimate-ordered candidates, but only the canonical full score and conservative bounds can authorize exclusion in ExactOnly.
+
+Official source: https://arxiv.org/abs/2611.07579
+
+The cross-algorithm owner remains [#11022](https://github.com/Luminous-Dynamics/symthaea/issues/11022); estimate/cost scheduling remains [#11041](https://github.com/Luminous-Dynamics/symthaea/issues/11041); global deterministic interval refinement remains [#11078](https://github.com/Luminous-Dynamics/symthaea/issues/11078). No HME speedup or PQR reproduction is claimed.
