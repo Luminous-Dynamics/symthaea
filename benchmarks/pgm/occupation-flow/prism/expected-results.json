@@ -2,6 +2,8 @@
   "schema": "symthaea.pgm.occupation-flow.prism-expected.v1",
   "status": "oracle-values-only-not-prism-executed",
   "source_fixture": "Rust StagewiseIntervalMarkovModel two-state three-period fixture",
+  "source_model_sha256": "b1fb89c3775613d7b9aeb20857e6eb1a15b4133419e6fa3a307ddec6c906c466",
+  
   "model_semantics": {
     "model_class": "IDTMC",
     "initial_state": "t=0,s=0",
