@@ -251,6 +251,11 @@
     "pair_count": 0,
     "pair_kinds": [],
     "pair_split_revision": null,
-    "source_lineage_manifest_sha256": null
+    "source_lineage_manifest_sha256": null,
+    "preference_training_pair_manifest_sha256": null,
+    "held_out_evaluation_pair_manifest_sha256": null,
+    "training_evaluation_disjointness_audit_sha256": null,
+    "training_evaluation_overlap_count": 0,
+    "training_evaluation_disjointness_status": "NOT_APPLICABLE"
   }
 }
