@@ -38,6 +38,7 @@ pub mod strategy_bdd;
 pub mod strategy_aig;
 pub mod strategy_portfolio;
 pub mod synqbf;
+pub mod synqbf_construction;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
