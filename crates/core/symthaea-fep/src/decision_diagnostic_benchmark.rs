@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::decision_relevant_information::{
-    DecisionDiagnosticConfig, DecisionDiagnosticError, DecisionHypothesis, DiagnosticAction,
-    evaluate_decision_focused_diagnostics, posterior_model_probabilities,
+    DecisionDiagnosticConfig, DecisionDiagnosticError, DecisionDiagnosticEvaluation,
+    DecisionHypothesis, DiagnosticAction, evaluate_decision_focused_diagnostics,
+    posterior_model_probabilities,
 };
 use super::hierarchical_information_gain::{
     HierarchicalHypothesis, compute_hierarchical_information_gains,
@@ -30,6 +31,9 @@ pub enum DiagnosticPolicy {
     NoProbe,
     /// Maximize model information gain, ignoring probe cost.
     PureModelInformationGain,
+    /// Maximize information gain about which downstream decision is optimal.
+    /// This is the targeted-active-learning baseline, not an EVSI utility criterion.
+    OptimalDecisionInformationGain,
     /// Minimize posterior Bayes risk plus configured cost and safety penalties.
     CostAwareEvsi,
     /// Always perform the first safety-eligible diagnostic.
@@ -64,6 +68,7 @@ pub struct DiagnosticPolicyMetrics {
     pub mean_observation_cost: f64,
     pub mean_safety_risk: f64,
     pub mean_predicted_model_eig_nats: f64,
+    pub mean_predicted_decision_eig_nats: f64,
     /// Can be negative under model misspecification.
     pub mean_realized_model_entropy_reduction_nats: f64,
     pub mean_model_brier_score: f64,
@@ -123,7 +128,7 @@ pub enum DiagnosticBenchmarkError {
     ScenarioIdMismatch,
 }
 
-/// Run the fixed four-policy suite using paired deterministic episode seeds.
+/// Run the fixed five-policy suite using paired deterministic episode seeds.
 ///
 /// Each policy sees the same sequence of hidden hypotheses, while observations
 /// are sampled from the scenario's truth-side model. This is a diagnostic
@@ -142,6 +147,7 @@ pub fn run_diagnostic_policy_benchmark(
     let policies = [
         DiagnosticPolicy::NoProbe,
         DiagnosticPolicy::PureModelInformationGain,
+        DiagnosticPolicy::OptimalDecisionInformationGain,
         DiagnosticPolicy::CostAwareEvsi,
         DiagnosticPolicy::AlwaysInspect,
     ];
@@ -239,6 +245,11 @@ fn run_policy(
 ) -> Result<DiagnosticPolicyMetrics, DiagnosticBenchmarkError> {
     let joint = to_joint_hypotheses(&scenario.hypotheses);
     let information = compute_hierarchical_information_gains(&joint)?;
+    let decision_evaluation = evaluate_decision_focused_diagnostics(
+        &scenario.hypotheses,
+        &scenario.actions,
+        config,
+    )?;
     let decision_count = scenario.hypotheses[0].loss_by_final_decision.len();
     let prior = scenario
         .hypotheses
@@ -246,7 +257,8 @@ fn run_policy(
         .map(|hypothesis| hypothesis.prior_probability)
         .collect::<Vec<_>>();
 
-    let selected_action = select_action(scenario, &information, policy, config)?;
+    let selected_action =
+        select_action(scenario, &information, &decision_evaluation, policy, config)?;
     let mut probes_taken = 0;
     let mut selected_action_counts = vec![0; scenario.actions.len()];
     let mut task_loss_sum = 0.0;
@@ -256,6 +268,7 @@ fn run_policy(
     let mut observation_cost_sum = 0.0;
     let mut safety_risk_sum = 0.0;
     let mut predicted_eig_sum = 0.0;
+    let mut predicted_decision_eig_sum = 0.0;
     let mut realized_entropy_reduction_sum = 0.0;
     let mut brier_sum = 0.0;
 
@@ -273,6 +286,7 @@ fn run_policy(
         if let Some(action_index) = selected_action {
             let action = &scenario.actions[action_index];
             let predicted = &information[action_index];
+            let predicted_decision = &decision_evaluation.actions[action_index];
             let truth = &scenario.true_outcome_probabilities_by_hypothesis_action[true_hypothesis]
                 [action_index];
             let outcome_index = sample_categorical(truth, &mut rng);
@@ -281,6 +295,7 @@ fn run_policy(
             action_cost = action.observation_cost;
             action_risk = action.safety_risk;
             predicted_eig_sum += predicted.model_information_gain_nats;
+            predicted_decision_eig_sum += predicted_decision.decision_information_gain_nats;
             selected_action_counts[action_index] += 1;
             probes_taken += 1;
         }
@@ -324,6 +339,7 @@ fn run_policy(
         mean_observation_cost: observation_cost_sum / episodes as f64,
         mean_safety_risk: safety_risk_sum / episodes as f64,
         mean_predicted_model_eig_nats: predicted_eig_sum / episodes as f64,
+        mean_predicted_decision_eig_nats: predicted_decision_eig_sum / episodes as f64,
         mean_realized_model_entropy_reduction_nats: realized_entropy_reduction_sum
             / episodes as f64,
         mean_model_brier_score: brier_sum / episodes as f64,
@@ -333,6 +349,7 @@ fn run_policy(
 fn select_action(
     scenario: &DiagnosticScenario,
     information: &[super::hierarchical_information_gain::HierarchicalActionInformationGain],
+    decision_evaluation: &DecisionDiagnosticEvaluation,
     policy: DiagnosticPolicy,
     config: DecisionDiagnosticConfig,
 ) -> Result<Option<usize>, DecisionDiagnosticError> {
@@ -353,12 +370,22 @@ fn select_action(
                 .filter(|(_, eig)| *eig > 0.0)
                 .map(|(index, _)| index))
         }
-        DiagnosticPolicy::CostAwareEvsi => Ok(evaluate_decision_focused_diagnostics(
-            &scenario.hypotheses,
-            &scenario.actions,
-            config,
-        )?
-        .selected_action_index),
+        DiagnosticPolicy::OptimalDecisionInformationGain => {
+            let mut selected: Option<(usize, f64)> = None;
+            for (index, action) in scenario.actions.iter().enumerate() {
+                if action.safety_risk > config.maximum_safety_risk {
+                    continue;
+                }
+                let information = decision_evaluation.actions[index].decision_information_gain_nats;
+                if selected.is_none_or(|(_, best)| information > best) {
+                    selected = Some((index, information));
+                }
+            }
+            Ok(selected
+                .filter(|(_, information)| *information > 0.0)
+                .map(|(index, _)| index))
+        }
+        DiagnosticPolicy::CostAwareEvsi => Ok(decision_evaluation.selected_action_index),
         DiagnosticPolicy::AlwaysInspect => Ok(scenario
             .actions
             .iter()
@@ -531,14 +558,18 @@ mod tests {
 
         let no_probe = &result.policies[0];
         let pure_eig = &result.policies[1];
-        let evsi = &result.policies[2];
-        let always = &result.policies[3];
+        let decision_eig = &result.policies[2];
+        let evsi = &result.policies[3];
+        let always = &result.policies[4];
 
         assert_eq!(no_probe.probes_taken, 0);
         assert_eq!(pure_eig.selected_action_counts, vec![10_000, 0]);
+        assert_eq!(decision_eig.selected_action_counts, vec![0, 10_000]);
         assert_eq!(evsi.selected_action_counts, vec![0, 10_000]);
         assert_eq!(always.selected_action_counts, vec![10_000, 0]);
-        assert!(pure_eig.mean_predicted_model_eig_nats > evsi.mean_predicted_model_eig_nats);
+        assert!(pure_eig.mean_predicted_model_eig_nats > decision_eig.mean_predicted_model_eig_nats);
+        assert!(decision_eig.mean_predicted_decision_eig_nats > 0.0);
+        assert!(evsi.mean_predicted_decision_eig_nats > 0.0);
         assert!(evsi.mean_task_loss < pure_eig.mean_task_loss - 0.15);
         assert!(evsi.mean_total_cost < pure_eig.mean_total_cost - 0.10);
         assert!(evsi.mean_decision_regret < pure_eig.mean_decision_regret);
@@ -567,8 +598,8 @@ mod tests {
         let misspecified_result =
             run_diagnostic_policy_benchmark(&misspecified, 20_000, 0xCA11B, config())
                 .expect("misspecified likelihood benchmark");
-        let matched_evsi = &matched_result.policies[2];
-        let misspecified_evsi = &misspecified_result.policies[2];
+        let matched_evsi = &matched_result.policies[3];
+        let misspecified_evsi = &misspecified_result.policies[3];
 
         assert_eq!(matched_evsi.selected_action_counts, vec![0, 20_000]);
         assert_eq!(misspecified_evsi.selected_action_counts, vec![0, 20_000]);
