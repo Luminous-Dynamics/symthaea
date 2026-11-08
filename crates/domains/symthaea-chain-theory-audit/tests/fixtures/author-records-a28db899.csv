@@ -2,7 +2,8 @@
 # Commit: a28db8998bce5bd5ef11195c05f13c86cd9dac5c
 # Path: papers/alpha/anc/records.csv
 # Git blob SHA: ff67bf8bfe6643812d2543470a0aaef4b7eb3891
-# License/rights review required before public redistribution.
+# License: Apache-2.0 (see LICENSE-APACHE-2.0 in this directory)
+# Provenance comments added by Luminous Dynamics; the author CSV rows below are unmodified.
 record,construction,slot_kinds,X,Y,ends_passed,k,weight
 R001,odd,mixed,+1,+1,none,1,1
 R002,odd,mixed,+1,+1,none,1,1
