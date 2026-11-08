@@ -224,6 +224,46 @@ An extracted proposition is a derived object, never a replacement for the raw so
 
 Do not let paraphrase or premise normalization silently upgrade evidence force. Every extracted atom must be replayable to its exact source span; unsupported components remain explicit.
 
+### Context-preserving evidence atoms and failure-localized repair
+
+Three further 2026 findings inform the implementation direction:
+
+- PrimeFacts (LREC 2026) builds 49,718 source anchors across 13,106 PolitiFact articles, then rewrites anchored sentences into standalone premises. In its evaluated corpora, this improved cross-article evidence retrieval by up to 30% relative MRR and verdict Macro-F1 by 10–20 points over its baseline. These gains are specific to its datasets and methods. https://aclanthology.org/2026.lrec-1.613/
+- Evidence-Based Generation (Findings EMNLP 2026) adds line-level citations and joint answer-plus-evidence scoring. Its authors report that similarity retrieval may retrieve a relevant chunk more reliably than all required chunks, and that chunking can destroy document-level identity information needed for cross-passage reasoning. https://aclanthology.org/2026.findings-emnlp.2222/
+- Dual Entity Recovery RAG (Findings EMNLP 2026) identifies entity-loss failures at both retrieval time and generation time: a passage can be retrieved correctly yet become uninterpretable after losing its antecedent/context. https://aclanthology.org/2026.findings-emnlp.1068/
+- LoCoRAG (EMNLP 2026) studies global failure localization and matched repair, reporting a 10.8-point average LLM-Acc gain over its strongest baseline on 3-hop-or-deeper settings. This is an external multi-hop QA result, not a REA result. https://aclanthology.org/2026.emnlp-main.2183/
+
+REA should adopt the *representation lesson*, not copy a particular RAG architecture.
+
+Keep two distinct layers:
+- **Immutable source layer:** original bytes, artifact identity, exact source-native locator, acquisition context, time, provider and lineage.
+- **Derived proposition layer:** normalized subject/relation/object/value, modality, time interval, scope, entity anchors, coreference dependencies and extraction provenance.
+
+A proposition may be decontextualized for retrieval, but its source span and all entity/context dependencies remain attached. It is a derived object, not a substitute for the source. A model-generated proposition is not independent Evidence.
+
+For multi-hop claims, the agent must retrieve the complete dependency set, not merely one topically relevant passage. The evaluator should include:
+- entity alias and coreference perturbations;
+- same-name/different-entity controls;
+- missing antecedent and missing document-metadata controls;
+- passage-only vs full-document context;
+- source-order and argument-order changes;
+- multi-fact tasks requiring two or more independently sourced premises.
+
+### Failure-localized repair loop
+
+Do not respond to every failed claim by retrieving more text. Diagnose the earliest failed stage and choose a matched repair:
+
+| Earliest failure | Appropriate repair |
+|---|---|
+| Query/plan decomposition | Revise the obligation decomposition, preserving the original claim and policy constraints |
+| Retrieval | Change source discovery, query expansion or candidate ranking |
+| Extraction | Re-read the exact source span, restore entity/context anchors, or use a different extractor |
+| Warrant | Re-evaluate the entailment/non-implication relation with claim force held fixed |
+| Provenance/admissibility | Reacquire, resolve dependency lineage, freshness, artifact identity or population evidence |
+| Replay/identity | Reconstruct from exact bytes and pinned rule/schema inputs; do not ask a language model to explain away a digest mismatch |
+
+A repair must be localized and its downstream derived objects recomputed. If an upstream proposition is withdrawn or its source is superseded, dependent inferences must be marked stale/revoked and replayed. This composes with evidence-continuity and causal-diagnosis owners; it is not a new memory graph.
+
 ### Metrics added
 
 - retrieval recall@k for mandatory admissible premises, plus precision and source-family diversity;
