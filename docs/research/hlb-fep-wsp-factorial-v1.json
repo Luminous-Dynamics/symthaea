@@ -606,7 +606,11 @@
         "predicted_decision_information_gain_nats",
         "posterior_optimal_decision_entropy",
         "mean_predicted_decision_eig_nats",
-        "optimal_decision_posterior_entropy"
+        "optimal_decision_posterior_entropy",
+        "paired_evsi_minus_baseline_task_loss_delta",
+        "paired_evsi_minus_baseline_decision_regret_delta",
+        "paired_evsi_minus_baseline_total_cost_delta",
+        "paired_normal_approximation_confidence_intervals"
       ],
       "negative_controls": [
         "high_eig_zero_evsi_irrelevant_probe",
@@ -618,7 +622,9 @@
         "targeted_decision_information_vs_evsi_divergence",
         "model_eig_vs_decision_eig_separation",
         "targeted_decision_eig_ignores_cost_while_evsi_declines",
-        "decision_information_data_processing_inequality"
+        "decision_information_data_processing_inequality",
+        "paired_evsi_contrast_episode_seed_alignment",
+        "paired_evsi_confidence_interval_source_data_preserved"
       ],
       "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
     },
@@ -1235,7 +1241,9 @@
       "butterfly_angle_parameter_count",
       "dense_matrix_parameter_count",
       "decision_information_gain_nats",
-      "mean_predicted_decision_eig_nats"
+      "mean_predicted_decision_eig_nats",
+      "paired_evsi_regret_difference",
+      "paired_evsi_total_cost_difference"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1342,7 +1350,9 @@
       "decision_information_vs_model_information_gap",
       "targeted_decision_eig_policy_selection_error",
       "decision_information_data_processing_inequality_violation_rate",
-      "targeted_decision_policy_cost_ignorance_guardrail"
+      "targeted_decision_policy_cost_ignorance_guardrail",
+      "paired_policy_seed_count_mismatch_rate",
+      "paired_contrast_confidence_interval_nonfinite_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
