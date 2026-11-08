@@ -325,7 +325,32 @@ Compose with existing owners:
 
 The microcosm should remain a reference adapter. Do not introduce another production PhysicsIR, scheduler, posterior authority or receipts service.
 
-## 8. References
+## 8. Updated external benchmark map — 2026-11-08
+
+The external landscape is broader than the initial comparator set. These benchmarks test overlapping but non-identical abilities; their scores must not be collapsed into one leaderboard.
+
+| Benchmark | What it tests | How Symthaea should use it |
+|---|---|---|
+| DiscoverPhysics (2026) | 22 deliberately non-standard N-body worlds; agents choose experiments and submit both explanations and executable laws. The paper reports a gap between held-out trajectory fit and conceptual explanation. | Closest additional comparator for altered-law discovery. Match intervention budgets, private held-out worlds, law semantics, long-horizon prediction and explanation scoring. |
+| Unsatz (2026) | 80 executable systems across 20 domains; active ansatz discovery across ODE, delay, PDE, discrete, causal and stochastic forms. | Closest target for general ansatz discovery, but reproduce only under exact task-DSL, split, cost and scorer parity. |
+| ACDB (2026) | Budgeted observe/intervene causal-graph recovery with skeleton, orientation and intervention-efficiency layers. | Native causal-graph track; do not treat graph F1 as physics-law discovery. |
+| FIRE-Bench (ICML 2026) | Experimental rediscovery of verifiable findings from recent ML papers, with claims tied to documented research results. | Reproduction-first gate for any claimed innovation; measure independent recovery of a known result before novel claims. |
+| AIRS-Bench (2026) | Twenty research-science tasks sourced from SOTA ML papers, covering idea generation, experiment analysis and iterative refinement. | Full research-lifecycle comparator on ML tasks; preserve per-task results and resource accounting. |
+| SciAgentArena (2026) | Roughly 200 real-world scientific research tasks with stepwise verification. | Cross-domain evaluation of execution and workflow reliability; task specification quality and open-ended novelty need separate scores. |
+| ScienceAgentBench | 102 data-driven discovery tasks sourced from peer-reviewed publications and expert-validated. | Use for real-data analysis and discovery workflow controls, not hidden-law simulator identification. |
+| FrontierPhysics (2026) | 56 expert-authored end-to-end physics research tasks; deterministic verification plus expert blocking criteria. | Adopt its two-part acceptance pattern: a verifier pass is necessary but not enough if expert scientific blockers remain. |
+| Scientist World (2026) | Paper-derived executable research environments and innovation attempts scored against reproduced baselines. | Use as a research-agent environment and baseline-reproduction comparator, not as a law-discovery percentage. |
+| AstaBench | Thousands of scientific workflow problems spanning literature retrieval, data analysis and discovery. | Track retrieval, execution and per-problem cost separately from scientific novelty. |
+
+**Competitive positioning:** Symthaea should not try to win by claiming one larger aggregate score. Its proposed differentiator is a composable evidence contract across (1) structural-family recovery, (2) parameter and measurement identifiability, (3) held-out interventional prediction, (4) decision value per inclusive cost, and (5) evidence-path integrity. This is a narrower and more falsifiable claim than "AI scientist", but it can become a stronger qualification layer for other science agents.
+
+### Immediate benchmark consequence
+
+The microcosm now scores the projected structural-family set independently of the full parameterized-model version space. This is required because an agent can correctly identify a direct-response mechanism while gain and sensor scale remain equivalent; conversely, an uninformative constant sensor can leave multiple mechanisms compatible. Report both results, with identifiable and non-identifiable strata, rather than one "model accuracy" number.
+
+Before any leaderboard comparison, preregister matched tasks, action semantics, budgets, held-out worlds, run denominators, model access, and external dependencies. A benchmark score is not comparable if one system receives the true variable set, executable oracle, extra interventions, paper abstracts, or more wall-time than its comparator.
+
+## 9. References
 
 - Unsatz: https://arxiv.org/abs/2611.03713
 - Active Causal Discovery Benchmark: https://arxiv.org/abs/2609.31675
@@ -335,6 +360,12 @@ The microcosm should remain a reference adapter. Do not introduce another produc
 - Decision-Centric Research / RD-Bench: https://arxiv.org/abs/2611.00774
 - OpenScience benchmark and its 2026-10-01 correction: https://www.openscience.sh/benchmark
 - Symbolic-regression survey (2026-08-20): https://doi.org/10.1007/s11831-026-10681-w
+- DiscoverPhysics: https://arxiv.org/abs/2605.26087
+- FIRE-Bench: https://proceedings.mlr.press/v306/wang26d.html
+- AIRS-Bench: https://ai.meta.com/research/publications/airs-bench-a-suite-of-tasks-for-frontier-ai-research-science-agents/
+- SciAgentArena: https://www.microsoft.com/en-us/research/publication/benchmarking-ai-agents-for-addressing-scientific-challenges-across-scales/
+- ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
+- AstaBench: https://allenai.org/asta/bench
 
 ## Claim boundary
 
