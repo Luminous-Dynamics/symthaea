@@ -291,3 +291,16 @@ Compare:
 Keep index construction and memory overhead in the total-cost comparison. Report how quickly the exact kth threshold rises, bound-tightening per byte, payload bytes read, exact candidates completed, safe prunes, p50/p95/p99 and exact top-k agreement. The full exact baseline must include any extra sketch/metadata work.
 
 This is a particularly promising HME proposition: **approximate intelligence can decide where to look first; independently verified mathematics decides what may be ignored.** It combines industry ANN scheduling with deterministic HDC exactness without claiming that the ANN itself became exact.
+
+
+## 2026-11-08 exact-oracle pinning update
+
+Per-query Recall@k, candidate coverage, decision-margin and false-pruning metrics are only meaningful if every baseline shares the same versioned exact oracle. HME's ContinuousHV reference contract is now:
+
+`continuous_hv_cosine_full_f32_group8_v1`
+
+It identifies full-coordinate f32 scoring with eight-coordinate grouping, ordered tail handling and the declared near-zero denominator rule. The HME exact admission profile rejects non-finite components, values outside [-1, 1], and dimension mismatch. Query receipts bind this identifier for continuous_f32/cosine workloads.
+
+The term "exact" in this benchmark means exact agreement with the pinned finite-precision oracle, not an assertion of infinite-precision real arithmetic. SIMD kernels with different reduction order must be qualified against the reference and must not decide a tie unless the profile specifies their canonical behavior.
+
+New admission fixture: [hme_similarity_admission_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_similarity_admission_v0.json). It is a synthetic contract matrix, not executed test output.
