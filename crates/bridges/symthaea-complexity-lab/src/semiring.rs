@@ -250,7 +250,6 @@ fn compare_nonnegative_rationals(
         }
     }
 }
-}
 
 impl ExactSemiring for MaxTimesRational {
     fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
