@@ -269,6 +269,67 @@ def semantic_errors(payload: dict) -> list[str]:
         if "not code review" not in caveats or "not ceb-secure" not in caveats:
             errors.append("SecRepoBench must retain its secure-completion-vs-CEB caveat")
 
+    # Requirement-conformance over-correction, academic-review grounding and
+    # selective pairwise judging stay distinct from direct CEB review scores.
+    required_claim_reliability_comparators = {
+        "llm-overcorrection-paired-conformance": ("CEB-REVIEW", "llm-overcorrection-review-paper", "not_reported", None),
+        "reviewgrounder-academic-peer-review": ("CEB-REVIEW", "reviewgrounder-acl2026-paper", "not_reported", None),
+        "scope-selective-pairwise-judging": ("CEB-REVIEW", "scope-selective-judge-summary", "not_reported", None),
+    }
+    for comparator_id, expected in required_claim_reliability_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing claim-reliability comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        denom = comparator["sample_denominator"]
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        if denom["status"] != denominator_status or denom["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_claim_reliability_observations = {
+        "overcorr-humaneval-full-fnr": ("llm-overcorrection-paired-conformance", "false_negative_rate_humaneval_full", 54.8),
+        "overcorr-humaneval-filter-fnr": ("llm-overcorrection-paired-conformance", "false_negative_rate_humaneval_full_filter", 16.3),
+        "overcorr-mbpp-full-fnr": ("llm-overcorrection-paired-conformance", "false_negative_rate_mbpp_full", 69.0),
+        "overcorr-mbpp-filter-fnr": ("llm-overcorrection-paired-conformance", "false_negative_rate_mbpp_full_filter", 28.9),
+        "overcorr-quixbugs-full-fnr": ("llm-overcorrection-paired-conformance", "false_negative_rate_quixbugs_full", 51.0),
+        "overcorr-quixbugs-filter-fnr": ("llm-overcorrection-paired-conformance", "false_negative_rate_quixbugs_full_filter", 24.0),
+        "overcorr-gpt4o-humaneval-full-fpr": ("llm-overcorrection-paired-conformance", "false_positive_rate_gpt4o_humaneval_full", 0.0),
+        "overcorr-gpt4o-humaneval-filter-fpr": ("llm-overcorrection-paired-conformance", "false_positive_rate_gpt4o_humaneval_full_filter", 1.83),
+        "reviewgrounder-rubric-dimensions": ("reviewgrounder-academic-peer-review", "rubric_dimension_count", 8),
+        "scope-fdr-lower-bound": ("scope-selective-pairwise-judging", "accepted_judgement_fdr_lower_bound", 0.097),
+        "scope-fdr-upper-bound": ("scope-selective-pairwise-judging", "accepted_judgement_fdr_upper_bound", 0.099),
+        "scope-acceptance-multiplier": ("scope-selective-pairwise-judging", "accepted_judgement_coverage_multiplier_upper_bound", 2.4),
+    }
+    for observation_id, expected in required_claim_reliability_observations.items():
+        observation = next((row for row in observations if row["observation_id"] == observation_id), None)
+        if observation is None:
+            errors.append(f"missing claim-reliability observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            observation["comparator_id"] != comparator_id
+            or observation["metric"]["metric_id"] != metric_id
+            or observation["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    if "llm-overcorrection-paired-conformance" in comparators:
+        caveats = " ".join(comparators["llm-overcorrection-paired-conformance"]["caveats"]).lower()
+        if "not pr review" not in caveats or "not ceb-review" not in caveats:
+            errors.append("over-correction comparator must retain conformance-vs-PR-review metric caveat")
+        if "two-sided error trade-off" not in caveats:
+            errors.append("over-correction comparator must retain FNR/FPR trade-off caveat")
+    if "reviewgrounder-academic-peer-review" in comparators:
+        caveats = " ".join(comparators["reviewgrounder-academic-peer-review"]["caveats"]).lower()
+        if "academic-paper review" not in caveats or "not source-code" not in caveats:
+            errors.append("ReviewGrounder must retain academic-peer-review scope caveat")
+    if "scope-selective-pairwise-judging" in comparators:
+        caveats = " ".join(comparators["scope-selective-pairwise-judging"]["caveats"]).lower()
+        if "not software code review" not in caveats or "exchangeability" not in caveats:
+            errors.append("SCOPE must retain pairwise-judging and calibration-assumption caveats")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -483,6 +544,28 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     row = next(row for row in mutant["observations"] if row["observation_id"] == "secrepobench-top-setup-secure-pass-at-1")
     row["metric"]["value"] = 76.4
     must_reject(mutant, "SecRepoBench secure-pass conflated with functional pass")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "overcorr-humaneval-filter-fnr"
+    ]
+    must_reject(mutant, "Fix-guided filter HumanEval over-correction observation removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "overcorr-gpt4o-humaneval-filter-fpr")
+    row["metric"]["value"] = 0.0
+    must_reject(mutant, "Fix-guided filter FPR trade-off erased")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "reviewgrounder-rubric-dimensions")
+    row["metric"]["value"] = 12
+    must_reject(mutant, "ReviewGrounder rubric dimension descriptor changed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "scope-fdr-upper-bound")
+    row["metric"]["value"] = 0.25
+    must_reject(mutant, "SCOPE FDR bound inflated")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
