@@ -7,8 +7,12 @@ use serde_json::Value;
 pub fn validate_files(schema_path: &Path, instance_path: &Path) -> Result<(), Vec<String>> {
     let schema_text = fs::read_to_string(schema_path)
         .map_err(|error| vec![format!("read schema {}: {error}", schema_path.display())])?;
-    let instance_text = fs::read_to_string(instance_path)
-        .map_err(|error| vec![format!("read instance {}: {error}", instance_path.display())])?;
+    let instance_text = fs::read_to_string(instance_path).map_err(|error| {
+        vec![format!(
+            "read instance {}: {error}",
+            instance_path.display()
+        )]
+    })?;
     let schema: Value = serde_json::from_str(&schema_text)
         .map_err(|error| vec![format!("parse schema {}: {error}", schema_path.display())])?;
     let instance: Value = serde_json::from_str(&instance_text).map_err(|error| {
