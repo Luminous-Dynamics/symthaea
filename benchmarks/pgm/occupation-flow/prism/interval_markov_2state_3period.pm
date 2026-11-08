@@ -41,15 +41,40 @@ rewards "action_b"
     t=1 & s=0 : 1;
 endrewards
 
-// Rmin/Rmax of these shifted structures equals 2 + worst-case regret(A)
-// and 1 + worst-case regret(B), respectively. Each complete path visits
-// exactly one state at t=1 and one at t=2, so the shifts are path-constant.
-rewards "regret_a_shifted"
+rewards "action_c"
+    t=1 : 0.5;
+    t=2 & s=1 : 0.5;
+endrewards
+
+// Every ordered pair compares score functions under the same transition
+// process. Each shifted reward adds a path-constant offset, which is removed
+// from the resulting maximum total reward.
+rewards "regret_a_b_shifted"
     t=1 & s=0 : 2;
     t=2 & s=0 : 1;
 endrewards
 
-rewards "regret_b_shifted"
+rewards "regret_a_c_shifted"
+    t=1 & s=0 : 1;
+    t=2 & s=0 : 0.5;
+endrewards
+
+rewards "regret_b_a_shifted"
     t=1 & s=1 : 2;
     t=2 & s=1 : 1;
+endrewards
+
+rewards "regret_b_c_shifted"
+    t=1 & s=1 : 1;
+    t=2 & s=1 : 0.5;
+endrewards
+
+rewards "regret_c_a_shifted"
+    t=1 & s=1 : 1;
+    t=2 & s=1 : 0.5;
+endrewards
+
+rewards "regret_c_b_shifted"
+    t=1 & s=0 : 1;
+    t=2 & s=0 : 0.5;
 endrewards
