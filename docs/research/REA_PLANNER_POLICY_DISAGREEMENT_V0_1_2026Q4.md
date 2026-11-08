@@ -31,7 +31,7 @@ With prior P(vulnerable)=0.5, utility matrix mitigate=(3,-6), no_action=(-20,0),
 | Expected EVSI (synthetic utility units) | 0.775 | 0 | 0.05 |
 | Mandatory obligation updates | 0 | 1 | 1 |
 
-These values are independently computed mathematical expectations, not empirical probabilities or planner API results.
+Point and robust planner utilities divide the selected information-gain statistic by normalized cost: cost = w_time × (time / time_budget) + w_energy × (energy / energy_budget) + w_risk × (risk / risk_budget). The table uses the #10074/#10105 weighting and budgets from the agent-visible planner config. These values are independently computed mathematical expectations, not empirical probabilities or planner API results. EVSI is shown as expected value before any additional action-cost penalty; no public EVSI planner result is claimed.
 
 ## Expected first-action disagreement
 
