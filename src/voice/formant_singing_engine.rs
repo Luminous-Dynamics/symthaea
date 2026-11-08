@@ -1214,6 +1214,25 @@ mod tests {
             .unwrap();
         assert_eq!(second_note.source_type, SourceType::Vowel);
         assert!((second_note.f0 - 246.94).abs() < 0.01);
+
+        // The vowel is one continuous melisma event: the first sample frame
+        // after a tied-note boundary must not restart its attack envelope.
+        let before_boundary = frames
+            .iter()
+            .find(|frame| (frame.time - 0.495).abs() < 1e-5)
+            .unwrap();
+        let at_boundary = frames
+            .iter()
+            .find(|frame| (frame.time - 0.5).abs() < 1e-5)
+            .unwrap();
+        assert!(before_boundary.energy > 0.5);
+        assert!(at_boundary.energy > 0.5);
+        assert!(
+            (before_boundary.energy - at_boundary.energy).abs() < 0.01,
+            "melisma envelope must remain continuous: before={}, at={}",
+            before_boundary.energy,
+            at_boundary.energy
+        );
     }
 
     #[test]
