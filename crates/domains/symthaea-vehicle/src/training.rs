@@ -78,7 +78,7 @@ pub struct VehicleTrainer {
     perturbation_schedule: PerturbationSchedule,
     /// Road model for computing lateral_offset and curvature_ahead.
     road: Road,
-    /// Optional swarm config — when set, peer vehicles populate mesh channels.
+    /// Optional swarm config; synthetic peer snapshots populate only legacy simulation-oracle training channels.
     swarm_config: Option<SwarmConfig>,
     /// Optional subterranean context for GPS-denied cave/tunnel operation.
     subterranean_context: Option<SubterraneanTrainingContext>,
@@ -148,7 +148,7 @@ impl VehicleTrainer {
         self
     }
 
-    /// Set a swarm config — peer vehicles will populate the 4 mesh channels during training.
+    /// Set a swarm config — peer vehicles will populate the four legacy simulator-oracle channels during training.
     pub fn with_swarm(mut self, swarm_config: SwarmConfig) -> Self {
         self.swarm_config = Some(swarm_config);
         self
@@ -365,10 +365,10 @@ impl VehicleTrainer {
             let mut state = physics.state().clone();
             self.road.apply(&mut state);
 
-            // Step swarm peers and write mesh channels onto ego state
+            // Step swarm peers and adapt simulator-oracle snapshots into legacy training channels
             if let Some(ref mut sw) = swarm {
                 sw.step(dt);
-                sw.aggregate_mesh(&mut state);
+                sw.aggregate_simulator_oracle_into_state(&mut state);
             }
 
             // -- STATE-LEVEL PERTURBATIONS (sensor blindness, mesh spoof) --
