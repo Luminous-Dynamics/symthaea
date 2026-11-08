@@ -23,6 +23,42 @@
       "uniqueItems": true
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "problem": {
+            "properties": {
+              "family": { "enum": ["sde", "neural_score_dynamics"] }
+            },
+            "required": ["family"]
+          }
+        },
+        "required": ["problem"]
+      },
+      "then": {
+        "properties": {
+          "problem": { "required": ["stochastic_contract"] }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task_contract": {
+            "properties": { "objective": { "const": "sample_distribution" } },
+            "required": ["objective"]
+          }
+        },
+        "required": ["task_contract"]
+      },
+      "then": {
+        "properties": {
+          "task_contract": { "required": ["statistical_protocol"] }
+        }
+      }
+    }
+  ],
   "$defs": {
     "evidence_status": {
       "type": "string",
@@ -179,6 +215,21 @@
             "notes": { "type": "string", "maxLength": 1000 }
           },
           "allOf": [
+            {
+              "if": {
+                "properties": { "target_noise_process": { "const": "white_gaussian" } },
+                "required": ["target_noise_process"]
+              },
+              "then": {
+                "required": ["noise_channel_count", "target_covariance_ref", "target_power_spectral_density_ref", "target_autocorrelation_ref"],
+                "properties": {
+                  "noise_channel_count": { "type": "integer", "minimum": 1 },
+                  "target_covariance_ref": { "type": "string", "minLength": 1 },
+                  "target_power_spectral_density_ref": { "type": "string", "minLength": 1 },
+                  "target_autocorrelation_ref": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
             {
               "if": {
                 "properties": { "target_noise_process": { "const": "colored_gaussian" } },
