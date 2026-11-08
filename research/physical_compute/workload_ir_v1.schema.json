@@ -306,9 +306,11 @@
         "statistical_protocol": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["sample_count", "independent_replicates", "confidence_level", "preregistered"],
+          "required": ["sample_count", "sampling_unit", "independent_replicates", "confidence_level", "preregistered"],
           "properties": {
             "sample_count": { "type": "integer", "minimum": 2 },
+            "sampling_unit": { "enum": ["independent_samples", "trajectory_paths", "image_samples", "sequence_paths", "other"] },
+            "burn_in_duration": { "type": "number", "minimum": 0 },
             "independent_replicates": { "type": "integer", "minimum": 2 },
             "confidence_level": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
             "bootstrap_replicates": { "type": "integer", "minimum": 100 },
