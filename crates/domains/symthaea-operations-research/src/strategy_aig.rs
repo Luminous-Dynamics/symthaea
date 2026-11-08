@@ -522,6 +522,7 @@ fn evaluate_literal(values: &[bool], literal: AigLiteral) -> Result<bool, Strate
             )?;
             Ok(if inverted { !value } else { value })
         }
+    }
 }
 
 fn evaluate_validated_aig(
