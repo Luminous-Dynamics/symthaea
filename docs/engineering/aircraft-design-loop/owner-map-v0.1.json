@@ -1,0 +1,81 @@
+{
+  "schema": "luminous.symthaea.aircraft-engineering-owner-map",
+  "schema_version": "0.1.0",
+  "status": "research_owner_mapping",
+  "claim_ceiling": "This map describes software/research ownership only. It does not establish model validity, airworthiness or authority.",
+  "owners": [
+    {
+      "concern": "design_intent_and_requirements",
+      "owner": "symthaea-engineering",
+      "reference": "Luminous-Dynamics/symthaea#6090",
+      "role": "structure intent, requirements and unresolved assumptions"
+    },
+    {
+      "concern": "fixed_wing_aerodynamics_dynamics_loads",
+      "owner": "fixed_wing_domain",
+      "reference": "Luminous-Dynamics/symthaea#6249",
+      "role": "own model semantics and applicability"
+    },
+    {
+      "concern": "candidate_specific_mass_coupled_mission",
+      "owner": "aircraft_energy_domain",
+      "reference": "Luminous-Dynamics/symthaea#7729",
+      "role": "candidate-specific mission demand and mass feedback"
+    },
+    {
+      "concern": "design_variables_and_objectives",
+      "owner": "engineering_optimization",
+      "reference": "Luminous-Dynamics/symthaea#5635",
+      "role": "candidate/objective/constraint contract"
+    },
+    {
+      "concern": "robust_interval_frontier",
+      "owner": "robust_frontier",
+      "reference": "Luminous-Dynamics/symthaea#7787",
+      "role": "interval dominance and visible unresolved alternatives"
+    },
+    {
+      "concern": "decision_value_and_next_experiment",
+      "owner": "decision_value_benchmark",
+      "reference": "Luminous-Dynamics/symthaea#7803",
+      "role": "compare next-evaluation policies under frozen budget"
+    },
+    {
+      "concern": "cross_domain_physical_transfer",
+      "owner": "engineering_coupling",
+      "reference": "Luminous-Dynamics/symthaea#6173",
+      "role": "quantities, units, frames, time, support, conservation and uncertainty transfer"
+    },
+    {
+      "concern": "simulation_request_and_backend",
+      "owner": "symthaea_sim_bridge",
+      "reference": "crates/bridges/symthaea-sim-bridge",
+      "role": "typed request/result orchestration and explicit backend registry"
+    },
+    {
+      "concern": "aerospace_mdo_and_solver_interoperability",
+      "owner": "symtropy_aero_mdo",
+      "reference": "Luminous-Dynamics/symtropy#3237",
+      "role": "solver execution, design artifacts, exact run provenance and independent replay"
+    },
+    {
+      "concern": "mission_chronology_and_energy_planes",
+      "owner": "symtropy_aero_mission",
+      "reference": "Luminous-Dynamics/symtropy#4029;Luminous-Dynamics/symtropy#4036",
+      "role": "phase state, mass transition, bus/source/store/shaft accounting"
+    },
+    {
+      "concern": "safety_release_certification",
+      "owner": "human_and_competent_authority",
+      "reference": "project_specific_certification_basis",
+      "role": "external design release, physical test and operating approval"
+    }
+  ],
+  "prohibitions": [
+    "Do not introduce a second generic aircraft optimizer.",
+    "Do not place CFD/FEM/flight-dynamics authoritative calculations in the language model.",
+    "Do not assign universal scalar fidelity scores to unlike methods.",
+    "Do not promote surrogate predictions or solver convergence to physical validation.",
+    "Do not let a Symthaea proposal bypass backend allow-lists, independent checks or human release."
+  ]
+}
