@@ -190,7 +190,7 @@ pub fn analyze_jacobian(
     }
 
     let observation_count = jacobian.len();
-    let mut information = vec![vec![0.0; parameter_count]; parameter_count];
+    let mut scaled_jacobian = vec![vec![0.0; parameter_count]; observation_count];
 
     for (row_index, row) in jacobian.iter().enumerate() {
         if row.len() != parameter_count {
@@ -201,7 +201,6 @@ pub fn analyze_jacobian(
             });
         }
 
-        let mut scaled_row = Vec::with_capacity(parameter_count);
         for (column, value) in row.iter().copied().enumerate() {
             if !value.is_finite() {
                 return Err(ObservabilityError::NonFiniteJacobian {
@@ -213,28 +212,17 @@ pub fn analyze_jacobian(
             if !scaled.is_finite() {
                 return Err(ObservabilityError::NumericalOverflow);
             }
-            scaled_row.push(scaled);
-        }
-
-        for left in 0..parameter_count {
-            for right in left..parameter_count {
-                information[left][right] += scaled_row[left] * scaled_row[right];
-                if !information[left][right].is_finite() {
-                    return Err(ObservabilityError::NumericalOverflow);
-                }
-                information[right][left] = information[left][right];
-            }
+            scaled_jacobian[row_index][column] = scaled;
         }
     }
 
-    let (eigenvalues, eigenvectors) = symmetric_jacobi_eigen(information)?;
-    let mut order: Vec<usize> = (0..parameter_count).collect();
-    order.sort_by(|left, right| eigenvalues[*right].total_cmp(&eigenvalues[*left]));
+    // Work directly on J rather than forming J^T J. The latter squares the
+    // condition number and can erase exactly the weak singular directions this
+    // diagnostic exists to expose. A one-sided Jacobi SVD keeps the small,
+    // dependency-free parameter-block kernel numerically better behaved.
+    let (singular_values, right_singular_vectors) =
+        one_sided_jacobi_svd(scaled_jacobian, parameter_count)?;
 
-    let singular_values: Vec<f64> = order
-        .iter()
-        .map(|index| eigenvalues[*index].max(0.0).sqrt())
-        .collect();
     let largest = singular_values.first().copied().unwrap_or(0.0);
     let rank_threshold = largest * relative_tolerance;
     let numerical_rank = singular_values
@@ -246,9 +234,8 @@ pub fn analyze_jacobian(
     let mut weak_directions = Vec::with_capacity(nullity);
     for (position, singular_value) in singular_values.iter().copied().enumerate() {
         if singular_value <= rank_threshold {
-            let eigenvector_column = order[position];
             let direction = (0..parameter_count)
-                .map(|row| eigenvectors[row][eigenvector_column])
+                .map(|row| right_singular_vectors[row][position])
                 .collect();
             weak_directions.push(direction);
         }
@@ -278,39 +265,61 @@ pub fn analyze_jacobian(
     })
 }
 
-fn symmetric_jacobi_eigen(
+/// One-sided Jacobi SVD for a tall or square matrix with a small column count.
+///
+/// The right singular vectors are returned as columns. Rotations orthogonalize
+/// columns of the working matrix directly, avoiding the loss of small singular
+/// values caused by explicitly forming the Gram matrix. This routine is
+/// intentionally capped by MAX_OBSERVABILITY_PARAMETERS at its public boundary.
+fn one_sided_jacobi_svd(
     mut matrix: Vec<Vec<f64>>,
+    column_count: usize,
 ) -> Result<(Vec<f64>, Vec<Vec<f64>>), ObservabilityError> {
-    let dimension = matrix.len();
-    let mut eigenvectors = vec![vec![0.0; dimension]; dimension];
-    for (index, row) in eigenvectors.iter_mut().enumerate() {
+    let row_count = matrix.len();
+    let mut right_vectors = vec![vec![0.0; column_count]; column_count];
+    for (index, row) in right_vectors.iter_mut().enumerate() {
         row[index] = 1.0;
     }
 
-    let matrix_scale = matrix
-        .iter()
-        .flatten()
-        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
-    if matrix_scale == 0.0 {
-        return Ok((vec![0.0; dimension], eigenvectors));
+    if matrix.iter().all(|row| row.iter().all(|value| *value == 0.0)) {
+        return Ok((vec![0.0; column_count], right_vectors));
     }
 
-    let stopping_threshold = matrix_scale * 16.0 * f64::EPSILON;
+    const MAX_SWEEPS: usize = 128;
+    const ORTHOGONALITY_TOLERANCE: f64 = 16.0 * f64::EPSILON;
     let mut converged = false;
 
-    for _ in 0..64 {
-        let mut largest_off_diagonal = 0.0_f64;
-        for left in 0..dimension {
-            for right in (left + 1)..dimension {
-                let off_diagonal = matrix[left][right];
-                largest_off_diagonal = largest_off_diagonal.max(off_diagonal.abs());
-                if off_diagonal.abs() <= stopping_threshold {
+    for _ in 0..MAX_SWEEPS {
+        let mut rotated_any_pair = false;
+
+        for left in 0..column_count {
+            for right in (left + 1)..column_count {
+                let mut alpha = 0.0;
+                let mut beta = 0.0;
+                let mut gamma = 0.0;
+
+                for row in &matrix {
+                    alpha += row[left] * row[left];
+                    beta += row[right] * row[right];
+                    gamma += row[left] * row[right];
+                }
+
+                if !alpha.is_finite() || !beta.is_finite() || !gamma.is_finite() {
+                    return Err(ObservabilityError::NumericalOverflow);
+                }
+                if alpha == 0.0 || beta == 0.0 {
                     continue;
                 }
 
-                let left_diagonal = matrix[left][left];
-                let right_diagonal = matrix[right][right];
-                let tau = (right_diagonal - left_diagonal) / (2.0 * off_diagonal);
+                let scale = alpha.sqrt() * beta.sqrt();
+                if !scale.is_finite() {
+                    return Err(ObservabilityError::NumericalOverflow);
+                }
+                if gamma.abs() <= ORTHOGONALITY_TOLERANCE * scale {
+                    continue;
+                }
+
+                let tau = (beta - alpha) / (2.0 * gamma);
                 let tangent = if tau >= 0.0 {
                     1.0 / (tau + tau.hypot(1.0))
                 } else {
@@ -319,52 +328,90 @@ fn symmetric_jacobi_eigen(
                 let cosine = 1.0 / (1.0 + tangent * tangent).sqrt();
                 let sine = tangent * cosine;
 
-                for index in 0..dimension {
-                    if index == left || index == right {
-                        continue;
+                for row in &mut matrix {
+                    let left_value = row[left];
+                    let right_value = row[right];
+                    row[left] = cosine * left_value - sine * right_value;
+                    row[right] = sine * left_value + cosine * right_value;
+                    if !row[left].is_finite() || !row[right].is_finite() {
+                        return Err(ObservabilityError::NumericalOverflow);
                     }
-                    let left_value = matrix[index][left];
-                    let right_value = matrix[index][right];
-                    let new_left = cosine * left_value - sine * right_value;
-                    let new_right = sine * left_value + cosine * right_value;
-                    matrix[index][left] = new_left;
-                    matrix[left][index] = new_left;
-                    matrix[index][right] = new_right;
-                    matrix[right][index] = new_right;
                 }
 
-                matrix[left][left] = left_diagonal - tangent * off_diagonal;
-                matrix[right][right] = right_diagonal + tangent * off_diagonal;
-                matrix[left][right] = 0.0;
-                matrix[right][left] = 0.0;
-
-                for row in &mut eigenvectors {
+                for row in &mut right_vectors {
                     let left_value = row[left];
                     let right_value = row[right];
                     row[left] = cosine * left_value - sine * right_value;
                     row[right] = sine * left_value + cosine * right_value;
                 }
+
+                rotated_any_pair = true;
             }
         }
 
-        if largest_off_diagonal <= stopping_threshold {
+        if !rotated_any_pair {
             converged = true;
             break;
         }
     }
 
     if !converged {
-        let remaining = (0..dimension)
-            .flat_map(|left| ((left + 1)..dimension).map(move |right| (left, right)))
-            .map(|(left, right)| matrix[left][right].abs())
-            .fold(0.0_f64, f64::max);
-        if remaining > stopping_threshold {
+        // Check the final maximum normalized column correlation before
+        // reporting a solver failure; the last sweep can have made the matrix
+        // converged even if it performed a final round of tiny rotations.
+        let mut maximum_correlation = 0.0_f64;
+        for left in 0..column_count {
+            for right in (left + 1)..column_count {
+                let mut alpha = 0.0;
+                let mut beta = 0.0;
+                let mut gamma = 0.0;
+                for row in &matrix {
+                    alpha += row[left] * row[left];
+                    beta += row[right] * row[right];
+                    gamma += row[left] * row[right];
+                }
+                if !alpha.is_finite() || !beta.is_finite() || !gamma.is_finite() {
+                    return Err(ObservabilityError::NumericalOverflow);
+                }
+                let denominator = alpha.sqrt() * beta.sqrt();
+                if denominator > 0.0 {
+                    maximum_correlation =
+                        maximum_correlation.max(gamma.abs() / denominator);
+                }
+            }
+        }
+        if maximum_correlation > ORTHOGONALITY_TOLERANCE {
             return Err(ObservabilityError::EigenSolverDidNotConverge);
         }
     }
 
-    let eigenvalues = (0..dimension).map(|index| matrix[index][index]).collect();
-    Ok((eigenvalues, eigenvectors))
+    let mut indexed_singular_values = Vec::with_capacity(column_count);
+    for column in 0..column_count {
+        let norm = matrix.iter().fold(0.0_f64, |accumulator, row| {
+            accumulator.hypot(row[column])
+        });
+        if !norm.is_finite() {
+            return Err(ObservabilityError::NumericalOverflow);
+        }
+        indexed_singular_values.push((column, norm));
+    }
+    indexed_singular_values.sort_by(|left, right| right.1.total_cmp(&left.1));
+
+    let singular_values = indexed_singular_values
+        .iter()
+        .map(|(_, singular_value)| *singular_value)
+        .collect();
+    let sorted_right_vectors = (0..column_count)
+        .map(|row| {
+            indexed_singular_values
+                .iter()
+                .map(|(column, _)| right_vectors[row][*column])
+                .collect()
+        })
+        .collect();
+
+    let _ = row_count;
+    Ok((singular_values, sorted_right_vectors))
 }
 
 #[cfg(test)]
@@ -433,6 +480,23 @@ mod tests {
         assert_eq!(report.numerical_rank, 1);
         assert_eq!(report.nullity, 1);
         assert!(report.smallest_singular_value() < 1.0e-4);
+    }
+
+    #[test]
+    fn direct_svd_preserves_a_small_singular_value_lost_by_gram_squaring() {
+        // J has a real second singular value about 7.07e-9. Forming J^T J
+        // subtracts nearly equal O(1) terms and loses that direction in f64.
+        let report = analyze_jacobian(
+            &[vec![1.0, 1.0], vec![0.0, 1.0e-8]],
+            &[1.0, 1.0],
+            1.0e-10,
+        )
+        .unwrap();
+
+        assert_eq!(report.numerical_rank, 2);
+        assert!(report.singular_values[1] > 6.0e-9);
+        assert!(report.singular_values[1] < 8.0e-9);
+        assert!(report.condition_number.unwrap() > 1.0e8);
     }
 
     #[test]
