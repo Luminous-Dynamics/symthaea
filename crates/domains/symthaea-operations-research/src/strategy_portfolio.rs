@@ -283,7 +283,7 @@ pub fn encode_qbf_game_proof(
     for node in &proof.nodes {
         append_u64(&mut bytes, node.prefix_position, encoding_budget)?;
         append_byte(&mut bytes, u8::from(node.value), encoding_budget)?;
-        match node.kind {
+        match &node.kind {
             QbfProofNodeKind::MatrixLeaf => {
                 append_byte(&mut bytes, 0, encoding_budget)?;
             }
@@ -292,7 +292,7 @@ pub fn encode_qbf_game_proof(
             }
             QbfProofNodeKind::EarlyFalseClause { clause_index } => {
                 append_byte(&mut bytes, 2, encoding_budget)?;
-                append_u64(&mut bytes, clause_index, encoding_budget)?;
+                append_u64(&mut bytes, *clause_index, encoding_budget)?;
             }
             QbfProofNodeKind::ExistsDecision {
                 variable,
@@ -300,9 +300,9 @@ pub fn encode_qbf_game_proof(
                 high_child,
             } => {
                 append_byte(&mut bytes, 3, encoding_budget)?;
-                append_u64(&mut bytes, variable, encoding_budget)?;
-                append_u64(&mut bytes, low_child, encoding_budget)?;
-                append_u64(&mut bytes, high_child, encoding_budget)?;
+                append_u64(&mut bytes, *variable, encoding_budget)?;
+                append_u64(&mut bytes, *low_child, encoding_budget)?;
+                append_u64(&mut bytes, *high_child, encoding_budget)?;
             }
             QbfProofNodeKind::ForAllDecision {
                 variable,
@@ -486,6 +486,9 @@ mod tests {
     use super::super::decomposition::Literal;
     use super::super::quantified_scope::{Quantifier, QuantifierBlock, ValidatedQuantifierPrefix};
     use super::super::quantified_strategy::{StrategyOwner, evaluate_qbf_with_strategy};
+    use super::super::quantified_proof::{
+        QbfProofNodeKind, QuantifiedProofBudget, build_qbf_game_proof,
+    };
     use super::*;
 
     fn qbf_budget() -> QuantifiedEvaluationBudget {
@@ -712,6 +715,121 @@ mod tests {
             Err(StrategyPortfolioError::SourceOrBddCompilation(
                 VerifiedStrategyCompilationError::ResultOwnerMismatch { .. }
             ))
+        ));
+    }
+
+    #[test]
+    fn game_proof_and_strategy_are_bound_in_one_evidence_portfolio() {
+        let (problem, prefix) = equality_qbf();
+        let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
+        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
+            .unwrap();
+        let portfolio = verify_and_compile_qbf_evidence_portfolio(
+            &problem,
+            &prefix,
+            &proof,
+            &candidate,
+            qbf_budget(),
+            QuantifiedProofBudget::default(),
+            bdd_budget(),
+            aig_budget(),
+            encoding_budget(),
+        )
+        .unwrap();
+
+        assert!(portfolio.value);
+        assert!(portfolio.game_proof_verification.root_value);
+        assert_eq!(portfolio.game_proof_verification.proof_nodes_checked, proof.nodes.len());
+        assert!(portfolio.game_proof_bytes.starts_with(b"LD-QBFPROOF1"));
+        assert_eq!(portfolio.strategy_portfolio.value, portfolio.value);
+        assert_eq!(
+            portfolio.total_evidence_bytes,
+            portfolio.game_proof_bytes.len()
+                + portfolio.strategy_portfolio.total_bdd_bytes
+                + portfolio.strategy_portfolio.total_aig_bytes
+        );
+    }
+
+    #[test]
+    fn game_proof_mutation_is_rejected_before_strategy_compilation() {
+        let (problem, prefix) = equality_qbf();
+        let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
+        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
+            .unwrap();
+        let mut tampered = proof.clone();
+        tampered.nodes[tampered.root].value = false;
+        assert!(matches!(
+            verify_and_compile_qbf_evidence_portfolio(
+                &problem,
+                &prefix,
+                &tampered,
+                &candidate,
+                qbf_budget(),
+                QuantifiedProofBudget::default(),
+                bdd_budget(),
+                aig_budget(),
+                encoding_budget(),
+            ),
+            Err(StrategyPortfolioError::GameProof(
+                super::super::quantified_proof::QuantifiedProofError::IncorrectNodeValue { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn game_proof_and_candidate_truth_must_agree() {
+        let (problem, prefix) = equality_qbf();
+        let mut candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
+        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
+            .unwrap();
+        candidate.value = false;
+        assert_eq!(
+            verify_and_compile_qbf_evidence_portfolio(
+                &problem,
+                &prefix,
+                &proof,
+                &candidate,
+                qbf_budget(),
+                QuantifiedProofBudget::default(),
+                bdd_budget(),
+                aig_budget(),
+                encoding_budget(),
+            )
+            .unwrap_err(),
+            StrategyPortfolioError::GameProofResultMismatch {
+                proof_value: true,
+                candidate_value: false,
+            }
+        );
+    }
+
+    #[test]
+    fn proof_encoding_is_deterministic_and_single_representation_bounded() {
+        let (problem, prefix) = equality_qbf();
+        let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
+        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
+            .unwrap();
+        let first = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
+        let second = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
+        assert_eq!(first, second);
+
+        let too_small = StrategyPortfolioBudget {
+            max_single_representation_bytes: 8,
+            max_total_representation_bytes: 1 << 18,
+        };
+        assert!(matches!(
+            verify_and_compile_qbf_evidence_portfolio(
+                &problem,
+                &prefix,
+                &proof,
+                &candidate,
+                qbf_budget(),
+                QuantifiedProofBudget::default(),
+                bdd_budget(),
+                aig_budget(),
+                too_small,
+            ),
+            Err(StrategyPortfolioError::RepresentationTooLarge { .. })
         ));
     }
 
