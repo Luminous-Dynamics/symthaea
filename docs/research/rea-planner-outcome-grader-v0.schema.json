@@ -47,7 +47,9 @@
         "held_out_dgp_not_supplied_to_planner",
         "hidden_likelihoods",
         "realized_hypothesis_id",
-        "outcome_oracle_policy"
+        "outcome_oracle_policy",
+        "out_of_ensemble_testable",
+        "not_testable_reason"
       ],
       "properties": {
         "case_id": {
@@ -113,6 +115,15 @@
         "outcome_oracle_policy": {
           "type": "string",
           "minLength": 30
+        },
+        "out_of_ensemble_testable": {
+          "type": "boolean"
+        },
+        "not_testable_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }
