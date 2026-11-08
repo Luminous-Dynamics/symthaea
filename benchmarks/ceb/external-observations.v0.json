@@ -542,6 +542,17 @@
       "supports": [
         "CEB-CONTINUITY"
       ]
+    },
+    {
+      "source_id": "swe-ci-maintenance-paper-2026",
+      "source_url": "https://arxiv.org/abs/2603.03823",
+      "title": "SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-03-04",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
     }
   ],
   "comparators": [
@@ -1670,6 +1681,27 @@
         "The synthesis identifies actor-based model checking, TLA+ control-plane verification, static analysis, continuous certification and runtime/self-adaptive testing as complementary clusters.",
         "The authors report small academic case studies, few shared datasets and limited end-to-end CI/CD integration in the included literature.",
         "Use as a research-gap map for verification under evolution; do not equate study counts with technique effectiveness."
+      ]
+    },
+    {
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "SWE-CI",
+      "benchmark_version": "arXiv:2603.03823; March 4, 2026",
+      "split": "100 repository-maintenance tasks; average evolution history 233 days and 71 consecutive commits",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 100,
+        "unit": "repository_maintenance_tasks"
+      },
+      "source_id": "swe-ci-maintenance-paper-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Repository-maintenance benchmark built around repeated CI loops and long-term requirement/feature evolution, not code-review claim-support adjudication.",
+        "100 tasks; average history spans 233 days and 71 consecutive commits.",
+        "Long-horizon maintenance success is adjacent to CEB-CONTINUITY but is not evidence-disposition macro-F1, stale-evidence use or proof of selective claim retention.",
+        "Do not rank SWE-CI and CEB scores together without matched tasks, harness, budgets and outcome definitions."
       ]
     }
   ],
@@ -6927,6 +6959,108 @@
       },
       "notes": [
         "Review-method descriptor."
+      ]
+    },
+    {
+      "observation_id": "sweci-maintenance-task-count",
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "source_locator": "Chen et al., arXiv:2603.03823, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "sweci-paper-benchmark-population",
+        "model": "Benchmark population",
+        "harness": "Continuous Integration maintenance loop",
+        "configuration": "Repository-maintenance task set"
+      },
+      "metric": {
+        "metric_id": "repository_maintenance_task_count",
+        "label": "Repository-maintenance task count",
+        "definition": "Number of repository-maintenance tasks in the SWE-CI benchmark.",
+        "value": 100,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "100 tasks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported in abstract summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in abstract summary",
+          "applies_to_metric_id": "repository_maintenance_task_count",
+          "applies_to_task_count": 100
+        }
+      },
+      "notes": [
+        "Task population descriptor, not a model performance score."
+      ]
+    },
+    {
+      "observation_id": "sweci-average-history-days",
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "source_locator": "Chen et al., arXiv:2603.03823, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "sweci-paper-benchmark-history",
+        "model": "Benchmark population",
+        "harness": "Continuous Integration maintenance loop",
+        "configuration": "Mean repository history per task"
+      },
+      "metric": {
+        "metric_id": "average_history_duration",
+        "label": "Average history duration",
+        "definition": "Average evolution-history duration represented by each SWE-CI maintenance task.",
+        "value": 233,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "days",
+        "direction": "not_applicable",
+        "raw_display": "233 days",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported in abstract summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in abstract summary",
+          "applies_to_metric_id": "average_history_duration",
+          "applies_to_task_count": 100
+        }
+      },
+      "notes": [
+        "Average task history duration; not wall-clock agent runtime."
+      ]
+    },
+    {
+      "observation_id": "sweci-average-commit-count",
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "source_locator": "Chen et al., arXiv:2603.03823, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "sweci-paper-benchmark-history",
+        "model": "Benchmark population",
+        "harness": "Continuous Integration maintenance loop",
+        "configuration": "Mean consecutive commit history per task"
+      },
+      "metric": {
+        "metric_id": "average_consecutive_commit_count",
+        "label": "Average consecutive commits",
+        "definition": "Average number of consecutive repository commits represented in each SWE-CI task history.",
+        "value": 71,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "commits",
+        "direction": "not_applicable",
+        "raw_display": "71 consecutive commits",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported in abstract summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in abstract summary",
+          "applies_to_metric_id": "average_consecutive_commit_count",
+          "applies_to_task_count": 100
+        }
+      },
+      "notes": [
+        "History-length descriptor; not agent action or turn count."
       ]
     }
   ]
