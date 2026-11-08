@@ -1,0 +1,2087 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "LOS18_MASS_LOADCASE_SYNTH_V0_1",
+  "status": "synthetic_mass_state_fixture_not_real_vessel_data",
+  "explicit_warning": "All item masses, positions, fluids, tank geometries, densities and budgets are synthetic test fixture values, not LOS-18 sizing assumptions or measured vessel properties.",
+  "datum": {
+    "frame_id": "LOS18_SYNTH_DATUM_V0",
+    "origin_ref": "synthetic:design-datum-at-aft-perpendicular-centerline-baseline",
+    "x_axis": "longitudinal_positive_forward",
+    "y_axis": "transverse_positive_starboard",
+    "z_axis": "vertical_positive_up",
+    "units": "metres"
+  },
+  "vessel_binding": {
+    "design_revision": "LOS18-SYNTH-DESIGN-0",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "mission_binding": {
+      "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "operating_case_id": "LOS18-MASS-STUDY",
+      "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "mass_budget": {
+      "frozen_design_baseline_mass_kg": 16900,
+      "approved_hard_max_mass_kg": 18000,
+      "reserved_growth_allowance_kg": 1000,
+      "budget_authority_ref": "synthetic:approved-mass-budget"
+    }
+  },
+  "mass_items": [
+    {
+      "item_id": "hull_structure",
+      "item_type": "hull_structure",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 6600,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 0.9,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:hull_structure"
+    },
+    {
+      "item_id": "crossdeck_outfit",
+      "item_type": "crossdeck_outfit",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 1800,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 1.4,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:crossdeck_outfit"
+    },
+    {
+      "item_id": "propulsion_motors_drives",
+      "item_type": "propulsion",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 700,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 3,
+        "y_m": 0,
+        "z_m": 0.6,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:propulsion_motors_drives"
+    },
+    {
+      "item_id": "battery_bank",
+      "item_type": "battery",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 1900,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 0.55,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:battery_bank"
+    },
+    {
+      "item_id": "solar_array_mounts",
+      "item_type": "solar",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 500,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 2.4,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:solar_array_mounts"
+    },
+    {
+      "item_id": "range_extender_generator",
+      "item_type": "generator",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 900,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": -1,
+        "y_m": 0,
+        "z_m": 0.9,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:range_extender_generator"
+    },
+    {
+      "item_id": "watermaker_module",
+      "item_type": "watermaker",
+      "revision": "SYN-R0",
+      "parent_item_id": "machinery_package_aggregate",
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 220,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 1.5,
+        "y_m": 0,
+        "z_m": 0.8,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:watermaker_module"
+    },
+    {
+      "item_id": "hvac_pumps_and_auxiliaries",
+      "item_type": "auxiliary_machinery",
+      "revision": "SYN-R0",
+      "parent_item_id": "machinery_package_aggregate",
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 430,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": -0.5,
+        "y_m": 0,
+        "z_m": 0.8,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:hvac_pumps_and_auxiliaries"
+    },
+    {
+      "item_id": "interior_furniture_insulation",
+      "item_type": "interior",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 1000,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 1.5,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:interior_furniture_insulation"
+    },
+    {
+      "item_id": "fuel_tank_empty",
+      "item_type": "tank",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 120,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 2,
+        "y_m": 0,
+        "z_m": 0.7,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:fuel_tank_empty"
+    },
+    {
+      "item_id": "freshwater_tank_empty",
+      "item_type": "tank",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 100,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 2.4,
+        "y_m": 0,
+        "z_m": 0.65,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:freshwater_tank_empty"
+    },
+    {
+      "item_id": "waste_tank_empty",
+      "item_type": "tank",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 80,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": -1,
+        "y_m": 0,
+        "z_m": 0.55,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:waste_tank_empty"
+    },
+    {
+      "item_id": "navigation_comms",
+      "item_type": "electronics",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 180,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 2,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:navigation_comms"
+    },
+    {
+      "item_id": "crew_occupants",
+      "item_type": "occupants",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 320,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 1.65,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:crew_occupants"
+    },
+    {
+      "item_id": "stores_provisions",
+      "item_type": "stores",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 450,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": -1.5,
+        "y_m": 0,
+        "z_m": 1.1,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:stores_provisions"
+    },
+    {
+      "item_id": "spares_tools",
+      "item_type": "spares",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 250,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": -2,
+        "y_m": 0,
+        "z_m": 1,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:spares_tools"
+    },
+    {
+      "item_id": "tender_anchor_mooring",
+      "item_type": "payload",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 600,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": -3,
+        "y_m": 0,
+        "z_m": 0.8,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:tender_anchor_mooring"
+    },
+    {
+      "item_id": "machinery_package_aggregate",
+      "item_type": "machinery_aggregate",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 650,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 1,
+        "y_m": 0,
+        "z_m": 0.8,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "reference_only",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:machinery_package_aggregate"
+    },
+    {
+      "item_id": "late_outfit_growth",
+      "item_type": "late_outfit_growth",
+      "revision": "SYN-R1",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 650,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 2.2,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:late_outfit_growth"
+    },
+    {
+      "item_id": "antenna_mast_late_addition",
+      "item_type": "antenna_mast",
+      "revision": "SYN-R1",
+      "parent_item_id": null,
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 80,
+      "mass_uncertainty_kg": 5,
+      "cg_m": null,
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:antenna_mast_late_addition"
+    },
+    {
+      "item_id": "battery_bank_wrong_config",
+      "item_type": "battery",
+      "revision": "SYN-R0",
+      "parent_item_id": null,
+      "configuration_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "quantity_count": 1,
+      "aggregate_mass_kg": 1900,
+      "mass_uncertainty_kg": 5,
+      "cg_m": {
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 0.55,
+        "frame_id": "LOS18_SYNTH_DATUM_V0",
+        "expanded_uncertainty_m": 0.02
+      },
+      "counting_role": "counted_mass",
+      "evidence_class": "synthetic",
+      "source_ref": "synthetic:mass-item:battery_bank_wrong_config"
+    }
+  ],
+  "loading_conditions": [
+    {
+      "condition_id": "departure_full_tanks",
+      "condition_kind": "departure",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "departure_full_tanks",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.9,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 720,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.75,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "pending_qualified_analysis",
+      "expected": {
+        "mass_accounting_state": "closed",
+        "expected_total_mass_kg": 17470,
+        "expected_cg_m": {
+          "x_m": 0.09273039496279337,
+          "y_m": 0,
+          "z_m": 0.9840297653119634,
+          "frame_id": "LOS18_SYNTH_DATUM_V0",
+          "expanded_uncertainty_m": 0.08
+        },
+        "weight_growth_state": "within_reserve",
+        "expected_disposition": "arithmetic_closed_only"
+      }
+    },
+    {
+      "condition_id": "arrival_low_consumables",
+      "condition_kind": "arrival",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "arrival_low_consumables",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "onboard_stowed",
+          "mass_override_kg": 200,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 0.11111111111111112,
+          "liquid_volume_m3": 0.1,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 80,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.55,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "review_required_pending",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 0.25,
+          "liquid_volume_m3": 0.15,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 150,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.52,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "review_required_pending",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0.5333333333333333,
+          "liquid_volume_m3": 0.08,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 80,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": -1,
+            "y_m": 0,
+            "z_m": 0.47,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "review_required_pending",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "blocked_free_surface_review",
+      "expected": {
+        "mass_accounting_state": "closed",
+        "expected_total_mass_kg": 16210,
+        "expected_cg_m": {
+          "x_m": -0.027452190006169032,
+          "y_m": 0,
+          "z_m": 0.996027143738433,
+          "frame_id": "LOS18_SYNTH_DATUM_V0",
+          "expanded_uncertainty_m": 0.08
+        },
+        "weight_growth_state": "within_reserve",
+        "expected_disposition": "arithmetic_closed_only"
+      }
+    },
+    {
+      "condition_id": "watermaker_removed_and_stowed",
+      "condition_kind": "service_module_removed",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "watermaker_removed_and_stowed",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "onboard_stowed",
+          "mass_override_kg": null,
+          "cg_override_m": {
+            "x_m": -2.5,
+            "y_m": 0,
+            "z_m": 1.2,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.9,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 720,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.75,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "pending_qualified_analysis",
+      "expected": {
+        "mass_accounting_state": "closed",
+        "expected_total_mass_kg": 17470,
+        "expected_cg_m": {
+          "x_m": 0.04235832856325129,
+          "y_m": 0,
+          "z_m": 0.9890669719519176,
+          "frame_id": "LOS18_SYNTH_DATUM_V0",
+          "expanded_uncertainty_m": 0.08
+        },
+        "weight_growth_state": "within_reserve",
+        "expected_disposition": "arithmetic_closed_only"
+      }
+    },
+    {
+      "condition_id": "asbuilt_weight_growth_over_budget",
+      "condition_kind": "weight_growth",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "asbuilt_weight_growth_over_budget",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "late_outfit_growth",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.9,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 720,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.75,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "blocked_growth_limit",
+      "expected": {
+        "mass_accounting_state": "closed",
+        "expected_total_mass_kg": 18120,
+        "expected_cg_m": {
+          "x_m": 0.08940397350993377,
+          "y_m": 0,
+          "z_m": 1.0276490066225166,
+          "frame_id": "LOS18_SYNTH_DATUM_V0",
+          "expanded_uncertainty_m": 0.08
+        },
+        "weight_growth_state": "over_hard_max",
+        "expected_disposition": "arithmetic_closed_only"
+      }
+    },
+    {
+      "condition_id": "unknown_high_mast_cg",
+      "condition_kind": "unknown_mass_or_cg",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "unknown_high_mast_cg",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "antenna_mast_late_addition",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.9,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 720,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.75,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "blocked_missing_mass_or_cg",
+      "expected": {
+        "mass_accounting_state": "indeterminate",
+        "expected_total_mass_kg": 17550,
+        "expected_cg_m": null,
+        "weight_growth_state": "within_reserve",
+        "expected_disposition": "indeterminate"
+      }
+    },
+    {
+      "condition_id": "parent_child_duplicate_count",
+      "condition_kind": "duplicate_count_negative",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "parent_child_duplicate_count",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "machinery_package_aggregate",
+          "presence": "installed",
+          "mass_override_kg": 650,
+          "cg_override_m": null,
+          "counting_role_override": "counted_mass"
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.9,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 720,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.75,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "blocked_missing_mass_or_cg",
+      "expected": {
+        "mass_accounting_state": "invalid",
+        "expected_total_mass_kg": null,
+        "expected_cg_m": null,
+        "weight_growth_state": "unknown",
+        "expected_disposition": "invalid_double_count"
+      }
+    },
+    {
+      "condition_id": "mixed_item_configuration_digest",
+      "condition_kind": "mixed_config_negative",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "mixed_item_configuration_digest",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank_wrong_config",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.9,
+          "density_kg_m3": 800,
+          "fluid_mass_kg": 720,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.75,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "blocked_missing_mass_or_cg",
+      "expected": {
+        "mass_accounting_state": "invalid",
+        "expected_total_mass_kg": null,
+        "expected_cg_m": null,
+        "weight_growth_state": "unknown",
+        "expected_disposition": "invalid_configuration"
+      }
+    },
+    {
+      "condition_id": "unknown_fuel_density",
+      "condition_kind": "tank_density_unknown",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "unknown_fuel_density",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "items": [
+        {
+          "item_id": "hull_structure",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crossdeck_outfit",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "propulsion_motors_drives",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "battery_bank",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "solar_array_mounts",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "range_extender_generator",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "watermaker_module",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "hvac_pumps_and_auxiliaries",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "interior_furniture_insulation",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "fuel_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "freshwater_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "waste_tank_empty",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "navigation_comms",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "crew_occupants",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "stores_provisions",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "spares_tools",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        },
+        {
+          "item_id": "tender_anchor_mooring",
+          "presence": "installed",
+          "mass_override_kg": null,
+          "cg_override_m": null,
+          "counting_role_override": null
+        }
+      ],
+      "tank_states": [
+        {
+          "tank_item_id": "fuel_tank_empty",
+          "fluid_type": "diesel_range_extender_fuel",
+          "tank_geometry_ref": "synthetic:tank-geometry:fuel_tank_empty",
+          "capacity_m3": 0.9,
+          "fill_fraction": 0.11111111111111112,
+          "liquid_volume_m3": 0.1,
+          "density_kg_m3": null,
+          "fluid_mass_kg": null,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2,
+            "y_m": 0,
+            "z_m": 0.55,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "unknown",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "freshwater_tank_empty",
+          "fluid_type": "potable_freshwater",
+          "tank_geometry_ref": "synthetic:tank-geometry:freshwater_tank_empty",
+          "capacity_m3": 0.6,
+          "fill_fraction": 1,
+          "liquid_volume_m3": 0.6,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 600,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": {
+            "x_m": 2.4,
+            "y_m": 0,
+            "z_m": 0.65,
+            "frame_id": "LOS18_SYNTH_DATUM_V0",
+            "expanded_uncertainty_m": 0.02
+          },
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        },
+        {
+          "tank_item_id": "waste_tank_empty",
+          "fluid_type": "grey_black_water",
+          "tank_geometry_ref": "synthetic:tank-geometry:waste_tank_empty",
+          "capacity_m3": 0.15,
+          "fill_fraction": 0,
+          "liquid_volume_m3": 0,
+          "density_kg_m3": 1000,
+          "fluid_mass_kg": 0,
+          "mass_uncertainty_kg": 5,
+          "fluid_cg_m": null,
+          "free_surface_status": "not_applicable_full_or_empty",
+          "free_surface_review_ref": null
+        }
+      ],
+      "stability_handoff": "blocked_free_surface_review",
+      "expected": {
+        "mass_accounting_state": "indeterminate",
+        "expected_total_mass_kg": null,
+        "expected_cg_m": null,
+        "weight_growth_state": "unknown",
+        "expected_disposition": "indeterminate"
+      }
+    }
+  ],
+  "claim_limitations": [
+    "Synthetic mass items, coordinates, fluid densities, fill levels, tank geometry references and budgets are not actual LOS-18 design or measured values.",
+    "No hydrostatics, intact/damage stability, free-surface correction, seakeeping, structural or seaworthiness result is produced.",
+    "No real vessel loading or maintenance operation is authorized."
+  ]
+}

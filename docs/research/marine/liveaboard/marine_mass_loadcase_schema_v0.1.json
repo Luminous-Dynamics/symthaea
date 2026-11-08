@@ -1,0 +1,549 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-mass-loadcase:v0.1",
+  "title": "Marine mass item and loading condition v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "status",
+    "datum",
+    "vessel_binding",
+    "mass_items",
+    "loading_conditions",
+    "claim_limitations",
+    "explicit_warning"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_mass_state_fixture_not_real_vessel_data"
+    },
+    "datum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_id",
+        "origin_ref",
+        "x_axis",
+        "y_axis",
+        "z_axis",
+        "units"
+      ],
+      "properties": {
+        "frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x_axis": {
+          "const": "longitudinal_positive_forward"
+        },
+        "y_axis": {
+          "const": "transverse_positive_starboard"
+        },
+        "z_axis": {
+          "const": "vertical_positive_up"
+        },
+        "units": {
+          "const": "metres"
+        }
+      }
+    },
+    "vessel_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_revision",
+        "configuration_digest",
+        "mission_binding",
+        "mass_budget"
+      ],
+      "properties": {
+        "design_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_binding": {
+          "$ref": "#/$defs/mission"
+        },
+        "mass_budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "frozen_design_baseline_mass_kg",
+            "approved_hard_max_mass_kg",
+            "reserved_growth_allowance_kg",
+            "budget_authority_ref"
+          ],
+          "properties": {
+            "frozen_design_baseline_mass_kg": {
+              "type": "number",
+              "minimum": 0
+            },
+            "approved_hard_max_mass_kg": {
+              "type": "number",
+              "minimum": 0
+            },
+            "reserved_growth_allowance_kg": {
+              "type": "number",
+              "minimum": 0
+            },
+            "budget_authority_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "mass_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "loading_conditions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/condition"
+      }
+    },
+    "claim_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "explicit_warning": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "cg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_m",
+        "y_m",
+        "z_m",
+        "frame_id",
+        "expanded_uncertainty_m"
+      ],
+      "properties": {
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "z_m": {
+          "type": "number"
+        },
+        "frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expanded_uncertainty_m": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "item_type",
+        "revision",
+        "parent_item_id",
+        "configuration_digest",
+        "quantity_count",
+        "aggregate_mass_kg",
+        "mass_uncertainty_kg",
+        "cg_m",
+        "counting_role",
+        "evidence_class",
+        "source_ref"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "item_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_item_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "quantity_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "aggregate_mass_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mass_uncertainty_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cg_m": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/cg"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counting_role": {
+          "enum": [
+            "counted_mass",
+            "reference_only"
+          ]
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "supplier_declared",
+            "engineering_estimate",
+            "measured"
+          ]
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "caseItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "presence",
+        "mass_override_kg",
+        "cg_override_m",
+        "counting_role_override"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presence": {
+          "enum": [
+            "installed",
+            "onboard_stowed",
+            "in_tank_or_container",
+            "removed_ashore",
+            "consumed"
+          ]
+        },
+        "mass_override_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cg_override_m": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/cg"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counting_role_override": {
+          "enum": [
+            "counted_mass",
+            "reference_only",
+            null
+          ]
+        }
+      }
+    },
+    "tank": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tank_item_id",
+        "fluid_type",
+        "tank_geometry_ref",
+        "capacity_m3",
+        "fill_fraction",
+        "liquid_volume_m3",
+        "density_kg_m3",
+        "fluid_mass_kg",
+        "mass_uncertainty_kg",
+        "fluid_cg_m",
+        "free_surface_status",
+        "free_surface_review_ref"
+      ],
+      "properties": {
+        "tank_item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fluid_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tank_geometry_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capacity_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fill_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "liquid_volume_m3": {
+          "type": "number",
+          "minimum": 0
+        },
+        "density_kg_m3": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fluid_mass_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mass_uncertainty_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fluid_cg_m": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/cg"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "free_surface_status": {
+          "enum": [
+            "not_applicable_full_or_empty",
+            "reviewed_external_ref",
+            "review_required_pending",
+            "unknown"
+          ]
+        },
+        "free_surface_review_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_id",
+        "condition_kind",
+        "mission_binding",
+        "configuration_digest",
+        "items",
+        "tank_states",
+        "stability_handoff",
+        "expected"
+      ],
+      "properties": {
+        "condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_kind": {
+          "enum": [
+            "lightship_as_built",
+            "departure",
+            "arrival",
+            "anchorage_living",
+            "full_tanks",
+            "slack_tanks",
+            "service_module_removed",
+            "weight_growth",
+            "unknown_mass_or_cg",
+            "duplicate_count_negative",
+            "mixed_config_negative",
+            "tank_density_unknown"
+          ]
+        },
+        "mission_binding": {
+          "$ref": "#/$defs/mission"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/caseItem"
+          }
+        },
+        "tank_states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tank"
+          }
+        },
+        "stability_handoff": {
+          "enum": [
+            "not_requested",
+            "blocked_missing_mass_or_cg",
+            "blocked_free_surface_review",
+            "blocked_growth_limit",
+            "pending_qualified_analysis"
+          ]
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mass_accounting_state",
+            "expected_total_mass_kg",
+            "expected_cg_m",
+            "weight_growth_state",
+            "expected_disposition"
+          ],
+          "properties": {
+            "mass_accounting_state": {
+              "enum": [
+                "closed",
+                "indeterminate",
+                "invalid"
+              ]
+            },
+            "expected_total_mass_kg": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "expected_cg_m": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/cg"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "weight_growth_state": {
+              "enum": [
+                "within_reserve",
+                "over_hard_max",
+                "unknown"
+              ]
+            },
+            "expected_disposition": {
+              "enum": [
+                "arithmetic_closed_only",
+                "indeterminate",
+                "invalid_double_count",
+                "invalid_configuration",
+                "invalid_tank_balance"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
