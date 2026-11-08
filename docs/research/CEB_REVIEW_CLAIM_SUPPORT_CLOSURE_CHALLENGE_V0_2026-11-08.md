@@ -118,6 +118,43 @@ Do not infer semantic independence merely from different files. Do not turn miss
 
 **Reviewer question:** Can C1 be retained by exact input/receipt identity? Can C2 also be retained because the edit is metadata-only, or must it remain unresolved because its support closure was already incomplete? Do not allow a benign event to cure a pre-existing completeness gap.
 
+
+## CCL-S07 — circular authorization support with no independent root
+
+**Initial claims:**
+
+- C1: “Deployment D is currently authorized under policy P.”
+- C2: “Policy P is the current approved policy for deployment D.”
+
+**Support closure as submitted:**
+
+- C1 cites C2 as its only authority for policy currency.
+- C2 cites C1 as its only authority that policy P is approved for deployment D.
+- Neither claim has an independent signed policy revision, trust-root verification, approved policy registry entry or human authorization record.
+
+**Change event E7:** a metadata-only correction changes the display label for deployment D. No independent policy or authorization evidence is introduced.
+
+**Reviewer question:** Can C1 and C2 jointly justify one another? What happens to both claims after E7? What independent evidence root would break the cycle? A graph may contain contradiction/rebuttal cycles, but a circular positive-support chain is not evidence.
+
+## CCL-S08 — omitted contradictory trace
+
+**Initial claim C1:** “The repaired transfer worker applies each logical operation at most once for all valid delivery attempts within the declared redelivery horizon.”
+
+**Supporting evidence packet:**
+- source anchor: the deduplication key uses logical_operation_id;
+- unit test: two attempts with different attempt IDs but the same logical operation ID produce one application;
+- successful smoke-test receipt: ordinary retry path passed.
+
+**Known counter-evidence:**
+- a separately captured integration trace from the same release and declared workload records a duplicate application after a retry crosses the retention boundary;
+- the workload is within the stated supported redelivery horizon;
+- the trace has independent run identity and is not copied from the unit-test fixture.
+
+**Change event E8:** the integration trace is added to the evidence packet after C1 was approved. No source or build change occurs.
+
+**Reviewer question:** Can the broad “all valid attempts” claim be retained because its source anchor and unit test remain unchanged? Must the trace be in the closure? What narrower claim, if any, could remain supportable after the counterexample is investigated?
+
+
 ## Submission worksheet
 
 | Field | Reviewer response |
@@ -138,4 +175,4 @@ Do not infer semantic independence merely from different files. Do not turn miss
 
 ## Development boundary
 
-Six cases are six development anchors, not independent statistical samples. The answer key is public; this challenge is not a sealed holdout. No candidate code, builds, tests, PoCs, hidden labels, grader, receipt or production event is executed.
+Eight cases are eight development anchors, not independent statistical samples. The answer key is public; this challenge is not a sealed holdout. No candidate code, builds, tests, PoCs, hidden labels, grader, receipt or production event is executed.
