@@ -158,6 +158,54 @@
             "sample_count": { "type": "integer", "minimum": 1 },
             "sampling_semantics": { "type": "string", "enum": ["continuous_observation", "fixed_grid", "event_driven", "not_applicable"] }
           }
+        },
+        "stochastic_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["calculus_interpretation", "target_noise_process", "stationarity", "evidence_status"],
+          "properties": {
+            "calculus_interpretation": { "enum": ["ito", "stratonovich", "not_applicable", "unknown"] },
+            "target_noise_process": { "enum": ["none", "white_gaussian", "colored_gaussian", "empirical", "physical_noise_target", "unknown"] },
+            "noise_channel_count": { "type": ["integer", "null"], "minimum": 1 },
+            "drift_field_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "diffusion_field_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "target_covariance_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "target_power_spectral_density_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "target_autocorrelation_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "target_cross_channel_covariance_ref": { "type": ["string", "null"], "maxLength": 200 },
+            "target_correlation_time_s": { "type": ["number", "null"], "minimum": 0 },
+            "stationarity": { "enum": ["stationary", "nonstationary", "conditionally_stationary", "unknown"] },
+            "evidence_status": { "$ref": "#/$defs/evidence_status" },
+            "notes": { "type": "string", "maxLength": 1000 }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "target_noise_process": { "const": "colored_gaussian" } },
+                "required": ["target_noise_process"]
+              },
+              "then": {
+                "required": ["target_power_spectral_density_ref", "target_autocorrelation_ref"],
+                "properties": {
+                  "target_power_spectral_density_ref": { "type": "string", "minLength": 1 },
+                  "target_autocorrelation_ref": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": { "target_noise_process": { "enum": ["empirical", "physical_noise_target"] } },
+                "required": ["target_noise_process"]
+              },
+              "then": {
+                "anyOf": [
+                  { "required": ["target_power_spectral_density_ref"] },
+                  { "required": ["target_autocorrelation_ref"] },
+                  { "required": ["target_covariance_ref"] }
+                ]
+              }
+            }
+          ]
         }
       }
     },
@@ -168,7 +216,7 @@
       "properties": {
         "metric": {
           "type": "string",
-          "enum": ["relative_true_residual", "absolute_true_residual", "relative_backward_error", "relative_forward_error", "trajectory_rms_error", "trajectory_max_error", "phase_error", "distribution_kl", "distribution_wasserstein", "distribution_mmd", "fid", "kid", "conditional_accuracy", "constraint_violation_rate", "other"]
+          "enum": ["relative_true_residual", "absolute_true_residual", "relative_backward_error", "relative_forward_error", "trajectory_rms_error", "trajectory_max_error", "phase_error", "distribution_kl", "distribution_wasserstein", "distribution_mmd", "fid", "kid", "conditional_accuracy", "stationary_mean_absolute_error", "stationary_variance_relative_error", "autocorrelation_relative_error", "psd_weighted_relative_error", "path_distribution_wasserstein", "path_distribution_mmd", "constraint_violation_rate", "other"]
         },
         "comparator": { "type": "string", "enum": ["<=", "<", ">=", ">", "within"] },
         "threshold": { "type": "number" },
@@ -203,7 +251,21 @@
           }
         },
         "deadline_ms": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-        "minimum_success_probability": { "type": "number", "minimum": 0, "maximum": 1 }
+        "minimum_success_probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "statistical_protocol": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sample_count", "independent_replicates", "confidence_level", "preregistered"],
+          "properties": {
+            "sample_count": { "type": "integer", "minimum": 2 },
+            "independent_replicates": { "type": "integer", "minimum": 2 },
+            "confidence_level": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+            "bootstrap_replicates": { "type": "integer", "minimum": 100 },
+            "preregistered": { "const": true },
+            "held_out_noise_calibration": { "const": true },
+            "notes": { "type": "string", "maxLength": 1000 }
+          }
+        }
       }
     },
     "resource_constraints": {
