@@ -236,3 +236,37 @@ The denominator factor additionally includes one f32 rounding for the norm-produ
 The canonical near-zero branch is treated separately. If the entire possible denominator is strictly below 1e-10f32, every candidate score is exactly zero. If the denominator interval crosses that threshold, the candidate interval is [-1,1]. Only a strictly positive lower denominator separated from the threshold may proceed to quotient propagation.
 
 This derivation is still a research proof obligation, not a completed formal verification. It depends on the operation-count model enclosing the compiled canonical scorer, normal-range assumptions for denominator operations when the lower denominator exceeds the threshold, binary32 round-to-nearest, gradual underflow, and the absence of fast-math/FTZ transformations. Before selector integration, a reviewer must check the inequalities independently and inspect generated code for each supported compiler/target profile.
+
+
+## 12. Canonical scorer compiler-contract regression (2026-11-08)
+
+A cancellation-sensitive regression test was added directly beside ContinuousHV::similarity_full_resolution in unified_hv.rs:
+
+- a0 = 1 - f32::EPSILON / 2
+- b1 = 1 - f32::EPSILON
+- ordinary rounded multiplication gives a0 * a0 == b1
+- the next group term is -b1, so separately rounded product-plus-add cancels exactly to zero
+- a fused multiply-add would preserve a nonzero remainder.
+
+The expected canonical score is exactly zero for this admitted finite, in-range 8D pair. This test is intended to catch a compiler/target configuration that contracts the canonical multiply/add chain. A corresponding HME interval test checks that the spherical-cap candidate still contains this cancellation-sensitive canonical score.
+
+The tests are authored but not run. They must be exercised in both the normal test profile and an optimized/LTO profile on each promoted target.
+
+### Repository build configuration inspected
+
+- rust-toolchain.toml pins Rust 1.96.0.
+- Cargo.toml has a test profile inheriting dev with opt-level 1 and 16 codegen units.
+- The release profile uses opt-level 3, thin LTO and one codegen unit.
+- flake.nix contains native-shell exports of RUSTFLAGS="-C target-cpu=native". This alone does not enable fast math or prove a particular FP instruction sequence.
+- The flake comments refer to a .cargo/config.toml, but that file is not present in the checked-out branch contents. Do not infer effective flags from comments; the qualification runner must capture the actual rustc command line.
+
+### Current language-level precision contract
+
+The Rust primitive documentation specifies roundTiesToEven for primitive f32 addition, subtraction, multiplication and division; f32::sqrt is specified as correctly rounded. The same correctly-rounded square-root guarantee is documented for f64. Rust documents algebraic_* operations separately as permitting reassociation and other algebraic transformations. The canonical scorer currently uses ordinary arithmetic operators, not those relaxed APIs.
+
+Sources:
+- Rust f32 primitive arithmetic: https://doc.rust-lang.org/core/primitive.f32.html
+- Rust f32 square root: https://doc.rust-lang.org/std/primitive.f32.html
+- Rust f64 square root: https://doc.rust-lang.org/std/primitive.f64.html
+
+This establishes the language-level primitive contract; it does not replace optimized IR/assembly inspection or runtime FTZ/DAZ/subnormal qualification. A dedicated issue, #11176, owns these compiler/target gates.
