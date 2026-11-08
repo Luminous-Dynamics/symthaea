@@ -37,6 +37,20 @@ This is a nested Cargo workspace and is intentionally not part of the root works
    - the scene snapshot's `traffic_convention_profile_id` must resolve in the same validated traffic profile registry;
    - the profile's `travel_frame_id` must resolve to a `local_road` frame in the scene registry and match both the ego-state and road-geometry frame IDs.
 
+## Follow-target evidence admission
+
+The scene fixture now carries a typed `follow_target_context` that records the consumer profile, disposition, evidence-source reference, scenario/actor identity, coordinate frame, observation time, maximum age, gap, relative speed and distance uncertainty.
+
+The checker enforces:
+- `simulation_benchmark` may use only a current, scenario-matched `simulator_oracle` source.
+- `local_perception` and `deployment` require a current `local_sensor_observation` measurement; simulator oracle data cannot satisfy this profile.
+- `remote_cooperative_claim` is never a Follow-target source. A signature or V2X claim does not become a local lead track.
+- The source frame must resolve and match the Follow context frame.
+- The observation tick must match the admitted source acquisition tick under the exact scene clock and clock-transform identity; age is bounded by the declared maximum.
+- `unknown` / `rejected` status must carry no source reference or numeric fallback. Missing local tracks do not silently fall back to oracle or remote peer distance.
+
+This is a contract checker, not an implementation of a local object tracker or production vehicle controller. The synthetic local-lidar source is a conformance vector, not physical sensor qualification.
+
 ## Traffic convention / mirror benchmark
 
 The same checker validates `SAM_TRAFFIC_CONVENTION_PROFILE_SCHEMA_V0_1.json` and the paired LHT/RHT fixture. It enforces explicit, versioned traffic-side and passing-rule profiles, verifies that the scene snapshot's `traffic_convention_profile_id` resolves in that exact profile registry, verifies the profile's travel frame exists as a `local_road` frame and matches ego/road frame identities, checks that map and scene profile IDs agree, and checks the mirror transform for lateral position/velocity, yaw, curvature, steering, lane sides, passing side, and invariant longitudinal / throttle / brake quantities. Steering-wheel position is intentionally independent of traffic side.
