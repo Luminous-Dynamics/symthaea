@@ -498,6 +498,50 @@
       "supports": [
         "CEB-CONTINUITY"
       ]
+    },
+    {
+      "source_id": "agent-evidence-tracing-survey-2026",
+      "source_url": "https://arxiv.org/abs/2606.04990",
+      "title": "From Agent Traces to Trust: Evidence Tracing and Execution Provenance in LLM Agents",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-06-03",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "llm-se-empirical-guidelines-2026",
+      "source_url": "https://link.springer.com/article/10.1007/s10664-026-10922-3",
+      "title": "Guidelines for empirical studies in software engineering involving large language models",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-11-03",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "pr-change-impact-analysis-2025",
+      "source_url": "https://doi.org/10.1007/s10664-024-10600-2",
+      "title": "Enhanced code reviews using pull request based change impact analysis",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2025-02-12",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "microservice-evolution-verification-slr-2026",
+      "source_url": "https://www.mdpi.com/2674-113x/5/3/32",
+      "title": "Formal Verification Under Evolution in Microservice-Based Systems: A Systematic Literature Review",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-07-15",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
     }
   ],
   "comparators": [
@@ -1542,6 +1586,90 @@
         "The 95% repository-clustered interval for the aggregate reduction crosses zero (-4.8% to +47.9%); the study says the sample cannot rule out a null population effect.",
         "The 32/32 measurable mutation detections are explicitly not a reliability estimate; the report states no production CI runs were skipped, cancelled or blocked.",
         "Only 3 of 7 attempted repositories passed its canonical suite-green qualification, and its own research page discloses limited repository reach."
+      ]
+    },
+    {
+      "comparator_id": "agent-evidence-tracing-provenance-survey",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Evidence tracing and execution provenance in LLM agents",
+      "benchmark_version": "arXiv:2606.04990; survey published 2026-06-03",
+      "split": "Conceptual survey of agent provenance: six taxonomy dimensions and six open challenge categories",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "surveyed studies/tasks denominator not represented in abstract summary"
+      },
+      "source_id": "agent-evidence-tracing-survey-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Survey/taxonomy, not a software code-review benchmark or empirical CEB performance result.",
+        "Connects retrieval, tool outputs, memory, environment observations, intermediate claims, actions and final answers through provenance relations.",
+        "Six open challenges are conceptual categories, not measured failure rates or performance values.",
+        "Use it as a design reference for traceable evidence/action/claim relationships; do not expose or score private chain-of-thought."
+      ]
+    },
+    {
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Guidelines for empirical LLM studies in software engineering",
+      "benchmark_version": "Empirical Software Engineering; published 2026-11-03",
+      "split": "Seven study types and eight reporting guidelines co-developed by 22 researchers",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "guideline study; not a benchmark task population"
+      },
+      "source_id": "llm-se-empirical-guidelines-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Empirical-method guidance, not a code-review system or benchmark score.",
+        "Twenty-two contributing researchers, seven study types and eight reporting guidelines are source descriptors.",
+        "The guidelines call for model/tool versions and configurations, system/prompt/harness description, interaction/runtime traces, suitable baselines/metrics, open-model baseline, human validation and limitations.",
+        "Use as a reporting checklist; do not interpret the counts as performance metrics."
+      ]
+    },
+    {
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "PR-based change impact analysis using call graphs and repository history",
+      "benchmark_version": "Empirical Software Engineering; published 2025-02-12",
+      "split": "Call-graph and history-mining impact detector; feasibility on three open-source projects plus two focus groups",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "three OSS feasibility projects; focus-group participant denominator not stated in abstract summary"
+      },
+      "source_id": "pr-change-impact-analysis-2025",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Change-impact analysis context, not a large-scale code-review accuracy benchmark.",
+        "Combines call graph dependencies and software history; file metrics and a PR-level risk score highlight possibly affected code.",
+        "Three-project feasibility study reports 7.4–22.43 seconds analysis time; focus-group scores are perception/construct ratings, not defect detection accuracy.",
+        "Call-graph reachability is not proof of semantic claim-support completeness; the method does not by itself cover policy, trust-root, evaluator and authority dependencies."
+      ]
+    },
+    {
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "Formal verification under microservice evolution — systematic literature review",
+      "benchmark_version": "Software 5(3), article 32; published 2026-07-15",
+      "split": "1,187 records screened; 18 included studies (13 primary, 5 background)",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 18,
+        "unit": "included studies"
+      },
+      "source_id": "microservice-evolution-verification-slr-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Systematic literature review, not a software-agent benchmark or CEB metric result.",
+        "The synthesis identifies actor-based model checking, TLA+ control-plane verification, static analysis, continuous certification and runtime/self-adaptive testing as complementary clusters.",
+        "The authors report small academic case studies, few shared datasets and limited end-to-end CI/CD integration in the included literature.",
+        "Use as a research-gap map for verification under evolution; do not equate study counts with technique effectiveness."
       ]
     }
   ],
@@ -6357,6 +6485,448 @@
       },
       "notes": [
         "The report says 32/32 were detected but explicitly warns this is not a reliability estimate; preserve that caveat."
+      ]
+    },
+    {
+      "observation_id": "agent-trace-provenance-taxonomy-dimensions",
+      "comparator_id": "agent-evidence-tracing-provenance-survey",
+      "source_locator": "Wang et al., arXiv:2606.04990, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "agent-trace-provenance-survey-2026",
+        "model": "Survey synthesis",
+        "harness": "Evidence-tracing survey",
+        "configuration": "Trace sources, evidence/execution units, provenance relations, granularity/timing, representations, trust functions"
+      },
+      "metric": {
+        "metric_id": "provenance_taxonomy_dimension_count",
+        "label": "Provenance taxonomy dimension count",
+        "definition": "Number of dimensions explicitly named in the survey's provenance taxonomy.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "dimensions",
+        "direction": "not_applicable",
+        "raw_display": "six dimensions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "provenance_taxonomy_dimension_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Conceptual taxonomy descriptor; not accuracy or reliability."
+      ]
+    },
+    {
+      "observation_id": "agent-trace-open-challenge-categories",
+      "comparator_id": "agent-evidence-tracing-provenance-survey",
+      "source_locator": "Wang et al., arXiv:2606.04990, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "agent-trace-open-challenges-2026",
+        "model": "Survey synthesis",
+        "harness": "Evidence-tracing survey",
+        "configuration": "Unified schema, semantic provenance, safety, trace benchmark, recovery, privacy"
+      },
+      "metric": {
+        "metric_id": "open_challenge_category_count",
+        "label": "Open challenge category count",
+        "definition": "Number of open challenge categories listed in the survey abstract.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "categories",
+        "direction": "not_applicable",
+        "raw_display": "six challenge categories",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "open_challenge_category_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Research-gap descriptor; not a performance measure."
+      ]
+    },
+    {
+      "observation_id": "llm-se-guidelines-contributor-count",
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "source_locator": "",
+      "system": {
+        "system_id": "llm-se-guidelines-22-authors",
+        "model": "22 researchers",
+        "harness": "Empirical study guideline collaboration",
+        "configuration": "Community-developed authorship"
+      },
+      "metric": {
+        "metric_id": "contributor_count",
+        "label": "Contributing researcher count",
+        "definition": "Number of researchers contributing to the LLM software-engineering empirical-study guidelines.",
+        "value": 22,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "researchers",
+        "direction": "not_applicable",
+        "raw_display": "22 researchers",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "contributor_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Source descriptor, not study sample size or performance."
+      ]
+    },
+    {
+      "observation_id": "llm-se-guidelines-study-type-count",
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "source_locator": "Baltes et al., Empirical Software Engineering, DOI 10.1007/s10664-026-10922-3, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "llm-se-guidelines-seven-types",
+        "model": "22-researcher collaboration",
+        "harness": "Empirical study guideline paper",
+        "configuration": "Seven study types"
+      },
+      "metric": {
+        "metric_id": "study_type_taxonomy_count",
+        "label": "Study-type taxonomy count",
+        "definition": "Number of LLM-in-SE empirical study types organized by the guideline paper.",
+        "value": 7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "study_types",
+        "direction": "not_applicable",
+        "raw_display": "seven study types",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "study_type_taxonomy_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Taxonomy descriptor."
+      ]
+    },
+    {
+      "observation_id": "llm-se-guidelines-recommendation-count",
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "source_locator": "Baltes et al., Empirical Software Engineering, DOI 10.1007/s10664-026-10922-3, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "llm-se-guidelines-eight-guidelines",
+        "model": "22-researcher collaboration",
+        "harness": "Empirical study guideline paper",
+        "configuration": "Eight reporting guidelines"
+      },
+      "metric": {
+        "metric_id": "reporting_guideline_count",
+        "label": "Reporting guideline count",
+        "definition": "Number of empirical study reporting guidelines proposed by the paper.",
+        "value": 8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "guidelines",
+        "direction": "not_applicable",
+        "raw_display": "eight guidelines",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "reporting_guideline_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Guideline count, not benchmark result."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-analysis-time-min",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-analysis-time-range",
+        "model": "Change Impact Detector",
+        "harness": "Call-graph + history analysis",
+        "configuration": "Three open-source project feasibility experiments; lower reported runtime bound"
+      },
+      "metric": {
+        "metric_id": "analysis_time_lower_bound",
+        "label": "PR impact analysis time lower bound",
+        "definition": "Lower endpoint of reported code-impact analysis time range.",
+        "value": 7.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "seconds",
+        "direction": "minimize",
+        "raw_display": "7.4 seconds",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "analysis_time_lower_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Observed analysis runtime, not review latency or defect-detection effectiveness."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-analysis-time-max",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-analysis-time-range",
+        "model": "Change Impact Detector",
+        "harness": "Call-graph + history analysis",
+        "configuration": "Three open-source project feasibility experiments; upper reported runtime bound"
+      },
+      "metric": {
+        "metric_id": "analysis_time_upper_bound",
+        "label": "PR impact analysis time upper bound",
+        "definition": "Upper endpoint of reported code-impact analysis time range.",
+        "value": 22.43,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "seconds",
+        "direction": "minimize",
+        "raw_display": "22.43 seconds",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "analysis_time_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Observed analysis runtime, not review latency or defect-detection effectiveness."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-focus-group-enhancement-rating",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-focus-group-review-enhancement",
+        "model": "Change Impact Detector",
+        "harness": "Focus group survey",
+        "configuration": "User-perceived enhancement of PR review across five aspects"
+      },
+      "metric": {
+        "metric_id": "review_enhancement_rating",
+        "label": "Review enhancement rating",
+        "definition": "Average focus-group rating for whether change-impact analysis enhanced the review experience.",
+        "value": 3.66,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "rating_out_of_5",
+        "direction": "maximize",
+        "raw_display": "3.66/5",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "review_enhancement_rating",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "User perception rating; not defect detection or causal claim accuracy."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-risk-score-perceived-accuracy",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-focus-group-risk-score",
+        "model": "Change Impact Detector",
+        "harness": "Focus group survey",
+        "configuration": "Perceived accuracy of the PR risk score"
+      },
+      "metric": {
+        "metric_id": "risk_score_perceived_accuracy_rating",
+        "label": "Risk-score perceived-accuracy rating",
+        "definition": "Average focus-group rating for how accurately the risk score represented change impact.",
+        "value": 3.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "rating_out_of_5",
+        "direction": "maximize",
+        "raw_display": "3.2/5",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "risk_score_perceived_accuracy_rating",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Construct/perception rating, not objective accuracy."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-metric-agreement",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-selected-metrics-agreement",
+        "model": "Change Impact Detector",
+        "harness": "Focus group survey",
+        "configuration": "Agreement on selected risk-score metrics"
+      },
+      "metric": {
+        "metric_id": "selected_metric_agreement",
+        "label": "Selected metric agreement",
+        "definition": "Reported participant agreement on the selected metrics.",
+        "value": 71,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "71%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "selected_metric_agreement",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Agreement on metric selection, not accuracy of the impact detector."
+      ]
+    },
+    {
+      "observation_id": "microservice-evolution-initial-records-screened",
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "source_locator": "Gómez et al., Software 5(3), 32, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "microservice-evolution-screening-pipeline",
+        "model": "Systematic review",
+        "harness": "Literature screening",
+        "configuration": "Initial search yield before screening"
+      },
+      "metric": {
+        "metric_id": "records_screened",
+        "label": "Records screened",
+        "definition": "Initial records retrieved by the systematic literature search before selection.",
+        "value": 1187,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "records",
+        "direction": "not_applicable",
+        "raw_display": "1,187 records",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "records_screened",
+          "applies_to_task_count": 18
+        }
+      },
+      "notes": [
+        "The comparator denominator is 18 included studies; 1,187 is the initial search yield, not the final included sample."
+      ]
+    },
+    {
+      "observation_id": "microservice-evolution-primary-studies",
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "source_locator": "Gómez et al., Software 5(3), 32, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "microservice-evolution-included-primary-studies",
+        "model": "Systematic review",
+        "harness": "Literature synthesis",
+        "configuration": "Included primary studies"
+      },
+      "metric": {
+        "metric_id": "primary_study_count",
+        "label": "Included primary study count",
+        "definition": "Number of included studies that contribute primary evidence.",
+        "value": 13,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "studies",
+        "direction": "not_applicable",
+        "raw_display": "13 primary studies",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "primary_study_count",
+          "applies_to_task_count": 18
+        }
+      },
+      "notes": [
+        "Review-method descriptor."
+      ]
+    },
+    {
+      "observation_id": "microservice-evolution-total-included-studies",
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "source_locator": "Gómez et al., Software 5(3), 32, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "microservice-evolution-included-studies",
+        "model": "Systematic review",
+        "harness": "Literature synthesis",
+        "configuration": "Total included primary and background studies"
+      },
+      "metric": {
+        "metric_id": "included_study_count",
+        "label": "Included study count",
+        "definition": "Number of studies retained in the systematic review.",
+        "value": 18,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "studies",
+        "direction": "not_applicable",
+        "raw_display": "18 studies",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "included_study_count",
+          "applies_to_task_count": 18
+        }
+      },
+      "notes": [
+        "Review-method descriptor."
       ]
     }
   ]
