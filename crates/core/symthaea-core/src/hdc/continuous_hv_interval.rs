@@ -366,7 +366,250 @@ fn square_group(candidate: &[F32Interval; 8]) -> Option<F32Interval> {
     Some(sum)
 }
 
+/// Advance a finite f64 to the next representable value toward +infinity.
+#[inline]
+fn f64_next_up(value: f64) -> f64 {
+    if value.is_nan() || value == f64::INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return f64::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f64::from_bits(if value > 0.0 { bits + 1 } else { bits - 1 })
+}
+
+/// Advance a finite f64 to the next representable value toward -infinity.
+#[inline]
+fn f64_next_down(value: f64) -> f64 {
+    if value.is_nan() || value == f64::NEG_INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return -f64::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f64::from_bits(if value > 0.0 { bits - 1 } else { bits + 1 })
+}
+
+fn f64_sum_squares_bounds(values: &[f32]) -> (f64, f64) {
+    let mut lower = 0.0f64;
+    let mut upper = 0.0f64;
+    for &value in values {
+        let value = value as f64;
+        // Every f32 value is exact in f64, and its square has at most 48
+        // significant bits. Outward sum steps cover accumulated f64 rounding.
+        let square = value * value;
+        lower = f64_next_down(lower + square).max(0.0);
+        upper = f64_next_up(upper + square);
+    }
+    (lower, upper)
+}
+
+fn f64_dot_bounds(left: &[f32], right: &[f32]) -> (f64, f64) {
+    let mut lower = 0.0f64;
+    let mut upper = 0.0f64;
+    for (&a, &b) in left.iter().zip(right) {
+        // A product of two binary32 significands is exactly representable in
+        // binary64. The outward sum bounds the real dot product.
+        let product = (a as f64) * (b as f64);
+        lower = f64_next_down(lower + product);
+        upper = f64_next_up(upper + product);
+    }
+    (lower, upper)
+}
+
+#[inline]
+fn f32_lower_from_f64(value: f64) -> Option<f32> {
+    if !value.is_finite() || value < -(f32::MAX as f64) || value > f32::MAX as f64 {
+        return None;
+    }
+    let rounded = value as f32;
+    if !rounded.is_finite() {
+        return None;
+    }
+    Some(if (rounded as f64) > value {
+        next_down(rounded)
+    } else {
+        rounded
+    })
+}
+
+#[inline]
+fn f32_upper_from_f64(value: f64) -> Option<f32> {
+    if !value.is_finite() || value < -(f32::MAX as f64) || value > f32::MAX as f64 {
+        return None;
+    }
+    let rounded = value as f32;
+    if !rounded.is_finite() {
+        return None;
+    }
+    Some(if (rounded as f64) < value {
+        next_up(rounded)
+    } else {
+        rounded
+    })
+}
+
 impl ContinuousHV {
+    /// Enclose canonical cosine for every candidate x in the L2 ball
+    /// ||x - center||_2 <= residual_l2_upper.
+    ///
+    /// This bound retains the joint L2 constraint and is intended for group
+    /// centroids/radii. It uses Cauchy-Schwarz for the dot product and reverse
+    /// triangle inequality for candidate norms, then adds a conservative
+    /// binary32 reduction-error envelope for the #10918 scorer.
+    ///
+    /// Preconditions: query and center are admitted finite [-1,1] ContinuousHV
+    /// values; the caller has independently verified that every original group
+    /// member is within residual_l2_upper of center. This method does not prove
+    /// group membership or radius validity. The error envelope assumes IEEE-754
+    /// binary32 round-to-nearest, gradual underflow, and no fast-math,
+    /// reassociation or fused contraction of the canonical multiply/add chain.
+    ///
+    /// If the operation-count error bound is too large, the denominator can
+    /// cross the canonical near-zero threshold, or any interval becomes
+    /// unbounded, this returns [-1,1] and authorizes no pruning.
+    pub fn similarity_interval_full_resolution_for_l2_ball_center(
+        &self,
+        center: &Self,
+        residual_l2_upper: f32,
+    ) -> Result<ContinuousHVScoreInterval, ContinuousHVIntervalError> {
+        self.validate_full_resolution_pair(center)?;
+        if !residual_l2_upper.is_finite() || residual_l2_upper < 0.0 {
+            return Err(ContinuousHVIntervalError::InvalidResidualBound);
+        }
+        if residual_l2_upper == 0.0 {
+            let score = self.similarity_full_resolution(center);
+            return Ok(ContinuousHVScoreInterval { lower: score, upper: score });
+        }
+
+        let query_norm_sq_f32 = canonical_norm_squared(&self.values);
+        if !query_norm_sq_f32.is_finite() {
+            return Ok(ContinuousHVScoreInterval::uninformative());
+        }
+        if query_norm_sq_f32 == 0.0 {
+            return Ok(ContinuousHVScoreInterval { lower: 0.0, upper: 0.0 });
+        }
+
+        let dimension = self.values.len();
+        let operation_count = (dimension as f64) * 2.0;
+        let unit_roundoff = 2.0f64.powi(-24);
+        let nu = operation_count * unit_roundoff;
+        if !nu.is_finite() || nu >= 1.0 {
+            return Ok(ContinuousHVScoreInterval::uninformative());
+        }
+        let gamma = f64_next_up(nu / (1.0 - nu));
+        let min_subnormal = f32::from_bits(1) as f64;
+        // The additive term covers the worst absolute subnormal rounding per
+        // multiply/add; division by (1-nu) bounds later amplification.
+        let eta = f64_next_up(
+            (operation_count * min_subnormal) / (1.0 - nu),
+        );
+
+        let (query_norm_sq_lower, query_norm_sq_upper) =
+            f64_sum_squares_bounds(&self.values);
+        let (center_norm_sq_lower, center_norm_sq_upper) =
+            f64_sum_squares_bounds(&center.values);
+        let (center_dot_lower, center_dot_upper) =
+            f64_dot_bounds(&self.values, &center.values);
+
+        let query_norm_upper =
+            f64_next_up(query_norm_sq_upper.max(0.0).sqrt());
+        let center_norm_lower =
+            f64_next_down(query_norm_sq_lower.max(0.0).sqrt()).max(0.0);
+        let center_norm_upper =
+            f64_next_up(center_norm_sq_upper.max(0.0).sqrt());
+        let radius = residual_l2_upper as f64;
+
+        let candidate_norm_lower =
+            f64_next_down(center_norm_lower - radius).max(0.0);
+        let candidate_norm_upper =
+            f64_next_up(center_norm_upper + radius);
+
+        // Real dot-product interval from the centroid plus a Cauchy-Schwarz
+        // radius, expanded again to enclose the canonical f32 reduction.
+        let dot_slack = f64_next_up(query_norm_upper * radius);
+        let geometric_dot_lower = f64_next_down(center_dot_lower - dot_slack);
+        let geometric_dot_upper = f64_next_up(center_dot_upper + dot_slack);
+        let absolute_dot_sum_upper =
+            f64_next_up(query_norm_upper * candidate_norm_upper);
+        let dot_rounding_error =
+            f64_next_up(f64_next_up(gamma * absolute_dot_sum_upper) + eta);
+        let dot_lower = f64_next_down(geometric_dot_lower - dot_rounding_error);
+        let dot_upper = f64_next_up(geometric_dot_upper + dot_rounding_error);
+
+        // The canonical positive norm-squared reduction is enclosed by the
+        // standard gamma_n relative-error model plus an absolute subnormal
+        // allowance. Reverse triangle bounds the real candidate norm.
+        let norm_lower_real_sq =
+            f64_next_down(candidate_norm_lower * candidate_norm_lower).max(0.0);
+        let norm_upper_real_sq =
+            f64_next_up(candidate_norm_upper * candidate_norm_upper);
+        let norm_lower_scaled =
+            f64_next_down((1.0 - gamma).max(0.0) * norm_lower_real_sq);
+        let norm_upper_scaled =
+            f64_next_up((1.0 + gamma) * norm_upper_real_sq);
+        let candidate_norm_sq_lower =
+            f64_next_down(norm_lower_scaled - eta).max(0.0);
+        let candidate_norm_sq_upper =
+            f64_next_up(norm_upper_scaled + eta);
+
+        let dot_interval = match (
+            f32_lower_from_f64(dot_lower),
+            f32_upper_from_f64(dot_upper),
+        ) {
+            (Some(lower), Some(upper)) if lower <= upper => F32Interval {
+                lo: lower,
+                hi: upper,
+            },
+            _ => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+        let candidate_norm_sq_interval = match (
+            f32_lower_from_f64(candidate_norm_sq_lower),
+            f32_upper_from_f64(candidate_norm_sq_upper),
+        ) {
+            (Some(lower), Some(upper)) if lower <= upper => F32Interval {
+                lo: lower.max(0.0),
+                hi: upper.max(0.0),
+            },
+            _ => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+
+        let norm_product = match F32Interval::point(query_norm_sq_f32)
+            .mul(candidate_norm_sq_interval)
+        {
+            Some(value) => F32Interval {
+                lo: value.lo.max(0.0),
+                hi: value.hi.max(0.0),
+            },
+            None => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+        let denominator = match norm_product.sqrt_nonnegative() {
+            Some(value) => value,
+            None => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+
+        const CANONICAL_NEAR_ZERO_DENOMINATOR: f32 = 1e-10;
+        if denominator.hi < CANONICAL_NEAR_ZERO_DENOMINATOR {
+            return Ok(ContinuousHVScoreInterval { lower: 0.0, upper: 0.0 });
+        }
+        if denominator.lo < CANONICAL_NEAR_ZERO_DENOMINATOR {
+            return Ok(ContinuousHVScoreInterval::uninformative());
+        }
+
+        let quotient = match dot_interval.div_positive(denominator) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+        let interval = quotient.clamp_cosine();
+        if interval.is_well_formed() {
+            Ok(interval)
+        } else {
+            Ok(ContinuousHVScoreInterval::uninformative())
+        }
+    }
+
     /// Enclose the canonical full-resolution score for every candidate inside
     /// a component-wise box. This is intended for immutable group/page
     /// synopses: lower[j] and upper[j] must conservatively enclose coordinate j
@@ -708,6 +951,46 @@ mod tests {
         assert_eq!(next_up(f32::MAX), f32::INFINITY);
         assert_eq!(next_down(f32::INFINITY), f32::MAX);
         assert_eq!(next_down(-f32::MAX), f32::NEG_INFINITY);
+    }
+
+    #[test]
+    fn l2_ball_interval_contains_candidates_inside_verified_radius() {
+        let query = ContinuousHV::from_vec(
+            (0..257).map(|i| ((i as f32) * 0.013).sin()).collect(),
+        );
+        let center = ContinuousHV::from_vec(
+            (0..257).map(|i| ((i as f32) * 0.017).cos() * 0.8).collect(),
+        );
+        let mut actual_values = center.values.clone();
+        for (index, value) in actual_values.iter_mut().enumerate() {
+            let delta = (((index as f32) * 0.19).sin()) * 0.0005;
+            *value = (*value + delta).clamp(-1.0, 1.0);
+        }
+        let actual = ContinuousHV::from_vec(actual_values);
+        let radius = 0.01;
+        verify_l2_residual_certificate(&actual, &center, radius).unwrap();
+
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_ball_center(&center, radius)
+            .unwrap();
+        assert!(interval.contains(query.similarity_full_resolution(&actual)));
+        assert!(interval.is_well_formed());
+    }
+
+    #[test]
+    fn l2_ball_interval_handles_zero_radius_and_rejects_invalid_radius() {
+        let query = ContinuousHV::from_vec(vec![0.5, -0.25, 0.75, 0.1, -0.9, 0.2, 0.3, -0.4]);
+        let center = ContinuousHV::from_vec(vec![0.2, -0.5, 0.8, -0.1, 0.7, 0.4, -0.3, 0.9]);
+        let score = query.similarity_full_resolution(&center);
+        let point = query
+            .similarity_interval_full_resolution_for_l2_ball_center(&center, 0.0)
+            .unwrap();
+        assert_eq!(point.lower, score);
+        assert_eq!(point.upper, score);
+        assert_eq!(
+            query.similarity_interval_full_resolution_for_l2_ball_center(&center, f32::NAN),
+            Err(ContinuousHVIntervalError::InvalidResidualBound)
+        );
     }
 
     #[test]
