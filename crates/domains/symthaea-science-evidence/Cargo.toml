@@ -16,3 +16,7 @@ thiserror = { workspace = true }
 [[example]]
 name = "manifest_demo"
 path = "examples/manifest_demo.rs"
+
+[[example]]
+name = "theory_prediction_coverage"
+path = "examples/theory_prediction_coverage.rs"
