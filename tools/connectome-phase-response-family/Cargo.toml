@@ -9,5 +9,8 @@ description = "Exact weighted anytime-FWER ledger for connectome phase-response 
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+connectome-asof-filtration = { path = "../connectome-asof-filtration" }
+
 # Standalone validation crate: intentionally outside the root workspace.
 [workspace]
