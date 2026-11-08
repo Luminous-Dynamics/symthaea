@@ -429,10 +429,14 @@ fn simplify_residual(
     value: bool,
 ) -> Result<(ResidualCnf, u128), QbfGameDagError> {
     let mut clauses = Vec::with_capacity(residual.len());
+    let mut scanned_literals = 0u128;
     for clause in residual {
         let mut satisfied = false;
         let mut reduced = Vec::with_capacity(clause.len());
         for literal in clause {
+            scanned_literals = scanned_literals
+                .checked_add(1)
+                .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
             if literal.variable == variable {
                 if literal.positive == value {
                     satisfied = true;
@@ -446,7 +450,11 @@ fn simplify_residual(
             clauses.push(reduced);
         }
     }
-    canonicalize_residual(clauses)
+    let (canonical, canonicalization_visits) = canonicalize_residual(clauses)?;
+    let total_visits = scanned_literals
+        .checked_add(canonicalization_visits)
+        .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
+    Ok((canonical, total_visits))
 }
 
 fn residual_literal_count(residual: &ResidualCnf) -> Result<u128, QbfGameDagError> {
@@ -794,7 +802,7 @@ pub fn verify_qbf_game_proof_dag(
         });
     }
 
-    let (source, _) = source_residual(problem)?;
+    let (source, source_work) = source_residual(problem)?;
     if proof.nodes[proof.root].residual != source {
         return Err(QbfGameDagError::MatrixResidualMismatch);
     }
@@ -802,7 +810,7 @@ pub fn verify_qbf_game_proof_dag(
 
     let mut parent_counts = vec![0usize; proof.nodes.len()];
     let mut seen_states = BTreeMap::new();
-    let mut residual_literal_visits = 0u128;
+    let mut residual_literal_visits = source_work;
     let mut stored_literals = 0u128;
     let mut stored_clauses = 0u128;
     let mut shared_child_references = 0u128;
@@ -1108,13 +1116,13 @@ mod tests {
         let (dag, report) = assert_all_three_paths_agree(&problem, &prefix);
         assert_eq!(report.memo_hits, 1);
         assert_eq!(dag.nodes.len(), 4);
-        match dag.nodes[dag.root].kind {
+        match &dag.nodes[dag.root].kind {
             QbfGameDagNodeKind::ForAllDecision {
                 low_child,
                 high_child,
                 ..
             } => assert_eq!(low_child, high_child),
-            ref other => panic!("expected root universal decision, got {other:?}"),
+            other => panic!("expected root universal decision, got {other:?}"),
         }
         let verified = verify_qbf_game_proof_dag(&problem, &prefix, &dag, budget()).unwrap();
         assert_eq!(verified.shared_child_references, 1);
@@ -1136,7 +1144,7 @@ mod tests {
         let (dag, report) = assert_all_three_paths_agree(&problem, &prefix);
         assert!(report.memo_hits > 0);
         let root = &dag.nodes[dag.root];
-        match root.kind {
+        match &root.kind {
             QbfGameDagNodeKind::ForAllDecision {
                 low_child,
                 high_child,
@@ -1144,7 +1152,7 @@ mod tests {
             } => {
                 assert_eq!(low_child, high_child);
                 assert_eq!(
-                    dag.nodes[low_child].residual,
+                    dag.nodes[*low_child].residual,
                     vec![vec![ResidualLiteral {
                         variable: 1,
                         positive: true
@@ -1221,8 +1229,9 @@ mod tests {
             variable,
             low_child,
             high_child,
-        } = wrong_rule.nodes[root].kind
+        } = &wrong_rule.nodes[root].kind
         {
+            let (variable, low_child, high_child) = (*variable, *low_child, *high_child);
             wrong_rule.nodes[root].kind = QbfGameDagNodeKind::ExistsDecision {
                 variable,
                 low_child,
@@ -1235,7 +1244,8 @@ mod tests {
         ));
 
         let mut wrong_value = dag;
-        wrong_value.nodes[wrong_value.root].value = !wrong_value.nodes[wrong_value.root].value;
+        let root_value = wrong_value.nodes[wrong_value.root].value;
+        wrong_value.nodes[wrong_value.root].value = !root_value;
         assert!(matches!(
             verify_qbf_game_proof_dag(&problem, &prefix, &wrong_value, budget()),
             Err(QbfGameDagError::IncorrectNodeValue { .. })
