@@ -1,6 +1,8 @@
 # SAM Scene Evidence Contract v0.1
 
 Status: research interface / synthetic conformance contract  
+Machine-readable structural schema: `SAM_SCENE_EVIDENCE_SCHEMA_V0_1.json`  
+Canonical synthetic fixture: `fixtures/SAM_SCENE_EVIDENCE_CONTRACT_V0_1.json`  
 Owner: Symthaea SAM perception-to-planning boundary  
 Composes: SAM-SCENE-ADMISSION-001 (#11109)
 
