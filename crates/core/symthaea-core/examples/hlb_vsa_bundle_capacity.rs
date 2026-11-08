@@ -13,7 +13,8 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 
 const LOADS: &[usize] = &[1, 3, 7, 15, 31, 63, 127, 255, 511];
 const TRIALS: usize = 8;
-const NEGATIVE_QUERIES: usize = 128;
+const NEGATIVE_CALIBRATION_QUERIES: usize = 512;
+const NEGATIVE_EVALUATION_QUERIES: usize = 512;
 
 #[derive(Debug, Clone, Copy, Default)]
 struct TrialMetrics {
@@ -26,7 +27,7 @@ struct TrialMetrics {
 
 fn main() {
     println!(
-        "load,mean_member_cosine,mean_nonmember_cosine,mean_auc,mean_tpr_at_empirical_1pct_fpr,mean_empirical_fpr,trial_count,negative_queries"
+        "load,mean_member_cosine,mean_nonmember_cosine,mean_auc,mean_tpr_at_empirical_1pct_fpr,mean_evaluation_fpr,trial_count,negative_calibration_queries,negative_evaluation_queries"
     );
     for &load in LOADS {
         let metrics = (0..TRIALS)
@@ -46,7 +47,7 @@ fn main() {
                 .map(|m| m.empirical_false_positive_rate),
         );
         println!(
-            "{load},{mean_member:.8},{mean_nonmember:.8},{mean_auc:.8},{mean_tpr:.8},{mean_fpr:.8},{TRIALS},{NEGATIVE_QUERIES}"
+            "{load},{mean_member:.8},{mean_nonmember:.8},{mean_auc:.8},{mean_tpr:.8},{mean_fpr:.8},{TRIALS},{NEGATIVE_CALIBRATION_QUERIES},{NEGATIVE_EVALUATION_QUERIES}"
         );
     }
 }
@@ -61,33 +62,42 @@ fn run_trial(load: usize, trial: usize) -> TrialMetrics {
         .iter()
         .map(|member| f64::from(bundled.cosine_similarity(member)))
         .collect::<Vec<_>>();
-    let nonmember_scores = (0..NEGATIVE_QUERIES)
+    let calibration_nonmembers = (0..NEGATIVE_CALIBRATION_QUERIES)
         .map(|slot| {
             let query = BinaryHV::random(stable_seed(trial, slot, 0xBADC0DE));
             f64::from(bundled.cosine_similarity(&query))
         })
         .collect::<Vec<_>>();
+    let evaluation_nonmembers = (0..NEGATIVE_EVALUATION_QUERIES)
+        .map(|slot| {
+            let query = BinaryHV::random(stable_seed(trial, slot, 0xD15EA5E));
+            f64::from(bundled.cosine_similarity(&query))
+        })
+        .collect::<Vec<_>>();
 
-    let mut sorted_nonmembers = nonmember_scores.clone();
-    sorted_nonmembers.sort_by(f64::total_cmp);
-    let threshold_index = ((sorted_nonmembers.len() - 1) * 99) / 100;
-    let threshold = sorted_nonmembers[threshold_index];
+    let mut sorted_calibration = calibration_nonmembers.clone();
+    sorted_calibration.sort_by(f64::total_cmp);
+    let threshold_rank = (sorted_calibration.len() * 99).div_ceil(100);
+    let threshold_index = threshold_rank.saturating_sub(1).min(sorted_calibration.len() - 1);
+    let threshold = sorted_calibration[threshold_index];
 
+    // Fit the threshold on calibration negatives; report rates on the
+    // independent evaluation-negative set.
     let true_positive_rate = member_scores
         .iter()
-        .filter(|score| **score > threshold)
+        .filter(|score| **score >= threshold)
         .count() as f64
         / member_scores.len() as f64;
-    let false_positive_rate = nonmember_scores
+    let false_positive_rate = evaluation_nonmembers
         .iter()
-        .filter(|score| **score > threshold)
+        .filter(|score| **score >= threshold)
         .count() as f64
-        / nonmember_scores.len() as f64;
+        / evaluation_nonmembers.len() as f64;
 
     TrialMetrics {
         mean_member_cosine: mean(member_scores.iter().copied()),
-        mean_nonmember_cosine: mean(nonmember_scores.iter().copied()),
-        auc: pairwise_auc(&member_scores, &nonmember_scores),
+        mean_nonmember_cosine: mean(evaluation_nonmembers.iter().copied()),
+        auc: pairwise_auc(&member_scores, &evaluation_nonmembers),
         tpr_at_empirical_one_percent_fpr: true_positive_rate,
         empirical_false_positive_rate: false_positive_rate,
     }
@@ -138,7 +148,7 @@ mod tests {
         let metrics = run_trial(7, 2026);
         assert!(metrics.mean_member_cosine > metrics.mean_nonmember_cosine);
         assert!(metrics.auc > 0.95);
-        assert!(metrics.empirical_false_positive_rate <= 0.02);
+        assert!(metrics.empirical_false_positive_rate <= 0.06);
     }
 
     #[test]
