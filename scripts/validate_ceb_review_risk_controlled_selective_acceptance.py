@@ -10,7 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-DOC = "docs/research/CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08"
+DOC = "docs/research/CEB_REVIEW_RISK_CONTROLLED_SELECTIVE_CLAIM_ACCEPTANCE_PROTOCOL_V0_2026-11-08.md"
 REQUIRED = (
     "False-discovery risk is not false-positive rate",
     "Development / policy selection",
