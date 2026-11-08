@@ -130,6 +130,8 @@ The shared comparison policy currently permits documented approximations and con
 
 This is **admission to a fair comparison**, not proof that approximated controls are equivalent to native controls or that either backend achieved good perceptual quality. Report capability support class alongside all benchmark scores.
 
+Human-sung anchor imports must now match the exact case lyric, category, challenge, and BLAKE3 digest of the score melody. The importer also requires a singer pseudonym plus explicit consent and license references, rejects symlink/non-regular audio paths, hashes the copied WAV, and writes rights metadata only to `private/human_reference_receipts.json`. This prevents an unrelated recording from being mislabeled as a same-score human anchor and makes the rights basis auditable without exposing it to listeners.
+
 The Muse gate places listener-facing material in a dedicated `blind/` directory and private evaluator material in a sibling `private/` directory. The blind directory contains only clip WAVs, a backend-concealed manifest, and the rating template. Backend key/salt, objective metrics, run provenance, and release status go to the private directory. Share only `blind/` with listeners; never distribute the output root or `private/` as part of a blind study.
 
 ## Fair comparison protocol
