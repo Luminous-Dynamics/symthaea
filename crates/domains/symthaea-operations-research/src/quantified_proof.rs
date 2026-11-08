@@ -107,44 +107,120 @@ pub struct QbfProofVerificationReport {
 /// Fail-closed construction and verification errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuantifiedProofError {
-    MatrixPrefixVariableCountMismatch { matrix: usize, prefix: usize },
-    VariableBudgetExceeded { required: usize, limit: usize },
-    VariableNameBudgetExceeded { required: usize, limit: usize },
-    EmptyVariableName { index: usize },
+    MatrixPrefixVariableCountMismatch {
+        matrix: usize,
+        prefix: usize,
+    },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    VariableNameBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    EmptyVariableName {
+        index: usize,
+    },
     DuplicateVariableName(String),
-    ClauseBudgetExceeded { required: usize, limit: usize },
-    LiteralBudgetExceeded { required: usize, limit: usize },
+    ClauseBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    LiteralBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     LiteralVariableOutOfRange {
         clause: usize,
         literal: usize,
         variable: usize,
         variable_count: usize,
     },
-    BuilderVisitBudgetExceeded { required: u128, limit: u128 },
-    ProofNodeBudgetExceeded { required: usize, limit: usize },
+    BuilderVisitBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    ProofNodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     MissingRoot,
-    RootNotFinalNode { root: usize, final_node: usize },
-    RootOutOfRange { root: usize, node_count: usize },
-    ProofVariableCountMismatch { proof: usize, source: usize },
-    ChildOutOfRange { parent: usize, child: usize, node_count: usize },
-    ChildNotPostOrder { parent: usize, child: usize },
-    DuplicateChildReference { parent: usize, child: usize },
-    MultipleParents { child: usize, parents: usize },
+    RootNotFinalNode {
+        root: usize,
+        final_node: usize,
+    },
+    RootOutOfRange {
+        root: usize,
+        node_count: usize,
+    },
+    ProofVariableCountMismatch {
+        proof: usize,
+        source: usize,
+    },
+    ChildOutOfRange {
+        parent: usize,
+        child: usize,
+        node_count: usize,
+    },
+    ChildNotPostOrder {
+        parent: usize,
+        child: usize,
+    },
+    DuplicateChildReference {
+        parent: usize,
+        child: usize,
+    },
+    MultipleParents {
+        child: usize,
+        parents: usize,
+    },
     UnreachableNode { node: usize },
-    VerifierVisitBudgetExceeded { required: u128, limit: u128 },
-    PrefixPositionMismatch { node: usize, expected: usize, actual: usize },
-    DecisionVariableMismatch { node: usize, expected: usize, actual: usize },
-    QuantifierRuleMismatch { node: usize, expected: Quantifier },
-    IncorrectNodeValue { node: usize, expected: bool, actual: bool },
-    EarlyTrueNotEstablished { node: usize },
+    VerifierVisitBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    PrefixPositionMismatch {
+        node: usize,
+        expected: usize,
+        actual: usize,
+    },
+    DecisionVariableMismatch {
+        node: usize,
+        expected: usize,
+        actual: usize,
+    },
+    QuantifierRuleMismatch {
+        node: usize,
+        expected: Quantifier,
+    },
+    IncorrectNodeValue {
+        node: usize,
+        expected: bool,
+        actual: bool,
+    },
+    EarlyTrueNotEstablished {
+        node: usize,
+    },
     EarlyFalseClauseOutOfRange {
         node: usize,
         clause_index: usize,
         clause_count: usize,
     },
-    EarlyFalseClauseNotEstablished { node: usize, clause_index: usize },
-    MatrixLeafBeforePrefixEnd { node: usize, position: usize, prefix_len: usize },
-    MatrixLeafValueMismatch { node: usize, expected: bool, actual: bool },
+    EarlyFalseClauseNotEstablished {
+        node: usize,
+        clause_index: usize,
+    },
+    MatrixLeafBeforePrefixEnd {
+        node: usize,
+        position: usize,
+        prefix_len: usize,
+    },
+    MatrixLeafValueMismatch {
+        node: usize,
+        expected: bool,
+        actual: bool,
+    },
     ResourceAccountingOverflow,
 }
 
@@ -371,13 +447,9 @@ fn build_node(
 
     let (quantifier, variable) = order[position];
     assignment[variable] = Some(false);
-    let low_child = build_node(
-        position + 1, order, problem, assignment, budget, state,
-    )?;
+    let low_child = build_node(position + 1, order, problem, assignment, budget, state)?;
     assignment[variable] = Some(true);
-    let high_child = build_node(
-        position + 1, order, problem, assignment, budget, state,
-    )?;
+    let high_child = build_node(position + 1, order, problem, assignment, budget, state)?;
     assignment[variable] = None;
 
     let low_value = state.nodes[low_child].value;
@@ -426,9 +498,7 @@ pub fn build_qbf_game_proof(
         matrix_leaves: 0,
     };
     let mut assignment = vec![None; problem.variables.len()];
-    let root = build_node(
-        0, &order, problem, &mut assignment, budget, &mut state,
-    )?;
+    let root = build_node(0, &order, problem, &mut assignment, budget, &mut state)?;
     let proof = QbfGameProof {
         variable_count: problem.variables.len(),
         root,
@@ -461,9 +531,9 @@ fn verify_falsified_clause(
     let Some(clause) = problem.clauses.get(clause_index) else {
         return false;
     };
-    clause.iter().all(|literal| {
-        assignment[literal.variable].is_some_and(|value| value != literal.positive)
-    })
+    clause
+        .iter()
+        .all(|literal| assignment[literal.variable].is_some_and(|value| value != literal.positive))
 }
 
 struct VerifierState {
@@ -494,10 +564,13 @@ fn verify_node(
             limit: budget.max_verifier_node_visits,
         });
     }
-    let node = proof.nodes.get(node_id).ok_or(QuantifiedProofError::RootOutOfRange {
-        root: node_id,
-        node_count: proof.nodes.len(),
-    })?;
+    let node = proof
+        .nodes
+        .get(node_id)
+        .ok_or(QuantifiedProofError::RootOutOfRange {
+            root: node_id,
+            node_count: proof.nodes.len(),
+        })?;
     if node.prefix_position != expected_position {
         return Err(QuantifiedProofError::PrefixPositionMismatch {
             node: node_id,
@@ -596,13 +669,25 @@ fn verify_node(
                 .ok_or(QuantifiedProofError::ResourceAccountingOverflow)?;
             assignment[*variable] = Some(false);
             let low = verify_node(
-                *low_child, expected_position + 1, order, problem, proof,
-                assignment, budget, state,
+                *low_child,
+                expected_position + 1,
+                order,
+                problem,
+                proof,
+                assignment,
+                budget,
+                state,
             )?;
             assignment[*variable] = Some(true);
             let high = verify_node(
-                *high_child, expected_position + 1, order, problem, proof,
-                assignment, budget, state,
+                *high_child,
+                expected_position + 1,
+                order,
+                problem,
+                proof,
+                assignment,
+                budget,
+                state,
             )?;
             assignment[*variable] = None;
             low || high
@@ -696,10 +781,7 @@ fn validate_tree_shape(proof: &QbfGameProof) -> Result<(), QuantifiedProofError>
         };
         if let (Some(low), Some(high)) = (children[0], children[1]) {
             if low == high {
-                return Err(QuantifiedProofError::DuplicateChildReference {
-                    parent,
-                    child: low,
-                });
+                return Err(QuantifiedProofError::DuplicateChildReference { parent, child: low });
             }
         }
         for child in children.into_iter().flatten() {
@@ -766,7 +848,14 @@ pub fn verify_qbf_game_proof(
         decisions: 0,
     };
     let root_value = verify_node(
-        proof.root, 0, &order, problem, proof, &mut assignment, budget, &mut state,
+        proof.root,
+        0,
+        &order,
+        problem,
+        proof,
+        &mut assignment,
+        budget,
+        &mut state,
     )?;
 
     Ok(QbfProofVerificationReport {
@@ -785,7 +874,7 @@ mod tests {
     use super::super::decomposition::Literal;
     use super::super::quantified_scope::QuantifierBlock;
     use super::super::quantified_strategy::{
-        evaluate_qbf_with_strategy, QuantifiedEvaluationBudget,
+        QuantifiedEvaluationBudget, evaluate_qbf_with_strategy,
     };
     use super::*;
 
@@ -808,10 +897,7 @@ mod tests {
         }
     }
 
-    fn make_prefix(
-        variables: usize,
-        blocks: Vec<QuantifierBlock>,
-    ) -> ValidatedQuantifierPrefix {
+    fn make_prefix(variables: usize, blocks: Vec<QuantifierBlock>) -> ValidatedQuantifierPrefix {
         ValidatedQuantifierPrefix::new(variables, blocks, Default::default()).unwrap()
     }
 
@@ -831,12 +917,9 @@ mod tests {
     ) -> QbfProofVerificationReport {
         let (proof, built) = build_qbf_game_proof(problem, prefix, budget()).unwrap();
         let verified = verify_qbf_game_proof(problem, prefix, &proof, budget()).unwrap();
-        let oracle = evaluate_qbf_with_strategy(
-            problem,
-            prefix,
-            QuantifiedEvaluationBudget::default(),
-        )
-        .unwrap();
+        let oracle =
+            evaluate_qbf_with_strategy(problem, prefix, QuantifiedEvaluationBudget::default())
+                .unwrap();
         assert_eq!(built.root_value, verified.root_value);
         assert_eq!(built.root_value, oracle.value);
         assert_eq!(verified.proof_nodes_checked, proof.nodes.len());
@@ -918,9 +1001,11 @@ mod tests {
             proof.nodes[proof.root].kind,
             QbfProofNodeKind::EarlyFalseClause { clause_index: 0 }
         );
-        assert!(!verify_qbf_game_proof(&problem, &prefix, &proof, budget())
-            .unwrap()
-            .root_value);
+        assert!(
+            !verify_qbf_game_proof(&problem, &prefix, &proof, budget())
+                .unwrap()
+                .root_value
+        );
     }
 
     #[test]
@@ -940,12 +1025,9 @@ mod tests {
         assert!(built.root_value);
         assert_eq!(built.early_true_prunes, 1);
         match &proof.nodes[proof.root].kind {
-            QbfProofNodeKind::ExistsDecision {
-                high_child, ..
-            } => assert_eq!(
-                proof.nodes[*high_child].kind,
-                QbfProofNodeKind::EarlyTrue
-            ),
+            QbfProofNodeKind::ExistsDecision { high_child, .. } => {
+                assert_eq!(proof.nodes[*high_child].kind, QbfProofNodeKind::EarlyTrue)
+            }
             other => panic!("expected existential decision, got {other:?}"),
         }
         let verified = verify_qbf_game_proof(&problem, &prefix, &proof, budget()).unwrap();
@@ -957,10 +1039,7 @@ mod tests {
     fn early_false_witness_rejects_clause_with_unassigned_literal() {
         let problem = CnfProblem {
             variables: vec!["x".into(), "y".into()],
-            clauses: vec![
-                vec![Literal::positive(0)],
-                vec![Literal::positive(1)],
-            ],
+            clauses: vec![vec![Literal::positive(0)], vec![Literal::positive(1)]],
         };
         let prefix = make_prefix(
             2,
@@ -976,8 +1055,7 @@ mod tests {
             QbfProofNodeKind::ForAllDecision { low_child, .. } => *low_child,
             _ => unreachable!(),
         };
-        tampered.nodes[low_child].kind =
-            QbfProofNodeKind::EarlyFalseClause { clause_index: 1 };
+        tampered.nodes[low_child].kind = QbfProofNodeKind::EarlyFalseClause { clause_index: 1 };
         assert!(matches!(
             verify_qbf_game_proof(&problem, &prefix, &tampered, budget()),
             Err(QuantifiedProofError::EarlyFalseClauseNotEstablished { .. })
@@ -1140,10 +1218,7 @@ mod tests {
         ));
     }
 
-    fn direct_game_oracle(
-        problem: &CnfProblem,
-        prefix: &ValidatedQuantifierPrefix,
-    ) -> bool {
+    fn direct_game_oracle(problem: &CnfProblem, prefix: &ValidatedQuantifierPrefix) -> bool {
         let order = ordered_prefix(prefix);
         fn visit(
             position: usize,
@@ -1154,8 +1229,7 @@ mod tests {
             if position == order.len() {
                 return problem.clauses.iter().all(|clause| {
                     clause.iter().any(|literal| {
-                        assignment[literal.variable]
-                            .is_some_and(|value| value == literal.positive)
+                        assignment[literal.variable].is_some_and(|value| value == literal.positive)
                     })
                 });
             }
@@ -1170,12 +1244,7 @@ mod tests {
                 Quantifier::ForAll => low && high,
             }
         }
-        visit(
-            0,
-            &order,
-            problem,
-            &mut vec![None; problem.variables.len()],
-        )
+        visit(0, &order, problem, &mut vec![None; problem.variables.len()])
     }
 
     #[test]
@@ -1231,18 +1300,15 @@ mod tests {
                         .collect();
                     let prefix = make_prefix(2, blocks);
                     let expected = direct_game_oracle(problem, &prefix);
-                    let (proof, built) =
-                        build_qbf_game_proof(problem, &prefix, budget()).unwrap();
+                    let (proof, built) = build_qbf_game_proof(problem, &prefix, budget()).unwrap();
                     let checked =
                         verify_qbf_game_proof(problem, &prefix, &proof, budget()).unwrap();
                     assert_eq!(
-                        built.root_value,
-                        expected,
+                        built.root_value, expected,
                         "builder formula {formula_index}, order {order:?}, mask {quantifier_mask}"
                     );
                     assert_eq!(
-                        checked.root_value,
-                        expected,
+                        checked.root_value, expected,
                         "checker formula {formula_index}, order {order:?}, mask {quantifier_mask}"
                     );
                 }
