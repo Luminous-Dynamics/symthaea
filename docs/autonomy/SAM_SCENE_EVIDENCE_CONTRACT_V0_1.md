@@ -172,7 +172,8 @@ Use distinct labels for at least `observed_free`, `occupied`, `occluded`, `unobs
 9. Prediction and simulation outputs remain distinct from observations.
 10. A missing covariance, support envelope or model applicability declaration becomes unknown / rejected, not zero uncertainty.
 11. Contradictory sources remain visible; averaging incompatible frames or sources is not a valid resolution.
-12. The scene layer cannot grant vehicle, ODD or actuator authority. Symthaea's separate runtime-assurance boundary owns command admission.
+12. Local object tracks cannot cite remote cooperative claims or simulator oracle truth; those sources remain in their separate typed reference collections.
+13. The scene layer cannot grant vehicle, ODD or actuator authority. Symthaea's separate runtime-assurance boundary owns command admission.
 
 ## 10. Ownership boundaries
 
