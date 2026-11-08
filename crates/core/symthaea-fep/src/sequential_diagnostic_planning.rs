@@ -26,11 +26,14 @@ use super::decision_relevant_information::{
 
 const RISK_TOLERANCE: f64 = 1e-10;
 const MAX_DIAGNOSTIC_ACTIONS: usize = 64;
+const MAX_HYPOTHESES: usize = 1024;
+const MAX_OUTCOMES_PER_ACTION: usize = 256;
 
 /// Finite-horizon search limits.
 ///
-/// The expansion budget counts each eligible action considered at a belief
-/// node. It bounds work independently of observation branching factor.
+/// The expansion budget counts belief-state nodes in the search tree. In
+/// addition, explicit hypothesis, action, and outcome caps bound each node's
+/// branching and validation work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequentialDiagnosticConfig {
     pub horizon: usize,
@@ -102,6 +105,14 @@ pub enum SequentialDiagnosticError {
     DecisionDiagnostic(#[from] DecisionDiagnosticError),
     #[error("at most {maximum} diagnostic actions are supported, received {actual}")]
     TooManyActions { maximum: usize, actual: usize },
+    #[error("at most {maximum} model hypotheses are supported, received {actual}")]
+    TooManyHypotheses { maximum: usize, actual: usize },
+    #[error("action {action_index} has {actual} possible outcomes; maximum is {maximum}")]
+    TooManyOutcomes {
+        action_index: usize,
+        maximum: usize,
+        actual: usize,
+    },
     #[error("planning horizon {horizon} exceeds the {action_count} distinct actions")]
     HorizonExceedsActionCount { horizon: usize, action_count: usize },
     #[error("planning expansion budget must be positive")]
@@ -128,14 +139,28 @@ pub fn evaluate_sequential_decision_diagnostics(
     decision_config: DecisionDiagnosticConfig,
     planning_config: SequentialDiagnosticConfig,
 ) -> Result<SequentialDiagnosticEvaluation, SequentialDiagnosticError> {
-    // Reuse the one-step kernel as the canonical validator for priors,
-    // likelihood shapes, losses, action descriptors, and policy weights.
-    let one_step = evaluate_decision_focused_diagnostics(hypotheses, actions, decision_config)?;
     if actions.len() > MAX_DIAGNOSTIC_ACTIONS {
         return Err(SequentialDiagnosticError::TooManyActions {
             maximum: MAX_DIAGNOSTIC_ACTIONS,
             actual: actions.len(),
         });
+    }
+    if hypotheses.len() > MAX_HYPOTHESES {
+        return Err(SequentialDiagnosticError::TooManyHypotheses {
+            maximum: MAX_HYPOTHESES,
+            actual: hypotheses.len(),
+        });
+    }
+    if let Some(first) = hypotheses.first() {
+        for (action_index, outcomes) in first.outcome_probabilities_by_action.iter().enumerate() {
+            if outcomes.len() > MAX_OUTCOMES_PER_ACTION {
+                return Err(SequentialDiagnosticError::TooManyOutcomes {
+                    action_index,
+                    maximum: MAX_OUTCOMES_PER_ACTION,
+                    actual: outcomes.len(),
+                });
+            }
+        }
     }
     if planning_config.horizon > actions.len() {
         return Err(SequentialDiagnosticError::HorizonExceedsActionCount {
@@ -146,6 +171,9 @@ pub fn evaluate_sequential_decision_diagnostics(
     if planning_config.max_policy_expansions == 0 {
         return Err(SequentialDiagnosticError::EmptyExpansionBudget);
     }
+    // Reuse the one-step kernel as the canonical validator for priors,
+    // likelihood shapes, losses, action descriptors, and policy weights.
+    let one_step = evaluate_decision_focused_diagnostics(hypotheses, actions, decision_config)?;
 
     let prior: Vec<f64> = hypotheses
         .iter()
@@ -193,6 +221,12 @@ fn solve_node(
     (SequentialDiagnosticPlanNode, Vec<SequentialDiagnosticActionValue>),
     SequentialDiagnosticError,
 > {
+    if *expansions >= planning_config.max_policy_expansions {
+        return Err(SequentialDiagnosticError::ExpansionBudgetExceeded {
+            budget: planning_config.max_policy_expansions,
+        });
+    }
+    *expansions += 1;
     let decision_count = hypotheses[0].loss_by_final_decision.len();
     let stop_risk = bayes_risk(posterior, hypotheses, decision_count)?;
     let mut best = stop_node(stop_risk);
@@ -220,13 +254,6 @@ fn solve_node(
             });
             continue;
         }
-
-        if *expansions >= planning_config.max_policy_expansions {
-            return Err(SequentialDiagnosticError::ExpansionBudgetExceeded {
-                budget: planning_config.max_policy_expansions,
-            });
-        }
-        *expansions += 1;
 
         let candidate = plan_after_action(
             hypotheses,
