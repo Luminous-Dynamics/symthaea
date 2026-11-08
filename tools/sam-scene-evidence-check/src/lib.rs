@@ -276,14 +276,14 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
         if pair[0].get("scenario_family") != pair[1].get("scenario_family") {
             errors.push(format!("pair {pair_id}: scenario families do not match"));
         }
-        validate_mirrored_pair(&mut errors, pair_id, pair[0], pair[1]);
+        validate_mirrored_pair(&mut errors, &pair_id, pair[0], pair[1]);
     }
     errors
 }
 
-fn approx_eq(a: Option<f64>, b: Option<f64>, expected: f64) -> bool {
-    match (a, b) {
-        (Some(a), Some(b)) => (a - expected).abs() <= 1e-9,
+fn approx_eq(actual: Option<f64>, expected: Option<f64>) -> bool {
+    match (actual, expected) {
+        (Some(actual), Some(expected)) => (actual - expected).abs() <= 1e-9,
         _ => false,
     }
 }
@@ -307,7 +307,7 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
         let av = number_at(a_state.and_then(|state| state.get(field)), index);
         let bv = number_at(b_state.and_then(|state| state.get(field)), index);
         let expected = av.map(|value| value * f64::from(sign));
-        if !approx_eq(bv, expected, 0.0) {
+        if !approx_eq(bv, expected) {
             errors.push(format!(
                 "pair {pair_id}: {field}[{index}] violates mirror sign/magnitude invariant"
             ));
@@ -362,7 +362,7 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
                 for field in ["center_lateral_m"] {
                     let av = a_lane.get(field).and_then(Value::as_f64);
                     let bv = b_lane.get(field).and_then(Value::as_f64);
-                    if !approx_eq(bv, av.map(|value| -value), 0.0) {
+                    if !approx_eq(bv, av.map(|value| -value)) {
                         errors.push(format!(
                             "pair {pair_id}: lane {index} field {field} did not reflect"
                         ));
