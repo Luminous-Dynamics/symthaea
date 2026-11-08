@@ -33,7 +33,10 @@ impl fmt::Display for CurvedOrderStatisticsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidDimensionlessCurvature => {
-                write!(f, "dimensionless curvature q must be finite and non-negative")
+                write!(
+                    f,
+                    "dimensionless curvature q must be finite and non-negative"
+                )
             }
             Self::InvalidQuadratureCount => write!(
                 f,
@@ -42,14 +45,24 @@ impl fmt::Display for CurvedOrderStatisticsError {
             Self::InvalidObservedFraction => {
                 write!(f, "observed order fraction must be finite and in [0,1]")
             }
-            Self::InvalidSearchRange => write!(f, "dimensionless-curvature search range is invalid"),
+            Self::InvalidSearchRange => {
+                write!(f, "dimensionless-curvature search range is invalid")
+            }
             Self::NonMonotoneCalibration => {
-                write!(f, "finite-QMC ordering-fraction calibration is not monotone")
+                write!(
+                    f,
+                    "finite-QMC ordering-fraction calibration is not monotone"
+                )
             }
             Self::FractionOutsideCalibration => {
-                write!(f, "observed order fraction lies outside the calibrated range")
+                write!(
+                    f,
+                    "observed order fraction lies outside the calibrated range"
+                )
             }
-            Self::NumericalFailure => write!(f, "curved order-statistic calculation failed"),
+            Self::NumericalFailure => {
+                write!(f, "curved order-statistic calculation failed")
+            }
         }
     }
 }
@@ -166,9 +179,7 @@ pub fn estimate_dimensionless_curvature(
     quadrature_points: usize,
     iterations: usize,
 ) -> Result<DimensionlessCurvatureEstimate, CurvedOrderStatisticsError> {
-    if !observed_ordering_fraction.is_finite()
-        || !(0.0..=1.0).contains(&observed_ordering_fraction)
-    {
+    if !observed_ordering_fraction.is_finite() || !(0.0..=1.0).contains(&observed_ordering_fraction) {
         return Err(CurvedOrderStatisticsError::InvalidObservedFraction);
     }
     if !maximum_dimensionless_curvature.is_finite()
@@ -180,25 +191,23 @@ pub fn estimate_dimensionless_curvature(
     }
     validate_qmc_inputs(0.0, quadrature_points)?;
 
-    let mut previous = qmc_expected_comparable_pair_fraction(0.0, quadrature_points)?
-        .comparable_pair_fraction;
+    let mut previous =
+        qmc_expected_comparable_pair_fraction(0.0, quadrature_points)?.comparable_pair_fraction;
     for step in 1..=8 {
         let q = maximum_dimensionless_curvature * step as f64 / 8.0;
-        let current = qmc_expected_comparable_pair_fraction(q, quadrature_points)?
-            .comparable_pair_fraction;
+        let current =
+            qmc_expected_comparable_pair_fraction(q, quadrature_points)?.comparable_pair_fraction;
         if current + 1.0e-12 < previous {
             return Err(CurvedOrderStatisticsError::NonMonotoneCalibration);
         }
         previous = current;
     }
 
-    let lower_fraction = qmc_expected_comparable_pair_fraction(0.0, quadrature_points)?
-        .comparable_pair_fraction;
-    let upper_fraction = qmc_expected_comparable_pair_fraction(
-        maximum_dimensionless_curvature,
-        quadrature_points,
-    )?
-    .comparable_pair_fraction;
+    let lower_fraction =
+        qmc_expected_comparable_pair_fraction(0.0, quadrature_points)?.comparable_pair_fraction;
+    let upper_fraction =
+        qmc_expected_comparable_pair_fraction(maximum_dimensionless_curvature, quadrature_points)?
+            .comparable_pair_fraction;
     if observed_ordering_fraction < lower_fraction - 1.0e-12
         || observed_ordering_fraction > upper_fraction + 1.0e-12
     {
