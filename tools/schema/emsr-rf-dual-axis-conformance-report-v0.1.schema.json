@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1",
+  "title": "EMSR RF dual-axis synthetic conformance report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_contract",
+    "status",
+    "authority",
+    "input_sha256",
+    "profile_id",
+    "fixture_version",
+    "fixture_count_expected",
+    "fixture_count_discovered",
+    "fixture_ids",
+    "discovery_complete",
+    "duplicate_fixture_ids",
+    "passed_count",
+    "failure_count",
+    "reference_disagreement_count",
+    "false_accept_count",
+    "high_confidence_acquisition_fault_cases_blocked",
+    "verification",
+    "per_fixture",
+    "claim_ceiling",
+    "non_claims"
+  ],
+  "properties": {
+    "report_contract": {
+      "const": "emsr-rf-dual-axis-conformance-report/0.1"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "authority": {
+      "const": "synthetic_rf_dual_axis_semantic_conformance_only"
+    },
+    "input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "profile_id": {
+      "const": "EMSR-RF-OPENSET-001"
+    },
+    "fixture_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_count_expected": {
+      "const": 12
+    },
+    "fixture_count_discovered": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fixture_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "discovery_complete": {
+      "type": "boolean"
+    },
+    "duplicate_fixture_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "passed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failure_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reference_disagreement_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_accept_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "high_confidence_acquisition_fault_cases_blocked": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "method": {
+          "const": "separate_4x3_reference_decision_table"
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "per_fixture": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "acquisition_qualification",
+          "recognition_disposition",
+          "primary",
+          "reference",
+          "submitted_derived",
+          "expected",
+          "reference_agrees",
+          "submitted_derived_matches",
+          "expected_matches",
+          "false_accept",
+          "passed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "acquisition_qualification": {
+            "type": "string"
+          },
+          "recognition_disposition": {
+            "type": "string"
+          },
+          "recognition_confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "primary": {
+            "type": "object"
+          },
+          "reference": {
+            "type": "object"
+          },
+          "submitted_derived": {
+            "type": "object"
+          },
+          "expected": {
+            "type": "object"
+          },
+          "reference_agrees": {
+            "type": "boolean"
+          },
+          "submitted_derived_matches": {
+            "type": "boolean"
+          },
+          "expected_matches": {
+            "type": "boolean"
+          },
+          "false_accept": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "non_claims": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

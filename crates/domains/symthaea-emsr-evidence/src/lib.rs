@@ -15,6 +15,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub mod rf_dual_axis;
+
 const CATALOG_SCHEMA: &str = "emsr.dataset-catalog";
 const CATALOG_VERSION: &str = "0.1.0";
 const SPLIT_SCHEMA: &str = "emsr.split-manifest";
