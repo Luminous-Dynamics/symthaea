@@ -24,6 +24,71 @@ pub fn validate_files(schema_path: &Path, instance_path: &Path) -> Result<(), Ve
     validate_values(&schema, &instance)
 }
 
+pub fn validate_bundle_files(
+    scene_schema_path: &Path,
+    scene_fixture_path: &Path,
+    traffic_schema_path: &Path,
+    traffic_fixture_path: &Path,
+) -> Result<(), Vec<String>> {
+    let scene_schema = read_json_file(scene_schema_path, "scene schema")?;
+    let scene_fixture = read_json_file(scene_fixture_path, "scene fixture")?;
+    let traffic_schema = read_json_file(traffic_schema_path, "traffic profile schema")?;
+    let traffic_fixture = read_json_file(traffic_fixture_path, "traffic profile fixture")?;
+    validate_bundle_values(
+        &scene_schema,
+        &scene_fixture,
+        &traffic_schema,
+        &traffic_fixture,
+    )
+}
+
+fn read_json_file(path: &Path, label: &str) -> Result<Value, Vec<String>> {
+    let text = fs::read_to_string(path)
+        .map_err(|error| vec![format!("read {label} {}: {error}", path.display())])?;
+    serde_json::from_str(&text)
+        .map_err(|error| vec![format!("parse {label} {}: {error}", path.display())])
+}
+
+pub fn validate_bundle_values(
+    scene_schema: &Value,
+    scene_fixture: &Value,
+    traffic_schema: &Value,
+    traffic_fixture: &Value,
+) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    if let Err(mut validation_errors) = validate_values(scene_schema, scene_fixture) {
+        errors.append(&mut validation_errors);
+    }
+    if let Err(mut validation_errors) = validate_traffic_values(traffic_schema, traffic_fixture) {
+        errors.append(&mut validation_errors);
+    }
+
+    let scene_profile_id = scene_fixture
+        .get("snapshot")
+        .and_then(|snapshot| snapshot.get("traffic_convention_profile_id"))
+        .and_then(Value::as_str);
+    let known_profile = traffic_fixture
+        .get("profiles")
+        .and_then(Value::as_array)
+        .is_some_and(|profiles| {
+            profiles.iter().any(|profile| {
+                profile.get("profile_id").and_then(Value::as_str) == scene_profile_id
+            })
+        });
+    if !known_profile {
+        errors.push(format!(
+            "scene snapshot traffic_convention_profile_id {:?} does not resolve in the traffic profile registry",
+            scene_profile_id
+        ));
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
 pub fn validate_values(schema: &Value, instance: &Value) -> Result<(), Vec<String>> {
     if !jsonschema::meta::is_valid(schema) {
         return Err(vec![
@@ -920,5 +985,35 @@ mod tests {
 
         profiles["profiles"][0]["passing_side_sign"] = Value::from(-1);
         assert!(validate_traffic_values(&schema, &profiles).is_err());
+    }
+
+    #[test]
+    fn scene_traffic_profile_reference_resolves_across_contracts() {
+        let (scene_schema, scene_fixture) = load_fixture();
+        let (traffic_schema, _, traffic_fixture) = load_traffic_fixtures();
+        validate_bundle_values(
+            &scene_schema,
+            &scene_fixture,
+            &traffic_schema,
+            &traffic_fixture,
+        )
+        .expect("scene traffic-convention profile must resolve in the profile registry");
+    }
+
+    #[test]
+    fn rejects_scene_traffic_profile_missing_from_registry() {
+        let (scene_schema, mut scene_fixture) = load_fixture();
+        let (traffic_schema, _, traffic_fixture) = load_traffic_fixtures();
+        scene_fixture["snapshot"]["traffic_convention_profile_id"] =
+            Value::String("missing-traffic-profile".into());
+        assert!(
+            validate_bundle_values(
+                &scene_schema,
+                &scene_fixture,
+                &traffic_schema,
+                &traffic_fixture,
+            )
+            .is_err()
+        );
     }
 }
