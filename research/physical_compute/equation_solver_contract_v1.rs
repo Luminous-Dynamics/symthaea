@@ -460,7 +460,10 @@ pub fn conjugate_gradient<A: LinearOperator>(
             // Recompute b - A*x from the matrix and candidate, rather than
             // trusting the recursively updated CG residual at acceptance.
             let ax = a.mat_vec(&x)?;
-            let true_residual: Vec<f64> = b.iter().zip(ax).map(|(rhs, lhs)| rhs - lhs).collect();
+            let mut true_residual = try_zeroed_vector(n)?;
+            for (out, (rhs, lhs)) in true_residual.iter_mut().zip(b.iter().zip(ax)) {
+                *out = rhs - lhs;
+            }
             let true_residual_norm = norm2(&true_residual);
             if true_residual_norm <= threshold {
                 return Ok(IterativeSolution {
@@ -599,9 +602,10 @@ pub fn preconditioned_conjugate_gradient<A: LinearOperator>(
 
         if norm2(&r) <= threshold {
             let ax = a.mat_vec(&x)?;
-            let true_residual: Vec<f64> = b.iter().zip(ax)
-                .map(|(rhs, lhs)| rhs - lhs)
-                .collect();
+            let mut true_residual = try_zeroed_vector(n)?;
+            for (out, (rhs, lhs)) in true_residual.iter_mut().zip(b.iter().zip(ax)) {
+                *out = rhs - lhs;
+            }
             let true_norm = norm2(&true_residual);
             if true_norm <= threshold {
                 return Ok(IterativeSolution {
