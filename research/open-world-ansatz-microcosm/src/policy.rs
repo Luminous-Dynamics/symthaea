@@ -142,6 +142,115 @@ impl FiniteEnumeratorBaseline {
     }
 }
 
+/// Runs the same exact finite inference baseline with interchangeable
+/// one-step experiment-selection strategies, enabling controlled policy arms.
+pub struct StrategyEnumeratorBaseline;
+
+impl StrategyEnumeratorBaseline {
+    pub fn next_action(
+        view: &AgentView,
+        strategy: crate::strategies::ProbeStrategy,
+    ) -> Result<AgentAction, PolicyError> {
+        if view.status != crate::protocol::EpisodeStatus::Open {
+            return Err(PolicyError::EpisodeNotOpen);
+        }
+        match view.task.world_family {
+            crate::protocol::WorldFamily::BooleanMechanism => {
+                let access = match view.task.structure_access {
+                    StructureAccess::BooleanWithheld => crate::StructureAccess::Withheld,
+                    StructureAccess::BooleanSupplied(mechanism) => {
+                        crate::StructureAccess::Supplied(mechanism)
+                    }
+                    _ => return Err(PolicyError::ManifestFamilyMismatch),
+                };
+                let log = boolean_log(view)?;
+                let models = if log.interventions.is_empty() {
+                    crate::candidate_hypotheses(access)
+                } else {
+                    crate::discover(&log, access)
+                        .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?
+                        .compatible_hypotheses
+                };
+                if !log.interventions.is_empty()
+                    && (view.remaining_probe_actions == 0 || models.len() <= 1)
+                {
+                    let count = models.len();
+                    return Ok(submit(
+                        view,
+                        AgentClaim::Boolean {
+                            compatible_models: models,
+                            disposition: disposition(count),
+                        },
+                    ));
+                }
+            }
+            crate::protocol::WorldFamily::NumericMechanism => {
+                let access = match view.task.structure_access {
+                    StructureAccess::NumericWithheld => numeric::StructureAccess::Withheld,
+                    StructureAccess::NumericSupplied(mechanism) => {
+                        numeric::StructureAccess::Supplied(mechanism)
+                    }
+                    _ => return Err(PolicyError::ManifestFamilyMismatch),
+                };
+                let log = numeric_log(view)?;
+                let models = if log.interventions.is_empty() {
+                    numeric::candidate_models(access)
+                } else {
+                    numeric::discover(&log, access)
+                        .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?
+                        .compatible_models
+                };
+                if !log.interventions.is_empty()
+                    && (view.remaining_probe_actions == 0 || models.len() <= 1)
+                {
+                    let count = models.len();
+                    return Ok(submit(
+                        view,
+                        AgentClaim::Numeric {
+                            compatible_models: models,
+                            disposition: disposition(count),
+                        },
+                    ));
+                }
+            }
+            crate::protocol::WorldFamily::TwoInputResponse => {
+                let access = match view.task.structure_access {
+                    StructureAccess::InteractionWithheld => {
+                        interaction::StructureAccess::Withheld
+                    }
+                    StructureAccess::InteractionSupplied(structure) => {
+                        interaction::StructureAccess::Supplied(structure)
+                    }
+                    _ => return Err(PolicyError::ManifestFamilyMismatch),
+                };
+                let log = interaction_log(view)?;
+                let models = if log.interventions.is_empty() {
+                    interaction::candidate_models(access)
+                } else {
+                    interaction::discover(&log, access)
+                        .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?
+                        .compatible_models
+                };
+                if !log.interventions.is_empty()
+                    && (view.remaining_probe_actions == 0 || models.len() <= 1)
+                {
+                    let count = models.len();
+                    return Ok(submit(
+                        view,
+                        AgentClaim::Interaction {
+                            compatible_models: models,
+                            disposition: disposition(count),
+                        },
+                    ));
+                }
+            }
+        }
+        let intervention = crate::strategies::choose_probe(view, strategy)
+            .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
+        Ok(probe(intervention))
+    }
+}
+
 fn probe(intervention: AgentIntervention) -> AgentAction {
     AgentAction::Probe { intervention }
 }
@@ -239,6 +348,7 @@ pub enum PolicyError {
     ObservationFamilyMismatch,
     DiscoveryFailure(String),
     ProbeFailure(String),
+    StrategyFailure(String),
 }
 
 impl std::fmt::Display for PolicyError {
