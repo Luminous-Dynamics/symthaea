@@ -2794,6 +2794,42 @@ mod tests {
     }
 
     #[test]
+    fn anf_transform_reconstructs_every_three_input_boolean_function() {
+        for function_mask in 0..256usize {
+            let values: Vec<bool> = (0..8)
+                .map(|assignment| ((function_mask >> assignment) & 1) != 0)
+                .collect();
+            let source = function(&[0, 1, 2], &values);
+            let report = strategy_anf_interaction_hypergraph(&source, budget()).unwrap();
+
+            for (assignment, expected) in values.iter().copied().enumerate() {
+                let mut reconstructed = report.constant_term;
+                for &variable in &report.linear_variables {
+                    reconstructed ^= ((assignment >> variable) & 1) != 0;
+                }
+                for monomial in &report.hyperedges {
+                    if monomial
+                        .iter()
+                        .all(|&variable| ((assignment >> variable) & 1) != 0)
+                    {
+                        reconstructed = !reconstructed;
+                    }
+                }
+                assert_eq!(
+                    reconstructed, expected,
+                    "function mask {function_mask}, assignment {assignment}"
+                );
+            }
+
+            let order = anf_hypergraph_min_fill_order(3, &report.hyperedges).unwrap();
+            assert_eq!(
+                order.iter().copied().collect::<BTreeSet<_>>(),
+                BTreeSet::from([0, 1, 2])
+            );
+        }
+    }
+
+    #[test]
     fn anf_hypergraph_min_fill_is_deterministic_and_covers_all_variables() {
         let edges = vec![vec![0, 1, 2], vec![2, 3], vec![3, 4, 5]];
         let first = anf_hypergraph_min_fill_order(6, &edges).unwrap();
