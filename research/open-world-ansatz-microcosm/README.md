@@ -130,6 +130,27 @@ The `open_world_agent` binary is a newline-delimited JSON (JSONL) process adapte
 
 Stdout is reserved for action JSONL; errors and diagnostics go to stderr. Input framing is capped at 1 MiB per message, the protocol version is checked, blank lines and submitted episodes are rejected. The adapter has no evaluator constructors or truth arguments. It is a **protocol-facing reference policy**, not yet a bridge to the learned Symthaea research orchestrator. Do not call the process boundary a security sandbox: an external runner must isolate the agent's filesystem, network, environment, process visibility, CPU/memory and wall time.
 
+## Parent-runner / child-agent process bridge
+
+The `process` module adds a parent-runner boundary for episodes. The evaluator keeps `BlindEpisode` and generating truth in the parent process. A separately spawned child receives only public `AgentView` JSONL frames on stdin and returns `AgentAction` JSONL frames on stdout.
+
+The parent records:
+- the child executable's SHA-256 and exact argument vector;
+- explicit `env_clear()` behavior (no inherited environment variables);
+- the initial and final evidence-prefix digests;
+- each action with the evidence-prefix digest immediately before and after it;
+- the evaluator's post-submission score and the child exit code.
+
+The stream reader bounds each input and output frame (1 MiB by default), includes the JSONL newline delimiter in the limit, rejects malformed/blank/oversized frames, rejects unsolicited stdout after terminal submission, and requires a clean child exit. The parent-runner smoke executable drives matched-world A0 and A2 episodes through the same child artifact and strategy:
+
+    cargo build --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin open_world_agent --bin process_episode_smoke
+    target_dir="$(cargo metadata --format-version 1 --no-deps --manifest-path research/open-world-ansatz-microcosm/Cargo.toml | jq -r '.target_directory')"
+    "$target_dir/debug/process_episode_smoke" --agent "$target_dir/debug/open_world_agent" --strategy maximum_structure_information_gain
+
+The smoke receipt reports the two episode scores and action/evidence trace. It checks truth retention, exact version-space match, valid evidence references, common executable bytes/configuration and probe-budget compliance. This is a **process-boundary integration test**, not a learned-researcher result.
+
+**Security boundary:** `env_clear()`, separate stdin/stdout and a temporary working directory do not make an OS sandbox. The child may still have host filesystem/network access and may inspect its process environment through host interfaces. This adapter does not enforce CPU, memory or wall-clock timeouts. Do not execute untrusted agents without an external container/namespace/seccomp or equivalent isolation and explicit resource limits. A production runner must also bind the complete runtime dependency image, not just the executable bytes.
+
 ## Paired A0/A2 campaign manifest
 
 `campaign::CampaignManifest` validates public experimental-design metadata. Every pair contains exactly A0 and A2, shares the same agent artifact, policy config, initial evidence and action/compute budgets, and selects one of two comparison contracts:
@@ -159,7 +180,7 @@ The focused workflow runs the census and fails closed on incomplete exact versio
 
 ## Authored tests
 
-Eighty-three Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, and a serialized AgentView-to-AgentAction episode round trip.
+Eighty-six Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, serialized AgentView-to-AgentAction round trip, and bounded parent-runner process-frame handling.
 
 Test functions include the finite truth-census, paired A0/A2 episode, campaign seed-schedule controls, process JSONL framing/round-trip and campaign manifest negative controls. The exact current-head formatting, Clippy, tests and exhaustive-census status must be read from the focused workflow; do not infer a pass from this authored-test count or an older source SHA.
 
