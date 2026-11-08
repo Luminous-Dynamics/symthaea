@@ -280,7 +280,10 @@ fn one_sided_jacobi_svd(
         row[index] = 1.0;
     }
 
-    if matrix.iter().all(|row| row.iter().all(|value| *value == 0.0)) {
+    if matrix
+        .iter()
+        .all(|row| row.iter().all(|value| *value == 0.0))
+    {
         return Ok((vec![0.0; column_count], right_vectors));
     }
 
@@ -374,8 +377,7 @@ fn one_sided_jacobi_svd(
                 }
                 let denominator = alpha.sqrt() * beta.sqrt();
                 if denominator > 0.0 {
-                    maximum_correlation =
-                        maximum_correlation.max(gamma.abs() / denominator);
+                    maximum_correlation = maximum_correlation.max(gamma.abs() / denominator);
                 }
             }
         }
@@ -386,9 +388,9 @@ fn one_sided_jacobi_svd(
 
     let mut indexed_singular_values = Vec::with_capacity(column_count);
     for column in 0..column_count {
-        let norm = matrix.iter().fold(0.0_f64, |accumulator, row| {
-            accumulator.hypot(row[column])
-        });
+        let norm = matrix
+            .iter()
+            .fold(0.0_f64, |accumulator, row| accumulator.hypot(row[column]));
         if !norm.is_finite() {
             return Err(ObservabilityError::NumericalOverflow);
         }
@@ -484,12 +486,8 @@ mod tests {
     fn direct_svd_preserves_a_small_singular_value_lost_by_gram_squaring() {
         // J has a real second singular value about 7.07e-9. Forming J^T J
         // subtracts nearly equal O(1) terms and loses that direction in f64.
-        let report = analyze_jacobian(
-            &[vec![1.0, 1.0], vec![0.0, 1.0e-8]],
-            &[1.0, 1.0],
-            1.0e-10,
-        )
-        .unwrap();
+        let report =
+            analyze_jacobian(&[vec![1.0, 1.0], vec![0.0, 1.0e-8]], &[1.0, 1.0], 1.0e-10).unwrap();
 
         assert_eq!(report.numerical_rank, 2);
         assert!(report.singular_values[1] > 6.0e-9);
