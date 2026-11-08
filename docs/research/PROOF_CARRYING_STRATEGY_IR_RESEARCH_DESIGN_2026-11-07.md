@@ -581,3 +581,18 @@ The research sequence is:
 3. integrate verified DAG evidence into the existing strategy portfolio without duplicating formats;
 4. build a distinct finite #QBF reference/counting lane;
 5. only then compare with QBF Gallery benchmarks and #QBF knowledge-compilation / d4-QBF baselines.
+
+## 18. Cross-representation QBF evidence portfolio
+
+The strategy portfolio now has a second complete evidence path:
+
+- **Tree proof path:** existing QbfGameProof, source-bound tree verifier and canonical LD-QBFPROOF1 encoding.
+- **Residual DAG path:** QbfGameProofDag, source-bound independent residual verifier and canonical LD-QBFDAG1 encoding.
+- **Strategy path:** independently checked Skolem/Herbrand functions.
+- **Circuit path:** support-minimized ROBDD and AIG per strategy function, independently checked and canonically encoded.
+
+The new DAG bundle builder verifies the residual proof DAG, checks its root value against the candidate, encodes and decodes the DAG, reruns the source-bound verifier on the decoded object, independently verifies the candidate strategy, compiles the BDD/AIG portfolio, and accounts the total evidence bytes. The tree and DAG evidence bundles remain distinct types; the portfolio can compare their size, verification work and construction costs without pretending they share a proof calculus.
+
+The bounded #QBF reference counter is also implemented separately from decision and #SAT. It enumerates total Skolem strategy profiles over exact prefix-derived dependency tables and counts a profile once only if it wins for every universal assignment. It has known answers and differential exact-count oracles on generated small instances. It is not a scalable #QBF proof system.
+
+The official SAT Competition 2026 results have since been corrected. The current official Main Track table reports 306/400 solved by the best individual listed configuration (kissat-sc2024) and 347/400 by the per-instance VBS; the website notes an August 10, 2026 update that changed a ranking. Historical local recomputations (276/269 and derived 324/344 VBS) are not the official table and must be reconciled against the updated scores.csv before any claim that uses them.
