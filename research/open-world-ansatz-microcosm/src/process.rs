@@ -187,7 +187,8 @@ impl ProcessAgent {
 
         let mut input = serde_json::to_vec(view)
             .map_err(|error| ProcessError::Serialization(error.to_string()))?;
-        if input.len() > self.max_input_frame_bytes {
+        // The JSONL delimiter is part of the child-side frame limit.
+        if input.len().saturating_add(1) > self.max_input_frame_bytes {
             return Err(ProcessError::FrameTooLarge {
                 direction: "input",
                 limit: self.max_input_frame_bytes,
