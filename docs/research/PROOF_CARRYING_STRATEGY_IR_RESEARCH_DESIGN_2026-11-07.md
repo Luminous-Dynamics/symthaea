@@ -596,3 +596,29 @@ The new DAG bundle builder verifies the residual proof DAG, checks its root valu
 The bounded #QBF reference counter is also implemented separately from decision and #SAT. It enumerates total Skolem strategy profiles over exact prefix-derived dependency tables and counts a profile once only if it wins for every universal assignment. It has known answers and differential exact-count oracles on generated small instances. It is not a scalable #QBF proof system.
 
 The official SAT Competition 2026 results have since been corrected. The current official Main Track table reports 306/400 solved by the best individual listed configuration (kissat-sc2024) and 347/400 by the per-instance VBS; the website notes an August 10, 2026 update that changed a ranking. Historical local recomputations (276/269 and derived 324/344 VBS) are not the official table and must be reconciled against the updated scores.csv before any claim that uses them.
+
+
+## 17. Full-history game values and Skolem/Herbrand synthesis
+
+A winning strategy and a full-history Skolem/Herbrand function are not interchangeable. The winning strategy only needs to secure the initial game. Full-history functions must make the right move after every partial play, even one not reached when both players follow a winning strategy.
+
+Following Akshay et al., SAT 2026, *Proof Systems for QBF Synthesis: Extracting Skolem and Herbrand Functions* (https://doi.org/10.4230/LIPIcs.SAT.2026.3), define (g_i(x_1,\ldots,x_i)) as the value of the remaining quantified suffix after the first i moves. Then:
+- (g_n) is the source matrix;
+- (g_{i-1} = g_i|_{x_i=0} \lor g_i|_{x_i=1}) for existential (x_i);
+- (g_{i-1} = g_i|_{x_i=0} \land g_i|_{x_i=1}) for universal (x_i);
+- the full-history Skolem function is (f_i(x_{<i}) = g_i(x_{<i},1)) for existential (x_i);
+- the full-history Herbrand function is (f_i(x_{<i}) = g_i(x_{<i},0)) for universal (x_i).
+
+Crucially, (f_i)'s dependency scope is every earlier prefix variable, including earlier variables quantified by the same player. This is deliberately different from the opponent-only dependency scope of the existing initial winning-strategy contract.
+
+The new finite module `quantified_game_values.rs` extracts complete (g_0,\ldots,g_n) truth tables by traversing the already independently verified residual game DAG. It returns both full-history function families even if the root formula is true or false. An independent verifier rechecks the final matrix layer, all quantifier recurrences, all function scopes/rows and the root value.
+
+This is a semantic profile, not yet a SynQBF proof. The SAT 2026 proof system uses a circuit (hat\varphi(x_i,\hat x_i)) subject to three explicit conditions (source-matrix equivalence, per-variable representability after the paper's prescribed substitutions, and truth-value agreement). Its CEGC constructor uses an AllSATRep routine to represent all satisfying assignments; the paper leaves implementation of AllSATRep outside its scope. Symthaea must implement and validate that subroutine separately before claiming a SynQBF proof constructor.
+
+### Qualification boundary
+
+- Existing `WinningStrategy`: one initial winning player's strategy, opponent-only dependencies.
+- New `QuantifiedGameValueProfile`: every intermediate game value, plus both full-history function families, all-prior-prefix dependencies.
+- Future SynQBF proof object: a circuit proof meeting the paper's three representability/equivalence conditions, independently checked from the source and prefix.
+
+These are related but different evidence artifacts. A full-history profile does not become a SynQBF proof by renaming it.
