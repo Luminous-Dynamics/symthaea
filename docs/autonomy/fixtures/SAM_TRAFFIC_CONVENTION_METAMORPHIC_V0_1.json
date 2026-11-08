@@ -1,7 +1,5 @@
 {
-  "fixture_schema": "luminous.sam.traffic-convention-metamorphic",
-  "fixture_version": "0.1.0",
-  "claim_ceiling": "paired_synthetic_metamorphic_conformance_only",
+  "claim_ceiling": "synthetic_convention_semantics_only",
   "profile_registry_ref": "SAM_TRAFFIC_CONVENTION_PROFILE_FIXTURE_V0_1.json",
   "coordinate_contract": {
     "frame": "right_handed_local_road",
@@ -207,5 +205,8 @@
       "lane_ordering_profile_id": "kerb-to-median-lht-v1",
       "applicability": "synthetic_fixture"
     }
-  ]
+  ],
+  "schema_id": "luminous.sam.traffic-convention-profiles",
+  "schema_version": "0.1.0",
+  "metamorphic_claim_ceiling": "paired_synthetic_metamorphic_conformance_only"
 }
