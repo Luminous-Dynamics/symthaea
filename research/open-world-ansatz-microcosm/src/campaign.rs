@@ -81,12 +81,10 @@ impl CampaignManifest {
         validate_digest(&self.confirmation_ledger_sha256)?;
 
         let mut pair_ids = BTreeSet::new();
-        let mut world_aliases = BTreeSet::new();
         for pair in &self.pairs {
             if pair.pair_id.trim().is_empty()
                 || pair.world_alias.trim().is_empty()
                 || !pair_ids.insert(pair.pair_id.as_str())
-                || !world_aliases.insert(pair.world_alias.as_str())
                 || pair.access_arms != [AccessArm::A0, AccessArm::A2]
                 || pair.action_budget == 0
                 || pair.compute_budget_units == 0
@@ -211,11 +209,22 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_pair_or_world_alias() {
+    fn rejects_duplicate_pair_id() {
         let mut manifest = valid_manifest();
         let duplicate = manifest.pairs[0].clone();
         manifest.pairs.push(duplicate);
         assert_eq!(manifest.validate(), Err(CampaignError::InvalidPair));
+    }
+
+    #[test]
+    fn allows_repeated_world_alias_across_distinct_pairs() {
+        let mut manifest = valid_manifest();
+        let mut second_pair = manifest.pairs[0].clone();
+        second_pair.pair_id = "pair-0002".to_owned();
+        second_pair.shared_initial_evidence_sha256 = digest('3');
+        second_pair.intervention_trace_sha256 = Some(digest('4'));
+        manifest.pairs.push(second_pair);
+        assert!(manifest.validate().is_ok());
     }
 
     #[test]
