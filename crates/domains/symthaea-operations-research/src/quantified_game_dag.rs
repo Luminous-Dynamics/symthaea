@@ -811,7 +811,8 @@ fn derive_child_residual_for_verification(
             work = work
                 .checked_add(1)
                 .ok_or(QbfGameDagError::ResourceAccountingOverflow)?;
-            if let Some(previous) = polarity_by_variable.insert(literal.variable, literal.positive) {
+            if let Some(previous) = polarity_by_variable.insert(literal.variable, literal.positive)
+            {
                 if previous != literal.positive {
                     tautological = true;
                     break;
@@ -1290,10 +1291,8 @@ mod tests {
                 vec![],
             ],
         };
-        let constrained_prefix =
-            prefix(2, vec![block(Quantifier::Exists, &[0, 1])]);
-        let (dag, _) =
-            build_qbf_game_proof_dag(&problem, &constrained_prefix, budget()).unwrap();
+        let constrained_prefix = prefix(2, vec![block(Quantifier::Exists, &[0, 1])]);
+        let (dag, _) = build_qbf_game_proof_dag(&problem, &constrained_prefix, budget()).unwrap();
         assert_eq!(dag.nodes[dag.root].residual.len(), 1);
         assert!(dag.nodes[dag.root].residual[0].is_empty());
         assert!(!dag.nodes[dag.root].value);
