@@ -443,6 +443,39 @@
       "supports": [
         "CEB-SECURE"
       ]
+    },
+    {
+      "source_id": "llm-overcorrection-review-paper",
+      "source_url": "https://doi.org/10.1007/s10515-026-00638-5",
+      "title": "Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-06-26",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "reviewgrounder-acl2026-paper",
+      "source_url": "https://aclanthology.org/2026.acl-long.1477/",
+      "title": "ReviewGrounder: Improving Review Substantiveness with Rubric-Guided, Tool-Integrated Agents",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-07-01",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "scope-selective-judge-summary",
+      "source_url": "https://hypermatrix.cs.dal.ca/selective-prediction/",
+      "title": "Uncertainty-Guarded Selective Prediction for Large Language Models — SCOPE research summary",
+      "source_type": "research_summary",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-08-20",
+      "supports": [
+        "CEB-REVIEW"
+      ]
     }
   ],
   "comparators": [
@@ -1378,6 +1411,70 @@
         "Correctness uses developer-written tests and security uses OSS-Fuzz-derived proof-of-concept inputs.",
         "Leaderboard rows are setup-specific; do not treat a single setup as a universal industry ceiling.",
         "Security completion metrics are not CEB-SECURE joint secure-functional pass unless the exact task, denominator, oracle and execution policy are matched."
+      ]
+    },
+    {
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Requirement-conformance over-correction / Fix-guided Verification Filter",
+      "benchmark_version": "Automated Software Engineering 33, article 90 (2026)",
+      "split": "Paired canonical/buggy HumanEval, MBPP and QuixBugs instances; five models; Direct / Direct+Explain / Full prompts",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "paper reports over 700 tasks and over 1,400 paired instances; exact per-benchmark denominators not copied here"
+      },
+      "source_id": "llm-overcorrection-review-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Task is natural-language requirement conformance on paired canonical and buggy implementations, not PR review or CEB-REVIEW finding adjudication.",
+        "False-negative rate here measures rejection of a canonical correct implementation (over-correction); false-positive rate measures acceptance of a buggy implementation. Do not equate FNR with CEB defect recall or actionable precision.",
+        "Fix-guided Verification Filter uses the model-proposed patch with benchmark and specification-constrained tests; generated tests and benchmark oracles can be incomplete.",
+        "Average FNR reductions are reported across five models under Full prompting. Exact per-model/per-task raw denominators and uncertainty intervals are not represented in these summary observations.",
+        "Authors report small FPR increases in some settings; retain the two-sided error trade-off."
+      ]
+    },
+    {
+      "comparator_id": "reviewgrounder-academic-peer-review",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "ReviewGrounder / ReviewBench",
+      "benchmark_version": "ACL 2026",
+      "split": "Academic-paper peer review; eight rubric dimensions; draft then evidence-grounding pipeline",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task denominator not stated in the retrieved paper summary"
+      },
+      "source_id": "reviewgrounder-acl2026-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "This is academic-paper review, not source-code pull-request review.",
+        "The framework separates a Phi-4-14B drafter from GPT-OSS-120B evidence grounding and reports improved human-judgment alignment/rubric review quality versus larger backbones.",
+        "The eight rubric dimensions describe evaluation scope, not eight CEB primary metrics.",
+        "Methodological reference only; no direct CEB score or industry ranking is implied."
+      ]
+    },
+    {
+      "comparator_id": "scope-selective-pairwise-judging",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "SCOPE — Selective Conformal Optimized Pairwise LLM Judging",
+      "benchmark_version": "ACL 2026; HyperMatrix research summary snapshot 2026-08-20",
+      "split": "Pairwise LLM judging across general judging benchmarks; acceptance calibrated under exchangeability",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task count not stated in the retrieved summary"
+      },
+      "source_id": "scope-selective-judge-summary",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "This is pairwise LLM judging, not software code review or causal diagnosis.",
+        "The reported empirical FDR range is under a target alpha of 0.10 and the stated calibration protocol; it is not an unconditional guarantee for CEB.",
+        "Reported acceptance multiplier is up to 2.4x versus vanilla baselines, not 2.4x accuracy.",
+        "CEB adaptation requires disjoint calibration material and evaluation of exchangeability/shift by repository, defect family, severity and claim type."
       ]
     }
   ],
@@ -5411,6 +5508,414 @@
       "notes": [
         "Top visible setup row; benchmark includes 318 tasks, 27 repositories and 15 CWEs.",
         "Functional pass@1 is not the joint CEB secure-functional pass metric."
+      ]
+    },
+    {
+      "observation_id": "overcorr-humaneval-full-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-humaneval",
+        "model": "Five-model average",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_humaneval_full",
+        "label": "False-negative rate — HumanEval — Full prompt",
+        "definition": "Share of canonical implementations incorrectly rejected under Full prompting; reported average across five models.",
+        "value": 54.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "54.8%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_humaneval_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Canonical-code rejection / over-correction measure; not CEB review recall."
+      ]
+    },
+    {
+      "observation_id": "overcorr-humaneval-filter-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-filter-humaneval",
+        "model": "Five-model average",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_humaneval_full_filter",
+        "label": "False-negative rate — HumanEval — Full + filter",
+        "definition": "Share of canonical implementations incorrectly rejected after original/proposed-patch executable comparison; reported average across five models.",
+        "value": 16.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "16.3%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_humaneval_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Filter uses benchmark and spec-constrained tests; retain oracle-coverage caveat."
+      ]
+    },
+    {
+      "observation_id": "overcorr-mbpp-full-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-mbpp",
+        "model": "Five-model average",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_mbpp_full",
+        "label": "False-negative rate — MBPP — Full prompt",
+        "definition": "Share of canonical implementations incorrectly rejected under Full prompting; reported average across five models.",
+        "value": 69,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "69.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_mbpp_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Canonical-code rejection / over-correction measure; not CEB review recall."
+      ]
+    },
+    {
+      "observation_id": "overcorr-mbpp-filter-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-filter-mbpp",
+        "model": "Five-model average",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_mbpp_full_filter",
+        "label": "False-negative rate — MBPP — Full + filter",
+        "definition": "Share of canonical implementations incorrectly rejected after original/proposed-patch executable comparison; reported average across five models.",
+        "value": 28.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "28.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_mbpp_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Filter uses benchmark and spec-constrained tests; retain oracle-coverage caveat."
+      ]
+    },
+    {
+      "observation_id": "overcorr-quixbugs-full-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-quixbugs",
+        "model": "Five-model average",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_quixbugs_full",
+        "label": "False-negative rate — QuixBugs — Full prompt",
+        "definition": "Share of canonical implementations incorrectly rejected under Full prompting; reported average across five models.",
+        "value": 51,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "51.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_quixbugs_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Canonical-code rejection / over-correction measure; not CEB review recall."
+      ]
+    },
+    {
+      "observation_id": "overcorr-quixbugs-filter-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-filter-quixbugs",
+        "model": "Five-model average",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_quixbugs_full_filter",
+        "label": "False-negative rate — QuixBugs — Full + filter",
+        "definition": "Share of canonical implementations incorrectly rejected after original/proposed-patch executable comparison; reported average across five models.",
+        "value": 24,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "24.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_quixbugs_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Filter uses benchmark and spec-constrained tests; retain oracle-coverage caveat."
+      ]
+    },
+    {
+      "observation_id": "overcorr-gpt4o-humaneval-full-fpr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "gpt4o-full-humaneval",
+        "model": "GPT-4o",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; HumanEval buggy slice"
+      },
+      "metric": {
+        "metric_id": "false_positive_rate_gpt4o_humaneval_full",
+        "label": "False-positive rate — GPT-4o — HumanEval — Full",
+        "definition": "Share of buggy implementations incorrectly accepted under Full prompting.",
+        "value": 0,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "0.00%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_positive_rate_gpt4o_humaneval_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Model- and benchmark-specific example."
+      ]
+    },
+    {
+      "observation_id": "overcorr-gpt4o-humaneval-filter-fpr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "gpt4o-full-filter-humaneval",
+        "model": "GPT-4o",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; HumanEval buggy slice"
+      },
+      "metric": {
+        "metric_id": "false_positive_rate_gpt4o_humaneval_full_filter",
+        "label": "False-positive rate — GPT-4o — HumanEval — Full + filter",
+        "definition": "Share of buggy implementations incorrectly accepted after filtering.",
+        "value": 1.83,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "1.83%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_positive_rate_gpt4o_humaneval_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Small false-positive increase in this example; do not hide FNR/FPR trade-off."
+      ]
+    },
+    {
+      "observation_id": "reviewgrounder-rubric-dimensions",
+      "comparator_id": "reviewgrounder-academic-peer-review",
+      "source_locator": "ACL 2026 paper abstract/metadata, section describing ReviewBench rubric",
+      "system": {
+        "system_id": "reviewgrounder-eight-dimensions",
+        "model": "Phi-4-14B drafter + GPT-OSS-120B grounder",
+        "harness": "ReviewGrounder",
+        "configuration": "Academic-paper peer-review benchmark"
+      },
+      "metric": {
+        "metric_id": "rubric_dimension_count",
+        "label": "Rubric dimension count",
+        "definition": "Number of paper-specific review rubric dimensions reported for the ReviewGrounder evaluation.",
+        "value": 8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "dimensions",
+        "direction": "not_applicable",
+        "raw_display": "8 dimensions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "rubric_dimension_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Evaluation-scope descriptor, not a performance score or software code-review metric."
+      ]
+    },
+    {
+      "observation_id": "scope-fdr-lower-bound",
+      "comparator_id": "scope-selective-pairwise-judging",
+      "source_locator": "HyperMatrix Research Lab SCOPE research summary; ACL 2026 result synopsis",
+      "system": {
+        "system_id": "scope-alpha-010-fdr-lower",
+        "model": "SCOPE",
+        "harness": "Selective conformal pairwise judge",
+        "configuration": "Target alpha=0.10; pairwise judging"
+      },
+      "metric": {
+        "metric_id": "accepted_judgement_fdr_lower_bound",
+        "label": "Accepted-judgment FDR lower bound",
+        "definition": "Lower bound of the reported empirical FDR range among accepted judgments at target alpha 0.10.",
+        "value": 0.097,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "fraction",
+        "direction": "minimize",
+        "raw_display": "approximately 0.097",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "accepted_judgement_fdr_lower_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Methodological result under the source calibration/exchangeability setup; not a CEB target guarantee."
+      ]
+    },
+    {
+      "observation_id": "scope-fdr-upper-bound",
+      "comparator_id": "scope-selective-pairwise-judging",
+      "source_locator": "HyperMatrix Research Lab SCOPE research summary; ACL 2026 result synopsis",
+      "system": {
+        "system_id": "scope-alpha-010-fdr-upper",
+        "model": "SCOPE",
+        "harness": "Selective conformal pairwise judge",
+        "configuration": "Target alpha=0.10; pairwise judging"
+      },
+      "metric": {
+        "metric_id": "accepted_judgement_fdr_upper_bound",
+        "label": "Accepted-judgment FDR upper bound",
+        "definition": "Upper bound of the reported empirical FDR range among accepted judgments at target alpha 0.10.",
+        "value": 0.099,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "fraction",
+        "direction": "minimize",
+        "raw_display": "approximately 0.099",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "accepted_judgement_fdr_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Methodological result under the source calibration/exchangeability setup; not a CEB target guarantee."
+      ]
+    },
+    {
+      "observation_id": "scope-acceptance-multiplier",
+      "comparator_id": "scope-selective-pairwise-judging",
+      "source_locator": "HyperMatrix Research Lab SCOPE research summary; ACL 2026 result synopsis",
+      "system": {
+        "system_id": "scope-vanilla-coverage-multiplier",
+        "model": "SCOPE",
+        "harness": "Selective conformal pairwise judge",
+        "configuration": "Compared with vanilla pairwise judging under same risk constraint"
+      },
+      "metric": {
+        "metric_id": "accepted_judgement_coverage_multiplier_upper_bound",
+        "label": "Accepted-judgment multiplier upper bound",
+        "definition": "Maximum reported multiplicative increase in accepted judgments compared with vanilla baselines under the same risk constraint.",
+        "value": 2.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "x",
+        "direction": "maximize",
+        "raw_display": "up to 2.4x",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "accepted_judgement_coverage_multiplier_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Acceptance/coverage multiplier, not accuracy improvement."
       ]
     }
   ]
