@@ -547,6 +547,9 @@ mod tests {
         ).expect("valid corpus");
         assert_eq!(result.estimable_utterances, 1);
         assert_eq!(result.non_estimable_utterances, 1);
+        assert_eq!(result.totals.reference_tokens, 4);
+        assert_eq!(result.totals.hypothesis_tokens, 4);
+        assert_eq!(result.totals.poi_reference_tokens, 1);
         assert_eq!(result.micro_pier_percent, Some(0.0));
         assert_eq!(result.macro_pier_percent, Some(0.0));
     }
