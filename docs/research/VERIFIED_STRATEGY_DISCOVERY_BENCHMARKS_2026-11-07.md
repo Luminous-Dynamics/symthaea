@@ -817,3 +817,31 @@ The QBFGallery page lists results as presented at SAT but does not expose a mach
 ### #QBF boundary
 
 The October 2026 knowledge-compilation paper treats #QBF as counting winning strategies and studies proof systems for this task. It is not the same as deciding whether a QBF is true. Any Symthaea #QBF prototype must count distinct Skolem strategy profiles under the exact dependency semantics, independently validate the count on finite instances, and compare with d4-QBF/Q-MICE-related references where compatible. Do not report #QBF values as QBF decision results or ordinary #SAT model counts.
+
+## 15. Corrected official SAT Competition 2026 Main Track baseline
+
+The current official [SAT Competition 2026 results table](https://github.com/satcompetition/2026/blob/main/results.html) reports these Main Track outcomes:
+
+| Configuration | Total solved | SAT solved | UNSAT solved |
+|---|---:|---:|---:|
+| Official virtual best solver (VBS) | 347 / 400 | 168 | 179 |
+| Best individual listed configuration, kissat-sc2024 | 306 / 400 | 153 | 153 |
+| Kissat_MAB-DC | 290 / 400 | 146 | 144 |
+| Kissat_MAB_ESA | 287 / 400 | 141 | 146 |
+| hKis-bva | 285 / 400 | 143 | 142 |
+
+The VBS is a per-instance hindsight oracle, not a deployable portfolio; its 41-instance gap over the best individual configuration is an upper-bound diagnostic, not a forecast of selector gain.
+
+The competition website records an August 10, 2026 correction that added two initially omitted solvers and changed the third-place Main Track ranking. See the official [competition update](https://github.com/satcompetition/2026/blob/main/index.html) and [results table](https://github.com/satcompetition/2026/blob/main/results.html).
+
+**Historical reconciliation:** the earlier instance-wise research note reported 276 / 269 individual configurations and 324 / 344 derived VBS values. Those figures are preserved as a historical local recomputation with a different extraction/selection basis. They must not be labelled the current official Main Track leaderboard. Before using them for head-to-head claims, regenerate the per-instance table from the corrected scores.csv and reconcile inclusion rules, solver configurations, track filters and timeout/score semantics.
+
+### Symthaea competitive targets
+
+Do not compare the QBF/strategy engine with SAT Main Track solved counts. For the SAT portfolio work, use the official table as the public baseline:
+- reproduce 306/400 for the exact pinned kissat-sc2024 baseline before claiming parity;
+- measure selector improvement against that pinned individual baseline under identical CPU, memory, timeout and per-instance scoring;
+- report total, SAT, UNSAT, PAR-2/official score, family breakdown and selector overhead;
+- require improvement on a sealed held-out set and never use the 347 VBS score as the practical target.
+
+For QBF / #QBF, use QBFGallery 2026 and compatible #QBF corpora separately. The SAT score table is not a QBF benchmark.
