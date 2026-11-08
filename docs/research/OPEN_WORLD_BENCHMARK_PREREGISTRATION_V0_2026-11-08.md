@@ -190,17 +190,21 @@ Do not pursue these stretch values at the expense of evidence validity, selectiv
 
 | Existing owner | Reuse boundary |
 |---|---|
-| #6879 / #6880 ScientificModel / PhysicsIR | Canonical candidate model representation, semantics, units, assumptions and provenance |
+| #8487 / #8143 / #8150 | Scientific-discovery benchmark protocol and existing open-world family-selection v0 |
+| #6879 / #6880 | Canonical ScientificModel / PhysicsIR, equations, units, assumptions and provenance |
 | #6868 / #6869 | Physical typing and explicit unknowns |
 | #8286 | Noisy SCM active experiment design and intervention semantics |
-| #8669 | Posterior over equivalence classes, support omission, class-level scoring and receipts |
+| #8588 | Hidden regime transitions and boundary identifiability |
+| #8607 | Unknown observation noise, adaptive sampling and calibration |
+| #8628 | Law-drift vs measurement-drift diagnosis by costed intervention |
+| #8667 | Unit/coordinate invariance and paired canonical-law checks |
+| #8669 | Posterior over equivalence classes, support omission, prior-splitting and abstention |
+| #8671 | Progressive law discovery, intermediate knowledge and negative transfer |
 | #8705 | Invariant mechanisms, environment transfer and change rejection |
 | #5476 / #5478 / #8721 | Prospective value-of-computation, realized utility and tool-allocation comparisons |
-| #10877 | Research direction/approach/experimental/interpretive taste |
-| #11012 | Generic fixed-versus-adaptive orchestration |
-| #9332 / #10756 | Sealed benchmark generation and evaluator quality |
+| #10877 / #11012 / #11015 | Research taste and generic fixed-versus-adaptive orchestration |
 | #6874 / #6875 | Proposal qualification / independent scientific acceptance |
-| #8143 / #8150 | Existing open-world physics family-selection v0 |
+| #9332 / #10756 | Sealed benchmark generation and evaluator quality |
 
 This lane owns the matched benchmark experiment and thin adapter only. It does not own a second PhysicsIR, posterior engine, active selector, VoC predictor, scheduler, receipt service or evaluator.
 
