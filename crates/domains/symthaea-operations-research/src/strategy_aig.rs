@@ -389,6 +389,11 @@ fn build_shannon(
     assignment[dependency_index] = true;
     let high = build_shannon(level + 1, order, function, assignment, builder)?;
 
+    // Eliminate a Shannon test when both cofactors are identical.
+    if low == high {
+        return Ok(low);
+    }
+
     let high_branch = builder.and(input, high)?;
     let low_branch = builder.and(input.not(), low)?;
     builder.or(high_branch, low_branch)
@@ -740,7 +745,7 @@ mod tests {
     fn identity_function_uses_a_direct_input_edge() {
         let source = function(&[7, 2], &[false, false, true, true]);
         let aig = compile_strategy_function_to_aig(&source, budget()).unwrap();
-        assert_eq!(aig.output, AigLiteral::node(0));
+        assert_eq!(aig.output, AigLiteral::node(1));
         let report = verify_aig_matches_strategy_function(&aig, &source, budget()).unwrap();
         assert_eq!(report.and_nodes, 0);
         assert_eq!(report.input_nodes, 2);
