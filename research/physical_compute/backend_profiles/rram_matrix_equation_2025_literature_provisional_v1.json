@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "profile_id": "rram-matrix-equation-2025-literature-v1",
+  "backend_family": "rram",
+  "profile_status": "provisional",
+  "evidence_class": "literature_reported",
+  "hardware_identity": {
+    "manufacturer": null,
+    "model": null,
+    "technology": "1T1R resistive random-access memory",
+    "device_id": null,
+    "firmware": null,
+    "calibration_id": null
+  },
+  "capabilities": [
+    {
+      "primitive": "matrix_equation",
+      "status": "provisional",
+      "maximum_dimension": null,
+      "supported_operations": ["paper_reported_16x16_matrix_equation_demonstration"],
+      "evidence_refs": [
+        "https://www.nature.com/articles/s41928-025-01477-0",
+        "https://doi.org/10.1038/s41928-025-01477-0"
+      ],
+      "limitations": [
+        "The 16x16 paper demonstration is not an established maximum device dimension or a general large-system scaling result.",
+        "The reported 24-bit fixed-point output is not the raw precision of each analog operation."
+      ]
+    }
+  ],
+  "noise_characterization": {
+    "status": "unknown",
+    "sources": ["unknown"],
+    "autocorrelation_status": "unknown",
+    "cross_channel_status": "unknown",
+    "stationarity_status": "unknown"
+  },
+  "fault_characterization": {
+    "status": "unknown",
+    "mechanisms": ["unknown"]
+  },
+  "peripheral_accounting": {
+    "measurement_boundary": "unknown",
+    "components": [],
+    "host_transfer_included": null,
+    "calibration_included": null,
+    "verification_included": null,
+    "recovery_included": null
+  },
+  "evidence_refs": [
+    "https://www.nature.com/articles/s41928-025-01477-0",
+    "https://doi.org/10.1038/s41928-025-01477-0"
+  ],
+  "limitations": [
+    "Literature-reported profile only. No Luminous physical hardware is identified or qualified.",
+    "Noise, fault topology, full-system energy, calibration and verification boundaries remain unknown in this profile.",
+    "The paper's measured results are specific to its device, workload, and block/iterative precision-extension method."
+  ]
+}
