@@ -996,7 +996,7 @@ pub fn plan_next_experiment_decision_aware(
             item.reasons.iter().all(|reason| {
                 matches!(
                     reason,
-                    DecisionRejectionReason::NoPositiveEIGCandidate
+                    DecisionRejectionReason::NoPositiveEigCandidate
                         | DecisionRejectionReason::NoPositiveValueOfInformation
                 )
             })
@@ -1025,9 +1025,9 @@ mod tests {
     use super::super::robust::{
         LikelihoodModelScenario, RobustExperimentProposal, ScenarioExperimentLikelihood,
     };
+    use super::super::robust::RobustPlannerConfig;
     use super::super::{
-        Authorization, EvidenceOrigin, EvidenceProvenance, Hypothesis, LikelihoodRow,
-        RobustPlannerConfig, TargetImpact,
+        Authorization, EvidenceOrigin, EvidenceProvenance, Hypothesis, LikelihoodRow, TargetImpact,
     };
     use super::*;
 
