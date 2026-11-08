@@ -512,7 +512,7 @@ where
         } else {
             right.interval.lower.total_cmp(&left.interval.lower)
         };
-        lower_order.then_with(|| left.identity.cmp(&right.identity))
+        lower_order.then_with(|| left.id.cmp(&right.id))
     });
     let threshold = lower_order[top_k - 1].interval.lower;
 
@@ -559,7 +559,7 @@ pub fn select_group_refinement_set(
 ) -> Result<GroupIntervalSelectionPlan, GroupIntervalSelectionError> {
     let mut covered_records = 0usize;
     let mut first_index_by_id = BTreeMap::new();
-    let mut lower_order: Vec<&GroupScoreIntervalRecord<Id>> =
+    let mut lower_order: Vec<&GroupScoreIntervalRecord> =
         Vec::with_capacity(groups.len());
 
     for (group_index, group) in groups.iter().enumerate() {
@@ -700,7 +700,7 @@ where
         } else {
             right.score.total_cmp(&left.score)
         };
-        score_order.then_with(|| left.identity.cmp(&right.identity))
+        score_order.then_with(|| left.id.cmp(&right.id))
     });
 
     Ok(ordered
