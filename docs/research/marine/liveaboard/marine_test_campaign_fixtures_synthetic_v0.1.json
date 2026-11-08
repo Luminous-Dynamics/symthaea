@@ -80,7 +80,8 @@
             "required_claim_bandwidth_hz": 0.2,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:feed_flow",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:feed_flow",
@@ -129,7 +130,8 @@
             "required_claim_bandwidth_hz": 0.2,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:permeate_flow",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:permeate_flow",
@@ -178,7 +180,8 @@
             "required_claim_bandwidth_hz": 0.2,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:concentrate_flow",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:concentrate_flow",
@@ -227,7 +230,8 @@
             "required_claim_bandwidth_hz": 0.1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:feed_conductivity",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:feed_conductivity",
@@ -276,7 +280,8 @@
             "required_claim_bandwidth_hz": 0.1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:product_conductivity",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:product_conductivity",
@@ -325,7 +330,8 @@
             "required_claim_bandwidth_hz": 1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:whole_system_power",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 2
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:whole_system_power",
@@ -434,7 +440,8 @@
             "required_claim_bandwidth_hz": 10000,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:dc_bus_voltage",
-            "sampling_adequacy_review_ref": null
+            "sampling_adequacy_review_ref": null,
+            "minimum_required_sample_rate_hz": 250000
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:dc_bus_voltage",
@@ -483,7 +490,8 @@
             "required_claim_bandwidth_hz": 10000,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:dc_bus_current",
-            "sampling_adequacy_review_ref": null
+            "sampling_adequacy_review_ref": null,
+            "minimum_required_sample_rate_hz": 20000
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:dc_bus_current",
@@ -592,7 +600,8 @@
             "required_claim_bandwidth_hz": 0.1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:battery_case_temp",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:battery_case_temp",
@@ -641,7 +650,8 @@
             "required_claim_bandwidth_hz": 0.1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:machinery_space_temp",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:machinery_space_temp",
@@ -750,7 +760,8 @@
             "required_claim_bandwidth_hz": 1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:task_event_marker",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 2
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:task_event_marker",
@@ -799,7 +810,8 @@
             "required_claim_bandwidth_hz": 0.05,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:clearance_measurement",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:clearance_measurement",
@@ -908,7 +920,8 @@
             "required_claim_bandwidth_hz": 1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:watermaker_power",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 2
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:watermaker_power",
@@ -957,7 +970,8 @@
             "required_claim_bandwidth_hz": 0.1,
             "sensor_response_lag_ms": 1,
             "anti_alias_profile_ref": "synthetic:anti-alias:battery_case_temp",
-            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed"
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
           },
           "calibration": {
             "calibration_id_ref": "EXEC-ID-CAL:battery_case_temp",
