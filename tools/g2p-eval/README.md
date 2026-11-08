@@ -6,11 +6,11 @@ A standalone Rust scorer for evaluating a pronunciation frontend against indepen
 
 Each JSONL reference record represents one lexical item or fixed phrase:
 
-- `case_id`, canonical `language`, `text`, and disambiguating `context`;
+- `case_id`, canonical `language`, explicit versioned `profile_id`, `text`, and disambiguating `context`;
 - `expected_oov`;
 - zero or more accepted pronunciation variants. Each variant contains canonical IPA phone tokens, exclusive syllable-ending phone indices, and one stress value per syllable (0 none, 1 primary, 2 secondary).
 
-Each candidate JSONL record carries the same case ID, candidate/system identity, source identity, explicit language tag, canonical phone tokens, optional syllable boundaries and stress values, OOV decision, and optional probability that the complete pronunciation is exactly correct. Candidate and reference language tags must match case-by-case. A backend may omit syllable boundaries or stress; those metrics remain null while phone error rate is still calculated. An OOV candidate must return empty phones and null syllable metadata.
+Each candidate JSONL record carries the same case ID, candidate/system identity, source identity, explicit language tag and profile ID, canonical phone tokens, optional syllable boundaries and stress values, OOV decision, and optional probability that the complete pronunciation is exactly correct. Candidate and reference language and profile tags must match case-by-case. A profile ID distinguishes varieties that share a broad language tag—for example, an English variety, a dialect, or a normalized spelling/phonology standard. A backend may omit syllable boundaries or stress; those metrics remain null while phone error rate is still calculated. An OOV candidate must return empty phones and null syllable metadata.
 
 Accepted variants are explicit so contextual heteronyms and dialect variants can be represented without treating one dictionary entry as universal truth. The evaluator selects the candidate's closest accepted variant using deterministic phone-edit, boundary-error, and stress-error tie-breaking.
 
@@ -23,7 +23,7 @@ Accepted variants are explicit so contextual heteronyms and dialect variants can
 - OOV precision, recall, F1, and accuracy.
 - Optional Brier score for a system-provided exact-pronunciation confidence. It is omitted if no such probability is supplied.
 
-All metrics with no valid denominator or no candidate estimate are null/undefined, not zero. The exact-pronunciation and phone-error-rate denominators contain only in-vocabulary cases; OOV detection is scored separately. Unknown phones remain tokens; no fuzzy symbol mapping is applied. Malformed reference or candidate structure, duplicate case/variant IDs, missing cases, mixed system identities, standalone stress/length-marker tokens, stress values without boundaries, and contradictory OOV declarations fail closed.
+The scorer reports aggregate, by-language and by-profile metrics; the case receipt retains the selected profile ID. All metrics with no valid denominator or no candidate estimate are null/undefined, not zero. The exact-pronunciation and phone-error-rate denominators contain only in-vocabulary cases; OOV detection is scored separately. Unknown phones remain tokens; no fuzzy symbol mapping is applied. Malformed reference or candidate structure, duplicate case/variant IDs, missing cases, mixed system identities, standalone stress/length-marker tokens, stress values without boundaries, and contradictory OOV declarations fail closed.
 
 ## Run
 
@@ -42,4 +42,4 @@ Build a small, licensed, human-reviewed gold set with at least two independent a
 
 ## Research use
 
-Compare the current Muse frontend, Piper Plus G2P, and any legally approved alternative against the same gold references. Do not use one candidate's output to create its own test labels. Report metrics by language, dialect, phoneme, word-frequency band, morphology, OOV class, and context.
+Compare the current Muse frontend, Piper Plus G2P, and any legally approved alternative against the same gold references. Do not use one candidate's output to create its own test labels. Report metrics by language, profile ID, dialect, phoneme, word-frequency band, morphology, OOV class, and context. Use immutable profile IDs that bind the orthography, phoneme inventory, stress/tone conventions, syllabification policy and version.
