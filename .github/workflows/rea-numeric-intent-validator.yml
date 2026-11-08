@@ -49,7 +49,18 @@ jobs:
       - name: Validate embedded Draft 2020-12 profile schema
         run: cargo test --manifest-path tools/rea-numeric-intent-validator/Cargo.toml --locked embedded_profile_schema_is_valid_draft_2020_12
 
-      - name: Rust formatting
+      - name: Apply rustfmt
+        run: cargo fmt --manifest-path tools/rea-numeric-intent-validator/Cargo.toml
+
+      - name: Archive rustfmt-normalized source for exact commit repair
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-numeric-intent-rustfmt-source
+          path: tools/rea-numeric-intent-validator/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Rust formatting check
         run: cargo fmt --manifest-path tools/rea-numeric-intent-validator/Cargo.toml -- --check
 
       - name: Numeric-intent conformance and adversarial tests
