@@ -284,6 +284,31 @@ Keep the threshold-selection set separate from the risk-certification set. Do no
 
 The two reviewers adjudicate claim truth and evidence authority; they do not certify the policy's statistical guarantee. The statistical owner verifies calibration splits, multiplicity, cluster assumptions and the one-sided risk bound before any policy claim is published.
 
+
+### 6.5 Claim-support closure worksheet (CCL cases only)
+
+Use the six public [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) cases to independently annotate each claim's dependency closure and event impact before viewing the public key.
+
+| Field | Reviewer response |
+|---|---|
+| Case / claim ID | |
+| Claim proposition, kind, time and decision-use scope | |
+| Terminal evidence nodes and exact identities | |
+| Source/caller/contract dependencies | |
+| Assumptions and open-world remainder | |
+| Environment/build/dependency nodes | |
+| Policy/authority root | |
+| Evaluator/oracle/method identity | |
+| Typed dependency paths | |
+| Closure completeness argument | |
+| Event and changed node(s) | |
+| Impact witness or unaffectedness witness | |
+| #10630 disposition | retain / revalidate / invalidate / supersede / unresolved |
+| #10610 treatment | rerun / regrade / reuse / assurance re-evaluation / not applicable |
+| Independent adjudication / disagreement | |
+
+Adjudicate closure completeness separately from event-impact correctness. A reviewer can identify the correct changed dependency but still miss another dependency needed by the claim. A retain answer without an unaffectedness witness is incomplete. Keep historical truth separate from current decision-use admissibility and preserve unresolved closure gaps.
+
 ## 7. Agreement analysis and interpretation
 
 The calibration exercise has two purposes: reveal unclear rules and train reviewers to apply the same distinctions. It does not create a new CEB performance metric.
