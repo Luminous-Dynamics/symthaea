@@ -58,7 +58,7 @@ jobs:
             .properties.fixtures.minItems == 12
           ' docs/research/emsr-v0.1/emsr-rf-dual-axis-contract-v0.1.schema.json >/dev/null
           jq -e '
-            .$id == "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1" and
+            .["$id"] == "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1" and
             .properties.report_contract.const == "emsr-rf-dual-axis-conformance-report/0.1"
           ' tools/schema/emsr-rf-dual-axis-conformance-report-v0.1.schema.json >/dev/null
 
