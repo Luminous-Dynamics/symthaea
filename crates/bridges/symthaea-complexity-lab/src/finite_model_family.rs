@@ -701,9 +701,18 @@ pub struct FiniteFamilyCredalMapResult {
     pub supported_model_count: usize,
     pub zero_evidence_model_count: usize,
     pub conditioning_status: ConditioningDomainStatus,
+    /// Canonical representative of the maximax optimum set (first assignment
+    /// in ascending mixed-radix query order). Retained for compatibility.
     pub maximax: Option<CredalMapAssignment>,
-    /// None for partial or entirely unsupported conditioning domains.
+    /// Every assignment attaining the global maximax objective, in canonical
+    /// query-assignment order. Each entry carries its endpoint model witness.
+    pub maximax_optima: Vec<CredalMapAssignment>,
+    /// Canonical representative of the maximin optimum set, when the
+    /// conditioning domain is complete. Retained for compatibility.
     pub maximin: Option<CredalMapAssignment>,
+    /// Every assignment attaining the global maximin objective. Empty when
+    /// maximin is withheld for partial or empty evidence support.
+    pub maximin_optima: Vec<CredalMapAssignment>,
     pub model_records: Vec<CredalMapModelRecord>,
 }
 
@@ -921,43 +930,19 @@ pub fn evaluate_finite_family_credal_map(
         ConditioningDomainStatus::Complete
     };
 
-    let maximax = if supported_model_count == 0 {
-        None
+    let maximax_optima = if supported_model_count == 0 {
+        Vec::new()
     } else {
-        let mut best: Option<(usize, ProbabilityWitness)> = None;
-        for (query_index, witness) in max_by_query.iter().enumerate() {
-            let witness = witness.ok_or(FiniteFamilyError::MissingQueryAssignmentWitness {
-                query_assignment_index: query_index,
-            })?;
-            if best.map_or(true, |(_, current)| witness.probability > current.probability) {
-                best = Some((query_index, witness));
-            }
-        }
-        best.map(|(query_index, witness)| CredalMapAssignment {
-            assignment: decode_query_assignment(query_index, &query_cardinalities),
-            probability: witness.probability,
-            witness_model: ordered[witness.model_index].model_digest.to_owned(),
-        })
+        collect_optimal_assignments(&max_by_query, &ordered, &query_cardinalities)?
     };
+    let maximax = maximax_optima.first().cloned();
 
-    let maximin = if conditioning_status != ConditioningDomainStatus::Complete {
-        None
+    let maximin_optima = if conditioning_status != ConditioningDomainStatus::Complete {
+        Vec::new()
     } else {
-        let mut best: Option<(usize, ProbabilityWitness)> = None;
-        for (query_index, witness) in min_by_query.iter().enumerate() {
-            let witness = witness.ok_or(FiniteFamilyError::MissingQueryAssignmentWitness {
-                query_assignment_index: query_index,
-            })?;
-            if best.map_or(true, |(_, current)| witness.probability > current.probability) {
-                best = Some((query_index, witness));
-            }
-        }
-        best.map(|(query_index, witness)| CredalMapAssignment {
-            assignment: decode_query_assignment(query_index, &query_cardinalities),
-            probability: witness.probability,
-            witness_model: ordered[witness.model_index].model_digest.to_owned(),
-        })
+        collect_optimal_assignments(&min_by_query, &ordered, &query_cardinalities)?
     };
+    let maximin = maximin_optima.first().cloned();
 
     Ok(FiniteFamilyCredalMapResult {
         query_variables: canonical_query,
@@ -967,9 +952,49 @@ pub fn evaluate_finite_family_credal_map(
         zero_evidence_model_count,
         conditioning_status,
         maximax,
+        maximax_optima,
         maximin,
+        maximin_optima,
         model_records,
     })
+}
+
+fn collect_optimal_assignments(
+    witnesses: &[Option<ProbabilityWitness>],
+    ordered_models: &[FiniteModelRef<'_>],
+    query_cardinalities: &[usize],
+) -> Result<Vec<CredalMapAssignment>, FiniteFamilyError> {
+    let mut best_probability: Option<CheckedRational> = None;
+    for (query_assignment_index, witness) in witnesses.iter().enumerate() {
+        let witness = witness.ok_or(FiniteFamilyError::MissingQueryAssignmentWitness {
+            query_assignment_index,
+        })?;
+        if best_probability
+            .as_ref()
+            .map_or(true, |best| witness.probability > *best)
+        {
+            best_probability = Some(witness.probability);
+        }
+    }
+
+    let Some(best_probability) = best_probability else {
+        return Ok(Vec::new());
+    };
+
+    let mut optima = Vec::new();
+    for (query_assignment_index, witness) in witnesses.iter().enumerate() {
+        let witness = witness.ok_or(FiniteFamilyError::MissingQueryAssignmentWitness {
+            query_assignment_index,
+        })?;
+        if witness.probability == best_probability {
+            optima.push(CredalMapAssignment {
+                assignment: decode_query_assignment(query_assignment_index, query_cardinalities),
+                probability: witness.probability,
+                witness_model: ordered_models[witness.model_index].model_digest.to_owned(),
+            });
+        }
+    }
+    Ok(optima)
 }
 
 fn decode_mixed_radix(mut index: usize, cardinalities: &[usize], output: &mut [usize]) {
@@ -1384,6 +1409,19 @@ mod tests {
         let result = evaluate_finite_family_credal_map(&models, &[0], &[0, 1], 4).unwrap();
 
         assert_eq!(result.conditioning_status, ConditioningDomainStatus::Complete);
+        // Both query assignments tie for both objectives. The legacy fields
+        // expose the first canonical representative, while the optima fields
+        // preserve the complete argmax sets.
+        assert_eq!(
+            result.maximax_optima.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
+            vec![vec![0], vec![1]]
+        );
+        assert_eq!(
+            result.maximin_optima.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
+            vec![vec![0], vec![1]]
+        );
+        assert!(result.maximax_optima.iter().all(|item| item.probability == q(7, 10)));
+        assert!(result.maximin_optima.iter().all(|item| item.probability == q(3, 10)));
         let maximax = result.maximax.unwrap();
         assert_eq!(maximax.assignment, vec![0]);
         assert_eq!(maximax.probability, q(7, 10));
@@ -1427,6 +1465,8 @@ mod tests {
         assert_eq!(result.maximax.as_ref().unwrap().assignment, Vec::<usize>::new());
         assert_eq!(result.maximax.as_ref().unwrap().probability, CheckedRational::one());
         assert_eq!(result.maximin.as_ref().unwrap().probability, CheckedRational::one());
+        assert_eq!(result.maximax_optima.len(), 1);
+        assert_eq!(result.maximin_optima.len(), 1);
     }
 
     #[test]
@@ -1459,7 +1499,9 @@ mod tests {
         let result = evaluate_finite_family_credal_map(&models, &[0], &[0], 2).unwrap();
         assert_eq!(result.conditioning_status, ConditioningDomainStatus::PartialConditioningDomain);
         assert!(result.maximax.is_some());
+        assert_eq!(result.maximax_optima.len(), 1);
         assert_eq!(result.maximin, None);
+        assert!(result.maximin_optima.is_empty());
     }
 
     #[test]
