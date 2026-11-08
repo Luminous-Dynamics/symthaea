@@ -1079,7 +1079,8 @@
     "All target thresholds are prospective, not measured Symthaea results.",
     "NAVSIM v2 is a non-reactive pseudo-simulation profile; do not describe it as fully interactive closed-loop traffic simulation.",
     "ReactSim-Bench evaluates surrounding-agent responses to pre-generated ego deviations; it is not a complete reciprocal online ego/actor policy loop.",
-    "System architecture references (for example Autoware 2.0) are not benchmark results and are stored separately from benchmark entries."
+    "System architecture references (for example Autoware 2.0) are not benchmark results and are stored separately from benchmark entries.",
+    "SAM-developed synthetic conformance crucibles are stored separately from external benchmark leaderboard records; a passing synthetic suite is not external benchmark reproduction or physical-safety evidence."
   ],
   "system_references": [
     {
@@ -1150,6 +1151,85 @@
       "sources": [
         "https://waymo.com/safety/impact/",
         "https://blog.waymo.com/blog/shorts/safetydata-september26/"
+      ]
+    }
+  ],
+  "internal_conformance_crucibles": [
+    {
+      "id": "sam-scene-traffic-evidence-bundle-v0.1",
+      "name": "SAM Scene Evidence + Traffic Convention Mirror Bundle v0.1",
+      "category": "synthetic_contract_conformance",
+      "capability_target": [
+        "metric_scene_evidence_admission",
+        "jurisdiction_parametric_lane_semantics",
+        "left_right_traffic_mirror_equivariance",
+        "cross_contract_frame_and_profile_closure",
+        "fail_closed_negative_controls"
+      ],
+      "protocol": {
+        "kind": "paired_synthetic_metamorphic_scene",
+        "paired_scene_count": 2,
+        "traffic_profiles": [
+          {
+            "traffic_side": "left",
+            "steering_wheel_position": "right"
+          },
+          {
+            "traffic_side": "right",
+            "steering_wheel_position": "left"
+          },
+          {
+            "traffic_side": "left",
+            "steering_wheel_position": "left"
+          }
+        ],
+        "coordinate_transform": "x'=x; y'=-y; z'=z",
+        "signed_state_transforms": [
+          "heading",
+          "curvature",
+          "lateral_offset",
+          "lateral_velocity",
+          "yaw_rate",
+          "steering_angle",
+          "steering_command"
+        ],
+        "cross_contract_validation": true
+      },
+      "metrics": [
+        "validator_test_pass_count",
+        "mirror_equivariance_pass_rate",
+        "invalid_profile_rejection_rate",
+        "wrong_frame_profile_rejection_rate",
+        "untransformed_steering_rejection_rate",
+        "unknown_passing_authority_rejection_rate"
+      ],
+      "source_status": "sam_reproduced",
+      "rights_status": "synthetic_no_external_dataset",
+      "validation_result": {
+        "exact_head": "3dc43bd653f84ee23c39f3c48ed6664a8aa682ab",
+        "workflow_run_id": 42485276624,
+        "unit_tests_total": 25,
+        "unit_tests_passed": 25,
+        "unit_tests_failed": 0,
+        "format": "passed",
+        "scene_schema_and_fixture": "passed",
+        "traffic_profile_schema_and_fixture": "passed",
+        "cross_contract_profile_resolution": "passed",
+        "cross_contract_road_frame_closure": "passed",
+        "strict_clippy": "passed"
+      },
+      "caveats": [
+        "This is a SAM-authored synthetic conformance suite, not an external leaderboard.",
+        "Two paired synthetic scenes and three synthetic traffic profiles do not represent broad road-jurisdiction or scenario coverage.",
+        "Passing tests do not establish national traffic-law correctness, local sensor accuracy, map fidelity, real-road generalization, roadworthiness or safety.",
+        "The paired-scene count and all control-family denominators must accompany future pass-rate claims."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11111",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11123",
+        "https://github.com/Luminous-Dynamics/symthaea/actions/runs/42485276624",
+        "https://www.iso.org/standard/78951.html",
+        "https://saemobilus.sae.org/standards/j3164_202301-ontology-lexicon-automated-driving-system-ads-operated-vehicle-behaviors-maneuvers-routine-normal-operating-scenarios"
       ]
     }
   ]
