@@ -590,5 +590,4 @@ mod tests {
             serde_json::json!(["not_reproduced", "reproduced"]);
         assert!(validate_contract(&value).is_err());
     }
-
 }
