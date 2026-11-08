@@ -37,6 +37,7 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
           python3 - <<'PY'
+          import hashlib
           import json
           from fractions import Fraction
           from pathlib import Path
@@ -54,6 +55,13 @@ jobs:
               "C3-contact-recovery": (Fraction(40), None),
           }
           alpha = Fraction(fixture["alpha"])
+          ledger = fixture["global_ledger"]
+          assert ledger["campaign_id"] == fixture["campaign_id"]
+          assert ledger["global_filtration_sha256"] == fixture["global_filtration_sha256"]
+          event_sequences = {
+              entry["payload"]["event_id"]: entry["sequence"]
+              for entry in ledger["entries"] if entry["kind"] == "EVIDENCE"
+          }
           for claim in fixture["claims"]:
               threshold = 1 / (alpha * Fraction(claim["weight"]))
               running_max = Fraction(0)
@@ -63,7 +71,28 @@ jobs:
                   if first_crossing is None and running_max >= threshold and stage > 0:
                       first_crossing = stage
               assert (threshold, first_crossing) == expected[claim["claim_id"]]
-          print("phase-response familywise schema/fixture: PASS")
+              path_bytes = ("symthaea-eprocess-path-v1\n" + "".join(x + "\n" for x in claim["e_process_values"])).encode()
+              path_sha = hashlib.sha256(path_bytes).hexdigest()
+              admission = claim["filtration_admission"]
+              assert claim["e_process_path_sha256"] == path_sha
+              assert admission["output_process_sha256"] == path_sha
+              assert admission["campaign_id"] == fixture["campaign_id"]
+              assert admission["process_id"] == claim["claim_id"]
+              assert admission["null_spec_sha256"] == claim["null_envelope_sha256"]
+              assert admission["proof_receipt_sha256"] == claim["component_validity_receipt_sha256"]
+              assert admission["target_filtration_sha256"] == fixture["global_filtration_sha256"]
+              assert admission["mode"] in ("DIRECT_GLOBAL_SUPERMARTINGALE", "ADJUSTER_LIFTED")
+              assert admission["observed_event_ids"]
+              assert all(event_id in event_sequences and event_sequences[event_id] < admission["process_output_sequence"]
+                         for event_id in admission["observed_event_ids"])
+              if admission["mode"] == "ADJUSTER_LIFTED":
+                  adjuster = admission["adjuster"]
+                  assert adjuster["source_process_sha256"] == admission["input_process_sha256"]
+                  assert adjuster["source_filtration_sha256"] == admission["source_filtration_sha256"]
+                  assert adjuster["target_filtration_sha256"] == admission["target_filtration_sha256"]
+                  assert adjuster["theorem_assumptions_sha256"] == admission["assumption_sha256"]
+                  assert adjuster["lifted_output_sha256"] == path_sha
+          print("phase-response familywise schema/admission/path oracle: PASS")
           PY
       - name: Format standalone crate
         run: cargo fmt --manifest-path tools/connectome-phase-response-family/Cargo.toml -- --check

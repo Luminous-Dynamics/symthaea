@@ -6,6 +6,11 @@
 //! e-process receipts are authentic or valid; those guarantees must be
 //! independently established in the shared global filtration.
 
+use connectome_asof_filtration::{
+    AdjusterReceipt, AdmissionMode, AdmissionStatus, AvailabilityState, DecisionAuditStatus,
+    DecisionKind, DecisionReceipt, EvidenceEvent, EvidenceSplit, FamilyFreeze, FiltrationAdmission,
+    GlobalLedger, LedgerEntry, LedgerPayload, audit_admission, audit_ledger,
+};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -225,9 +230,14 @@ pub struct ClaimEvidence {
     pub null_envelope_sha256: String,
     pub component_e_process_receipt_sha256: String,
     pub component_validity_receipt_sha256: String,
+    /// Exact digest for the raw input process bound by the as-of receipt.
+    pub component_input_process_sha256: String,
+    /// SHA-256 of the canonical, stage-ordered rational e-process path below.
+    pub e_process_path_sha256: String,
     pub global_filtration_sha256: String,
     pub confirmation_split_sha256: String,
-    pub component_status: String,
+    /// Typed receipt consumed by the same as-of auditor used for ledger replay.
+    pub filtration_admission: FiltrationAdmission,
     pub weight: Rational,
     /// E-process values E_0,...,E_T. Values may fall; the verifier computes
     /// their running supremum and never treats that supremum as an e-value.
@@ -245,6 +255,8 @@ pub struct FamilyManifest {
     pub alpha: Rational,
     pub global_filtration_sha256: String,
     pub confirmation_split_sha256: String,
+    /// Shared append-only ledger replayed by the as-of filtration auditor.
+    pub global_ledger: GlobalLedger,
     pub claims: Vec<ClaimEvidence>,
 }
 
@@ -279,7 +291,151 @@ fn valid_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+// Small dependency-free SHA-256 implementation. The canonical path encoding
+// is versioned and exact, so the as-of admission output is bound to the actual
+// sequence of reduced rational values consumed by the statistical engine.
+fn sha256_hex(input: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2,
+    ];
+    let mut state = [
+        0x6a09e667u32,
+        0xbb67ae85,
+        0x3c6ef372,
+        0xa54ff53a,
+        0x510e527f,
+        0x9b05688c,
+        0x1f83d9ab,
+        0x5be0cd19,
+    ];
+    let mut message = input.to_vec();
+    let bit_len = (message.len() as u64).wrapping_mul(8);
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    for block in message.chunks_exact(64) {
+        let mut words = [0u32; 64];
+        for (index, chunk) in block.chunks_exact(4).take(16).enumerate() {
+            words[index] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+        for index in 16..64 {
+            let s0 = words[index - 15].rotate_right(7)
+                ^ words[index - 15].rotate_right(18)
+                ^ (words[index - 15] >> 3);
+            let s1 = words[index - 2].rotate_right(17)
+                ^ words[index - 2].rotate_right(19)
+                ^ (words[index - 2] >> 10);
+            words[index] = words[index - 16]
+                .wrapping_add(s0)
+                .wrapping_add(words[index - 7])
+                .wrapping_add(s1);
+        }
+
+        let [mut a, mut b, mut cc, mut d, mut e, mut f, mut g, mut h] = state;
+        for index in 0..64 {
+            let big1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let choose = (e & f) ^ ((!e) & g);
+            let temp1 = h
+                .wrapping_add(big1)
+                .wrapping_add(choose)
+                .wrapping_add(K[index])
+                .wrapping_add(words[index]);
+            let big0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let majority = (a & b) ^ (a & cc) ^ (b & cc);
+            let temp2 = big0.wrapping_add(majority);
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = cc;
+            cc = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+        for (slot, value) in state.iter_mut().zip([a, b, cc, d, e, f, g, h]) {
+            *slot = slot.wrapping_add(value);
+        }
+    }
+    state.iter().map(|word| format!("{word:08x}")).collect()
+}
+
+pub fn canonical_e_process_path_sha256(values: &[Rational]) -> String {
+    let mut encoded = b"symthaea-eprocess-path-v1\n".to_vec();
+    for value in values {
+        encoded.extend_from_slice(value.to_string().as_bytes());
+        encoded.push(b'\n');
+    }
+    sha256_hex(&encoded)
+}
+
+fn validate_confirmatory_admission_scope(
+    ledger: &GlobalLedger,
+    observed_event_ids: &[String],
+    family_id: &str,
+    family_commitment_sha256: &str,
+) -> Result<(), FamilyError> {
+    let observed: BTreeSet<&str> = observed_event_ids.iter().map(String::as_str).collect();
+    let mut matching_freeze_seen = false;
+    for entry in &ledger.entries {
+        match &entry.payload {
+            LedgerPayload::FamilyFreeze(freeze) if freeze.family_id == family_id => {
+                if freeze.family_commitment_sha256 != family_commitment_sha256 {
+                    return Err(FamilyError(
+                        "confirmatory family freeze commitment does not match manifest".into(),
+                    ));
+                }
+                matching_freeze_seen = true;
+            }
+            LedgerPayload::Evidence(event)
+                if observed.contains(event.event_id.as_str())
+                    && event.split == EvidenceSplit::Confirmation =>
+            {
+                if !matching_freeze_seen
+                    || event.confirmatory_family_id.as_deref() != Some(family_id)
+                {
+                    return Err(FamilyError(
+                        "claim admission consumes confirmation evidence outside its frozen family"
+                            .into(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyError> {
+    let ledger_audit = audit_ledger(&manifest.global_ledger)
+        .map_err(|error| FamilyError(format!("global as-of ledger rejected: {error}")))?;
+    if ledger_audit.campaign_id != manifest.campaign_id
+        || ledger_audit.global_filtration_sha256 != manifest.global_filtration_sha256
+    {
+        return Err(FamilyError(
+            "as-of ledger campaign or global filtration does not match family".into(),
+        ));
+    }
+    if ledger_audit
+        .decisions
+        .iter()
+        .any(|decision| decision.status != DecisionAuditStatus::Accepted)
+    {
+        return Err(FamilyError(
+            "global as-of ledger contains a rejected adaptive decision prefix".into(),
+        ));
+    }
     if manifest.family_id.is_empty() || manifest.campaign_id.is_empty() {
         return Err(FamilyError(
             "family_id and campaign_id must be non-empty".into(),
@@ -347,6 +503,14 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
                 "component validity receipt",
                 claim.component_validity_receipt_sha256.as_str(),
             ),
+            (
+                "component input process",
+                claim.component_input_process_sha256.as_str(),
+            ),
+            (
+                "canonical e-process path",
+                claim.e_process_path_sha256.as_str(),
+            ),
             ("claim filtration", claim.global_filtration_sha256.as_str()),
             (
                 "claim confirmation split",
@@ -370,10 +534,42 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
                 "claim is bound to a different confirmation split".into(),
             ));
         }
-        if claim.component_status != "VALIDATED_GLOBAL_FILTRATION_EPROCESS" {
-            return Err(FamilyError(
-                "claim lacks a validated global-filtration e-process receipt".into(),
-            ));
+        let admission = &claim.filtration_admission;
+        validate_confirmatory_admission_scope(
+            &manifest.global_ledger,
+            &admission.observed_event_ids,
+            &manifest.family_id,
+            &manifest.family_commitment_sha256,
+        )?;
+        let admission_audit = audit_admission(&manifest.global_ledger, admission);
+        if !matches!(
+            admission_audit.status,
+            AdmissionStatus::AdmittedDirectGlobal | AdmissionStatus::AdmittedAfterLift
+        ) {
+            return Err(FamilyError(format!(
+                "{} is not admitted to the family filtration: {:?}",
+                claim.claim_id, admission_audit.status
+            )));
+        }
+        if admission.campaign_id != manifest.campaign_id
+            || admission.process_id != claim.claim_id
+            || admission.null_spec_sha256 != claim.null_envelope_sha256
+            || admission.input_process_sha256 != claim.component_input_process_sha256
+            || admission.output_process_sha256 != claim.e_process_path_sha256
+            || admission.target_filtration_sha256 != manifest.global_filtration_sha256
+            || admission.proof_receipt_sha256.as_deref()
+                != Some(claim.component_validity_receipt_sha256.as_str())
+        {
+            return Err(FamilyError(format!(
+                "{} filtration admission is not bound to this exact claim/null/process/path/proof",
+                claim.claim_id
+            )));
+        }
+        if canonical_e_process_path_sha256(&claim.e_process_values) != claim.e_process_path_sha256 {
+            return Err(FamilyError(format!(
+                "{} e-process path digest does not match its exact rational path",
+                claim.claim_id
+            )));
         }
         if claim.weight.is_zero() {
             return Err(FamilyError(
@@ -451,6 +647,54 @@ mod tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    fn global_ledger() -> GlobalLedger {
+        GlobalLedger {
+            campaign_id: "synthetic-phase-response-campaign".into(),
+            global_filtration_id: "connectome-global-v1".into(),
+            global_filtration_sha256: digest('e'),
+            entries: vec![
+                LedgerEntry {
+                    sequence: 1,
+                    entry_commitment_sha256: digest('9'),
+                    payload: LedgerPayload::Evidence(EvidenceEvent {
+                        event_id: "S1".into(),
+                        evidence_family_id: "structural-revision-s1".into(),
+                        source_stream: "structural-em".into(),
+                        source_artifact_sha256: digest('a'),
+                        revision: 0,
+                        supersedes_event_id: None,
+                        event_time_ms: Some(100),
+                        acquired_at_ms: Some(101),
+                        annotated_at_ms: Some(102),
+                        qc_at_ms: Some(103),
+                        availability_state: AvailabilityState::Approved,
+                        split: EvidenceSplit::Fit,
+                        confirmatory_family_id: None,
+                    }),
+                },
+                LedgerEntry {
+                    sequence: 2,
+                    entry_commitment_sha256: digest('8'),
+                    payload: LedgerPayload::Evidence(EvidenceEvent {
+                        event_id: "T7".into(),
+                        evidence_family_id: "behaviour-trial-7".into(),
+                        source_stream: "behaviour-kinematics".into(),
+                        source_artifact_sha256: digest('b'),
+                        revision: 0,
+                        supersedes_event_id: None,
+                        event_time_ms: Some(90),
+                        acquired_at_ms: Some(91),
+                        annotated_at_ms: Some(110),
+                        qc_at_ms: Some(111),
+                        availability_state: AvailabilityState::Approved,
+                        split: EvidenceSplit::Exploration,
+                        confirmatory_family_id: None,
+                    }),
+                },
+            ],
+        }
+    }
+
     fn claim(
         id: &str,
         sender: &str,
@@ -459,6 +703,8 @@ mod tests {
         weight: Rational,
         path: &[Rational],
     ) -> ClaimEvidence {
+        let e_process_values = path.to_vec();
+        let e_process_path_sha256 = canonical_e_process_path_sha256(&e_process_values);
         ClaimEvidence {
             claim_id: id.into(),
             key: PhaseResponseClaimKey {
@@ -476,11 +722,29 @@ mod tests {
             null_envelope_sha256: digest('b'),
             component_e_process_receipt_sha256: digest('c'),
             component_validity_receipt_sha256: digest('d'),
+            component_input_process_sha256: digest('1'),
+            e_process_path_sha256: e_process_path_sha256.clone(),
             global_filtration_sha256: digest('e'),
             confirmation_split_sha256: digest('f'),
-            component_status: "VALIDATED_GLOBAL_FILTRATION_EPROCESS".into(),
+            filtration_admission: FiltrationAdmission {
+                campaign_id: "synthetic-phase-response-campaign".into(),
+                process_id: id.into(),
+                null_spec_sha256: digest('b'),
+                input_process_sha256: digest('1'),
+                output_process_sha256: e_process_path_sha256,
+                source_filtration_id: "connectome-global-v1".into(),
+                source_filtration_sha256: digest('e'),
+                target_filtration_id: "connectome-global-v1".into(),
+                target_filtration_sha256: digest('e'),
+                observed_event_ids: vec!["S1".into()],
+                process_output_sequence: 2,
+                mode: AdmissionMode::DirectGlobalSupermartingale,
+                proof_receipt_sha256: Some(digest('d')),
+                assumption_sha256: Some(digest('2')),
+                adjuster: None,
+            },
             weight,
-            e_process_values: path.into(),
+            e_process_values,
         }
     }
 
@@ -495,6 +759,7 @@ mod tests {
             alpha: r(1, 10),
             global_filtration_sha256: digest('e'),
             confirmation_split_sha256: digest('f'),
+            global_ledger: global_ledger(),
             claims: vec![
                 claim(
                     "C1-local-reset",
@@ -640,6 +905,174 @@ mod tests {
     fn rejects_non_global_component_status() {
         let mut manifest = fixture();
         manifest.claims[0].component_status = "LOCAL_FILTRATION_ONLY".into();
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn canonical_path_sha256_matches_standard_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn admits_theorem_matched_lifted_process() {
+        let mut manifest = fixture();
+        let claim = &mut manifest.claims[1];
+        let admission = &mut claim.filtration_admission;
+        admission.mode = AdmissionMode::AdjusterLifted;
+        admission.source_filtration_id = "neural-local-stream-v1".into();
+        admission.source_filtration_sha256 = digest('7');
+        admission.adjuster = Some(AdjusterReceipt {
+            adjuster_id: "chore-ramdas-filtration-lift".into(),
+            adjuster_version: "reviewed-v1".into(),
+            source_process_sha256: admission.input_process_sha256.clone(),
+            source_filtration_sha256: admission.source_filtration_sha256.clone(),
+            target_filtration_sha256: admission.target_filtration_sha256.clone(),
+            parameter_sha256: digest('8'),
+            theorem_assumptions_sha256: admission.assumption_sha256.clone().unwrap(),
+            lifted_output_sha256: admission.output_process_sha256.clone(),
+        });
+        let report = audit_family(&manifest).expect("reviewed lift receipt is bound");
+        assert_eq!(report.claims.len(), 3);
+    }
+
+    #[test]
+    fn rejects_local_only_process_even_when_global_digest_label_matches() {
+        let mut manifest = fixture();
+        manifest.claims[0].filtration_admission.mode = AdmissionMode::LocalOnly;
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_incomparable_filtration_process() {
+        let mut manifest = fixture();
+        manifest.claims[0].filtration_admission.mode = AdmissionMode::IncomparableOrUnknown;
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_e_process_path_mutation_without_new_admission() {
+        let mut manifest = fixture();
+        manifest.claims[0].e_process_values[2] = r(26, 1);
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_claim_null_binding() {
+        let mut manifest = fixture();
+        manifest.claims[0].filtration_admission.null_spec_sha256 = digest('9');
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_campaign_process_or_proof_receipt() {
+        for mutation in 0..3 {
+            let mut manifest = fixture();
+            match mutation {
+                0 => manifest.claims[0].filtration_admission.campaign_id = "other".into(),
+                1 => manifest.claims[0].filtration_admission.process_id = "other-process".into(),
+                _ => {
+                    manifest.claims[0].filtration_admission.proof_receipt_sha256 =
+                        Some(digest('9'));
+                }
+            }
+            assert!(audit_family(&manifest).is_err(), "mutation {mutation}");
+        }
+    }
+
+    #[test]
+    fn rejects_process_that_consumes_event_at_its_output_sequence() {
+        let mut manifest = fixture();
+        manifest.claims[0]
+            .filtration_admission
+            .observed_event_ids
+            .push("T7".into());
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_global_ledger_with_lookahead_decision() {
+        let mut manifest = fixture();
+        manifest.global_ledger.entries.push(LedgerEntry {
+            sequence: 3,
+            entry_commitment_sha256: digest('7'),
+            payload: LedgerPayload::Decision(DecisionReceipt {
+                decision_id: "D-lookahead".into(),
+                campaign_id: manifest.campaign_id.clone(),
+                kind: DecisionKind::Discovery,
+                policy_version_sha256: digest('1'),
+                input_prefix_sha256: digest('2'),
+                driver_receipt_sha256: digest('3'),
+                history_prefix_sha256: digest('4'),
+                action_sha256: digest('5'),
+                feasibility_receipt_sha256: digest('6'),
+                available_event_ids: vec!["S1".into(), "T7".into()],
+                consumed_event_ids: vec!["FUTURE-EVENT".into()],
+                confirmatory_family_id: None,
+            }),
+        });
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_confirmation_event_from_another_frozen_family() {
+        let mut manifest = fixture();
+        manifest.global_ledger.entries.push(LedgerEntry {
+            sequence: 3,
+            entry_commitment_sha256: digest('7'),
+            payload: LedgerPayload::FamilyFreeze(FamilyFreeze {
+                family_id: "different-family".into(),
+                family_commitment_sha256: digest('8'),
+                confirmation_lockbox_closed: true,
+            }),
+        });
+        manifest.global_ledger.entries.push(LedgerEntry {
+            sequence: 4,
+            entry_commitment_sha256: digest('6'),
+            payload: LedgerPayload::Evidence(EvidenceEvent {
+                event_id: "C-other-family".into(),
+                evidence_family_id: "confirmatory-observation".into(),
+                source_stream: "behaviour-confirmation".into(),
+                source_artifact_sha256: digest('5'),
+                revision: 0,
+                supersedes_event_id: None,
+                event_time_ms: Some(200),
+                acquired_at_ms: Some(201),
+                annotated_at_ms: Some(202),
+                qc_at_ms: Some(203),
+                availability_state: AvailabilityState::Approved,
+                split: EvidenceSplit::Confirmation,
+                confirmatory_family_id: Some("different-family".into()),
+            }),
+        });
+        manifest.global_ledger.entries.push(LedgerEntry {
+            sequence: 5,
+            entry_commitment_sha256: digest('4'),
+            payload: LedgerPayload::Evidence(EvidenceEvent {
+                event_id: "T8".into(),
+                evidence_family_id: "later-exploration".into(),
+                source_stream: "behaviour-exploration".into(),
+                source_artifact_sha256: digest('3'),
+                revision: 0,
+                supersedes_event_id: None,
+                event_time_ms: Some(210),
+                acquired_at_ms: Some(211),
+                annotated_at_ms: Some(212),
+                qc_at_ms: Some(213),
+                availability_state: AvailabilityState::Approved,
+                split: EvidenceSplit::Exploration,
+                confirmatory_family_id: None,
+            }),
+        });
+        manifest.claims[0]
+            .filtration_admission
+            .observed_event_ids
+            .push("C-other-family".into());
+        manifest.claims[0]
+            .filtration_admission
+            .process_output_sequence = 5;
         assert!(audit_family(&manifest).is_err());
     }
 
