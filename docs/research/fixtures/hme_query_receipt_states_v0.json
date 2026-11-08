@@ -11,7 +11,7 @@
         "representation": "continuous_f32",
         "dimension": 2048,
         "metric": "cosine",
-        "score_contract_id": "continuous-cosine-fixture-v1",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
         "top_k": 2,
         "tie_policy": "score_desc_item_id_asc"
       },
@@ -100,7 +100,7 @@
         "representation": "continuous_f32",
         "dimension": 2048,
         "metric": "cosine",
-        "score_contract_id": "continuous-cosine-fixture-v1",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
         "top_k": 2,
         "tie_policy": "score_desc_item_id_asc"
       },
@@ -189,7 +189,7 @@
         "representation": "continuous_f32",
         "dimension": 2048,
         "metric": "cosine",
-        "score_contract_id": "continuous-cosine-fixture-v1",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
         "top_k": 2,
         "tie_policy": "score_desc_item_id_asc"
       },
@@ -284,7 +284,7 @@
         "representation": "continuous_f32",
         "dimension": 2048,
         "metric": "cosine",
-        "score_contract_id": "continuous-cosine-fixture-v1",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
         "top_k": 2,
         "tie_policy": "score_desc_item_id_asc"
       },
@@ -366,7 +366,7 @@
         "representation": "continuous_f32",
         "dimension": 2048,
         "metric": "cosine",
-        "score_contract_id": "continuous-cosine-fixture-v1",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
         "top_k": 2,
         "tie_policy": "score_desc_item_id_asc"
       },
