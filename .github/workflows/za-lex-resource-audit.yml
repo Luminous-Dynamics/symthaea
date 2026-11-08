@@ -1,0 +1,78 @@
+name: ZA_LEX resource provenance audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/za-lex-audit/**"
+      - ".github/workflows/za-lex-resource-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-za-lex-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact Symthaea revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          path: symthaea
+          persist-credentials: false
+
+      - name: Verify exact Symthaea revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd symthaea
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "SYTHAEA_AUDIT_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Check out immutable upstream za_lex snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: NWU-MuST/za_lex
+          ref: 59a93768d72b5804f8b87bc3dd409320c8f0c328
+          path: external/za_lex
+          persist-credentials: false
+
+      - name: Verify exact upstream source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd external/za_lex
+          actual="$(git rev-parse HEAD)"
+          expected="59a93768d72b5804f8b87bc3dd409320c8f0c328"
+          test "$actual" = "$expected"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test the manifest and path-safety contract
+        run: python3 -m unittest discover -s symthaea/tools/za-lex-audit -p 'test_*.py' -v
+
+      - name: Verify pinned language resource files and generate metadata-only report
+        run: |
+          python3 symthaea/tools/za-lex-audit/audit.py \
+            --root external/za_lex \
+            --manifest symthaea/tools/za-lex-audit/resource-manifest.json \
+            --expected-commit 59a93768d72b5804f8b87bc3dd409320c8f0c328 \
+            --output za-lex-audit-report.json
+
+      - name: Bind audit report to Symthaea revision
+        run: printf '%s\n' "$SYTHAEA_AUDIT_REVISION" > za-lex-audit-symthaea-revision.txt
+
+      - name: Upload metadata-only audit receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: za-lex-audit-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            za-lex-audit-report.json
+            za-lex-audit-symthaea-revision.txt
+          if-no-files-found: error
