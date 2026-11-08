@@ -2727,6 +2727,19 @@ fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.sync_all()
 }
 
+/// Flush directory-entry metadata after publishing a bundle. On non-Unix
+/// platforms Rust does not expose a portable directory fsync operation;
+/// individual file contents are still synced before publication.
+#[cfg(unix)]
+fn sync_directory(path: &Path) -> std::io::Result<()> {
+    std::fs::File::open(path)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_directory(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 fn atomic_replace_file(path: &Path, bytes: &[u8], sequence: u64) -> std::io::Result<()> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     std::fs::create_dir_all(parent)?;
@@ -2748,16 +2761,290 @@ fn atomic_replace_file(path: &Path, bytes: &[u8], sequence: u64) -> std::io::Res
     result
 }
 
+const KEEPER_BUNDLE_SCHEMA_VERSION: u16 = 1;
+const KEEPER_BUNDLE_MANIFEST_FILE: &str = "bundle-manifest.json";
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct KeeperArtifactRecordV1 {
+    file_name: String,
+    media_type: String,
+    sha256: String,
+    byte_len: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct KeeperArtifactManifestBodyV1 {
+    schema_version: u16,
+    audio_key: String,
+    midi_available: bool,
+    artifacts: Vec<KeeperArtifactRecordV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct KeeperArtifactManifestV1 {
+    schema_version: u16,
+    audio_key: String,
+    midi_available: bool,
+    artifacts: Vec<KeeperArtifactRecordV1>,
+    transaction_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct KeeperBundleReadbackV1 {
+    manifest: KeeperArtifactManifestV1,
+    /// SHA-256 of the exact persisted bundle manifest bytes.
+    manifest_sha256: String,
+}
+
+impl KeeperBundleReadbackV1 {
+    fn artifact_sha256(&self, file_name: &str) -> Option<&str> {
+        self.manifest
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.file_name == file_name)
+            .map(|artifact| artifact.sha256.as_str())
+    }
+}
+
+fn keeper_artifact_media_type(file_name: &str) -> Option<&'static str> {
+    match file_name {
+        "audio.wav" => Some("audio/wav"),
+        "recipe.json" | "score.json" => Some("application/json"),
+        "performance.mid" => Some("audio/midi"),
+        _ => None,
+    }
+}
+
+fn keeper_artifact_record(
+    bundle_path: &Path,
+    file_name: &str,
+) -> std::io::Result<KeeperArtifactRecordV1> {
+    let media_type = keeper_artifact_media_type(file_name).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "unsupported keeper artifact name",
+        )
+    })?;
+    let bytes = std::fs::read(bundle_path.join(file_name))?;
+    Ok(KeeperArtifactRecordV1 {
+        file_name: file_name.to_owned(),
+        media_type: media_type.to_owned(),
+        sha256: sha256_hex(&bytes),
+        byte_len: bytes.len() as u64,
+    })
+}
+
+fn keeper_manifest_body(
+    audio_key: &str,
+    midi_available: bool,
+    artifacts: Vec<KeeperArtifactRecordV1>,
+) -> KeeperArtifactManifestBodyV1 {
+    KeeperArtifactManifestBodyV1 {
+        schema_version: KEEPER_BUNDLE_SCHEMA_VERSION,
+        audio_key: audio_key.to_owned(),
+        midi_available,
+        artifacts,
+    }
+}
+
+fn keeper_transaction_sha256(
+    body: &KeeperArtifactManifestBodyV1,
+) -> std::io::Result<String> {
+    let bytes = serde_json::to_vec(body).map_err(std::io::Error::other)?;
+    Ok(sha256_hex(&bytes))
+}
+
+/// Build the bundle content manifest from the bytes already on disk in the
+/// staging directory. Required artifacts are audio, recipe and symbolic score.
+/// MIDI is explicit optional evidence.
+fn write_keeper_bundle_manifest(
+    staging: &Path,
+    audio_key: &str,
+    midi_available: bool,
+) -> std::io::Result<()> {
+    if !valid_artifact_key(audio_key) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid keeper artifact key",
+        ));
+    }
+    if midi_available != staging.join("performance.mid").is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "MIDI availability does not match staged bytes",
+        ));
+    }
+
+    let mut artifacts = vec![
+        keeper_artifact_record(staging, "audio.wav")?,
+        keeper_artifact_record(staging, "recipe.json")?,
+        keeper_artifact_record(staging, "score.json")?,
+    ];
+    if midi_available {
+        artifacts.push(keeper_artifact_record(staging, "performance.mid")?);
+    }
+    let body = keeper_manifest_body(audio_key, midi_available, artifacts);
+    let transaction_sha256 = keeper_transaction_sha256(&body)?;
+    let manifest = KeeperArtifactManifestV1 {
+        schema_version: body.schema_version,
+        audio_key: body.audio_key,
+        midi_available: body.midi_available,
+        artifacts: body.artifacts,
+        transaction_sha256,
+    };
+    let bytes = serde_json::to_vec_pretty(&manifest).map_err(std::io::Error::other)?;
+    write_synced(&staging.join(KEEPER_BUNDLE_MANIFEST_FILE), &bytes)
+}
+
+/// Re-open a published keeper directory and independently recompute each
+/// artifact digest and the transaction commitment. No in-memory source
+/// buffer participates in this verification.
+fn verify_keeper_bundle_readback(
+    bundle_path: &Path,
+    expected_audio_key: &str,
+) -> std::io::Result<KeeperBundleReadbackV1> {
+    if !valid_artifact_key(expected_audio_key) || !bundle_path.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid keeper read-back target",
+        ));
+    }
+
+    let manifest_path = bundle_path.join(KEEPER_BUNDLE_MANIFEST_FILE);
+    let manifest_type = std::fs::symlink_metadata(&manifest_path)?.file_type();
+    if !manifest_type.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "keeper bundle manifest must be a regular file, not a symlink",
+        ));
+    }
+    let manifest_bytes = std::fs::read(&manifest_path)?;
+    let manifest: KeeperArtifactManifestV1 =
+        serde_json::from_slice(&manifest_bytes).map_err(std::io::Error::other)?;
+    if manifest.schema_version != KEEPER_BUNDLE_SCHEMA_VERSION
+        || manifest.audio_key != expected_audio_key
+        || manifest.artifacts.len() != if manifest.midi_available { 4 } else { 3 }
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "keeper manifest identity or artifact count mismatch",
+        ));
+    }
+
+    let expected_names: &[&str] = if manifest.midi_available {
+        &["audio.wav", "recipe.json", "score.json", "performance.mid"]
+    } else {
+        &["audio.wav", "recipe.json", "score.json"]
+    };
+    let actual_names: Vec<&str> = manifest
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.file_name.as_str())
+        .collect();
+    if actual_names.as_slice() != expected_names {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "keeper manifest artifact names or order are invalid",
+        ));
+    }
+
+    // The bundle directory must contain exactly the committed files and
+    // its manifest. Reject detached/untracked files rather than silently
+    // treating them as part of the same transaction.
+    let expected_entries: BTreeSet<&str> = expected_names
+        .iter()
+        .copied()
+        .chain(std::iter::once(KEEPER_BUNDLE_MANIFEST_FILE))
+        .collect();
+    let mut observed_entries = BTreeSet::new();
+    for entry in std::fs::read_dir(bundle_path)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "keeper bundle contains a non-file entry",
+            ));
+        }
+        let name = entry.file_name();
+        let name = name.to_str().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "keeper bundle contains a non-UTF-8 entry",
+            )
+        })?;
+        if !observed_entries.insert(name.to_owned()) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "duplicate keeper bundle directory entry",
+            ));
+        }
+    }
+    if observed_entries.len() != expected_entries.len()
+        || observed_entries
+            .iter()
+            .any(|name| !expected_entries.contains(name.as_str()))
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "keeper bundle contains missing or untracked files",
+        ));
+    }
+
+    for artifact in &manifest.artifacts {
+        let expected_media_type = keeper_artifact_media_type(&artifact.file_name).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "keeper manifest contains an unsupported path",
+            )
+        })?;
+        if artifact.media_type != expected_media_type
+            || artifact.byte_len == 0
+            || artifact.sha256.len() != 64
+            || !artifact.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "keeper artifact descriptor is malformed",
+            ));
+        }
+        let bytes = std::fs::read(bundle_path.join(&artifact.file_name))?;
+        if bytes.len() as u64 != artifact.byte_len || sha256_hex(&bytes) != artifact.sha256 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("keeper artifact read-back mismatch: {}", artifact.file_name),
+            ));
+        }
+    }
+
+    let body = keeper_manifest_body(
+        &manifest.audio_key,
+        manifest.midi_available,
+        manifest.artifacts.clone(),
+    );
+    if keeper_transaction_sha256(&body)? != manifest.transaction_sha256 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "keeper transaction commitment mismatch",
+        ));
+    }
+
+    Ok(KeeperBundleReadbackV1 {
+        manifest,
+        manifest_sha256: sha256_hex(&manifest_bytes),
+    })
+}
+
 fn persist_keeper_bundle(
     audio_key: &str,
     wav: &[u8],
     recipe_bytes: &[u8],
+    score_bytes: &[u8],
     score: &Score,
     spec: &CompositionSpec,
     seed: u64,
     state: &MusicalState,
     sequence: u64,
-) -> std::io::Result<(PathBuf, bool)> {
+) -> std::io::Result<(PathBuf, bool, KeeperBundleReadbackV1)> {
     let root = Path::new("data/taste/audio");
     std::fs::create_dir_all(root)?;
     let staging = root.join(format!(
@@ -2770,6 +3057,7 @@ fn persist_keeper_bundle(
     let result = (|| {
         write_synced(&staging.join("audio.wav"), wav)?;
         write_synced(&staging.join("recipe.json"), recipe_bytes)?;
+        write_synced(&staging.join("score.json"), score_bytes)?;
 
         let midi_path = staging.join("performance.mid");
         let midi_available = symthaea_muse::midi_export::export_performance_midi(
@@ -2782,11 +3070,27 @@ fn persist_keeper_bundle(
             let _ = std::fs::remove_file(&midi_path);
         }
 
-        // The directory rename publishes the complete canonical keeper bundle
-        // in one filesystem operation. Existing flat-file keepers remain
-        // readable through the compatibility paths below.
+        write_keeper_bundle_manifest(&staging, audio_key, midi_available)?;
+        sync_directory(&staging)?;
+
+        // Publish the whole directory atomically, sync the parent directory
+        // entry on Unix, then re-open every file from the published path.
+        // A mismatch removes the bundle and fails the keep before
+        // genealogy/index metadata can commit.
         std::fs::rename(&staging, &destination)?;
-        Ok((destination.clone(), midi_available))
+        if let Err(error) = sync_directory(root) {
+            let _ = std::fs::remove_dir_all(&destination);
+            let _ = sync_directory(root);
+            return Err(error);
+        }
+        let readback = match verify_keeper_bundle_readback(&destination, audio_key) {
+            Ok(verified) => verified,
+            Err(error) => {
+                let _ = std::fs::remove_dir_all(&destination);
+                return Err(error);
+            }
+        };
+        Ok((destination.clone(), midi_available, readback))
     })();
 
     if result.is_err() {
@@ -2850,6 +3154,150 @@ fn recent_keeper_identities_at(
         .into_iter()
         .map(|r| (r.resolved_spec, r.intent))
         .collect()
+}
+
+
+#[cfg(test)]
+mod keeper_bundle_integrity_tests {
+    use super::*;
+
+    fn temp_bundle_path(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "muse-keeper-{label}-{}-{nonce}",
+            std::process::id()
+        ))
+    }
+
+    fn create_fixture_bundle(path: &Path, midi_available: bool) {
+        std::fs::create_dir_all(path).unwrap();
+        write_synced(&path.join("audio.wav"), b"exact wav bytes").unwrap();
+        write_synced(&path.join("recipe.json"), br#"{"recipe":"exact"}"#).unwrap();
+        write_synced(&path.join("score.json"), br#"{"score":[1,2,3]}"#).unwrap();
+        if midi_available {
+            write_synced(&path.join("performance.mid"), b"exact midi bytes").unwrap();
+        }
+        write_keeper_bundle_manifest(path, "test-bundle-1", midi_available).unwrap();
+    }
+
+    #[test]
+    fn keeper_bundle_manifest_hashes_exact_persisted_bytes_and_reopens() {
+        let path = temp_bundle_path("readback");
+        create_fixture_bundle(&path, true);
+        let verified = verify_keeper_bundle_readback(&path, "test-bundle-1").unwrap();
+        assert_eq!(
+            verified.artifact_sha256("audio.wav").unwrap(),
+            sha256_hex(b"exact wav bytes")
+        );
+        assert_eq!(
+            verified.artifact_sha256("recipe.json").unwrap(),
+            sha256_hex(br#"{"recipe":"exact"}"#)
+        );
+        assert_eq!(
+            verified.artifact_sha256("score.json").unwrap(),
+            sha256_hex(br#"{"score":[1,2,3]}"#)
+        );
+        assert_eq!(
+            verified.artifact_sha256("performance.mid").unwrap(),
+            sha256_hex(b"exact midi bytes")
+        );
+        assert_eq!(verified.manifest.schema_version, KEEPER_BUNDLE_SCHEMA_VERSION);
+        assert_eq!(
+            verified.manifest.transaction_sha256,
+            keeper_transaction_sha256(&keeper_manifest_body(
+                "test-bundle-1",
+                true,
+                verified.manifest.artifacts.clone()
+            ))
+            .unwrap()
+        );
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn keeper_bundle_readback_rejects_mutated_artifact_bytes() {
+        for file_name in ["audio.wav", "recipe.json", "score.json", "performance.mid"] {
+            let path = temp_bundle_path(file_name);
+            create_fixture_bundle(&path, true);
+            let mut bytes = std::fs::read(path.join(file_name)).unwrap();
+            bytes.push(b'!');
+            std::fs::write(path.join(file_name), bytes).unwrap();
+            assert!(
+                verify_keeper_bundle_readback(&path, "test-bundle-1").is_err(),
+                "mutated {file_name} must not pass read-back"
+            );
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+
+    #[test]
+    fn keeper_bundle_readback_rejects_missing_required_and_untracked_files() {
+        let missing = temp_bundle_path("missing");
+        create_fixture_bundle(&missing, false);
+        std::fs::remove_file(missing.join("score.json")).unwrap();
+        assert!(verify_keeper_bundle_readback(&missing, "test-bundle-1").is_err());
+        let _ = std::fs::remove_dir_all(missing);
+
+        let extra = temp_bundle_path("extra");
+        create_fixture_bundle(&extra, false);
+        std::fs::write(extra.join("untracked.bin"), b"not committed").unwrap();
+        assert!(verify_keeper_bundle_readback(&extra, "test-bundle-1").is_err());
+        let _ = std::fs::remove_dir_all(extra);
+    }
+
+    #[test]
+    fn keeper_bundle_manifest_rejects_transaction_tampering_and_wrong_key() {
+        let path = temp_bundle_path("receipt");
+        create_fixture_bundle(&path, false);
+        let original = verify_keeper_bundle_readback(&path, "test-bundle-1").unwrap();
+        assert!(
+            verify_keeper_bundle_readback(&path, "another-key").is_err(),
+            "a keeper receipt cannot be replayed for a different artifact key"
+        );
+
+        let mut manifest = original.manifest;
+        manifest.transaction_sha256 = "00".repeat(32);
+        let bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        std::fs::write(path.join(KEEPER_BUNDLE_MANIFEST_FILE), bytes).unwrap();
+        assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn keeper_bundle_readback_rejects_manifest_symlink() {
+        let path = temp_bundle_path("manifest-symlink");
+        std::fs::create_dir_all(&path).unwrap();
+        let outside = temp_bundle_path("outside-manifest");
+        std::fs::write(&outside, b"{}").unwrap();
+        std::os::unix::fs::symlink(&outside, path.join(KEEPER_BUNDLE_MANIFEST_FILE)).unwrap();
+        assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
+        let _ = std::fs::remove_dir_all(path);
+        let _ = std::fs::remove_file(outside);
+    }
+
+    #[test]
+    fn absent_midi_is_explicit_and_does_not_invalidate_required_keeper_artifacts() {
+        let path = temp_bundle_path("no-midi");
+        create_fixture_bundle(&path, false);
+        let verified = verify_keeper_bundle_readback(&path, "test-bundle-1").unwrap();
+        assert!(!verified.manifest.midi_available);
+        assert!(verified.artifact_sha256("performance.mid").is_none());
+        assert_eq!(verified.manifest.artifacts.len(), 3);
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn keeper_bundle_readback_rejects_zero_length_required_artifacts() {
+        let path = temp_bundle_path("empty-required");
+        create_fixture_bundle(&path, false);
+        std::fs::write(path.join("score.json"), b"").unwrap();
+        assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
+        let _ = std::fs::remove_dir_all(path);
+    }
 }
 
 #[cfg(test)]
@@ -2976,6 +3424,8 @@ struct KeeperResponse {
     audio_key: Option<String>,
     recipe_sha256: Option<String>,
     score_sha256: Option<String>,
+    audio_sha256: Option<String>,
+    artifact_manifest_sha256: Option<String>,
     genealogy: Option<symthaea_muse_protocol::GenealogyManifest>,
 }
 
@@ -3053,6 +3503,8 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
                 audio_key: None,
                 recipe_sha256: None,
                 score_sha256: Some(score_hash),
+                audio_sha256: None,
+                artifact_manifest_sha256: None,
                 genealogy: None,
             })
             .into_response());
@@ -3072,30 +3524,48 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
 
     let recipe_bytes =
         serde_json::to_vec_pretty(&recipe).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let (bundle_path, midi_available) = persist_keeper_bundle(
+    let score_bytes =
+        serde_json::to_vec(&score).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let (bundle_path, midi_available, readback) = persist_keeper_bundle(
         &audio_key,
         &wav,
         &recipe_bytes,
+        &score_bytes,
         &score,
         &spec,
         seed,
         &state,
         keeper_sequence,
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|error| {
+        eprintln!("[muse_studio] keeper bundle verification failed: {error}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // These hashes come from a second read of the published directory, not
+    // from caller-owned/in-memory values. Genealogy and the keeper index
+    // therefore commit to the exact bytes a later consumer can reopen.
+    let artifact_manifest_sha256 = readback.manifest_sha256.clone();
+    let audio_sha256 = readback
+        .artifact_sha256("audio.wav")
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+        .to_owned();
+    let recipe_sha256 = readback
+        .artifact_sha256("recipe.json")
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+        .to_owned();
+    let score_sha256 = readback
+        .artifact_sha256("score.json")
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+        .to_owned();
+    let midi_sha256 = readback.artifact_sha256("performance.mid").map(str::to_owned);
 
     // Genealogy is an enrichment, not a requirement -- a ledger failure
     // (missing store, sqlite error) must not block the keep the user asked
     // for. Every manifest allocated here is a `Root`: nothing upstream yet
     // tracks "this candidate was derived from kept piece X" (see
     // `symthaea_muse::genealogy`'s module docs).
-    let recipe_sha256 = serialized_sha256(&recipe).ok();
-    let score_sha256 = serialized_sha256(&score).ok();
     let genealogy = studio.genealogy.as_ref().and_then(|store| {
-        let Some(recipe_sha256) = recipe_sha256.as_deref() else {
-            eprintln!("[muse_studio] genealogy: could not hash recipe");
-            return None;
-        };
         let origin = symthaea_muse_protocol::GenealogyOrigin::MuseGenerated {
             seed,
             style_name: spec.name.clone(),
@@ -3103,9 +3573,9 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         match store.allocate_root(
             &origin,
             &audio_key,
-            recipe_sha256,
-            score_sha256.as_deref(),
-            &sha256_hex(&wav),
+            &recipe_sha256,
+            Some(score_sha256.as_str()),
+            &audio_sha256,
             unix_time_ms(),
         ) {
             Ok(manifest) => Some(manifest),
@@ -3133,10 +3603,15 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         "novelty": novelty,
         "diversity_plan": diversity_plan,
         "audio_key": audio_key.clone(),
-        "artifact_layout": "keeper-directory-v1",
+        "artifact_layout": "keeper-directory-v2",
+        "bundle_manifest_version": KEEPER_BUNDLE_SCHEMA_VERSION,
+        "artifact_manifest_sha256": artifact_manifest_sha256,
+        "audio_sha256": audio_sha256,
+        "recipe_sha256": recipe_sha256,
+        "score_sha256": score_sha256.clone(),
+        "midi_sha256": midi_sha256,
         "midi_available": midi_available,
         "genealogy_id": genealogy.as_ref().map(|m| m.id),
-        "score_sha256": score_sha256.clone(),
         // Persisted so future Atlas reads don't depend on recompose
         // determinism across engine versions (MUSE_DIVERSITY_TRUTH_PLAN
         // Phase 3's "persist fingerprints at keep time"). Dimension count
@@ -3154,15 +3629,18 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
             .collect::<Vec<_>>(),
     });
 
-    let index_result = {
-        let _guard = studio
-            .keeper_log
-            .lock()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        append_keeper_entry_atomically(&entry, keeper_sequence)
+    let index_result = match studio.keeper_log.lock() {
+        Ok(_guard) => append_keeper_entry_atomically(&entry, keeper_sequence),
+        Err(_) => Err(std::io::Error::other("keeper index mutex poisoned")),
     };
-    if index_result.is_err() {
-        let _ = std::fs::remove_dir_all(bundle_path);
+    if let Err(index_error) = index_result {
+        if let Err(cleanup_error) = std::fs::remove_dir_all(&bundle_path) {
+            eprintln!(
+                "[muse_studio] keeper: failed to remove unindexed bundle {} after index failure ({index_error}): {cleanup_error}",
+                bundle_path.display()
+            );
+        }
+        let _ = sync_directory(bundle_path.parent().unwrap_or_else(|| Path::new(".")));
         // The keep itself failed downstream of genealogy allocation --
         // don't leave a manifest referencing an audio_key whose bundle
         // directory was just deleted and whose JSONL entry never landed.
@@ -3179,8 +3657,10 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
     Ok(Json(KeeperResponse {
         already_kept: false,
         audio_key: Some(audio_key),
-        recipe_sha256,
-        score_sha256,
+        recipe_sha256: Some(recipe_sha256),
+        score_sha256: Some(score_sha256),
+        audio_sha256: Some(audio_sha256),
+        artifact_manifest_sha256: Some(artifact_manifest_sha256),
         genealogy,
     })
     .into_response())
