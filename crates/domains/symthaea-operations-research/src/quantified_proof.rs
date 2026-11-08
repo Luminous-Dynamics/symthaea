@@ -89,6 +89,10 @@ pub struct QbfProofBuildReport {
     pub early_true_prunes: u128,
     pub early_false_prunes: u128,
     pub complete_matrix_leaves: u128,
+    /// Full binary prefix expansion size before early matrix pruning.
+    pub full_expansion_node_bound: u128,
+    /// Full expansion node bound minus emitted proof nodes.
+    pub proof_nodes_saved_vs_full_expansion: u128,
     pub root_value: bool,
 }
 
@@ -144,6 +148,10 @@ pub enum QuantifiedProofError {
     ProofNodeBudgetExceeded {
         required: usize,
         limit: usize,
+    },
+    ProofNodeCountExceedsExpansionBound {
+        proof_nodes: u128,
+        full_expansion_nodes: u128,
     },
     MissingRoot,
     RootNotFinalNode {
@@ -506,12 +514,28 @@ pub fn build_qbf_game_proof(
         root,
         nodes: state.nodes,
     };
+    let expansion_shift = u32::try_from(order.len().saturating_add(1))
+        .map_err(|_| QuantifiedProofError::ResourceAccountingOverflow)?;
+    let full_expansion_node_bound = 1u128
+        .checked_shl(expansion_shift)
+        .and_then(|value| value.checked_sub(1))
+        .ok_or(QuantifiedProofError::ResourceAccountingOverflow)?;
+    let proof_node_count = u128::try_from(proof.nodes.len())
+        .map_err(|_| QuantifiedProofError::ResourceAccountingOverflow)?;
+    let proof_nodes_saved_vs_full_expansion = full_expansion_node_bound
+        .checked_sub(proof_node_count)
+        .ok_or(QuantifiedProofError::ProofNodeCountExceedsExpansionBound {
+            proof_nodes: proof_node_count,
+            full_expansion_nodes: full_expansion_node_bound,
+        })?;
     let report = QbfProofBuildReport {
         proof_nodes: proof.nodes.len(),
         builder_node_visits: state.visits,
         early_true_prunes: state.early_true,
         early_false_prunes: state.early_false,
         complete_matrix_leaves: state.matrix_leaves,
+        full_expansion_node_bound,
+        proof_nodes_saved_vs_full_expansion,
         root_value: proof.nodes[proof.root].value,
     };
     Ok((proof, report))
@@ -1011,6 +1035,8 @@ mod tests {
         let (proof, built) = build_qbf_game_proof(&problem, &prefix, budget()).unwrap();
         assert!(!built.root_value);
         assert_eq!(built.early_false_prunes, 1);
+        assert_eq!(built.full_expansion_node_bound, 3);
+        assert_eq!(built.proof_nodes_saved_vs_full_expansion, 2);
         assert_eq!(
             proof.nodes[proof.root].kind,
             QbfProofNodeKind::EarlyFalseClause { clause_index: 0 }
@@ -1038,6 +1064,9 @@ mod tests {
         let (proof, built) = build_qbf_game_proof(&problem, &prefix, budget()).unwrap();
         assert!(built.root_value);
         assert_eq!(built.early_true_prunes, 1);
+        assert_eq!(built.proof_nodes, 3);
+        assert_eq!(built.full_expansion_node_bound, 7);
+        assert_eq!(built.proof_nodes_saved_vs_full_expansion, 4);
         match &proof.nodes[proof.root].kind {
             QbfProofNodeKind::ExistsDecision { high_child, .. } => {
                 assert_eq!(proof.nodes[*high_child].kind, QbfProofNodeKind::EarlyTrue)
