@@ -234,3 +234,103 @@ No HME speedup, exact-complete production receipt, industry-leading score, deter
 - LongMemEval, ICLR 2025: https://proceedings.iclr.cc/paper_files/paper/2025/hash/d813d324dbf0598bbdc9c8e79740ed01-Abstract-Conference.html
 - MemoryAgentBench, ICLR 2026: https://mlanthology.org/iclr/2026/hu2026iclr-evaluating/
 - Mem2ActBench, ACL 2026: https://aclanthology.org/2026.acl-long.370/
+
+
+## 9. Current geometric-bound prototype and evidence (2026-11-08)
+
+A separate real-arithmetic spherical-cap interval prototype now exists in crates/core/symthaea-core/src/hdc/continuous_hv_interval.rs:
+
+- Public result type: ContinuousHVRealCosineInterval.
+- Method: ContinuousHV::real_cosine_interval_for_l2_ball_center.
+- The radius-to-centroid norm, normalized dot, square roots, algebraic sqrt(1 - z^2) terms, and endpoint products are propagated with outward f64 intervals.
+- The formula avoids asin/acos; it computes sin(alpha) = r / ||c|| and cos(alpha) = sqrt(1 - sin(alpha)^2).
+- It returns [-1,1] when the ball may contain the origin, the query or center is zero/uncertain, or arithmetic cannot be safely bounded.
+
+**Critical type boundary:** this is a real-cosine geometry result, not an enclosure for the canonical f32 score. It is intentionally not accepted by ScoreIntervalRecord or select_refinement_set, and it must not authorize payload pruning. The eventual f32 score enclosure needs a separate derivation that includes the canonical reduction, denominator, near-zero branch and rounding behavior. The current exact interval path remains the only candidate for deterministic pruning.
+
+Three Rust test groups have been authored for this prototype: generated high-dimensional member containment; aligned/antipodal saturation; and origin-containing-ball fallback. A further property test generates random residual directions across dimensions 1 through 16,384 and independently verifies each residual before testing real-cosine containment. None has been executed because this environment lacks cargo and rustc.
+
+A separate Python numerical simulation exercised 2,400 randomly generated query/center/ball/member cases at dimensions 1, 7, 8, 9, 17, 257, 2,048 and 16,384. It observed zero real-cosine interval escapes. This is an exploratory simulation, not execution of the Rust implementation, a formal proof, a canonical-f32 result, or a performance benchmark.
+
+A separate aligned-cluster geometry comparison with 1,000 query/centroid cases per dimension (8, 128 and 16,384), at radius 0.08 times centroid norm, observed:
+- spherical-cap mean interval widths: 0.0402, 0.0426 and 0.0427;
+- independent Cauchy/reverse-triangle surrogate mean widths: 0.1814, 0.1817 and 0.1818;
+- cone interval narrower in all 3,000 sampled cases.
+
+The comparison is synthetic and uses real-arithmetic enclosures. It does not establish safe canonical pruning or end-to-end speedup. See #11142 for the qualification contract.
+
+## 10. Agent-memory frontier: lifecycle and relationship are now first-class benchmark axes
+
+Do not stop at LongMemEval, LoCoMo or retrieval Recall@K. Current evaluations expose two gaps particularly relevant to Luminous:
+
+### MEME — multi-entity and evolving memory
+
+MEME (arXiv:2605.12477) evaluates six tasks: Exact Recall, Aggregation, Tracking, Deletion, Cascade and Absence. Its 100 controlled episodes test whether a system updates dependent facts when upstream facts change, honors deletion, and knows when an old conclusion is no longer justified. The paper reports mean baseline accuracy of 3% on Cascade and 1% on Absence despite adequate static retrieval. This is an author-reported benchmark result, not an HME result.
+
+Use MEME to test whether HME's event/provenance links and #9075 bitemporal ledger can invalidate or revise dependent memories, rather than merely retrieving the most similar historical vector. The authoritative dependency graph and temporal semantics belong to the existing ledger; HME should be its fast, rebuildable retrieval materialization, not a second truth store.
+
+### DyadMem — user-conditioned relational agent memory
+
+DyadMem (arXiv:2610.03020) explicitly evaluates both user-side memory and relational agent memory—how the agent should work with a particular user as the shared history evolves. Its release describes 3,065 episodes, 50,961 sessions and 61,210 QA instances, with session-level Capture/Update and query-level Recall annotations. It separates Gold-Memory QA from Full-Pipeline QA.
+
+This distinction is important: a high answer score with gold memory does not prove the system can capture, update, retrieve and use the right memory in a real pipeline. Compare:
+- Gold-Memory: tests the reader and memory representation given correct memory;
+- Full-Pipeline: tests capture, consolidation, retrieval, revision and answer integration;
+- user facts vs agent-user working agreements/preferences;
+- correct retrieval vs correct use of a memory, including when it should not be surfaced.
+
+Add DyadMem as a separate agent-memory track; do not pool its score with MEME or LongMemEval.
+
+### Luminous HME-Revise diagnostic suite
+
+Use these public benchmarks plus a small project-owned deterministic diagnostic suite. Each fixture should be a graph of source events, claims, derived claims, temporal scopes and typed dependencies. It is not a replacement for the public benchmark.
+
+Required sequences:
+1. admit a source event and derive one or more conclusions;
+2. update or supersede the source, including a late-arriving correction with an earlier valid time;
+3. retract or delete the source, then test dependent conclusion availability;
+4. query both "what was true at valid time V, as known at knowledge time T?" and "what do we now believe was true at V?";
+5. compact, restart and rebuild all retrieval indexes;
+6. check that obsolete conclusions are not emitted or resurrected and that unsupported absence is not represented as certainty.
+
+First-class metrics:
+- dependency-cascade precision and recall;
+- stale-conclusion emission rate;
+- false-absence and false-unknown rate;
+- bitemporal leakage rate;
+- deleted/revoked descendant read and emission count;
+- invalidation-to-unavailability latency;
+- resurrection rate after compaction/reopen/replay;
+- provenance completeness and independent-source diversity;
+- correct abstention with a typed reason (unknown, stale, superseded, retracted, not authorized, or not observed).
+
+Use MEME for dependency closure/deletion/absence, DyadMem for capture/update/relationship-specific memory, Memora's FAMA for stale-memory penalties, and LongMemEval/MemoryAgentBench/Mem2ActBench for temporal reasoning, selective forgetting and action grounding. Reuse #8427 for the common reader/cost harness and #9075 for valid-time/known-time semantics.
+
+### Paradigm shift: absence and invalidation are data
+
+A missing nearest neighbor is not evidence that a proposition is false; a tombstoned memory is not the same as a never-observed fact; a superseded claim is not the same as an unknown claim. Model these states distinctly and preserve the source of the state transition. The reader should receive a small typed answerability/evidence status rather than an unlabelled empty result.
+
+A second paradigm shift is **write-time revision with read-time proof checking**:
+- source updates propagate supersession/invalidation through the authoritative dependency graph;
+- HME indexes are rebuilt or generation-invalidated as derived views;
+- query-time proof checks catch stale materializations and policy changes;
+- every response is tied to the bitemporal snapshot and current authorization scope.
+
+This directly addresses cascading stale memory without asking a larger LLM to reconstruct every dependency from a large transcript at answer time.
+
+## 11. Competitive interpretation and promotion rules
+
+The frontier is not one aggregate score:
+- **PQR-Search** is the strongest comparator for per-query probabilistic ANN guarantees under updates. Its guarantee is not the same as deterministic complete exact top-k.
+- **Recast** is the closest storage/refinement architecture comparator. Match its memory budget, raw vector bytes, query distribution, update/delete volume and recall target before comparing QPS or device I/O.
+- **QBAT** is the query-specific budget-allocation comparator. HME should let a scheduler predict work order, while only certified bounds may reject a candidate.
+- **MEME / DyadMem / LongMemEval / MemoryAgentBench** test semantic and lifecycle quality. A retrieval speedup is irrelevant if HME returns stale or unauthorized memory.
+- **MLPerf Storage** supplies system/I/O discipline; use its native profile for that workload, and separately publish HME-native 16K/64K/256K traces.
+
+For every competitor, identify whether the reported result is author/vendor-reported, independently reproduced, or run under the same HME harness. Do not rank results across different dimensions, metrics, readers, context budgets, or guarantee classes.
+
+## References added
+
+- MEME (arXiv:2605.12477): https://arxiv.org/abs/2605.12477 ; project page: https://seokwonjung-jay.github.io/meme-eval/
+- DyadMem (arXiv:2610.03020): https://arxiv.org/abs/2610.03020 ; project page: https://renaissancet.github.io/DyadMem/
+- Rust f64 primitive precision contract (sqrt and other operations): https://doc.rust-lang.org/std/primitive.f64.html
