@@ -368,7 +368,12 @@ fn import_references(
         let case = cases
             .iter()
             .find(|case| case.case_id == reference.case_id)
-            .ok_or_else(|| anyhow::anyhow!("human reference references unknown case {}", reference.case_id))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "human reference references unknown case {}",
+                    reference.case_id
+                )
+            })?;
         validate_reference_case(&reference, case)?;
 
         let metadata = std::fs::symlink_metadata(&reference.audio)
