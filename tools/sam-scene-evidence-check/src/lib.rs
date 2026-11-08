@@ -899,10 +899,22 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
 }
 
 fn validate_source_role(errors: &mut Vec<String>, source: &Value) {
-    let id = source.get("source_id").and_then(Value::as_str).unwrap_or("<missing>");
-    let role = source.get("source_role").and_then(Value::as_str).unwrap_or("unknown");
-    let modality = source.get("modality").and_then(Value::as_str).unwrap_or("unknown");
-    let evidence = source.get("evidence_kind").and_then(Value::as_str).unwrap_or("unknown");
+    let id = source
+        .get("source_id")
+        .and_then(Value::as_str)
+        .unwrap_or("<missing>");
+    let role = source
+        .get("source_role")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let modality = source
+        .get("modality")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let evidence = source
+        .get("evidence_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
 
     let sensor_modality = matches!(
         modality,
@@ -921,7 +933,9 @@ fn validate_source_role(errors: &mut Vec<String>, source: &Value) {
             (sensor_modality || modality == "synthetic") && evidence == "synthetic_observation"
         }
         "remote_cooperative_claim" => modality == "v2x" && evidence == "advisory",
-        "simulator_oracle" => modality == "synthetic" && evidence == "synthetic_observation",
+        "simulator_oracle" => {
+            modality == "synthetic" && evidence == "synthetic_observation"
+        },
         "map_prior" => modality == "map" && evidence == "map_prior",
         "derived_estimate" => evidence == "estimate",
         "unknown" => true,
