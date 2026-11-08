@@ -567,11 +567,26 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
             .get("capability_manifest_blake3")
             .and_then(Value::as_str)
             .ok_or_else(|| fail(format!("objective {clip_id} has no capability digest")))?;
+        let capability_canonical_json = objective
+            .get("capability_manifest_canonical_json")
+            .and_then(Value::as_str)
+            .ok_or_else(|| fail(format!("objective {clip_id} has no canonical capability JSON")))?;
+        let decoded_capability: Value =
+            serde_json::from_str(capability_canonical_json).map_err(|error| {
+                fail(format!("objective {clip_id} canonical capability JSON is invalid: {error}"))
+            })?;
+        let capability_value = objective
+            .get("capability_manifest")
+            .ok_or_else(|| fail(format!("objective {clip_id} has no capability manifest")))?;
+        let observed_capability_digest =
+            blake3::hash(capability_canonical_json.as_bytes()).to_hex().to_string();
         if backend != key_entry.backend
             || case_id != key_entry.case_id
             || Some(capability_digest) != key_entry.capability_manifest_blake3.as_deref()
-            || objective.get("capability_manifest").is_none()
-            || objective.get("metrics").is_none()
+            || capability_digest != observed_capability_digest
+            || decoded_capability != *capability_value
+            || !capability_value.is_object()
+            || !objective.get("metrics").is_some_and(Value::is_object)
         {
             return Err(fail(format!(
                 "objective receipt does not match private key for {clip_id}"
@@ -774,21 +789,27 @@ mod tests {
             challenge: "baseline".into(),
         };
         let mut clips = vec![model_clip];
+        let capability_manifest = serde_json::json!({"backend_id": backend});
+        let capability_manifest_canonical_json =
+            serde_json::to_string(&capability_manifest).unwrap();
+        let capability_manifest_blake3 =
+            digest(capability_manifest_canonical_json.as_bytes());
         let mut entries = vec![KeyEntry {
             clip_id: clip_id.clone(),
             backend: backend.into(),
             case_id: 0,
             performance_blake3: Some(performance_blake3),
             audio_blake3: audio_digest.clone(),
-            capability_manifest_blake3: Some("d".repeat(64)),
+            capability_manifest_blake3: Some(capability_manifest_blake3.clone()),
         }];
         let objectives = vec![serde_json::json!({
             "clip_id": clip_id,
             "backend": backend,
             "case_id": 0,
             "metrics": {"objective_pass": true},
-            "capability_manifest": {"backend_id": backend},
-            "capability_manifest_blake3": "d".repeat(64)
+            "capability_manifest": capability_manifest,
+            "capability_manifest_canonical_json": capability_manifest_canonical_json,
+            "capability_manifest_blake3": capability_manifest_blake3
         })];
 
         let mut reference_receipts = Vec::new();
