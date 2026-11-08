@@ -143,6 +143,8 @@ pub mod pilot_protocol;
 pub mod pilot_report;
 #[cfg(feature = "theory")]
 pub mod pilot_schedule;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod sfz_manifest;
 pub mod pitch;
 #[cfg(feature = "theory")]
 pub mod policy_budget_evidence;
