@@ -2,22 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Conservative f32 score intervals for compressed ContinuousHV candidates.
+//! Conservative score intervals for canonical full-resolution ContinuousHV cosine.
 //!
-//! A verified L2 residual bound implies a per-coordinate error bound. This
-//! reference relaxes the L2 ball to a coordinate box, then propagates outward
-//! f32 intervals through the same group-of-eight and ordered-tail reduction as
-//! ContinuousHV::similarity_full_resolution. The box relaxation may be loose,
-//! but uncertainty can only widen the result, never authorize an unsafe prune.
+//! The module provides three complementary uncertainty bounds: a coordinate-box
+//! relaxation of an L2 residual, a joint L2-ball bound for group centroids, and
+//! caller-supplied component bounds for immutable group/page synopses. The
+//! joint-ball method uses Cauchy–Schwarz and reverse-triangle geometry plus an
+//! explicit binary32 reduction-error envelope. The box method propagates
+//! outward intervals through the canonical group-of-eight and ordered-tail
+//! reduction. HME can intersect independently validated enclosures; uncertainty
+//! or malformed metadata must widen the result or disable pruning.
 //!
-//! The caller must independently validate the residual certificate and ensure
-//! that the original payload belongs to the admitted [-1, 1] profile. A digest
-//! binding certificate bytes is not proof of the residual inequality.
+//! Residual admission is separate: verify_l2_residual_certificate checks the
+//! original payload against its reconstruction. A digest binding certificate
+//! bytes is not proof of the residual inequality, group membership or eligibility.
 //!
-//! Numeric preconditions: IEEE-754 binary32 roundTiesToEven operations, the
-//! default Rust floating-point environment, and no fast-math/reassociation
-//! flags. Every arithmetic endpoint is expanded by one adjacent f32 value;
-//! sqrt is likewise expanded after the correctly-rounded binary32 operation.
+//! Numeric assumptions are documented on each public method. They include
+//! round-to-nearest floating-point operations and gradual underflow; compiler,
+//! target and runtime qualification is still required. Interval endpoints are
+//! expanded outward, and the canonical score's reduction order remains part
+//! of the versioned HME score contract.
 
 use super::unified_hv::{ContinuousHV, ContinuousHVProfileError};
 
