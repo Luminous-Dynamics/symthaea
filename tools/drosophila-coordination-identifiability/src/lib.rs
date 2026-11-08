@@ -638,10 +638,7 @@ mod tests {
                 vec!["W-sensory".to_string()]
             ]
         );
-        assert_eq!(
-            report.status,
-            "EXACT_SIGNATURE_EQUIVALENCE_REMAINS"
-        );
+        assert_eq!(report.status, "EXACT_SIGNATURE_EQUIVALENCE_REMAINS");
         assert!(!report.mechanism_certificate_issued);
         assert_eq!(
             report.unavailable_candidate_interventions,
@@ -659,10 +656,7 @@ mod tests {
             .feasible = true;
         let report = audit_mechanism_identifiability(&worlds, &interventions).unwrap();
         assert_eq!(report.feasible_portfolio_unresolved_pairs, 0);
-        assert_eq!(
-            report.status,
-            "PAIRWISE_DISTINCT_EXACT_SIGNATURES"
-        );
+        assert_eq!(report.status, "PAIRWISE_DISTINCT_EXACT_SIGNATURES");
         assert!(!report.mechanism_certificate_issued);
     }
 
@@ -674,8 +668,7 @@ mod tests {
         for (index, world) in relabeled.iter_mut().enumerate() {
             world.mechanism_family = format!("ARBITRARY_LABEL_{index}");
         }
-        let relabeled_report =
-            audit_mechanism_identifiability(&relabeled, &interventions).unwrap();
+        let relabeled_report = audit_mechanism_identifiability(&relabeled, &interventions).unwrap();
         assert_eq!(original, relabeled_report);
         assert_eq!(
             original.interpretation,
@@ -730,9 +723,6 @@ mod tests {
         assert_eq!(report.feasible_portfolio_classes.len(), 3);
         assert_eq!(report.feasible_portfolio_unresolved_pairs, 2);
         assert_eq!(report.unavailable_candidate_interventions.len(), 2);
-        assert_eq!(
-            report.status,
-            "EXACT_SIGNATURE_EQUIVALENCE_REMAINS"
-        );
+        assert_eq!(report.status, "EXACT_SIGNATURE_EQUIVALENCE_REMAINS");
     }
 }
