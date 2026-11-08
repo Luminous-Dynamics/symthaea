@@ -66,5 +66,6 @@
       "verification_valid_from": null,
       "verification_valid_until": null
     }
-  ]
+  ],
+  "evidence_records": []
 }
