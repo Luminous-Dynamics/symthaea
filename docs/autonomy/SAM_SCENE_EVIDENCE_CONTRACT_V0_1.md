@@ -54,6 +54,22 @@ sensor observations
 
 The scene snapshot is a bounded hot-path structure. The high-rate raw data plane stays at the edge or in a separately governed telemetry system. Mycelix may preserve selected evidence commitments, provenance and lifecycle receipts, but Holochain/DHT reconciliation is never a dependency in the hard real-time braking or steering path.
 
+### Source-role separation
+
+Every source declares a `source_role`, separate from its modality and epistemic/evidence kind:
+
+- `local_sensor_observation`: physical sensor measurement candidate;
+- `synthetic_sensor_observation`: synthetic sensor output with sensor-like semantics, explicitly not simulator oracle truth;
+- `remote_cooperative_claim`: V2V/V2I or other remote advisory claim;
+- `simulator_oracle`: privileged simulator state unavailable to a deployed vehicle;
+- `map_prior`: map or road prior;
+- `derived_estimate`: estimator/model output;
+- `unknown`: unresolved source role.
+
+The canonical fixture deliberately contains both a remote V2X claim and simulator oracle truth, but keeps them in separate `cooperative_advisory_refs` and `simulator_truth_refs` lists. Neither may appear in a physical local actor track's `source_refs`. Object tracks, HDC appearance proposals and observed-free regions may cite only local or explicitly synthetic sensor observations; road geometry may additionally cite a map prior.
+
+These roles are declared metadata and semantic consistency checks, not cryptographic authentication. The contract can reject internal role/modality contradictions (for example V2X labelled as a local sensor), but it cannot prove that the source's author declared its real origin honestly. Signatures, device attestation, revocation and evidence provenance remain separate owners and admission obligations.
+
 ## 4. Canonical coordinate and time semantics
 
 ### 4.1 Coordinates
