@@ -62,6 +62,122 @@ pub enum ContinuousHVIntervalError {
     InvalidResidualBound,
 }
 
+/// Result of independently checking an original/reconstruction L2 residual.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResidualCertificateVerification {
+    /// Outward upper bound on the squared L2 residual, accumulated in f64.
+    pub residual_norm_squared_upper: f64,
+    /// Exact f64 square of the supplied binary32 epsilon.
+    pub certified_norm_squared: f64,
+    /// Number of coordinates whose original and reconstruction differ.
+    pub changed_coordinates: usize,
+}
+
+/// Errors from validating a candidate's residual certificate against its payload.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ResidualCertificateError {
+    /// Original and reconstruction dimensions differ.
+    #[error("residual certificate dimension mismatch: original={original_dim}, reconstruction={reconstruction_dim}")]
+    DimensionMismatch {
+        /// Original payload dimension.
+        original_dim: usize,
+        /// Reconstruction dimension.
+        reconstruction_dim: usize,
+    },
+    /// Original or reconstruction components are not in the admitted finite [-1, 1] domain.
+    #[error(transparent)]
+    InvalidProfile(#[from] ContinuousHVProfileError),
+    /// The supplied epsilon must be finite and non-negative.
+    #[error("residual certificate epsilon must be finite and non-negative")]
+    InvalidEpsilon,
+    /// The measured residual cannot be enclosed by the supplied epsilon.
+    #[error("residual certificate under-reports the payload error")]
+    Underreported {
+        /// Conservative squared residual upper bound.
+        residual_norm_squared_upper: f64,
+        /// Exact squared radius represented by epsilon.
+        certified_norm_squared: f64,
+    },
+}
+
+/// Advance a finite non-negative f64 to its next representable larger value.
+#[inline]
+fn f64_next_up_nonnegative(value: f64) -> f64 {
+    if value.is_nan() || value == f64::INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return f64::from_bits(1);
+    }
+    f64::from_bits(value.to_bits() + 1)
+}
+
+/// Independently verify `||original - reconstruction||_2 <= epsilon`.
+///
+/// The inputs are the actual stored binary32 payload and the reconstruction.
+/// Each binary32 value is exactly representable in f64. The absolute
+/// subtraction, square and running sum are rounded outward before comparison
+/// with the exact f64 square of the binary32 epsilon (24-bit significand
+/// product). The returned upper bound is conservative; equality at the
+/// certificate radius is accepted only when the outward sum still fits.
+///
+/// This is an admission/build-time check, not a cryptographic proof receipt.
+/// The caller must bind its result to the exact payload bytes, reconstruction,
+/// transform/codebook and generation. A digest alone is not certificate proof.
+pub fn verify_l2_residual_certificate(
+    original: &ContinuousHV,
+    reconstruction: &ContinuousHV,
+    epsilon: f32,
+) -> Result<ResidualCertificateVerification, ResidualCertificateError> {
+    if original.values.len() != reconstruction.values.len() {
+        return Err(ResidualCertificateError::DimensionMismatch {
+            original_dim: original.values.len(),
+            reconstruction_dim: reconstruction.values.len(),
+        });
+    }
+    if !epsilon.is_finite() || epsilon < 0.0 {
+        return Err(ResidualCertificateError::InvalidEpsilon);
+    }
+    original.validate_full_resolution_profile("original")?;
+    reconstruction.validate_full_resolution_profile("reconstruction")?;
+
+    let epsilon_f64 = epsilon as f64;
+    // The product of two binary32 significands is exactly representable in
+    // binary64 (at most 48 significant bits), including binary32 subnormals.
+    let certified_norm_squared = epsilon_f64 * epsilon_f64;
+    let mut residual_norm_squared_upper = 0.0f64;
+    let mut changed_coordinates = 0usize;
+
+    for (&actual, &approximate) in original.values.iter().zip(&reconstruction.values) {
+        if actual == approximate {
+            continue;
+        }
+        changed_coordinates += 1;
+        // Expand every non-zero operation outward. The subtraction of widely
+        // separated binary32 values need not be exact in binary64.
+        let delta_rounded = ((actual as f64) - (approximate as f64)).abs();
+        let delta_upper = f64_next_up_nonnegative(delta_rounded);
+        let square_rounded = delta_upper * delta_upper;
+        let square_upper = f64_next_up_nonnegative(square_rounded);
+        residual_norm_squared_upper = f64_next_up_nonnegative(
+            residual_norm_squared_upper + square_upper,
+        );
+    }
+
+    if residual_norm_squared_upper > certified_norm_squared {
+        return Err(ResidualCertificateError::Underreported {
+            residual_norm_squared_upper,
+            certified_norm_squared,
+        });
+    }
+
+    Ok(ResidualCertificateVerification {
+        residual_norm_squared_upper,
+        certified_norm_squared,
+        changed_coordinates,
+    })
+}
+
 /// Outward-enclosed interval over binary32 values.
 #[derive(Debug, Clone, Copy)]
 struct F32Interval {
@@ -380,6 +496,47 @@ mod tests {
         *state ^= *state << 5;
         let unit = (*state >> 8) as f32 / (u32::MAX >> 8) as f32;
         unit * 2.0 - 1.0
+    }
+
+    #[test]
+    fn residual_certificate_verifier_accepts_exact_and_conservative_radii() {
+        let original = ContinuousHV::from_vec(vec![0.0, 0.5, -0.25, 1.0]);
+        let same = original.clone();
+        let exact = verify_l2_residual_certificate(&original, &same, 0.0).unwrap();
+        assert_eq!(exact.residual_norm_squared_upper, 0.0);
+        assert_eq!(exact.changed_coordinates, 0);
+
+        let reconstruction = ContinuousHV::from_vec(vec![0.01, 0.49, -0.25, 1.0]);
+        let verified =
+            verify_l2_residual_certificate(&original, &reconstruction, 0.015).unwrap();
+        assert_eq!(verified.changed_coordinates, 2);
+        assert!(verified.residual_norm_squared_upper <= verified.certified_norm_squared);
+    }
+
+    #[test]
+    fn residual_certificate_verifier_rejects_underreported_and_invalid_claims() {
+        let original = ContinuousHV::from_vec(vec![0.5, -0.5, 0.25]);
+        let reconstruction = ContinuousHV::from_vec(vec![0.6, -0.5, 0.25]);
+        assert!(matches!(
+            verify_l2_residual_certificate(&original, &reconstruction, 0.05),
+            Err(ResidualCertificateError::Underreported { .. })
+        ));
+        assert_eq!(
+            verify_l2_residual_certificate(&original, &reconstruction, f32::NAN),
+            Err(ResidualCertificateError::InvalidEpsilon)
+        );
+        let invalid = ContinuousHV::from_vec(vec![f32::INFINITY, 0.0, 0.0]);
+        assert!(matches!(
+            verify_l2_residual_certificate(&invalid, &invalid, 0.1),
+            Err(ResidualCertificateError::InvalidProfile(
+                ContinuousHVProfileError::NonFiniteComponent { .. }
+            ))
+        ));
+        let wrong_dim = ContinuousHV::ones(2);
+        assert!(matches!(
+            verify_l2_residual_certificate(&original, &wrong_dim, 1.0),
+            Err(ResidualCertificateError::DimensionMismatch { .. })
+        ));
     }
 
     #[test]
