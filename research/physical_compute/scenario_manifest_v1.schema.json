@@ -112,7 +112,8 @@
         "kind",
         "numerical_semantics",
         "deadline_ticks",
-        "oracle"
+        "oracle",
+        "required_component_ids"
       ],
       "properties": {
         "contract_id": {
@@ -249,6 +250,16 @@
               "exclusiveMinimum": 0
             }
           }
+        },
+        "required_component_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Components required by the candidate execution path; the verifier component is separately named under mitigation."
         }
       }
     },
