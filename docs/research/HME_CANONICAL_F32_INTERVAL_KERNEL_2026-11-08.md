@@ -92,7 +92,21 @@ A separate NumPy binary32 simulation exercised 1,024 generated query/candidate c
 
 The current container does not have `rustc` or `cargo`. No claim is made that formatting, compilation, unit tests, SIMD differential checks, or CI have passed.
 
-## 6. Required qualification before ExactComplete
+## 6. Memory-crate global selector and canonical reranker
+
+A first runtime-layer algorithmic reference now exists in the existing `symthaea-memory` crate:
+
+- `crates/domains/symthaea-memory/src/hme/interval_select.rs`
+- module export: `symthaea_memory::hme`
+- `select_refinement_set` computes the kth-largest lower-bound threshold and retains all upper bounds at or above it;
+- `stable_exact_top_k` validates finite in-range canonical scores, rejects duplicate IDs, sorts score-descending and ID-ascending, and treats signed zero values as numerically equal.
+
+The selector rejects count mismatch, any unbounded unopened partition, malformed interval, duplicate ID and invalid k. Its `IntervalCoverageCounts` are only consistency counters: a caller-supplied count is not proof of manifest or eligibility coverage. The selector returns an `IntervalSelectionPlan`, not an ExactComplete receipt. Original-payload refinement and receipt verification remain outside this pure algorithm.
+
+Authored Rust tests cover the seven-record fixture, strict threshold equality, input-order independence, invalid/duplicate/incomplete controls, signed-zero ties and 4,096 deterministic generated comparisons between full exact top-k and exact reranking of the selected set. They have not been run because the current execution environment does not provide `cargo` or `rustc`.
+
+## 7. Required qualification before ExactComplete
+
 
 1. Run `cargo fmt --check` and the focused `symthaea-core` test target.
 2. Confirm that the canonical scalar scorer and the interval kernel compile under the same default floating-point assumptions on x86_64 and aarch64.
@@ -103,7 +117,7 @@ The current container does not have `rustc` or `cargo`. No claim is made that fo
 7. Benchmark interval width, refinement fraction, metadata cost, and end-to-end bytes/latency. The coordinate-box reference may be too loose to beat full scan; that is an empirical question.
 8. Keep `ExactComplete` unavailable until the entire eligible corpus has valid intervals (or admissible unopened-segment aggregate bounds) and all the above checks are qualified.
 
-## 7. Competitive evaluation
+## 8. Competitive evaluation
 
 The kernel is not an ANN index and has no throughput claim. Compare the *complete retrieval architecture* against:
 
