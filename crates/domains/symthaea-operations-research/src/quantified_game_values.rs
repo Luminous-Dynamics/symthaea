@@ -66,6 +66,9 @@ pub struct QuantifiedGameValueProfile {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GameValueProfileBudget {
     pub max_variables: usize,
+    pub max_total_variable_name_bytes: usize,
+    pub max_clauses: usize,
+    pub max_literals: usize,
     pub max_total_truth_table_entries: u128,
     pub max_dag_path_steps: u128,
     pub max_matrix_literal_checks: u128,
@@ -75,6 +78,9 @@ impl Default for GameValueProfileBudget {
     fn default() -> Self {
         Self {
             max_variables: 16,
+            max_total_variable_name_bytes: 4 * 1024,
+            max_clauses: 1 << 16,
+            max_literals: 1 << 20,
             max_total_truth_table_entries: 1 << 24,
             max_dag_path_steps: 1 << 28,
             max_matrix_literal_checks: 1 << 28,
@@ -88,6 +94,17 @@ pub enum GameValueProfileError {
     DagVerification(QbfGameDagError),
     MatrixPrefixVariableCountMismatch { matrix: usize, prefix: usize },
     VariableBudgetExceeded { required: usize, limit: usize },
+    VariableNameBudgetExceeded { required: usize, limit: usize },
+    EmptyVariableName { index: usize },
+    DuplicateVariableName(String),
+    ClauseBudgetExceeded { required: usize, limit: usize },
+    LiteralBudgetExceeded { required: usize, limit: usize },
+    LiteralVariableOutOfRange {
+        clause: usize,
+        literal: usize,
+        variable: usize,
+        variable_count: usize,
+    },
     TruthTableEntryBudgetExceeded { required: u128, limit: u128 },
     DagPathStepBudgetExceeded { required: u128, limit: u128 },
     MatrixLiteralCheckBudgetExceeded { required: u128, limit: u128 },
@@ -213,6 +230,56 @@ fn validate_profile_source(
             required: problem.variables.len(),
             limit: budget.max_variables,
         });
+    }
+
+    let name_bytes = problem.variables.iter().try_fold(0usize, |total, name| {
+        total
+            .checked_add(name.len())
+            .ok_or(GameValueProfileError::ResourceAccountingOverflow)
+    })?;
+    if name_bytes > budget.max_total_variable_name_bytes {
+        return Err(GameValueProfileError::VariableNameBudgetExceeded {
+            required: name_bytes,
+            limit: budget.max_total_variable_name_bytes,
+        });
+    }
+    let mut names = std::collections::BTreeSet::new();
+    for (index, name) in problem.variables.iter().enumerate() {
+        if name.is_empty() {
+            return Err(GameValueProfileError::EmptyVariableName { index });
+        }
+        if !names.insert(name.as_str()) {
+            return Err(GameValueProfileError::DuplicateVariableName(name.clone()));
+        }
+    }
+    if problem.clauses.len() > budget.max_clauses {
+        return Err(GameValueProfileError::ClauseBudgetExceeded {
+            required: problem.clauses.len(),
+            limit: budget.max_clauses,
+        });
+    }
+    let literal_total = problem.clauses.iter().try_fold(0usize, |total, clause| {
+        total
+            .checked_add(clause.len())
+            .ok_or(GameValueProfileError::ResourceAccountingOverflow)
+    })?;
+    if literal_total > budget.max_literals {
+        return Err(GameValueProfileError::LiteralBudgetExceeded {
+            required: literal_total,
+            limit: budget.max_literals,
+        });
+    }
+    for (clause_index, clause) in problem.clauses.iter().enumerate() {
+        for (literal_index, literal) in clause.iter().enumerate() {
+            if literal.variable >= problem.variables.len() {
+                return Err(GameValueProfileError::LiteralVariableOutOfRange {
+                    clause: clause_index,
+                    literal: literal_index,
+                    variable: literal.variable,
+                    variable_count: problem.variables.len(),
+                });
+            }
+        }
     }
 
     let entries = profile_entry_bound(problem.variables.len())?;
@@ -733,6 +800,9 @@ mod tests {
     fn profile_budget() -> GameValueProfileBudget {
         GameValueProfileBudget {
             max_variables: 8,
+            max_total_variable_name_bytes: 256,
+            max_clauses: 128,
+            max_literals: 512,
             max_total_truth_table_entries: 1 << 12,
             max_dag_path_steps: 1 << 14,
             max_matrix_literal_checks: 1 << 14,
@@ -961,6 +1031,44 @@ mod tests {
             ),
             Err(GameValueProfileError::TruthTableEntryBudgetExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn rejects_out_of_range_source_literal_before_matrix_indexing() {
+        let problem = CnfProblem {
+            variables: vec!["x".into()],
+            clauses: vec![vec![Literal::positive(1)]],
+        };
+        let prefix = prefix(1, vec![block(Quantifier::Exists, &[0])]);
+        assert_eq!(
+            validate_profile_source(&problem, &prefix, profile_budget()).unwrap_err(),
+            GameValueProfileError::LiteralVariableOutOfRange {
+                clause: 0,
+                literal: 0,
+                variable: 1,
+                variable_count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_excessive_source_clause_count() {
+        let problem = CnfProblem {
+            variables: vec!["x".into()],
+            clauses: vec![vec![], vec![]],
+        };
+        let prefix = prefix(1, vec![block(Quantifier::Exists, &[0])]);
+        let tight = GameValueProfileBudget {
+            max_clauses: 1,
+            ..profile_budget()
+        };
+        assert_eq!(
+            validate_profile_source(&problem, &prefix, tight).unwrap_err(),
+            GameValueProfileError::ClauseBudgetExceeded {
+                required: 2,
+                limit: 1,
+            }
+        );
     }
 
     #[test]
