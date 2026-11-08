@@ -475,3 +475,38 @@ The direction-aware scorer requires exact agreement on the tuple (boundary posit
 - Golden vectors: [`switch_transition_direction_golden_v0.1.json`](./switch_transition_direction_golden_v0.1.json), with Draft 2020-12 schema.
 
 Nine synthetic cases were independently recomputed for exact transition tuple sets and directional TP/FP/FN/precision/recall/F1; all cases matched. This validates the fixture arithmetic, not Rust execution or audio-derived language identification.
+
+
+## 18. Reproducible experiment receipts are mandatory
+
+PazaBench provides an important external deployment baseline: its August 2026 paper harmonizes six public corpora and evaluates 52 ASR systems across 39 African languages using WER, CER and inverse real-time factor (RTFx). It also highlights language-family and architecture variance, which reinforces that one pooled WER cannot identify a universal winner:
+https://www.microsoft.com/en-us/research/publication/pazabench-large-scale-asr-benchmark-for-low-resource-languages-in-africa/
+
+Paza's companion model study compares Whisper, XLS-R, MMS and W2v-BERT across 13 languages and 1–400 labelled hours. It reports architecture-dependent data-scaling behaviour: MMS/W2v-BERT are more data-efficient in the very-low-resource range, XLS-R improves with more data, while Whisper has advantages in some mid-resource settings:
+https://proceedings.mlr.press/v302/nahabwe26a.html
+
+These results suggest the experiment programme should compare not just raw recognition accuracy but accuracy per labelled hour, per trainable parameter, per joule and per dollar. The published patterns are not universal laws and must be tested on the admitted target cohort.
+
+### 18.1 Receipt schema
+
+The programme now defines a machine-readable experiment receipt:
+- [`voice_experiment_receipt_v1.schema.json`](./voice_experiment_receipt_v1.schema.json), JSON Schema Draft 2020-12;
+- [`voice_experiment_receipt_design_example_v1.json`](./voice_experiment_receipt_design_example_v1.json), explicitly DESIGN_ONLY and SYNTHETIC_ONLY.
+
+A receipt captures the immutable dataset revision/file manifest and admission state; code commit and environment; model/checkpoint/tokenizer/adapter; language-input mode (oracle/provided/predicted/open-set); preprocessing/resampling/channel policy; decoder/prompt/chunking; scorer/normalization/alignment/reference revisions; raw metric counts/denominators; micro/macro definitions; per-group scores; speaker/source-cluster bootstrap details; negative controls; hardware, latency p50/p95/p99, RTFx, memory, energy and cost; and prediction/log/scorer artifact hashes.
+
+The schema validates structure, not rights or truth. A syntactically valid receipt is not proof that the run actually occurred. EXECUTED and REPRODUCED require immutable outputs and run evidence; INDEPENDENTLY_VERIFIED requires an independent receipt and separate reproduction. Skipped CI or authored test functions cannot promote an evidence state.
+
+### 18.2 Comparison policy
+
+A result must not enter the external frontier without its receipt. Keep the following conditions explicit:
+- an oracle-language run is not an open-language identification run;
+- test-only or evaluation-only corpora are never used as training data;
+- model-card language coverage is not a per-language score;
+- a changed checkpoint, adapter, tokenizer, normalizer, prompt, decoder, dataset revision or split is a different experiment;
+- inaccessible/rights-blocked/not-run cases are not zero-error observations;
+- report both micro and macro where meaningful, with exact denominators and non-estimable counts;
+- use speaker/source/witness-clustered uncertainty, not naive utterance-level iid confidence intervals;
+- publish worst-language and worst-domain cells beside aggregate results.
+
+The receipt requirement is tracked in [#11107 — VOICE-RESULT-RECEIPT-001](https://github.com/Luminous-Dynamics/symthaea/issues/11107). The machine-readable benchmark matrix now contains eleven tracks, with experiment-receipt conformance as the final meta-track.
