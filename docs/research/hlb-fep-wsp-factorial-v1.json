@@ -955,6 +955,10 @@
     {
       "id": "fep_epistemic_alignment_probe_selection",
       "scope": "Candidate FEP probe policy maximizing calibrated expected information gain about hidden-unit correspondence under a registered observation-noise model"
+    },
+    {
+      "id": "gaussian_permutation_hypothesis_eig_probe_selector",
+      "scope": "Exact finite permutation posterior with explicit scalar Gaussian projection-observation likelihood; prospective I(Permutation; projected activation | candidate input probe), limited to at most 120 permutations and 32 candidate probes per call; noise scale must be empirically calibrated before claiming diagnostic efficiency"
     }
   ],
   "seeds": {
@@ -1061,7 +1065,9 @@
       "permutation_posterior_brier_score",
       "held_out_permutation_accuracy",
       "expected_information_gain_about_permutation_nats",
-      "probe_cost_to_accepted_alignment"
+      "probe_cost_to_accepted_alignment",
+      "permutation_probe_expected_information_gain_nats",
+      "permutation_probe_expected_posterior_entropy_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1144,7 +1150,10 @@
       "probe_noise_sigma_calibration_error",
       "permutation_posterior_calibration_error",
       "zero_noise_eig_claim_rejection_rate",
-      "exact_permutation_width_limit_violation_rate"
+      "exact_permutation_width_limit_violation_rate",
+      "permutation_posterior_brier_score",
+      "gaussian_observation_noise_calibration_error",
+      "permutation_probe_realized_entropy_reduction_nats"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1258,7 +1267,9 @@
     "The native CfC sequential WSP integration fixture must materialize two consecutive frozen-template evidence batches through candidate-only native snapshots, prove verifier rejection does not advance the session, prove accepted batches bind to the prior accepted native fingerprint and advance exactly once, and prove the original live/source network fingerprint remains unchanged.",
     "Feedback log preferences are treated as relative log weights: normalize with a stable log-sum-exp before evaluating KL pragmatic risk, and verify that adding a common constant to all preference logits leaves every action's risk and policy ranking invariant.",
     "Bayesian expected information gain over hidden-unit permutations is claimed only when an explicit observation/measurement-noise likelihood is independently calibrated from repeat-run, device/precision, or stochastic-model variation; a deterministic margin heuristic is labelled as such and is not called EIG.",
-    "Exact finite-permutation enumeration is restricted to declared small-width oracle fixtures and must report factorial scaling; larger-width methods report approximation residuals, calibration, ambiguity abstention, and compute."
+    "Exact finite-permutation enumeration is restricted to declared small-width oracle fixtures and must report factorial scaling; larger-width methods report approximation residuals, calibration, ambiguity abstention, and compute.",
+    "Gaussian permutation EIG may be reported as calibrated diagnostic efficiency only when the scalar observation-noise standard deviation is estimated from a preregistered repeated-probe/device/stochasticity protocol on development data and then frozen for held-out evaluation; arbitrary noise insertion solely to increase EIG is prohibited.",
+    "Exact permutation EIG is limited to at most 120 hypotheses (five hidden units) and 32 candidate probes per call; larger layers must use a separately benchmarked approximate posterior/assignment method and cannot be labelled exact."
   ],
   "research_references": [
     {
