@@ -158,12 +158,24 @@ pub struct SetScore {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StructureScore {
+    pub claimed_structure_count: usize,
+    pub oracle_structure_count: usize,
+    pub correct_structure_count: usize,
+    pub exact_structure_set_match: bool,
+    pub claimed_structure_identified: bool,
+    pub oracle_structure_identified: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluatorScore {
     pub evidence_prefix_sha256: String,
     /// Evaluator-only check that the generating model survived the independent
     /// trace filter. This catches a candidate-family omission or verifier bug.
     pub generating_model_in_version_space: bool,
     pub set_score: SetScore,
+    /// Scores structural-family recovery independently of coefficients and sensor parameters.
+    pub structure_score: StructureScore,
     pub decision_correct: bool,
     pub abstained: bool,
     pub evidence_references_valid: bool,
@@ -197,6 +209,17 @@ pub struct BlindEpisode {
     submission: Option<AgentSubmission>,
 }
 
+struct EpisodeInit {
+    episode_id: String,
+    world_family: WorldFamily,
+    structure_access: StructureAccess,
+    intervention_domain: InterventionDomain,
+    dynamics: DynamicsContract,
+    max_probe_actions: usize,
+    world: WorldState,
+    generating_truth: GeneratingTruth,
+}
+
 impl BlindEpisode {
     /// Evaluator-side constructor. Generating truth is never copied into the
     /// agent-facing manifest.
@@ -220,16 +243,16 @@ impl BlindEpisode {
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
         let world = HiddenWorld::new(mechanism, measurement_map, initial_hidden_state)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
-        Self::new_internal(
-            episode_id.into(),
-            WorldFamily::BooleanMechanism,
-            access,
-            InterventionDomain::Boolean([false, true]),
-            DynamicsContract::StatefulAcrossProbes,
+        Self::new_internal(EpisodeInit {
+            episode_id: episode_id.into(),
+            world_family: WorldFamily::BooleanMechanism,
+            structure_access: access,
+            intervention_domain: InterventionDomain::Boolean([false, true]),
+            dynamics: DynamicsContract::StatefulAcrossProbes,
             max_probe_actions,
-            WorldState::Boolean(world),
-            GeneratingTruth::Boolean(truth),
-        )
+            world: WorldState::Boolean(world),
+            generating_truth: GeneratingTruth::Boolean(truth),
+        })
     }
 
     /// Evaluator-side constructor. The full generating model remains private.
@@ -249,16 +272,16 @@ impl BlindEpisode {
         }
         let world = numeric::NumericWorld::new(truth)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
-        Self::new_internal(
-            episode_id.into(),
-            WorldFamily::NumericMechanism,
-            access,
-            InterventionDomain::Integer(numeric::INPUT_LEVELS.to_vec()),
-            DynamicsContract::StatefulAcrossProbes,
+        Self::new_internal(EpisodeInit {
+            episode_id: episode_id.into(),
+            world_family: WorldFamily::NumericMechanism,
+            structure_access: access,
+            intervention_domain: InterventionDomain::Integer(numeric::INPUT_LEVELS.to_vec()),
+            dynamics: DynamicsContract::StatefulAcrossProbes,
             max_probe_actions,
-            WorldState::Numeric(world),
-            GeneratingTruth::Numeric(truth),
-        )
+            world: WorldState::Numeric(world),
+            generating_truth: GeneratingTruth::Numeric(truth),
+        })
     }
 
     /// Evaluator-side constructor. The generating coefficients remain private.
@@ -278,28 +301,30 @@ impl BlindEpisode {
         }
         let world = interaction::InteractionWorld::new(truth)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
-        Self::new_internal(
-            episode_id.into(),
-            WorldFamily::TwoInputResponse,
-            access,
-            InterventionDomain::IntegerPair(interaction::INPUT_LEVELS.to_vec()),
-            DynamicsContract::IndependentProbes,
+        Self::new_internal(EpisodeInit {
+            episode_id: episode_id.into(),
+            world_family: WorldFamily::TwoInputResponse,
+            structure_access: access,
+            intervention_domain: InterventionDomain::IntegerPair(interaction::INPUT_LEVELS.to_vec()),
+            dynamics: DynamicsContract::IndependentProbes,
             max_probe_actions,
-            WorldState::Interaction(world),
-            GeneratingTruth::Interaction(truth),
-        )
+            world: WorldState::Interaction(world),
+            generating_truth: GeneratingTruth::Interaction(truth),
+        })
     }
 
-    fn new_internal(
-        episode_id: String,
-        world_family: WorldFamily,
-        structure_access: StructureAccess,
-        intervention_domain: InterventionDomain,
-        dynamics: DynamicsContract,
-        max_probe_actions: usize,
-        world: WorldState,
-        generating_truth: GeneratingTruth,
-    ) -> Result<Self, ProtocolError> {
+    fn new_internal(init: EpisodeInit) -> Result<Self, ProtocolError> {
+        let EpisodeInit {
+            episode_id,
+            world_family,
+            structure_access,
+            intervention_domain,
+            dynamics,
+            max_probe_actions,
+            world,
+            generating_truth,
+        } = init;
+
         if episode_id.trim().is_empty() || max_probe_actions == 0 {
             return Err(ProtocolError::InvalidManifest);
         }
@@ -533,7 +558,7 @@ impl BlindEpisode {
                     .all(|reference| known.contains(reference.as_str()))
         };
 
-        let (set_score, disposition, generating_model_in_version_space) =
+        let (set_score, structure_score, disposition, generating_model_in_version_space) =
             match (&self.world, &self.generating_truth, &submission.claim) {
                 (
                     WorldState::Boolean(_),
@@ -579,6 +604,9 @@ impl BlindEpisode {
                     }
                     (
                         compare_model_sets(compatible_models, &oracle_models)?,
+                        compare_structure_sets(compatible_models, &oracle_models, |model| {
+                            model.mechanism
+                        }),
                         *disposition,
                         truth_present,
                     )
@@ -627,6 +655,9 @@ impl BlindEpisode {
                     }
                     (
                         compare_model_sets(compatible_models, &oracle_models)?,
+                        compare_structure_sets(compatible_models, &oracle_models, |model| {
+                            model.mechanism
+                        }),
                         *disposition,
                         truth_present,
                     )
@@ -677,6 +708,9 @@ impl BlindEpisode {
                     }
                     (
                         compare_model_sets(compatible_models, &oracle_models)?,
+                        compare_structure_sets(compatible_models, &oracle_models, |model| {
+                            model.structure
+                        }),
                         *disposition,
                         truth_present,
                     )
@@ -695,6 +729,7 @@ impl BlindEpisode {
             decision_correct: disposition == expected,
             abstained: disposition == ClaimDisposition::Abstain,
             set_score,
+            structure_score,
             evidence_references_valid,
             cited_evidence_count: submission.cited_evidence_ids.len(),
             observed_evidence_count: self.observations.len(),
@@ -1040,6 +1075,32 @@ fn serialized_set<T: Serialize>(models: &[T]) -> Result<BTreeSet<String>, Protoc
         .collect()
 }
 
+fn compare_structure_sets<T, S>(
+    claimed: &[T],
+    oracle: &[T],
+    structure_of: impl Fn(&T) -> S,
+) -> StructureScore
+where
+    S: Ord,
+{
+    let claimed_structures: BTreeSet<S> =
+        claimed.iter().map(|model| structure_of(model)).collect();
+    let oracle_structures: BTreeSet<S> =
+        oracle.iter().map(|model| structure_of(model)).collect();
+    let correct_structure_count = claimed_structures
+        .intersection(&oracle_structures)
+        .count();
+
+    StructureScore {
+        claimed_structure_count: claimed_structures.len(),
+        oracle_structure_count: oracle_structures.len(),
+        correct_structure_count,
+        exact_structure_set_match: claimed_structures == oracle_structures,
+        claimed_structure_identified: claimed_structures.len() == 1,
+        oracle_structure_identified: oracle_structures.len() == 1,
+    }
+}
+
 fn compare_model_sets<T: Serialize>(
     claimed: &[T],
     oracle: &[T],
@@ -1249,6 +1310,116 @@ mod tests {
         let score = episode.evaluate_after_submission().unwrap();
         assert!(!score.set_score.exact_version_space_match);
         assert!(score.set_score.correct_model_count < score.set_score.claimed_model_count);
+    }
+
+    #[test]
+    fn structure_scoring_separates_structure_recovery_from_parameter_identification() {
+        let mut episode = BlindEpisode::new_numeric(
+            "numeric-structure-only-identified",
+            direct_numeric_truth(),
+            StructureAccess::NumericWithheld,
+            4,
+        )
+        .unwrap();
+
+        for intervention in [1, -1, 1] {
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Numeric(intervention),
+                })
+                .unwrap();
+        }
+
+        let log = numeric::ObservationLog {
+            interventions: vec![1, -1, 1],
+            measurements: vec![2, -2, 2],
+        };
+        let compatible_models = numeric::discover(&log, numeric::StructureAccess::Withheld)
+            .unwrap()
+            .compatible_models;
+        assert!(compatible_models.len() > 1);
+        assert!(compatible_models.iter().all(|model| {
+            model.mechanism == numeric::Mechanism::DirectResponse
+        }));
+
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                disposition: ClaimDisposition::Ambiguous,
+                compatible_models,
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![
+                "E0001".to_string(),
+                "E0002".to_string(),
+                "E0003".to_string(),
+            ],
+            rationale: "The mechanism is identified, while gain and sensor scale remain observationally equivalent.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.decision_correct);
+        assert!(score.structure_score.exact_structure_set_match);
+        assert!(score.structure_score.claimed_structure_identified);
+        assert!(score.structure_score.oracle_structure_identified);
+        assert_eq!(score.structure_score.oracle_structure_count, 1);
+    }
+
+    #[test]
+    fn structure_scoring_preserves_cross_family_ambiguity_under_uninformative_sensor() {
+        let truth = numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::ConstantZero,
+        };
+        let mut episode = BlindEpisode::new_numeric(
+            "numeric-structure-ambiguous",
+            truth,
+            StructureAccess::NumericWithheld,
+            4,
+        )
+        .unwrap();
+
+        for intervention in [1, -1, 1] {
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Numeric(intervention),
+                })
+                .unwrap();
+        }
+
+        let log = numeric::ObservationLog {
+            interventions: vec![1, -1, 1],
+            measurements: vec![0, 0, 0],
+        };
+        let compatible_models = numeric::discover(&log, numeric::StructureAccess::Withheld)
+            .unwrap()
+            .compatible_models;
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                disposition: claim_disposition(compatible_models.len()),
+                compatible_models,
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![
+                "E0001".to_string(),
+                "E0002".to_string(),
+                "E0003".to_string(),
+            ],
+            rationale: "The constant sensor makes direct and leaky mechanisms observationally equivalent.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.structure_score.exact_structure_set_match);
+        assert!(!score.structure_score.oracle_structure_identified);
+        assert_eq!(score.structure_score.oracle_structure_count, 2);
     }
 
     #[test]
