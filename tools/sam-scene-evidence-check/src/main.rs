@@ -24,12 +24,9 @@ fn main() {
 
     let has_traffic = traffic_schema.is_some();
     let result = match (traffic_schema, traffic_fixture) {
-        (Some(traffic_schema), Some(traffic_fixture)) => validate_bundle_files(
-            &schema,
-            &fixture,
-            &traffic_schema,
-            &traffic_fixture,
-        ),
+        (Some(traffic_schema), Some(traffic_fixture)) => {
+            validate_bundle_files(&schema, &fixture, &traffic_schema, &traffic_fixture)
+        },
         (None, None) => validate_files(&schema, &fixture),
         _ => unreachable!("argument pairing checked above"),
     };
@@ -42,7 +39,9 @@ fn main() {
                 schema.display()
             );
             if has_traffic {
-                println!("PASS: scene traffic_convention_profile_id resolves in the validated traffic profile registry");
+                println!(
+                    "PASS: scene traffic_convention_profile_id resolves in the validated traffic profile registry"
+                );
             }
         }
         Err(errors) => {
