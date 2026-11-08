@@ -104,7 +104,7 @@ struct KeyEntry {
     capability_manifest_blake3: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct CaseReceipt {
     case_id: usize,
     seed: u64,
@@ -119,6 +119,7 @@ struct CaseReceipt {
     consciousness_level: f32,
     transpose_semitones: f32,
     melody: Vec<symthaea_muse::Note>,
+    score_blake3: String,
     performance_blake3: String,
 }
 
@@ -164,6 +165,20 @@ struct ReferenceClip {
     lyrics: String,
     category: String,
     challenge: String,
+    score_blake3: String,
+    singer_pseudonym: String,
+    consent_reference: String,
+    license_reference: String,
+}
+
+#[derive(Serialize)]
+struct HumanReferenceReceipt {
+    case_id: usize,
+    singer_pseudonym: String,
+    consent_reference: String,
+    license_reference: String,
+    score_blake3: String,
+    audio_blake3: String,
 }
 
 fn arg(args: &[String], flag: &str) -> Option<String> {
@@ -219,6 +234,42 @@ fn validate_source_revision(revision: &str) -> Result<String> {
 fn performance_digest(performance: &VocalPerformance) -> Result<String> {
     let bytes = serde_json::to_vec(performance)?;
     Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+fn score_digest(melody: &[symthaea_muse::Note]) -> Result<String> {
+    let bytes = serde_json::to_vec(melody)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+fn validate_reference_case(reference: &ReferenceClip, case: &CaseReceipt) -> Result<()> {
+    if reference.case_id != case.case_id {
+        anyhow::bail!("human reference case ID does not match its score receipt");
+    }
+    if reference.lyrics != case.lyrics
+        || reference.category != case.category
+        || reference.challenge != case.challenge
+    {
+        anyhow::bail!(
+            "human reference lyrics/category/challenge do not match case {}",
+            case.case_id
+        );
+    }
+    if reference.score_blake3 != case.score_blake3 {
+        anyhow::bail!(
+            "human reference score digest does not match case {}",
+            case.case_id
+        );
+    }
+    if reference.singer_pseudonym.trim().is_empty()
+        || reference.consent_reference.trim().is_empty()
+        || reference.license_reference.trim().is_empty()
+    {
+        anyhow::bail!(
+            "human reference case {} requires singer pseudonym, consent reference, and license reference",
+            case.case_id
+        );
+    }
+    Ok(())
 }
 
 fn artifact_digest(path: &Path) -> Result<String> {
@@ -305,16 +356,30 @@ fn render_one(
 
 fn import_references(
     manifest: &Path,
+    cases: &[CaseReceipt],
     salt: &str,
     output: &Path,
     clips: &mut Vec<BlindClip>,
     key: &mut Vec<KeyEntry>,
-) -> Result<()> {
+) -> Result<Vec<HumanReferenceReceipt>> {
     let references: Vec<ReferenceClip> = serde_json::from_slice(&std::fs::read(manifest)?)?;
+    let mut receipts = Vec::with_capacity(references.len());
     for reference in references {
-        if !reference.audio.is_file() {
-            anyhow::bail!("missing human reference: {}", reference.audio.display());
+        let case = cases
+            .iter()
+            .find(|case| case.case_id == reference.case_id)
+            .ok_or_else(|| anyhow::anyhow!("human reference references unknown case {}", reference.case_id))?;
+        validate_reference_case(&reference, case)?;
+
+        let metadata = std::fs::symlink_metadata(&reference.audio)
+            .with_context(|| format!("missing human reference: {}", reference.audio.display()))?;
+        if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
+            anyhow::bail!(
+                "human reference must be a regular non-symlink file: {}",
+                reference.audio.display()
+            );
         }
+
         let id = blind_id(salt, "human-reference", reference.case_id);
         if clips.iter().any(|clip| clip.clip_id == id) {
             anyhow::bail!("duplicate human-reference case_id {}", reference.case_id);
@@ -338,11 +403,19 @@ fn import_references(
             backend: "human-reference".to_string(),
             case_id: reference.case_id,
             performance_blake3: None,
-            audio_blake3,
+            audio_blake3: audio_blake3.clone(),
             capability_manifest_blake3: None,
         });
+        receipts.push(HumanReferenceReceipt {
+            case_id: reference.case_id,
+            singer_pseudonym: reference.singer_pseudonym,
+            consent_reference: reference.consent_reference,
+            license_reference: reference.license_reference,
+            score_blake3: reference.score_blake3,
+            audio_blake3,
+        });
     }
-    Ok(())
+    Ok(receipts)
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -504,6 +577,7 @@ fn main() -> Result<()> {
             bars: 2,
             consciousness_level: 0.72,
             transpose_semitones: case.transpose_semitones,
+            score_blake3: score_digest(&melody)?,
             melody: melody.clone(),
             performance_blake3: performance_digest(&performance)?,
         });
@@ -553,16 +627,28 @@ fn main() -> Result<()> {
             .map(|path| artifact_digest(path))
             .transpose()?,
         case_count: case_receipts.len(),
-        cases: case_receipts,
+        cases: case_receipts.clone(),
     };
     std::fs::write(
         private_output.join("run_manifest.json"),
         serde_json::to_vec_pretty(&run_manifest)?,
     )?;
 
+    let mut human_reference_receipts = Vec::new();
     if let Some(manifest) = reference_manifest {
-        import_references(&manifest, &salt, &blind_output, &mut clips, &mut key)?;
+        human_reference_receipts = import_references(
+            &manifest,
+            &case_receipts,
+            &salt,
+            &blind_output,
+            &mut clips,
+            &mut key,
+        )?;
     }
+    std::fs::write(
+        private_output.join("human_reference_receipts.json"),
+        serde_json::to_vec_pretty(&human_reference_receipts)?,
+    )?;
 
     // Deterministic IDs conceal the backend; sort by ID so presentation order
     // does not reveal alternating render order.
