@@ -370,6 +370,43 @@ The current branch now contains a deliberately limited, candidate-only implement
 
 This is a real CfC candidate adapter, but it is **not** an autonomous WSP proposer, a production FEP integration, or a promotion authority. HDC-LTC is represented in the typed IR but does not yet have a live-model adapter. The new Rust tests and formatting checks must pass on the exact branch head before implementation qualification; queued workflows are not passes.
 
+### 3.5 Function-space quotienting and epistemic alignment
+
+A neural parameter vector is not a unique description of the function it computes. For supported feed-forward CfC topologies, hidden-unit relabellings act on the parameter tensors without changing the input/output function. Let \(G=S_h^L\) be the product of hidden-layer permutation groups for a network with \(L\) layers of width \(h\). The relevant model is then not an isolated parameter point \(\theta\), but an equivalence class:
+
+\`\`\`text
+[theta] = { g · theta : g in G }
+\`\`\`
+
+This changes the learning problem. Raw Euclidean distance between two parameter vectors is not a reliable measure of functional distance; coordinate permutations can make it large while preserving the function exactly. Conversely, similar weights do not prove equivalent behavior. Use three distinct quantities:
+
+- **Parameter distance:** distance between a chosen pair of coordinate representatives.
+- **Functional distance:** discrepancy between outputs or internal activations over a frozen, explicitly declared probe distribution.
+- **Alignment uncertainty:** uncertainty over the group element that relates the two parameterizations.
+
+The CfC alignment/canonicalization code implements a deliberately bounded first slice. It measures source-bound activation signatures, solves a one-to-one Hungarian assignment, reports an alternating-cycle assignment margin, and can materialize a canonicalizing \`WeightProgram\` on a candidate clone. The single-layer transform is restricted to no-backbone, no-residual, unidirectional CfC. The multi-layer transform additionally permutes adjacent input-projection columns and is restricted to feed-forward/no-residual/no-backbone/no-bidirectional topologies. Other graph structures must be rejected until their complete symmetry action is derived.
+
+**New paradigm to test: FEP over representation correspondence.** Treat the hidden-unit map \(\Pi\) as an epistemic latent variable. Given frozen evidence \(D\), a candidate functional probe \(a\), and measured signature \(Y\), choose a probe by:
+
+\`\`\`text
+a* = argmax_a I(Pi; Y | a, D) - lambda_cost * probe_cost(a)
+\`\`\`
+
+For a finite small-width research fixture, one possible posterior is:
+
+\`\`\`text
+q(pi | D) proportional to exp(- L_probe(pi; D) / (2 sigma^2))
+L_probe(pi; D) = sum_(unit,probe) (source[unit,probe] - candidate[pi(unit),probe])^2
+\`\`\`
+
+This is a *candidate model*, not yet a calibrated posterior. \`sigma\` must be estimated from repeat-run variation, device/precision effects, stochastic layers, or an explicit observation-noise protocol. Do not manufacture epistemic uncertainty by adding arbitrary noise solely to make EIG nonzero. If execution is exactly deterministic and probe outputs are fully observed, use the current deterministic margin objective or a justified bootstrap/noise model rather than claim a Bayesian information gain.
+
+The next experiment should compare: random probe selection; maximum assignment-margin gain; minimum functional-fit error; calibrated finite-permutation EIG for small widths; Sinkhorn/soft-assignment approximations for larger widths; Deep-Align; and a permutation-equivariant WSN baseline. Report posterior calibration and abstention as first-class outcomes. A probe is useful only if its selected alignment generalizes to a disjoint held-out probe sequence.
+
+Primary metrics: probes to a unique/accepted alignment, permutation posterior Brier score, held-out mapping accuracy, held-out functional equivalence, ambiguity abstention precision/recall, and probe cost. Add scaling curves over width (e.g., 4, 8, 16, 32, 64, then larger if the approximate method supports it). Exact permutation enumeration is a small-width oracle/control only; it is factorial in width and must not be presented as a scalable algorithm.
+
+**Safety invariant:** alignment metadata never authorizes a live-model edit. The source/candidate native digests, architecture/manifest digests, probe digest, layer ID, bijection, fit error, and ambiguity margin must all be checked again when constructing a candidate-only WSP program. A stale model or changed probe sequence invalidates the alignment. Independent held-out functional verification remains mandatory after canonicalization.
+
 ## 4. Four-factor factorial study
 
 Add a new 2×2×2×2 factorial, separate from HLB factorial v1 so that the existing three-factor protocol remains stable:
