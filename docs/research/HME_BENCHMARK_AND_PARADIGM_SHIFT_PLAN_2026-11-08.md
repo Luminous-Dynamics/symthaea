@@ -310,7 +310,7 @@ First-class metrics:
 - provenance completeness and independent-source diversity;
 - correct abstention with a typed reason (unknown, stale, superseded, retracted, not authorized, or not observed).
 
-Use MEME for dependency closure/deletion/absence, DyadMem for capture/update/relationship-specific memory, Memora's FAMA for stale-memory penalties, and LongMemEval/MemoryAgentBench/Mem2ActBench for temporal reasoning, selective forgetting and action grounding. Reuse #8427 for the common reader/cost harness and #9075 for valid-time/known-time semantics.
+Use MEME for dependency closure/deletion/absence, DyadMem for capture/update/relationship-specific memory, Memora's FAMA for stale-memory penalties, and LongMemEval/MemoryAgentBench/Mem2ActBench for temporal reasoning, selective forgetting and action grounding. Reuse #8427 for the common reader/cost harness, #9075 for valid-time/known-time semantics, #9048 for alternative AND/OR justifications and explicit Unsupported state, and #9139 for governed consolidation, forgetting and erasure policy.
 
 ### Paradigm shift: absence and invalidation are data
 
