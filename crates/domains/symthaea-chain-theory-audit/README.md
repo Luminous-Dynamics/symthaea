@@ -16,9 +16,10 @@ and evaluates the resulting radical sum.
 Run:
 
     cargo test -p symthaea-chain-theory-audit
-    cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit > /tmp/chain-alpha-rust.csv
+    cargo run --locked -p symthaea-chain-theory-audit --example chain_alpha_audit > /tmp/chain-alpha-rust.csv
     sed -n '/^record,construction,slot_kinds/,$p' /tmp/chain-alpha-rust.csv > /tmp/chain-alpha-rows.csv
-    diff -u /path/to/author/records.csv /tmp/chain-alpha-rows.csv
+    sed '/^#/d' crates/domains/symthaea-chain-theory-audit/tests/fixtures/author-records-a28db899.csv > /tmp/chain-alpha-author-rows.csv
+    diff -u /tmp/chain-alpha-author-rows.csv /tmp/chain-alpha-rows.csv
 
 The sector counts reproduce the author's published table:
 
