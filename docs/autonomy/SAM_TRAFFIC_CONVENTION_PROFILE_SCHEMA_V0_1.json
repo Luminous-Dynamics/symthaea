@@ -26,6 +26,12 @@
       "items": {
         "$ref": "#/$defs/profile"
       }
+    },
+    "paired_scenes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scene"
+      }
     }
   },
   "$defs": {
@@ -201,6 +207,162 @@
           }
         }
       ]
+    },
+    "scene": {
+      "type": "object",
+      "required": [
+        "scene_id",
+        "pair_id",
+        "traffic_convention_profile_id",
+        "map_traffic_convention_profile_id",
+        "map_profile_id",
+        "travel_frame_id",
+        "scenario_family",
+        "ego_state",
+        "candidate_command",
+        "lanes",
+        "declared_passing_side_sign"
+      ],
+      "properties": {
+        "scene_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traffic_convention_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "map_traffic_convention_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "map_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "travel_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ego_state": {
+          "type": "object",
+          "required": [
+            "position_m",
+            "heading_rad",
+            "velocity_mps",
+            "yaw_rate_rad_s",
+            "lateral_offset_m",
+            "curvature_per_m",
+            "steering_angle_rad"
+          ],
+          "properties": {
+            "position_m": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "heading_rad": {
+              "type": "number"
+            },
+            "velocity_mps": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "yaw_rate_rad_s": {
+              "type": "number"
+            },
+            "lateral_offset_m": {
+              "type": "number"
+            },
+            "curvature_per_m": {
+              "type": "number"
+            },
+            "steering_angle_rad": {
+              "type": "number"
+            }
+          }
+        },
+        "candidate_command": {
+          "type": "object",
+          "required": [
+            "steering",
+            "throttle",
+            "brake"
+          ],
+          "properties": {
+            "steering": {
+              "type": "number"
+            },
+            "throttle": {
+              "type": "number"
+            },
+            "brake": {
+              "type": "number"
+            }
+          }
+        },
+        "lanes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "lane_id",
+              "role",
+              "center_lateral_m",
+              "relative_lateral_sign"
+            ],
+            "properties": {
+              "lane_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "ego_travel_lane",
+                  "oncoming_lane",
+                  "bus_lane",
+                  "cycle_lane",
+                  "shoulder",
+                  "unknown"
+                ]
+              },
+              "center_lateral_m": {
+                "type": "number"
+              },
+              "relative_lateral_sign": {
+                "type": "integer",
+                "enum": [
+                  -1,
+                  1
+                ]
+              }
+            }
+          },
+          "minItems": 2
+        },
+        "declared_passing_side_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        }
+      }
     }
   }
 }
