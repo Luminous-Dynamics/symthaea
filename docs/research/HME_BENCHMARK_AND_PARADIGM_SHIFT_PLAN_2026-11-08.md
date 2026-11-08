@@ -358,3 +358,69 @@ These are HME project targets, not published standards or achieved scores:
 For public benchmarks, use official splits, official scorers, licensed data and reproducible reader/judge settings. The project-owned HME-Revise fixture is a deterministic diagnostic gate, not an alternative public benchmark and not a substitute for human evaluation.
 
 A high MEME or DyadMem score cannot compensate for data-governance violations. The safety invariants are independent hard gates, not weighted terms in a single aggregate.
+
+
+## 12. External agent-memory leaderboard and embodied-memory frontier
+
+### Agent Memory Leaderboard (AML)
+
+AML is now a useful industry-facing benchmark target in addition to paper-specific datasets. Its Cycle 1 results (published 12 August 2026) include separate textual, multimodal and coding tracks, with metrics covering explicit fact recall, compositional inference, temporal/event reasoning, memory governance, personalization/care, context learning/execution, and safety/privacy.
+
+Published Cycle 1 textual results show:
+- commercial products: MemoraX v0.5 at 58.02 overall;
+- open-source methods: InvMem at 45.06 overall.
+
+The AML landing page states that Cycle 2 results are expected in mid-November 2026. As of 8 November 2026, Cycle 2 has not yet been published, and its materials submission window is closed. Do not infer that HME has a current submission or score.
+
+The evaluation path requires participant-hosted Add/Search APIs and a formal evaluation after a smoke test; it is not a repository-only offline submission. This is a valuable future productization gate: build a stable, versioned public Add/Search interface only after local correctness and governance qualification.
+
+AML scores should be reported separately by track and metric; don't compare its overall score directly with MEME or LongMemEval.
+
+### MEMORA-Bench — embodied and multimodal memory
+
+MEMORA-Bench (Findings of EMNLP 2026) evaluates memory formed from 45 hours of egocentric video, with retrospective memory-faithfulness and prospective memory-grounded planning tasks. Its framework maintains typed spatial, object-identity/state and temporal-action evidence, then consolidates repeated experience into routines, habits and preferences.
+
+This is especially relevant as an optional HME multimodal/embodied track:
+- index HDC or other supported representations of objects, states, places and action episodes;
+- preserve links to source video/time evidence and observation provenance;
+- measure retrospective faithfulness separately from prospective planning utility;
+- hold perception and answer/planning model constant between memory baselines;
+- report OOD goal composition and physical/action grounding separately from textual memory scores.
+
+Do not conflate MEMORA-Bench (embodied video memory) with Memora (ACL 2026 personalized-agent benchmark using FAMA).
+
+### Updated comparative targets
+
+The proposed MEME 90% Cascade/Absence target remains an aspirational stretch, but should not be the only milestone. N71 publishes a vendor-reported full 100-episode MEME run with iteration-3 Cascade 0.628 and Absence 0.42. A credible near-term bar is to reproduce those two scores under the official protocol, then exceed them with source-linked dependencies and typed absence; the longer-term stretch remains ≥0.90 on both.
+
+For AML, the first milestone is protocol compliance and a clean local evaluation, followed by an Add/Search service implementation. Only submit to a future open cycle after:
+- Add/Search API version and security review;
+- equal benchmark settings and all required tasks;
+- full per-task score and resource disclosure;
+- governance/privacy controls that pass separately from the quality score.
+
+For MEMORA-Bench, first target faithful retrospective retrieval and evidence grounding. Prospective planning is a later integration test involving perception, memory and policy; it must not be credited to HME alone.
+
+## 13. Canonical f32 scorer regression and qualification status
+
+A cancellation-sensitive regression test is now authored in the canonical scorer module and a paired candidate-interval test is authored in the HME interval module. They distinguish a separately rounded product followed by addition from a fused multiply-add result. The exact primitive arithmetic contract is documented in Rust's f32/f64 documentation; release target/IR/assembly and FTZ/DAZ qualification remain open under #11176.
+
+Repository build metadata inspected on the research branch:
+- Rust toolchain pinned to 1.96.0;
+- test profile: opt-level 1, codegen-units 16;
+- release profile: opt-level 3, thin LTO, codegen-units 1;
+- Nix flake native shells export target-cpu=native in selected shells.
+
+The actual effective compiler flags and runtime floating-point mode still need to be captured from real invocations. A target-cpu setting does not by itself prove fast-math or FMA contraction, and a flake comment is not a substitute for an executed compiler command line. No Rust build/test run is claimed.
+
+### Updated references
+
+- Agent Memory Leaderboard evaluation and protocol: https://agentmemories.ai/evaluation
+- AML Cycle 1 official results: https://agentmemories.ai/results/cycle-1/
+- AML documentation and Add/Search evaluation flow: https://agentmemories.ai/docs
+- MEMORA-Bench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1211/
+- MEME official project and benchmark results: https://seokwonjung-jay.github.io/meme-eval/
+- Rust f32 precision contract: https://doc.rust-lang.org/core/primitive.f32.html
+- Rust f32 square root: https://doc.rust-lang.org/std/primitive.f32.html
+- Rust f64 square root: https://doc.rust-lang.org/std/primitive.f64.html
+- LLVM floating-point contraction semantics: https://llvm.org/docs/LangRef.html#fast-math-flags
