@@ -252,6 +252,10 @@ Three Rust test groups have been authored for this prototype: generated high-dim
 
 A separate Python numerical simulation exercised 2,400 randomly generated query/center/ball/member cases at dimensions 1, 7, 8, 9, 17, 257, 2,048 and 16,384. It observed zero real-cosine interval escapes. This is an exploratory simulation, not execution of the Rust implementation, a formal proof, a canonical-f32 result, or a performance benchmark.
 
+A second prototype now exists: ContinuousHVSphericalCapF32ScoreInterval from similarity_interval_full_resolution_for_l2_ball_center_spherical_cap. It maps the real spherical-cap cosine interval through separate gamma/eta bounds for the canonical dot/norm reductions, the f32 norm-product multiply, square root and quotient. This type is not accepted by the HME selector; it remains an unqualified research candidate.
+
+A separate Python f32 arithmetic simulation compared this candidate interval against the existing joint-ball canonical interval on 900 generated members at dimensions 8, 9, 17, 257, 2,048 and 16,384. It observed zero canonical-score escapes for both and candidate mean interval width 0.0585 vs 0.0732 for the joint-ball interval; the candidate was narrower in all 900 samples. This is not Rust execution, proof, a benchmark run or permission to prune.
+
 A separate aligned-cluster geometry comparison with 1,000 query/centroid cases per dimension (8, 128 and 16,384), at radius 0.08 times centroid norm, observed:
 - spherical-cap mean interval widths: 0.0402, 0.0426 and 0.0427;
 - independent Cauchy/reverse-triangle surrogate mean widths: 0.1814, 0.1817 and 0.1818;
