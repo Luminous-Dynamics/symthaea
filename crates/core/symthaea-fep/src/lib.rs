@@ -141,6 +141,7 @@ mod agent;
 pub mod bayesian_model_reduction;
 mod bridge;
 pub mod dirichlet_model_reduction;
+pub mod decision_relevant_information;
 pub mod free_energy;
 pub mod gaussian_model_information_gain;
 pub mod generative_model;
