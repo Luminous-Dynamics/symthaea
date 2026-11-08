@@ -1013,6 +1013,75 @@ mod tests {
     }
 
     #[test]
+    fn representation_pareto_frontier_preserves_incomparable_tradeoffs() {
+        let smaller_and_fast_verifier = StrategyRepresentationCost {
+            encoded_bytes: 40,
+            internal_nodes: 4,
+            logic_depth: 4,
+            worst_case_evaluation_steps: 4,
+            estimated_verification_work_units: 100,
+        };
+        let larger_but_shallower = StrategyRepresentationCost {
+            encoded_bytes: 60,
+            internal_nodes: 7,
+            logic_depth: 2,
+            worst_case_evaluation_steps: 9,
+            estimated_verification_work_units: 150,
+        };
+        assert_eq!(
+            strategy_representation_pareto_frontier(
+                smaller_and_fast_verifier,
+                larger_but_shallower
+            ),
+            vec![
+                SelectedStrategyRepresentation::Robdd,
+                SelectedStrategyRepresentation::Aig
+            ]
+        );
+    }
+
+    #[test]
+    fn representation_pareto_frontier_removes_a_dominated_encoding() {
+        let better = StrategyRepresentationCost {
+            encoded_bytes: 20,
+            internal_nodes: 2,
+            logic_depth: 2,
+            worst_case_evaluation_steps: 2,
+            estimated_verification_work_units: 20,
+        };
+        let dominated = StrategyRepresentationCost {
+            encoded_bytes: 30,
+            internal_nodes: 4,
+            logic_depth: 4,
+            worst_case_evaluation_steps: 8,
+            estimated_verification_work_units: 100,
+        };
+        assert_eq!(
+            strategy_representation_pareto_frontier(better, dominated),
+            vec![SelectedStrategyRepresentation::Robdd]
+        );
+        assert_eq!(
+            strategy_representation_pareto_frontier(dominated, better),
+            vec![SelectedStrategyRepresentation::Aig]
+        );
+    }
+
+    #[test]
+    fn exact_representation_cost_tie_uses_canonical_robdd_preference() {
+        let equal = StrategyRepresentationCost {
+            encoded_bytes: 32,
+            internal_nodes: 3,
+            logic_depth: 2,
+            worst_case_evaluation_steps: 2,
+            estimated_verification_work_units: 12,
+        };
+        assert_eq!(
+            strategy_representation_pareto_frontier(equal, equal),
+            vec![SelectedStrategyRepresentation::Robdd]
+        );
+    }
+
+    #[test]
     fn canonical_encodings_are_deterministic_and_versioned() {
         let (problem, prefix) = equality_qbf();
         let result = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
@@ -1077,6 +1146,24 @@ mod tests {
                 .bdd_bytes
                 .len()
                 .min(portfolio.functions[0].aig_bytes.len())
+        );
+        assert!(
+            portfolio.functions[0]
+                .pareto_frontier
+                .contains(&portfolio.functions[0].selected)
+        );
+        assert!(portfolio.functions[0].bdd_cost.encoded_bytes > 0);
+        assert!(portfolio.functions[0].aig_cost.encoded_bytes > 0);
+        assert_eq!(
+            portfolio.total_selected_estimated_verification_work,
+            match portfolio.functions[0].selected {
+                SelectedStrategyRepresentation::Robdd => {
+                    portfolio.functions[0].bdd_cost.estimated_verification_work_units
+                }
+                SelectedStrategyRepresentation::Aig => {
+                    portfolio.functions[0].aig_cost.estimated_verification_work_units
+                }
+            }
         );
         assert_eq!(
             portfolio.total_selected_bytes,
