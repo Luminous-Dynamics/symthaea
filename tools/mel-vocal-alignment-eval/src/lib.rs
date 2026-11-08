@@ -72,13 +72,20 @@ pub struct TimingMetrics {
     pub onset_mae_ms: Option<f64>,
     pub onset_median_ms: Option<f64>,
     pub onset_p95_ms: Option<f64>,
+    /// Fraction of exact-phone pairs whose absolute onset error is <= 20 ms.
+    pub onset_within_20ms_fraction: Option<f64>,
     /// Fraction of exact-phone pairs whose absolute onset error is <= 50 ms.
     pub onset_within_50ms_fraction: Option<f64>,
+    /// Fraction of exact vowel-identity pairs whose onset error is <= 50 ms.
+    pub vowel_onset_within_50ms_fraction: Option<f64>,
     /// Fraction of exact-phone pairs whose absolute onset error is <= 100 ms.
     pub onset_within_100ms_fraction: Option<f64>,
     pub offset_mae_ms: Option<f64>,
     pub offset_p95_ms: Option<f64>,
     pub duration_mae_ms: Option<f64>,
+    /// Sum(predicted exact-phone durations) / sum(reference exact-phone durations).
+    /// A value near 1.0 means aligned exact phones have conserved duration overall.
+    pub duration_ratio: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -145,6 +152,9 @@ pub fn score_alignment(
     let mut onset_errors_ms = Vec::new();
     let mut offset_errors_ms = Vec::new();
     let mut duration_errors_ms = Vec::new();
+    let mut vowel_onset_errors_ms = Vec::new();
+    let mut exact_reference_duration_frames = 0u128;
+    let mut exact_predicted_duration_frames = 0u128;
 
     let frames_to_ms = 1000.0 / f64::from(sample_rate_hz);
     for edit in edits {
@@ -157,13 +167,18 @@ pub fn score_alignment(
                 exact_prediction_for_reference[r] = Some(p);
                 let expected = &reference[r];
                 let observed = &predicted[p];
-                onset_errors_ms.push(
-                    expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms,
-                );
+                let onset_error_ms =
+                    expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms;
+                onset_errors_ms.push(onset_error_ms);
+                if expected.is_vowel {
+                    vowel_onset_errors_ms.push(onset_error_ms);
+                }
                 offset_errors_ms
                     .push(expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms);
                 let expected_duration = expected.end_frame - expected.start_frame;
                 let observed_duration = observed.end_frame - observed.start_frame;
+                exact_reference_duration_frames += u128::from(expected_duration);
+                exact_predicted_duration_frames += u128::from(observed_duration);
                 duration_errors_ms
                     .push(expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms);
             }
@@ -209,11 +224,16 @@ pub fn score_alignment(
             onset_mae_ms: mean(&onset_errors_ms),
             onset_median_ms: median(&onset_errors_ms),
             onset_p95_ms: percentile(&onset_errors_ms, 0.95),
+            onset_within_20ms_fraction: fraction_at_or_below(&onset_errors_ms, 20.0),
             onset_within_50ms_fraction: fraction_at_or_below(&onset_errors_ms, 50.0),
+            vowel_onset_within_50ms_fraction: fraction_at_or_below(&vowel_onset_errors_ms, 50.0),
             onset_within_100ms_fraction: fraction_at_or_below(&onset_errors_ms, 100.0),
             offset_mae_ms: mean(&offset_errors_ms),
             offset_p95_ms: percentile(&offset_errors_ms, 0.95),
             duration_mae_ms: mean(&duration_errors_ms),
+            duration_ratio: (exact_reference_duration_frames > 0).then(|| {
+                exact_predicted_duration_frames as f64 / exact_reference_duration_frames as f64
+            }),
         },
         melisma: MelismaMetrics {
             expected_spans: expected_melismas,
@@ -533,6 +553,28 @@ mod tests {
         assert_eq!(result.timing.onset_within_50ms_fraction, Some(0.25));
         assert_eq!(result.timing.onset_within_100ms_fraction, Some(0.75));
         assert_eq!(result.timing.onset_p95_ms, Some(150.0));
+    }
+
+    #[test]
+    fn onset_metrics_include_20ms_and_vowel_50ms_thresholds_and_duration_ratio() {
+        let reference = vec![
+            reference("a", 0, 100, 200, true),
+            reference("b", 1, 300, 400, false),
+            reference("e", 2, 500, 600, true),
+            reference("s", 3, 700, 800, false),
+        ];
+        let predicted = vec![
+            prediction("a", 0, 110, 220, true),  // 10 ms, duration ratio 1.1
+            prediction("b", 1, 340, 440, false), // 40 ms, ratio 1.0
+            prediction("e", 2, 560, 680, true),  // 60 ms, ratio 1.2
+            prediction("s", 3, 830, 930, false), // 130 ms, ratio 1.0
+        ];
+        let result = score_alignment(1_000, 2_000, &reference, &predicted, &[]).unwrap();
+        assert_eq!(result.timing.onset_within_20ms_fraction, Some(0.25));
+        assert_eq!(result.timing.onset_within_50ms_fraction, Some(0.5));
+        assert_eq!(result.timing.vowel_onset_within_50ms_fraction, Some(0.5));
+        assert_eq!(result.timing.onset_within_100ms_fraction, Some(0.75));
+        assert!((result.timing.duration_ratio.unwrap() - 1.075).abs() < 1e-12);
     }
 
     #[test]
