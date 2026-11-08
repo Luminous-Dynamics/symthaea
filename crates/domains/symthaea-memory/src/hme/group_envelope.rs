@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use symthaea_core::hdc::continuous_hv_interval::{
     ContinuousHVIntervalError, ContinuousHVScoreInterval,
 };
+use symthaea_core::hdc::unified_hv::CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Domain separator for deterministic group-envelope content identities.
@@ -139,19 +140,21 @@ impl std::error::Error for GroupEnvelopeError {}
 pub fn member_id_set_digest(
     member_ids: &[String],
 ) -> Result<[u8; 32], GroupEnvelopeError> {
-    let mut sorted = member_ids.to_vec();
-    if sorted.iter().any(|id| id.is_empty()) {
-        return Err(GroupEnvelopeError::EmptyMemberId { member_index: 0 });
-    }
-    sorted.sort();
-    for index in 1..sorted.len() {
-        if sorted[index - 1] == sorted[index] {
+    let mut first_index_by_id = BTreeMap::new();
+    for (member_index, id) in member_ids.iter().enumerate() {
+        if id.is_empty() {
+            return Err(GroupEnvelopeError::EmptyMemberId { member_index });
+        }
+        if let Some(first_index) = first_index_by_id.get(id).copied() {
             return Err(GroupEnvelopeError::DuplicateMemberId {
-                first_index: index - 1,
-                duplicate_index: index,
+                first_index,
+                duplicate_index: member_index,
             });
         }
+        first_index_by_id.insert(id, member_index);
     }
+    let mut sorted = member_ids.to_vec();
+    sorted.sort();
     let mut hasher = blake3::Hasher::new();
     hasher.update(GROUP_ENVELOPE_DOMAIN);
     hasher.update(&(sorted.len() as u64).to_le_bytes());
@@ -222,6 +225,7 @@ impl ContinuousHVGroupEnvelope {
         let mut hasher = blake3::Hasher::new();
         hasher.update(GROUP_ENVELOPE_DOMAIN);
         hasher.update(b"/content");
+        hasher.update(CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1.as_bytes());
         hasher.update(&manifest_generation.to_le_bytes());
         hasher.update(&eligibility_generation.to_le_bytes());
         hasher.update(&(dimension as u64).to_le_bytes());
@@ -370,6 +374,20 @@ mod tests {
         for (_, member) in &members {
             assert!(interval.contains(query.similarity_full_resolution(member)));
         }
+    }
+
+    #[test]
+    fn content_digest_is_input_order_independent_and_profile_bound() {
+        let a = hv(&[0.1, 0.2, 0.3, 0.4]);
+        let b = hv(&[-0.1, -0.2, -0.3, -0.4]);
+        let first = vec![("b".to_owned(), b.clone()), ("a".to_owned(), a.clone())];
+        let second = vec![("a".to_owned(), a), ("b".to_owned(), b)];
+        let first_envelope =
+            ContinuousHVGroupEnvelope::from_original_members(5, 2, &first).unwrap();
+        let second_envelope =
+            ContinuousHVGroupEnvelope::from_original_members(5, 2, &second).unwrap();
+        assert_eq!(first_envelope.member_set_digest(), second_envelope.member_set_digest());
+        assert_eq!(first_envelope.content_digest(), second_envelope.content_digest());
     }
 
     #[test]
