@@ -463,6 +463,39 @@
         100
       ],
       "note": "DAMA (Findings ACL 2026) reports depth-aware adaptation, 80% fewer trainable parameters and 29% error reduction in its own setting. Reproduce on matched South African data/compute; published gains are not assumed to transfer."
+    },
+    {
+      "id": "metric_vector_conformance",
+      "name": "Cross-implementation metric vector conformance",
+      "task": "SCORER_REPRODUCIBILITY",
+      "issue": 11082,
+      "metrics": [
+        "WER_count_exactness",
+        "PIER_count_exactness",
+        "SETER_count_exactness",
+        "SPER_count_exactness_by_radius",
+        "micro_macro_aggregation_exactness",
+        "non_estimable_state_exactness",
+        "alignment_policy_conformance"
+      ],
+      "required_outputs": [
+        "metric_vector_id",
+        "implementation_revision",
+        "exact_counts",
+        "denominators",
+        "non_estimable_reason",
+        "normalization_revision",
+        "alignment_policy_revision"
+      ],
+      "candidate_sources": [
+        {
+          "id": "voice_metric_vectors_v1",
+          "status": "SYNTHETIC_ONLY_NO_LANGUAGE_EVIDENCE",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.json",
+          "note": "Ten hand-computed synthetic vectors for WER, PIER, SETER, SPER@k and per-language masked error; schema at voice_metric_vectors_v1.schema.json. Current custom formula/alignment audit passes; this is not Rust execution or cross-implementation differential qualification."
+        }
+      ],
+      "note": "All scorer implementations should consume identical frozen vectors. Validate metric counts and denominators separately from floating-point presentation; real-corpus results require additional independent evidence."
     }
   ],
   "promotion_gates": [
