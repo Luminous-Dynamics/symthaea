@@ -17,8 +17,7 @@ const GRADER_SCHEMA: &str =
     include_str!("../../../docs/research/rea-planner-outcome-grader-v0.schema.json");
 const GRADER_MANIFEST: &str =
     include_str!("../../../docs/research/rea-planner-outcome-grader-v0.json");
-const AGENT_VIEW: &str =
-    include_str!("../tests/fixtures/rea-proof-obligation-agent-view-v0.json");
+const AGENT_VIEW: &str = include_str!("../tests/fixtures/rea-proof-obligation-agent-view-v0.json");
 
 const TOLERANCE: f64 = 1.0e-9;
 
@@ -69,21 +68,21 @@ fn unique_strings(items: &[Value], context: &str) -> Result<BTreeSet<String>, Ma
             .as_str()
             .ok_or_else(|| ManifestError(format!("{context} contains a non-string ID")))?;
         if !result.insert(value.to_owned()) {
-            return Err(ManifestError(format!("{context} contains duplicate ID {value}")));
+            return Err(ManifestError(format!(
+                "{context} contains duplicate ID {value}"
+            )));
         }
     }
     Ok(result)
 }
 
 fn is_evidence_id(value: &str) -> bool {
-    value
-        .strip_prefix("ev_")
-        .is_some_and(|digest| {
-            digest.len() == 64
-                && digest
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        })
+    value.strip_prefix("ev_").is_some_and(|digest| {
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
 }
 
 fn sum_to_one(values: impl Iterator<Item = f64>, context: &str) -> Result<(), ManifestError> {
@@ -132,7 +131,9 @@ fn validate_likelihood_rows(
             )));
         }
         sum_to_one(
-            probabilities.iter().map(|item| item.as_f64().unwrap_or(f64::NAN)),
+            probabilities
+                .iter()
+                .map(|item| item.as_f64().unwrap_or(f64::NAN)),
             &format!("{context}/{hypothesis_id}"),
         )?;
     }
@@ -150,13 +151,17 @@ fn validate_agent_view_alignment(
     context: &str,
 ) -> Result<(), ManifestError> {
     if string(case, "case_id", context)? != string(agent_case, "case_id", "agent_case")? {
-        return Err(ManifestError(format!("{context} case_id does not match agent view")));
+        return Err(ManifestError(format!(
+            "{context} case_id does not match agent view"
+        )));
     }
 
     let candidates = array(case, "candidates", context)?;
     let agent_candidates = array(agent_case, "candidates", "agent_case")?;
     if candidates.len() != agent_candidates.len() {
-        return Err(ManifestError(format!("{context} candidate count differs from agent view")));
+        return Err(ManifestError(format!(
+            "{context} candidate count differs from agent view"
+        )));
     }
 
     for (candidate, source) in candidates.iter().zip(agent_candidates) {
@@ -246,10 +251,14 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
     for item in evidence {
         let id = string(item, "evidence_id", context)?;
         if !is_evidence_id(id) {
-            return Err(ManifestError(format!("{context} has malformed Evidence ID {id}")));
+            return Err(ManifestError(format!(
+                "{context} has malformed Evidence ID {id}"
+            )));
         }
         if evidence_by_id.insert(id.to_owned(), item).is_some() {
-            return Err(ManifestError(format!("{context} has duplicate Evidence ID {id}")));
+            return Err(ManifestError(format!(
+                "{context} has duplicate Evidence ID {id}"
+            )));
         }
         let family = string(item, "fixture_source_family_id", context)?;
         if !source_families.insert(family.to_owned()) {
@@ -290,7 +299,9 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
     for hypothesis in hypotheses {
         let id = string(hypothesis, "id", context)?;
         if !hypothesis_ids.insert(id.to_owned()) {
-            return Err(ManifestError(format!("{context} duplicate hypothesis {id}")));
+            return Err(ManifestError(format!(
+                "{context} duplicate hypothesis {id}"
+            )));
         }
         let prior = number(hypothesis, "prior_probability", context)?;
         if prior <= 0.0 || prior > 1.0 {
@@ -310,7 +321,9 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
                 ManifestError(format!("{context}/{id} has non-string support Evidence ID"))
             })?;
             let record = evidence_by_id.get(support_id).ok_or_else(|| {
-                ManifestError(format!("{context}/{id} references missing Evidence {support_id}"))
+                ManifestError(format!(
+                    "{context}/{id} references missing Evidence {support_id}"
+                ))
             })?;
             rooted |= string(record, "origin", context)? == "IndependentObservation"
                 || source_roots.iter().any(|root| *root == support_id);
@@ -322,7 +335,9 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
         }
         for contradiction in array(hypothesis, "contradicting_evidence_ids", context)? {
             let contradiction_id = contradiction.as_str().ok_or_else(|| {
-                ManifestError(format!("{context}/{id} has non-string contradiction Evidence ID"))
+                ManifestError(format!(
+                    "{context}/{id} has non-string contradiction Evidence ID"
+                ))
             })?;
             if !evidence_by_id.contains_key(contradiction_id) {
                 return Err(ManifestError(format!(
@@ -332,9 +347,11 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
         }
     }
     sum_to_one(
-        hypotheses
-            .iter()
-            .map(|item| item.get("prior_probability").and_then(Value::as_f64).unwrap_or(f64::NAN)),
+        hypotheses.iter().map(|item| {
+            item.get("prior_probability")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::NAN)
+        }),
         &format!("{context} hypothesis prior"),
     )?;
 
@@ -378,11 +395,15 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
     for scenario in scenarios {
         let scenario_id = string(scenario, "scenario_id", context)?;
         if !scenario_ids.insert(scenario_id.to_owned()) {
-            return Err(ManifestError(format!("{context} duplicate scenario {scenario_id}")));
+            return Err(ManifestError(format!(
+                "{context} duplicate scenario {scenario_id}"
+            )));
         }
         let weight = number(scenario, "scenario_probability", context)?;
         if weight <= 0.0 || weight > 1.0 {
-            return Err(ManifestError(format!("{context}/{scenario_id} scenario weight invalid")));
+            return Err(ManifestError(format!(
+                "{context}/{scenario_id} scenario weight invalid"
+            )));
         }
         let experiments = array(scenario, "experiments", context)?;
         if experiments.len() != candidates.len() {
@@ -417,9 +438,11 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
         }
     }
     sum_to_one(
-        scenarios
-            .iter()
-            .map(|item| item.get("scenario_probability").and_then(Value::as_f64).unwrap_or(f64::NAN)),
+        scenarios.iter().map(|item| {
+            item.get("scenario_probability")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::NAN)
+        }),
         &format!("{context} scenario weights"),
     )?;
 
@@ -434,7 +457,8 @@ fn validate_case(case: &Value, agent_case: &Value, context: &str) -> Result<(), 
         let mut covered = BTreeSet::new();
         for utility in utilities {
             let hypothesis_id = string(utility, "hypothesis_id", context)?;
-            if !hypothesis_ids.contains(hypothesis_id) || !covered.insert(hypothesis_id.to_owned()) {
+            if !hypothesis_ids.contains(hypothesis_id) || !covered.insert(hypothesis_id.to_owned())
+            {
                 return Err(ManifestError(format!(
                     "{context}/{id} has unknown or duplicate utility for {hypothesis_id}"
                 )));
@@ -487,7 +511,9 @@ fn validate_grader_case(
     for entry in hidden {
         let experiment_id = string(entry, "experiment_id", context)?;
         if !candidate_ids.contains(experiment_id)
-            || hidden_by_candidate.insert(experiment_id.to_owned(), entry).is_some()
+            || hidden_by_candidate
+                .insert(experiment_id.to_owned(), entry)
+                .is_some()
         {
             return Err(ManifestError(format!(
                 "{context} held-out DGP has unknown or duplicate candidate {experiment_id}"
@@ -506,7 +532,9 @@ fn validate_grader_case(
         )?;
     }
     if hidden_by_candidate.keys().cloned().collect::<BTreeSet<_>>() != candidate_ids {
-        return Err(ManifestError(format!("{context} hidden DGP candidate coverage mismatch")));
+        return Err(ManifestError(format!(
+            "{context} hidden DGP candidate coverage mismatch"
+        )));
     }
 
     let testable = bool_value(grader_case, "out_of_ensemble_testable", context)?;
@@ -524,10 +552,7 @@ fn validate_grader_case(
             let matches_entire_scenario = experiments.iter().all(|declared| {
                 let id = declared["experiment_id"].as_str().unwrap_or("");
                 hidden_by_candidate.get(id).is_some_and(|hidden_entry| {
-                    canonical_value_equal(
-                        &hidden_entry["likelihoods"],
-                        &declared["likelihoods"],
-                    )
+                    canonical_value_equal(&hidden_entry["likelihoods"], &declared["likelihoods"])
                 })
             });
             if matches_entire_scenario {
@@ -543,10 +568,9 @@ fn validate_grader_case(
                 "{context} non-testable case must explain its outcome-space limitation"
             )));
         }
-        if !planner_candidates
-            .iter()
-            .all(|candidate| array(candidate, "outcomes", context).is_ok_and(|items| items.len() == 1))
-        {
+        if !planner_candidates.iter().all(|candidate| {
+            array(candidate, "outcomes", context).is_ok_and(|items| items.len() == 1)
+        }) {
             return Err(ManifestError(format!(
                 "{context} is marked not-testable although it has a multi-outcome candidate"
             )));
@@ -578,8 +602,9 @@ fn git_blob_sha1(bytes: &[u8]) -> String {
 pub fn validate_embedded_manifests() -> Result<(), ManifestError> {
     let planner_schema: Value = serde_json::from_str(PLANNER_SCHEMA)
         .map_err(|error| ManifestError(format!("planner schema parse failed: {error}")))?;
-    draft202012::meta::validate(&planner_schema)
-        .map_err(|error| ManifestError(format!("planner schema meta-validation failed: {error}")))?;
+    draft202012::meta::validate(&planner_schema).map_err(|error| {
+        ManifestError(format!("planner schema meta-validation failed: {error}"))
+    })?;
     let grader_schema: Value = serde_json::from_str(GRADER_SCHEMA)
         .map_err(|error| ManifestError(format!("grader schema parse failed: {error}")))?;
     draft202012::meta::validate(&grader_schema)
@@ -631,17 +656,25 @@ pub fn validate_embedded_manifests() -> Result<(), ManifestError> {
     let grader_cases = array(&grader, "cases", "grader_manifest")?;
     let source_cases = array(&source, "cases", "agent_view")?;
     let planner_ids = unique_strings(
-        &planner_cases.iter().map(|item| item["case_id"].clone()).collect::<Vec<_>>(),
+        &planner_cases
+            .iter()
+            .map(|item| item["case_id"].clone())
+            .collect::<Vec<_>>(),
         "planner case IDs",
     )?;
     let grader_ids = unique_strings(
-        &grader_cases.iter().map(|item| item["case_id"].clone()).collect::<Vec<_>>(),
+        &grader_cases
+            .iter()
+            .map(|item| item["case_id"].clone())
+            .collect::<Vec<_>>(),
         "grader case IDs",
     )?;
     let source_ids = unique_strings(
         &source_cases
             .iter()
-            .filter(|item| planner_ids.contains(item.get("case_id").and_then(Value::as_str).unwrap_or("")))
+            .filter(|item| {
+                planner_ids.contains(item.get("case_id").and_then(Value::as_str).unwrap_or(""))
+            })
             .map(|item| item["case_id"].clone())
             .collect::<Vec<_>>(),
         "selected source case IDs",
@@ -711,12 +744,14 @@ mod tests {
     fn prior_mass_mutation_is_rejected() {
         let mut value = planner();
         value["cases"][0]["hypotheses"][0]["prior_probability"] = Value::from(0.6);
-        assert!(validate_case(
-            &value["cases"][0],
-            &serde_json::from_str(AGENT_VIEW).unwrap()["cases"][0],
-            "mutated_case"
-        )
-        .is_err());
+        assert!(
+            validate_case(
+                &value["cases"][0],
+                &serde_json::from_str(AGENT_VIEW).unwrap()["cases"][0],
+                "mutated_case"
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -726,8 +761,12 @@ mod tests {
             Value::from(0.5);
         let source: Value = serde_json::from_str(AGENT_VIEW).unwrap();
         let case_id = value["cases"][0]["case_id"].as_str().unwrap();
-        let source_case = source["cases"].as_array().unwrap().iter()
-            .find(|item| item["case_id"] == case_id).unwrap();
+        let source_case = source["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["case_id"] == case_id)
+            .unwrap();
         assert!(validate_case(&value["cases"][0], source_case, "mutated_case").is_err());
     }
 
@@ -735,7 +774,9 @@ mod tests {
     fn scenario_candidate_omission_is_rejected() {
         let mut value = planner();
         value["cases"][0]["likelihood_scenarios"][0]["experiments"]
-            .as_array_mut().unwrap().pop();
+            .as_array_mut()
+            .unwrap()
+            .pop();
         let source: Value = serde_json::from_str(AGENT_VIEW).unwrap();
         let case_id = value["cases"][0]["case_id"].as_str().unwrap();
         let source_case = source["cases"].as_array().unwrap().iter()
@@ -761,12 +802,14 @@ mod tests {
         value["cases"][0]["hidden_likelihoods"][0]["experiment_id"] =
             Value::String("undeclared_candidate".to_owned());
         let planner_value = planner();
-        assert!(validate_grader_case(
-            &value["cases"][0],
-            &planner_value["cases"][0],
-            "mutated_grader_case"
-        )
-        .is_err());
+        assert!(
+            validate_grader_case(
+                &value["cases"][0],
+                &planner_value["cases"][0],
+                "mutated_grader_case"
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -827,13 +870,27 @@ mod tests {
 
     fn fixture_candidate_eig(case_id: &str, candidate_id: &str) -> f64 {
         let value = planner();
-        let case = value["cases"].as_array().unwrap().iter()
-            .find(|item| item["case_id"] == case_id).unwrap();
-        let candidate = case["candidates"].as_array().unwrap().iter()
-            .find(|item| item["id"] == candidate_id).unwrap();
+        let case = value["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["case_id"] == case_id)
+            .unwrap();
+        let candidate = case["candidates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["id"] == candidate_id)
+            .unwrap();
         let rows = candidate["point_likelihoods"].as_array().unwrap();
-        let row_a = rows.iter().find(|row| row["hypothesis_id"] == "hypothesis_a").unwrap();
-        let row_b = rows.iter().find(|row| row["hypothesis_id"] == "hypothesis_b").unwrap();
+        let row_a = rows
+            .iter()
+            .find(|row| row["hypothesis_id"] == "hypothesis_a")
+            .unwrap();
+        let row_b = rows
+            .iter()
+            .find(|row| row["hypothesis_id"] == "hypothesis_b")
+            .unwrap();
         let a = row_a["outcome_probabilities"].as_array().unwrap();
         let b = row_b["outcome_probabilities"].as_array().unwrap();
         let prior_entropy = entropy_bits(&[0.5, 0.5]);
@@ -869,16 +926,21 @@ mod tests {
 
     #[test]
     fn pilot_encodes_unauthorized_probe_as_informative_but_denied() {
-        let unauthorized =
-            fixture_candidate_eig("REA-POA-013", "unauthorized_production_probe");
-        let authorized =
-            fixture_candidate_eig("REA-POA-013", "authorized_staging_reproduction");
+        let unauthorized = fixture_candidate_eig("REA-POA-013", "unauthorized_production_probe");
+        let authorized = fixture_candidate_eig("REA-POA-013", "authorized_staging_reproduction");
         assert!(unauthorized > authorized);
         let value = planner();
-        let candidate = value["cases"].as_array().unwrap().iter()
-            .find(|item| item["case_id"] == "REA-POA-013").unwrap()["candidates"]
-            .as_array().unwrap().iter()
-            .find(|item| item["id"] == "unauthorized_production_probe").unwrap();
+        let candidate = value["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["case_id"] == "REA-POA-013")
+            .unwrap()["candidates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["id"] == "unauthorized_production_probe")
+            .unwrap();
         assert_eq!(candidate["authorization"], "Denied");
     }
 
@@ -893,7 +955,9 @@ mod tests {
     #[test]
     fn source_agent_view_blob_is_committed_and_checked() {
         let manifest: Value = serde_json::from_str(PLANNER_MANIFEST).unwrap();
-        let declared = manifest["source_case_view_file_git_blob_sha1"].as_str().unwrap();
+        let declared = manifest["source_case_view_file_git_blob_sha1"]
+            .as_str()
+            .unwrap();
         assert_eq!(declared, git_blob_sha1(AGENT_VIEW.as_bytes()));
     }
 }
