@@ -98,7 +98,17 @@
         },
         {
           "if": { "properties": { "evidence_class": { "enum": ["measured", "derived"] } }, "required": ["evidence_class"] },
-          "then": { "required": ["evidence_ref"] }
+          "then": {
+            "required": ["evidence_ref"],
+            "properties": {
+              "value": { "type": "number" },
+              "evidence_ref": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "evidence_class": { "enum": ["modelled", "synthetic"] } }, "required": ["evidence_class"] },
+          "then": { "properties": { "value": { "type": "number" } } }
         }
       ]
     },
@@ -149,7 +159,23 @@
           "items": { "type": "string", "minLength": 1, "maxLength": 200 },
           "uniqueItems": true
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "eligibility": { "const": "eligible" } }, "required": ["eligibility"] },
+          "then": {
+            "properties": {
+              "backend": {
+                "properties": { "profile_status": { "const": "qualified" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "profile_status": { "const": "qualified" } }, "required": ["profile_status"] },
+          "then": { "required": ["capability_profile_sha256"] }
+        }
+      ]
     }
   }
 }
