@@ -131,3 +131,45 @@ Numeric MTTR, availability or mission-success improvements are not set until exa
 ## 10. Claim ceiling
 
 Synthetic passes validate only the event/evaluator semantics on the frozen corpus. They do not establish real component failure rates, fleet availability, safe degraded operation, emergency survivability, vessel seaworthiness, permission to repair underway, class/flag compliance or authority to sail. Those require exact vessel engineering, approved procedures, qualified operators, measured physical/fleet exposure and competent independent authorities.
+
+
+## 11. Industry comparators and how to benchmark beyond them
+
+Public product descriptions show that established marine suppliers already offer meaningful parts of this problem:
+
+- **Wärtsilä Expert Insight** combines vessel operational data, AI-based anomaly detection, rule-based diagnostics and expert analysis to identify developing engine-system issues and recommend corrective maintenance to onboard crews. It is delivered through service agreements and expertise centres. This is a direct predictive-maintenance and expert-support comparator: https://www.wartsila.com/marine/services/lifecycle-agreements/expert-insight-service
+- **Kongsberg K-Fleet Maintenance** is described as a type-approved planned-maintenance system integrating short/long-term maintenance, class-survey jobs, certificates, electrical test reports, component history and maintenance/purchase workflows: https://www.kongsberg.com/maritime/products/digital/K-Fleet/K-Fleet-Maintenance/
+- **Kongsberg Health Management** describes continuous equipment-condition analysis, breakdown prediction and preventive/condition-based task recommendations: https://www.kongsbergmaritime.com/services/kongsberg-remote-services/health-management/
+- Kongsberg's 13 February 2026 launch of a harmonized digital-solutions portfolio and KM Performance shows the industry is consolidating multiple fleet-performance and management products around common data foundations: https://www.kongsbergmaritime.com/news-and-events/news-archive/2026/harmonised-digital-solutions-portfolio-and-km-performance-launched/
+
+These public product descriptions establish feature overlap, not independently measured performance superiority. They do not provide a matched open benchmark in these pages for service-floor breaches, exact-config accepted restoration, common-cause failures, or end-to-end mission service continuity. Do not claim that vendors lack those internal capabilities without a direct evidence comparison.
+
+### Fair differentiation hypothesis
+
+Do not compete on anomaly detection alone. Benchmark the composition of:
+1. condition evidence and fault diagnosis (compare to predictive/condition-based maintenance services);
+2. maintenance planning, certificates, spares and work-order management (compare to type-approved PMS workflows);
+3. service contracts with quantity/quality/time floors, not only component status;
+4. cross-OEM dependency and common-cause analysis with exact component/configuration lineage;
+5. spare stockout, effectivity, crew skill, tooling, workspace and weather/operating-context constraints;
+6. completed repair, post-maintenance test, configuration update and authorized release;
+7. mission-level service continuity across power, water, thermal, sanitation, propulsion, navigation and safety, without averaging away a critical service failure.
+
+### Industry-comparison metrics to add when vendor data are available
+
+| Comparator capability | Matched metric |
+|---|---|
+| Predictive anomaly detection | detection lead time, precision/recall, false-negative rate, calibration and missed-failure cost, stratified by equipment/duty cycle |
+| Planned maintenance management | overdue critical tasks, schedule adherence, deferrals with reason, closeout evidence completeness, certificate currency |
+| Condition-based maintenance | recommendation-to-action time, accepted diagnosis, unnecessary intervention rate and observed post-action condition |
+| Repair/service support | time to diagnose, dispatch, parts arrival, hands-on repair, post-test and authorized return-to-service |
+| Cross-system service continuity | delivered service-hours above owner-defined floor, below-floor hours, permitted degraded hours and mission interruptions by service |
+| Lifecycle evidence | proportion of claims linked to exact configuration, measurement/calibration, approved procedure and independent release |
+
+A proper vendor comparison requires an agreed anonymized event corpus or customer-authorized operational data, same equipment scope, same fault definitions, same observation timeline, same crew/parts assumptions and independent outcome verification. Public marketing pages are a capability map, not a performance dataset.
+
+## 12. Updated standards link
+
+ISO 16315:2026 is the second edition published on 6 February 2026 for electrical propulsion and the electrical part of hybrid propulsion on applicable small craft up to 24 m hull length. Its public change information includes clarified overcurrent protection and revised fault-monitoring requirements for isolated DC systems: https://committee.iso.org/standard/84203.html
+
+For LOS propulsion candidates, include the applicable overcurrent/fault-monitoring requirements in the standards applicability register and physical test-readiness plan. A qualified marine electrical engineer must inspect the complete purchased standard and determine the actual applicability/acceptance basis. This is not a compliance statement.
