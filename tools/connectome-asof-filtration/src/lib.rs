@@ -1567,7 +1567,11 @@ mod tests {
         let (base_kind, base_bytes) =
             canonical_payload(&LedgerPayload::Evidence(base.clone())).unwrap();
         assert_eq!(base_kind, 1);
-        assert!(base_bytes.windows("trial-µ".len()).any(|w| w == "trial-µ".as_bytes()));
+        assert!(
+            base_bytes
+                .windows("trial-µ".len())
+                .any(|w| w == "trial-µ".as_bytes())
+        );
 
         let mut present_option = base.clone();
         present_option.supersedes_event_id = Some("prior-1".into());
@@ -1648,12 +1652,9 @@ mod tests {
             truncated_audit.integrity_disposition,
             LedgerIntegrityDisposition::InternallyCommittedUnanchored
         );
-        assert!(audit_ledger_against_external_checkpoint(
-            &truncated,
-            &checkpoint,
-            &pinned_sha
-        )
-        .is_err());
+        assert!(
+            audit_ledger_against_external_checkpoint(&truncated, &checkpoint, &pinned_sha).is_err()
+        );
     }
 
     #[test]
