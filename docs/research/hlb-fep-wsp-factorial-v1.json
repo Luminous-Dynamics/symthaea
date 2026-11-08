@@ -612,6 +612,31 @@
         "matched_vs_misspecified_likelihood"
       ],
       "scope_note": "Current executable implementation is a deterministic synthetic fixture and four-policy harness; it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study."
+    },
+    {
+      "id": "packed_binaryhv_bundle_capacity_pilot",
+      "environment": "Fixed 16,384-bit packed Symthaea BinaryHV; majority-vote bundling at loads 1,3,7,15,31,63,127,255,511; 8 deterministic trials and 128 independent random non-member queries per load. The runner outputs mean member/non-member cosine similarity, pairwise AUC, TPR at the empirical 1% FPR threshold, and observed FPR. This pilot measures one implementation and one logical dimension only.",
+      "primary_outcomes": [
+        "mean_member_cosine",
+        "mean_nonmember_cosine",
+        "pairwise_auc",
+        "tpr_at_empirical_one_percent_fpr",
+        "empirical_false_positive_rate"
+      ],
+      "diagnostics": [
+        "bundle_load",
+        "logical_dimension_bits",
+        "packed_bytes_per_vector",
+        "trial_count",
+        "negative_query_count",
+        "threshold_tie_behavior"
+      ],
+      "negative_controls": [
+        "single_item_bundle_exact_round_trip",
+        "independent_random_nonmember_queries",
+        "deterministic_seed_replay"
+      ],
+      "scope_note": "This is a source-bound packed-BinaryHV characterization pilot, not a full VSA capacity comparison, IBM theoretical-bound reproduction, or SOTA claim."
     }
   ],
   "baselines": [
@@ -1015,7 +1040,13 @@
     "pure_model_eig_only",
     "no_probe_bayes_decision",
     "always_inspect_first_safe",
-    "paired_truth_separated_diagnostic_policy_harness"
+    "paired_truth_separated_diagnostic_policy_harness",
+    "symthaea_binaryhv_packed_majority_bundle",
+    "symthaea_continuoushv_reference",
+    "symbolar_rust_vsa_reference",
+    "oxicuda_hdc_0_5_5",
+    "ibm_jair_vsa_capacity_bound_reference",
+    "date_2026_ghrr_reference"
   ],
   "seeds": {
     "development": [
@@ -1128,7 +1159,12 @@
       "prior_bayes_risk",
       "expected_posterior_bayes_risk",
       "decision_focused_diagnostic_regret",
-      "diagnostic_total_cost"
+      "diagnostic_total_cost",
+      "mean_member_cosine",
+      "mean_nonmember_cosine",
+      "pairwise_auc",
+      "tpr_at_empirical_one_percent_fpr",
+      "empirical_false_positive_rate"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1221,7 +1257,11 @@
       "truth_outside_model_support_acceptance_rate",
       "paired_policy_hidden_hypothesis_mismatch_rate",
       "safety_threshold_violation_rate",
-      "nonpositive_net_evsi_probe_selection_rate"
+      "nonpositive_net_evsi_probe_selection_rate",
+      "binary_bundle_capacity_false_retrieval_rate",
+      "single_item_binary_bundle_round_trip_error",
+      "nonmember_query_seed_collision_rate",
+      "packed_vs_unpacked_storage_accounting_error"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1244,7 +1284,12 @@
       "diagnostic_probes_taken",
       "diagnostic_observation_cost",
       "decision_value_per_probe_cost",
-      "diagnostic_policy_selection_runtime_ns"
+      "diagnostic_policy_selection_runtime_ns",
+      "packed_hypervector_bytes",
+      "unpacked_i8_hypervector_bytes",
+      "f32_hypervector_bytes",
+      "bundle_bytes_read",
+      "query_bytes_read"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -1348,7 +1393,10 @@
     "Agent belief likelihoods and evaluator truth-side outcome distributions are separately represented; model-misspecification arms must report task regret and posterior calibration rather than sampling from the agent's own predictions.",
     "Paired policy comparisons derive the same hidden-hypothesis draw from a domain-separated per-episode seed independent of the number of random draws consumed by a policy.",
     "All action selectors enforce the preregistered hard safety-risk threshold; information gain or decision value cannot override an ineligible action.",
-    "Impossible observations, truth probability outside the agent likelihood support, malformed probability mass, non-finite losses, and invalid costs fail closed."
+    "Impossible observations, truth probability outside the agent likelihood support, malformed probability mass, non-finite losses, and invalid costs fail closed.",
+    "The packed BinaryHV pilot must state the fixed logical dimension and packed byte width; it cannot be compared to i8/f32/complex baselines without separately reporting physical storage and precision.",
+    "A single-item majority bundle must round-trip exactly; member and nonmember score distributions, pairwise AUC, empirical false-positive rate, and TPR at the declared operating point are all reported across every registered load.",
+    "The packed BinaryHV pilot is labelled a fixed-dimension implementation characterization; it is not a theoretical capacity proof, a full VSA comparison, or a SOTA result."
   ],
   "research_references": [
     {
