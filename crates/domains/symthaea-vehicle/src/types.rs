@@ -167,9 +167,11 @@ pub struct VehicleState {
     pub nearest_peer_distance: f64,
     /// Speed of nearest peer minus ego speed (m/s). Negative = peer braking.
     pub peer_relative_speed: f64,
-    /// Fraction of swarm currently applying brakes (0..1).
+    /// Unverified synthetic aggregate of peer braking (0..1); not a local sensor
+    /// measurement or a control-authority signal. Current policy encoders mask it.
     pub mesh_brake_density: f64,
-    /// Aggregate mesh signal integrity (0..1). 0 = no mesh, 1 = full confidence.
+    /// Unverified aggregate-reported confidence (0..1), not a trust or truth score.
+    /// Current policy encoders mask it until a qualified advisory contract exists.
     pub mesh_confidence: f64,
 
     // ── Metadata ──
