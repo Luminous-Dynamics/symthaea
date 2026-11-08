@@ -2171,7 +2171,12 @@
         "changed_dimension_annotation_revision",
         "pair_count",
         "pair_kinds",
-        "pair_split_revision"
+        "pair_split_revision",
+        "preference_training_pair_manifest_sha256",
+        "held_out_evaluation_pair_manifest_sha256",
+        "training_evaluation_disjointness_audit_sha256",
+        "training_evaluation_overlap_count",
+        "training_evaluation_disjointness_status"
       ],
       "properties": {
         "mode": {
@@ -2291,6 +2296,72 @@
               ]
             }
           ]
+        },
+        "preference_training_pair_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "held_out_evaluation_pair_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "training_evaluation_disjointness_audit_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "training_evaluation_overlap_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "training_evaluation_disjointness_status": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "NOT_VERIFIED",
+            "VERIFIED_DISJOINT",
+            "OVERLAP_DETECTED"
+          ]
         }
       },
       "allOf": [
@@ -2336,6 +2407,21 @@
               },
               "source_lineage_manifest_sha256": {
                 "type": "null"
+              },
+              "preference_training_pair_manifest_sha256": {
+                "type": "null"
+              },
+              "held_out_evaluation_pair_manifest_sha256": {
+                "type": "null"
+              },
+              "training_evaluation_disjointness_audit_sha256": {
+                "type": "null"
+              },
+              "training_evaluation_overlap_count": {
+                "const": 0
+              },
+              "training_evaluation_disjointness_status": {
+                "const": "NOT_APPLICABLE"
               }
             }
           }
@@ -2390,6 +2476,21 @@
               },
               "source_lineage_manifest_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "preference_training_pair_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "held_out_evaluation_pair_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "training_evaluation_disjointness_audit_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "training_evaluation_overlap_count": {
+                "const": 0
+              },
+              "training_evaluation_disjointness_status": {
+                "const": "VERIFIED_DISJOINT"
               }
             }
           }
