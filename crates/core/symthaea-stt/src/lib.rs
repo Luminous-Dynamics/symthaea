@@ -90,6 +90,7 @@ pub mod liquid_projection;
 pub mod lm;
 pub mod phonological_eval;
 pub mod acoustic_faithfulness;
+pub mod counterfactual_pairs;
 pub mod ltc;
 #[cfg(feature = "gpu")]
 pub mod ltc_gpu;
