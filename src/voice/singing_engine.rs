@@ -623,10 +623,7 @@ impl VocalPerformance {
         }
         Ok(())
     }
-    fn pitch_control_at(
-        &self,
-        time_s: f32,
-    ) -> Option<(f32, &VocalSyllable, &Note)> {
+    fn pitch_control_at(&self, time_s: f32) -> Option<(f32, &VocalSyllable, &Note)> {
         if !time_s.is_finite() || time_s < 0.0 {
             return None;
         }
@@ -695,9 +692,8 @@ impl VocalPerformance {
             return Some(center_frequency);
         }
         let onset_gate = ((time_s - vibrato_start) / VIBRATO_ONSET_RAMP_S).clamp(0.0, 1.0);
-        let phase = std::f32::consts::TAU
-            * syllable.vibrato_rate_hz
-            * (time_s - vibrato_start).max(0.0);
+        let phase =
+            std::f32::consts::TAU * syllable.vibrato_rate_hz * (time_s - vibrato_start).max(0.0);
         let cents = syllable.vibrato_depth_cents * phase.sin() * onset_gate;
         Some(center_frequency * 2.0f32.powf(cents / 1200.0))
     }
