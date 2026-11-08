@@ -643,6 +643,38 @@
         "deterministic_seed_replay"
       ],
       "scope_note": "This is a source-bound packed-BinaryHV characterization pilot with a separate negative calibration set and held-out negative evaluation set; it is not a full VSA capacity comparison, IBM theoretical-bound reproduction, or SOTA claim."
+    },
+    {
+      "id": "parameterized_orthogonal_cross_dimensional_mixing",
+      "environment": "Standalone ContinuousHV operator characterization at dimensions 256, 1,024, 4,096, and 16,384. Compare identity, cyclic permutation, fixed normalized Walsh-Hadamard, and a caller-parameterized orthogonal butterfly made from log2(D) stages of disjoint Givens rotations. The butterfly has (D/2)*log2(D) angle parameters and exact inverse; it is not yet integrated into HDC-LTC and has no learned parameters until a separate optimizer is used.",
+      "primary_outcomes": [
+        "basis_coordinate_spread",
+        "round_trip_max_abs_error",
+        "relative_norm_error",
+        "apply_latency_ns",
+        "butterfly_angle_parameter_count",
+        "dense_matrix_parameter_count"
+      ],
+      "diagnostics": [
+        "operator_kind",
+        "dimension",
+        "stage_count",
+        "rotation_pair_count",
+        "measured_cpu_latency",
+        "inverse_error",
+        "operator_norm_error",
+        "parameter_to_dense_ratio"
+      ],
+      "negative_controls": [
+        "identity_preserves_basis_support",
+        "cyclic_permutation_is_exactly_invertible",
+        "zero_angle_butterfly_equals_identity",
+        "butterfly_inverse_reverses_stage_order",
+        "nonfinite_butterfly_parameters_rejected",
+        "wrong_parameter_count_rejected",
+        "dimension_mismatch_rejected"
+      ],
+      "scope_note": "This benchmark is an operator characterization only. It does not establish improved forecasting, associative retrieval, HDC-LTC task performance, or SOTA. Integration into the unified neuron is a separate preregistered ablation after operator-level qualification."
     }
   ],
   "baselines": [
@@ -1052,7 +1084,15 @@
     "symbolar_rust_vsa_reference",
     "oxicuda_hdc_0_5_5",
     "ibm_jair_vsa_capacity_bound_reference",
-    "date_2026_ghrr_reference"
+    "date_2026_ghrr_reference",
+    "symthaea_structured_mixer_identity",
+    "symthaea_structured_mixer_cyclic_permutation",
+    "symthaea_structured_mixer_walsh_hadamard",
+    "symthaea_parameterized_orthogonal_butterfly",
+    "dense_orthogonal_matrix_reference",
+    "monarch_structured_matrix_reference",
+    "butterfly_factorization_reference",
+    "boft_orthogonal_butterfly_reference"
   ],
   "seeds": {
     "development": [
@@ -1170,7 +1210,13 @@
       "mean_nonmember_cosine",
       "pairwise_auc",
       "tpr_at_empirical_one_percent_fpr",
-      "empirical_false_positive_rate"
+      "empirical_false_positive_rate",
+      "basis_coordinate_spread",
+      "round_trip_max_abs_error",
+      "relative_norm_error",
+      "apply_latency_ns",
+      "butterfly_angle_parameter_count",
+      "dense_matrix_parameter_count"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1267,7 +1313,12 @@
       "binary_bundle_capacity_false_retrieval_rate",
       "single_item_binary_bundle_round_trip_error",
       "nonmember_query_seed_collision_rate",
-      "packed_vs_unpacked_storage_accounting_error"
+      "packed_vs_unpacked_storage_accounting_error",
+      "orthogonal_mixer_norm_error",
+      "orthogonal_mixer_inverse_error",
+      "butterfly_parameter_count_contract_error",
+      "butterfly_nonfinite_angle_acceptance_rate",
+      "orthogonal_mixer_basis_spread_control_error"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1295,7 +1346,14 @@
       "unpacked_i8_hypervector_bytes",
       "f32_hypervector_bytes",
       "bundle_bytes_read",
-      "query_bytes_read"
+      "query_bytes_read",
+      "structured_mixer_apply_latency_ns",
+      "structured_mixer_inverse_latency_ns",
+      "butterfly_angle_parameters",
+      "dense_matrix_parameters",
+      "structured_mixer_parameter_ratio",
+      "structured_mixer_rotation_pairs",
+      "structured_mixer_bytes_allocated_per_apply"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -1404,7 +1462,12 @@
     "A single-item majority bundle must round-trip exactly; member and nonmember score distributions, pairwise AUC, empirical false-positive rate, and TPR at the declared operating point are all reported across every registered load.",
     "The packed BinaryHV pilot is labelled a fixed-dimension implementation characterization; it is not a theoretical capacity proof, a full VSA comparison, or a SOTA result.",
     "The packed BinaryHV operating threshold is calibrated on a dedicated negative-query set; empirical false-positive rate is measured on a disjoint negative-query set that was not used to choose the threshold.",
-    "The packed BinaryHV pilot must compare empirical mean member similarity to the analytic independent-bipolar majority-bundle expectation C(2m,m)/4^m for odd load 2m+1, preserving the exact discrete formula separately from its asymptotic approximation."
+    "The packed BinaryHV pilot must compare empirical mean member similarity to the analytic independent-bipolar majority-bundle expectation C(2m,m)/4^m for odd load 2m+1, preserving the exact discrete formula separately from its asymptotic approximation.",
+    "Parameterized butterfly mixing is an opt-in, standalone orthogonal operator until a separate HDC-LTC task ablation justifies integration; it must not silently alter the default neuron.",
+    "For dimension D=2^L, the butterfly angle manifest contains exactly (D/2)*L finite parameters, stage-major and pair-major, and reports this count against D^2 dense parameters.",
+    "Each butterfly stage consists of disjoint orthogonal Givens rotations; the inverse applies transposed rotations in reverse stage order and must restore the input within the preregistered floating-point tolerance.",
+    "Operator characterization reports norm preservation, inverse error, basis-coordinate spread, parameter count, and measured latency separately; operator-level performance is not a downstream task or SOTA claim.",
+    "A zero-angle butterfly is the identity and invalid dimensions, angle counts, non-finite angles, and input dimensions must fail closed."
   ],
   "research_references": [
     {
@@ -1498,6 +1561,22 @@
     {
       "id": "symthaea_hlb_hdc_capacity_issue_11145",
       "url": "https://github.com/Luminous-Dynamics/symthaea/issues/11145"
+    },
+    {
+      "id": "monarch_structured_matrices_icml_2022",
+      "url": "https://proceedings.mlr.press/v162/dao22a.html"
+    },
+    {
+      "id": "butterfly_factorizations_fast_linear_transforms_2019",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6879380/"
+    },
+    {
+      "id": "boft_orthogonal_butterfly_iclr_2024",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2024/hash/a63ce8e6867a1bf4b4ca62e5077814d9-Abstract-Conference.html"
+    },
+    {
+      "id": "efficient_structured_linear_layers_neurips_2024",
+      "url": "https://proceedings.neurips.cc/paper_files/paper/2024/hash/0729c38b421cd66f2313ab397d099e37-Abstract-Conference.html"
     }
   ]
 }
