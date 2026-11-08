@@ -521,7 +521,6 @@ mod tests {
         fn enumerate(
             function_index: usize,
             problem: &CnfProblem,
-            prefix: &ValidatedQuantifierPrefix,
             layouts: &[(usize, Vec<usize>)],
             universal_variables: &[usize],
             tables: &mut Vec<Vec<bool>>,
@@ -544,7 +543,6 @@ mod tests {
                 winning += enumerate(
                     function_index + 1,
                     problem,
-                    prefix,
                     layouts,
                     universal_variables,
                     tables,
@@ -557,7 +555,6 @@ mod tests {
         enumerate(
             0,
             problem,
-            prefix,
             &layouts,
             &universal_variables,
             &mut Vec::new(),
