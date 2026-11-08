@@ -80,7 +80,8 @@ impl ModelHypothesis {
                 Ok(())
             }
             Structure::BilinearInteraction
-                if COEFFICIENT_VALUES.contains(&self.weight_v)
+                if COEFFICIENT_VALUES.contains(&self.weight_u)
+                    && COEFFICIENT_VALUES.contains(&self.weight_v)
                     && COEFFICIENT_VALUES.contains(&self.interaction_weight) =>
             {
                 Ok(())
@@ -342,18 +343,25 @@ pub fn oracle_equivalence_classes() -> Result<Vec<OracleEquivalenceClass>, Inter
 fn closed_form_signature(model: &ModelHypothesis) -> Result<Vec<i64>, InteractionError> {
     let mut signature = Vec::with_capacity(FACTORIAL_DESIGN.len());
     for [u, v] in FACTORIAL_DESIGN {
-        let mut value = model.bias;
-        value = value
-            .checked_add(model.weight_u * u)
+        let u_term = model
+            .weight_u
+            .checked_mul(u)
             .ok_or(InteractionError::ArithmeticOverflow)?;
-        value = value
-            .checked_add(model.weight_v * v)
+        let v_term = model
+            .weight_v
+            .checked_mul(v)
             .ok_or(InteractionError::ArithmeticOverflow)?;
-        if model.structure == Structure::BilinearInteraction {
-            value = value
-                .checked_add(model.interaction_weight * u * v)
-                .ok_or(InteractionError::ArithmeticOverflow)?;
-        }
+        let interaction = model
+            .interaction_weight
+            .checked_mul(u)
+            .and_then(|value| value.checked_mul(v))
+            .ok_or(InteractionError::ArithmeticOverflow)?;
+        let value = model
+            .bias
+            .checked_add(u_term)
+            .and_then(|value| value.checked_add(v_term))
+            .and_then(|value| value.checked_add(interaction))
+            .ok_or(InteractionError::ArithmeticOverflow)?;
         signature.push(value);
     }
     Ok(signature)
@@ -497,6 +505,24 @@ mod tests {
             vec![Structure::BilinearInteraction]
         );
         assert_eq!(report.compatible_models, vec![bilinear_truth()]);
+    }
+
+    #[test]
+    fn a2_can_identify_that_only_the_second_variable_matters() {
+        let truth = ModelHypothesis {
+            structure: Structure::SingleInputV,
+            bias: 1,
+            weight_u: 0,
+            weight_v: 2,
+            interaction_weight: 0,
+        };
+        let world = InteractionWorld::new(truth).unwrap();
+        let log = world.run(&FACTORIAL_DESIGN).unwrap();
+        let report = discover(&log, StructureAccess::Withheld).unwrap();
+
+        assert_eq!(report.disposition, DiscoveryDisposition::UniqueModel);
+        assert_eq!(report.compatible_structures, vec![Structure::SingleInputV]);
+        assert_eq!(report.compatible_models, vec![truth]);
     }
 
     #[test]
