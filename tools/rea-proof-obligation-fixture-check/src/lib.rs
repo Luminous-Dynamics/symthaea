@@ -135,6 +135,7 @@ pub fn evaluate_claim_readiness(case: &Value) -> Result<ClaimReadiness, FixtureE
 /// Apply only the effects associated with an already observed outcome.
 /// This is a fixture reference simulator, not an acquisition planner or
 /// production Evidence verifier.
+#[cfg(test)]
 fn apply_observed_fixture_outcome(
     agent_case: &Value,
     grader_case: &Value,
@@ -953,7 +954,7 @@ mod tests {
         let mut value = fixture();
         let case = value["cases"].as_array_mut().unwrap().iter_mut()
             .find(|case| case["case_id"] == "REA-POA-001").unwrap();
-        case["obligations"][0]["status"] = Value::String("satisfied".to_owned());
+        case["obligations"][2]["status"] = Value::String("satisfied".to_owned());
         case["candidates"][0]["effects"][0]["resulting_status"] =
             Value::String("unknown".to_owned());
         assert!(validate_fixture(&value).is_err());
@@ -965,6 +966,7 @@ mod tests {
         let mut value = fixture();
         let case = value["cases"].as_array_mut().unwrap().iter_mut()
             .find(|case| case["case_id"] == "REA-POA-013").unwrap();
+        case["obligations"][0]["status"] = Value::String("satisfied".to_owned());
         case["candidates"][0]["effects"] = serde_json::json!([{
             "outcome":"recovered",
             "obligation_id":"fault_reproduction",
