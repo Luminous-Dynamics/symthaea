@@ -377,6 +377,23 @@ mod tests {
         Err(ProtocolError::NotSubmitted)
     }
 
+    fn run_strategy_to_submission(
+        episode: &mut BlindEpisode,
+        budget: usize,
+        strategy: crate::strategies::ProbeStrategy,
+    ) -> Result<(), ProtocolError> {
+        for _ in 0..=budget {
+            let view = episode.view()?;
+            let action = StrategyEnumeratorBaseline::next_action(&view, strategy)
+                .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
+            let response = episode.apply(action)?;
+            if response.status == EpisodeStatus::Submitted {
+                return Ok(());
+            }
+        }
+        Err(ProtocolError::NotSubmitted)
+    }
+
     #[test]
     fn matched_numeric_a0_and_a2_use_identical_truth_and_budget() {
         let truth = numeric::ModelHypothesis {
@@ -457,6 +474,78 @@ mod tests {
         assert!(score.set_score.exact_version_space_match);
         assert!(score.decision_correct);
         assert!(score.generating_model_in_version_space);
+    }
+
+    #[test]
+    fn strategy_baseline_completes_matched_world_episodes_with_exact_claims() {
+        let strategies = [
+            crate::strategies::ProbeStrategy::MaximumPartition,
+            crate::strategies::ProbeStrategy::Minimax,
+            crate::strategies::ProbeStrategy::MaximumEntropy,
+            crate::strategies::ProbeStrategy::MinimumExpectedRemaining,
+            crate::strategies::ProbeStrategy::FixedGrid,
+            crate::strategies::ProbeStrategy::Random { seed: 23 },
+        ];
+
+        for strategy in strategies {
+            let mut boolean = BlindEpisode::new_boolean(
+                "strategy-policy-boolean",
+                crate::Mechanism::HiddenLag,
+                crate::MeasurementMap::Identity,
+                Some(false),
+                StructureAccess::BooleanWithheld,
+                6,
+            ).unwrap();
+            run_strategy_to_submission(&mut boolean, 6, strategy).unwrap();
+            let boolean_score = boolean.evaluate_after_submission().unwrap();
+            assert!(boolean_score.set_score.exact_version_space_match);
+            assert!(boolean_score.generating_model_in_version_space);
+
+            let numeric_truth = numeric::ModelHypothesis {
+                mechanism: numeric::Mechanism::LeakyMemory,
+                gain: 2,
+                decay: Some(1),
+                initial_state: Some(1),
+                sensor: numeric::SensorMap::Identity,
+            };
+            let mut numeric_a0 = BlindEpisode::new_numeric(
+                "strategy-policy-numeric-a0",
+                numeric_truth,
+                StructureAccess::NumericSupplied(numeric::Mechanism::LeakyMemory),
+                12,
+            ).unwrap();
+            let mut numeric_a2 = BlindEpisode::new_numeric(
+                "strategy-policy-numeric-a2",
+                numeric_truth,
+                StructureAccess::NumericWithheld,
+                12,
+            ).unwrap();
+            run_strategy_to_submission(&mut numeric_a0, 12, strategy).unwrap();
+            run_strategy_to_submission(&mut numeric_a2, 12, strategy).unwrap();
+            let a0_score = numeric_a0.evaluate_after_submission().unwrap();
+            let a2_score = numeric_a2.evaluate_after_submission().unwrap();
+            assert!(a0_score.set_score.exact_version_space_match);
+            assert!(a2_score.set_score.exact_version_space_match);
+            assert!(a0_score.generating_model_in_version_space);
+            assert!(a2_score.generating_model_in_version_space);
+
+            let mut interaction_episode = BlindEpisode::new_interaction(
+                "strategy-policy-interaction",
+                interaction::ModelHypothesis {
+                    structure: interaction::Structure::BilinearInteraction,
+                    bias: 0,
+                    weight_u: 1,
+                    weight_v: 1,
+                    interaction_weight: 1,
+                },
+                StructureAccess::InteractionWithheld,
+                9,
+            ).unwrap();
+            run_strategy_to_submission(&mut interaction_episode, 9, strategy).unwrap();
+            let interaction_score = interaction_episode.evaluate_after_submission().unwrap();
+            assert!(interaction_score.set_score.exact_version_space_match);
+            assert!(interaction_score.generating_model_in_version_space);
+        }
     }
 
     #[test]
