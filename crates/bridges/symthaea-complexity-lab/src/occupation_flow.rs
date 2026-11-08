@@ -132,6 +132,8 @@ pub struct OccupationFlowBudget {
     pub max_variables: usize,
     pub max_constraints: usize,
     pub max_matrix_entries: usize,
+    /// Maximum bit width of any rational numerator or denominator.
+    pub max_rational_bit_width: usize,
 }
 
 /// Canonical variable layout for the occupation-flow LP.
@@ -394,12 +396,78 @@ impl From<LpCertificateError> for OccupationFlowError {
     }
 }
 
+fn rational_bit_width(value: CheckedRational) -> usize {
+    let numerator = value.numerator().unsigned_abs();
+    let denominator = value.denominator() as u128;
+    let numerator_bits = if numerator == 0 {
+        0
+    } else {
+        (u128::BITS - numerator.leading_zeros()) as usize
+    };
+    let denominator_bits = (u128::BITS - denominator.leading_zeros()) as usize;
+    numerator_bits.max(denominator_bits)
+}
+
+fn check_rational_bit_width(
+    value: CheckedRational,
+    budget: OccupationFlowBudget,
+) -> Result<(), OccupationFlowError> {
+    let required = rational_bit_width(value);
+    if required > budget.max_rational_bit_width {
+        return Err(OccupationFlowError::BudgetExceeded {
+            resource: "rational numerator/denominator bit width",
+            required,
+            limit: budget.max_rational_bit_width,
+        });
+    }
+    Ok(())
+}
+
+fn validate_score_matrix(
+    model: &StagewiseIntervalMarkovModel,
+    scores: &[Vec<CheckedRational>],
+    budget: OccupationFlowBudget,
+) -> Result<(), OccupationFlowError> {
+    if scores.len() != model.period_count() {
+        return Err(OccupationFlowError::ScorePeriodCountMismatch {
+            expected: model.period_count(),
+            actual: scores.len(),
+        });
+    }
+    for (time, row) in scores.iter().enumerate() {
+        if row.len() != model.state_count() {
+            return Err(OccupationFlowError::ScoreStateCountMismatch {
+                time,
+                expected: model.state_count(),
+                actual: row.len(),
+            });
+        }
+        for value in row {
+            check_rational_bit_width(*value, budget)?;
+        }
+    }
+    Ok(())
+}
+
 fn preflight_dimensions(
     model: &StagewiseIntervalMarkovModel,
     budget: OccupationFlowBudget,
 ) -> Result<(OccupationFlowLayout, usize), OccupationFlowError> {
     let periods = model.period_count();
     let states = model.state_count();
+
+    for probability in &model.initial {
+        check_rational_bit_width(*probability, budget)?;
+    }
+    for stage in &model.transitions {
+        for row in stage {
+            for interval in row {
+                check_rational_bit_width(interval.lower, budget)?;
+                check_rational_bit_width(interval.upper, budget)?;
+            }
+        }
+    }
+
     let occupancy_count = periods.checked_mul(states)
         .ok_or(OccupationFlowError::DimensionOverflow)?;
     let flow_count = model.transitions.len()
@@ -478,7 +546,10 @@ pub fn build_pairwise_worst_case_regret_lp(
         }
     }
 
-    // Reject an over-budget LP before constructing the temporary score-difference grid.
+    // Reject oversized inputs and an over-budget LP before constructing the
+    // temporary score-difference grid.
+    validate_score_matrix(model, selected_scores, budget)?;
+    validate_score_matrix(model, comparator_scores, budget)?;
     let _ = preflight_dimensions(model, budget)?;
 
     let mut regret_scores = Vec::new();
@@ -529,25 +600,10 @@ pub fn build_occupation_flow_lp(
     direction: UtilityDirection,
     budget: OccupationFlowBudget,
 ) -> Result<OccupationFlowLp, OccupationFlowError> {
+    validate_score_matrix(model, state_scores, budget)?;
+    let (layout, constraint_count) = preflight_dimensions(model, budget)?;
     let periods = model.period_count();
     let states = model.state_count();
-    if state_scores.len() != periods {
-        return Err(OccupationFlowError::ScorePeriodCountMismatch {
-            expected: periods,
-            actual: state_scores.len(),
-        });
-    }
-    for (time, scores) in state_scores.iter().enumerate() {
-        if scores.len() != states {
-            return Err(OccupationFlowError::ScoreStateCountMismatch {
-                time,
-                expected: states,
-                actual: scores.len(),
-            });
-        }
-    }
-
-    let (layout, constraint_count) = preflight_dimensions(model, budget)?;
 
     let mut matrix: Vec<Vec<CheckedRational>> = Vec::new();
     matrix.try_reserve_exact(constraint_count).map_err(|_| {
@@ -858,6 +914,7 @@ mod tests {
             max_variables: 14,
             max_constraints: 36,
             max_matrix_entries: max_entries,
+            max_rational_bit_width: 64,
         }
     }
 
@@ -1289,6 +1346,30 @@ mod tests {
     }
 
     #[test]
+    fn rejects_rational_bit_width_over_budget_before_matrix_allocation() {
+        let model = fixture();
+        let scores = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let tight = OccupationFlowBudget {
+            max_variables: 14,
+            max_constraints: 36,
+            max_matrix_entries: 504,
+            max_rational_bit_width: 4,
+        };
+        assert_eq!(
+            build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize, tight),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "rational numerator/denominator bit width",
+                required: 5,
+                limit: 4,
+            })
+        );
+    }
+
+    #[test]
     fn verifies_interval_row_with_narrow_and_exact_zero_bounds() {
         let valid = StagewiseIntervalMarkovModel::new(
             vec![q(1, 1), q(0, 1)],
@@ -1306,6 +1387,7 @@ mod tests {
                 max_variables: 6,
                 max_constraints: 20,
                 max_matrix_entries: 120,
+                max_rational_bit_width: 64,
             },
         ).unwrap();
         assert_eq!(built.problem().row_count(), 20);
