@@ -6,7 +6,8 @@
 //! revision still has to identify the exact source snapshot used for a run.
 
 use crate::{
-    BUILT_GENERATOR_SOURCE_REVISION, GenerationManifestV1, compute_artifact_commitment, sha256_hex,
+    BUILT_GENERATOR_SOURCE_REVISION, GenerationManifestV1, compute_artifact_commitment,
+    compute_protocol_commitment, sha256_hex,
     validate_manifest_bytes, verify_reveal,
 };
 use serde::Deserialize;
