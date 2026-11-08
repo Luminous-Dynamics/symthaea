@@ -15,7 +15,7 @@ from pathlib import Path
 PROTOCOL = "docs/research/CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md"
 CHALLENGE = "docs/research/CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md"
 KEY = "docs/research/CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md"
-CASE_IDS = [f"CCL-S{i:02d}" for i in range(1, 7)]
+CASE_IDS = [f"CCL-S{i:02d}" for i in range(1, 9)]
 DISPOSITIONS = ("retain", "revalidate", "invalidate", "supersede", "unresolved")
 EDGE_KINDS = (
     "supports",
@@ -46,9 +46,9 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
     key_ids, key_blocks = extract_blocks(key, r"^## \d+\. (CCL-S\d{2})\b")
 
     if challenge_ids != CASE_IDS:
-        errors.append(f"challenge must contain CCL-S01..CCL-S06 once and in order; got {challenge_ids}")
+        errors.append(f"challenge must contain CCL-S01..CCL-S08 once and in order; got {challenge_ids}")
     if key_ids != CASE_IDS:
-        errors.append(f"key must contain CCL-S01..CCL-S06 once and in order; got {key_ids}")
+        errors.append(f"key must contain CCL-S01..CCL-S08 once and in order; got {key_ids}")
 
     for case_id, block in zip(challenge_ids, challenge_blocks):
         for required in ("Initial claims:", "Support closure:", "Change event", "Reviewer question:"):
@@ -226,7 +226,7 @@ def main() -> int:
 
     print(
         "CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_PACK_PASS: "
-        "cases=6 dispositions=5 typed_edges=8 challenge=public-key=separate-public"
+        "cases=8 dispositions=5 typed_edges=8 challenge=public-key=separate-public"
     )
     print(
         "CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CLAIM_BOUNDARY: static documentation validation only; "
