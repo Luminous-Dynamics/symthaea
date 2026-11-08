@@ -131,6 +131,96 @@ pub fn evaluate_claim_readiness(case: &Value) -> Result<ClaimReadiness, FixtureE
     Ok(ClaimReadiness::Ready)
 }
 
+
+/// Apply only the effects associated with an already observed outcome.
+/// This is a fixture reference simulator, not an acquisition planner or
+/// production Evidence verifier.
+fn apply_observed_fixture_outcome(
+    agent_case: &Value,
+    grader_case: &Value,
+    experiment_id: &str,
+    observed_outcome: &str,
+) -> Result<Value, FixtureError> {
+    let mut updated = agent_case.clone();
+    let candidate = array_at(agent_case, &["candidates"])?
+        .iter()
+        .find(|candidate| {
+            candidate.get("experiment_id").and_then(Value::as_str) == Some(experiment_id)
+        })
+        .ok_or_else(|| {
+            FixtureError(format!("unknown agent-visible experiment {experiment_id}"))
+        })?;
+
+    let eligible = string_at(candidate, &["authorization"])? == "authorized"
+        && bool_at(candidate, &["reversible"])?
+        && !bool_at(candidate, &["destructive"])?;
+    if !eligible {
+        return Err(FixtureError(format!(
+            "experiment {experiment_id} is not eligible for observed-outcome application"
+        )));
+    }
+
+    if !array_at(candidate, &["outcomes"])?
+        .iter()
+        .any(|outcome| outcome.as_str() == Some(observed_outcome))
+    {
+        return Err(FixtureError(format!(
+            "observed outcome {observed_outcome} was not declared for {experiment_id}"
+        )));
+    }
+
+    let grader_candidate = array_at(grader_case, &["candidate_effects"])?
+        .iter()
+        .find(|entry| {
+            entry.get("experiment_id").and_then(Value::as_str) == Some(experiment_id)
+        })
+        .ok_or_else(|| {
+            FixtureError(format!("grader has no effects for experiment {experiment_id}"))
+        })?;
+
+    let matching_effects: Vec<&Value> = array_at(grader_candidate, &["effects"])?
+        .iter()
+        .filter(|effect| effect.get("outcome").and_then(Value::as_str) == Some(observed_outcome))
+        .collect();
+
+    for effect in matching_effects {
+        let obligation_id = string_at(effect, &["obligation_id"])?;
+        let evidence_class = string_at(effect, &["evidence_class"])?;
+        let resulting_status = string_at(effect, &["resulting_status"])?;
+
+        let obligation = array_at(&updated, &["obligations"])?
+            .iter()
+            .position(|item| {
+                item.get("obligation_id").and_then(Value::as_str) == Some(obligation_id)
+            })
+            .ok_or_else(|| {
+                FixtureError(format!("unknown obligation {obligation_id} in observed effect"))
+            })?;
+
+        let current = string_at(&updated["obligations"][obligation], &["status"])?;
+        let admissible = array_at(
+            &updated["obligations"][obligation],
+            &["admissible_evidence_classes"],
+        )?
+        .iter()
+        .any(|item| item.as_str() == Some(evidence_class));
+
+        if !admissible {
+            if resulting_status != current {
+                return Err(FixtureError(format!(
+                    "inadmissible observed evidence {evidence_class} cannot change {obligation_id}"
+                )));
+            }
+            continue;
+        }
+
+        updated["obligations"][obligation]["status"] =
+            Value::String(resulting_status.to_owned());
+    }
+
+    Ok(updated)
+}
+
 pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
     if string_at(value, &["schema_version"])? != "0.1.0"
         || string_at(value, &["dataset_id"])? != "rea-proof-obligation-acquisition"
@@ -883,6 +973,148 @@ mod tests {
             "source_family_id":"synthetic:unauthorized-observation"
         }]);
         assert!(validate_fixture(&value).is_err());
+    }
+
+
+    #[test]
+    fn candidate_prediction_does_not_change_readiness_before_observation() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let case = &agent["cases"][0];
+        assert_eq!(evaluate_claim_readiness(case).unwrap(), ClaimReadiness::NotReady);
+        assert_eq!(
+            string_at(&case["obligations"][1], &["status"]).unwrap(),
+            "unknown",
+            "candidate prediction is not an observation"
+        );
+    }
+
+    #[test]
+    fn high_information_static_probe_does_not_close_deployment_or_behavior_obligations() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let agent_case = &agent["cases"][0];
+        let grader_case = &grader["cases"][0];
+
+        let after = apply_observed_fixture_outcome(
+            agent_case,
+            grader_case,
+            "probe_many_functions",
+            "function_a",
+        )
+        .unwrap();
+        assert_eq!(evaluate_claim_readiness(&after).unwrap(), ClaimReadiness::NotReady);
+        assert_eq!(
+            string_at(&after["obligations"][2], &["status"]).unwrap(),
+            "unknown"
+        );
+    }
+
+    #[test]
+    fn exact_manifest_observation_closes_only_the_binding_obligation() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let after = apply_observed_fixture_outcome(
+            &agent["cases"][0],
+            &grader["cases"][0],
+            "verify_deployment_manifest",
+            "digest_match",
+        )
+        .unwrap();
+        assert_eq!(after["obligations"][1]["status"], "satisfied");
+        assert_eq!(after["obligations"][2]["status"], "unknown");
+        assert_eq!(evaluate_claim_readiness(&after).unwrap(), ClaimReadiness::NotReady);
+    }
+
+    #[test]
+    fn complete_page_reconciliation_closes_enumeration_and_acquisition() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let after = apply_observed_fixture_outcome(
+            &agent["cases"][3],
+            &grader["cases"][3],
+            "reacquire_missing_page",
+            "page_reconciled",
+        )
+        .unwrap();
+        assert_eq!(after["obligations"][1]["status"], "satisfied");
+        assert_eq!(after["obligations"][2]["status"], "satisfied");
+        assert_eq!(evaluate_claim_readiness(&after).unwrap(), ClaimReadiness::Ready);
+    }
+
+    #[test]
+    fn averaging_conflicted_scanner_scores_does_not_clear_the_conflict() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let after = apply_observed_fixture_outcome(
+            &agent["cases"][8],
+            &grader["cases"][8],
+            "average_scanner_scores",
+            "high_average",
+        )
+        .unwrap();
+        assert_eq!(after["obligations"][0]["status"], "conflicted");
+        assert_eq!(evaluate_claim_readiness(&after).unwrap(), ClaimReadiness::NotReady);
+    }
+
+    #[test]
+    fn matched_configuration_reproduction_resolves_both_required_obligations() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let after = apply_observed_fixture_outcome(
+            &agent["cases"][8],
+            &grader["cases"][8],
+            "reproduce_production_configuration",
+            "pass",
+        )
+        .unwrap();
+        assert_eq!(after["obligations"][0]["status"], "satisfied");
+        assert_eq!(after["obligations"][1]["status"], "satisfied");
+        assert_eq!(evaluate_claim_readiness(&after).unwrap(), ClaimReadiness::Ready);
+    }
+
+    #[test]
+    fn bounded_no_event_observation_does_not_prove_universal_absence() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        let after = apply_observed_fixture_outcome(
+            &agent["cases"][11],
+            &grader["cases"][11],
+            "run_one_short_session",
+            "no_network_event",
+        )
+        .unwrap();
+        assert_eq!(after["obligations"][0]["status"], "unknown");
+        assert_eq!(evaluate_claim_readiness(&after).unwrap(), ClaimReadiness::NotReady);
+    }
+
+    #[test]
+    fn irreversible_or_unauthorized_proposals_cannot_be_applied_as_observed_actions() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        assert!(apply_observed_fixture_outcome(
+            &agent["cases"][12],
+            &grader["cases"][12],
+            "unauthorized_production_probe",
+            "recovered"
+        ).is_err());
+        assert!(apply_observed_fixture_outcome(
+            &agent["cases"][13],
+            &grader["cases"][13],
+            "run_irreversible_production_migration",
+            "success"
+        ).is_err());
+    }
+
+    #[test]
+    fn undeclared_observed_outcome_is_rejected() {
+        let agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        assert!(apply_observed_fixture_outcome(
+            &agent["cases"][0],
+            &grader["cases"][0],
+            "verify_deployment_manifest",
+            "invented_digest_match"
+        ).is_err());
     }
 
 }
