@@ -20,7 +20,11 @@ use super::quantified_proof::{
     QbfGameProof, QbfProofNodeKind, QbfProofVerificationReport, QuantifiedProofBudget,
     QuantifiedProofError, verify_qbf_game_proof,
 };
-use super::quantified_scope::ValidatedQuantifierPrefix;
+use super::quantified_game_dag::{
+    QbfGameDagBudget, QbfGameDagError, QbfGameDagVerificationReport, QbfGameProofDag,
+    QbfGameDagNodeKind, ResidualLiteral, verify_qbf_game_proof_dag,
+};
+use super::quantified_scope::{Quantifier, ValidatedQuantifierPrefix};
 use super::quantified_strategy::{
     QbfEvaluationResult, QuantifiedEvaluationBudget, StrategyVerificationReport,
 };
@@ -152,6 +156,11 @@ pub enum StrategyPortfolioError {
         proof_value: bool,
         candidate_value: bool,
     },
+    GameDag(QbfGameDagError),
+    GameDagResultMismatch {
+        proof_value: bool,
+        candidate_value: bool,
+    },
     ProofEncodingInvalid {
         offset: usize,
     },
@@ -224,6 +233,18 @@ pub struct VerifiedQbfEvidencePortfolio {
     pub game_proof: QbfGameProof,
     pub game_proof_verification: QbfProofVerificationReport,
     pub game_proof_bytes: Vec<u8>,
+    pub strategy_portfolio: VerifiedStrategyPortfolio,
+    pub total_evidence_bytes: usize,
+}
+
+/// A complete verified bundle using the residual-CNF proof DAG, extracted
+/// strategy, and independently checked BDD/AIG representations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedQbfDagEvidencePortfolio {
+    pub value: bool,
+    pub game_proof_dag: QbfGameProofDag,
+    pub game_proof_dag_verification: QbfGameDagVerificationReport,
+    pub game_proof_dag_bytes: Vec<u8>,
     pub strategy_portfolio: VerifiedStrategyPortfolio,
     pub total_evidence_bytes: usize,
 }
@@ -524,6 +545,73 @@ pub fn encode_qbf_game_proof(
     Ok(bytes)
 }
 
+/// Encode a residual QBF proof DAG in canonical LD-QBFDAG1 little-endian
+/// format. The DAG must still be bound to its source matrix and prefix by the
+/// independent DAG verifier before acceptance.
+pub fn encode_qbf_game_proof_dag(
+    proof: &QbfGameProofDag,
+    encoding_budget: StrategyPortfolioBudget,
+) -> Result<Vec<u8>, StrategyPortfolioError> {
+    let mut bytes = Vec::new();
+    for byte in b"LD-QBFDAG1" {
+        append_byte(&mut bytes, *byte, encoding_budget)?;
+    }
+    append_u64(&mut bytes, proof.variable_count, encoding_budget)?;
+    append_u64(&mut bytes, proof.prefix_order.len(), encoding_budget)?;
+    for (quantifier, variable) in &proof.prefix_order {
+        let tag = match quantifier {
+            Quantifier::Exists => 0,
+            Quantifier::ForAll => 1,
+        };
+        append_byte(&mut bytes, tag, encoding_budget)?;
+        append_u64(&mut bytes, *variable, encoding_budget)?;
+    }
+    append_u64(&mut bytes, proof.root, encoding_budget)?;
+    append_u64(&mut bytes, proof.nodes.len(), encoding_budget)?;
+
+    for node in &proof.nodes {
+        append_u64(&mut bytes, node.prefix_position, encoding_budget)?;
+        append_byte(&mut bytes, u8::from(node.value), encoding_budget)?;
+        append_u64(&mut bytes, node.residual.len(), encoding_budget)?;
+        for clause in &node.residual {
+            append_u64(&mut bytes, clause.len(), encoding_budget)?;
+            for literal in clause {
+                append_u64(&mut bytes, literal.variable, encoding_budget)?;
+                append_byte(&mut bytes, u8::from(literal.positive), encoding_budget)?;
+            }
+        }
+        match &node.kind {
+            QbfGameDagNodeKind::TrueTerminal => {
+                append_byte(&mut bytes, 0, encoding_budget)?;
+            }
+            QbfGameDagNodeKind::FalseTerminal => {
+                append_byte(&mut bytes, 1, encoding_budget)?;
+            }
+            QbfGameDagNodeKind::ExistsDecision {
+                variable,
+                low_child,
+                high_child,
+            } => {
+                append_byte(&mut bytes, 2, encoding_budget)?;
+                append_u64(&mut bytes, *variable, encoding_budget)?;
+                append_u64(&mut bytes, *low_child, encoding_budget)?;
+                append_u64(&mut bytes, *high_child, encoding_budget)?;
+            }
+            QbfGameDagNodeKind::ForAllDecision {
+                variable,
+                low_child,
+                high_child,
+            } => {
+                append_byte(&mut bytes, 3, encoding_budget)?;
+                append_u64(&mut bytes, *variable, encoding_budget)?;
+                append_u64(&mut bytes, *low_child, encoding_budget)?;
+                append_u64(&mut bytes, *high_child, encoding_budget)?;
+            }
+        }
+    }
+    Ok(bytes)
+}
+
 fn read_proof_byte(bytes: &[u8], offset: &mut usize) -> Result<u8, StrategyPortfolioError> {
     let Some(&value) = bytes.get(*offset) else {
         return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: *offset });
@@ -730,6 +818,174 @@ pub fn decode_qbf_game_proof(
     Ok(proof)
 }
 
+/// Decode canonical LD-QBFDAG1 bytes under explicit source-independent
+/// structural limits. Source binding and mathematical correctness still
+/// require `verify_qbf_game_proof_dag` with the original problem and prefix.
+pub fn decode_qbf_game_proof_dag(
+    bytes: &[u8],
+    dag_budget: QbfGameDagBudget,
+    encoding_budget: StrategyPortfolioBudget,
+) -> Result<QbfGameProofDag, StrategyPortfolioError> {
+    if bytes.len() > encoding_budget.max_single_representation_bytes {
+        return Err(StrategyPortfolioError::RepresentationTooLarge {
+            required: bytes.len(),
+            limit: encoding_budget.max_single_representation_bytes,
+        });
+    }
+    const MAGIC: &[u8] = b"LD-QBFDAG1";
+    if bytes.get(..MAGIC.len()) != Some(MAGIC) {
+        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: 0 });
+    }
+    let mut offset = MAGIC.len();
+    let variable_count = read_proof_usize(bytes, &mut offset)?;
+    let prefix_len = read_proof_usize(bytes, &mut offset)?;
+    if variable_count > dag_budget.max_variables || prefix_len != variable_count {
+        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+    }
+
+    let mut prefix_order = Vec::with_capacity(prefix_len);
+    let mut prefix_variables = std::collections::BTreeSet::new();
+    for _ in 0..prefix_len {
+        let quantifier_tag = read_proof_byte(bytes, &mut offset)?;
+        let quantifier = match quantifier_tag {
+            0 => Quantifier::Exists,
+            1 => Quantifier::ForAll,
+            tag => {
+                return Err(StrategyPortfolioError::ProofEncodingUnknownNodeTag {
+                    offset: offset.saturating_sub(1),
+                    tag,
+                });
+            }
+        };
+        let variable = read_proof_usize(bytes, &mut offset)?;
+        if variable >= variable_count || !prefix_variables.insert(variable) {
+            return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                offset: offset.saturating_sub(8),
+            });
+        }
+        prefix_order.push((quantifier, variable));
+    }
+    if prefix_variables.len() != variable_count {
+        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+    }
+
+    let root = read_proof_usize(bytes, &mut offset)?;
+    let node_count = read_proof_usize(bytes, &mut offset)?;
+    if node_count == 0 || node_count > dag_budget.max_proof_nodes || root != node_count - 1 {
+        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+    }
+    // Each node minimally needs prefix_position:u64, value:u8 and tag:u8.
+    let minimum_node_bytes = node_count
+        .checked_mul(10)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+    if minimum_node_bytes > bytes.len().saturating_sub(offset) {
+        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+    }
+
+    let mut nodes = Vec::with_capacity(node_count);
+    let mut total_residual_literals = 0u128;
+    let mut total_residual_clauses = 0u128;
+    for _ in 0..node_count {
+        let prefix_position = read_proof_usize(bytes, &mut offset)?;
+        let value = match read_proof_byte(bytes, &mut offset)? {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                    offset: offset.saturating_sub(1),
+                });
+            }
+        };
+        let clause_count = read_proof_usize(bytes, &mut offset)?;
+        if clause_count > dag_budget.max_clauses {
+            return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+        }
+        total_residual_clauses = total_residual_clauses
+            .checked_add(clause_count as u128)
+            .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+        if total_residual_clauses > dag_budget.max_stored_residual_clauses {
+            return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+        }
+
+        let mut residual = Vec::with_capacity(clause_count);
+        for _ in 0..clause_count {
+            let literal_count = read_proof_usize(bytes, &mut offset)?;
+            if literal_count > dag_budget.max_literals {
+                return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+            }
+            total_residual_literals = total_residual_literals
+                .checked_add(literal_count as u128)
+                .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+            if total_residual_literals > dag_budget.max_stored_residual_literals {
+                return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
+            }
+
+            let mut clause = Vec::with_capacity(literal_count);
+            for _ in 0..literal_count {
+                let variable = read_proof_usize(bytes, &mut offset)?;
+                let positive = match read_proof_byte(bytes, &mut offset)? {
+                    0 => false,
+                    1 => true,
+                    _ => {
+                        return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                            offset: offset.saturating_sub(1),
+                        });
+                    }
+                };
+                if variable >= variable_count {
+                    return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                        offset: offset.saturating_sub(9),
+                    });
+                }
+                clause.push(ResidualLiteral { variable, positive });
+            }
+            residual.push(clause);
+        }
+
+        let kind_tag_offset = offset;
+        let tag = read_proof_byte(bytes, &mut offset)?;
+        let kind = match tag {
+            0 => QbfGameDagNodeKind::TrueTerminal,
+            1 => QbfGameDagNodeKind::FalseTerminal,
+            2 => QbfGameDagNodeKind::ExistsDecision {
+                variable: read_proof_usize(bytes, &mut offset)?,
+                low_child: read_proof_usize(bytes, &mut offset)?,
+                high_child: read_proof_usize(bytes, &mut offset)?,
+            },
+            3 => QbfGameDagNodeKind::ForAllDecision {
+                variable: read_proof_usize(bytes, &mut offset)?,
+                low_child: read_proof_usize(bytes, &mut offset)?,
+                high_child: read_proof_usize(bytes, &mut offset)?,
+            },
+            unknown => {
+                return Err(StrategyPortfolioError::ProofEncodingUnknownNodeTag {
+                    offset: kind_tag_offset,
+                    tag: unknown,
+                });
+            }
+        };
+        nodes.push(super::quantified_game_dag::QbfGameDagNode {
+            prefix_position,
+            residual,
+            value,
+            kind,
+        });
+    }
+
+    if offset != bytes.len() {
+        return Err(StrategyPortfolioError::ProofEncodingTrailingBytes {
+            remaining: bytes.len().saturating_sub(offset),
+        });
+    }
+
+    Ok(QbfGameProofDag {
+        variable_count,
+        prefix_order,
+        root,
+        nodes,
+    })
+}
+
 /// Verify and compile the game proof, winning strategy and both circuit
 /// representations as one evidence bundle. The independent game proof and
 /// strategy verifiers are both mandatory; equal truth values alone are not
@@ -793,6 +1049,78 @@ pub fn verify_and_compile_qbf_evidence_portfolio(
         game_proof: decoded_proof,
         game_proof_verification: decoded_verification,
         game_proof_bytes,
+        strategy_portfolio,
+        total_evidence_bytes,
+    })
+}
+
+/// Verify and compile a residual-DAG proof, its canonical byte encoding,
+/// and the candidate's BDD/AIG strategy portfolio as one source-bound bundle.
+pub fn verify_and_compile_qbf_dag_evidence_portfolio(
+    problem: &CnfProblem,
+    prefix: &ValidatedQuantifierPrefix,
+    proof: &QbfGameProofDag,
+    candidate: &QbfEvaluationResult,
+    qbf_budget: QuantifiedEvaluationBudget,
+    dag_budget: QbfGameDagBudget,
+    bdd_budget: StrategyBddBudget,
+    aig_budget: StrategyAigBudget,
+    encoding_budget: StrategyPortfolioBudget,
+) -> Result<VerifiedQbfDagEvidencePortfolio, StrategyPortfolioError> {
+    let dag_verification = verify_qbf_game_proof_dag(problem, prefix, proof, dag_budget)
+        .map_err(StrategyPortfolioError::GameDag)?;
+    if dag_verification.root_value != candidate.value {
+        return Err(StrategyPortfolioError::GameDagResultMismatch {
+            proof_value: dag_verification.root_value,
+            candidate_value: candidate.value,
+        });
+    }
+
+    let dag_bytes = encode_qbf_game_proof_dag(proof, encoding_budget)?;
+    let decoded_dag = decode_qbf_game_proof_dag(&dag_bytes, dag_budget, encoding_budget)?;
+    if decoded_dag != *proof {
+        return Err(StrategyPortfolioError::ProofEncodingRoundTripMismatch);
+    }
+    let decoded_verification = verify_qbf_game_proof_dag(
+        problem,
+        prefix,
+        &decoded_dag,
+        dag_budget,
+    )
+    .map_err(StrategyPortfolioError::GameDag)?;
+    if decoded_verification != dag_verification {
+        return Err(StrategyPortfolioError::ProofEncodingRoundTripMismatch);
+    }
+
+    let strategy_portfolio = verify_and_compile_qbf_strategy_portfolio(
+        problem,
+        prefix,
+        candidate,
+        qbf_budget,
+        bdd_budget,
+        aig_budget,
+        encoding_budget,
+    )?;
+    let circuit_bytes = strategy_portfolio
+        .total_bdd_bytes
+        .checked_add(strategy_portfolio.total_aig_bytes)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+    let total_evidence_bytes = dag_bytes
+        .len()
+        .checked_add(circuit_bytes)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+    if total_evidence_bytes > encoding_budget.max_total_representation_bytes {
+        return Err(StrategyPortfolioError::TotalPortfolioTooLarge {
+            required: total_evidence_bytes,
+            limit: encoding_budget.max_total_representation_bytes,
+        });
+    }
+
+    Ok(VerifiedQbfDagEvidencePortfolio {
+        value: decoded_verification.root_value,
+        game_proof_dag: decoded_dag,
+        game_proof_dag_verification: decoded_verification,
+        game_proof_dag_bytes: dag_bytes,
         strategy_portfolio,
         total_evidence_bytes,
     })
@@ -1007,6 +1335,100 @@ mod tests {
         )
         .unwrap();
         (problem, prefix)
+    }
+
+    fn dag_budget() -> QbfGameDagBudget {
+        QbfGameDagBudget {
+            max_variables: 4,
+            max_total_variable_name_bytes: 64,
+            max_clauses: 16,
+            max_literals: 64,
+            max_proof_nodes: 1 << 8,
+            max_builder_state_visits: 1 << 8,
+            max_verifier_node_visits: 1 << 8,
+            max_residual_literal_visits: 1 << 12,
+            max_stored_residual_literals: 1 << 12,
+            max_stored_residual_clauses: 1 << 10,
+        }
+    }
+
+    #[test]
+    fn dag_proof_and_strategy_portfolio_roundtrip_as_source_bound_evidence() {
+        let (problem, prefix) = equality_qbf();
+        let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
+        let (proof, _) =
+            super::super::quantified_game_dag::build_qbf_game_proof_dag(
+                &problem,
+                &prefix,
+                dag_budget(),
+            )
+            .unwrap();
+        let portfolio = verify_and_compile_qbf_dag_evidence_portfolio(
+            &problem,
+            &prefix,
+            &proof,
+            &candidate,
+            qbf_budget(),
+            dag_budget(),
+            bdd_budget(),
+            aig_budget(),
+            encoding_budget(),
+        )
+        .unwrap();
+        assert!(portfolio.value);
+        assert_eq!(portfolio.game_proof_dag, proof);
+        assert_eq!(
+            portfolio.game_proof_dag_verification.root_value,
+            candidate.value
+        );
+        assert!(!portfolio.game_proof_dag_bytes.is_empty());
+        assert!(portfolio.total_evidence_bytes >= portfolio.game_proof_dag_bytes.len());
+    }
+
+    #[test]
+    fn dag_proof_encoder_rejects_unknown_tags_and_trailing_bytes() {
+        let (problem, prefix) = equality_qbf();
+        let (proof, _) =
+            super::super::quantified_game_dag::build_qbf_game_proof_dag(
+                &problem,
+                &prefix,
+                dag_budget(),
+            )
+            .unwrap();
+        let mut bytes = encode_qbf_game_proof_dag(&proof, encoding_budget()).unwrap();
+        bytes.push(0);
+        assert!(matches!(
+            decode_qbf_game_proof_dag(&bytes, dag_budget(), encoding_budget()),
+            Err(StrategyPortfolioError::ProofEncodingTrailingBytes { .. })
+        ));
+    }
+
+    #[test]
+    fn dag_evidence_portfolio_rejects_wrong_candidate_value() {
+        let (problem, prefix) = equality_qbf();
+        let mut candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
+        candidate.value = false;
+        let (proof, _) =
+            super::super::quantified_game_dag::build_qbf_game_proof_dag(
+                &problem,
+                &prefix,
+                dag_budget(),
+            )
+            .unwrap();
+        assert!(matches!(
+            verify_and_compile_qbf_dag_evidence_portfolio(
+                &problem,
+                &prefix,
+                &proof,
+                &candidate,
+                qbf_budget(),
+                dag_budget(),
+                bdd_budget(),
+                aig_budget(),
+                encoding_budget(),
+            ),
+            Err(StrategyPortfolioError::GameDagResultMismatch { .. })
+        ));
     }
 
     #[test]
