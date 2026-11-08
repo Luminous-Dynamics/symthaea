@@ -445,8 +445,8 @@ pub fn gaussian_predictive_kl_nats(
     let standardized_difference = mean_difference / right_sigma;
     let ratio_squared = sigma_ratio * sigma_ratio;
     let difference_squared = standardized_difference * standardized_difference;
-    let value = right_sigma.ln() - left_sigma.ln()
-        + 0.5 * (ratio_squared + difference_squared - 1.0);
+    let value =
+        right_sigma.ln() - left_sigma.ln() + 0.5 * (ratio_squared + difference_squared - 1.0);
 
     if !left_sigma.is_finite()
         || !right_sigma.is_finite()
