@@ -189,6 +189,8 @@ impl OccupationFlowLayout {
 pub struct VerifiedOccupationFlowOptimum {
     pub source_model_sha256: [u8; 32],
     pub compiled_lp_sha256: [u8; 32],
+    /// SHA-256 of the exact source-bound primal/dual witness.
+    pub certificate_sha256: [u8; 32],
     pub lp_objective: CheckedRational,
     pub utility: CheckedRational,
 }
@@ -202,11 +204,27 @@ pub struct OccupationFlowCertificate {
     pub primal_dual: PrimalDualCertificate,
 }
 
+impl OccupationFlowCertificate {
+    /// Versioned SHA-256 identity of this exact source-bound primal/dual proof.
+    ///
+    /// The encoding binds both model/LP identities, vector lengths and every
+    /// normalized rational numerator/denominator in primal then dual order.
+    pub fn sha256(&self) -> [u8; 32] {
+        canonical_primal_dual_certificate_sha256(
+            self.source_model_sha256,
+            self.compiled_lp_sha256,
+            &self.primal_dual,
+        )
+    }
+}
+
 /// Verified original-utility bracket for maximize or minimize queries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerifiedOccupationFlowGap {
     pub source_model_sha256: [u8; 32],
     pub compiled_lp_sha256: [u8; 32],
+    /// SHA-256 of the exact source-bound primal/dual witness.
+    pub certificate_sha256: [u8; 32],
     pub lower_utility: CheckedRational,
     pub upper_utility: CheckedRational,
     pub absolute_gap: CheckedRational,
@@ -342,6 +360,11 @@ impl OccupationFlowLp {
         Ok(VerifiedOccupationFlowOptimum {
             source_model_sha256: self.source_model_sha256,
             compiled_lp_sha256: self.compiled_lp_sha256,
+            certificate_sha256: canonical_primal_dual_certificate_sha256(
+                self.source_model_sha256,
+                self.compiled_lp_sha256,
+                certificate,
+            ),
             lp_objective: objective,
             utility: self.utility_from_lp_objective(objective)?,
         })
@@ -371,6 +394,11 @@ impl OccupationFlowLp {
         Ok(VerifiedOccupationFlowGap {
             source_model_sha256: self.source_model_sha256,
             compiled_lp_sha256: self.compiled_lp_sha256,
+            certificate_sha256: canonical_primal_dual_certificate_sha256(
+                self.source_model_sha256,
+                self.compiled_lp_sha256,
+                certificate,
+            ),
             lower_utility,
             upper_utility,
             absolute_gap,
@@ -834,6 +862,27 @@ pub fn build_occupation_flow_lp(
         source_model_sha256,
         compiled_lp_sha256,
     })
+}
+
+/// Versioned canonical SHA-256 identity of an exact primal/dual certificate.
+pub fn canonical_primal_dual_certificate_sha256(
+    source_model_sha256: [u8; 32],
+    compiled_lp_sha256: [u8; 32],
+    certificate: &PrimalDualCertificate,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-OCCUPATION-CERTIFICATE\\0\\x01");
+    hasher.update(source_model_sha256);
+    hasher.update(compiled_lp_sha256);
+    hasher.update((certificate.primal.len() as u64).to_le_bytes());
+    for value in &certificate.primal {
+        hash_rational(&mut hasher, *value);
+    }
+    hasher.update((certificate.dual.len() as u64).to_le_bytes());
+    for value in &certificate.dual {
+        hash_rational(&mut hasher, *value);
+    }
+    hasher.finalize().into()
 }
 
 /// Versioned canonical SHA-256 identity of a stagewise interval model.
@@ -1556,6 +1605,45 @@ mod tests {
                 limit: 217,
             })
         );
+    }
+
+
+    #[test]
+    fn verified_optimum_binds_exact_primal_dual_certificate_digest() {
+        let model = fixture();
+        let scores = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let built = build_occupation_flow_lp(
+            &model,
+            &scores,
+            UtilityDirection::Maximize,
+            budget(84),
+        ).unwrap();
+        let certificate = built.bind_certificate(PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,32,25),(2,9,5),(4,1,2),(6,9,5),(8,1,2),(10,9,5),(15,13,10),(26,1,1),(31,1,1),(35,1,1)],
+            ),
+        });
+        let verified = built.verify_bound_optimality(&certificate).unwrap();
+        assert_eq!(verified.utility, q(32, 25));
+        assert_eq!(verified.certificate_sha256, certificate.sha256());
+        assert_eq!(
+            sha256_hex(verified.certificate_sha256),
+            "PLACEHOLDER_CERT_SHA256"
+        );
+
+        let mut changed = certificate.clone();
+        changed.primal_dual.primal[2] = q(3, 5);
+        assert_ne!(changed.sha256(), certificate.sha256());
+        assert!(built.verify_bound_optimality(&changed).is_err());
     }
 
     #[test]
