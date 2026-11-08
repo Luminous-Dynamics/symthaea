@@ -1,0 +1,84 @@
+name: Connectome as-of filtration admission contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/connectome-asof-filtration/**"
+      - "docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.md"
+      - "docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json"
+      - ".github/workflows/connectome-asof-filtration-admission.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectome-asof-filtration/**"
+      - "docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.md"
+      - "docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json"
+      - ".github/workflows/connectome-asof-filtration-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-asof-filtration:
+    name: Validate as-of ledger and filtration admission
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Validate schema and independent as-of oracle
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_ASOF_FILTRATION_ADMISSION_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          entries = fixture["entries"]
+          evidence_prefix = []
+          decisions = []
+          for entry in entries:
+              if entry["kind"] == "EVIDENCE":
+                  evidence_prefix.append(entry["payload"]["event_id"])
+              elif entry["kind"] == "DECISION":
+                  decision = entry["payload"]
+                  assert decision["available_event_ids"] == evidence_prefix
+                  assert set(decision["consumed_event_ids"]).issubset(set(evidence_prefix))
+                  decisions.append(decision)
+          assert [d["decision_id"] for d in decisions] == ["D1", "D2"]
+          assert decisions[0]["consumed_event_ids"] == ["S1"]
+          assert decisions[1]["consumed_event_ids"] == ["S1", "T7"]
+          assert next(e["payload"] for e in entries if e["kind"] == "EVIDENCE" and e["payload"]["event_id"] == "T7")["event_time_ms"] < 100
+          assert fixture["oracle_expectations"]["decision_statuses"] == ["ACCEPTED", "ACCEPTED"]
+          assert fixture["oracle_expectations"]["admission_statuses"] == ["ADMITTED_DIRECT_GLOBAL", "NOT_COMBINABLE_LOCAL_ONLY", "ADMITTED_AFTER_LIFT"]
+          event_sequence = {
+              entry["payload"]["event_id"]: entry["sequence"]
+              for entry in entries if entry["kind"] == "EVIDENCE"
+          }
+          for admission in fixture["admissions"]:
+              assert all(event_sequence[event_id] < admission["process_output_sequence"]
+                         for event_id in admission["observed_event_ids"])
+              if admission["mode"] == "ADJUSTER_LIFTED":
+                  adjuster = admission["adjuster"]
+                  assert adjuster["source_process_sha256"] == admission["input_process_sha256"]
+                  assert adjuster["source_filtration_sha256"] == admission["source_filtration_sha256"]
+                  assert adjuster["target_filtration_sha256"] == admission["target_filtration_sha256"]
+                  assert adjuster["lifted_output_sha256"] == admission["output_process_sha256"]
+                  assert adjuster["theorem_assumptions_sha256"] == admission["assumption_sha256"]
+          print("as-of filtration schema/prefix oracle: PASS")
+          PY
+      - name: Format standalone Rust crate
+        run: cargo fmt --manifest-path tools/connectome-asof-filtration/Cargo.toml -- --check
+      - name: Test standalone Rust crate
+        run: cargo test --manifest-path tools/connectome-asof-filtration/Cargo.toml --locked

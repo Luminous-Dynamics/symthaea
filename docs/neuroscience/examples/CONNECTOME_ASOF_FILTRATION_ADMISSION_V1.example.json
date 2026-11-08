@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "claim_scope": "synthetic_known_truth",
+  "campaign_id": "campaign-1",
+  "global_filtration_id": "connectome-global-v1",
+  "global_filtration_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "entries": [
+    {
+      "sequence": 1,
+      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "kind": "EVIDENCE",
+      "payload": {
+        "event_id": "S1",
+        "evidence_family_id": "structural",
+        "source_stream": "structural-em",
+        "source_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "revision": 0,
+        "supersedes_event_id": null,
+        "event_time_ms": 100,
+        "acquired_at_ms": 101,
+        "annotated_at_ms": 102,
+        "qc_at_ms": 103,
+        "availability_state": "APPROVED",
+        "split": "FIT",
+        "confirmatory_family_id": null
+      }
+    },
+    {
+      "sequence": 2,
+      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "kind": "DECISION",
+      "payload": {
+        "decision_id": "D1",
+        "campaign_id": "campaign-1",
+        "kind": "DISCOVERY",
+        "policy_version_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "input_prefix_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "driver_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "history_prefix_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "action_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "feasibility_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "available_event_ids": [
+          "S1"
+        ],
+        "consumed_event_ids": [
+          "S1"
+        ],
+        "confirmatory_family_id": null
+      }
+    },
+    {
+      "sequence": 3,
+      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "kind": "EVIDENCE",
+      "payload": {
+        "event_id": "T7",
+        "evidence_family_id": "behaviour-trial-7",
+        "source_stream": "behaviour-kinematics",
+        "source_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "revision": 0,
+        "supersedes_event_id": null,
+        "event_time_ms": 90,
+        "acquired_at_ms": 91,
+        "annotated_at_ms": 110,
+        "qc_at_ms": 111,
+        "availability_state": "APPROVED",
+        "split": "EXPLORATION",
+        "confirmatory_family_id": null
+      }
+    },
+    {
+      "sequence": 4,
+      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "kind": "DECISION",
+      "payload": {
+        "decision_id": "D2",
+        "campaign_id": "campaign-1",
+        "kind": "DISCOVERY",
+        "policy_version_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "input_prefix_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "driver_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "history_prefix_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "action_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "feasibility_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "available_event_ids": [
+          "S1",
+          "T7"
+        ],
+        "consumed_event_ids": [
+          "S1",
+          "T7"
+        ],
+        "confirmatory_family_id": null
+      }
+    },
+    {
+      "sequence": 5,
+      "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "kind": "EVIDENCE",
+      "payload": {
+        "event_id": "T8-failed",
+        "evidence_family_id": "behaviour-trial-8",
+        "source_stream": "behaviour-kinematics",
+        "source_artifact_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "revision": 0,
+        "supersedes_event_id": null,
+        "event_time_ms": 105,
+        "acquired_at_ms": 106,
+        "annotated_at_ms": 107,
+        "qc_at_ms": 108,
+        "availability_state": "FAILED",
+        "split": "EXPLORATION",
+        "confirmatory_family_id": null
+      }
+    }
+  ],
+  "admissions": [
+    {
+      "campaign_id": "campaign-1",
+      "process_id": "P-S",
+      "null_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "input_process_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "output_process_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_filtration_id": "connectome-global-v1",
+      "source_filtration_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "target_filtration_id": "connectome-global-v1",
+      "target_filtration_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "observed_event_ids": [
+        "S1",
+        "T7"
+      ],
+      "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+      "proof_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "assumption_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "adjuster": null,
+      "process_output_sequence": 4
+    },
+    {
+      "campaign_id": "campaign-1",
+      "process_id": "P-T-local",
+      "null_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "input_process_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "output_process_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_filtration_id": "behaviour-local-v1",
+      "source_filtration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "target_filtration_id": "connectome-global-v1",
+      "target_filtration_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "observed_event_ids": [
+        "T7"
+      ],
+      "mode": "LOCAL_ONLY",
+      "proof_receipt_sha256": null,
+      "assumption_sha256": null,
+      "adjuster": null,
+      "process_output_sequence": 4
+    },
+    {
+      "campaign_id": "campaign-1",
+      "process_id": "P-T-lifted",
+      "null_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "input_process_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "output_process_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_filtration_id": "behaviour-local-v1",
+      "source_filtration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "target_filtration_id": "connectome-global-v1",
+      "target_filtration_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "observed_event_ids": [
+        "T7"
+      ],
+      "mode": "ADJUSTER_LIFTED",
+      "proof_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "assumption_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "adjuster": {
+        "adjuster_id": "reviewed-adjuster",
+        "adjuster_version": "1",
+        "parameter_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "theorem_assumptions_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "lifted_output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "source_process_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_filtration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "target_filtration_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "process_output_sequence": 4
+    }
+  ],
+  "oracle_expectations": {
+    "decision_statuses": [
+      "ACCEPTED",
+      "ACCEPTED"
+    ],
+    "admission_statuses": [
+      "ADMITTED_DIRECT_GLOBAL",
+      "NOT_COMBINABLE_LOCAL_ONLY",
+      "ADMITTED_AFTER_LIFT"
+    ],
+    "final_sequence": 5
+  }
+}
