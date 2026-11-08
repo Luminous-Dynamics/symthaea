@@ -52,16 +52,24 @@ pub fn validate_values(schema: &Value, instance: &Value) -> Result<(), Vec<Strin
 }
 
 pub fn validate_traffic_files(schema_path: &Path, fixture_path: &Path) -> Result<(), Vec<String>> {
-    let schema_text = fs::read_to_string(schema_path)
-        .map_err(|error| vec![format!("read traffic schema {}: {error}", schema_path.display())])?;
+    let schema_text = fs::read_to_string(schema_path).map_err(|error| {
+        vec![format!(
+            "read traffic schema {}: {error}",
+            schema_path.display()
+        )]
+    })?;
     let fixture_text = fs::read_to_string(fixture_path).map_err(|error| {
         vec![format!(
             "read traffic fixture {}: {error}",
             fixture_path.display()
         )]
     })?;
-    let schema: Value = serde_json::from_str(&schema_text)
-        .map_err(|error| vec![format!("parse traffic schema {}: {error}", schema_path.display())])?;
+    let schema: Value = serde_json::from_str(&schema_text).map_err(|error| {
+        vec![format!(
+            "parse traffic schema {}: {error}",
+            schema_path.display()
+        )]
+    })?;
     let fixture: Value = serde_json::from_str(&fixture_text).map_err(|error| {
         vec![format!(
             "parse traffic fixture {}: {error}",
@@ -186,7 +194,9 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
                 "paired_scenes[{index}]: declared passing side conflicts with the versioned rule profile"
             ));
         }
-        if scene.get("map_traffic_convention_profile_id") != scene.get("traffic_convention_profile_id") {
+        if scene.get("map_traffic_convention_profile_id")
+            != scene.get("traffic_convention_profile_id")
+        {
             errors.push(format!(
                 "paired_scenes[{index}]: map and scene traffic convention profiles disagree"
             ));
@@ -249,15 +259,19 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
             errors.push(format!("pair {pair_id}: missing traffic profile reference"));
             continue;
         };
-        let (Some(a_profile), Some(b_profile)) =
-            (profile_index.get(a_id), profile_index.get(b_id))
+        let (Some(a_profile), Some(b_profile)) = (profile_index.get(a_id), profile_index.get(b_id))
         else {
             continue;
         };
         let a_side = a_profile.get("traffic_side").and_then(Value::as_str);
         let b_side = b_profile.get("traffic_side").and_then(Value::as_str);
-        if !matches!((a_side, b_side), (Some("left"), Some("right")) | (Some("right"), Some("left"))) {
-            errors.push(format!("pair {pair_id}: traffic_side must flip left <-> right"));
+        if !matches!(
+            (a_side, b_side),
+            (Some("left"), Some("right")) | (Some("right"), Some("left"))
+        ) {
+            errors.push(format!(
+                "pair {pair_id}: traffic_side must flip left <-> right"
+            ));
         }
         if pair[0].get("scenario_family") != pair[1].get("scenario_family") {
             errors.push(format!("pair {pair_id}: scenario families do not match"));
@@ -275,10 +289,7 @@ fn approx_eq(a: Option<f64>, b: Option<f64>, expected: f64) -> bool {
 }
 
 fn number_at(value: Option<&Value>, index: usize) -> Option<f64> {
-    value?
-        .as_array()?
-        .get(index)?
-        .as_f64()
+    value?.as_array()?.get(index)?.as_f64()
 }
 
 fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b: &Value) {
@@ -321,11 +332,7 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
     }
     let a_command = a.get("candidate_command");
     let b_command = b.get("candidate_command");
-    for (field, sign) in [
-        ("steering", -1.0),
-        ("throttle", 1.0),
-        ("brake", 1.0),
-    ] {
+    for (field, sign) in [("steering", -1.0), ("throttle", 1.0), ("brake", 1.0)] {
         let av = a_command
             .and_then(|command| command.get(field))
             .and_then(Value::as_f64);
@@ -361,9 +368,7 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
                         ));
                     }
                 }
-                if a_lane.get("relative_lateral_sign")
-                    == b_lane.get("relative_lateral_sign")
-                {
+                if a_lane.get("relative_lateral_sign") == b_lane.get("relative_lateral_sign") {
                     errors.push(format!(
                         "pair {pair_id}: lane {index} relative lateral sign did not flip"
                     ));
@@ -371,7 +376,9 @@ fn validate_mirrored_pair(errors: &mut Vec<String>, pair_id: &str, a: &Value, b:
             }
         }
     } else {
-        errors.push(format!("pair {pair_id}: lanes must be present in both scenes"));
+        errors.push(format!(
+            "pair {pair_id}: lanes must be present in both scenes"
+        ));
     }
 
     let a_pass = a.get("declared_passing_side_sign").and_then(Value::as_i64);
@@ -824,13 +831,14 @@ mod tests {
             .expect("traffic schema text"),
         )
         .expect("traffic schema JSON");
-        let profiles: Value = serde_json::from_str(
-            &fs::read_to_string(
-                root.join("docs/autonomy/fixtures/SAM_TRAFFIC_CONVENTION_PROFILE_FIXTURE_V0_1.json"),
+        let profiles: Value =
+            serde_json::from_str(
+                &fs::read_to_string(root.join(
+                    "docs/autonomy/fixtures/SAM_TRAFFIC_CONVENTION_PROFILE_FIXTURE_V0_1.json",
+                ))
+                .expect("traffic profile fixture text"),
             )
-            .expect("traffic profile fixture text"),
-        )
-        .expect("traffic profile fixture JSON");
+            .expect("traffic profile fixture JSON");
         let mirrored: Value = serde_json::from_str(
             &fs::read_to_string(
                 root.join("docs/autonomy/fixtures/SAM_TRAFFIC_CONVENTION_METAMORPHIC_V0_1.json"),
@@ -844,8 +852,7 @@ mod tests {
     #[test]
     fn traffic_profile_registry_conforms_to_schema_and_sign_semantics() {
         let (schema, profiles, _) = load_traffic_fixtures();
-        validate_traffic_values(&schema, &profiles)
-            .expect("traffic profile registry must conform");
+        validate_traffic_values(&schema, &profiles).expect("traffic profile registry must conform");
     }
 
     #[test]
@@ -862,18 +869,15 @@ mod tests {
             Value::String("synthetic-rht-lhd-v1".into());
         mirrored["paired_scenes"][0]["map_traffic_convention_profile_id"] =
             Value::String("synthetic-rht-lhd-v1".into());
-        mirrored["paired_scenes"][0]["travel_frame_id"] =
-            Value::String("road-local-rht-v1".into());
+        mirrored["paired_scenes"][0]["travel_frame_id"] = Value::String("road-local-rht-v1".into());
         assert!(validate_traffic_values(&schema, &mirrored).is_err());
     }
 
     #[test]
     fn rejects_untransformed_steering_under_road_reflection() {
         let (schema, _, mut mirrored) = load_traffic_fixtures();
-        mirrored["paired_scenes"][1]["ego_state"]["steering_angle_rad"] =
-            Value::from(0.1);
-        mirrored["paired_scenes"][1]["candidate_command"]["steering"] =
-            Value::from(0.2);
+        mirrored["paired_scenes"][1]["ego_state"]["steering_angle_rad"] = Value::from(0.1);
+        mirrored["paired_scenes"][1]["candidate_command"]["steering"] = Value::from(0.2);
         assert!(validate_traffic_values(&schema, &mirrored).is_err());
     }
 
