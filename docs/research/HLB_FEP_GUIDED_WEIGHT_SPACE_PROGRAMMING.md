@@ -146,7 +146,7 @@ The implementation currently supports independent diagonal-Gaussian coordinates.
 
 The intended combination is: prospective action selection evaluates the expected information in possible outcomes; after observing an outcome, the posterior is updated and BMR can compare prior-restricted model structures. Do not add BMR log evidence ratios to mutual information as though they were independent reward terms. They operate at different stages and answer different questions.
 
-Future work should provide a canonical digest-construction helper over native manifests/configuration (the present function requires callers to supply a digest), add correlated Gaussian priors/posteriors, and prove numerical stability against Cholesky-based reference calculations. Only then should the operator become part of an FEP model-structure adapter.
+The branch now provides `canonical_parameterization_digest` and a versioned `ParameterizationDescriptor` over architecture identity, ordered parameter-group IDs/roles, tensor shapes, and every flattened coordinate name. It uses domain-separated, length-prefixed SHA-256 encoding and rejects duplicate IDs/coordinates, zero or overflowing shapes, and coordinate-count mismatches. Native CfC/HDC adapters still need to derive these descriptors directly from their canonical manifests rather than asking callers to supply them manually. Future work should add correlated Gaussian priors/posteriors and numerical stability comparisons against Cholesky-based reference calculations. Only then should the operator become part of a production FEP model-structure adapter.
 
 ### 2.3.2 Dirichlet BMR for categorical active-inference models
 
