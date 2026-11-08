@@ -1370,6 +1370,79 @@ mod tests {
     }
 
     #[test]
+    fn certificate_replay_enforces_entry_memory_and_work_budgets() {
+        let model = fixture();
+        let scores = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let make_proof = || PrimalDualCertificate {
+            primal: sparse_vector(
+                14,
+                &[(0,1,1),(2,2,5),(3,3,5),(4,8,25),(5,17,25),(6,2,5),(7,3,5),(10,1,5),(11,1,5),(12,3,25),(13,12,25)],
+            ),
+            dual: sparse_vector(
+                36,
+                &[(0,32,25),(2,9,5),(4,1,2),(6,9,5),(8,1,2),(10,9,5),(15,13,10),(26,1,1),(31,1,1),(35,1,1)],
+            ),
+        };
+
+        // Primal + dual vectors contain 14 + 36 = 50 rational entries.
+        let mut entry_budget = budget(504);
+        entry_budget.max_certificate_entries = 49;
+        let entry_lp = build_occupation_flow_lp(
+            &model, &scores, UtilityDirection::Maximize, entry_budget,
+        ).unwrap();
+        let entry_certificate = entry_lp.bind_certificate(make_proof());
+        assert_eq!(
+            entry_lp.verify_bound_optimality(&entry_certificate),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "certificate rational entries",
+                required: 50,
+                limit: 49,
+            })
+        );
+
+        let proof = make_proof();
+        let estimated_bytes =
+            (proof.primal.capacity() + proof.dual.capacity())
+                * std::mem::size_of::<CheckedRational>()
+            + std::mem::size_of::<PrimalDualCertificate>();
+        let mut memory_budget = budget(504);
+        memory_budget.max_certificate_memory_bytes = estimated_bytes - 1;
+        let memory_lp = build_occupation_flow_lp(
+            &model, &scores, UtilityDirection::Maximize, memory_budget,
+        ).unwrap();
+        let memory_certificate = memory_lp.bind_certificate(proof);
+        assert_eq!(
+            memory_lp.verify_bound_optimality(&memory_certificate),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "estimated certificate memory bytes",
+                required: estimated_bytes,
+                limit: estimated_bytes - 1,
+            })
+        );
+
+        // Exact replay requires 2*m*n + m + n = 1,058 rational
+        // multiply/add terms for this 36-row, 14-column LP.
+        let mut work_budget = budget(504);
+        work_budget.max_verifier_multiply_adds = 1_057;
+        let work_lp = build_occupation_flow_lp(
+            &model, &scores, UtilityDirection::Maximize, work_budget,
+        ).unwrap();
+        let work_certificate = work_lp.bind_certificate(make_proof());
+        assert_eq!(
+            work_lp.verify_bound_optimality(&work_certificate),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "primal-dual verifier multiply-add work",
+                required: 1_058,
+                limit: 1_057,
+            })
+        );
+    }
+
+    #[test]
     fn rejects_infeasible_interval_rows_and_invalid_dimensions() {
         let infeasible = StagewiseIntervalMarkovModel::new(
             vec![q(1, 1), q(0, 1)],
@@ -1424,6 +1497,9 @@ mod tests {
             max_constraints: 36,
             max_matrix_entries: 504,
             max_rational_bit_width: 3,
+            max_certificate_entries: 64,
+            max_certificate_memory_bytes: 1_000_000,
+            max_verifier_multiply_adds: 100_000,
         };
         assert_eq!(
             build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize, tight),
