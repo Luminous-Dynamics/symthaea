@@ -25,7 +25,10 @@ impl AigLiteral {
     pub const TRUE: Self = Self::Constant(true);
 
     pub const fn node(index: usize) -> Self {
-        Self::Node { index, inverted: false }
+        Self::Node {
+            index,
+            inverted: false,
+        }
     }
 
     pub const fn not(self) -> Self {
@@ -42,8 +45,14 @@ impl AigLiteral {
         match (self, other) {
             (Self::Constant(left), Self::Constant(right)) => left != right,
             (
-                Self::Node { index: left_index, inverted: left_inverted },
-                Self::Node { index: right_index, inverted: right_inverted },
+                Self::Node {
+                    index: left_index,
+                    inverted: left_inverted,
+                },
+                Self::Node {
+                    index: right_index,
+                    inverted: right_inverted,
+                },
             ) => left_index == right_index && left_inverted != right_inverted,
             _ => false,
         }
@@ -90,38 +99,98 @@ impl Default for StrategyAigBudget {
 /// Structural, semantic and resource failures for strategy AIGs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StrategyAigError {
-    DependencyBudgetExceeded { required: usize, limit: usize },
-    TruthTableBudgetExceeded { required: u128, limit: u128 },
-    AndNodeBudgetExceeded { required: usize, limit: usize },
-    AssignmentBudgetExceeded { required: u128, limit: u128 },
-    AssignmentSpaceOverflow { dependency_count: usize },
-    TruthTableEntryCountMismatch { expected: u128, actual: usize },
-    TruthTableKeyWidthMismatch { expected: usize, actual: usize },
-    MissingTruthTableRow { key: Vec<bool> },
-    DependencyScopeMismatch { expected: Vec<usize>, actual: Vec<usize> },
-    DependencyOrderLengthMismatch { expected: usize, actual: usize },
+    DependencyBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    TruthTableBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    AndNodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    AssignmentBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    AssignmentSpaceOverflow {
+        dependency_count: usize,
+    },
+    TruthTableEntryCountMismatch {
+        expected: u128,
+        actual: usize,
+    },
+    TruthTableKeyWidthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    MissingTruthTableRow {
+        key: Vec<bool>,
+    },
+    DependencyScopeMismatch {
+        expected: Vec<usize>,
+        actual: Vec<usize>,
+    },
+    DependencyOrderLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
     DependencyOrderIndexOutOfRange {
         position: usize,
         dependency_index: usize,
         dependency_count: usize,
     },
-    DuplicateDependencyOrderIndex { dependency_index: usize },
-    DuplicateSemanticDependency { dependency: usize },
-    InputNodeCountMismatch { expected: usize, actual: usize },
+    DuplicateDependencyOrderIndex {
+        dependency_index: usize,
+    },
+    DuplicateSemanticDependency {
+        dependency: usize,
+    },
+    InputNodeCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     InputNodePositionMismatch {
         node_index: usize,
         expected_dependency: usize,
         actual_dependency: usize,
     },
-    AndNodeBeforeAllInputs { node_index: usize, input_count: usize },
-    NonCanonicalAndNode { node_index: usize },
-    ConstantAndInputNotReduced { node_index: usize },
-    DuplicateAndNode { node_index: usize, earlier_node: usize },
-    ChildNodeOutOfRange { parent: usize, child: usize, node_count: usize },
-    NonTopologicalEdge { parent: usize, child: usize },
-    OutputNodeOutOfRange { node: usize, node_count: usize },
-    UnreachableAndNode { node_index: usize },
-    AssignmentWidthMismatch { expected: usize, actual: usize },
+    AndNodeBeforeAllInputs {
+        node_index: usize,
+        input_count: usize,
+    },
+    NonCanonicalAndNode {
+        node_index: usize,
+    },
+    ConstantAndInputNotReduced {
+        node_index: usize,
+    },
+    DuplicateAndNode {
+        node_index: usize,
+        earlier_node: usize,
+    },
+    ChildNodeOutOfRange {
+        parent: usize,
+        child: usize,
+        node_count: usize,
+    },
+    NonTopologicalEdge {
+        parent: usize,
+        child: usize,
+    },
+    OutputNodeOutOfRange {
+        node: usize,
+        node_count: usize,
+    },
+    UnreachableAndNode {
+        node_index: usize,
+    },
+    AssignmentWidthMismatch {
+        expected: usize,
+        actual: usize,
+    },
     SemanticMismatch {
         assignment: Vec<bool>,
         truth_table_value: bool,
@@ -142,19 +211,22 @@ pub struct StrategyAigReport {
 }
 
 fn canonical_pair(left: AigLiteral, right: AigLiteral) -> (AigLiteral, AigLiteral) {
-    if left <= right { (left, right) } else { (right, left) }
+    if left <= right {
+        (left, right)
+    } else {
+        (right, left)
+    }
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, StrategyAigError> {
-    let shift = u32::try_from(exponent)
-        .map_err(|_| StrategyAigError::AssignmentSpaceOverflow {
+    let shift = u32::try_from(exponent).map_err(|_| StrategyAigError::AssignmentSpaceOverflow {
+        dependency_count: exponent,
+    })?;
+    1u128
+        .checked_shl(shift)
+        .ok_or(StrategyAigError::AssignmentSpaceOverflow {
             dependency_count: exponent,
-        })?;
-    1u128.checked_shl(shift).ok_or(
-        StrategyAigError::AssignmentSpaceOverflow {
-            dependency_count: exponent,
-        },
-    )
+        })
 }
 
 fn validate_function(
@@ -218,9 +290,7 @@ fn validate_decomposition_order(
             });
         }
         if seen[dependency_index] {
-            return Err(StrategyAigError::DuplicateDependencyOrderIndex {
-                dependency_index,
-            });
+            return Err(StrategyAigError::DuplicateDependencyOrderIndex { dependency_index });
         }
         seen[dependency_index] = true;
     }
@@ -251,11 +321,7 @@ impl AigBuilder {
         AigLiteral::node(dependency_index)
     }
 
-    fn and(
-        &mut self,
-        left: AigLiteral,
-        right: AigLiteral,
-    ) -> Result<AigLiteral, StrategyAigError> {
+    fn and(&mut self, left: AigLiteral, right: AigLiteral) -> Result<AigLiteral, StrategyAigError> {
         match (left, right) {
             (AigLiteral::Constant(false), _) | (_, AigLiteral::Constant(false)) => {
                 return Ok(AigLiteral::FALSE);
@@ -293,11 +359,7 @@ impl AigBuilder {
         Ok(AigLiteral::node(index))
     }
 
-    fn or(
-        &mut self,
-        left: AigLiteral,
-        right: AigLiteral,
-    ) -> Result<AigLiteral, StrategyAigError> {
+    fn or(&mut self, left: AigLiteral, right: AigLiteral) -> Result<AigLiteral, StrategyAigError> {
         Ok(self.and(left.not(), right.not())?.not())
     }
 }
@@ -391,7 +453,8 @@ pub fn validate_strategy_aig(
         }
     }
 
-    let input_count = aig.nodes
+    let input_count = aig
+        .nodes
         .iter()
         .take_while(|node| matches!(node, AigNode::Input { .. }))
         .count();
@@ -496,7 +559,10 @@ pub fn validate_strategy_aig(
         reachable[index] = true;
         if let AigNode::And { left, right } = aig.nodes[index] {
             for child in [left, right] {
-                if let AigLiteral::Node { index: child_index, .. } = child {
+                if let AigLiteral::Node {
+                    index: child_index, ..
+                } = child
+                {
                     pending.push(child_index);
                 }
             }
@@ -514,12 +580,12 @@ fn evaluate_literal(values: &[bool], literal: AigLiteral) -> Result<bool, Strate
     match literal {
         AigLiteral::Constant(value) => Ok(value),
         AigLiteral::Node { index, inverted } => {
-            let value = *values.get(index).ok_or(
-                StrategyAigError::OutputNodeOutOfRange {
+            let value = *values
+                .get(index)
+                .ok_or(StrategyAigError::OutputNodeOutOfRange {
                     node: index,
                     node_count: values.len(),
-                },
-            )?;
+                })?;
             Ok(if inverted { !value } else { value })
         }
     }
@@ -584,9 +650,7 @@ pub fn verify_aig_matches_strategy_function(
             .map(|index| ((mask >> index) & 1) != 0)
             .collect();
         let Some(&truth_table_value) = function.table.get(&assignment) else {
-            return Err(StrategyAigError::MissingTruthTableRow {
-                key: assignment,
-            });
+            return Err(StrategyAigError::MissingTruthTableRow { key: assignment });
         };
         let aig_value = evaluate_validated_aig(aig, &assignment)?;
         if truth_table_value != aig_value {
@@ -598,10 +662,14 @@ pub fn verify_aig_matches_strategy_function(
         }
     }
 
-    let and_nodes = aig.nodes.iter()
+    let and_nodes = aig
+        .nodes
+        .iter()
         .filter(|node| matches!(node, AigNode::And { .. }))
         .count();
-    let complemented_edges = aig.nodes.iter()
+    let complemented_edges = aig
+        .nodes
+        .iter()
         .map(|node| match node {
             AigNode::Input { .. } => 0,
             AigNode::And { left, right } => {
@@ -610,7 +678,10 @@ pub fn verify_aig_matches_strategy_function(
             }
         })
         .sum::<usize>()
-        + usize::from(matches!(aig.output, AigLiteral::Node { inverted: true, .. }));
+        + usize::from(matches!(
+            aig.output,
+            AigLiteral::Node { inverted: true, .. }
+        ));
 
     Ok(StrategyAigReport {
         dependency_count: function.dependencies.len(),
@@ -748,13 +819,14 @@ mod tests {
     fn validator_rejects_non_topological_children() {
         let source = function(&[0, 1], &[false, true, true, false]);
         let mut aig = compile_strategy_function_to_aig(&source, budget()).unwrap();
-        let and_index = aig.nodes
+        let and_index = aig
+            .nodes
             .iter()
             .position(|node| matches!(node, AigNode::And { .. }))
             .unwrap();
         aig.nodes[and_index] = AigNode::And {
-            left: AigLiteral::node(aig.nodes.len()),
-            right: AigLiteral::FALSE,
+            left: AigLiteral::node(0),
+            right: AigLiteral::node(and_index + 1),
         };
         assert!(matches!(
             validate_strategy_aig(&aig, budget()),
