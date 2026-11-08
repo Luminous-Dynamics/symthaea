@@ -11,10 +11,12 @@
 //! The 20-channel "Sensory Schema":
 //! - Proprioceptive Core (14): physics state from the bicycle model
 //! - Road Vector (2): lateral_offset, curvature_ahead
-//! - Swarm Vector (4): nearest_peer_distance, peer_relative_speed, mesh_brake_density, mesh_confidence
+//! - Simulation-only peer vector (4): delayed simulator-oracle gap/speed/braking/attenuation
 //!
-//! `mesh_brake_density` gets the highest weight (3.0x) — if the swarm slams on the brakes
-//! five cars ahead, that signal physically overpowers the accelerator in hyperdimensional space.
+//! This encoder is used by the vehicle research/training harness. Its peer channels are
+//! populated from synthetic simulator state, not from a local sensor tracker or remote V2X
+//! messages. A deployment path must use separately admitted scene evidence and must not
+//! treat these legacy compatibility channels as production perception or trust.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -45,10 +47,10 @@ struct ChannelGroup {
 /// | Pitch              | [13]      | 1     | 0.8    | Weight transfer indicator          |
 /// | Road: lateral off  | [14]      | 1     | 2.0    | Lane position reference            |
 /// | Road: curvature    | [15]      | 1     | 1.5    | Anticipatory steering              |
-/// | Mesh: peer dist    | [16]      | 1     | 1.5    | Proximity awareness                |
-/// | Mesh: peer speed   | [17]      | 1     | 1.5    | Closing rate                       |
-/// | Mesh: brake dens.  | [18]      | 1     | 3.0    | SUPREME: swarm emergency broadcast |
-/// | Mesh: confidence   | [19]      | 1     | 1.0    | Signal quality (meta)              |
+/// | Sim: peer dist     | [16]      | 1     | 1.5    | Synthetic oracle proximity          |
+/// | Sim: peer speed    | [17]      | 1     | 1.5    | Synthetic oracle closing rate       |
+/// | Sim: brake dens.   | [18]      | 1     | 3.0    | Synthetic oracle brake state        |
+/// | Sim: attenuation   | [19]      | 1     | 1.0    | Distance attenuation proxy          |
 const CHANNEL_GROUPS: [ChannelGroup; 16] = [
     ChannelGroup {
         start: 0,
@@ -114,22 +116,22 @@ const CHANNEL_GROUPS: [ChannelGroup; 16] = [
         start: 16,
         count: 1,
         weight: 1.5,
-    }, // mesh: peer distance
+    }, // simulator oracle: peer distance
     ChannelGroup {
         start: 17,
         count: 1,
         weight: 1.5,
-    }, // mesh: peer relative speed
+    }, // simulator oracle: peer relative speed
     ChannelGroup {
         start: 18,
         count: 1,
         weight: 3.0,
-    }, // mesh: brake density (SUPREME)
+    }, // simulator oracle: brake density (training only)
     ChannelGroup {
         start: 19,
         count: 1,
         weight: 1.0,
-    }, // mesh: confidence
+    }, // simulator oracle: distance attenuation proxy
 ];
 
 /// Channel normalization ranges [min, max].
@@ -156,7 +158,7 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_STATE_CHANNELS] = [
     [0.0, 200.0],  // nearest_peer_distance (m)
     [-30.0, 30.0], // peer_relative_speed (m/s)
     [0.0, 1.0],    // mesh_brake_density (fraction)
-    [0.0, 1.0],    // mesh_confidence (fraction)
+    [0.0, 1.0],    // legacy distance attenuation proxy (not confidence)
 ];
 
 /// HDC encoder for vehicle sensor state.
