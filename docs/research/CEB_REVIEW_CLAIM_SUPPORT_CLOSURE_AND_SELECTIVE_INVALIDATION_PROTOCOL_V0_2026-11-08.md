@@ -144,7 +144,7 @@ The six cases cover:
 - authority-root revocation;
 - metadata-only event plus incomplete closure.
 
-The cases are public synthetic development material, not admitted task sequences, hidden labels or a sealed holdout.
+The cases are public synthetic development material, not admitted task sequences or hidden labels. They are not a sealed holdout.
 
 ## 7. Development experiment
 
