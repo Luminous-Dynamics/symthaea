@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Static authoring validator for the CEB branch-aware continuity development pack.
+"""Static authoring validator for the CEB branch-aware continuity pack.
 
-This validates public documentation structure and claim boundaries only. It does not
-parse Git repositories, compute merge bases, construct repository graphs, evaluate
-candidate agents, execute code, or establish evidence validity.
+This checks documentation structure and claim boundaries only. It does not parse Git
+history, construct repository graphs, evaluate candidates, or establish evidence validity.
 """
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ from pathlib import Path
 PROTOCOL = "docs/research/CEB_BRANCH_AWARE_EVIDENCE_CONTINUITY_PROTOCOL_V0_2026-11-08.md"
 CHALLENGE = "docs/research/CEB_BRANCH_AWARE_EVIDENCE_CONTINUITY_CHALLENGE_V0_2026-11-08.md"
 KEY = "docs/research/CEB_BRANCH_AWARE_EVIDENCE_CONTINUITY_KEY_V0_2026-11-08.md"
+WORKSHEET = "docs/research/CEB_BRANCH_AWARE_EVIDENCE_CONTINUITY_ANNOTATION_WORKSHEET_V0_2026-11-08.md"
 CASE_IDS = [f"BHC-S{i:02d}" for i in range(1, 9)]
 CASE_MARKERS = {
     "BHC-S01": ("fork", "branch-local"),
@@ -50,20 +50,25 @@ def extract_blocks(text: str, pattern: str) -> tuple[list[str], list[str]]:
     return ids, blocks
 
 
-def validate(protocol: str, challenge: str, key: str) -> list[str]:
+def validate(protocol: str, challenge: str, key: str, worksheet: str) -> list[str]:
     errors: list[str] = []
     challenge_ids, challenge_blocks = extract_blocks(challenge, r"^## (BHC-S\d{2})\b")
     key_ids, key_blocks = extract_blocks(key, r"^## \d+\. (BHC-S\d{2})\b")
-    if challenge_ids != CASE_IDS:
-        errors.append(f"challenge cases must be BHC-S01..BHC-S08 in order; got {challenge_ids}")
-    if key_ids != CASE_IDS:
-        errors.append(f"key cases must be BHC-S01..BHC-S08 in order; got {key_ids}")
+    worksheet_ids, worksheet_blocks = extract_blocks(worksheet, r"^## (BHC-S\d{2})\b")
+
+    for label, observed in (
+        ("challenge", challenge_ids), ("key", key_ids), ("worksheet", worksheet_ids)
+    ):
+        if observed != CASE_IDS:
+            errors.append(f"{label} cases must be BHC-S01..BHC-S08 in order; got {observed}")
 
     challenge_map = dict(zip(challenge_ids, challenge_blocks))
     key_map = dict(zip(key_ids, key_blocks))
+    worksheet_map = dict(zip(worksheet_ids, worksheet_blocks))
     for case_id in CASE_IDS:
         challenge_block = challenge_map.get(case_id, "")
         key_block = key_map.get(case_id, "")
+        worksheet_block = worksheet_map.get(case_id, "")
         for phrase in ("Initial state:", "Branch events:", "Claims:", "Agent-visible task:"):
             if phrase not in challenge_block:
                 errors.append(f"{case_id}: missing {phrase}")
@@ -75,6 +80,8 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
                 errors.append(f"{case_id}: missing scenario marker {phrase!r}")
             if phrase.lower() not in key_block.lower():
                 errors.append(f"{case_id} key: missing scenario marker {phrase!r}")
+        if case_id not in worksheet_block:
+            errors.append(f"{case_id} worksheet block missing")
 
     for phrase in PROTOCOL_PHRASES:
         if phrase.lower() not in protocol.lower():
@@ -90,13 +97,33 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
     if "no candidate-controlled code" not in protocol.lower():
         errors.append("protocol must preserve the no-candidate-execution boundary")
 
+    worksheet_fields = (
+        "target resolved tip commit",
+        "target tree identity / digest",
+        "complete known parent commit set",
+        "claim proposition and claim kind",
+        "original claim branch/revision scope",
+        "primary continuity disposition",
+        "impact witness",
+        "unaffectedness / equivalence witness",
+        "minimum discriminating evidence request",
+        "actual result (leave blank before evidence is acquired)",
+        "locked artifact sha-256",
+        "not securely blinded",
+        "do not fabricate annotations",
+    )
+    for field in worksheet_fields:
+        if field not in worksheet.lower():
+            errors.append(f"worksheet missing required field or boundary: {field}")
+
     return errors
 
 
-def minimal_pack() -> tuple[str, str, str]:
+def minimal_pack() -> tuple[str, str, str, str]:
     protocol = " ".join(PROTOCOL_PHRASES + DISPOSITIONS) + " no candidate-controlled code"
     challenge_blocks = []
     key_blocks = []
+    worksheet_blocks = []
     for index, case_id in enumerate(CASE_IDS, 1):
         markers = " ".join(CASE_MARKERS[case_id])
         challenge_blocks.append(
@@ -107,29 +134,44 @@ def minimal_pack() -> tuple[str, str, str]:
             f"## {index}. {case_id}\nExpected dispositions: unresolved\n"
             f"Reason: x\nDiscriminating evidence: y\n{markers}\n"
         )
+        worksheet_blocks.append(
+            f"## {case_id}\nTarget resolved tip commit: x\nTarget tree identity / digest: x\n"
+        )
     challenge = "\n".join(challenge_blocks) + "\nnot a sealed holdout"
     key = "\n".join(key_blocks) + "\nnot secure blinding"
-    return protocol, challenge, key
+    worksheet = (
+        "\n".join(worksheet_blocks)
+        + "\nComplete known parent commit set; Claim proposition and claim kind; "
+        "Original claim branch/revision scope; Primary continuity disposition; "
+        "Impact witness; Unaffectedness / equivalence witness; "
+        "Minimum discriminating evidence request; "
+        "Actual result (leave blank before evidence is acquired); "
+        "Locked artifact SHA-256; not securely blinded; Do not fabricate annotations"
+    )
+    return protocol, challenge, key, worksheet
 
 
 def self_test() -> list[str]:
-    protocol, challenge, key = minimal_pack()
-    if validate(protocol, challenge, key):
+    protocol, challenge, key, worksheet = minimal_pack()
+    if validate(protocol, challenge, key, worksheet):
         return ["valid minimal branch-aware pack rejected"]
+
     mutations = (
-        ("case removed", challenge.replace("## BHC-S03", "## BHC-SXX", 1), key, protocol),
-        ("second-parent control removed", challenge.replace("second parent", "unknown parent", 1), key, protocol),
-        ("merge-resolution control removed", challenge.replace("merge resolution", "integration event", 1), key, protocol),
-        ("branch-scope protocol removed", protocol.replace("branch scope", "scope", 1), challenge, key),
-        ("clean oracle removed", protocol.replace("clean full-recomputation", "incremental guess", 1), challenge, key),
-        ("continuity disposition removed", protocol.replace("supersede", "missing", 1), challenge, key),
-        ("sealed-boundary removed", challenge.replace("not a sealed holdout", "development set", 1), key, protocol),
-        ("blinding-boundary removed", key.replace("not secure blinding", "secure key", 1), challenge, protocol),
-        ("execution-boundary removed", protocol.replace("no candidate-controlled code", "candidate execution permitted", 1), challenge, key),
-        ("S07 global-scope distinction removed", challenge.replace("global authority", "authority", 1), key, protocol),
+        ("challenge case removed", protocol, challenge.replace("## BHC-S03", "## BHC-SXX", 1), key, worksheet),
+        ("second-parent control removed", protocol, challenge.replace("second parent", "unknown parent", 1), key, worksheet),
+        ("merge-resolution control removed", protocol, challenge.replace("merge resolution", "integration event", 1), key, worksheet),
+        ("branch-scope protocol removed", protocol.replace("branch scope", "scope", 1), challenge, key, worksheet),
+        ("clean oracle removed", protocol.replace("clean full-recomputation", "incremental guess", 1), challenge, key, worksheet),
+        ("continuity disposition removed", protocol.replace("supersede", "missing", 1), challenge, key, worksheet),
+        ("sealed-boundary removed", protocol, challenge.replace("not a sealed holdout", "development set", 1), key, worksheet),
+        ("blinding-boundary removed", protocol, challenge, key.replace("not secure blinding", "secure key", 1), worksheet),
+        ("execution-boundary removed", protocol.replace("no candidate-controlled code", "candidate execution permitted", 1), challenge, key, worksheet),
+        ("S07 global-scope distinction removed", protocol, challenge.replace("global authority", "authority", 1), key, worksheet),
+        ("worksheet case removed", protocol, challenge, key, worksheet.replace("## BHC-S08", "## BHC-XX", 1)),
+        ("worksheet critical field removed", protocol, challenge, key, worksheet.replace("Impact witness", "Impact detail", 1)),
     )
-    for label, mutated_challenge, mutated_key, mutated_protocol in mutations:
-        if not validate(mutated_protocol, mutated_challenge, mutated_key):
+    for label, p, c, k, w in mutations:
+        if not validate(p, c, k, w):
             return [f"negative self-test accepted mutation: {label}"]
     return []
 
@@ -146,10 +188,10 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_BRANCH_AWARE_CONTINUITY_SELF_TEST_PASS: 10 negative controls")
+        print("CEB_BRANCH_AWARE_CONTINUITY_SELF_TEST_PASS: 12 negative controls")
 
     documents = []
-    for relative in (PROTOCOL, CHALLENGE, KEY):
+    for relative in (PROTOCOL, CHALLENGE, KEY, WORKSHEET):
         try:
             documents.append((args.repo_root / relative).read_text(encoding="utf-8"))
         except OSError as exc:
@@ -162,7 +204,7 @@ def main() -> int:
             print(f"ERROR: {failure}", file=sys.stderr)
         return 1
 
-    print("CEB_BRANCH_AWARE_CONTINUITY_PACK_PASS: cases=8 dispositions=5")
+    print("CEB_BRANCH_AWARE_CONTINUITY_PACK_PASS: cases=8 dispositions=5 reviewers=independent-template")
     print(
         "CEB_BRANCH_AWARE_CONTINUITY_CLAIM_BOUNDARY: static documentation validation only; "
         "no Git repository history, candidate code, builds, tests, graders or model evaluations executed"
