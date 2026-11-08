@@ -13,6 +13,16 @@ const EXAMPLE: &str =
     include_str!("../../../docs/research/rea-planner-input-contract-v0-1-example-math-only.json");
 const SUM_TOLERANCE: f64 = 1.0e-9;
 
+const POLICY_AGENT: &str = include_str!(
+    "../../../docs/research/rea-planner-policy-disagreement-v0-1-agent-input.json"
+);
+const POLICY_GRADER_SCHEMA: &str = include_str!(
+    "../../../docs/research/rea-planner-policy-disagreement-v0-1-grader.schema.json"
+);
+const POLICY_GRADER: &str =
+    include_str!("../../../docs/research/rea-planner-policy-disagreement-v0-1-grader.json");
+
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContractError(pub String);
 
@@ -461,6 +471,298 @@ pub fn validate_embedded_example() -> Result<(), ContractError> {
         )));
     }
     validate_contract(&example)
+}
+
+
+/// Validate the three-action policy-disagreement fixture and its grader-only
+/// effects. The public planner API is intentionally not called: this is a
+/// synthetic mathematical oracle, not observed-Evidence integration.
+pub fn validate_policy_disagreement_fixture() -> Result<(), ContractError> {
+    let schema: Value = serde_json::from_str(SCHEMA)
+        .map_err(|error| ContractError(format!("planner schema parse failed: {error}")))?;
+    draft202012::meta::validate(&schema)
+        .map_err(|error| ContractError(format!("planner schema invalid: {error}")))?;
+    let agent: Value = serde_json::from_str(POLICY_AGENT)
+        .map_err(|error| ContractError(format!("policy agent input parse failed: {error}")))?;
+    let validator = draft202012::options()
+        .build(&schema)
+        .map_err(|error| ContractError(format!("planner schema compilation failed: {error}")))?;
+    let errors: Vec<String> = validator
+        .iter_errors(&agent)
+        .map(|error| error.to_string())
+        .collect();
+    if !errors.is_empty() {
+        return Err(ContractError(format!(
+            "policy agent input fails planner schema: {}",
+            errors.join("; ")
+        )));
+    }
+    validate_contract(&agent)?;
+
+    let grader_schema: Value = serde_json::from_str(POLICY_GRADER_SCHEMA)
+        .map_err(|error| ContractError(format!("policy grader schema parse failed: {error}")))?;
+    draft202012::meta::validate(&grader_schema)
+        .map_err(|error| ContractError(format!("policy grader schema invalid: {error}")))?;
+    let grader: Value = serde_json::from_str(POLICY_GRADER)
+        .map_err(|error| ContractError(format!("policy grader parse failed: {error}")))?;
+    let grader_validator = draft202012::options()
+        .build(&grader_schema)
+        .map_err(|error| ContractError(format!("policy grader schema compilation failed: {error}")))?;
+    let grader_errors: Vec<String> = grader_validator
+        .iter_errors(&grader)
+        .map(|error| error.to_string())
+        .collect();
+    if !grader_errors.is_empty() {
+        return Err(ContractError(format!(
+            "policy grader fails schema: {}",
+            grader_errors.join("; ")
+        )));
+    }
+
+    if string(&agent, "case_id")? != string(&grader, "case_id")? {
+        return Err(ContractError(
+            "agent and grader case IDs must match".to_owned(),
+        ));
+    }
+    for forbidden in [
+        "candidate_effects",
+        "expected_policy_rankings",
+        "oracle_policy",
+        "world_state_oracle",
+    ] {
+        if agent.get(forbidden).is_some() {
+            return Err(ContractError(format!(
+                "grader-only field {forbidden} leaked into agent-visible planner input"
+            )));
+        }
+    }
+
+    let experiments = array(&agent, "experiments")?;
+    let mut experiment_outcomes = BTreeMap::<String, BTreeSet<String>>::new();
+    for experiment in experiments {
+        let id = string(experiment, "id")?;
+        let outcomes = string_set(array(experiment, "outcomes")?, &format!("{id} outcomes"))?;
+        experiment_outcomes.insert(id.to_owned(), outcomes);
+    }
+
+    let obligations = array(&grader, "obligations")?;
+    let mut obligation_classes = BTreeMap::<String, BTreeSet<String>>::new();
+    for obligation in obligations {
+        let id = string(obligation, "obligation_id")?;
+        let classes = string_set(
+            array(obligation, "admissible_evidence_classes")?,
+            &format!("{id} admissible evidence classes"),
+        )?;
+        obligation_classes.insert(id.to_owned(), classes);
+    }
+
+    let mut grader_candidates = BTreeSet::new();
+    for candidate in array(&grader, "candidate_effects")? {
+        let candidate_id = string(candidate, "experiment_id")?;
+        if !grader_candidates.insert(candidate_id.to_owned()) {
+            return Err(ContractError(format!(
+                "duplicate grader candidate {candidate_id}"
+            )));
+        }
+        let allowed_outcomes = experiment_outcomes.get(candidate_id).ok_or_else(|| {
+            ContractError(format!(
+                "grader references unknown agent-visible experiment {candidate_id}"
+            ))
+        })?;
+        for effect in array(candidate, "effects")? {
+            let outcome = string(effect, "outcome")?;
+            if !allowed_outcomes.contains(outcome) {
+                return Err(ContractError(format!(
+                    "grader effect references undeclared outcome {outcome} for {candidate_id}"
+                )));
+            }
+            let obligation_id = string(effect, "obligation_id")?;
+            let classes = obligation_classes.get(obligation_id).ok_or_else(|| {
+                ContractError(format!(
+                    "grader effect references unknown obligation {obligation_id}"
+                ))
+            })?;
+            let evidence_class = string(effect, "evidence_class")?;
+            if !classes.contains(evidence_class) {
+                return Err(ContractError(format!(
+                    "grader effect uses inadmissible evidence class {evidence_class} for {obligation_id}"
+                )));
+            }
+        }
+    }
+    if grader_candidates.len() != experiment_outcomes.len()
+        || grader_candidates.iter().any(|id| !experiment_outcomes.contains_key(id))
+    {
+        return Err(ContractError(
+            "agent and grader candidate identity sets must match exactly".to_owned(),
+        ));
+    }
+
+    let rankings = object(&grader, "expected_policy_rankings")?;
+    for key in [
+        "point_eig_best",
+        "expected_scenario_eig_best",
+        "lower_tail_cvar_eig_best",
+        "expected_evsi_best",
+        "obligation_closure_per_second_best",
+    ] {
+        let id = string(rankings.get(key).ok_or_else(|| {
+            ContractError(format!("expected policy ranking {key} missing"))
+        })?, "id")?;
+        if !experiment_outcomes.contains_key(id) {
+            return Err(ContractError(format!(
+                "policy ranking {key} references unknown candidate {id}"
+            )));
+        }
+    }
+    for item in array(&Value::Object(rankings.clone()), "combined_gated_sequence")? {
+        let id = item
+            .as_str()
+            .ok_or_else(|| ContractError("combined policy sequence must contain strings".to_owned()))?;
+        if !experiment_outcomes.contains_key(id) {
+            return Err(ContractError(format!(
+                "combined policy sequence references unknown candidate {id}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn entropy_bits(probabilities: &[f64]) -> f64 {
+    probabilities
+        .iter()
+        .copied()
+        .filter(|probability| *probability > 0.0)
+        .map(|probability| -probability * probability.log2())
+        .sum()
+}
+
+#[cfg(test)]
+fn hypothesis_priors(agent: &Value) -> Result<(Vec<String>, Vec<f64>), ContractError> {
+    let mut ids = Vec::new();
+    let mut priors = Vec::new();
+    for hypothesis in array(agent, "hypotheses")? {
+        ids.push(string(hypothesis, "id")?.to_owned());
+        priors.push(number(hypothesis, "prior_probability")?);
+    }
+    Ok((ids, priors))
+}
+
+#[cfg(test)]
+fn eig_from_rows(
+    hypothesis_ids: &[String],
+    priors: &[f64],
+    rows: &[Value],
+) -> Result<f64, ContractError> {
+    let prior_entropy = entropy_bits(priors);
+    let mut expected_posterior_entropy = 0.0;
+    let outcomes = array(rows.first().ok_or_else(|| {
+        ContractError("EIG requires at least one likelihood row".to_owned())
+    })?, "outcome_probabilities")?
+    .len();
+
+    for outcome_index in 0..outcomes {
+        let mut predictive = 0.0;
+        let mut posterior = vec![0.0; hypothesis_ids.len()];
+        for (hypothesis_index, hypothesis_id) in hypothesis_ids.iter().enumerate() {
+            let row = rows
+                .iter()
+                .find(|row| row.get("hypothesis_id").and_then(Value::as_str) == Some(hypothesis_id))
+                .ok_or_else(|| ContractError(format!("missing likelihood row for {hypothesis_id}")))?;
+            let probability = array(row, "outcome_probabilities")?[outcome_index]
+                .as_f64()
+                .ok_or_else(|| ContractError("outcome probability must be numeric".to_owned()))?;
+            let joint = priors[hypothesis_index] * probability;
+            predictive += joint;
+            posterior[hypothesis_index] = joint;
+        }
+        if predictive > 0.0 {
+            for probability in &mut posterior {
+                *probability /= predictive;
+            }
+            expected_posterior_entropy += predictive * entropy_bits(&posterior);
+        }
+    }
+    Ok(prior_entropy - expected_posterior_entropy)
+}
+
+#[cfg(test)]
+fn best_decision_utility(
+    hypothesis_ids: &[String],
+    posterior: &[f64],
+    decisions: &[Value],
+) -> Result<f64, ContractError> {
+    let mut best = f64::NEG_INFINITY;
+    for decision in decisions {
+        let mut expected = 0.0;
+        for (index, hypothesis_id) in hypothesis_ids.iter().enumerate() {
+            let utility = array(decision, "utilities")?
+                .iter()
+                .find(|item| item.get("hypothesis_id").and_then(Value::as_str) == Some(hypothesis_id))
+                .ok_or_else(|| ContractError(format!("missing decision utility for {hypothesis_id}")))?;
+            expected += posterior[index] * number(utility, "utility")?;
+        }
+        best = best.max(expected);
+    }
+    Ok(best)
+}
+
+#[cfg(test)]
+fn evsi_from_rows(
+    hypothesis_ids: &[String],
+    priors: &[f64],
+    rows: &[Value],
+    decisions: &[Value],
+) -> Result<f64, ContractError> {
+    let baseline = best_decision_utility(hypothesis_ids, priors, decisions)?;
+    let outcomes = array(rows.first().ok_or_else(|| {
+        ContractError("EVSI requires at least one likelihood row".to_owned())
+    })?, "outcome_probabilities")?
+    .len();
+    let mut expected_posterior_best = 0.0;
+
+    for outcome_index in 0..outcomes {
+        let mut predictive = 0.0;
+        let mut posterior = vec![0.0; hypothesis_ids.len()];
+        for (hypothesis_index, hypothesis_id) in hypothesis_ids.iter().enumerate() {
+            let row = rows
+                .iter()
+                .find(|row| row.get("hypothesis_id").and_then(Value::as_str) == Some(hypothesis_id))
+                .ok_or_else(|| ContractError(format!("missing likelihood row for {hypothesis_id}")))?;
+            let probability = array(row, "outcome_probabilities")?[outcome_index]
+                .as_f64()
+                .ok_or_else(|| ContractError("outcome probability must be numeric".to_owned()))?;
+            let joint = priors[hypothesis_index] * probability;
+            predictive += joint;
+            posterior[hypothesis_index] = joint;
+        }
+        if predictive > 0.0 {
+            for probability in &mut posterior {
+                *probability /= predictive;
+            }
+            expected_posterior_best += predictive
+                * best_decision_utility(hypothesis_ids, &posterior, decisions)?;
+        }
+    }
+    Ok(expected_posterior_best - baseline)
+}
+
+#[cfg(test)]
+fn lower_tail_cvar(values: &[(f64, f64)], alpha: f64) -> f64 {
+    let mut ordered = values.to_vec();
+    ordered.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut remaining = alpha;
+    let mut weighted = 0.0;
+    for (value, probability) in ordered {
+        let included = remaining.min(probability);
+        weighted += included * value;
+        remaining -= included;
+        if remaining <= 0.0 {
+            break;
+        }
+    }
+    weighted / alpha
 }
 
 #[cfg(test)]
