@@ -12,8 +12,8 @@
 //! it is not a general Bayesian inference or posterior predictive engine.
 
 use super::model_discrimination::{
-    CandidateExperiment, DiscriminationHypothesis, ExperimentBlocker, GaussianModelPrediction,
-    ModelDiscriminationError, ModelPriorScenario,
+    CandidateExperiment, DiscriminationHypothesis, ExperimentBlocker, ModelDiscriminationError,
+    ModelPriorScenario,
 };
 use super::theory_prediction::{
     MeasurementNoiseModel, NoiseCalibrationStatus, OTHER_UNRESOLVED_MODEL_ID, PredictionDisposition,
@@ -539,7 +539,8 @@ fn log_sum_exp(values: &[f64]) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model_discrimination::{GaussianModelPrediction, PredictionDisposition};
+    use crate::model_discrimination::GaussianModelPrediction;
+    use crate::theory_prediction::PredictionDisposition;
 
     fn hypothesis(id: &str, byte: u8) -> DiscriminationHypothesis {
         DiscriminationHypothesis {
