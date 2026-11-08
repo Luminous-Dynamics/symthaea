@@ -215,9 +215,7 @@ impl StrategyEnumeratorBaseline {
             }
             crate::protocol::WorldFamily::TwoInputResponse => {
                 let access = match view.task.structure_access {
-                    StructureAccess::InteractionWithheld => {
-                        interaction::StructureAccess::Withheld
-                    }
+                    StructureAccess::InteractionWithheld => interaction::StructureAccess::Withheld,
                     StructureAccess::InteractionSupplied(structure) => {
                         interaction::StructureAccess::Supplied(structure)
                     }
@@ -495,7 +493,8 @@ mod tests {
                 Some(false),
                 StructureAccess::BooleanWithheld,
                 6,
-            ).unwrap();
+            )
+            .unwrap();
             run_strategy_to_submission(&mut boolean, 6, strategy).unwrap();
             let boolean_score = boolean.evaluate_after_submission().unwrap();
             assert!(boolean_score.set_score.exact_version_space_match);
@@ -513,13 +512,15 @@ mod tests {
                 numeric_truth,
                 StructureAccess::NumericSupplied(numeric::Mechanism::LeakyMemory),
                 12,
-            ).unwrap();
+            )
+            .unwrap();
             let mut numeric_a2 = BlindEpisode::new_numeric(
                 "strategy-policy-numeric-a2",
                 numeric_truth,
                 StructureAccess::NumericWithheld,
                 12,
-            ).unwrap();
+            )
+            .unwrap();
             run_strategy_to_submission(&mut numeric_a0, 12, strategy).unwrap();
             run_strategy_to_submission(&mut numeric_a2, 12, strategy).unwrap();
             let a0_score = numeric_a0.evaluate_after_submission().unwrap();
@@ -540,7 +541,8 @@ mod tests {
                 },
                 StructureAccess::InteractionWithheld,
                 9,
-            ).unwrap();
+            )
+            .unwrap();
             run_strategy_to_submission(&mut interaction_episode, 9, strategy).unwrap();
             let interaction_score = interaction_episode.evaluate_after_submission().unwrap();
             assert!(interaction_score.set_score.exact_version_space_match);
