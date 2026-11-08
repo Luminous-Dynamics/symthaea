@@ -65,6 +65,10 @@ The machine-readable v1 manifest, preflight receipt contract and semantic/replay
 - `research/physical_compute/manifest-validator/`: isolated Rust CLI/library for semantic validation, canonical digesting and deterministic domain-outage preflight replay (uses `serde_json` and `sha2`; not a Symthaea workspace member).
 - `docs/engineering/computers/INDEPENDENT_VERIFICATION_V1.md`: verification benchmark families and independence contract.
 
+The v1 scenario manifest now includes an `error_budget` object. Every error contribution carries a typed mechanism, physical/computational layer, local magnitude, units, propagation gain, deterministic-bound vs standard-deviation interpretation and evidence status/digest. The manifest also requires an explicit dependence assumption and either an unknown task-sensitivity bound or a sensitivity value tied to an evidence digest. The two checked-in synthetic fixtures deliberately use empty contribution lists and null sensitivity: the error budget is **uncharacterized**, not zero.
+
+The semantic subset validator checks unique contribution IDs, finite non-negative magnitudes/gains, provenance for measured/derived contributions, and the rule that an independent-dependence declaration or task-sensitivity bound must carry an evidence digest. It checks the digest syntax only; it does not resolve or verify the referenced evidence.
+
 The examples are deterministic **negative-control fixtures**, not probability estimates. The controller-outage case places the verifier in a separate synthetic power/clock/controller island: candidate execution is unavailable while the verifier remains available. The shared-power case deliberately places the verifier, array and controller under one power domain: both candidate and verifier become unavailable. Both also retain the shared system/host as a potential common cause not yet modeled away.
 
 The JSON Schema validates structure and primitive types. The semantic subset validator checks:
