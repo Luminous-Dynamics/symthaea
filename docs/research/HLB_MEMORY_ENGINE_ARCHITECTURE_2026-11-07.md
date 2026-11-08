@@ -808,3 +808,19 @@ A source-level test now constructs 12 groups × 8 members in 64D, derives the kt
 Independent JavaScript binary32-model simulations (not Rust execution) are documented in [hme_group_envelope_js_sanity_v0.json](fixtures/hme_group_envelope_js_sanity_v0.json): one clustered random-vector experiment observed 4,138 of 4,320 groups pruned with zero false-prune disagreements; a dimension/norm-stratified experiment checked 1,000 groups / 8,000 member scores with zero interval escapes and 144 deliberately uninformative fallbacks. A coordinate-box-only random control pruned zero groups. These are synthetic arithmetic/selectivity checks, not measurements of actual bytes read, page I/O, latency, or a representative HME corpus.
 
 The current group-envelope protocol and limitations are in [HME_GROUP_ENVELOPE_REFERENCE_2026-11-08.md](HME_GROUP_ENVELOPE_REFERENCE_2026-11-08.md). Segment persistence, reopen-time verifier binding, full eligible-corpus group accounting and physical page-read telemetry remain #10917/#11003 integration work.
+
+
+## 2026-11-08: evidence utilization and natural conversational integration
+
+New evaluation research materially widens the meaning of memory quality:
+- UTILMEM tests dense-history reasoning, implicit relevance, distributed evidence synthesis and semantically similar distractors over 1,717 instances in five domains.
+- LoCoMo-Conv expands LoCoMo into dialog, implicit, counterfactual and composed queries, with supportive-memory annotations and both retrieval/response evaluation.
+- MemUse studies real user-cued natural integration and reports a large gap between Direct QA recall and actual use of those facts in conversation.
+- PRAGMA evaluates personalized guidance over evolving long-term context and incorrect assumptions.
+- MemLoc provides a Retrieve–Localize–Generate method with multi-granularity units, cross-session graph retrieval and evidence location IDs.
+
+The new protocol is [HME_EVIDENCE_UTILIZATION_AND_NATURAL_INTEGRATION_2026-11-08.md](HME_EVIDENCE_UTILIZATION_AND_NATURAL_INTEGRATION_2026-11-08.md). It composes #8427 for benchmark adapters and #9177 for minimal sufficient evidence packets. It does not create a parallel proof engine or new reader.
+
+Architectural implication: after query/context detection and candidate retrieval, HME/Broca must localize source fragments, preserve stable source location IDs, resolve temporal/rights/provenance eligibility, and deliver a compact independently verifiable evidence packet to the reader. Measure candidate recall, localization precision, sufficient proof, response integration and intrusive/missed memory use separately. Original memory source units remain authoritative; summaries and graph indexes are rebuildable views. The reader must not receive evaluator gold labels.
+
+No downstream benchmark result is claimed by adding this protocol. Dataset license/consent and official evaluator availability remain preconditions for any actual run.
