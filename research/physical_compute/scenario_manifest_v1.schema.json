@@ -1,0 +1,1099 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/physical_compute/scenario_manifest_v1.schema.json",
+  "title": "Luminous Physical Compute Scenario Manifest",
+  "description": "Versioned, replay-oriented manifest for synthetic or measured physical-compute reliability scenarios. A schema pass is structural validation only; semantic reference, independence and evidence validation are separate gates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "scenario_id",
+    "scenario_class",
+    "provenance",
+    "workload",
+    "substrate",
+    "components",
+    "fault_domains",
+    "domain_dependencies",
+    "fault_injections",
+    "mitigation",
+    "experiment",
+    "measurement",
+    "acceptance",
+    "error_budget"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "1.0.0"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._-]+$"
+    },
+    "scenario_class": {
+      "enum": [
+        "screening",
+        "confirmatory",
+        "negative_control",
+        "reproduction"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "created_utc",
+        "generator",
+        "generator_version",
+        "seed",
+        "assumptions"
+      ],
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "synthetic",
+            "measured",
+            "derived_from_measurements",
+            "paper_reproduction"
+          ]
+        },
+        "created_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "generator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_manifest_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "source_data_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "kind",
+        "numerical_semantics",
+        "deadline_ticks",
+        "oracle",
+        "required_component_ids"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "exact_hdc_retrieval",
+            "approximate_matrix_transform",
+            "temporal_state_update",
+            "differential_equation",
+            "matrix_equation",
+            "other"
+          ]
+        },
+        "numerical_semantics": {
+          "enum": [
+            "exact",
+            "bounded_approximate",
+            "probabilistic"
+          ]
+        },
+        "deadline_ticks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state_retention_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "data_split": {
+          "enum": [
+            "fixed_public",
+            "training",
+            "validation",
+            "held_out",
+            "synthetic_fixture",
+            "not_applicable"
+          ]
+        },
+        "oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "implementation_id",
+            "independent_of_candidate",
+            "evaluator_truth_withheld_from_verifier"
+          ],
+          "properties": {
+            "implementation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "independent_of_candidate": {
+              "type": "boolean"
+            },
+            "evaluator_truth_withheld_from_verifier": {
+              "const": true
+            }
+          }
+        },
+        "quality_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "direction": {
+              "enum": [
+                "lower_is_better",
+                "higher_is_better",
+                "exact_match"
+              ]
+            },
+            "threshold": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "units": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tie_break": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "condition_number_range": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "minimum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maximum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "required_component_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Components required by the candidate execution path; the verifier component is separately named under mitigation."
+        }
+      }
+    },
+    "substrate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity",
+        "geometry",
+        "calibration"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "synthetic_array",
+            "cpu",
+            "gpu",
+            "fpga",
+            "memristive_array",
+            "photonic",
+            "cmos_analog",
+            "neuromorphic",
+            "hybrid",
+            "other"
+          ]
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platform_id",
+            "device_id",
+            "revision"
+          ],
+          "properties": {
+            "platform_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "device_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "board_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "package_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lot_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "firmware_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "bitstream_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rows",
+            "columns"
+          ],
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "units": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "measured_at_utc",
+            "valid_until_utc",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "synthetic_assumption",
+                "measured_current",
+                "measured_stale",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "measured_at_utc": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "valid_until_utc": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "evidence_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "environment_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component_id",
+          "kind"
+        ],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "cell_array",
+              "row",
+              "column",
+              "controller",
+              "clock_source",
+              "reset_controller",
+              "power_rail",
+              "regulator",
+              "interconnect",
+              "dma",
+              "host",
+              "verifier",
+              "fallback",
+              "thermal_zone",
+              "sensor",
+              "other"
+            ]
+          },
+          "attributes": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "fault_domains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain_id",
+          "kind",
+          "parent_domain_id",
+          "member_component_ids"
+        ],
+        "properties": {
+          "domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "cell",
+              "subarray",
+              "array",
+              "die",
+              "package",
+              "board",
+              "system",
+              "power",
+              "clock",
+              "reset",
+              "controller",
+              "interconnect",
+              "thermal",
+              "host",
+              "verifier",
+              "fallback",
+              "lot",
+              "other"
+            ]
+          },
+          "parent_domain_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "member_component_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "failure_probability": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "failure_model": {
+            "enum": [
+              "independent",
+              "common_cause",
+              "conditional",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "evidence_status": {
+            "enum": [
+              "synthetic",
+              "measured",
+              "derived",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "domain_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dependent_domain_id",
+          "dependency_domain_id",
+          "relationship"
+        ],
+        "properties": {
+          "dependent_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependency_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relationship": {
+            "enum": [
+              "requires",
+              "shares_power_with",
+              "shares_clock_with",
+              "shares_reset_with",
+              "shares_controller_with",
+              "shares_thermal_zone_with",
+              "common_firmware_with",
+              "common_host_with",
+              "failover_controlled_by",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "fault_injections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "injection_id",
+          "mechanism",
+          "target_id",
+          "parameters",
+          "evidence_status"
+        ],
+        "properties": {
+          "injection_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanism": {
+            "enum": [
+              "stuck_off",
+              "stuck_on",
+              "independent_cell_faults",
+              "rectangular_cluster",
+              "row_loss",
+              "column_loss",
+              "domain_outage",
+              "read_noise",
+              "write_error",
+              "conductance_drift",
+              "retention_loss",
+              "temperature_excursion",
+              "voltage_excursion",
+              "timing_fault",
+              "other"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "evidence_status": {
+            "enum": [
+              "synthetic",
+              "measured",
+              "derived",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "mitigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategies",
+        "verifier_component_id",
+        "fallback_component_id"
+      ],
+      "properties": {
+        "strategies": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "direct_mapping",
+              "independent_redundancy",
+              "screen_remap",
+              "spare_rows_columns",
+              "independent_islands",
+              "adaptive_representation",
+              "bit_slicing",
+              "residue_number_system",
+              "error_correction",
+              "residual_verification",
+              "mixed_precision_refinement",
+              "independent_verifier",
+              "fallback_recovery"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "verifier_component_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fallback_component_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "experimental_unit",
+        "planned_units",
+        "seed_policy",
+        "independence_statement"
+      ],
+      "properties": {
+        "phase": {
+          "enum": [
+            "pilot",
+            "screening",
+            "confirmatory",
+            "negative_control",
+            "reproduction"
+          ]
+        },
+        "experimental_unit": {
+          "enum": [
+            "scenario",
+            "read",
+            "cycle",
+            "device",
+            "array",
+            "package",
+            "lot",
+            "board",
+            "system"
+          ]
+        },
+        "planned_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed_policy": {
+          "enum": [
+            "fixed_replay",
+            "independent_held_out",
+            "measured_trace",
+            "not_applicable"
+          ]
+        },
+        "independence_statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "training_seed_range": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "validation_seed_range": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "confirmatory_seed_range": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latency_boundary",
+        "energy_boundary",
+        "resource_boundary",
+        "raw_receipt_required"
+      ],
+      "properties": {
+        "latency_boundary": {
+          "enum": [
+            "algorithm",
+            "kernel",
+            "device",
+            "host_to_device_to_host",
+            "task_end_to_end",
+            "sensor_to_decision",
+            "not_measured"
+          ]
+        },
+        "latency_unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "energy_boundary": {
+          "enum": [
+            "array_only",
+            "device",
+            "board_input",
+            "whole_system_wall_input",
+            "not_measured"
+          ]
+        },
+        "energy_unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "energy_includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resource_boundary": {
+          "enum": [
+            "logical_cells",
+            "physical_cells_and_peripherals",
+            "board",
+            "whole_system",
+            "not_measured"
+          ]
+        },
+        "raw_receipt_required": {
+          "type": "boolean"
+        },
+        "instrument_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "environment": {
+          "type": "object"
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_classification",
+        "silent_corruption_allowed",
+        "deadline_required",
+        "notes"
+      ],
+      "properties": {
+        "expected_classification": {
+          "enum": [
+            "correct_accepted_on_time",
+            "silent_corruption_accepted",
+            "detected_rejected",
+            "verification_unavailable",
+            "deadline_miss",
+            "hardware_unavailable",
+            "resource_infeasible",
+            "abstained",
+            "unverifiable",
+            "unknown"
+          ]
+        },
+        "silent_corruption_allowed": {
+          "const": false
+        },
+        "deadline_required": {
+          "type": "boolean"
+        },
+        "target_correct_accepted_probability_lcb": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "target_silent_corruption_probability_ucb": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "error_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dependence_assumption",
+        "dependence_evidence_sha256",
+        "task_sensitivity_bound",
+        "sensitivity_evidence_sha256",
+        "contributions"
+      ],
+      "properties": {
+        "dependence_assumption": {
+          "enum": [
+            "unknown_or_correlated",
+            "independent_declared"
+          ]
+        },
+        "dependence_evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "task_sensitivity_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sensitivity_evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contribution_id",
+              "kind",
+              "layer",
+              "magnitude",
+              "units",
+              "propagation_gain",
+              "magnitude_kind",
+              "evidence_status",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "contribution_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "weight_perturbation",
+                  "multiplicative_distortion",
+                  "nonlinear_transfer_residual",
+                  "additive_offset",
+                  "input_conversion",
+                  "output_quantization",
+                  "accumulation",
+                  "read_noise",
+                  "timing_jitter",
+                  "spatial_fault",
+                  "other"
+                ]
+              },
+              "layer": {
+                "enum": [
+                  "device",
+                  "array",
+                  "circuit",
+                  "data_conversion",
+                  "readout",
+                  "controller",
+                  "system",
+                  "algorithm",
+                  "other"
+                ]
+              },
+              "magnitude": {
+                "type": "number",
+                "minimum": 0
+              },
+              "units": {
+                "type": "string",
+                "minLength": 1
+              },
+              "propagation_gain": {
+                "type": "number",
+                "minimum": 0
+              },
+              "magnitude_kind": {
+                "enum": [
+                  "deterministic_upper_bound",
+                  "standard_deviation"
+                ]
+              },
+              "evidence_status": {
+                "enum": [
+                  "synthetic",
+                  "measured",
+                  "derived",
+                  "unknown"
+                ]
+              },
+              "evidence_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dependence_assumption": {
+                "const": "independent_declared"
+              }
+            },
+            "required": [
+              "dependence_assumption"
+            ]
+          },
+          "then": {
+            "properties": {
+              "dependence_evidence_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dependence_assumption": {
+                "const": "unknown_or_correlated"
+              }
+            },
+            "required": [
+              "dependence_assumption"
+            ]
+          },
+          "then": {
+            "properties": {
+              "dependence_evidence_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_sensitivity_bound": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "task_sensitivity_bound"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sensitivity_evidence_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_sensitivity_bound": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "task_sensitivity_bound"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sensitivity_evidence_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/physical_compute/preflight_receipt_v1.schema.json",
+  "title": "Luminous Physical Compute Preflight Receipt",
+  "description": "Immutable output contract for deterministic domain-outage preflight replay. It explicitly makes no task-correctness, latency, energy, or physical-reliability claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "result_kind",
+    "scenario_id",
+    "manifest_sha256",
+    "replay_engine_version",
+    "failed_domain_ids",
+    "failed_component_ids",
+    "candidate_available",
+    "verifier_available",
+    "preflight_classification",
+    "correctness",
+    "latency",
+    "energy",
+    "json_schema_validation",
+    "semantic_validation",
+    "replay_scope"
+  ],
+  "properties": {
+    "receipt_version": {
+      "const": "1.0.0"
+    },
+    "result_kind": {
+      "const": "preflight_only"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._-]+$"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "replay_engine_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failed_domain_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "failed_component_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "candidate_available": {
+      "type": "boolean"
+    },
+    "verifier_available": {
+      "type": "boolean"
+    },
+    "preflight_classification": {
+      "enum": [
+        "preflight_ready",
+        "hardware_unavailable",
+        "verification_unavailable"
+      ]
+    },
+    "correctness": {
+      "const": "not_evaluated"
+    },
+    "latency": {
+      "const": "not_measured"
+    },
+    "energy": {
+      "const": "not_measured"
+    },
+    "json_schema_validation": {
+      "const": "not_performed_by_rust_cli"
+    },
+    "semantic_validation": {
+      "const": "passed_subset"
+    },
+    "replay_scope": {
+      "const": "domain_outage_only"
+    }
+  }
+}

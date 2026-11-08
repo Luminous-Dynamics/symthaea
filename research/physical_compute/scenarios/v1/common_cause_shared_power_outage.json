@@ -1,0 +1,248 @@
+{
+  "manifest_version": "1.0.0",
+  "scenario_id": "synthetic.common-cause.shared-power-outage.v1",
+  "scenario_class": "negative_control",
+  "provenance": {
+    "source_kind": "synthetic",
+    "created_utc": "2026-11-08T05:30:00Z",
+    "generator": "luminous-physical-compute-fixture",
+    "generator_version": "0.1.0",
+    "seed": 20261108,
+    "source_manifest_digest": null,
+    "source_data_digest": null,
+    "assumptions": [
+      "All failure states are deterministic fixtures, not sampled failure probabilities.",
+      "No physical device distribution or reliability prediction is implied."
+    ],
+    "limitations": [
+      "One scenario does not estimate any probability.",
+      "The fixture tests a controller cut-set negative control only."
+    ]
+  },
+  "workload": {
+    "contract_id": "exact-hdc-retrieval-v1",
+    "kind": "exact_hdc_retrieval",
+    "numerical_semantics": "exact",
+    "deadline_ticks": 100,
+    "state_retention_ticks": null,
+    "input_digest": null,
+    "data_split": "synthetic_fixture",
+    "oracle": {
+      "implementation_id": "independent-scalar-binaryhv-oracle",
+      "version": "1.0",
+      "source_digest": null,
+      "independent_of_candidate": true,
+      "evaluator_truth_withheld_from_verifier": true
+    },
+    "quality_contract": {
+      "metric": "bit_exact_top1_identity",
+      "direction": "exact_match",
+      "threshold": null,
+      "units": null,
+      "tie_break": "lowest_stable_candidate_id"
+    },
+    "condition_number_range": null,
+    "required_component_ids": [
+      "array-0",
+      "controller-0",
+      "clock-0",
+      "power-0"
+    ]
+  },
+  "substrate": {
+    "kind": "synthetic_array",
+    "identity": {
+      "platform_id": "synthetic-crossbar-fixture",
+      "device_id": "fixture-array-8x8",
+      "revision": "v1",
+      "board_id": "fixture-board-0",
+      "package_id": "fixture-package-0",
+      "lot_id": "synthetic-lot-0",
+      "firmware_digest": null,
+      "bitstream_digest": null
+    },
+    "geometry": {
+      "rows": 8,
+      "columns": 8,
+      "units": "synthetic cells"
+    },
+    "calibration": {
+      "status": "synthetic_assumption",
+      "measured_at_utc": null,
+      "valid_until_utc": null,
+      "evidence_digest": null,
+      "environment_digest": null
+    }
+  },
+  "components": [
+    {
+      "component_id": "array-0",
+      "kind": "cell_array",
+      "attributes": {
+        "rows": 8,
+        "columns": 8
+      }
+    },
+    {
+      "component_id": "controller-0",
+      "kind": "controller",
+      "attributes": {}
+    },
+    {
+      "component_id": "clock-0",
+      "kind": "clock_source",
+      "attributes": {}
+    },
+    {
+      "component_id": "power-0",
+      "kind": "power_rail",
+      "attributes": {}
+    },
+    {
+      "component_id": "host-0",
+      "kind": "host",
+      "attributes": {}
+    },
+    {
+      "component_id": "verifier-0",
+      "kind": "verifier",
+      "attributes": {}
+    }
+  ],
+  "fault_domains": [
+    {
+      "domain_id": "system-0",
+      "kind": "system",
+      "parent_domain_id": null,
+      "member_component_ids": [
+        "host-0"
+      ],
+      "failure_probability": null,
+      "failure_model": "unknown",
+      "evidence_status": "synthetic"
+    },
+    {
+      "domain_id": "board-0",
+      "kind": "board",
+      "parent_domain_id": "system-0",
+      "member_component_ids": [
+        "controller-0",
+        "clock-0",
+        "power-0"
+      ],
+      "failure_probability": null,
+      "failure_model": "unknown",
+      "evidence_status": "synthetic"
+    },
+    {
+      "domain_id": "array-0-domain",
+      "kind": "array",
+      "parent_domain_id": "board-0",
+      "member_component_ids": [
+        "array-0"
+      ],
+      "failure_probability": null,
+      "failure_model": "unknown",
+      "evidence_status": "synthetic"
+    },
+    {
+      "domain_id": "controller-domain-0",
+      "kind": "controller",
+      "parent_domain_id": "board-0",
+      "member_component_ids": [
+        "controller-0"
+      ],
+      "failure_probability": null,
+      "failure_model": "common_cause",
+      "evidence_status": "synthetic"
+    },
+    {
+      "domain_id": "shared-power-domain-0",
+      "kind": "power",
+      "parent_domain_id": "board-0",
+      "member_component_ids": [
+        "array-0",
+        "controller-0",
+        "verifier-0",
+        "power-0"
+      ],
+      "failure_probability": null,
+      "failure_model": "common_cause",
+      "evidence_status": "synthetic"
+    }
+  ],
+  "domain_dependencies": [
+    {
+      "dependent_domain_id": "array-0-domain",
+      "dependency_domain_id": "shared-power-domain-0",
+      "relationship": "shares_power_with"
+    },
+    {
+      "dependent_domain_id": "controller-domain-0",
+      "dependency_domain_id": "shared-power-domain-0",
+      "relationship": "shares_power_with"
+    }
+  ],
+  "fault_injections": [
+    {
+      "injection_id": "shared-power-loss-1",
+      "mechanism": "domain_outage",
+      "target_id": "shared-power-domain-0",
+      "parameters": {
+        "state": "failed",
+        "time_tick": 0
+      },
+      "evidence_status": "synthetic"
+    }
+  ],
+  "mitigation": {
+    "strategies": [
+      "direct_mapping"
+    ],
+    "verifier_component_id": "verifier-0",
+    "fallback_component_id": null,
+    "notes": [
+      "Negative control: one shared power-domain outage simultaneously affects the array, controller and verifier.",
+      "No task may be accepted and the verifier cannot be counted as independent when it shares the failed supply."
+    ]
+  },
+  "experiment": {
+    "phase": "negative_control",
+    "experimental_unit": "scenario",
+    "planned_units": 1,
+    "seed_policy": "fixed_replay",
+    "independence_statement": "No statistical independence claim; this is one deterministic logic negative control.",
+    "training_seed_range": null,
+    "validation_seed_range": null,
+    "confirmatory_seed_range": null
+  },
+  "measurement": {
+    "latency_boundary": "not_measured",
+    "latency_unit": null,
+    "energy_boundary": "not_measured",
+    "energy_unit": null,
+    "energy_includes": [],
+    "resource_boundary": "logical_cells",
+    "raw_receipt_required": true,
+    "instrument_id": null,
+    "environment": {}
+  },
+  "acceptance": {
+    "expected_classification": "hardware_unavailable",
+    "silent_corruption_allowed": false,
+    "deadline_required": true,
+    "target_correct_accepted_probability_lcb": null,
+    "target_silent_corruption_probability_ucb": null,
+    "notes": [
+      "Expected result is a deterministic classification, not a probability estimate.",
+      "Shared power loss must dominate healthy channel count and invalidate the verifier path that shares the rail."
+    ]
+  },
+  "error_budget": {
+    "dependence_assumption": "unknown_or_correlated",
+    "dependence_evidence_sha256": null,
+    "task_sensitivity_bound": null,
+    "sensitivity_evidence_sha256": null,
+    "contributions": []
+  }
+}
