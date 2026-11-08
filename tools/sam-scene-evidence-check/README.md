@@ -30,11 +30,12 @@ This is a nested Cargo workspace and is intentionally not part of the root works
    - observed-free regions require source evidence;
    - prediction references must name a track in the scene;
    - HDC proposals cannot gain metric or semantic authority (also fixed by schema);
-   - scene admission cannot grant actuator authority (also fixed by schema).
+   - scene admission cannot grant actuator authority (also fixed by schema);
+   - the scene snapshot's `traffic_convention_profile_id` must resolve in the same validated traffic profile registry.
 
 ## Traffic convention / mirror benchmark
 
-The same checker validates `SAM_TRAFFIC_CONVENTION_PROFILE_SCHEMA_V0_1.json` and the paired LHT/RHT fixture. It enforces explicit, versioned traffic-side and passing-rule profiles, verifies that map and scene profile IDs agree, and checks the mirror transform for lateral position/velocity, yaw, curvature, steering, lane sides, passing side, and invariant longitudinal / throttle / brake quantities. Steering-wheel position is intentionally independent of traffic side.
+The same checker validates `SAM_TRAFFIC_CONVENTION_PROFILE_SCHEMA_V0_1.json` and the paired LHT/RHT fixture. It enforces explicit, versioned traffic-side and passing-rule profiles, verifies that the scene snapshot's `traffic_convention_profile_id` resolves in that exact profile registry, checks that map and scene profile IDs agree, and checks the mirror transform for lateral position/velocity, yaw, curvature, steering, lane sides, passing side, and invariant longitudinal / throttle / brake quantities. Steering-wheel position is intentionally independent of traffic side.
 
 ## Negative controls
 
@@ -52,6 +53,7 @@ Unit tests mutate the canonical fixture to test rejection of:
 - map/profile identity mismatch;
 - passing-side / rule-profile mismatch;
 - unknown traffic-side profiles that attempt to retain a passing-side authority;
-- steering-wheel-layout-only changes that must preserve road semantics.
+- steering-wheel-layout-only changes that must preserve road semantics;
+- a scene contract whose traffic profile ID does not resolve in the validated registry.
 
 A PASS means structural and declared SAM semantic conformance for this interface version. It does not establish calibration accuracy, source independence, physical truth, sensor validity, ODD applicability, model safety, or vehicle authority.
