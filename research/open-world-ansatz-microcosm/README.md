@@ -102,9 +102,9 @@ For the matched A0 control, use the same world and intervention sequence, changi
 
 ## Experiment-selection controls
 
-`strategies::ProbeStrategy` supplies six comparable one-step policies: maximum partition count, minimax worst-case survivors, maximum entropy, minimum expected remaining candidates under a uniform prior, fixed grid, and seeded random. Each action is scored over the candidates still compatible with the public evidence. The score exposes partition count, worst-case survivors, exact expected-survivor numerator/denominator, entropy and action cost.
+`strategies::ProbeStrategy` supplies seven comparable one-step policies: maximum partition count, minimax worst-case survivors, maximum entropy, minimum expected remaining candidates under a uniform model prior, maximum structure-balanced information gain, fixed grid, and seeded random. Each action is scored over the candidates still compatible with the public evidence. The score exposes partition count, worst-case model survivors, exact expected-survivor numerator/denominator, model entropy, structure-balanced mutual information, worst-case surviving structural families and action cost.
 
-These are deliberately different objectives. Maximum entropy and expected survivors assume a uniform prior over the surviving finite grammar; they are not calibrated Bayesian posteriors or decision-focused EVSI. The random arm is seeded and reproducible. Independent two-input probes already used in the episode are excluded; repeat inputs remain available in stateful Boolean/numeric worlds.
+These are deliberately different objectives. Model entropy and expected survivors assume a uniform prior over the surviving parameterized grammar. The new structure-balanced objective first assigns equal prior mass to each surviving structural family, then a uniform conditional prior over that family's surviving parameterizations; it is invariant to duplicating equivalent parameterizations within a family. None of these heuristics is a calibrated Bayesian posterior or decision-focused EVSI. The random arm is seeded and reproducible. Independent two-input probes already used in the episode are excluded; repeat inputs remain available in stateful Boolean/numeric worlds.
 
 `policy::StrategyEnumeratorBaseline` combines each strategy with the same exact finite inference/submission logic, enabling per-strategy matched A0/A2 episodes. No comparative performance ranking is claimed until the exact-head Rust campaign runs and its full per-world metrics are recorded.
 
@@ -122,7 +122,7 @@ Important boundary: this Rust API is not an OS security sandbox. The agent must 
 
 ## Authored tests
 
-Sixty-two Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability and safe-versus-unnecessary abstention scoring.
+Sixty-four Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, and structure-balanced information-gain invariance to parameterization count.
 
 The previous exact-head focused runs covered 34 tests on commit 58128d025bdb24995c31822a86cd3afcaec28413. The additional protocol tests and wire contract must be qualified on the new exact branch head before this expanded branch is called green.
 
