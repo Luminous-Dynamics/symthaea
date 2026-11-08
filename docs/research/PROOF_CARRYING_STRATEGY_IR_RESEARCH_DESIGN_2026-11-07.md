@@ -622,3 +622,25 @@ This is a semantic profile, not yet a SynQBF proof. The SAT 2026 proof system us
 - Future SynQBF proof object: a circuit proof meeting the paper's three representability/equivalence conditions, independently checked from the source and prefix.
 
 These are related but different evidence artifacts. A full-history profile does not become a SynQBF proof by renaming it.
+
+
+## 17. Portable SynQBF artifacts and full-chain acceptance
+
+The finite pipeline now has a deterministic versioned portable artifact for SynQbfProof, backed by the existing AIG representation. The v1 codec uses explicit lengths and tags, little-endian integer fields, canonical input/decomposition order and strict malformed/trailing-byte rejection.
+
+The trust model is deliberately two-stage:
+
+1. Decode checks byte/count budgets, prefix binding shape, AIG graph validity, and canonical input/decomposition order. It establishes only structural validity.
+2. The source-bound artifact verifier decodes and calls the independent SynQBF verifier with the original CNF and validated ordered quantifier prefix. Source equivalence, every representability condition and the claimed root value must all pass.
+
+The format does not embed the source CNF, make a producer-provided verification flag authoritative, or claim cryptographic authenticity. Source and prefix digests are recorded by the existing evidence manifest/receipt system.
+
+The intended vertical acceptance chain is:
+
+QDIMACS source -> parsed ordered prefix + CNF -> residual game proof DAG -> independently verified game-value profile -> SynQBF AIG proof -> deterministic artifact bytes -> decode -> source-bound SynQBF verification
+
+The focused finite corpus now includes the full 2,184 two-variable CNF/prefix construction combinations, empty-prefix constant TRUE/FALSE cases and a QDIMACS-to-portable-artifact example. Until exact-head CI passes, these are committed tests, not qualified results.
+
+The decoder preflights the minimum bytes needed for the declared AIG node count before reserving storage. This is separate from the absolute artifact-byte and node-count limits; a small malformed artifact must not induce a large node-vector allocation.
+
+For external evaluation, follow QBFGallery's documented exit-code contract: 10=TRUE, 20=FALSE, any other status=error/unknown. Keep its decision-only execution separate from proof/artifact generation and verified strategy coverage. The current PCNF parser supports QDIMACS only; QCIR, prenex non-CNF and DQBF require separate typed input semantics and must not silently fall through to CNF parsing.
