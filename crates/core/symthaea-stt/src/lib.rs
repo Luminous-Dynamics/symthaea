@@ -153,8 +153,9 @@ pub use phoneme::{
 pub use rls::{FastRlsClassifier, RlsClassifier};
 pub use sleep_sentinel::{BandPowers, ConsciousnessSentinel, ConsciousnessState};
 pub use switch_metrics::{
-    LanguageErrorRate, MaskedErrorRate, SwitchAwareResult, SwitchMetricError,
-    SwitchWindowErrorRate, switch_aware_error_rates,
+    LanguageErrorRate, MacroMaskedErrorRate, MaskedErrorRate, SwitchAwareCorpusResult,
+    SwitchAwareResult, SwitchCorpusError, SwitchMetricError, SwitchWindowErrorRate,
+    aggregate_switch_aware_error_rates, switch_aware_error_rates,
 };
 pub use streaming::{StreamConfig, StreamProcessor, StreamSession};
 
