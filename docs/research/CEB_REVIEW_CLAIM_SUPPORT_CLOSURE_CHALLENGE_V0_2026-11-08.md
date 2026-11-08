@@ -126,7 +126,7 @@ Do not infer semantic independence merely from different files. Do not turn miss
 - C1: “Deployment D is currently authorized under policy P.”
 - C2: “Policy P is the current approved policy for deployment D.”
 
-**Support closure as submitted:**
+**Support closure:** as submitted.
 
 - C1 cites C2 as its only authority for policy currency.
 - C2 cites C1 as its only authority that policy P is approved for deployment D.
@@ -138,9 +138,13 @@ Do not infer semantic independence merely from different files. Do not turn miss
 
 ## CCL-S08 — omitted contradictory trace
 
-**Initial claim C1:** “The repaired transfer worker applies each logical operation at most once for all valid delivery attempts within the declared redelivery horizon.”
+**Initial claims:**
 
-**Supporting evidence packet:**
+- C1: “The repaired transfer worker applies each logical operation at most once for all valid delivery attempts within the declared redelivery horizon.”
+- C2: “The exact ordinary-retry unit-test scenario applies a logical operation once for the tested pair of attempts.”
+
+**Support closure:**
+
 - source anchor: the deduplication key uses logical_operation_id;
 - unit test: two attempts with different attempt IDs but the same logical operation ID produce one application;
 - successful smoke-test receipt: ordinary retry path passed.
