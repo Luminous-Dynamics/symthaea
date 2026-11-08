@@ -67,6 +67,9 @@ pub struct ServiceEvaluation {
     pub service_id: String, pub unit: String, pub minimum_rate: f64,
     pub minimum_observed_rate: f64, pub time_below_floor_seconds: u64,
     pub floor_breach_episodes: u32, pub first_floor_breach_seconds: Option<u64>,
+    /// 0 if the floor was never breached; Some(t) for the latest recovery;
+    /// None if the service ends the observation window below its floor.
+    pub last_floor_recovery_seconds: Option<u64>,
     pub shortfall_rate_hours: f64, pub first_fault_seconds: Option<u64>,
     pub repair_started_seconds: Option<u64>, pub spare_arrived_seconds: Option<u64>,
     pub repair_completed_seconds: Option<u64>, pub post_test_passed_seconds: Option<u64>,
@@ -79,7 +82,12 @@ pub struct ServiceContinuityEvaluation {
     pub case_id: String, pub disposition: ContinuityDisposition,
     pub safety_gate_failed: bool, pub service_floor_breach_count: u32,
     pub first_floor_breach_seconds: Option<u64>,
-    pub authorized_restoration_seconds: Option<u64>, pub services: Vec<ServiceEvaluation>,
+    /// Latest time at which every declared service was at or above its floor.
+    /// None means at least one service remained below floor or a safety gate failed.
+    pub all_declared_service_floors_restored_seconds: Option<u64>,
+    /// Earliest accepted restoration among services; inspect per-service values too.
+    pub earliest_service_accepted_restoration_seconds: Option<u64>,
+    pub services: Vec<ServiceEvaluation>,
 }
 
 /// Recompute service-floor exposure and accepted restoration from event evidence.
@@ -100,14 +108,19 @@ pub fn evaluate_service_continuity(
     }
     let breaches: u32 = services.iter().map(|s| s.floor_breach_episodes).sum();
     let first_breach = services.iter().filter_map(|s| s.first_floor_breach_seconds).min();
-    let restored = services.iter().filter_map(|s| s.accepted_restoration_seconds).min();
+    let earliest_restoration = services.iter().filter_map(|s| s.accepted_restoration_seconds).min();
+    let all_floors_restored = if safety_failed { None } else {
+        services.iter().map(|s| s.last_floor_recovery_seconds)
+            .collect::<Option<Vec<u64>>>().map(|times| times.into_iter().max().unwrap_or(0))
+    };
     let disposition = if safety_failed { ContinuityDisposition::UnsafeNotAuthorized }
         else if breaches > 0 { ContinuityDisposition::FloorBreach }
         else { ContinuityDisposition::NoFloorBreach };
     Ok(ServiceContinuityEvaluation {
         case_id: case.case_id.clone(), disposition, safety_gate_failed: safety_failed,
         service_floor_breach_count: breaches, first_floor_breach_seconds: first_breach,
-        authorized_restoration_seconds: restored, services,
+        all_declared_service_floors_restored_seconds: all_floors_restored,
+        earliest_service_accepted_restoration_seconds: earliest_restoration, services,
     })
 }
 
@@ -235,10 +248,11 @@ fn evaluate_service(
     let mut rate = c.initial_rate;
     let mut min_rate = rate;
     let mut prev = 0_u64;
-    let mut active = false;
+    let mut active = c.initial_rate < c.minimum_rate;
     let mut seconds_below = 0_u64;
-    let mut episodes = 0_u32;
-    let mut first_breach = None;
+    let mut episodes = u32::from(active);
+    let mut first_breach = active.then_some(0);
+    let mut last_floor_recovery = (!active).then_some(0);
     let mut deficit_hours = 0.0;
     let mut restoration = None;
     let mut rejected = 0_u32;
@@ -262,7 +276,14 @@ fn evaluate_service(
             }
         }
         min_rate = min_rate.min(rate);
-        if rate >= c.minimum_rate { active = false; }
+        if rate >= c.minimum_rate {
+            if active { last_floor_recovery = Some(t); }
+            active = false;
+        } else if !active {
+            episodes = episodes.saturating_add(1);
+            first_breach.get_or_insert(t);
+            active = true;
+        }
         prev = t; i = j;
     }
     integrate(c, rate, prev, timeline, &mut active, &mut seconds_below,
@@ -274,6 +295,7 @@ fn evaluate_service(
         service_id: c.service_id.clone(), unit: c.unit.clone(), minimum_rate: c.minimum_rate,
         minimum_observed_rate: min_rate, time_below_floor_seconds: seconds_below,
         floor_breach_episodes: episodes, first_floor_breach_seconds: first_breach,
+        last_floor_recovery_seconds: if active { None } else { last_floor_recovery },
         shortfall_rate_hours: deficit_hours, first_fault_seconds: first_fault,
         repair_started_seconds: first_time(events, EventKind::RepairStarted),
         spare_arrived_seconds: first_time(events, EventKind::SpareArrived),
@@ -555,6 +577,9 @@ mod tests {
         assert_eq!(out.disposition,ContinuityDisposition::FloorBreach);
         assert_eq!(out.services[0].time_below_floor_seconds,0);
         assert_eq!(out.services[1].time_below_floor_seconds,3600);
+        assert_eq!(out.services[0].last_floor_recovery_seconds,Some(0));
+        assert_eq!(out.services[1].last_floor_recovery_seconds,None);
+        assert_eq!(out.all_declared_service_floors_restored_seconds,None);
         assert!((out.services[1].shortfall_rate_hours-2.0).abs()<1e-12);
     }
 
@@ -574,6 +599,24 @@ mod tests {
         unqualified.qualified_personnel_present=false;
         let out=evaluate_service_continuity(&case(events,vec![unqualified],100)).unwrap();
         assert_eq!(out.services[0].accepted_restoration_seconds,None);
+    }
+
+    #[test]
+    fn all_declared_service_floors_require_every_service_to_recover() {
+        let mut input=case(vec![
+            event("water_failure",10,EventKind::ComponentFailure,0.0),
+            task_event("water_repair",30,EventKind::RepairCompleted,0.0),
+            task_event("water_test",40,EventKind::PostTestPassed,0.0),
+            task_event("water_config",50,EventKind::ConfigurationUpdated,0.0),
+            task_event("water_release",60,EventKind::AuthorizedRelease,80.0),
+        ],vec![task()],100);
+        input.services.push(ServiceContract {
+            service_id:"electrical_distribution".into(), unit:"kW".into(),
+            minimum_rate:2.0, nominal_rate:5.0, initial_rate:5.0,
+        });
+        let out=evaluate_service_continuity(&input).unwrap();
+        assert_eq!(out.all_declared_service_floors_restored_seconds,Some(60));
+        assert_eq!(out.services[1].last_floor_recovery_seconds,Some(0));
     }
 
     #[test]
