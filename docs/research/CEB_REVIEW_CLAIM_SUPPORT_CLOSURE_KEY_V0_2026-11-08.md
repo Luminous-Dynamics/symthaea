@@ -33,7 +33,7 @@ A file-path match alone does not prove semantic impact. A missing path match doe
 
 ## 4. CCL-S03 — build/feature transition
 
-**C1 — default Linux build selection:** expected disposition is **invalidate for current-tree decision use**, with a requirement to **revalidate** the new build-world claim. The manifest event changes the feature-default premise. The old build-selection claim cannot be reused for the new tree. A new feature-resolution/build-provenance record is needed to establish which implementation is now selected. Do not infer the exact active implementation from a manifest edit alone.
+**C1 — default Linux build selection:** expected disposition is **invalidate for current-tree decision use**. The manifest event changes the feature-default premise, so the old build-selection claim cannot be reused for the new tree. A distinct new claim about the current default build remains **unresolved** until a fresh feature-resolution/build-provenance record establishes which implementation is selected. Do not infer the exact active implementation from a manifest edit alone.
 
 **C2 — both implementations exist in source:** expected disposition is **retain** within the declared source-tree scope, because both cfg-gated definitions remain present and the event changes only feature defaults. This does not establish that both are compiled or selectable in one artifact.
 
@@ -41,7 +41,7 @@ A file-path match alone does not prove semantic impact. A missing path match doe
 
 ## 5. CCL-S04 — verifier-only update
 
-**C1 — pass under verifier V1:** expected disposition is **revalidate/regrade**. The old pass remains a historical record of what V1 reported, but V1's false-negative defect removes its current decision-use authority for this criterion. Regrade the retained exact artifact A and identical inputs with V2. Do not rerun candidate code by default when source, artifact and environment are byte-identical and the canonical release policy permits regrade.
+**C1 — pass under verifier V1:** expected disposition is **revalidate**. The old pass remains a historical record of what V1 reported, but V1's false-negative defect removes its current decision-use authority for this criterion. The required revalidation action is to regrade the retained exact artifact A and identical inputs with V2. Do not rerun candidate code by default when source, artifact and environment are byte-identical and the canonical release policy permits regrade.
 
 **C2 — source contains the authorization guard:** expected disposition is **retain** for the source-level proposition. It does not depend on V1's verdict. If the claim were that the guard passed a particular test, that would be a different claim and would require the verifier result.
 
