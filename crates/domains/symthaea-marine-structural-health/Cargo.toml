@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-marine-structural-health"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence-bounded marine inspection interval and value-of-information verifier"
+
+[lib]
+path = "src/lib.rs"
