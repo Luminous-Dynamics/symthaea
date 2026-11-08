@@ -72,6 +72,7 @@ impl StagewiseIntervalMarkovModel {
                 let mut upper_sum = CheckedRational::zero();
                 for (column, interval) in intervals.iter().enumerate() {
                     if interval.lower.is_negative()
+                        || interval.upper.is_negative()
                         || compare_nonnegative(interval.upper, CheckedRational::one()) == Ordering::Greater
                         || compare_nonnegative(interval.lower, interval.upper) == Ordering::Greater
                     {
@@ -146,7 +147,7 @@ impl OccupationFlowLayout {
     }
 
     pub fn flow_variable(&self, stage: usize, source: usize, destination: usize) -> Option<usize> {
-        if stage + 1 >= self.periods || source >= self.states || destination >= self.states {
+        if stage >= self.periods.saturating_sub(1) || source >= self.states || destination >= self.states {
             return None;
         }
         let offset = stage.checked_mul(self.states.checked_mul(self.states)?)?
@@ -436,7 +437,7 @@ fn compare_nonnegative(left: CheckedRational, right: CheckedRational) -> Orderin
 mod tests {
     use super::*;
     use crate::lp_certificate::{
-        verify_primal_dual_optimality, FarkasCertificate, PrimalDualCertificate,
+        verify_primal_dual_optimality, PrimalDualCertificate,
     };
 
     fn q(n: i128, d: i128) -> CheckedRational {
@@ -573,8 +574,8 @@ mod tests {
         let valid = StagewiseIntervalMarkovModel::new(
             vec![q(1, 1), q(0, 1)],
             vec![vec![
-                vec![interval(1, 1), interval(0, 1)],
-                vec![interval(0, 1), interval(1, 1)],
+                vec![interval(1, 1, 1, 1), interval(0, 1, 0, 1)],
+                vec![interval(0, 1, 0, 1), interval(1, 1, 1, 1)],
             ]],
         );
         assert!(valid.is_ok());
@@ -583,7 +584,7 @@ mod tests {
             &vec![vec![q(1, 1), q(0, 1)], vec![q(0, 1), q(1, 1)]],
             UtilityDirection::Maximize,
         ).unwrap();
-        assert_eq!(built.problem().row_count(), 18);
+        assert_eq!(built.problem().row_count(), 20);
         assert_eq!(built.problem().column_count(), 6);
     }
 }
