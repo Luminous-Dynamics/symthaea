@@ -256,3 +256,8 @@ At feasible budgets (e.g. 1/5/10/20/50/100 labelled hours where enough admitted 
 - [#11040](https://github.com/Luminous-Dynamics/symthaea/pull/11040): this programme synthesis.
 
 All new issue and PR artefacts are research or implementation drafts. No dataset has been ingested, no model has been trained or evaluated, and no language capability has been promoted. Skipped CI is not PASS.
+
+
+## Machine-readable benchmark contract
+
+The seven evaluation lanes are represented in [`voice_benchmark_matrix_2026q4.json`](./voice_benchmark_matrix_2026q4.json). Its structural contract is [`voice_benchmark_matrix_2026q4.schema.json`](./voice_benchmark_matrix_2026q4.schema.json) (JSON Schema Draft 2020-12). The schema checks required identifiers, task/metric fields, and source status metadata; it does not validate licence truth, speaker consent, scientific validity or capability qualification. Those remain human/source-governance gates under #10942 and #5352.
