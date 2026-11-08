@@ -162,21 +162,21 @@
           "file": "open_domain/imgs/cape_town.png",
           "sha256": "8ee006e20747e6c9a3033b54b67ea9c54a030f5c6971fd3795e91a328363a4da",
           "xet_hash": "6073160048c69b88de8306651b187e7ac8eb59911fc6053e49e1f23261bb1ba6",
-          "size_bytes": 506880,
           "caption_file": "open_domain/caption/cape_town.txt",
           "caption_summary": "Forward-facing car-mounted camera on a highway; vehicles pass or are overtaken in steady traffic; buildings and palm trees appear roadside.",
           "caption_bytes": 411,
-          "evidence_of_traffic_side": "none"
+          "evidence_of_traffic_side": "none",
+          "size_reported": "495 kB"
         },
         {
           "file": "open_domain/imgs/cape_town_2.png",
           "sha256": "727d72b69c233c333724cf988092810e4e7b39ff48637b4d305d77c1c0b00f4d",
           "xet_hash": "666ecb116227071a4481fd9a770d4452268b4fe067915ab8d67e5ee01d3337d5",
-          "size_bytes": 727040,
           "caption_file": "open_domain/caption/cape_town_2.txt",
           "caption_summary": "Forward-facing car-mounted camera with steady traffic; greenery on the left and a coastal view on the right; overcast weather.",
           "caption_bytes": 340,
-          "evidence_of_traffic_side": "none"
+          "evidence_of_traffic_side": "none",
+          "size_reported": "710 kB"
         }
       ],
       "interpretation": {
