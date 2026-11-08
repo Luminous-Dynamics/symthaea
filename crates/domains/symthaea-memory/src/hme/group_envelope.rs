@@ -383,6 +383,26 @@ impl ContinuousHVGroupEnvelope {
         self.dimension
     }
 
+    /// Deterministic centroid used by the joint L2 group envelope.
+    pub fn centroid(&self) -> &ContinuousHV {
+        &self.centroid
+    }
+
+    /// Conservatively verified maximum member-to-centroid L2 radius.
+    pub fn radius_l2_upper(&self) -> f32 {
+        self.radius_l2_upper
+    }
+
+    /// Coordinate-wise minimum extrema used by the box envelope.
+    pub fn coordinate_minima(&self) -> &[f32] {
+        &self.coordinate_minima
+    }
+
+    /// Coordinate-wise maximum extrema used by the box envelope.
+    pub fn coordinate_maxima(&self) -> &[f32] {
+        &self.coordinate_maxima
+    }
+
     /// Query-specific interval enclosing every member score for a pinned group.
     ///
     /// The expected generations, member-set digest and content digest must come
@@ -571,6 +591,84 @@ mod tests {
             ),
             Err(GroupEnvelopeError::MemberSetMismatch)
         ));
+    }
+
+    #[test]
+    fn exact_top_k_threshold_prunes_only_groups_that_cannot_contain_a_winner() {
+        const DIM: usize = 64;
+        const GROUPS: usize = 12;
+        const MEMBERS_PER_GROUP: usize = 8;
+        let mut groups = Vec::new();
+        let mut all_scores = Vec::new();
+
+        // Make group 0 align with the query; the remaining groups point in
+        // orthogonal or opposing directions. A small perturbation ensures the
+        // group radii are nonzero while remaining tightly bounded.
+        for group_index in 0..GROUPS {
+            let mut center = vec![0.0f32; DIM];
+            center[0] = if group_index == 0 {
+                1.0
+            } else if group_index % 2 == 0 {
+                -0.8
+            } else {
+                0.0
+            };
+            if group_index % 2 == 1 {
+                center[(group_index / 2).max(1)] = 0.9;
+            }
+            let mut members = Vec::new();
+            for member_index in 0..MEMBERS_PER_GROUP {
+                let mut values = center.clone();
+                let coordinate = (member_index * 7 + group_index * 3) % DIM;
+                let delta = (member_index as f32 - 3.5) * 0.0001;
+                values[coordinate] = (values[coordinate] + delta).clamp(-1.0, 1.0);
+                let id = format!("g{group_index:02}-m{member_index:02}");
+                let vector = ContinuousHV::from_vec(values);
+                members.push((id.clone(), vector.clone()));
+                all_scores.push((id, vector.similarity_full_resolution(&ContinuousHV::from_vec({
+                    let mut q = vec![0.0f32; DIM];
+                    q[0] = 1.0;
+                    q
+                }))));
+            }
+            groups.push(
+                ContinuousHVGroupEnvelope::from_original_members(17, 5, &members).unwrap(),
+            );
+        }
+
+        all_scores.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let kth_threshold = all_scores[9].1;
+        let query = ContinuousHV::from_vec({
+            let mut q = vec![0.0f32; DIM];
+            q[0] = 1.0;
+            q
+        });
+
+        let mut pruned_groups = 0usize;
+        for envelope in &groups {
+            let may_prune = envelope
+                .can_prune_for_top_k(
+                    &query,
+                    kth_threshold,
+                    17,
+                    5,
+                    envelope.member_set_digest(),
+                    envelope.content_digest(),
+                )
+                .unwrap();
+            if may_prune {
+                pruned_groups += 1;
+                for id in envelope.member_ids() {
+                    let (member_id, score) =
+                        all_scores.iter().find(|(member_id, _)| member_id == id).unwrap();
+                    assert!(
+                        *score < kth_threshold,
+                        "group was pruned but member {member_id} reaches kth threshold"
+                    );
+                }
+            }
+        }
+        assert!(pruned_groups > 0, "expected the separated groups to expose a safe prune");
     }
 
     #[test]
