@@ -1,6 +1,6 @@
 # HME industry benchmark crosswalk and research priorities
 
-**Date:** 2026-11-07  
+**Date:** 2026-11-08  
 **Status:** Research / protocol design; no HME benchmark result is claimed  
 **Parent:** [#10915 — HDC-native Holographic Memory Engine](https://github.com/Luminous-Dynamics/symthaea/issues/10915)  
 **RFC:** [PR #10916](https://github.com/Luminous-Dynamics/symthaea/pull/10916)
@@ -563,3 +563,67 @@ q\cdot x\le q\cdot\hat{x}+\sum_b\|q_b\|_2\epsilon_b(m_b).
 The workload weight chooses where to spend storage; it is not a proof premise. Under distribution shift, the chosen code may become less efficient but a verified worst-case epsilon remains safe. Compare uniform allocation, variance-only bit-gain, query-energy-weighted allocation and robust multi-profile allocation at equal total code + certificate bytes. Rebuilds must create a new generation and revalidate all certificates.
 
 Synthetic allocation fixture: [hme_query_weighted_code_allocation_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_query_weighted_code_allocation_v0.json). Its two-block epsilon curve is illustrative only; no production quantizer or benchmark result is claimed.
+
+
+## 8. 2026-11-08: per-query guarantees, refinement-first storage and decision-preserving compression
+
+The external frontier now makes three distinctions especially important for HME:
+
+| System / research | Demonstrated contribution (authors' reports) | HME comparison boundary |
+|---|---|---|
+| PQR-Search, arXiv:2611.07579 (2026-11-05) | Per-fixed-query probabilistic recall guarantee; 20 datasets up to 100M; reported 26.4x geometric-mean batch throughput over FAISS exhaustive search and 69–154x at 100M | Compare only in an explicitly probabilistic retrieval profile. Match its guarantee parameters and report probability over index randomness separately from deterministic exact mode. Re-audit after updates, deletes and OOD queries. |
+| Recast, arXiv:2611.02765 (2026-11-02) | Refinement-centered storage architecture; reported 1.56–2.01x QPS at 0.99 recall under matched memory and 1.22–6.75x less external storage | Reproduce its probed-list/refinement boundary; do not infer global exactness from interval containment inside probed IVF lists. Compare storage bytes, I/Os, updates and cold/warm latency. |
+| QBAT, PVLDB 2026 | Query-specific budget prediction; authors report up to 68.8% lower total searched budget in ScaNN consistency mode while enforcing a per-query recall target | Direct baseline for #11041 scheduler. Count offline model/training cost, feature extraction, calibration, prediction overhead, distribution shift and searched-work budget. |
+| Decision-preserving low-bit quantization, arXiv:2609.09854 (2026-09-09) | Connects exact comparison margins and residual tails/dependence to ranking and graph-pruning decision flips; proposes held-out block certificates for frozen quantized decisions | Compare on margin-conditioned top-k and pruning-decision flips, residual covariance and rare-contamination controls—not just vector MSE or global rank correlation. Probabilistic results remain separate from worst-case certificates. |
+| VIBE / VectorDBBench | VIBE is an algorithm-level benchmark with modern in-distribution and OOD embedding corpora; VectorDBBench now registers the 24 VIBE datasets and multimodal corpora at 1M/10M/100M | Use VIBE for index algorithm comparisons and VectorDBBench for system/storage/ingestion behavior. Neither substitutes for HME's source-aware episodic-memory and exact HDC contract tests. |
+
+Sources:
+- PQR-Search: https://arxiv.org/abs/2611.07579
+- Recast: https://arxiv.org/abs/2611.02765
+- QBAT: https://research.google/pubs/qbat-model-based-query-budget-autotuner-for-clustering-based-approximate-nearest-neighbor-search/
+- Decision-level quantization: https://arxiv.org/abs/2609.09854
+- VIBE: https://github.com/vector-index-bench/vibe
+- VectorDBBench: https://github.com/zilliztech/VectorDBBench
+
+### Benchmark protocol upgrade
+
+Every HME retrieval experiment must publish a guarantee-class field and a complete coverage denominator:
+
+- **ExactFull:** original payloads fully scored; canonical oracle.
+- **ExactCertified:** all eligible records covered by valid per-record intervals or admissible unopened-segment bounds; exact top-k agreement 100%, false prunes 0.
+- **ApproximatePerQuery:** probabilistic guarantee explicitly names the random variable, fixed-query scope, parameters and post-update validity.
+- **EmpiricalSelective:** measured recall/coverage only; no mathematical per-query promise.
+- **IncompleteOrUncertified:** partial result or missing proof; never count as completed top-k.
+
+Publish both corpus-average and per-query distributions. Include query cohorts for ID, OOD, adversarial, low-margin, high-margin, rights-filtered, newly updated, deleted and stale-generation records. Report p50/p95/p99 and full latency histograms where possible; no mean-only claims.
+
+### Decision-centric quantization protocol
+
+For each query, compute exact score margin at the boundary:
+
+`m_k = s_{(k)} - s_{(k+1)}`
+
+and the per-candidate margin to the kth boundary. Report ranking/pruning flips conditioned on normalized margin bins, not only aggregate cosine/MSE. Also report the empirical covariance and tail dependence of reconstruction residuals among candidates sharing a query, block, codebook or update batch.
+
+Evaluate at equal total bytes:
+1. uniform code allocation;
+2. variance-only allocation;
+3. query-energy-weighted allocation;
+4. robust multi-profile allocation;
+5. decision-margin-aware allocation;
+6. independently certified blockwise residual bounds.
+
+Workload-aware allocation may improve expected efficiency, but worst-case residual caps and proof validation remain mandatory for ExactCertified. A held-out calibration or statistical tail estimate can support only a separately named approximate mode.
+
+### Promotion gates against the industry
+
+HME can claim a differentiated result only after it shows, on at least one declared workload, all of the following:
+
+1. 100% canonical exact top-k agreement and zero false pruning in ExactCertified.
+2. Complete eligible-record coverage, with zero payload reads for policy-excluded records.
+3. At least 50% original cold-payload bytes avoided **after** adding interval metadata, certificates, codebooks, cache and scheduling overhead.
+4. Better end-to-end p95/p99 latency or throughput than the full-scan and progressive-exact baselines at identical outputs; no win claimed from kernel-only timing.
+5. Updates, deletes, compaction, recovery and rights changes do not invalidate the exactness receipt or resurrect stale content.
+6. For ApproximatePerQuery, match or exceed a named PQR-style `(tau, delta)` target on fixed-query audits and OOD/update stress, while publishing the exact probability scope.
+
+These are project gates, not external standards or present results. Do not compare Recast's 0.99-recall QPS, PQR's per-query probability and HME ExactCertified throughput as if they were the same contract.
