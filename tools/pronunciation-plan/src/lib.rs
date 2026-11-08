@@ -500,21 +500,27 @@ impl BeatDomainScore {
                 let start_s = self.seconds_at_beat(event.start_beat)?;
                 let end_s = self.seconds_at_beat(event.start_beat + event.duration_beats)?;
                 let duration_s = end_s - start_s;
-                if !duration_s.is_finite() || duration_s <= 0.0 {
+                let start_s_f32 = start_s as f32;
+                let duration_s_f32 = duration_s as f32;
+                if !start_s_f32.is_finite()
+                    || !duration_s.is_finite()
+                    || duration_s <= 0.0
+                    || !duration_s_f32.is_finite()
+                    || duration_s_f32 <= 0.0
+                {
                     return Err(format!(
-                        "beat score event {index} materializes to an invalid duration"
+                        "beat score event {index} cannot be represented as a finite positive f32 timeline"
                     ));
                 }
                 Ok(ScoreEvent {
-                    start_s: start_s as f32,
-                    duration_s: duration_s as f32,
+                    start_s: start_s_f32,
+                    duration_s: duration_s_f32,
                     kind: event.kind,
                 })
             })
             .collect()
     }
 }
-
 
 /// Ordered note-index assignment for one resolved pronunciation syllable.
 /// Multiple consecutive note indices represent a melisma over one explicitly
@@ -1530,4 +1536,126 @@ mod tests {
             "{error}"
         );
     }
+    #[test]
+    fn beat_domain_score_integrates_tempo_changes_inside_score_events() {
+        let score = BeatDomainScore {
+            schema_version: 1,
+            tempo_map: vec![
+                TempoChange {
+                    start_beat: 0.0,
+                    quarter_bpm: 120.0,
+                },
+                TempoChange {
+                    start_beat: 4.0,
+                    quarter_bpm: 60.0,
+                },
+            ],
+            events: vec![
+                BeatScoreEvent {
+                    start_beat: 0.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                BeatScoreEvent {
+                    start_beat: 2.0,
+                    duration_beats: 4.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+                BeatScoreEvent {
+                    start_beat: 6.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::Rest,
+                },
+            ],
+        };
+
+        let seconds = score.materialize_seconds().unwrap();
+        assert_eq!(seconds.len(), 3);
+        assert!((seconds[0].start_s - 0.0).abs() < 1e-6);
+        assert!((seconds[0].duration_s - 1.0).abs() < 1e-6);
+        assert!((seconds[1].start_s - 1.0).abs() < 1e-6);
+        assert!((seconds[1].duration_s - 3.0).abs() < 1e-6);
+        assert!((seconds[2].start_s - 4.0).abs() < 1e-6);
+        assert!((seconds[2].duration_s - 2.0).abs() < 1e-6);
+        assert!(matches!(seconds[2].kind, ScoreEventKind::Rest));
+        assert!((score.seconds_at_beat(8.0).unwrap() - 6.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn beat_domain_score_rejects_implicit_gaps_and_malformed_tempo_maps() {
+        let mut score = BeatDomainScore {
+            schema_version: 1,
+            tempo_map: vec![TempoChange {
+                start_beat: 0.0,
+                quarter_bpm: 120.0,
+            }],
+            events: vec![
+                BeatScoreEvent {
+                    start_beat: 0.0,
+                    duration_beats: 1.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                BeatScoreEvent {
+                    start_beat: 1.5,
+                    duration_beats: 1.0,
+                    kind: ScoreEventKind::Rest,
+                },
+            ],
+        };
+        assert!(score.validate().unwrap_err().contains("implicit gap"));
+
+        score.events[1].start_beat = 1.0;
+        score.tempo_map = vec![
+            TempoChange {
+                start_beat: 1.0,
+                quarter_bpm: 120.0,
+            },
+        ];
+        assert!(score.validate().unwrap_err().contains("begin at beat zero"));
+
+        score.tempo_map = vec![
+            TempoChange {
+                start_beat: 0.0,
+                quarter_bpm: 120.0,
+            },
+            TempoChange {
+                start_beat: 0.0,
+                quarter_bpm: 90.0,
+            },
+        ];
+        assert!(score.validate().unwrap_err().contains("strictly increasing"));
+    }
+
+    #[test]
+    fn beat_domain_score_rejects_time_overflow_at_renderer_precision() {
+        let score = BeatDomainScore {
+            schema_version: 1,
+            tempo_map: vec![TempoChange {
+                start_beat: 0.0,
+                quarter_bpm: 120.0,
+            }],
+            events: vec![BeatScoreEvent {
+                start_beat: 0.0,
+                duration_beats: 1.0e60,
+                kind: ScoreEventKind::Rest,
+            }],
+        };
+        assert!(
+            score
+                .materialize_seconds()
+                .unwrap_err()
+                .contains("finite positive f32 timeline")
+        );
+    }
+
+
 }
