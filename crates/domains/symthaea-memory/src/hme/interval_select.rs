@@ -966,6 +966,16 @@ pub fn select_group_refinement_set(
         {
             return Err(GroupIntervalSelectionError::InvalidGroupMembership { group_index });
         }
+        if !group.interval.is_well_formed() {
+            return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
+        }
+        if let Some(first_index) = first_index_by_id.get(&group.identity.member_set_digest).copied() {
+            return Err(GroupIntervalSelectionError::DuplicateGroupId {
+                first_index,
+                duplicate_index: group_index,
+            });
+        }
+        first_index_by_id.insert(group.identity.member_set_digest, group_index);
         for member_id in &group.member_ids {
             if let Some(first_group_index) =
                 first_group_by_member_id.get(member_id.as_str()).copied()
@@ -978,16 +988,6 @@ pub fn select_group_refinement_set(
             }
             first_group_by_member_id.insert(member_id.as_str(), group_index);
         }
-        if !group.interval.is_well_formed() {
-            return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
-        }
-        if let Some(first_index) = first_index_by_id.get(&group.identity.member_set_digest).copied() {
-            return Err(GroupIntervalSelectionError::DuplicateGroupId {
-                first_index,
-                duplicate_index: group_index,
-            });
-        }
-        first_index_by_id.insert(group.identity.member_set_digest, group_index);
         covered_records = covered_records
             .checked_add(group.member_count)
             .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
