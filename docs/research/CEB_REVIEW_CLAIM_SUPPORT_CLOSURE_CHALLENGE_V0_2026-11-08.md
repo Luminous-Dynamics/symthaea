@@ -130,7 +130,7 @@ Do not infer semantic independence merely from different files. Do not turn miss
 
 - C1 cites C2 as its only authority for policy currency.
 - C2 cites C1 as its only authority that policy P is approved for deployment D.
-- Neither claim has an independent signed policy revision, trust-root verification, approved policy registry entry or human authorization record.
+- Neither claim has an independent signed policy revision, trust-root verification, approved policy registry entry or human authorization record. The two claims are mutually dependent and form a circular positive-support cycle.
 
 **Change event E7:** a metadata-only correction changes the display label for deployment D. No independent policy or authorization evidence is introduced.
 
@@ -147,7 +147,8 @@ Do not infer semantic independence merely from different files. Do not turn miss
 
 **Known counter-evidence:**
 - a separately captured integration trace from the same release and declared workload records a duplicate application after a retry crosses the retention boundary;
-- the workload is within the stated supported redelivery horizon;
+- this is a contradictory trace to the broad claim;
+- the trace is within the stated supported redelivery horizon;
 - the trace has independent run identity and is not copied from the unit-test fixture.
 
 **Change event E8:** the integration trace is added to the evidence packet after C1 was approved. No source or build change occurs.
