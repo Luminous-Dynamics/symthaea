@@ -31,7 +31,7 @@
       "id": "ISO 12217-1:2022",
       "edition": 4,
       "publication_date": "2022-12",
-      "status": "published_current_pending_revision",
+      "status": "published_stage_90_92_to_be_revised",
       "scope": "Stability and buoyancy assessment/categorization for non-sailing boats, principally 6–24 m LH.",
       "next_revision": {
         "id": "ISO/DIS 12217-1.2",
@@ -49,7 +49,7 @@
       "id": "ISO 12217-2:2022",
       "edition": 4,
       "publication_date": "2022-12",
-      "status": "published_current_pending_revision",
+      "status": "published_stage_90_92_to_be_revised",
       "scope": "Stability and buoyancy assessment/categorization for sailing boats, principally 6–24 m LH.",
       "next_revision": {
         "id": "ISO/DIS 12217-2.2",
@@ -185,6 +185,16 @@
       "scope": "Procedure families include ship resistance tests, general guidelines and examples for uncertainty analysis of resistance tests, propulsion tests and related model-test methods.",
       "applicability_note": "Use the current applicable ITTC procedure for towing-tank/model-test claims and uncertainty analysis. Does not by itself validate a specific facility, instrument chain, model scale correction or LOS design.",
       "source": "https://ittc.info/downloads/quality-systems-manual/recommended-procedures-and-guidelines/"
+    },
+    {
+      "id": "ITTC Recommended Procedure 7.5-02-07-04.7 — Inclining Tests",
+      "document_type": "ittc_recommended_procedure",
+      "revision": 1,
+      "effective_year": 2024,
+      "status": "published_procedure",
+      "scope": "Procedure for ship inclining tests; draft measurements, angles and hull geometry combined to determine displacement and longitudinal/transverse/vertical centre of gravity.",
+      "applicability_note": "Method reference for professional physical inclining-test planning and analysis. Does not substitute for exact test-article preparation, calibrated instruments, qualified personnel, vessel-specific procedure or applicable stability requirements. Synthetic mass-ledger arithmetic is not an inclining test.",
+      "source": "https://www.ittc.info/media/11946/75-02-07-047.pdf"
     }
   ]
 }
