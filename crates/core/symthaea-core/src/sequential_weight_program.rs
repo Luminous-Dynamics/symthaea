@@ -9,6 +9,7 @@
 //! Session advancement requires an independent verifier receipt. This module
 //! never mutates or promotes a live model.
 
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -88,11 +89,76 @@ pub struct SequentialStepReceipt {
     pub program_digest: String,
     pub candidate_snapshot_digest: String,
     pub candidate_native_model_digest: String,
+    /// Fingerprint of the pinned verifier public key that authenticated this step.
+    pub verifier_key_id: String,
+    /// Versioned protocol used by the independent verifier.
+    pub verification_protocol_digest: String,
+    /// Digest of held-out, retention, negative-control, and constraint results.
+    pub result_manifest_digest: String,
+    /// Digest of the complete signed verifier-attestation envelope.
     pub verifier_receipt_digest: String,
     pub previous_step_receipt_digest: Option<String>,
     pub cumulative_l2_path_after: f64,
     pub cumulative_parameter_change_events_after: usize,
     pub step_receipt_digest: String,
+}
+
+/// Claims an independent verifier must sign after checking a candidate.
+///
+/// The verifier protocol must independently recompute the native model digest,
+/// run held-out and retention probes, evaluate negative controls, and record
+/// its results in the manifest identified by `result_manifest_digest`. The
+/// caller must resolve the verifying key from a pinned trust store; a key
+/// supplied by the candidate proposer is not a trust anchor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SequentialVerifierAttestationClaims {
+    pub format_version: u32,
+    pub verifier_id: String,
+    pub verification_protocol_digest: String,
+    pub result_manifest_digest: String,
+    pub session_id: String,
+    pub batch_index: usize,
+    pub template_digest: String,
+    pub parent_candidate_model_digest: String,
+    pub candidate_native_model_digest: String,
+    pub target_specification_digest: String,
+    pub evidence_batch_digest: String,
+    pub observation_manifest_digest: String,
+    pub program_digest: String,
+    pub candidate_snapshot_digest: String,
+    /// False is a signed rejection. A verifier must never sign true before all
+    /// required tests and negative controls have completed.
+    pub accepted: bool,
+}
+
+/// Ed25519-signed verifier claims. The private signing key remains outside this crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignedSequentialVerifierAttestation {
+    pub claims: SequentialVerifierAttestationClaims,
+    pub verifier_key_id: String,
+    pub signature: Vec<u8>,
+}
+
+/// Stable, domain-separated message digest signed by the verifier.
+pub fn sequential_verifier_attestation_message(
+    claims: &SequentialVerifierAttestationClaims,
+) -> Result<[u8; 32], SequentialWeightProgramError> {
+    let encoded = serde_json::to_vec(claims)
+        .map_err(|_| SequentialWeightProgramError::InvalidDigest("verifier claims serialization"))?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-sequential-verifier-attestation-v1\\0");
+    hasher.update(&(encoded.len() as u64).to_le_bytes());
+    hasher.update(&encoded);
+    Ok(*hasher.finalize().as_bytes())
+}
+
+/// Stable identifier for a verifier public key. Trust still comes from the
+/// caller's pinned key registry, not from this identifier alone.
+pub fn sequential_verifier_key_id(verifying_key: &VerifyingKey) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-sequential-verifier-key-id-v1\\0");
+    hasher.update(&verifying_key.to_bytes());
+    hasher.finalize().to_hex().to_string()
 }
 
 /// Fail-closed sequential session errors.
@@ -126,6 +192,12 @@ pub enum SequentialWeightProgramError {
     InvalidCandidateNativeDigest,
     #[error("independent verifier rejected the candidate")]
     VerifierRejectedCandidate,
+    #[error("verifier key ID does not match the pinned trust key")]
+    VerifierKeyIdMismatch,
+    #[error("verifier signature is malformed or invalid")]
+    InvalidVerifierSignature,
+    #[error("verifier attestation field does not match the prepared candidate: {0}")]
+    VerifierAttestationMismatch(&'static str),
     #[error("cumulative L2 edit path exceeds the session budget")]
     CumulativeL2BudgetExceeded,
     #[error("cumulative parameter-change events exceed the session budget")]
@@ -244,8 +316,8 @@ pub fn accept_verified_sequential_candidate(
     template: &SequentialWeightProgramTemplate,
     prepared: &PreparedSequentialCandidate,
     candidate_native_model_digest: &str,
-    verifier_receipt_digest: &str,
-    verified: bool,
+    attestation: &SignedSequentialVerifierAttestation,
+    pinned_verifier_key: &VerifyingKey,
 ) -> Result<(SequentialEditSession, SequentialStepReceipt), SequentialWeightProgramError> {
     validate_template(template)?;
     if session.format_version != 1 || session.template_digest != template_digest(template)? {
@@ -278,11 +350,71 @@ pub fn accept_verified_sequential_candidate(
     if expected_prepared_digest != prepared.prepared_digest {
         return Err(SequentialWeightProgramError::StalePreparedCandidate);
     }
-    if !verified {
+    validate_digest(candidate_native_model_digest)?;
+    let claims = &attestation.claims;
+    if claims.format_version != 1 {
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+            "format_version",
+        ));
+    }
+    for (field, value) in [
+        ("verification_protocol_digest", claims.verification_protocol_digest.as_str()),
+        ("result_manifest_digest", claims.result_manifest_digest.as_str()),
+        ("template_digest", claims.template_digest.as_str()),
+        ("parent_candidate_model_digest", claims.parent_candidate_model_digest.as_str()),
+        ("candidate_native_model_digest", claims.candidate_native_model_digest.as_str()),
+        ("target_specification_digest", claims.target_specification_digest.as_str()),
+        ("evidence_batch_digest", claims.evidence_batch_digest.as_str()),
+        ("observation_manifest_digest", claims.observation_manifest_digest.as_str()),
+        ("program_digest", claims.program_digest.as_str()),
+        ("candidate_snapshot_digest", claims.candidate_snapshot_digest.as_str()),
+    ] {
+        validate_digest(value)?;
+        if value.is_empty() {
+            return Err(SequentialWeightProgramError::VerifierAttestationMismatch(field));
+        }
+    }
+    if claims.verifier_id.trim().is_empty() {
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+            "verifier_id",
+        ));
+    }
+    if attestation.verifier_key_id != sequential_verifier_key_id(pinned_verifier_key) {
+        return Err(SequentialWeightProgramError::VerifierKeyIdMismatch);
+    }
+    if claims.session_id != session.session_id {
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch("session_id"));
+    }
+    if claims.batch_index != prepared.batch.batch_index {
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch("batch_index"));
+    }
+    for (field, actual, expected) in [
+        ("template_digest", claims.template_digest.as_str(), prepared.template_digest.as_str()),
+        ("parent_candidate_model_digest", claims.parent_candidate_model_digest.as_str(), session.latest_candidate_model_digest.as_str()),
+        ("candidate_native_model_digest", claims.candidate_native_model_digest.as_str(), candidate_native_model_digest),
+        ("target_specification_digest", claims.target_specification_digest.as_str(), session.target_specification_digest.as_str()),
+        ("evidence_batch_digest", claims.evidence_batch_digest.as_str(), prepared.batch.evidence_batch_digest.as_str()),
+        ("observation_manifest_digest", claims.observation_manifest_digest.as_str(), prepared.batch.observation_manifest_digest.as_str()),
+        ("program_digest", claims.program_digest.as_str(), prepared.candidate.receipt.program_digest.as_str()),
+        ("candidate_snapshot_digest", claims.candidate_snapshot_digest.as_str(), prepared.candidate.receipt.candidate_snapshot_digest.as_str()),
+    ] {
+        if actual != expected {
+            return Err(SequentialWeightProgramError::VerifierAttestationMismatch(field));
+        }
+    }
+    let message = sequential_verifier_attestation_message(claims)?;
+    let signature = Signature::from_slice(&attestation.signature)
+        .map_err(|_| SequentialWeightProgramError::InvalidVerifierSignature)?;
+    pinned_verifier_key
+        .verify(&message, &signature)
+        .map_err(|_| SequentialWeightProgramError::InvalidVerifierSignature)?;
+    if !claims.accepted {
         return Err(SequentialWeightProgramError::VerifierRejectedCandidate);
     }
-    validate_digest(candidate_native_model_digest)?;
-    validate_digest(verifier_receipt_digest)?;
+    let verifier_receipt_digest = hash_value(
+        b"symthaea-sequential-verifier-envelope-v1\\0",
+        attestation,
+    )?;
     if candidate_native_model_digest == session.latest_candidate_model_digest {
         return Err(SequentialWeightProgramError::InvalidCandidateNativeDigest);
     }
@@ -325,7 +457,10 @@ pub fn accept_verified_sequential_candidate(
         program_digest: prepared.candidate.receipt.program_digest.clone(),
         candidate_snapshot_digest: prepared.candidate.receipt.candidate_snapshot_digest.clone(),
         candidate_native_model_digest: candidate_native_model_digest.to_owned(),
-        verifier_receipt_digest: verifier_receipt_digest.to_owned(),
+        verifier_key_id: attestation.verifier_key_id.clone(),
+        verification_protocol_digest: claims.verification_protocol_digest.clone(),
+        result_manifest_digest: claims.result_manifest_digest.clone(),
+        verifier_receipt_digest,
         previous_step_receipt_digest: session.previous_step_receipt_digest.clone(),
         cumulative_l2_path_after: cumulative_l2_path,
         cumulative_parameter_change_events_after: cumulative_parameter_change_events,
