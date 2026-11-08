@@ -123,6 +123,7 @@ pub enum AdmissionErrorKind {
     InvalidOriginParentShape,
     EmptySourceFamily,
     MissingHypothesisEvidence,
+    CommonModeIndependentRoot,
     PlannerRejected,
 }
 
@@ -367,6 +368,69 @@ impl VerifiedEvidenceCatalog {
             origin: record.declared_origin.to_planner_origin(),
             parent_evidence_ids: record.parent_evidence_ids.clone(),
         }).collect()
+    }
+
+
+    fn validate_hypothesis_source_family_independence(
+        &self,
+        hypotheses: &[Hypothesis],
+    ) -> Result<(), AdmissionError> {
+        fn collect_roots(
+            id: &str,
+            records: &BTreeMap<String, AdmittedRecord>,
+            family_roots: &mut BTreeMap<String, String>,
+            visited: &mut BTreeSet<String>,
+        ) -> Result<(), AdmissionError> {
+            if !visited.insert(id.to_owned()) {
+                return Ok(());
+            }
+            let record = records.get(id).ok_or_else(|| {
+                AdmissionError::new(
+                    AdmissionErrorKind::MissingHypothesisEvidence,
+                    format!("support closure references unadmitted Evidence {id}"),
+                )
+            })?;
+            match record.declared_origin {
+                DeclaredEvidenceOrigin::IndependentObservation => {
+                    if let Some(existing_root) = family_roots
+                        .insert(record.source_family_id.clone(), record.evidence_id.clone())
+                    {
+                        if existing_root != record.evidence_id {
+                            return Err(AdmissionError::new(
+                                AdmissionErrorKind::CommonModeIndependentRoot,
+                                format!(
+                                    "hypothesis support includes distinct independent-root IDs {existing_root} and {} from the same caller-declared source family '{}'; independent corroboration cannot be inferred from tool/record count",
+                                    record.evidence_id, record.source_family_id
+                                ),
+                            ));
+                        }
+                    }
+                }
+                DeclaredEvidenceOrigin::IndependentDerivation => {
+                    for parent in &record.parent_evidence_ids {
+                        collect_roots(parent, records, family_roots, visited)?;
+                    }
+                }
+                DeclaredEvidenceOrigin::ModelGenerated
+                | DeclaredEvidenceOrigin::Synthetic
+                | DeclaredEvidenceOrigin::ExternalReference => {}
+            }
+            Ok(())
+        }
+
+        for hypothesis in hypotheses {
+            let mut family_roots = BTreeMap::new();
+            let mut visited = BTreeSet::new();
+            for support_id in &hypothesis.supporting_evidence_ids {
+                collect_roots(
+                    support_id,
+                    &self.records,
+                    &mut family_roots,
+                    &mut visited,
+                )?;
+            }
+        }
+        Ok(())
     }
 
     fn validate_hypothesis_references(
@@ -752,4 +816,85 @@ mod tests {
         );
         assert_eq!(result.unwrap_err().kind, AdmissionErrorKind::EmptySourceFamily);
     }
+
+    #[test]
+    fn distinct_roots_from_one_declared_common_mode_family_do_not_count_as_independent() {
+        let first = raw_record_with_operation("same-provider-observation-one");
+        let second = raw_record_with_operation("same-provider-observation-two");
+        let first_id = evidence_id(&first);
+        let second_id = evidence_id(&second);
+        assert_ne!(first_id, second_id);
+
+        let catalog = VerifiedEvidenceCatalog::admit_raw_records(
+            vec![first, second],
+            vec![
+                declared(
+                    first_id.clone(),
+                    DeclaredEvidenceOrigin::IndependentObservation,
+                    Vec::new(),
+                ),
+                declared(
+                    second_id.clone(),
+                    DeclaredEvidenceOrigin::IndependentObservation,
+                    Vec::new(),
+                ),
+            ],
+        )
+        .unwrap();
+
+        let hypothesis = Hypothesis {
+            id: "h1".to_owned(),
+            prior_probability: 1.0,
+            supporting_evidence_ids: vec![first_id, second_id],
+            contradicting_evidence_ids: Vec::new(),
+        };
+        let result = catalog.validate_hypothesis_source_family_independence(&[hypothesis]);
+        assert_eq!(
+            result.unwrap_err().kind,
+            AdmissionErrorKind::CommonModeIndependentRoot
+        );
+    }
+
+    #[test]
+    fn same_root_reused_through_multiple_derived_support_paths_is_not_double_counted() {
+        let root = raw_record_with_operation("single-root");
+        let derivation_one = raw_record_with_operation("derived-one");
+        let derivation_two = raw_record_with_operation("derived-two");
+        let root_id = evidence_id(&root);
+        let derivation_one_id = evidence_id(&derivation_one);
+        let derivation_two_id = evidence_id(&derivation_two);
+
+        let catalog = VerifiedEvidenceCatalog::admit_raw_records(
+            vec![root, derivation_one, derivation_two],
+            vec![
+                declared(
+                    root_id.clone(),
+                    DeclaredEvidenceOrigin::IndependentObservation,
+                    Vec::new(),
+                ),
+                declared(
+                    derivation_one_id.clone(),
+                    DeclaredEvidenceOrigin::IndependentDerivation,
+                    vec![root_id.clone()],
+                ),
+                declared(
+                    derivation_two_id.clone(),
+                    DeclaredEvidenceOrigin::IndependentDerivation,
+                    vec![root_id],
+                ),
+            ],
+        )
+        .unwrap();
+
+        let hypothesis = Hypothesis {
+            id: "h1".to_owned(),
+            prior_probability: 1.0,
+            supporting_evidence_ids: vec![derivation_one_id, derivation_two_id],
+            contradicting_evidence_ids: Vec::new(),
+        };
+        assert!(catalog
+            .validate_hypothesis_source_family_independence(&[hypothesis])
+            .is_ok());
+    }
+
 }
