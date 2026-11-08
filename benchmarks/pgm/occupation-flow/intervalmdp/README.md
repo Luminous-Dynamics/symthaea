@@ -6,7 +6,7 @@ IntervalMDP.jl, a specialist interval Markov decision/process library.
 ## Pinned environment
 
 - Julia: 1.11 or later
-- IntervalMDP.jl: 0.7 compatibility line
+- IntervalMDP.jl: exactly 0.7.0 (compat pinned with =0.7.0; Julia package resolution is not run here, so no generated Manifest.toml is claimed)
 - Arithmetic: Rational{BigInt}
 - Algorithms: OMaximization() and VertexEnumeration()
 
@@ -53,7 +53,14 @@ chain over a larger state space, without introducing a shared transition
 parameter across stages.
 
 The horizon is three transitions. FiniteTimeReward(scores, 1, 3) evaluates
-the reward at t=0,1,2,3; the t=3 terminal reward is zero.
+the reward at t=0,1,2,3; the t=3 terminal reward is zero. The canonical
+Rust source-model SHA-256 for this exact initial distribution and transition
+interval manifest is:
+
+    b1fb89c3775613d7b9aeb20857e6eb1a15b4133419e6fa3a307ddec6c906c466
+
+The same source digest is recorded in the companion PRISM expected-results
+manifest.
 
 ## Exact query matrix
 
