@@ -2589,6 +2589,23 @@ mod tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    fn noise_calibration(
+        source: &CfCNetwork,
+        candidate: &CfCNetwork,
+        layer_index: usize,
+        calibration_digest: char,
+    ) -> CfCProjectionNoiseCalibration {
+        calibrate_cfc_projection_observation_noise(
+            source,
+            candidate,
+            layer_index,
+            &digest(calibration_digest),
+            CfCProjectionNoiseCalibrationMethod::RepeatedProjectionRuns,
+            &[0.10, 0.12, 0.08, 0.11, 0.09, 0.105, 0.095, 0.115],
+        )
+        .expect("repeated projection noise calibration")
+    }
+
     fn signature_set(
         signatures: Vec<Vec<f64>>,
         model: char,
@@ -4235,18 +4252,26 @@ mod tests {
             },
         ];
 
+        let calibration = noise_calibration(&source, &candidate, 0, 'n');
         let receipt = select_cfc_disambiguating_probe_by_gaussian_eig(
             &source,
             &candidate,
             0,
             &[],
             &probes,
-            0.05,
+            &calibration,
             65,
         )
         .expect("small exact permutation EIG selection");
 
         assert_eq!(receipt.format_version, 1);
+        assert_eq!(receipt.noise_calibration_digest, calibration.calibration_digest);
+        assert_eq!(
+            receipt.noise_calibration_method,
+            CfCProjectionNoiseCalibrationMethod::RepeatedProjectionRuns
+        );
+        assert_eq!(receipt.noise_calibration_sample_count, 8);
+        assert_eq!(receipt.observation_std_dev, calibration.observation_std_dev);
         assert_eq!(receipt.permutation_hypothesis_count, 6);
         assert_eq!(receipt.candidate_scores.len(), probes.len());
         assert_eq!(receipt.permutation_posterior.len(), 6);
@@ -4336,13 +4361,14 @@ mod tests {
             },
         ];
 
+        let calibration = noise_calibration(&source, &candidate, 0, 'p');
         let receipt = select_cfc_disambiguating_probe_by_gaussian_eig(
             &source,
             &candidate,
             0,
             &existing,
             &candidates,
-            0.05,
+            &calibration,
             65,
         )
         .expect("posterior update and EIG selection");
@@ -4358,6 +4384,92 @@ mod tests {
             .map(|hypothesis| hypothesis.posterior_probability)
             .fold(0.0_f64, f64::max);
         assert!(posterior_max > 0.95);
+    }
+
+    #[test]
+    fn projection_noise_calibration_rejects_degenerate_or_malformed_samples() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 3,
+            num_layers: 1,
+            output_dim: 2,
+            ..Default::default()
+        };
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-cfc-noise-calibration-negative-controls",
+        );
+        let network = CfCNetwork::from_genesis(config, &genesis, "noise-calibration");
+        assert!(matches!(
+            calibrate_cfc_projection_observation_noise(
+                &network,
+                &network,
+                0,
+                &digest('n'),
+                CfCProjectionNoiseCalibrationMethod::RepeatedProjectionRuns,
+                &[0.2, 0.2, 0.2]
+            ),
+            Err(CfCPermutationAlignmentError::DegenerateNoiseCalibration)
+        ));
+        assert!(matches!(
+            calibrate_cfc_projection_observation_noise(
+                &network,
+                &network,
+                0,
+                &digest('n'),
+                CfCProjectionNoiseCalibrationMethod::RepeatedProjectionRuns,
+                &[0.2]
+            ),
+            Err(CfCPermutationAlignmentError::InsufficientNoiseCalibrationSamples { .. })
+        ));
+        assert!(matches!(
+            calibrate_cfc_projection_observation_noise(
+                &network,
+                &network,
+                0,
+                &digest('n'),
+                CfCProjectionNoiseCalibrationMethod::RepeatedProjectionRuns,
+                &[0.2, f64::NAN]
+            ),
+            Err(CfCPermutationAlignmentError::NonFiniteNoiseCalibrationSample { index: 1 })
+        ));
+    }
+
+    #[test]
+    fn gaussian_permutation_eig_rejects_noise_calibration_from_stale_candidate() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 3,
+            num_layers: 1,
+            output_dim: 2,
+            ..Default::default()
+        };
+        let source_genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("noise-calibration-source");
+        let stale_genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("noise-calibration-stale-candidate");
+        let source = CfCNetwork::from_genesis(config.clone(), &source_genesis, "source");
+        let calibration_candidate = source.clone();
+        let stale_candidate = CfCNetwork::from_genesis(config, &stale_genesis, "stale");
+        let calibration = noise_calibration(&source, &calibration_candidate, 0, 's');
+        let candidate_probes = vec![CfCFunctionalProbe {
+            input: vec![0.2, -0.4],
+            dt: 0.1,
+        }];
+
+        assert!(matches!(
+            select_cfc_disambiguating_probe_by_gaussian_eig(
+                &source,
+                &stale_candidate,
+                0,
+                &[],
+                &candidate_probes,
+                &calibration,
+                65
+            ),
+            Err(CfCPermutationAlignmentError::StaleNoiseCalibration {
+                field: "candidate model digest"
+            })
+        ));
     }
 
     #[test]
