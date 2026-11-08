@@ -340,3 +340,21 @@ For every competitor, identify whether the reported result is author/vendor-repo
 - MEME (arXiv:2605.12477): https://arxiv.org/abs/2605.12477 ; project page: https://seokwonjung-jay.github.io/meme-eval/
 - DyadMem (arXiv:2610.03020): https://arxiv.org/abs/2610.03020 ; project page: https://renaissancet.github.io/DyadMem/
 - Rust f64 primitive precision contract (sqrt and other operations): https://doc.rust-lang.org/std/primitive.f64.html
+
+
+### Proposed lifecycle benchmark promotion targets
+
+These are HME project targets, not published standards or achieved scores:
+
+| Evaluation | Target |
+|---|---|
+| MEME Exact Recall / Tracking / Aggregation | ≥0.95 each under the frozen reader |
+| MEME Deletion | ≥0.99, with zero resurrection in deterministic reopen/replay controls |
+| MEME Cascade / Absence | ≥0.90 each as a stretch target; no false claim of certainty when replacement evidence is missing |
+| DyadMem Full-Pipeline vs Gold-Memory | ≤5 percentage-point gap on matched QA scoring, with Capture/Update support recall ≥0.95 |
+| HME-Revise deterministic suite | 100% bitemporal correctness; zero late-knowledge leakage, stale dependent emission, deleted-item resurrection or unauthorized pre-read |
+| LongMemEval / LoCoMo downstream | non-inferior strict answer accuracy at equal reader/context budget, with stale-use and abstention measured separately |
+
+For public benchmarks, use official splits, official scorers, licensed data and reproducible reader/judge settings. The project-owned HME-Revise fixture is a deterministic diagnostic gate, not an alternative public benchmark and not a substitute for human evaluation.
+
+A high MEME or DyadMem score cannot compensate for data-governance violations. The safety invariants are independent hard gates, not weighted terms in a single aggregate.
