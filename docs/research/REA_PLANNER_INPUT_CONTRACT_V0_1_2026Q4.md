@@ -56,7 +56,7 @@ The example has two hypotheses with prior 0.5/0.5 and one two-outcome reproducti
 - Nominal EIG is approximately 0.531004 bits.
 - Conservative EIG is approximately 0.188722 bits.
 - With scenario weights 0.5/0.5, expected scenario EIG is approximately 0.359863 bits; worst case is approximately 0.188722 bits.
-- Terminal decisions use a complete utility matrix: mitigate=(3,-6), no_action=(-20,0). Baseline best action is mitigate with expected utility -1.5. Nominal EVSI is 0.55 utility units; conservative EVSI is 0; expected scenario EVSI is 0.275.
+- Terminal decisions use a complete utility matrix: mitigate=(3,-6), no_action=(-20,0). Baseline best action is mitigate with expected utility -1.5. Nominal EVSI is 1.55 utility units; conservative EVSI is 0; expected scenario EVSI is 0.775 under equal scenario weights.
 
 These values are mathematical golden expectations, not planner-run receipts or model results. The utility units are arbitrary synthetic units and do not transfer to real remediation decisions.
 
