@@ -1,0 +1,526 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous:emsr:rf-dual-axis-assessment:0.1",
+  "title": "EMSR RF dual-axis acquisition and recognition assessment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "state",
+    "fixtures"
+  ],
+  "properties": {
+    "schema": {
+      "const": "emsr.rf-dual-axis-fixture-pack"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "state": {
+      "const": "EXECUTABLE_SYNTHETIC_FIXTURES"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
+    }
+  },
+  "$defs": {
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "assessment",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^RF-AXIS-[0-9]{3}$"
+        },
+        "assessment": {
+          "$ref": "#/$defs/assessment"
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "consumer_disposition",
+            "candidate_admitted",
+            "reason_code"
+          ],
+          "properties": {
+            "consumer_disposition": {
+              "enum": [
+                "KNOWN_CLASS",
+                "UNKNOWN_CLASS",
+                "INDETERMINATE",
+                "DEGRADED_ACQUISITION"
+              ]
+            },
+            "candidate_admitted": {
+              "type": "boolean"
+            },
+            "reason_code": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]+$"
+            }
+          }
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessment_id",
+        "profile_id",
+        "acquisition",
+        "recognition",
+        "derived",
+        "evidence",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "assessment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_id": {
+          "const": "EMSR-RF-OPENSET-001"
+        },
+        "acquisition": {
+          "$ref": "#/$defs/acquisition"
+        },
+        "recognition": {
+          "$ref": "#/$defs/recognition"
+        },
+        "derived": {
+          "$ref": "#/$defs/derived"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "claim_ceiling": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "acquisition": {
+                "properties": {
+                  "qualification": {
+                    "const": "QUALIFIED"
+                  }
+                },
+                "required": [
+                  "qualification"
+                ]
+              }
+            },
+            "required": [
+              "acquisition"
+            ]
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "recognition": {
+                      "properties": {
+                        "disposition": {
+                          "const": "KNOWN_CLASS"
+                        }
+                      },
+                      "required": [
+                        "disposition"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "recognition"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "derived": {
+                      "properties": {
+                        "consumer_disposition": {
+                          "const": "KNOWN_CLASS"
+                        },
+                        "candidate_admitted": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "consumer_disposition",
+                        "candidate_admitted"
+                      ]
+                    },
+                    "recognition": {
+                      "properties": {
+                        "candidate_class": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "candidate_class"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "recognition": {
+                      "properties": {
+                        "disposition": {
+                          "const": "UNKNOWN_CLASS"
+                        }
+                      },
+                      "required": [
+                        "disposition"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "recognition"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "derived": {
+                      "properties": {
+                        "consumer_disposition": {
+                          "const": "UNKNOWN_CLASS"
+                        },
+                        "candidate_admitted": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "consumer_disposition",
+                        "candidate_admitted"
+                      ]
+                    },
+                    "recognition": {
+                      "properties": {
+                        "candidate_class": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "candidate_class"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "recognition": {
+                      "properties": {
+                        "disposition": {
+                          "const": "INDETERMINATE"
+                        }
+                      },
+                      "required": [
+                        "disposition"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "recognition"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "derived": {
+                      "properties": {
+                        "consumer_disposition": {
+                          "const": "INDETERMINATE"
+                        },
+                        "candidate_admitted": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "consumer_disposition",
+                        "candidate_admitted"
+                      ]
+                    },
+                    "recognition": {
+                      "properties": {
+                        "candidate_class": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "candidate_class"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "acquisition": {
+                "properties": {
+                  "qualification": {
+                    "enum": [
+                      "DEGRADED",
+                      "UNQUALIFIED",
+                      "UNKNOWN"
+                    ]
+                  }
+                },
+                "required": [
+                  "qualification"
+                ]
+              }
+            },
+            "required": [
+              "acquisition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "derived": {
+                "properties": {
+                  "consumer_disposition": {
+                    "const": "DEGRADED_ACQUISITION"
+                  },
+                  "candidate_admitted": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "consumer_disposition",
+                  "candidate_admitted"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qualification",
+        "acquisition_profile_id",
+        "receiver_id",
+        "front_end_id",
+        "firmware_digest",
+        "configuration_digest",
+        "clock_quality",
+        "checks"
+      ],
+      "properties": {
+        "qualification": {
+          "enum": [
+            "QUALIFIED",
+            "DEGRADED",
+            "UNQUALIFIED",
+            "UNKNOWN"
+          ]
+        },
+        "acquisition_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "front_end_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "firmware_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "configuration_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "clock_quality": {
+          "enum": [
+            "QUALIFIED",
+            "DEGRADED",
+            "UNKNOWN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/acquisition_check"
+          }
+        }
+      }
+    },
+    "acquisition_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "result",
+        "evidence_ref"
+      ],
+      "properties": {
+        "check_id": {
+          "type": "string"
+        },
+        "result": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN",
+            "NOT_RUN"
+          ]
+        },
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "recognition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "class_vocabulary_digest",
+        "model_digest",
+        "input_window_digest",
+        "candidate_class",
+        "confidence"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "KNOWN_CLASS",
+            "UNKNOWN_CLASS",
+            "INDETERMINATE"
+          ]
+        },
+        "class_vocabulary_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "model_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "input_window_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "candidate_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "derived": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer_disposition",
+        "candidate_admitted",
+        "reason_codes"
+      ],
+      "properties": {
+        "consumer_disposition": {
+          "enum": [
+            "KNOWN_CLASS",
+            "UNKNOWN_CLASS",
+            "INDETERMINATE",
+            "DEGRADED_ACQUISITION"
+          ]
+        },
+        "candidate_admitted": {
+          "type": "boolean"
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acquisition_evidence_refs",
+        "recognition_evidence_refs",
+        "as_of"
+      ],
+      "properties": {
+        "acquisition_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "recognition_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

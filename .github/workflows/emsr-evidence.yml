@@ -2,7 +2,7 @@ name: EMSR Evidence Contract
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, research/emsr-evidence-validator-v0.1-20261107-current-main]
     paths:
       - 'Cargo.lock'
       - 'crates/domains/symthaea-emsr-evidence/**'
@@ -43,7 +43,7 @@ jobs:
       # The root workspace currently has unrelated wildcard-member directories
       # without manifests; see PR #9361. Format this package source directly.
       - name: Check formatting
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-emsr-evidence/src/lib.rs
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-emsr-evidence/src/lib.rs crates/domains/symthaea-emsr-evidence/src/rf_dual_axis.rs
 
       - name: Validate committed EMSR JSON artifacts
         shell: bash
@@ -52,6 +52,15 @@ jobs:
           while IFS= read -r file; do
             jq -e . "$file" >/dev/null
           done < <(find docs/research/emsr-v0.1 -maxdepth 1 -type f -name '*.json' -print | sort)
+          jq -e '
+            .properties.state.const == "EXECUTABLE_SYNTHETIC_FIXTURES" and
+            .properties.fixtures.maxItems == 12 and
+            .properties.fixtures.minItems == 12
+          ' docs/research/emsr-v0.1/emsr-rf-dual-axis-contract-v0.1.schema.json >/dev/null
+          jq -e '
+            .["$id"] == "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1" and
+            .properties.report_contract.const == "emsr-rf-dual-axis-conformance-report/0.1"
+          ' tools/schema/emsr-rf-dual-axis-conformance-report-v0.1.schema.json >/dev/null
 
       # Preserve the package's repository-relative include_str! fixture paths,
       # but give Cargo an isolated workspace so unrelated root members do not
@@ -64,7 +73,11 @@ jobs:
           pkg="$root/crates/domains/symthaea-emsr-evidence"
           mkdir -p "$pkg/src" "$root/docs/research/emsr-v0.1"
           cp crates/domains/symthaea-emsr-evidence/src/lib.rs "$pkg/src/lib.rs"
+          cp crates/domains/symthaea-emsr-evidence/src/rf_dual_axis.rs "$pkg/src/rf_dual_axis.rs"
           cp docs/research/emsr-v0.1/*.json "$root/docs/research/emsr-v0.1/"
+          mkdir -p tools/schema
+          cp tools/schema/emsr-rf-dual-axis-conformance-report-v0.1.schema.json "$root/emsr-rf-dual-axis-conformance-report.schema.json"
+          jq empty "$root/emsr-rf-dual-axis-conformance-report.schema.json"
           cat > "$pkg/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-emsr-evidence"
