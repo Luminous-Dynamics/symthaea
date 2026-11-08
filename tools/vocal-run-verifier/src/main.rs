@@ -20,6 +20,7 @@ const RUN_SCHEMA: &str = "muse-vocal-run/v1";
 const PRIVATE_KEY_VERSION: u64 = 2;
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BlindClip {
     clip_id: String,
     case_id: usize,
@@ -32,6 +33,7 @@ struct BlindClip {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RunManifest {
     schema: String,
     source_revision: String,
@@ -43,6 +45,7 @@ struct RunManifest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CaseReceipt {
     case_id: usize,
     seed: u64,
@@ -70,6 +73,7 @@ struct NoteReceipt {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PrivateBackendKey {
     format_version: u64,
     salt: String,
@@ -77,6 +81,7 @@ struct PrivateBackendKey {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct KeyEntry {
     clip_id: String,
     backend: String,
@@ -87,6 +92,7 @@ struct KeyEntry {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct HumanReferenceReceipt {
     case_id: usize,
     singer_pseudonym: String,
@@ -842,7 +848,8 @@ mod tests {
         let (blind, private) = bundle.roots();
         let path = private.join("private_backend_key.json");
         let mut key: Value = read_json(&path).unwrap();
-        key["entries"].as_array_mut().unwrap().push(key["entries"][0].clone());
+        let duplicate = key["entries"][0].clone();
+        key["entries"].as_array_mut().unwrap().push(duplicate);
         fs::write(path, serde_json::to_vec(&key).unwrap()).unwrap();
         assert!(verify(&blind, &private).unwrap_err().contains("clip count"));
     }
