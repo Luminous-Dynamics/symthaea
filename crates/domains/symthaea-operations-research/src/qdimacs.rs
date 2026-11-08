@@ -202,11 +202,9 @@ fn parse_header(line_number: usize, tokens: &[&str]) -> Result<Header, QdimacsEr
             line: line_number,
             token: tokens[2].to_owned(),
         })?;
-    let clauses = usize::try_from(clauses).map_err(|_| {
-        QdimacsError::InvalidHeaderClauseCount {
-            line: line_number,
-            token: tokens[3].to_owned(),
-        }
+    let clauses = usize::try_from(clauses).map_err(|_| QdimacsError::InvalidHeaderClauseCount {
+        line: line_number,
+        token: tokens[3].to_owned(),
     })?;
     Ok(Header { variables, clauses })
 }
