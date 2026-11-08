@@ -8,7 +8,10 @@
 //! safe, forward momentum. Deviations from that prior generate prediction error
 //! (free energy), which the LTC controller learns to minimize.
 
-use crate::types::{VehicleState, VehicleTask};
+use crate::types::{
+    FollowConsumerProfile, FollowEvidenceError, FollowTargetEvidence, VehicleState, VehicleTask,
+    admit_follow_target,
+};
 
 /// Core safety reward: penalizes dangerous states.
 ///
@@ -75,23 +78,61 @@ pub fn smoothness_reward(state: &VehicleState) -> f64 {
     lon_penalty * lat_penalty
 }
 
-/// Follow-distance reward: how well the vehicle maintains target gap to lead vehicle.
+/// Follow-distance reward using an explicit admitted metric gap.
 ///
-/// Returns 1.0 when at exact target gap, decays with gap error (Gaussian, σ=10m).
-pub fn follow_distance_reward(state: &VehicleState, target_gap: f64) -> f64 {
-    let gap_error = (state.nearest_peer_distance - target_gap).abs();
+/// This function never reads `VehicleState::nearest_peer_distance`.
+pub fn follow_distance_reward(gap_m: f64, target_gap: f64) -> f64 {
+    if !gap_m.is_finite() || gap_m < 0.0 || !target_gap.is_finite() || target_gap < 0.0 {
+        return 0.0;
+    }
+    let gap_error = (gap_m - target_gap).abs();
     (-gap_error / 10.0).exp()
 }
 
-/// Combined episode reward for a given task.
+/// Combined episode reward without a provenance-bearing Follow measurement.
 ///
-/// Weighted combination of component rewards, tuned per task.
-/// `target_heading` is the road heading at the vehicle's projected position (0.0 for straight roads).
+/// For `VehicleTask::Follow`, the gap-reward component is zero. Use
+/// `episode_reward_with_follow_target` when an admitted target is available; this function
+/// never infers a lead gap from the legacy peer-distance scalar.
 pub fn episode_reward(
     state: &VehicleState,
     task: &VehicleTask,
     target_speed: f64,
     target_heading: f64,
+) -> f64 {
+    episode_reward_with_gap(state, task, target_speed, target_heading, None)
+}
+
+/// Combined episode reward with an explicitly admitted Follow target.
+pub fn episode_reward_with_follow_target(
+    state: &VehicleState,
+    task: &VehicleTask,
+    target_speed: f64,
+    target_heading: f64,
+    evidence: Option<&FollowTargetEvidence>,
+    profile: &FollowConsumerProfile,
+) -> Result<f64, FollowEvidenceError> {
+    let follow_gap_m = match task {
+        VehicleTask::Follow { .. } => {
+            Some(admit_follow_target(evidence, profile)?.gap_lower_bound_m)
+        }
+        _ => None,
+    };
+    Ok(episode_reward_with_gap(
+        state,
+        task,
+        target_speed,
+        target_heading,
+        follow_gap_m,
+    ))
+}
+
+fn episode_reward_with_gap(
+    state: &VehicleState,
+    task: &VehicleTask,
+    target_speed: f64,
+    target_heading: f64,
+    follow_gap_m: Option<f64>,
 ) -> f64 {
     let safe = safety_reward(state);
     let speed = speed_reward(state, target_speed);
@@ -101,20 +142,19 @@ pub fn episode_reward(
 
     match task {
         VehicleTask::LaneKeep => {
-            // Safety dominates, then lane tracking, then speed, then comfort
             0.30 * safe + 0.25 * lane + 0.20 * speed + 0.15 * heading + 0.10 * smooth
         }
         VehicleTask::Follow { target_gap } => {
-            // Safety + gap-keeping + speed matching for adaptive cruise
-            let gap = follow_distance_reward(state, *target_gap);
+            // Missing evidence does not become a fabricated "clear" 200m lead gap.
+            let gap = follow_gap_m
+                .map(|gap_m| follow_distance_reward(gap_m, *target_gap))
+                .unwrap_or(0.0);
             0.25 * safe + 0.30 * speed + 0.25 * gap + 0.10 * lane + 0.10 * smooth
         }
         VehicleTask::LaneChange => {
-            // Heading and lane position change targets; safety still paramount
             0.35 * safe + 0.25 * smooth + 0.20 * speed + 0.10 * lane + 0.10 * heading
         }
         VehicleTask::EmergencyStop => {
-            // Speed should go to zero; safety is everything
             0.40 * safe + 0.40 * speed + 0.10 * lane + 0.10 * smooth
         }
     }
@@ -220,17 +260,84 @@ mod tests {
 
     #[test]
     fn test_follow_reward_on_target() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 30.0;
-        let r = follow_distance_reward(&state, 30.0);
+        let r = follow_distance_reward(30.0, 30.0);
         assert!((r - 1.0).abs() < 1e-6, "At target gap should be 1.0: {r}");
     }
 
     #[test]
     fn test_follow_reward_off_target() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 60.0;
-        let r = follow_distance_reward(&state, 30.0);
+        let r = follow_distance_reward(60.0, 30.0);
         assert!(r < 0.1, "Far from target gap should be low: {r}");
     }
+
+    #[test]
+    fn test_follow_reward_is_independent_of_legacy_peer_distance() {
+        let mut near_state = VehicleState::cruising(13.4);
+        near_state.nearest_peer_distance = 0.0;
+        let mut far_state = near_state.clone();
+        far_state.nearest_peer_distance = 200.0;
+        let task = VehicleTask::Follow { target_gap: 30.0 };
+        assert_eq!(
+            episode_reward(&near_state, &task, 13.4, 0.0),
+            episode_reward(&far_state, &task, 13.4, 0.0),
+            "Without evidence, the reward must not read a naked peer-distance scalar"
+        );
+    }
+
+    #[test]
+    fn test_follow_reward_uses_admitted_evidence() {
+        let state = VehicleState::cruising(13.4);
+        let task = VehicleTask::Follow { target_gap: 30.0 };
+        let profile = FollowConsumerProfile::SimulationBenchmark {
+            scenario_id: "scenario-1".into(),
+            frame_id: "ego_body".into(),
+            max_age_s: 0.1,
+        };
+        let evidence = FollowTargetEvidence::SimulatorOracle {
+            scenario_id: "scenario-1".into(),
+            actor_id: "peer-1".into(),
+            frame_id: "ego_body".into(),
+            observation_age_s: 0.01,
+            gap_m: 30.0,
+            relative_speed_mps: 0.0,
+        };
+        let admitted = episode_reward_with_follow_target(
+            &state,
+            &task,
+            13.4,
+            0.0,
+            Some(&evidence),
+            &profile,
+        )
+        .expect("scenario-bound oracle evidence should be admitted");
+        let unavailable = episode_reward(&state, &task, 13.4, 0.0);
+        assert!(admitted > unavailable, "admitted gap evidence should contribute reward");
+    }
+
+    #[test]
+    fn test_follow_reward_rejects_remote_advisory() {
+        let state = VehicleState::cruising(13.4);
+        let task = VehicleTask::Follow { target_gap: 30.0 };
+        let profile = FollowConsumerProfile::SimulationBenchmark {
+            scenario_id: "scenario-1".into(),
+            frame_id: "ego_body".into(),
+            max_age_s: 0.1,
+        };
+        let evidence = FollowTargetEvidence::CooperativeAdvisory {
+            claim_id: "v2x-claim-1".into(),
+        };
+        assert_eq!(
+            episode_reward_with_follow_target(
+                &state,
+                &task,
+                13.4,
+                0.0,
+                Some(&evidence),
+                &profile,
+            ),
+            Err(FollowEvidenceError::RemoteAdvisoryNotAuthority)
+        );
+    }
+
+
 }

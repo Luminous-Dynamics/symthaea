@@ -117,11 +117,11 @@ pub const CHANNEL_NAMES: [&str; NUM_STATE_CHANNELS] = [
 /// ── Road Vector (2) ──
 /// [14] lateral_offset    — distance from lane center (m), positive = left
 /// [15] curvature_ahead   — road curvature at look-ahead point (1/m)
-/// ── Swarm Vector (4) ──
-/// [16] nearest_peer_distance  — distance to nearest mesh peer (m)
-/// [17] peer_relative_speed    — speed of nearest peer minus ego speed (m/s)
-/// [18] mesh_brake_density     — fraction of swarm currently braking (0..1)
-/// [19] mesh_confidence        — aggregate mesh signal integrity (0..1)
+/// ── Legacy simulation-peer vector (4; never a local-sensor contract) ──
+/// [16] nearest_peer_distance  — nearest delayed simulator-peer distance (m)
+/// [17] peer_relative_speed    — simulator-peer speed minus ego speed (m/s)
+/// [18] mesh_brake_density     — unqualified aggregate advisory; excluded from policy HDC
+/// [19] mesh_confidence        — unqualified claimed confidence; excluded from policy HDC
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VehicleState {
     // ── Proprioceptive Core (14) ──
@@ -696,22 +696,232 @@ pub fn pd_cruise_baseline_with_road(
     }
 }
 
-/// PD cruise-control for Follow task: modulates speed based on gap to nearest peer.
+/// Evidence domain allowed to supply a lead-actor observation to Follow.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "profile", rename_all = "snake_case")]
+pub enum FollowConsumerProfile {
+    /// Ground-truth peer state may be used only by a named synthetic benchmark episode.
+    SimulationBenchmark {
+        scenario_id: String,
+        frame_id: String,
+        max_age_s: f64,
+    },
+    /// A local perception consumer requires a track from this exact scene snapshot.
+    LocalPerception {
+        scene_snapshot_id: String,
+        frame_id: String,
+        max_age_s: f64,
+        max_distance_error_bound_m: f64,
+    },
+    /// Deployment profile has the same evidence requirements, but remains a separate
+    /// profile so a simulator adapter cannot satisfy it by changing a label elsewhere.
+    Deployment {
+        scene_snapshot_id: String,
+        frame_id: String,
+        max_age_s: f64,
+        max_distance_error_bound_m: f64,
+    },
+}
+
+/// Provenance-bearing source for a Follow target.
 ///
-/// Same lateral/heading control as `pd_cruise_baseline_with_road`, but the speed
-/// command is adjusted by the gap error: if the peer is too close, slow down;
-/// if too far, speed up (up to 120% of target).
+/// Simulator truth, locally tracked actors and remote cooperative claims are intentionally
+/// distinct variants. A remote claim can never be converted into a local track by this API.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "evidence", rename_all = "snake_case")]
+pub enum FollowTargetEvidence {
+    /// Simulator oracle state; benchmark/training only.
+    SimulatorOracle {
+        scenario_id: String,
+        actor_id: String,
+        frame_id: String,
+        observation_age_s: f64,
+        gap_m: f64,
+        relative_speed_mps: f64,
+    },
+    /// A metric actor track derived from local sensor evidence.
+    LocalTrackedActor {
+        scene_snapshot_id: String,
+        track_lineage_id: String,
+        source_ids: Vec<String>,
+        frame_id: String,
+        observation_age_s: f64,
+        gap_m: f64,
+        relative_speed_mps: f64,
+        /// Declared absolute error bound on gap, not a generic confidence score.
+        distance_error_bound_m: f64,
+    },
+    /// Remote V2V/V2I claim. Kept explicit so callers must not treat it as a local track.
+    CooperativeAdvisory { claim_id: String },
+}
+
+/// A validated Follow measurement ready for the PD teacher.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdmittedFollowTarget {
+    /// Conservative lower bound on the actor gap.
+    pub gap_lower_bound_m: f64,
+    /// Actor speed minus ego speed; negative means the actor is slower.
+    pub relative_speed_mps: f64,
+}
+
+/// Reasons a Follow target could not be admitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FollowEvidenceError {
+    Missing,
+    RemoteAdvisoryNotAuthority,
+    WrongConsumerProfile,
+    ContextMismatch,
+    StaleOrFutureObservation,
+    InvalidNumericValue,
+    MissingProvenance,
+    ExcessiveDistanceErrorBound,
+}
+
+fn validate_follow_numeric(
+    age_s: f64,
+    max_age_s: f64,
+    gap_m: f64,
+    relative_speed_mps: f64,
+) -> Result<(), FollowEvidenceError> {
+    if !age_s.is_finite()
+        || !max_age_s.is_finite()
+        || !gap_m.is_finite()
+        || !relative_speed_mps.is_finite()
+        || age_s < 0.0
+        || max_age_s < 0.0
+        || gap_m < 0.0
+    {
+        return Err(FollowEvidenceError::InvalidNumericValue);
+    }
+    if age_s > max_age_s {
+        return Err(FollowEvidenceError::StaleOrFutureObservation);
+    }
+    Ok(())
+}
+
+/// Admit Follow-target evidence for a specific consumer profile.
+///
+/// This function is intentionally strict: no naked VehicleState peer-distance field and no
+/// remote cooperative claim can satisfy a Follow target. Local-track gaps are reduced by the
+/// declared absolute distance-error bound before the controller uses them.
+pub fn admit_follow_target(
+    evidence: Option<&FollowTargetEvidence>,
+    profile: &FollowConsumerProfile,
+) -> Result<AdmittedFollowTarget, FollowEvidenceError> {
+    let evidence = evidence.ok_or(FollowEvidenceError::Missing)?;
+    match (evidence, profile) {
+        (
+            FollowTargetEvidence::SimulatorOracle {
+                scenario_id,
+                actor_id,
+                frame_id,
+                observation_age_s,
+                gap_m,
+                relative_speed_mps,
+            },
+            FollowConsumerProfile::SimulationBenchmark {
+                scenario_id: expected_scenario,
+                frame_id: expected_frame,
+                max_age_s,
+            },
+        ) => {
+            if scenario_id.is_empty() || actor_id.is_empty() {
+                return Err(FollowEvidenceError::MissingProvenance);
+            }
+            if scenario_id != expected_scenario || frame_id != expected_frame {
+                return Err(FollowEvidenceError::ContextMismatch);
+            }
+            validate_follow_numeric(*observation_age_s, *max_age_s, *gap_m, *relative_speed_mps)?;
+            Ok(AdmittedFollowTarget {
+                gap_lower_bound_m: *gap_m,
+                relative_speed_mps: *relative_speed_mps,
+            })
+        }
+        (
+            FollowTargetEvidence::LocalTrackedActor {
+                scene_snapshot_id,
+                track_lineage_id,
+                source_ids,
+                frame_id,
+                observation_age_s,
+                gap_m,
+                relative_speed_mps,
+                distance_error_bound_m,
+            },
+            FollowConsumerProfile::LocalPerception {
+                scene_snapshot_id: expected_snapshot,
+                frame_id: expected_frame,
+                max_age_s,
+                max_distance_error_bound_m,
+            }
+            | FollowConsumerProfile::Deployment {
+                scene_snapshot_id: expected_snapshot,
+                frame_id: expected_frame,
+                max_age_s,
+                max_distance_error_bound_m,
+            },
+        ) => {
+            if scene_snapshot_id.is_empty()
+                || track_lineage_id.is_empty()
+                || source_ids.is_empty()
+                || source_ids.iter().any(String::is_empty)
+            {
+                return Err(FollowEvidenceError::MissingProvenance);
+            }
+            let mut unique_sources = std::collections::BTreeSet::new();
+            if source_ids.iter().any(|source| !unique_sources.insert(source)) {
+                return Err(FollowEvidenceError::MissingProvenance);
+            }
+            if scene_snapshot_id != expected_snapshot || frame_id != expected_frame {
+                return Err(FollowEvidenceError::ContextMismatch);
+            }
+            validate_follow_numeric(*observation_age_s, *max_age_s, *gap_m, *relative_speed_mps)?;
+            if !distance_error_bound_m.is_finite()
+                || *distance_error_bound_m < 0.0
+                || !max_distance_error_bound_m.is_finite()
+                || *max_distance_error_bound_m < 0.0
+            {
+                return Err(FollowEvidenceError::InvalidNumericValue);
+            }
+            if distance_error_bound_m > max_distance_error_bound_m {
+                return Err(FollowEvidenceError::ExcessiveDistanceErrorBound);
+            }
+            Ok(AdmittedFollowTarget {
+                gap_lower_bound_m: (*gap_m - *distance_error_bound_m).max(0.0),
+                relative_speed_mps: *relative_speed_mps,
+            })
+        }
+        (FollowTargetEvidence::CooperativeAdvisory { .. }, _) => {
+            Err(FollowEvidenceError::RemoteAdvisoryNotAuthority)
+        }
+        _ => Err(FollowEvidenceError::WrongConsumerProfile),
+    }
+}
+
+/// PD cruise-control for Follow task using admitted, provenance-bearing evidence.
+///
+/// The caller must explicitly choose a consumer profile. Missing or inadmissible evidence
+/// returns an error; it never falls back to `VehicleState::nearest_peer_distance`.
 pub fn pd_cruise_with_follow(
     state: &VehicleState,
     target_speed: f64,
     road_heading: f64,
     target_gap: f64,
-) -> VehicleCommand {
-    // Gap-modulated speed: speed_cmd = target_speed + gap_error * 0.3
-    let gap_error = state.nearest_peer_distance - target_gap;
+    evidence: Option<&FollowTargetEvidence>,
+    profile: &FollowConsumerProfile,
+) -> Result<VehicleCommand, FollowEvidenceError> {
+    if !target_speed.is_finite()
+        || target_speed < 0.0
+        || !road_heading.is_finite()
+        || !target_gap.is_finite()
+        || target_gap < 0.0
+    {
+        return Err(FollowEvidenceError::InvalidNumericValue);
+    }
+    let admitted = admit_follow_target(evidence, profile)?;
+    let gap_error = admitted.gap_lower_bound_m - target_gap;
     let speed_cmd = (target_speed + gap_error * 0.3).clamp(0.0, target_speed * 1.2);
-
-    pd_cruise_baseline_with_road(state, speed_cmd, road_heading)
+    Ok(pd_cruise_baseline_with_road(state, speed_cmd, road_heading))
 }
 
 /// Training-level perturbations that interact with the swarm (distinct from physics-level
@@ -1048,35 +1258,178 @@ mod tests {
         );
     }
 
+    fn simulation_follow_profile() -> FollowConsumerProfile {
+        FollowConsumerProfile::SimulationBenchmark {
+            scenario_id: "scenario-1".into(),
+            frame_id: "ego_body".into(),
+            max_age_s: 0.1,
+        }
+    }
+
+    fn oracle_follow_target(gap_m: f64) -> FollowTargetEvidence {
+        FollowTargetEvidence::SimulatorOracle {
+            scenario_id: "scenario-1".into(),
+            actor_id: "peer-1".into(),
+            frame_id: "ego_body".into(),
+            observation_age_s: 0.01,
+            gap_m,
+            relative_speed_mps: -2.0,
+        }
+    }
+
+    fn local_follow_profile() -> FollowConsumerProfile {
+        FollowConsumerProfile::Deployment {
+            scene_snapshot_id: "scene-1".into(),
+            frame_id: "road-local".into(),
+            max_age_s: 0.1,
+            max_distance_error_bound_m: 2.0,
+        }
+    }
+
+    fn local_follow_target(error_bound_m: f64) -> FollowTargetEvidence {
+        FollowTargetEvidence::LocalTrackedActor {
+            scene_snapshot_id: "scene-1".into(),
+            track_lineage_id: "track-1".into(),
+            source_ids: vec!["front-lidar".into()],
+            frame_id: "road-local".into(),
+            observation_age_s: 0.02,
+            gap_m: 15.0,
+            relative_speed_mps: -1.0,
+            distance_error_bound_m: error_bound_m,
+        }
+    }
+
     #[test]
-    fn test_pd_follow_slows_for_close_peer() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 15.0; // closer than target gap
-        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
-        // Gap error = 15 - 30 = -15 → speed_cmd = 13.4 + (-15)*0.3 = 8.9
-        // At 13.4 m/s with target 8.9 → speed_error negative → should brake or reduce throttle
+    fn test_pd_follow_uses_admitted_close_simulator_oracle() {
+        let state = VehicleState::cruising(13.4);
+        let target = oracle_follow_target(15.0);
+        let cmd = pd_cruise_with_follow(
+            &state,
+            13.4,
+            0.0,
+            30.0,
+            Some(&target),
+            &simulation_follow_profile(),
+        )
+        .expect("simulation benchmark oracle should be admitted");
         let baseline = pd_cruise_baseline(&state, 13.4);
         assert!(
             cmd.throttle < baseline.throttle || cmd.brake > baseline.brake,
-            "Close peer → reduced throttle or increased brake: follow={:?}, baseline={:?}",
-            cmd,
-            baseline
+            "Close oracle target should reduce throttle or increase brake"
         );
     }
 
     #[test]
-    fn test_pd_follow_speeds_for_far_peer() {
-        let mut state = VehicleState::cruising(10.0);
-        state.nearest_peer_distance = 60.0; // farther than target gap
-        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
-        // Gap error = 60 - 30 = 30 → speed_cmd = 13.4 + 30*0.3 = 22.4, clamped to 16.08
-        // At 10.0 m/s with target 16.08 → should throttle harder than baseline at 13.4
+    fn test_pd_follow_uses_admitted_far_simulator_oracle() {
+        let state = VehicleState::cruising(10.0);
+        let target = oracle_follow_target(60.0);
+        let cmd = pd_cruise_with_follow(
+            &state,
+            13.4,
+            0.0,
+            30.0,
+            Some(&target),
+            &simulation_follow_profile(),
+        )
+        .expect("simulation benchmark oracle should be admitted");
         let baseline = pd_cruise_baseline_with_road(&state, 13.4, 0.0);
-        assert!(
-            cmd.throttle >= baseline.throttle,
-            "Far peer → increased throttle: follow={:?}, baseline={:?}",
-            cmd,
-            baseline
+        assert!(cmd.throttle >= baseline.throttle);
+    }
+
+    #[test]
+    fn test_pd_follow_never_uses_naked_vehicle_state_peer_distance() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 0.0;
+        assert_eq!(
+            pd_cruise_with_follow(
+                &state,
+                13.4,
+                0.0,
+                30.0,
+                None,
+                &simulation_follow_profile(),
+            ),
+            Err(FollowEvidenceError::Missing)
+        );
+    }
+
+    #[test]
+    fn test_simulator_oracle_is_not_admissible_for_deployment() {
+        let target = oracle_follow_target(15.0);
+        assert_eq!(
+            admit_follow_target(Some(&target), &local_follow_profile()),
+            Err(FollowEvidenceError::WrongConsumerProfile)
+        );
+    }
+
+    #[test]
+    fn test_remote_advisory_never_becomes_follow_target() {
+        let target = FollowTargetEvidence::CooperativeAdvisory {
+            claim_id: "v2x-claim-1".into(),
+        };
+        assert_eq!(
+            admit_follow_target(Some(&target), &simulation_follow_profile()),
+            Err(FollowEvidenceError::RemoteAdvisoryNotAuthority)
+        );
+        assert_eq!(
+            admit_follow_target(Some(&target), &local_follow_profile()),
+            Err(FollowEvidenceError::RemoteAdvisoryNotAuthority)
+        );
+    }
+
+    #[test]
+    fn test_local_follow_uses_conservative_gap_lower_bound() {
+        let target = local_follow_target(2.0);
+        let admitted = admit_follow_target(Some(&target), &local_follow_profile())
+            .expect("valid local track should be admitted");
+        assert!((admitted.gap_lower_bound_m - 13.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_local_follow_rejects_excessive_distance_error_bound() {
+        let target = local_follow_target(2.1);
+        assert_eq!(
+            admit_follow_target(Some(&target), &local_follow_profile()),
+            Err(FollowEvidenceError::ExcessiveDistanceErrorBound)
+        );
+    }
+
+    #[test]
+    fn test_follow_rejects_stale_or_future_observation() {
+        let mut target = oracle_follow_target(15.0);
+        if let FollowTargetEvidence::SimulatorOracle {
+            observation_age_s, ..
+        } = &mut target
+        {
+            *observation_age_s = 0.11;
+        }
+        assert_eq!(
+            admit_follow_target(Some(&target), &simulation_follow_profile()),
+            Err(FollowEvidenceError::StaleOrFutureObservation)
+        );
+    }
+
+    #[test]
+    fn test_local_follow_requires_unique_source_provenance() {
+        let mut target = local_follow_target(0.5);
+        if let FollowTargetEvidence::LocalTrackedActor { source_ids, .. } = &mut target {
+            source_ids.push("front-lidar".into());
+        }
+        assert_eq!(
+            admit_follow_target(Some(&target), &local_follow_profile()),
+            Err(FollowEvidenceError::MissingProvenance)
+        );
+    }
+
+    #[test]
+    fn test_follow_rejects_context_frame_or_scenario_mismatch() {
+        let mut target = oracle_follow_target(15.0);
+        if let FollowTargetEvidence::SimulatorOracle { frame_id, .. } = &mut target {
+            *frame_id = "world".into();
+        }
+        assert_eq!(
+            admit_follow_target(Some(&target), &simulation_follow_profile()),
+            Err(FollowEvidenceError::ContextMismatch)
         );
     }
 }

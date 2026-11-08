@@ -8,13 +8,16 @@
 //! (thermometer coding) then bound with the base vector. Channels are organized in semantic
 //! groups with safety-critical channels weighted higher.
 //!
-//! The 20-channel "Sensory Schema":
-//! - Proprioceptive Core (14): physics state from the bicycle model
+//! The 20-channel legacy schema is retained for checkpoint/layout compatibility:
+//! - Proprioceptive Core (14): simulated or admitted local vehicle state
 //! - Road Vector (2): lateral_offset, curvature_ahead
-//! - Swarm Vector (4): nearest_peer_distance, peer_relative_speed, mesh_brake_density, mesh_confidence
+//! - Legacy peer vector (4): simulator peer distance/speed and unqualified mesh aggregates
 //!
-//! `mesh_brake_density` gets the highest weight (3.0x) — if the swarm slams on the brakes
-//! five cars ahead, that signal physically overpowers the accelerator in hyperdimensional space.
+//! `encode()` is the safe default: all legacy peer channels are neutralized before both
+//! position and derivative encoding. `encode_simulator_oracle()` is an explicit,
+//! simulation-only path that admits peer distance/speed while still masking unqualified
+//! aggregate brake-density and claimed-confidence channels. Neither method is a live V2X
+//! or production perception adapter.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -45,10 +48,10 @@ struct ChannelGroup {
 /// | Pitch              | [13]      | 1     | 0.8    | Weight transfer indicator          |
 /// | Road: lateral off  | [14]      | 1     | 2.0    | Lane position reference            |
 /// | Road: curvature    | [15]      | 1     | 1.5    | Anticipatory steering              |
-/// | Mesh: peer dist    | [16]      | 1     | 1.5    | Proximity awareness                |
-/// | Mesh: peer speed   | [17]      | 1     | 1.5    | Closing rate                       |
-/// | Mesh: brake dens.  | [18]      | 1     | 3.0    | SUPREME: swarm emergency broadcast |
-/// | Mesh: confidence   | [19]      | 1     | 1.0    | Signal quality (meta)              |
+/// | Peer: distance     | [16]      | 1     | 1.5    | Simulator-oracle mode only         |
+/// | Peer: relative spd | [17]      | 1     | 1.5    | Simulator-oracle mode only         |
+/// | Peer: brake dens.  | [18]      | 1     | 0.0    | Unqualified aggregate is excluded  |
+/// | Peer: confidence   | [19]      | 1     | 0.0    | Claimed confidence is not evidence |
 const CHANNEL_GROUPS: [ChannelGroup; 16] = [
     ChannelGroup {
         start: 0,
@@ -123,13 +126,13 @@ const CHANNEL_GROUPS: [ChannelGroup; 16] = [
     ChannelGroup {
         start: 18,
         count: 1,
-        weight: 3.0,
-    }, // mesh: brake density (SUPREME)
+        weight: 0.0,
+    }, // unqualified mesh brake aggregate is never encoded
     ChannelGroup {
         start: 19,
         count: 1,
-        weight: 1.0,
-    }, // mesh: confidence
+        weight: 0.0,
+    }, // claimed peer confidence is never encoded
 ];
 
 /// Channel normalization ranges [min, max].
@@ -245,11 +248,40 @@ impl VehicleHdcEncoder {
         1.0
     }
 
-    /// Encode a vehicle state into a full 16,384D ContinuousHV.
+    /// Encode admitted local vehicle state. Legacy peer channels are neutralized.
+    ///
+    /// This is the default for any non-simulator caller. It does not accept raw V2X,
+    /// swarm aggregates or simulator truth as local perception.
     pub fn encode(&mut self, state: &VehicleState) -> ContinuousHV {
-        let channels = state.to_channels();
-        let n = channels.len();
+        self.encode_with_peer_mode(state, false)
+    }
 
+    /// Encode a simulator state with explicit simulator-oracle peer distance/speed.
+    ///
+    /// Use only in synthetic simulation/benchmark runs. Brake-density and claimed-confidence
+    /// aggregates remain neutralized and have zero weight even in this mode.
+    pub fn encode_simulator_oracle(&mut self, state: &VehicleState) -> ContinuousHV {
+        self.encode_with_peer_mode(state, true)
+    }
+
+    fn encode_with_peer_mode(
+        &mut self,
+        state: &VehicleState,
+        allow_simulator_oracle_peer_state: bool,
+    ) -> ContinuousHV {
+        let mut channels = state.to_channels();
+
+        // Keep the historical 20D channel positions stable, but do not turn remote/aggregate
+        // peer values into local sensor inputs. The fixed neutral values are also stored in
+        // derivative history, so a spoofed channel change cannot leak through delta encoding.
+        if !allow_simulator_oracle_peer_state {
+            channels[16] = 100.0; // neutral midpoint of [0, 200] m
+            channels[17] = 0.0; // neutral relative speed
+        }
+        channels[18] = 0.5;
+        channels[19] = 0.5;
+
+        let n = channels.len();
         let mut bound_hvs: Vec<ContinuousHV> = Vec::with_capacity(n * 2);
         let mut weights: Vec<f32> = Vec::with_capacity(n * 2);
 
@@ -260,7 +292,7 @@ impl VehicleHdcEncoder {
             weights.push(Self::channel_weight(i) * (1.0 - self.derivative_weight));
         }
 
-        // Derivative channels from previous state
+        // Derivative channels use the same admitted/neutralized values as position encoding.
         if let Some(ref prev) = self.prev_channels {
             for i in 0..n {
                 let delta = channels[i] - prev[i];
@@ -417,45 +449,75 @@ mod tests {
         assert!((VehicleHdcEncoder::channel_weight(12) - 2.5).abs() < 1e-6);
         // Road: lateral offset should be 2.0
         assert!((VehicleHdcEncoder::channel_weight(14) - 2.0).abs() < 1e-6);
-        // Mesh: brake density should be 3.0 (SUPREME)
-        assert!((VehicleHdcEncoder::channel_weight(18) - 3.0).abs() < 1e-6);
-        // Mesh: confidence should be 1.0
-        assert!((VehicleHdcEncoder::channel_weight(19) - 1.0).abs() < 1e-6);
+        // Unqualified aggregate brake density / claimed confidence have no HDC weight.
+        assert_eq!(VehicleHdcEncoder::channel_weight(18), 0.0);
+        assert_eq!(VehicleHdcEncoder::channel_weight(19), 0.0);
         // Pitch should be 0.8
         assert!((VehicleHdcEncoder::channel_weight(13) - 0.8).abs() < 1e-6);
     }
 
     #[test]
-    fn test_mesh_brake_dominates_encoding() {
+    fn default_encoder_neutralizes_all_unqualified_peer_channels_in_position_and_derivative() {
         let genesis = test_genesis();
-
         let baseline = VehicleState::cruising(13.4);
+        let mut spoofed = baseline.clone();
+        spoofed.nearest_peer_distance = 0.1;
+        spoofed.peer_relative_speed = -30.0;
+        spoofed.mesh_brake_density = 1.0;
+        spoofed.mesh_confidence = 1.0;
 
-        // Swarm emergency: brake density spikes
-        let mut brake_state = VehicleState::cruising(13.4);
-        brake_state.mesh_brake_density = 0.8;
-        brake_state.mesh_confidence = 0.9;
+        let mut encoder = VehicleHdcEncoder::new(&genesis, 32);
+        let _first = encoder.encode(&baseline);
+        let baseline_next = encoder.encode(&baseline);
 
-        // Only position differs
-        let mut pos_state = VehicleState::cruising(13.4);
-        pos_state.position_x = 100.0;
+        encoder.reset();
+        let _first = encoder.encode(&baseline);
+        let spoofed_next = encoder.encode(&spoofed);
 
-        let mut enc = VehicleHdcEncoder::new(&genesis, 32);
-        let hv_base = enc.encode(&baseline);
-
-        enc.reset();
-        let hv_brake = enc.encode(&brake_state);
-
-        enc.reset();
-        let hv_pos = enc.encode(&pos_state);
-
-        let sim_brake = hv_base.similarity(&hv_brake);
-        let sim_pos = hv_base.similarity(&hv_pos);
-
-        // Mesh brake density (weight 3.0) should cause more change than position (weight 1.0)
         assert!(
-            sim_brake < sim_pos,
-            "Mesh brake density (w=3.0) should affect encoding more than position (w=1.0): brake_sim={sim_brake}, pos_sim={sim_pos}"
+            (baseline_next.similarity(&spoofed_next) - 1.0).abs() < 1e-5,
+            "Default local-evidence encoder must mask raw peer fields in position and derivative channels"
+        );
+    }
+
+    #[test]
+    fn explicit_simulator_oracle_encoder_admits_peer_distance_and_relative_speed() {
+        let genesis = test_genesis();
+        let baseline = VehicleState::cruising(13.4);
+        let mut oracle = baseline.clone();
+        oracle.nearest_peer_distance = 24.0;
+        oracle.peer_relative_speed = -5.0;
+
+        let mut baseline_encoder = VehicleHdcEncoder::new(&genesis, 32);
+        let hv_baseline = baseline_encoder.encode_simulator_oracle(&baseline);
+        let mut oracle_encoder = VehicleHdcEncoder::new(&genesis, 32);
+        let hv_oracle = oracle_encoder.encode_simulator_oracle(&oracle);
+
+        assert!(
+            hv_baseline.similarity(&hv_oracle) < 0.999,
+            "Explicit simulator-oracle mode should encode the synthetic lead gap and closing rate"
+        );
+    }
+
+    #[test]
+    fn simulator_oracle_encoder_still_masks_unqualified_mesh_aggregates() {
+        let genesis = test_genesis();
+        let baseline = VehicleState::cruising(13.4);
+        let mut spoofed = baseline.clone();
+        spoofed.mesh_brake_density = 1.0;
+        spoofed.mesh_confidence = 1.0;
+
+        let mut encoder = VehicleHdcEncoder::new(&genesis, 32);
+        let _first = encoder.encode_simulator_oracle(&baseline);
+        let baseline_next = encoder.encode_simulator_oracle(&baseline);
+
+        encoder.reset();
+        let _first = encoder.encode_simulator_oracle(&baseline);
+        let spoofed_next = encoder.encode_simulator_oracle(&spoofed);
+
+        assert!(
+            (baseline_next.similarity(&spoofed_next) - 1.0).abs() < 1e-5,
+            "Even simulation-oracle mode must not encode raw aggregate brake density or claimed confidence"
         );
     }
 }
