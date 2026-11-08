@@ -265,14 +265,15 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
     let mut total_aig_and_nodes = 0usize;
 
     for compiled in &verified.representation.functions {
-        let (bdd_bytes, bdd_verification) =
-            (encode_strategy_robdd(&compiled.bdd, bdd_budget, encoding_budget)?,
-             verify_robdd_matches_strategy_function(
-                 &compiled.bdd,
-                 &compiled.reduced_function,
-                 bdd_budget,
-             )
-             .map_err(StrategyPortfolioError::BddVerification)?);
+        let (bdd_bytes, bdd_verification) = (
+            encode_strategy_robdd(&compiled.bdd, bdd_budget, encoding_budget)?,
+            verify_robdd_matches_strategy_function(
+                &compiled.bdd,
+                &compiled.reduced_function,
+                bdd_budget,
+            )
+            .map_err(StrategyPortfolioError::BddVerification)?,
+        );
 
         let aig = compile_strategy_function_to_aig_with_order(
             &compiled.reduced_function,
