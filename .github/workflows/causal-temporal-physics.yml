@@ -107,6 +107,22 @@ jobs:
         if: matrix.package == 'symthaea-fractal-time-lab'
         run: cargo check --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep
 
+      - name: Diff independent Chain Theory reproduction against pinned author CSV
+        if: matrix.package == 'symthaea-chain-theory-audit'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-chain-theory-audit --example chain_alpha_audit > chain-alpha-audit.txt
+          sed -n '/^record,construction,slot_kinds/,$p' chain-alpha-audit.txt > chain-alpha-rust-rows.csv
+          sed '/^#/d' crates/domains/symthaea-chain-theory-audit/tests/fixtures/author-records-a28db899.csv > chain-alpha-author-rows.csv
+          diff -u chain-alpha-author-rows.csv chain-alpha-rust-rows.csv
+          {
+            echo "## Chain Theory author-record differential reproduction"
+            echo "- Author fixture: a28db8998bce5bd5ef11195c05f13c86cd9dac5c"
+            echo "- Compared rows: 172"
+            echo "- Result: exact CSV match"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
