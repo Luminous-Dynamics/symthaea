@@ -643,6 +643,7 @@ pub enum BoundedMapError {
     AssignmentLimitExceeded { required: usize, limit: usize },
     TieOutputLimitExceeded { maximum_possible: usize, limit: usize },
     TieStorageLimitExceeded { maximum_values: usize, limit: usize },
+    AllocationFailed { resource: &'static str, entries: usize },
     ArithmeticOverflow,
 }
 
@@ -662,12 +663,40 @@ impl fmt::Display for BoundedMapError {
                 f,
                 "complete MAP tie set may store {maximum_values} assignment values; configured limit is {limit}"
             ),
+            Self::AllocationFailed { resource, entries } => write!(
+                f,
+                "unable to reserve {resource} capacity for {entries} entries"
+            ),
             Self::ArithmeticOverflow => write!(f, "checked rational overflow during exact MAP scoring"),
         }
     }
 }
 
 impl Error for BoundedMapError {}
+
+fn store_map_optimum(
+    output: &mut Vec<ExactMapAssignment>,
+    assignment: &[usize],
+    score: CheckedRational,
+) -> Result<(), BoundedMapError> {
+    output.try_reserve(1).map_err(|_| BoundedMapError::AllocationFailed {
+        resource: "optimal assignment records",
+        entries: 1,
+    })?;
+    let mut stored_assignment = Vec::new();
+    stored_assignment.try_reserve_exact(assignment.len()).map_err(|_| {
+        BoundedMapError::AllocationFailed {
+            resource: "stored assignment values",
+            entries: assignment.len(),
+        }
+    })?;
+    stored_assignment.extend_from_slice(assignment);
+    output.push(ExactMapAssignment {
+        assignment: stored_assignment,
+        score,
+    });
+    Ok(())
+}
 
 /// Exact bounded exhaustive full MAP for nonnegative rational factor graphs.
 ///
@@ -708,8 +737,15 @@ pub fn exhaustive_max_times_map_bounded(
         });
     }
 
-    let mut ordered_factors = graph.factors.iter().collect::<Vec<_>>();
-    ordered_factors.sort_by(|left, right| {
+    let mut ordered_factors = Vec::new();
+    ordered_factors.try_reserve_exact(graph.factors.len()).map_err(|_| {
+        BoundedMapError::AllocationFailed {
+            resource: "factor references",
+            entries: graph.factors.len(),
+        }
+    })?;
+    ordered_factors.extend(graph.factors.iter());
+    ordered_factors.sort_unstable_by(|left, right| {
         let scope_order = left.scope.cmp(&right.scope);
         if scope_order != Ordering::Equal {
             return scope_order;
@@ -725,7 +761,14 @@ pub fn exhaustive_max_times_map_bounded(
 
     let mut best_score: Option<CheckedRational> = None;
     let mut optimal_assignments = Vec::new();
-    let mut assignment = vec![0usize; graph.cardinalities.len()];
+    let mut assignment = Vec::new();
+    assignment.try_reserve_exact(graph.cardinalities.len()).map_err(|_| {
+        BoundedMapError::AllocationFailed {
+            resource: "full assignment buffer",
+            entries: graph.cardinalities.len(),
+        }
+    })?;
+    assignment.resize(graph.cardinalities.len(), 0usize);
     let all_variables = (0..graph.cardinalities.len()).collect::<Vec<_>>();
 
     for full_index in 0..assignment_count {
@@ -749,10 +792,7 @@ pub fn exhaustive_max_times_map_bounded(
         match best_score {
             None => {
                 best_score = Some(score);
-                optimal_assignments.push(ExactMapAssignment {
-                    assignment: assignment.clone(),
-                    score,
-                });
+                store_map_optimum(&mut optimal_assignments, &assignment, score)?;
             }
             Some(current) => match compare_nonnegative_rationals(
                 score.numerator() as u128,
@@ -763,16 +803,10 @@ pub fn exhaustive_max_times_map_bounded(
                 Ordering::Greater => {
                     best_score = Some(score);
                     optimal_assignments.clear();
-                    optimal_assignments.push(ExactMapAssignment {
-                        assignment: assignment.clone(),
-                        score,
-                    });
+                    store_map_optimum(&mut optimal_assignments, &assignment, score)?;
                 }
                 Ordering::Equal => {
-                    optimal_assignments.push(ExactMapAssignment {
-                        assignment: assignment.clone(),
-                        score,
-                    });
+                    store_map_optimum(&mut optimal_assignments, &assignment, score)?;
                 }
                 Ordering::Less => {}
             },
