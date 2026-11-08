@@ -72,6 +72,32 @@ A system cannot prove non-impact merely by failing to find an edge. A retain dec
 
 If closure completeness is not defensible, do not infer retain. Use revalidate or unresolved according to the existing #10630 rules.
 
+
+### 2.3 Claim atomization and scope-local validity
+
+A claim must be small enough that one #10630 continuity disposition is meaningful. Decompose a compound sentence when its clauses depend on different evidence authorities, scopes, times or event classes.
+
+For example, these are separate claims and must not share a single disposition merely because they appear in one sentence:
+
+1. the source tree contains an authorization guard;
+2. the frozen build configuration selects that guard in artifact A;
+3. a qualified trace records the guard executing in run R;
+4. the guard made a counterfactual difference to outcome O under model M;
+5. the guard caused incident I in environment E;
+6. a signer is currently authorized to approve the resulting artifact.
+
+Their closures differ: source anchors, build provenance, execution traces, causal assumptions, incident identity and trust roots are not interchangeable evidence.
+
+Rules:
+- one claim node states one proposition, one subject, one applicability scope and one claim kind;
+- temporal and policy qualifiers are explicit (for example, “was signed at D” versus “is currently authorized”);
+- conjunctions with independently changing support are decomposed into component claims plus a derived compound claim whose closure references those components;
+- a compound claim is usable only when every required component remains valid for the compound's declared scope;
+- if the available language/evidence cannot support a stable decomposition, keep the claim unresolved rather than assigning a convenient coarse disposition.
+
+This is a claim-authoring/adjudication rule, not a new status. Continue to use only retain, revalidate, invalidate, supersede and unresolved. Do not add “partially retained” to the continuity vocabulary.
+
+
 ## 3. Event-to-claim impact analysis
 
 Given a change event E and claim C, evaluate impact against Cl(C), not only against file-path overlap.
