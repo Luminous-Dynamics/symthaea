@@ -791,21 +791,19 @@ impl ContinuousHV {
             return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
         }
 
-        let query_norm = match F64Interval {
+        let query_sq_interval = F64Interval {
             lo: query_sq_lower,
             hi: query_sq_upper,
-        }
-        .sqrt_nonnegative()
-        {
+        };
+        let center_sq_interval = F64Interval {
+            lo: center_sq_lower,
+            hi: center_sq_upper,
+        };
+        let query_norm = match query_sq_interval.sqrt_nonnegative() {
             Some(value) if value.lo > 0.0 => value,
             _ => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
         };
-        let center_norm = match F64Interval {
-            lo: center_sq_lower,
-            hi: center_sq_upper,
-        }
-        .sqrt_nonnegative()
-        {
+        let center_norm = match center_sq_interval.sqrt_nonnegative() {
             Some(value) if value.lo > 0.0 => value,
             _ => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
         };
@@ -852,12 +850,10 @@ impl ContinuousHV {
         if candidate_norm_sq_lower <= 0.0 {
             return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
         }
-        let query_relative_error = f64_next_up(
-            gamma + eta / query_sq_lower,
-        );
-        let candidate_relative_error = f64_next_up(
-            gamma + eta / candidate_norm_sq_lower,
-        );
+        let query_eta_ratio = f64_next_up(eta / query_sq_lower);
+        let candidate_eta_ratio = f64_next_up(eta / candidate_norm_sq_lower);
+        let query_relative_error = f64_next_up(gamma + query_eta_ratio);
+        let candidate_relative_error = f64_next_up(gamma + candidate_eta_ratio);
         if !query_relative_error.is_finite()
             || !candidate_relative_error.is_finite()
             || query_relative_error >= 1.0
@@ -914,9 +910,8 @@ impl ContinuousHV {
         }
 
         // |dot_rounding_error| / (||q|| ||x||) <= gamma + eta / (q_norm*x_norm).
-        let normalized_dot_error = f64_next_up(
-            gamma + eta / norm_product_lower,
-        );
+        let normalized_dot_eta_ratio = f64_next_up(eta / norm_product_lower);
+        let normalized_dot_error = f64_next_up(gamma + normalized_dot_eta_ratio);
         if !normalized_dot_error.is_finite() {
             return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
         }
