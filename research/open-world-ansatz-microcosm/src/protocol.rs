@@ -1101,8 +1101,8 @@ fn compare_structure_sets<T, S>(
 where
     S: Ord,
 {
-    let claimed_structures: BTreeSet<S> = claimed.iter().map(|model| structure_of(model)).collect();
-    let oracle_structures: BTreeSet<S> = oracle.iter().map(|model| structure_of(model)).collect();
+    let claimed_structures: BTreeSet<S> = claimed.iter().map(&structure_of).collect();
+    let oracle_structures: BTreeSet<S> = oracle.iter().map(structure_of).collect();
     let correct_structure_count = claimed_structures.intersection(&oracle_structures).count();
 
     StructureScore {
