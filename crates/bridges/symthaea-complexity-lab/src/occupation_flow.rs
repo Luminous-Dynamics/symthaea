@@ -852,7 +852,7 @@ fn canonical_occupation_sparse_lp_sha256(
     source_model_sha256: [u8; 32],
 ) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(b"SYMPGM-OCCUPATION-SPARSE-LP\\0\\x01");
+    hasher.update(b"SYMPGM-OCCUPATION-SPARSE-LP\0\x01");
     hasher.update(source_model_sha256);
     hasher.update((layout.period_count() as u64).to_le_bytes());
     hasher.update((layout.state_count() as u64).to_le_bytes());
@@ -902,7 +902,7 @@ fn sparse_row(
             requested: entries.len(),
         }
     })?;
-    row.extend_from_slice(entries);
+    row.extend(entries.iter().copied().filter(|(_, value)| !value.is_zero()));
     Ok(row)
 }
 
@@ -1093,12 +1093,13 @@ mod tests {
             vec![q(0, 1), q(1, 1)],
             vec![q(0, 1), q(1, 1)],
         ];
-        let built = build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize, budget(504)).unwrap();
+        let built = build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize, budget(84)).unwrap();
         assert_eq!(built.layout().period_count(), 3);
         assert_eq!(built.layout().state_count(), 2);
         assert_eq!(built.layout().variable_count(), 14);
         assert_eq!(built.problem().row_count(), 36);
         assert_eq!(built.problem().column_count(), 14);
+        assert_eq!(built.problem().nonzero_count(), 84);
     }
 
     #[test]
@@ -1147,7 +1148,7 @@ mod tests {
         ];
 
         for (scores, direction, expected_utility, primal_entries, dual_entries) in certificates {
-            let built = build_occupation_flow_lp(&model, scores, direction, budget(504)).unwrap();
+            let built = build_occupation_flow_lp(&model, scores, direction, budget(84)).unwrap();
             let certificate = PrimalDualCertificate {
                 primal: sparse_vector(14, &primal_entries),
                 dual: sparse_vector(36, &dual_entries),
@@ -1269,7 +1270,7 @@ mod tests {
             &model,
             &scores_a,
             &scores_b,
-            budget(504),
+            budget(84),
         ).unwrap();
         let certificate_a = PrimalDualCertificate {
             primal: sparse_vector(
@@ -1290,7 +1291,7 @@ mod tests {
             &model,
             &scores_b,
             &scores_a,
-            budget(504),
+            budget(84),
         ).unwrap();
         let certificate_b = PrimalDualCertificate {
             primal: sparse_vector(
@@ -1333,25 +1334,25 @@ mod tests {
             &model,
             &scores_a,
             UtilityDirection::Maximize,
-            budget(504),
+            budget(84),
         ).unwrap();
         let a_replay = build_occupation_flow_lp(
             &model,
             &scores_a,
             UtilityDirection::Maximize,
-            budget(504),
+            budget(84),
         ).unwrap();
         let b = build_occupation_flow_lp(
             &model,
             &scores_b,
             UtilityDirection::Maximize,
-            budget(504),
+            budget(84),
         ).unwrap();
         let a_min = build_occupation_flow_lp(
             &model,
             &scores_a,
             UtilityDirection::Minimize,
-            budget(504),
+            budget(84),
         ).unwrap();
 
         assert_eq!(a.source_model_sha256(), model_digest);
@@ -1359,7 +1360,7 @@ mod tests {
         assert_eq!(a.compiled_lp_sha256(), a_replay.compiled_lp_sha256());
         assert_eq!(
             sha256_hex(a.compiled_lp_sha256()),
-            "882d77b1c59cede87ee5f04f69bf8345d85d26f4ad6443d2840cfbd839186ce4"
+            "dd4ff48f3a409165ea531a7d3da4983ebbe93368ef89b31ff91213839eefd4de"
         );
         assert_ne!(a.compiled_lp_sha256(), b.compiled_lp_sha256());
         assert_ne!(a.compiled_lp_sha256(), a_min.compiled_lp_sha256());
@@ -1390,7 +1391,7 @@ mod tests {
             &model,
             &scores,
             UtilityDirection::Maximize,
-            budget(504),
+            budget(84),
         ).unwrap();
         let certificate = built.bind_certificate(PrimalDualCertificate {
             primal: sparse_vector(
@@ -1434,7 +1435,7 @@ mod tests {
             &model,
             &scores,
             UtilityDirection::Minimize,
-            budget(504),
+            budget(84),
         ).unwrap();
 
         // The primal point is the max-utility endpoint (U=32/25), hence
@@ -1483,7 +1484,7 @@ mod tests {
         };
 
         // Primal + dual vectors contain 14 + 36 = 50 rational entries.
-        let mut entry_budget = budget(504);
+        let mut entry_budget = budget(84);
         entry_budget.max_certificate_entries = 49;
         let entry_lp = build_occupation_flow_lp(
             &model, &scores, UtilityDirection::Maximize, entry_budget,
@@ -1503,7 +1504,7 @@ mod tests {
             (proof.primal.capacity() + proof.dual.capacity())
                 * std::mem::size_of::<CheckedRational>()
             + std::mem::size_of::<PrimalDualCertificate>();
-        let mut memory_budget = budget(504);
+        let mut memory_budget = budget(84);
         memory_budget.max_certificate_memory_bytes = estimated_bytes - 1;
         let memory_lp = build_occupation_flow_lp(
             &model, &scores, UtilityDirection::Maximize, memory_budget,
@@ -1518,10 +1519,10 @@ mod tests {
             })
         );
 
-        // Exact replay requires 2*m*n + m + n = 1,058 rational
-        // multiply/add terms for this 36-row, 14-column LP.
-        let mut work_budget = budget(504);
-        work_budget.max_verifier_multiply_adds = 1_057;
+        // Sparse replay requires 2*nnz + m + n = 218 terms:
+        // 2*84 + 36 + 14 for this fixture.
+        let mut work_budget = budget(84);
+        work_budget.max_verifier_multiply_adds = 217;
         let work_lp = build_occupation_flow_lp(
             &model, &scores, UtilityDirection::Maximize, work_budget,
         ).unwrap();
@@ -1530,8 +1531,8 @@ mod tests {
             work_lp.verify_bound_optimality(&work_certificate),
             Err(OccupationFlowError::BudgetExceeded {
                 resource: "primal-dual verifier multiply-add work",
-                required: 1_058,
-                limit: 1_057,
+                required: 218,
+                limit: 217,
             })
         );
     }
@@ -1550,13 +1551,13 @@ mod tests {
         let model = fixture();
         let bad_scores = vec![vec![q(0, 1), q(0, 1)]];
         assert!(matches!(
-            build_occupation_flow_lp(&model, &bad_scores, UtilityDirection::Maximize, budget(504)),
+            build_occupation_flow_lp(&model, &bad_scores, UtilityDirection::Maximize, budget(84)),
             Err(OccupationFlowError::ScorePeriodCountMismatch { .. })
         ));
     }
 
     #[test]
-    fn rejects_occupation_flow_budget_before_dense_matrix_allocation() {
+    fn rejects_occupation_flow_nonzero_budget_before_sparse_matrix_allocation() {
         let model = fixture();
         let scores = vec![
             vec![q(0, 1), q(0, 1)],
@@ -1568,12 +1569,12 @@ mod tests {
                 &model,
                 &scores,
                 UtilityDirection::Maximize,
-                budget(503),
+                budget(83),
             ),
             Err(OccupationFlowError::BudgetExceeded {
                 resource: "sparse nonzero entries",
-                required: 504,
-                limit: 503,
+                required: 84,
+                limit: 83,
             })
         );
     }
@@ -1589,7 +1590,7 @@ mod tests {
         let tight = OccupationFlowBudget {
             max_variables: 14,
             max_constraints: 36,
-            max_nonzero_entries: 504,
+            max_nonzero_entries: 44,
             max_rational_bit_width: 3,
             max_certificate_entries: 64,
             max_certificate_memory_bytes: 1_000_000,
@@ -1601,6 +1602,49 @@ mod tests {
                 resource: "rational numerator/denominator bit width",
                 required: 4,
                 limit: 3,
+            })
+        );
+    }
+
+    #[test]
+    fn occupation_flow_sparse_preflight_scales_to_24_states_and_8_periods() {
+        let states = 24usize;
+        let initial = (0..states)
+            .map(|state| if state == 0 { q(1, 1) } else { q(0, 1) })
+            .collect::<Vec<_>>();
+        let interval_row = vec![
+            TransitionInterval { lower: q(0, 1), upper: q(1, 1) };
+            states
+        ];
+        let matrix = vec![interval_row; states];
+        let transitions = vec![matrix; 7];
+        let model = StagewiseIntervalMarkovModel::new(initial, transitions).unwrap();
+
+        let exact_budget = OccupationFlowBudget {
+            max_variables: 4_224,
+            max_constraints: 8_784,
+            max_nonzero_entries: 32_976,
+            max_rational_bit_width: 64,
+            max_certificate_entries: 0,
+            max_certificate_memory_bytes: 0,
+            max_verifier_multiply_adds: 0,
+        };
+        let (layout, constraints, nonzeros) =
+            preflight_dimensions(&model, exact_budget).unwrap();
+        assert_eq!(layout.variable_count(), 4_224);
+        assert_eq!(constraints, 8_784);
+        assert_eq!(nonzeros, 32_976);
+
+        let tight = OccupationFlowBudget {
+            max_nonzero_entries: 32_975,
+            ..exact_budget
+        };
+        assert_eq!(
+            preflight_dimensions(&model, tight),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "sparse nonzero entries",
+                required: 32_976,
+                limit: 32_975,
             })
         );
     }
@@ -1622,7 +1666,7 @@ mod tests {
             OccupationFlowBudget {
                 max_variables: 6,
                 max_constraints: 20,
-                max_nonzero_entries: 120,
+                max_nonzero_entries: 44,
                 max_rational_bit_width: 64,
                 max_certificate_entries: 64,
                 max_certificate_memory_bytes: 1_000_000,
