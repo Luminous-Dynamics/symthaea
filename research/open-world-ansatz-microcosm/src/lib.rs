@@ -4,6 +4,7 @@
 //! a general equation-discovery engine or physical-world simulator.
 
 pub mod numeric;
+pub mod interaction;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
