@@ -973,7 +973,12 @@ mod tests {
         assert!(matches!(
             greedy_budgeted_design(
                 &scenarios,
-                &[option("bad-value", 1.0, None, vec![vec![vec![f64::NAN, 0.0]]])],
+                &[option(
+                    "bad-value",
+                    1.0,
+                    None,
+                    vec![vec![vec![f64::NAN, 0.0]]]
+                )],
                 &config(1.0)
             ),
             Err(BudgetedDesignError::NonFiniteJacobian { .. })
