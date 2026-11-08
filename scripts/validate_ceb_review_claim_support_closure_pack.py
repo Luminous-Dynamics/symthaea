@@ -92,6 +92,9 @@ def validate(protocol: str, challenge: str, key: str, continuity: str) -> list[s
     for item in (
         "support closure",
         "closure completeness",
+        "minimum-sufficient, not maximal",
+        "context-only provenance",
+        "context-only dependency",
         "impact witness",
         "closure-gap witness",
         "unaffectedness witness",
@@ -164,7 +167,7 @@ def validate(protocol: str, challenge: str, key: str, continuity: str) -> list[s
 
 def self_test() -> list[str]:
     protocol = "\n".join((
-        "support closure closure completeness impact witness closure-gap witness unaffectedness witness open-world remainder",
+        "support closure closure completeness minimum-sufficient, not maximal context-only provenance context-only dependency impact witness closure-gap witness unaffectedness witness open-world remainder",
         "historical truth current decision-use event-to-claim impact claim atomization one proposition compound claim do not add “partially retained”",
         "not a second evidence-continuity system #10630 #10173 #9112 #10314 #10610 #10619 #10064 #10369 no new task schema at least 0.90 at least 0.95 at most 0.05 at most 0.02 at least 0.98 at least 20% not a sealed holdout",
         *DISPOSITIONS,
