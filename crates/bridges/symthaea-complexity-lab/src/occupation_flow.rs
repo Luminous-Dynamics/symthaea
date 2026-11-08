@@ -871,7 +871,7 @@ pub fn canonical_primal_dual_certificate_sha256(
     certificate: &PrimalDualCertificate,
 ) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(b"SYMPGM-OCCUPATION-CERTIFICATE\\0\\x01");
+    hasher.update(b"SYMPGM-OCCUPATION-CERTIFICATE\0\x01");
     hasher.update(source_model_sha256);
     hasher.update(compiled_lp_sha256);
     hasher.update((certificate.primal.len() as u64).to_le_bytes());
@@ -1637,7 +1637,7 @@ mod tests {
         assert_eq!(verified.certificate_sha256, certificate.sha256());
         assert_eq!(
             sha256_hex(verified.certificate_sha256),
-            "PLACEHOLDER_CERT_SHA256"
+            "aecefa27673e34d63ca2098769e5e7538e57b39b9836a7a73f62c59e47ea4786"
         );
 
         let mut changed = certificate.clone();
