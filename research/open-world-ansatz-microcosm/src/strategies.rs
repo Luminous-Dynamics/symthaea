@@ -627,6 +627,45 @@ mod tests {
     }
 
     #[test]
+    fn structure_balanced_policy_prefers_a_mechanism_probe_over_model_entropy() {
+        let episode = BlindEpisode::new_numeric(
+            "strategy-structure-balanced-01",
+            numeric::ModelHypothesis {
+                mechanism: numeric::Mechanism::DirectResponse,
+                gain: 2,
+                decay: None,
+                initial_state: None,
+                sensor: numeric::SensorMap::Identity,
+            },
+            StructureAccess::NumericWithheld,
+            4,
+        )
+        .unwrap();
+        let view = episode.view().unwrap();
+
+        let structure_probe =
+            choose_probe(&view, ProbeStrategy::MaximumStructureInformationGain).unwrap();
+        let model_entropy_probe = choose_probe(&view, ProbeStrategy::MaximumEntropy).unwrap();
+        let scores = score_available_probes(&view).unwrap();
+        let zero_probe = scores
+            .iter()
+            .find(|score| score.intervention == AgentIntervention::Numeric(0))
+            .unwrap();
+        let positive_probe = scores
+            .iter()
+            .find(|score| score.intervention == AgentIntervention::Numeric(1))
+            .unwrap();
+
+        assert_eq!(structure_probe, AgentIntervention::Numeric(0));
+        assert_ne!(model_entropy_probe, AgentIntervention::Numeric(0));
+        assert!(
+            zero_probe.structure_information_gain_bits
+                > positive_probe.structure_information_gain_bits
+        );
+        assert!(zero_probe.entropy_bits < positive_probe.entropy_bits);
+    }
+
+    #[test]
     fn structure_information_gain_is_zero_when_only_one_family_remains() {
         let score = metrics(AgentIntervention::Numeric(1), [0_i64, 1, 1, 2], 4).unwrap();
         let score =
