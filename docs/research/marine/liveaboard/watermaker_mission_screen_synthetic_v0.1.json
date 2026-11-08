@@ -1,0 +1,129 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "liveaboard-watermaker-mission-screen-v0.1",
+  "evidence_class": "synthetic_screening_with_manufacturer_nameplate_inputs",
+  "mission_assumptions": {
+    "permanent_occupants": 4,
+    "potable_product_demand_l_per_person_day": 25,
+    "total_qualified_product_demand_l_per_day": 100,
+    "target_mission_days": 30,
+    "demand_basis": "Illustrative design assumption only; not a measured household/yacht use norm or potable-water standard.",
+    "other_water_streams_included": false,
+    "reserve_included": false
+  },
+  "calculation_contract": {
+    "runtime_h_per_day": "daily_product_demand_l / rated_product_output_l_per_h",
+    "electrical_energy_kwh_per_day": "rated_power_kw * runtime_h_per_day",
+    "specific_energy_kwh_per_m3": "rated_power_kw / (rated_product_output_l_per_h / 1000)",
+    "omitted_terms": [
+      "startup",
+      "automatic/manual flush",
+      "preservation",
+      "standby",
+      "pre-filter replacement",
+      "UV or post-treatment",
+      "product transfer pump",
+      "pump/controller losses outside published boundary",
+      "off-spec diversion",
+      "downtime",
+      "feed condition derating",
+      "battery/inverter conversion losses"
+    ],
+    "interpretation": "Derived arithmetic from manufacturer-published output and electrical input; not physical measurements or a comparable ranking."
+  },
+  "candidates": [
+    {
+      "id": "schenker_zen_30",
+      "manufacturer": "Schenker",
+      "product": "Zen 30",
+      "source": "https://schenkerwatermakers.com/products/zen/",
+      "evidence_class": "manufacturer_published_nameplate",
+      "output_l_per_h": {
+        "min": 30,
+        "max": 30
+      },
+      "power_kw": {
+        "min": 0.11,
+        "max": 0.11
+      },
+      "derived_runtime_h_per_day": {
+        "min": 3.3333,
+        "max": 3.3333
+      },
+      "derived_energy_kwh_per_day": {
+        "min": 0.3667,
+        "max": 0.3667
+      },
+      "derived_specific_energy_kwh_per_m3": {
+        "min": 3.6667,
+        "max": 3.6667
+      }
+    },
+    {
+      "id": "spectra_lb_800",
+      "manufacturer": "Spectra",
+      "product": "LB 800",
+      "source": "https://www.spectrawatermakers.com/downloads/all-downloads/fact-sheets/lb-800-fact-sheet.pdf",
+      "evidence_class": "manufacturer_published_nameplate",
+      "output_l_per_h": {
+        "min": 128,
+        "max": 128
+      },
+      "power_kw": {
+        "min": 0.3,
+        "max": 0.6
+      },
+      "feed_baseline": {
+        "salinity_ppm": 33000,
+        "temperature_c": 25
+      },
+      "derived_runtime_h_per_day": {
+        "min": 0.7813,
+        "max": 0.7813
+      },
+      "derived_energy_kwh_per_day": {
+        "min": 0.2344,
+        "max": 0.4688
+      },
+      "derived_specific_energy_kwh_per_m3": {
+        "min": 2.3438,
+        "max": 4.6875
+      }
+    },
+    {
+      "id": "rainman_ac_140l",
+      "manufacturer": "Rainman",
+      "product": "AC-140L",
+      "source": "https://www.rainmandesal.com/modular-watermaker/",
+      "evidence_class": "manufacturer_published_nameplate",
+      "output_l_per_h": {
+        "min": 100,
+        "max": 154
+      },
+      "power_kw": {
+        "min": 1.25,
+        "max": 1.25
+      },
+      "voltage": "115/230 V AC",
+      "derived_runtime_h_per_day": {
+        "min": 0.6494,
+        "max": 1
+      },
+      "derived_energy_kwh_per_day": {
+        "min": 0.8117,
+        "max": 1.25
+      },
+      "derived_specific_energy_kwh_per_m3": {
+        "min": 8.1169,
+        "max": 12.5
+      }
+    }
+  ],
+  "explicit_nonclaims": [
+    "25 L/person/day is a design scenario assumption, not a proven demand figure.",
+    "Nameplate output does not establish acceptable product-water quality or net daily accepted water.",
+    "No candidate is ranked because feeds, system boundaries and flush/preservation duties are not matched.",
+    "The calculation excludes every item listed in calculation_contract.omitted_terms.",
+    "No result establishes potable-water safety, environmental discharge approval, physical autonomy, or vessel seaworthiness."
+  ]
+}
