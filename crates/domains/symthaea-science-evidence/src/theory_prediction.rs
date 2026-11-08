@@ -955,8 +955,7 @@ mod tests {
             .predictions
             .iter_mut()
             .find(|record| {
-                record.theory_id == "causal-set"
-                    && record.observable_id == "ordering-fraction-1p1"
+                record.theory_id == "causal-set" && record.observable_id == "ordering-fraction-1p1"
             })
             .unwrap();
         record.uncertainty_status = PredictiveUncertaintyStatus::NotApplicable;
@@ -978,17 +977,12 @@ mod tests {
             .predictions
             .iter_mut()
             .find(|record| {
-                record.theory_id == "causal-set"
-                    && record.observable_id == "ordering-fraction-1p1"
+                record.theory_id == "causal-set" && record.observable_id == "ordering-fraction-1p1"
             })
             .unwrap();
         record.uncertainty_status = PredictiveUncertaintyStatus::Unspecified;
         let comparison = ledger
-            .compare_models(
-                "causal-set",
-                "minkowski-continuum",
-                "ordering-fraction-1p1",
-            )
+            .compare_models("causal-set", "minkowski-continuum", "ordering-fraction-1p1")
             .unwrap();
         let ModelPredictionComparison::NotComparable { blockers, .. } = comparison else {
             panic!("unspecified model-prediction uncertainty must block comparison");
