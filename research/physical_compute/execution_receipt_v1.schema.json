@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/physical_compute/execution_receipt_v1.schema.json",
+  "title": "Symthaea Physical Compute Execution Receipt v1",
+  "description": "Immutable execution and independent-verification record. Missing or unmeasured quantities remain null and must never be inferred from core-only estimates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "receipt_id", "workload_id", "workload_sha256",
+    "plan_id", "plan_sha256", "execution_status", "verification",
+    "measurement", "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "receipt_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+    "workload_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+    "workload_sha256": { "$ref": "#/$defs/digest" },
+    "plan_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+    "plan_sha256": { "$ref": "#/$defs/digest" },
+    "execution_status": {
+      "enum": ["not_executed", "accepted", "rejected", "abstained", "fallback_accepted", "failed"]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "independent", "evaluator_truth_visible_to_verifier", "status", "verifier_id"],
+      "properties": {
+        "required": { "const": true },
+        "independent": { "type": "boolean" },
+        "evaluator_truth_visible_to_verifier": { "const": false },
+        "status": { "enum": ["not_run", "passed", "failed", "inconclusive"] },
+        "verifier_id": { "type": ["string", "null"], "maxLength": 160 },
+        "verifier_revision": { "type": ["string", "null"], "maxLength": 128 },
+        "reason_codes": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_]{1,63}$" },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "passed" } }, "required": ["status"] },
+          "then": { "properties": { "independent": { "const": true }, "verifier_id": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "relative_true_residual": { "type": ["number", "null"], "minimum": 0 },
+        "relative_backward_error": { "type": ["number", "null"], "minimum": 0 },
+        "relative_forward_error": { "type": ["number", "null"], "minimum": 0 },
+        "trajectory_rms_error": { "type": ["number", "null"], "minimum": 0 },
+        "trajectory_max_error": { "type": ["number", "null"], "minimum": 0 },
+        "distribution_metric_name": { "type": ["string", "null"], "maxLength": 64 },
+        "distribution_metric_value": { "type": ["number", "null"] },
+        "converged": { "type": ["boolean", "null"] },
+        "iterations": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary", "latency_ms", "energy_j", "included_components", "excluded_components"],
+      "properties": {
+        "boundary": { "enum": ["algorithm", "device_core", "device_module", "board_system", "full_application", "sensor_to_decision", "unknown"] },
+        "latency_ms": { "$ref": "#/$defs/measurement_value" },
+        "energy_j": { "$ref": "#/$defs/measurement_value" },
+        "included_components": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "uniqueItems": true
+        },
+        "excluded_components": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "uniqueItems": true
+        },
+        "sample_count": { "type": ["integer", "null"], "minimum": 1 },
+        "latency_p50_ms": { "type": ["number", "null"], "minimum": 0 },
+        "latency_p95_ms": { "type": ["number", "null"], "minimum": 0 },
+        "latency_p99_ms": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision", "input_sha256", "configuration_sha256", "evidence_class"],
+      "properties": {
+        "source_revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "input_sha256": { "$ref": "#/$defs/digest" },
+        "configuration_sha256": { "$ref": "#/$defs/digest" },
+        "backend_id": { "type": ["string", "null"], "maxLength": 160 },
+        "backend_firmware": { "type": ["string", "null"], "maxLength": 128 },
+        "calibration_id": { "type": ["string", "null"], "maxLength": 160 },
+        "evidence_class": { "enum": ["synthetic", "software_observed", "hardware_measured", "projected", "analytical_estimate", "unknown"] },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "measurement_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit", "evidence_class"],
+      "properties": {
+        "value": { "type": ["number", "null"], "minimum": 0 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "evidence_class": { "enum": ["measured", "derived", "modelled", "projected", "analytical_estimate", "synthetic", "unknown"] },
+        "evidence_ref": { "type": ["string", "null"], "maxLength": 200 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "evidence_class": { "const": "unknown" } }, "required": ["evidence_class"] },
+          "then": { "properties": { "value": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "evidence_class": { "enum": ["measured", "derived"] } }, "required": ["evidence_class"] },
+          "then": { "required": ["evidence_ref"] }
+        }
+      ]
+    }
+  }
+}
