@@ -39,6 +39,14 @@ The current authoring environment did not contain rustc. Source compilation and 
 
 The semantic validator and replay CLI are deliberately narrow: it checks referential integrity, selected experiment/evidence invariants and canonical identity. The preflight replay only propagates declared deterministic domain outages through parent and dependency relations. Neither estimates common-cause probabilities, proves statistical independence, interprets mission profiles, validates arbitrary JSON Schema constraints, nor establishes physical device behavior.
 
+## Cross-layer error budget
+
+The new error-budget reference treats weight perturbation, multiplicative distortion, nonlinear transfer residual, additive offset, input/output conversion, accumulation, read noise, timing jitter and spatial fault as separate channels. Each contribution carries a local magnitude, propagation gain and deterministic-bound or standard-deviation interpretation.
+
+Deterministic bounds add linearly. Stochastic standard deviations use a conservative L1 sum when dependence is unknown. RSS is available only when the caller explicitly declares an independence assumption with a syntactically valid evidence digest; the utility does not retrieve that evidence or prove independence. Task-level propagation requires a separately justified sensitivity bound. This keeps unknown correlation and task conditioning from being silently hidden inside a single precision number.
+
+Five unit tests are authored for the error-budget reference: deterministic propagation, unknown-correlation L1 aggregation, conditional RSS, invalid input rejection and empty-budget behavior. They are uncompiled/unexecuted pending a Rust-capable environment.
+
 ## Model boundary
 
 This is a first executable slice, not the complete nested dependency graph in #10993. It does not model subarray/die/wafer/lot hierarchies, realistic spatial stochastic fields, device I-V behavior, conductance mapping, differential pairs, ADC/DAC/readout, noise spectra, write physics, drift, endurance, thermal feedback, real task arithmetic, measured latency, physical energy, area, cost or yield.
@@ -51,6 +59,8 @@ The machine-readable v1 manifest, preflight receipt contract and semantic/replay
 
 - `research/physical_compute/scenario_manifest_v1.schema.json`
 - `research/physical_compute/preflight_receipt_v1.schema.json`
+- `research/physical_compute/error_budget_v1.rs`: compositional typed error-budget reference.
+- `docs/engineering/computers/CROSS_LAYER_ERROR_BUDGET_V1.md`: mechanism taxonomy, propagation contract and sensitivity-aware resource allocation.
 - `research/physical_compute/scenarios/v1/common_cause_controller_outage.json`\n- `research/physical_compute/scenarios/v1/common_cause_shared_power_outage.json`
 - `research/physical_compute/manifest-validator/`: isolated Rust CLI/library for semantic validation, canonical digesting and deterministic domain-outage preflight replay (uses `serde_json` and `sha2`; not a Symthaea workspace member).
 - `docs/engineering/computers/INDEPENDENT_VERIFICATION_V1.md`: verification benchmark families and independence contract.
@@ -83,10 +93,10 @@ The crate and tests are authored but have not been compiled in this environment 
 
 ## Required next steps
 
-1. Compile and test the isolated Rust utility on an exact checked-out PR head; run Draft 2020-12 schema validation and semantic/preflight replay on both fixtures.
+1. Compile and test the isolated Rust utility and error-budget reference on exact checked-out PR heads; run Draft 2020-12 schema validation and semantic/preflight replay on both fixtures.
 2. Add adversarial parent/dependency topology tests and validate candidate + verifier cut sets, including a common host/input path and shared failover controller.
 3. Add spatial process and adversarial geometry generators; retain beta-binomial as an exchangeable-count baseline only.
-4. Add persistent write error, per-read noise, drift, temperature, retention and endurance.
+4. Add persistent write error, per-read noise, drift, temperature, retention and endurance, with separate cross-layer error-channel parameters and propagation evidence.
 5. Integrate independent workload oracles for exact HDC, matrix/equation solving and temporal state.
 6. Add immutable result receipts with per-scheduled-trial outcomes, measurement boundary, source/configuration/scenario digests, and recovery metrics.
 7. Compare direct mapping, independent-only redundancy, screening/remapping, fault-containment islands, adaptive representation, ABFT/randomized checks, mixed-precision refinement and combined policies.
