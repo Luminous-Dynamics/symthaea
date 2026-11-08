@@ -476,6 +476,28 @@
       "supports": [
         "CEB-REVIEW"
       ]
+    },
+    {
+      "source_id": "ase-ipa-2025-paper",
+      "source_url": "https://doi.org/10.1109/ase63991.2025.00194",
+      "title": "Incremental Program Analysis in the Wild: An Empirical Study on Real-World Program Changes",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2025-11-19",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "diffci-open-evidence-study",
+      "source_url": "https://diffci.com/research/diffci-open-evidence-2026",
+      "title": "DiffCI Open Evidence Study 2026: Change-Aware Test Selection",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-09-03",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
     }
   ],
   "comparators": [
@@ -1475,6 +1497,51 @@
         "The reported empirical FDR range is under a target alpha of 0.10 and the stated calibration protocol; it is not an unconditional guarantee for CEB.",
         "Reported acceptance multiplier is up to 2.4x versus vanilla baselines, not 2.4x accuracy.",
         "CEB adaptation requires disjoint calibration material and evaluation of exchangeability/shift by repository, defect family, severity and claim type."
+      ]
+    },
+    {
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "Incremental Program Analysis in the Wild",
+      "benchmark_version": "ASE 2025 empirical study",
+      "split": "4,084 real-world Java program changes from 20 open-source projects; two IPA tools evaluated",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 4084,
+        "unit": "program_change_commits"
+      },
+      "source_id": "ase-ipa-2025-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "This is incremental program analysis, not CEB evidence-disposition or engineering-claim continuity.",
+        "The corpus contains 4,084 commits from 20 Java projects; two representative Java IPA tools were evaluated.",
+        "The paper reports efficiency gains versus exhaustive analysis but also inconsistencies and markedly higher peak memory in evaluated tools.",
+        "Do not translate static-analysis recomputation results into continuity disposition accuracy or stale-evidence safety.",
+        "The Java-only population does not establish transfer to Rust, multi-language workspaces or security-authority changes."
+      ]
+    },
+    {
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "DiffCI Open Evidence Study 2026",
+      "benchmark_version": "diffci-oes-2026-v1; published 2026-09-03 / updated 2026-09-25",
+      "split": "2,000 historical commit deltas across 20 repositories; graph test selection compared with path-rule selection",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 2000,
+        "unit": "historical_commit_deltas"
+      },
+      "source_id": "diffci-open-evidence-study",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Self-published open evidence study; use as a transparent contextual comparator, not an independently replicated industry ceiling.",
+        "Only 29.8% of deltas offered a selective-test opportunity; reported whole-corpus test reduction against a path rule was 4.2%.",
+        "Reports job-level recall of 280 historical CI failures at 96.4% for DiffCI versus 70.7% for a path rule; this is change-aware test selection, not claim-disposition recall.",
+        "The 95% repository-clustered interval for the aggregate reduction crosses zero (-4.8% to +47.9%); the study says the sample cannot rule out a null population effect.",
+        "The 32/32 measurable mutation detections are explicitly not a reliability estimate; the report states no production CI runs were skipped, cancelled or blocked.",
+        "Only 3 of 7 attempted repositories passed its canonical suite-green qualification, and its own research page discloses limited repository reach."
       ]
     }
   ],
@@ -5916,6 +5983,380 @@
       },
       "notes": [
         "Acceptance/coverage multiplier, not accuracy improvement."
+      ]
+    },
+    {
+      "observation_id": "ase-ipa-real-change-commit-count",
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "source_locator": "Wang et al., ASE 2025, DOI 10.1109/ase63991.2025.00194, abstract and conference presentation",
+      "system": {
+        "system_id": "ase-ipa-2025-corpus",
+        "model": "Two Java incremental program analysis tools",
+        "harness": "Empirical incremental-analysis study",
+        "configuration": "4,084 historical real-world changes across 20 Java repositories"
+      },
+      "metric": {
+        "metric_id": "program_change_count",
+        "label": "Real-world program change count",
+        "definition": "Number of real-world program changes/commits in the curated incremental program-analysis corpus.",
+        "value": 4084,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "commits",
+        "direction": "not_applicable",
+        "raw_display": "4,084 commits",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "program_change_count",
+          "applies_to_task_count": 4084
+        }
+      },
+      "notes": [
+        "Population descriptor, not a CEB task count or success score."
+      ]
+    },
+    {
+      "observation_id": "ase-ipa-project-count",
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "source_locator": "Wang et al., ASE 2025, DOI 10.1109/ase63991.2025.00194, abstract and conference presentation",
+      "system": {
+        "system_id": "ase-ipa-2025-corpus",
+        "model": "Two Java incremental program analysis tools",
+        "harness": "Empirical incremental-analysis study",
+        "configuration": "Open-source Java project population"
+      },
+      "metric": {
+        "metric_id": "project_count",
+        "label": "Open-source project count",
+        "definition": "Number of Java open-source projects represented in the curated program-change corpus.",
+        "value": 20,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "projects",
+        "direction": "not_applicable",
+        "raw_display": "20 projects",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "project_count",
+          "applies_to_task_count": 4084
+        }
+      },
+      "notes": [
+        "Population descriptor; Java-only scope."
+      ]
+    },
+    {
+      "observation_id": "ase-ipa-tool-count",
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "source_locator": "Wang et al., ASE 2025, DOI 10.1109/ase63991.2025.00194, abstract and conference presentation",
+      "system": {
+        "system_id": "ase-ipa-2025-evaluated-tools",
+        "model": "Two representative Java IPA tools",
+        "harness": "Empirical incremental-analysis study",
+        "configuration": "Tool comparison scope"
+      },
+      "metric": {
+        "metric_id": "evaluated_tool_count",
+        "label": "Evaluated incremental-analysis tool count",
+        "definition": "Number of representative Java incremental program analysis tools evaluated in the study.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tools",
+        "direction": "not_applicable",
+        "raw_display": "two representative tools",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "evaluated_tool_count",
+          "applies_to_task_count": 4084
+        }
+      },
+      "notes": [
+        "Tool count, not a performance score."
+      ]
+    },
+    {
+      "observation_id": "diffci-historical-delta-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-open-study",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "20 repositories; historical commit-delta replay"
+      },
+      "metric": {
+        "metric_id": "historical_commit_delta_count",
+        "label": "Historical commit-delta count",
+        "definition": "Number of historical commit deltas replayed in the study.",
+        "value": 2000,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "commit_deltas",
+        "direction": "not_applicable",
+        "raw_display": "2,000 deltas",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_commit_delta_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Population descriptor. Study is self-published; repository selection and evidence limitations are disclosed."
+      ]
+    },
+    {
+      "observation_id": "diffci-repository-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-open-study",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Repository sample frame"
+      },
+      "metric": {
+        "metric_id": "repository_count",
+        "label": "Repository count",
+        "definition": "Number of repositories represented in the historical replay corpus.",
+        "value": 20,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "repositories",
+        "direction": "not_applicable",
+        "raw_display": "20 repositories",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "repository_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Population descriptor."
+      ]
+    },
+    {
+      "observation_id": "diffci-selective-opportunity-rate",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-graph-selector",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Deltas with a genuine selective-test opportunity"
+      },
+      "metric": {
+        "metric_id": "selective_test_opportunity_rate",
+        "label": "Selective-test opportunity rate",
+        "definition": "Share of all historical deltas classified as offering a genuine opportunity for selective test selection.",
+        "value": 29.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "29.8%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "selective_test_opportunity_rate",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Not a CEB claim-impact or evidence-invalidation recall metric."
+      ]
+    },
+    {
+      "observation_id": "diffci-whole-corpus-test-reduction",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-vs-path-rule",
+        "model": "DiffCI versus changed-path baseline",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Weighted whole-corpus comparison against path-rule selection"
+      },
+      "metric": {
+        "metric_id": "whole_corpus_test_reduction_vs_path_rule",
+        "label": "Whole-corpus test reduction versus path rule",
+        "definition": "Reported weighted test-count reduction across the whole corpus relative to path-rule selection.",
+        "value": 4.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "4.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "whole_corpus_test_reduction_vs_path_rule",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Repository-clustered 95% interval reported as -4.8% to +47.9%, crossing zero; do not claim a certain population gain."
+      ]
+    },
+    {
+      "observation_id": "diffci-job-recall",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-graph-selector",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Historical CI failure jobs; 280 failures"
+      },
+      "metric": {
+        "metric_id": "historical_ci_failure_job_recall",
+        "label": "Historical CI-failure job recall",
+        "definition": "Job-level recall of historical CI failure jobs under the DiffCI selection policy.",
+        "value": 96.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "96.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_ci_failure_job_recall",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "The denominator is 280 historical CI failures, recorded in comparator caveats; this is test-selection recall, not CEB evidence-disposition recall."
+      ]
+    },
+    {
+      "observation_id": "diffci-path-rule-job-recall",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "changed-path-baseline",
+        "model": "Changed-path selection baseline",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Historical CI failure jobs; 280 failures"
+      },
+      "metric": {
+        "metric_id": "historical_ci_failure_job_recall",
+        "label": "Historical CI-failure job recall — path rule",
+        "definition": "Job-level recall of historical CI failure jobs under the changed-path baseline.",
+        "value": 70.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "70.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_ci_failure_job_recall",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Matched baseline to the DiffCI study; not a CEB score."
+      ]
+    },
+    {
+      "observation_id": "diffci-historical-failure-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-historical-ci-failure-sample",
+        "model": "DiffCI and path-rule policies",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Historical CI-failure job set"
+      },
+      "metric": {
+        "metric_id": "historical_ci_failure_count",
+        "label": "Historical CI failure count",
+        "definition": "Number of historical CI failure jobs used in the recall comparison.",
+        "value": 280,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "failure_jobs",
+        "direction": "not_applicable",
+        "raw_display": "280 historical CI failure jobs",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_ci_failure_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Denominator descriptor for the separate job-level recall metric."
+      ]
+    },
+    {
+      "observation_id": "diffci-measurable-mutation-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-measurable-mutation-sample",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open mutation-safety replay",
+        "configuration": "Five corpora; all measurable mutations"
+      },
+      "metric": {
+        "metric_id": "measurable_mutation_count",
+        "label": "Measurable mutation count",
+        "definition": "Number of mutation cases for which detection was measurable in the study's safety evidence.",
+        "value": 32,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "mutations",
+        "direction": "not_applicable",
+        "raw_display": "32 measurable mutations",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "measurable_mutation_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "The report says 32/32 were detected but explicitly warns this is not a reliability estimate; preserve that caveat."
       ]
     }
   ]
