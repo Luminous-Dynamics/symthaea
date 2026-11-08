@@ -143,11 +143,25 @@ The manifest references evaluator-held seed and confirmation ledgers by digest o
 
 This validates metadata consistency only; it does not generate secret seeds, run paired worlds, enforce the operating-system sandbox or own the sealed benchmark service. The schema is `schemas/campaign_manifest_v0.schema.json`.
 
+## Exhaustive finite paired policy campaign
+
+The `finite_policy_campaign` binary enumerates every generating model in the three declared reference grammars and pairs A0/A2 under all seven one-step policies:
+
+    cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin finite_policy_campaign -- --budget 4
+
+The declared census contains 393 generating models (9 Boolean, 120 numeric, 264 two-input interaction), seven policies, 2,751 A0/A2 pairs and 5,502 episodes. The default library budgets are 4 Boolean, 6 numeric and 9 interaction probes; the command above uses a shared 4-action cap for all families, matching the focused-workflow campaign.
+
+The JSON scorecard reports, per world-family × policy × A0/A2 arm: exact parameterized-model version-space match, exact structural-family set match, generating-model retention, disposition correctness, evidence-reference validity, singleton identifiability, false-unique structure claims, safe/unnecessary abstention, probe count and probe cost units. The seeded-random arm uses base seed 23, deterministically salted by family and pair index; each action step receives a distinct deterministic seed, with the same pair seed schedule for A0 and A2.
+
+This is an **exhaustive census of the finite authored grammars**, not a sample of natural systems, an external benchmark, or a learned-agent evaluation. A0/A2 share truth, starting evidence and budget, but their adaptive post-start traces may differ; the design is `adaptive_budget`, not `matched_trace`. Report all 21 strata and do not rank policies solely by a pooled average.
+
+The focused workflow runs the census and fails closed on incomplete exact version spaces, dropped generating truth, invalid evidence references or false unique structural claims. Read the exact workflow run and artifact/log for the executed result; the test count alone is not the campaign result.
+
 ## Authored tests
 
-Seventy-six Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, and a serialized AgentView-to-AgentAction episode round trip.
+Eighty-one Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, and a serialized AgentView-to-AgentAction episode round trip.
 
-The previous exact-head focused runs covered 34 tests on commit 58128d025bdb24995c31822a86cd3afcaec28413. The additional protocol tests and wire contract must be qualified on the new exact branch head before this expanded branch is called green.
+Test functions include the finite truth-census, paired A0/A2 episode, campaign seed-schedule controls, process JSONL framing/round-trip and campaign manifest negative controls. The exact current-head formatting, Clippy, tests and exhaustive-census status must be read from the focused workflow; do not infer a pass from this authored-test count or an older source SHA.
 
 ## Claim boundaries
 
@@ -156,5 +170,5 @@ The previous exact-head focused runs covered 34 tests on commit 58128d025bdb2499
 - The implementation and source-visible tests are not a blind benchmark. The JSONL executable runs a finite enumerator or experiment-policy baseline, not the learned Symthaea research orchestrator.
 - No AI agent has been evaluated.
 - No empirical physical system, unknown natural law or published scientific result has been reproduced.
-- No Unsatz, Scientist World or FrontierPhysics benchmark score is claimed.
+- No Unsatz, DiscoverPhysics, ACDB, Scientist World, WorldTest or FrontierPhysics benchmark reproduction or score is claimed.
 - The numeric extension's exact-head Rust compilation, tests, formatting and Clippy status must be read from its focused workflow; do not infer it from the earlier binary-v1 pass.
