@@ -73,6 +73,19 @@ pub struct ObservableContract {
 
 /// One explicit theory/observable prediction status. A numeric value is
 /// permitted only for Quantitative records.
+/// What uncertainty information accompanies a numeric theory prediction.
+///
+/// Schema v1 deliberately supports point values only. Predictive uncertainty
+/// that has not been modelled is marked Unspecified and blocks quantitative
+/// comparison. Non-quantitative records use NotApplicable. A future schema
+/// may add distribution-valued predictions with their covariance contracts.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum PredictiveUncertaintyStatus {
+    PointValueOnly,
+    Unspecified,
+    NotApplicable,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TheoryPredictionRecord {
     pub theory_id: String,
@@ -81,6 +94,7 @@ pub struct TheoryPredictionRecord {
     pub scope_id: String,
     pub units: String,
     pub predicted_value: Option<f64>,
+    pub uncertainty_status: PredictiveUncertaintyStatus,
     pub derivation_reference: Option<String>,
     pub notes: String,
 }
@@ -121,6 +135,8 @@ pub enum ComparisonBlocker {
     LeftDomainMismatch,
     RightDomainMismatch,
     UnitsMismatch,
+    LeftPredictiveUncertaintyUnspecified,
+    RightPredictiveUncertaintyUnspecified,
     NonGaussianNoise,
     NoiseNotCalibrated,
     MissingMeasurementSigma,
@@ -364,6 +380,7 @@ impl TheoryPredictionLedger {
             if model.role == TheoryModelRole::OtherUnresolved {
                 if record.disposition != PredictionDisposition::Unresolved
                     || record.predicted_value.is_some()
+                    || record.uncertainty_status != PredictiveUncertaintyStatus::NotApplicable
                     || record.derivation_reference.is_some()
                 {
                     return Err(
@@ -377,6 +394,12 @@ impl TheoryPredictionLedger {
 
             match record.disposition {
                 PredictionDisposition::Quantitative => {
+                    if record.uncertainty_status == PredictiveUncertaintyStatus::NotApplicable {
+                        return Err(TheoryPredictionError::NonQuantitativePredictionHasValue {
+                            theory_id: record.theory_id.clone(),
+                            observable_id: record.observable_id.clone(),
+                        });
+                    }
                     let value = record.predicted_value.ok_or_else(|| {
                         TheoryPredictionError::QuantitativePredictionMissingValue {
                             theory_id: record.theory_id.clone(),
@@ -417,7 +440,9 @@ impl TheoryPredictionLedger {
                     }
                 }
                 _ => {
-                    if record.predicted_value.is_some() {
+                    if record.predicted_value.is_some()
+                        || record.uncertainty_status != PredictiveUncertaintyStatus::NotApplicable
+                    {
                         return Err(TheoryPredictionError::NonQuantitativePredictionHasValue {
                             theory_id: record.theory_id.clone(),
                             observable_id: record.observable_id.clone(),
@@ -558,6 +583,16 @@ impl TheoryPredictionLedger {
         if left.units != observable.units || right.units != observable.units {
             blockers.push(ComparisonBlocker::UnitsMismatch);
         }
+        if left.uncertainty_status == PredictiveUncertaintyStatus::Unspecified {
+            blockers.push(ComparisonBlocker::LeftPredictiveUncertaintyUnspecified);
+        } else if left.uncertainty_status != PredictiveUncertaintyStatus::PointValueOnly {
+            blockers.push(ComparisonBlocker::LeftNotQuantitative(left.disposition));
+        }
+        if right.uncertainty_status == PredictiveUncertaintyStatus::Unspecified {
+            blockers.push(ComparisonBlocker::RightPredictiveUncertaintyUnspecified);
+        } else if right.uncertainty_status != PredictiveUncertaintyStatus::PointValueOnly {
+            blockers.push(ComparisonBlocker::RightNotQuantitative(right.disposition));
+        }
         if observable.noise_model != MeasurementNoiseModel::Gaussian {
             blockers.push(ComparisonBlocker::NonGaussianNoise);
         }
@@ -683,6 +718,11 @@ mod tests {
             scope_id: scope_id.to_string(),
             units: units.to_string(),
             predicted_value: value,
+            uncertainty_status: if disposition == PredictionDisposition::Quantitative {
+                PredictiveUncertaintyStatus::PointValueOnly
+            } else {
+                PredictiveUncertaintyStatus::NotApplicable
+            },
             derivation_reference: derivation.map(str::to_string),
             notes: format!("{theory_id} status for {observable_id}"),
         }
@@ -901,6 +941,29 @@ mod tests {
         )));
         assert!(blockers.contains(&ComparisonBlocker::NonGaussianNoise));
         assert!(blockers.contains(&ComparisonBlocker::NoiseNotCalibrated));
+    }
+
+    #[test]
+    fn unspecified_model_predictive_uncertainty_blocks_comparison() {
+        let mut ledger = fixture();
+        let record = ledger.predictions.iter_mut().find(|record| {
+            record.theory_id == "causal-set-minkowski"
+                && record.observable_id == "ordering-fraction-1p1"
+        }).unwrap();
+        record.uncertainty_status = PredictiveUncertaintyStatus::Unspecified;
+        let comparison = ledger
+            .compare_models(
+                "causal-set-minkowski",
+                "minkowski-continuum",
+                "ordering-fraction-1p1",
+            )
+            .unwrap();
+        let ModelPredictionComparison::NotComparable { blockers, .. } = comparison else {
+            panic!("unspecified model-prediction uncertainty must block comparison");
+        };
+        assert!(blockers.contains(
+            &ComparisonBlocker::LeftPredictiveUncertaintyUnspecified
+        ));
     }
 
     #[test]
