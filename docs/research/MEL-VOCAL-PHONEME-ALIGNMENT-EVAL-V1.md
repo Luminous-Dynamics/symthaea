@@ -43,15 +43,25 @@ The aligner pipeline compares an MMS CTC pass with an IPA-native model plus spec
 
 Source and code: https://github.com/gillosae/phoneme-conditional-singing-analysis
 
-**Evaluator change in this iteration:** MEL-VOCAL-001 now reports median absolute phone-onset error and the fraction of exact phone-identity pairs within 50 ms and 100 ms. These figures are conditional on exact symbol, word, syllable and vowel/consonant identity matches; they are not a joint score that hides transcription mistakes. To reproduce the ISMIR metric fairly, first run a fixed-reference-phone alignment track on the same manually annotated corpus, then report the joint recognition-plus-alignment result separately.
+**Evaluator change in this iteration:** MEL-VOCAL-001 now reports median absolute phone-onset error; fractions within 20, 50 and 100 ms; a separate vowel-onset fraction within 50 ms; offset and duration errors; and the ratio of total predicted/reference durations over exact identity pairs. The timing denominator is explicitly exact phone identity (symbol, word, syllable, vowel/consonant class). These are conditional alignment-fidelity metrics, not a joint score that hides transcription mistakes. To reproduce the ISMIR metric fairly, first run a fixed-reference-phone alignment track on the same manually annotated corpus, then report the joint recognition-plus-alignment result separately.
 
-**Proposed stretch target, not an observed result:** on a speaker/song-disjoint singing alignment set using the same annotation convention, aim for median onset error <=20 ms, >=80% within 50 ms, and >=95% within 100 ms, while preserving high recall (do not achieve low timing error by rejecting difficult phones). Report results separately for vowels, stops, fricatives, word boundaries, melisma, vibrato, breathy singing, glissando and falsetto.
+The benchmark repository also states that the NUS-48E audio is not redistributed and must be obtained from its original source; GTSinger is likewise distributed under its own upstream terms. We will not vendor or mirror these recordings. The external pipeline's code is MIT except its vendored RMVPE component (Apache-2.0); its pretrained model downloads have separate upstream terms. The independent Symthaea scorer in this PR remains dependency-free and does not import that pipeline or its data.
+
+**Proposed stretch target, not an observed result:** on a speaker/song-disjoint singing alignment set using the same annotation convention, aim for median onset error <=20 ms, >=80% within 50 ms, and >=95% within 100 ms, while preserving high recall (do not achieve low timing error by rejecting difficult phones). Add a vowel-onset <=50 ms target of >=85% and duration ratio in [0.95, 1.05] over the same exact phone matches. Report results separately for vowels, stops, fricatives, word boundaries, melisma, vibrato, breathy singing, glissando and falsetto. Treat any result as conditional on the annotation convention and reference-phone accuracy; do not compare a fixed-phone alignment task directly with an end-to-end G2P+aligner result.
 
 ### Phoneme-conditioned musical identity: beyond generic voice similarity
 
 The same ISMIR 2026 work asks whether language-specific vocal identity remains measurable in singing when melody, singer and genre are held constant. It matches marker phones to non-marker controls within the same song, then tests articulatory effects (formants, spectral tilt, H1-H2, HNR), melodic deviation (F0), rhythmic adaptation (duration), melisma, and timbral properties. On a 5,024-track set gated from 9,331 aligned tracks, it reports 85.5% balanced accuracy in nine-way language classification under artist-grouped folds.
 
 This suggests a research direction for Muse: do not only ask whether the voice sounds like the same singer. Also measure whether its language-specific articulatory and prosodic identity survives when singing on different notes, in different registers, and across styles. Use within-singer / within-song matched controls where possible so the language effect is not confounded with singer, melody, or production. This is a separate language-characterization study, not a pronunciation-accuracy score.
+
+### Multilingual phonological competence: mPhonBench
+
+Keller and Glavaš's mPhonBench (EMNLP 2026) evaluates text-only and speech-augmented models on 10 phonology tasks, 58 languages and 19 scripts, including G2P and word-level phone recognition. Its finding that mid-sized LLMs can match or surpass expert G2P systems in some settings, while underrepresented languages remain disadvantaged, supports using a model as a pronunciation *candidate generator* rather than assuming model size or a language label guarantees coverage.
+
+mPhonBench is text-centric and does not evaluate singing, score alignment, melisma, or sustained vowel realization. The published abstract alone does not prove that isiZulu or isiXhosa are in the released task manifest. Before using it for any South African language comparison, inspect the exact dataset language/profile manifest, split construction, license and evaluation labels. It is a potential multilingual G2P pre-benchmark, not a singing-quality score.
+
+Source: https://aclanthology.org/2026.emnlp-main.2456/
 
 ### Music-aware singing quality assessment: MusicJudge
 
@@ -92,7 +102,7 @@ The evaluator should not ask one model whether the output is good. It should ass
 3. **Musical realization:** note map, beat map, pitch, duration, phrase boundaries, expressive timing, and melisma.
 4. **Perceptual judgment:** intelligibility, naturalness, expressive fit, timbral identity, emotional fit, and listener preference.
 
-The Rust crate is deliberately narrow: it scores the second layer when a recognizer/aligner supplies phone events. It also checks the relationship between a sustained vowel and its declared melisma note span. It does not infer the events from audio and does not claim to implement MusicJudge or STARS.
+The Rust crate is deliberately narrow: it scores the second layer when a recognizer/aligner supplies phone events. It also checks the relationship between a sustained vowel and its declared melisma note span. It does not infer the events from audio and does not claim to implement MusicJudge or STARS. Its onset metrics are deliberately conditioned on exact phone identity; a separate end-to-end score must count recognition, deletion, insertion and timing failures together.
 
 ## Benchmark design
 
