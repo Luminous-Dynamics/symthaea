@@ -217,7 +217,9 @@
     "alignment_algorithm": "NOT_APPLICABLE",
     "alignment_gap_penalty": null,
     "alignment_tie_policy": null,
-    "unscorable_segment_count": 0
+    "unscorable_segment_count": 0,
+    "feature_profile_schema_version": null,
+    "feature_profile_status": "NOT_APPLICABLE"
   },
   "acoustic_faithfulness": {
     "mode": "NOT_USED",
