@@ -56,12 +56,15 @@ pub use network::{
 
 // Weight-space programming
 pub use weight_program_adapter::{
-    CfCActivationSignatureSet, CfCAlignmentAcceptancePolicy, CfCDisambiguatingProbeSelection,
-    CfCFunctionalProbe, CfCHiddenUnitAlignment, CfCPermutationAlignmentError,
+    CfCActivationSignatureSet, CfCAlignmentAcceptancePolicy,
+    CfCGaussianPermutationEIGSelection, CfCGaussianPermutationProbeScore,
+    CfCDisambiguatingProbeSelection, CfCFunctionalProbe, CfCHiddenUnitAlignment,
+    CfCPermutationAlignmentError, CfCPermutationHypothesisPosterior,
     CfCProbeCandidateScore, CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
     align_cfc_hidden_unit_signatures, build_cfc_hidden_unit_canonicalization_program,
     build_cfc_network_hidden_unit_canonicalization_program, cfc_hidden_unit_activation_signatures,
-    cfc_weight_model_snapshot, materialize_cfc_weight_program, select_cfc_disambiguating_probe,
+    cfc_weight_model_snapshot, materialize_cfc_weight_program,
+    select_cfc_disambiguating_probe, select_cfc_disambiguating_probe_by_gaussian_eig,
     validate_cfc_alignment_for_parameter_transfer,
 };
 
