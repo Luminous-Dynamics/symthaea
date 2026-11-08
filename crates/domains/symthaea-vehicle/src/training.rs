@@ -499,6 +499,10 @@ impl VehicleTrainer {
                 }),
                 _ => reward::episode_reward(&state, &task, drive_target, road_heading),
             };
+            if follow_evidence_unavailable_this_step {
+                follow_evidence_unavailable_steps += 1;
+            }
+
             total_safety_reward += safe_r;
             total_episode_reward += episode_r;
             total_speed += state.speed;
@@ -601,10 +605,6 @@ impl VehicleTrainer {
             // -- STATE NORMALIZATION (every 100 steps) --
             if step % 100 == 0 && step > 0 {
                 controller.normalize_states();
-            }
-
-            if follow_evidence_unavailable_this_step {
-                follow_evidence_unavailable_steps += 1;
             }
 
             // -- COGNITIVE TICK (every cognitive_interval steps, 50Hz) --
@@ -909,6 +909,55 @@ mod tests {
         assert!(metrics.avg_safety_reward.is_finite());
         assert!(metrics.avg_free_energy.is_finite());
         assert!(metrics.avg_speed.is_finite());
+    }
+
+    #[test]
+    fn test_follow_without_swarm_records_every_step_as_evidence_unavailable() {
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 20,
+            early_termination: false,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = VehicleTrainer::new(config.clone());
+        let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = VehicleController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::Follow { target_gap: 30.0 });
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        assert_eq!(metrics.total_steps, 20);
+        assert_eq!(
+            metrics.follow_evidence_unavailable_steps, 20,
+            "No simulator or local target means no Follow evidence on every step"
+        );
+    }
+
+    #[test]
+    fn test_follow_with_simulator_swarm_has_admissible_targets() {
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 20,
+            early_termination: false,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = VehicleTrainer::new(config.clone())
+            .with_swarm(SwarmConfig::convoy_straight(2));
+        let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = VehicleController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::Follow { target_gap: 30.0 });
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        assert_eq!(metrics.total_steps, 20);
+        assert_eq!(
+            metrics.follow_evidence_unavailable_steps, 0,
+            "Scenario-bound current simulator-oracle target should be admissible"
+        );
     }
 
     #[test]
