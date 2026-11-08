@@ -369,6 +369,47 @@ fn bit_width(value: CheckedRational) -> usize {
     nb.max(db)
 }
 
+/// Enforce the configured rational-width limit on every generated intermediate,
+/// not only on the source model inputs.
+fn check_rational_width(
+    value: CheckedRational,
+    maximum: usize,
+) -> Result<CheckedRational, PolicyPortfolioError> {
+    let required = bit_width(value);
+    if required > maximum {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "rational bit width",
+            required,
+            limit: maximum,
+        });
+    }
+    Ok(value)
+}
+
+fn add_bounded(
+    left: CheckedRational,
+    right: CheckedRational,
+    maximum: usize,
+) -> Result<CheckedRational, PolicyPortfolioError> {
+    check_rational_width(add(left, right)?, maximum)
+}
+
+fn mul_bounded(
+    left: CheckedRational,
+    right: CheckedRational,
+    maximum: usize,
+) -> Result<CheckedRational, PolicyPortfolioError> {
+    check_rational_width(mul(left, right)?, maximum)
+}
+
+fn sub_bounded(
+    left: CheckedRational,
+    right: CheckedRational,
+    maximum: usize,
+) -> Result<CheckedRational, PolicyPortfolioError> {
+    check_rational_width(sub(left, right)?, maximum)
+}
+
 fn compare_nonnegative(mut an: u128, mut ad: u128, mut bn: u128, mut bd: u128) -> Ordering {
     let mut reverse = false;
     loop {
@@ -494,6 +535,7 @@ fn evaluate_policy(
     policy: &[usize],
     current: &mut [CheckedRational],
     next: &mut [CheckedRational],
+    max_rational_bit_width: usize,
 ) -> Result<CheckedRational, PolicyPortfolioError> {
     let states = model.state_count();
     let horizon = model.horizon();
@@ -505,20 +547,21 @@ fn evaluate_policy(
             let mut continuation = CheckedRational::zero();
             if time + 1 < horizon {
                 for destination in 0..states {
-                    continuation = add(
+                    continuation = add_bounded(
                         continuation,
-                        mul(model.transitions[time][state][action][destination], next[destination])?,
+                        mul_bounded(model.transitions[time][state][action][destination], next[destination], max_rational_bit_width)?,
+                        max_rational_bit_width,
                     )?;
                 }
-                continuation = mul(discount, continuation)?;
+                continuation = mul_bounded(discount, continuation, max_rational_bit_width)?;
             }
-            current[state] = add(model.rewards[time][state][action], continuation)?;
+            current[state] = add_bounded(model.rewards[time][state][action], continuation, max_rational_bit_width)?;
         }
         current.swap_with_slice(next);
     }
     let mut initial_value = CheckedRational::zero();
     for state in 0..states {
-        initial_value = add(initial_value, mul(model.initial[state], next[state])?)?;
+        initial_value = add_bounded(initial_value, mul_bounded(model.initial[state], next[state], max_rational_bit_width)?, max_rational_bit_width)?;
     }
     Ok(initial_value)
 }
@@ -528,6 +571,7 @@ fn optimal_value(
     discount: CheckedRational,
     current: &mut [CheckedRational],
     next: &mut [CheckedRational],
+    max_rational_bit_width: usize,
 ) -> Result<CheckedRational, PolicyPortfolioError> {
     let states = model.state_count();
     let actions = model.action_count();
@@ -541,14 +585,15 @@ fn optimal_value(
                 let mut continuation = CheckedRational::zero();
                 if time + 1 < horizon {
                     for destination in 0..states {
-                        continuation = add(
+                        continuation = add_bounded(
                             continuation,
-                            mul(model.transitions[time][state][action][destination], next[destination])?,
+                            mul_bounded(model.transitions[time][state][action][destination], next[destination], max_rational_bit_width)?,
+                            max_rational_bit_width,
                         )?;
                     }
-                    continuation = mul(discount, continuation)?;
+                    continuation = mul_bounded(discount, continuation, max_rational_bit_width)?;
                 }
-                let candidate = add(model.rewards[time][state][action], continuation)?;
+                let candidate = add_bounded(model.rewards[time][state][action], continuation, max_rational_bit_width)?;
                 if best.map_or(true, |value| compare_signed(candidate, value) == Ordering::Greater) {
                     best = Some(candidate);
                 }
@@ -559,7 +604,7 @@ fn optimal_value(
     }
     let mut initial_value = CheckedRational::zero();
     for state in 0..states {
-        initial_value = add(initial_value, mul(model.initial[state], next[state])?)?;
+        initial_value = add_bounded(initial_value, mul_bounded(model.initial[state], next[state], max_rational_bit_width)?, max_rational_bit_width)?;
     }
     Ok(initial_value)
 }
@@ -681,10 +726,10 @@ pub fn solve_finite_family_policy_portfolio(
         current.resize(states, CheckedRational::zero());
         let mut next = current.clone();
 
-        model_optima.push(optimal_value(model, discount, &mut current, &mut next)?);
+        model_optima.push(optimal_value(model, discount, &mut current, &mut next, budget.max_rational_bit_width)?);
         for policy_index in 0..policy_count {
             decode_policy(policy_index, horizon, states, actions, &mut policy);
-            row.push(evaluate_policy(model, discount, &policy, &mut current, &mut next)?);
+            row.push(evaluate_policy(model, discount, &policy, &mut current, &mut next, budget.max_rational_bit_width)?);
         }
         policy_values.push(row);
     }
@@ -744,7 +789,7 @@ pub fn solve_finite_family_policy_portfolio(
                     }
                 }
                 let portfolio_value = portfolio_value.ok_or(PolicyPortfolioError::EmptyPortfolio)?;
-                let regret = sub(model_optima[model_index], portfolio_value)?;
+                let regret = sub_bounded(model_optima[model_index], portfolio_value, budget.max_rational_bit_width)?;
                 if regret.is_negative() {
                     return Err(PolicyPortfolioError::NegativeRegret { model: model_index });
                 }
