@@ -2601,13 +2601,6 @@ mod tests {
         let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
         assert!(report.order_evaluations <= budget().max_variable_order_evaluations);
         assert!(!report.seed_orders.is_empty());
-        assert!(report.seed_orders.iter().any(|(seed, _)| {
-            matches!(
-                seed,
-                StrategyBddOrderSeed::ArithmeticWeightedMinFill
-                    | StrategyBddOrderSeed::ArithmeticWeightedFrontierRefined
-            )
-        }));
         assert!(report.arithmetic_interaction_context_checks > 0);
         assert!(report.arithmetic_interaction_total_weight > 0);
         assert!(report.optimized_node_count <= report.selected_initial_node_count);
@@ -2653,10 +2646,11 @@ mod tests {
 
             for first in 0..3 {
                 for second in first + 1..3 {
-                    let remaining = 3 - first - second - 1;
-                    let other = 3 - first - second;
+                    let other = (0..3)
+                        .find(|&variable| variable != first && variable != second)
+                        .unwrap();
                     let mut expected = 0u128;
-                    for context in 0..2usize.pow(remaining as u32) {
+                    for context in 0..2usize {
                         let base = if context == 0 { 0 } else { 1usize << other };
                         let f00 = i16::from(values[base]);
                         let f01 = i16::from(values[base | (1 << second)]);
@@ -2672,6 +2666,40 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn weighted_order_adds_a_distinct_seed_to_multistart_search() {
+        let source = function(
+            &[0, 1, 2, 3],
+            &[
+                true, true, false, true,
+                true, true, true, true,
+                true, false, false, true,
+                false, false, true, false,
+            ],
+        );
+        let weighted = strategy_arithmetic_weighted_interaction_graph(&source, budget()).unwrap();
+        assert_eq!(weighted.contexts_checked, 24);
+        assert_eq!(weighted.weights[0][1], 4);
+        assert_eq!(weighted.weights[0][2], 4);
+        assert_eq!(weighted.weights[0][3], 2);
+        assert_eq!(weighted.weights[1][2], 4);
+        assert_eq!(weighted.weights[1][3], 2);
+        assert_eq!(weighted.weights[2][3], 2);
+        assert_eq!(weighted.total_interaction_weight, 18);
+        assert_eq!(
+            weighted_interaction_min_fill_order(&weighted.weights).unwrap(),
+            vec![3, 0, 1, 2]
+        );
+
+        let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
+        assert!(report.seed_orders.contains(&(
+            StrategyBddOrderSeed::ArithmeticWeightedMinFill,
+            vec![3, 0, 1, 2],
+        )));
+        assert!(report.order_evaluations <= budget().max_variable_order_evaluations);
+        verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
     }
 
     #[test]
