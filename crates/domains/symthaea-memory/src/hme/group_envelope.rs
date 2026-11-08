@@ -561,6 +561,28 @@ mod tests {
     }
 
     #[test]
+    fn member_payload_digest_binds_id_dimension_and_exact_f32_bits() {
+        let vector = hv(&[0.1, -0.2, 0.3, -0.4]);
+        let same_id = continuous_hv_member_payload_digest("member-a", &vector);
+        let different_id = continuous_hv_member_payload_digest("member-b", &vector);
+        let different_payload = continuous_hv_member_payload_digest(
+            "member-a",
+            &hv(&[0.1, -0.2, 0.3, -0.401]),
+        );
+        let different_dimension = continuous_hv_member_payload_digest(
+            "member-a",
+            &hv(&[0.1, -0.2, 0.3]),
+        );
+        assert_eq!(
+            same_id,
+            continuous_hv_member_payload_digest("member-a", &vector)
+        );
+        assert_ne!(same_id, different_id);
+        assert_ne!(same_id, different_payload);
+        assert_ne!(same_id, different_dimension);
+    }
+
+    #[test]
     fn content_digest_is_input_order_independent_and_profile_bound() {
         let a = hv(&[0.1, 0.2, 0.3, 0.4]);
         let b = hv(&[-0.1, -0.2, -0.3, -0.4]);
