@@ -51,7 +51,7 @@ A file-path match alone does not prove semantic impact. A missing path match doe
 
 **C1 — signer approval:** split the proposition into two:
 - “The historical signed approval bytes were recorded on date D” may be **retained** as a historical record if the bytes and timestamp are authentic records.
-- “The approval is currently authorized/admissible under trust root R” is **invalidated** by the root revocation until a new trust evaluation establishes an alternative valid authority chain.
+- The **current authorized/admissible** proposition (“the approval is currently authorized/admissible under trust root R”) is **invalidated** by the root revocation until a new trust evaluation establishes an alternative valid authority chain.
 
 Do not claim the signature never existed. Do not continue treating it as current approval merely because the signed bytes are unchanged.
 
