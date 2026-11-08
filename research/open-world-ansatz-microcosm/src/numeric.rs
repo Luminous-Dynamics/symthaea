@@ -346,10 +346,12 @@ pub fn discover(
         .map(|model| (model.gain, model.decay))
         .collect();
     let coefficients_identified =
-        !compatible_models.is_empty() && coefficient_tuples.len() == 1;
-    let initial_state_identified = compatible_models.iter().all(|model| {
-        model.mechanism == Mechanism::DirectResponse
-    }) || compatible_initial_states.len() == 1;
+        structure_identified && !compatible_models.is_empty() && coefficient_tuples.len() == 1;
+    let initial_state_identified = structure_identified
+        && (compatible_models
+            .iter()
+            .all(|model| model.mechanism == Mechanism::DirectResponse)
+            || compatible_initial_states.len() == 1);
     let measurement_identified =
         !compatible_models.is_empty() && compatible_sensors.len() == 1;
     let model_identified = compatible_models.len() == 1;
