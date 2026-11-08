@@ -2219,7 +2219,7 @@ mod tests {
         let duplicate = vec![witnesses[0].clone(), witnesses[0].clone()];
         assert_eq!(
             verify_shared_dynamics_minimax_regret(
-                &model, &[scores_a, scores_b], &duplicate, budget(84), minimax_budget(2),
+                &model, &[scores_a.clone(), scores_b.clone()], &duplicate, budget(84), minimax_budget(2),
             ),
             Err(OccupationFlowError::DuplicatePairwiseWitness {
                 selected_action: 0,
