@@ -65,17 +65,17 @@
             {
               "hypothesis_id": "hypothesis_a",
               "outcome_probabilities": [
-                0.8,
-                0.09999999999999998,
-                0.09999999999999998
+                0.94,
+                0.03,
+                0.03
               ]
             },
             {
               "hypothesis_id": "hypothesis_b",
               "outcome_probabilities": [
-                0.09999999999999998,
-                0.09999999999999998,
-                0.8
+                0.03,
+                0.03,
+                0.94
               ]
             }
           ]
@@ -102,17 +102,17 @@
             {
               "hypothesis_id": "hypothesis_a",
               "outcome_probabilities": [
-                0.8,
-                0.09999999999999998,
-                0.09999999999999998
+                0.6,
+                0.2,
+                0.2
               ]
             },
             {
               "hypothesis_id": "hypothesis_b",
               "outcome_probabilities": [
-                0.09999999999999998,
-                0.09999999999999998,
-                0.8
+                0.2,
+                0.2,
+                0.6
               ]
             }
           ]
@@ -129,17 +129,17 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.8,
-                    0.09999999999999998,
-                    0.09999999999999998
+                    0.94,
+                    0.03,
+                    0.03
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.09999999999999998,
-                    0.09999999999999998,
-                    0.8
+                    0.03,
+                    0.03,
+                    0.94
                   ]
                 }
               ]
@@ -150,17 +150,17 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.8,
-                    0.09999999999999998,
-                    0.09999999999999998
+                    0.6,
+                    0.2,
+                    0.2
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.09999999999999998,
-                    0.09999999999999998,
-                    0.8
+                    0.2,
+                    0.2,
+                    0.6
                   ]
                 }
               ]
@@ -177,17 +177,17 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.15,
-                    0.15,
-                    0.7
+                    0.94,
+                    0.03,
+                    0.03
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.7,
-                    0.15,
-                    0.15
+                    0.03,
+                    0.03,
+                    0.94
                   ]
                 }
               ]
@@ -198,17 +198,17 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.15,
-                    0.15,
-                    0.7
+                    0.6,
+                    0.2,
+                    0.2
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.7,
-                    0.15,
-                    0.15
+                    0.2,
+                    0.2,
+                    0.6
                   ]
                 }
               ]
@@ -864,15 +864,15 @@
             {
               "hypothesis_id": "hypothesis_a",
               "outcome_probabilities": [
-                0.8,
-                0.19999999999999996
+                0.9,
+                0.1
               ]
             },
             {
               "hypothesis_id": "hypothesis_b",
               "outcome_probabilities": [
-                0.19999999999999996,
-                0.8
+                0.1,
+                0.9
               ]
             }
           ]
@@ -899,17 +899,17 @@
             {
               "hypothesis_id": "hypothesis_a",
               "outcome_probabilities": [
-                0.8,
-                0.09999999999999998,
-                0.09999999999999998
+                0.65,
+                0.2,
+                0.15
               ]
             },
             {
               "hypothesis_id": "hypothesis_b",
               "outcome_probabilities": [
-                0.09999999999999998,
-                0.09999999999999998,
-                0.8
+                0.15,
+                0.2,
+                0.65
               ]
             }
           ]
@@ -926,15 +926,15 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.8,
-                    0.19999999999999996
+                    0.9,
+                    0.1
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.19999999999999996,
-                    0.8
+                    0.1,
+                    0.9
                   ]
                 }
               ]
@@ -945,17 +945,17 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.8,
-                    0.09999999999999998,
-                    0.09999999999999998
+                    0.65,
+                    0.2,
+                    0.15
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.09999999999999998,
-                    0.09999999999999998,
-                    0.8
+                    0.15,
+                    0.2,
+                    0.65
                   ]
                 }
               ]
@@ -972,15 +972,15 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.3,
-                    0.7
+                    0.9,
+                    0.1
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.7,
-                    0.3
+                    0.1,
+                    0.9
                   ]
                 }
               ]
@@ -991,17 +991,17 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.15,
-                    0.15,
-                    0.7
+                    0.65,
+                    0.2,
+                    0.15
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.7,
                     0.15,
-                    0.15
+                    0.2,
+                    0.65
                   ]
                 }
               ]
@@ -1133,15 +1133,15 @@
             {
               "hypothesis_id": "hypothesis_a",
               "outcome_probabilities": [
-                0.8,
-                0.19999999999999996
+                0.98,
+                0.02
               ]
             },
             {
               "hypothesis_id": "hypothesis_b",
               "outcome_probabilities": [
-                0.19999999999999996,
-                0.8
+                0.02,
+                0.98
               ]
             }
           ]
@@ -1167,15 +1167,15 @@
             {
               "hypothesis_id": "hypothesis_a",
               "outcome_probabilities": [
-                0.8,
-                0.19999999999999996
+                0.65,
+                0.35
               ]
             },
             {
               "hypothesis_id": "hypothesis_b",
               "outcome_probabilities": [
-                0.19999999999999996,
-                0.8
+                0.35,
+                0.65
               ]
             }
           ]
@@ -1192,15 +1192,15 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.8,
-                    0.19999999999999996
+                    0.98,
+                    0.02
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.19999999999999996,
-                    0.8
+                    0.02,
+                    0.98
                   ]
                 }
               ]
@@ -1211,15 +1211,15 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.8,
-                    0.19999999999999996
+                    0.65,
+                    0.35
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.19999999999999996,
-                    0.8
+                    0.35,
+                    0.65
                   ]
                 }
               ]
@@ -1236,15 +1236,15 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.3,
-                    0.7
+                    0.98,
+                    0.02
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.7,
-                    0.3
+                    0.02,
+                    0.98
                   ]
                 }
               ]
@@ -1255,15 +1255,15 @@
                 {
                   "hypothesis_id": "hypothesis_a",
                   "outcome_probabilities": [
-                    0.3,
-                    0.7
+                    0.65,
+                    0.35
                   ]
                 },
                 {
                   "hypothesis_id": "hypothesis_b",
                   "outcome_probabilities": [
-                    0.7,
-                    0.3
+                    0.35,
+                    0.65
                   ]
                 }
               ]
