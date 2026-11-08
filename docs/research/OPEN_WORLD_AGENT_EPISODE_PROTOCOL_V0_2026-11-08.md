@@ -68,7 +68,7 @@ The protocol module covers the boolean hidden-lag world, numeric direct/leaky-me
 
 `policy::FiniteEnumeratorBaseline` consumes only `AgentView` values and emits one probe or a terminal submission. It uses exact consistency filtering over the declared finite model family and the finite partition heuristic. This provides a transparent reproducible reference against which the learned Symthaea research policy can be compared; it is not itself learned and does not demonstrate scientific discovery beyond the finite grammar.
 
-Its current policy tests exercise paired numeric A0/A2 episodes using the same generating model and probe budget, plus a full-factorial interaction discovery episode. This is a test harness for the protocol and baseline, not a reported benchmark score.
+Its current policy tests exercise paired numeric A0/A2 episodes using the same generating model and probe budget, plus a full-factorial interaction discovery episode. The evaluator separately asserts that the hidden generating model belongs to the computed version space. This is a test harness for the protocol and baseline, not a reported benchmark score.
 
 ## Current limitations / next falsifiable milestones
 
