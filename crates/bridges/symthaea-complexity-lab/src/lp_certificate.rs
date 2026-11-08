@@ -69,6 +69,100 @@ impl RationalLp {
     }
 }
 
+/// Canonical sparse rational LP in standard-form maximization convention:
+/// maximize c^T x subject to A x <= b and x >= 0.
+///
+/// Each row stores strictly increasing (column, coefficient) pairs. Explicit
+/// zero coefficients and duplicate/out-of-order columns are rejected. This
+/// representation stores O(nnz + rows + columns) values rather than rows*cols.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SparseRationalLp {
+    rows: Vec<Vec<(usize, CheckedRational)>>,
+    b: Vec<CheckedRational>,
+    c: Vec<CheckedRational>,
+    nonzero_count: usize,
+}
+
+impl SparseRationalLp {
+    pub fn new(
+        rows: Vec<Vec<(usize, CheckedRational)>>,
+        b: Vec<CheckedRational>,
+        c: Vec<CheckedRational>,
+    ) -> Result<Self, LpCertificateError> {
+        if rows.len() != b.len() {
+            return Err(LpCertificateError::RowCountMismatch {
+                matrix_rows: rows.len(),
+                rhs_rows: b.len(),
+            });
+        }
+        let columns = c.len();
+        let mut nonzero_count = 0usize;
+        for (row_index, row) in rows.iter().enumerate() {
+            let mut previous = None;
+            for (column, coefficient) in row {
+                if *column >= columns {
+                    return Err(LpCertificateError::SparseColumnOutOfBounds {
+                        row: row_index,
+                        column: *column,
+                        column_count: columns,
+                    });
+                }
+                if previous.is_some_and(|prior| prior >= *column) {
+                    return Err(LpCertificateError::SparseColumnOrderViolation {
+                        row: row_index,
+                        column: *column,
+                    });
+                }
+                if coefficient.is_zero() {
+                    return Err(LpCertificateError::SparseExplicitZero {
+                        row: row_index,
+                        column: *column,
+                    });
+                }
+                previous = Some(*column);
+                nonzero_count = nonzero_count.checked_add(1)
+                    .ok_or(LpCertificateError::ArithmeticOverflow)?;
+            }
+        }
+        Ok(Self { rows, b, c, nonzero_count })
+    }
+
+    pub fn row_count(&self) -> usize { self.b.len() }
+    pub fn column_count(&self) -> usize { self.c.len() }
+    pub fn nonzero_count(&self) -> usize { self.nonzero_count }
+    pub fn rows(&self) -> &[Vec<(usize, CheckedRational)>] { &self.rows }
+    pub fn rhs(&self) -> &[CheckedRational] { &self.b }
+    pub fn objective(&self) -> &[CheckedRational] { &self.c }
+
+    /// Convert a dense exact LP to canonical sparse row storage. Useful for
+    /// differential tests and small dense reference instances.
+    pub fn from_dense(lp: &RationalLp) -> Result<Self, LpCertificateError> {
+        let mut rows = Vec::new();
+        rows.try_reserve_exact(lp.row_count()).map_err(|_| {
+            LpCertificateError::AllocationFailed {
+                resource: "sparse LP rows",
+                entries: lp.row_count(),
+            }
+        })?;
+        for dense_row in lp.matrix() {
+            let mut row = Vec::new();
+            row.try_reserve_exact(dense_row.len()).map_err(|_| {
+                LpCertificateError::AllocationFailed {
+                    resource: "sparse LP row coefficients",
+                    entries: dense_row.len(),
+                }
+            })?;
+            for (column, coefficient) in dense_row.iter().enumerate() {
+                if !coefficient.is_zero() {
+                    row.push((column, *coefficient));
+                }
+            }
+            rows.push(row);
+        }
+        Self::new(rows, lp.rhs().to_vec(), lp.objective().to_vec())
+    }
+}
+
 /// Exact primal and dual candidate for a standard-form maximization LP.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrimalDualCertificate {
@@ -112,6 +206,23 @@ pub enum LpCertificateError {
         expected: usize,
         actual: usize,
     },
+    SparseColumnOutOfBounds {
+        row: usize,
+        column: usize,
+        column_count: usize,
+    },
+    SparseColumnOrderViolation {
+        row: usize,
+        column: usize,
+    },
+    SparseExplicitZero {
+        row: usize,
+        column: usize,
+    },
+    AllocationFailed {
+        resource: &'static str,
+        entries: usize,
+    },
     VectorLengthMismatch {
         vector: &'static str,
         expected: usize,
@@ -153,6 +264,22 @@ impl fmt::Display for LpCertificateError {
             Self::MatrixRowWidthMismatch { row, expected, actual } => write!(
                 f,
                 "LP matrix row {row} has {actual} columns; expected {expected}"
+            ),
+            Self::SparseColumnOutOfBounds { row, column, column_count } => write!(
+                f,
+                "sparse LP row {row} references column {column}, but has {column_count} columns"
+            ),
+            Self::SparseColumnOrderViolation { row, column } => write!(
+                f,
+                "sparse LP row {row} has duplicate or non-increasing column index {column}"
+            ),
+            Self::SparseExplicitZero { row, column } => write!(
+                f,
+                "sparse LP row {row} stores an explicit zero at column {column}"
+            ),
+            Self::AllocationFailed { resource, entries } => write!(
+                f,
+                "unable to reserve {resource} capacity for {entries} entries"
             ),
             Self::VectorLengthMismatch { vector, expected, actual } => write!(
                 f,
