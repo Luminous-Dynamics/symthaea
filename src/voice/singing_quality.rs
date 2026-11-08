@@ -293,10 +293,10 @@ fn rest_leakage_metrics(
     let mut voiced_energy = 0.0f64;
     let mut voiced_count = 0usize;
     for note in notes {
-        let start = ((note.start_time.max(0.0) * sample_rate as f32).floor() as usize)
-            .min(samples.len());
-        let end = (((note.start_time + note.duration).max(0.0) * sample_rate as f32)
-            .ceil() as usize)
+        let start =
+            ((note.start_time.max(0.0) * sample_rate as f32).floor() as usize).min(samples.len());
+        let end = (((note.start_time + note.duration).max(0.0) * sample_rate as f32).ceil()
+            as usize)
             .min(samples.len());
         for sample in &samples[start..end.max(start)] {
             voiced_energy += (*sample as f64) * (*sample as f64);
