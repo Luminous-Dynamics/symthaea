@@ -60,6 +60,12 @@ pub enum ContinuousHVIntervalError {
     /// The supplied L2 residual upper bound must be finite and non-negative.
     #[error("L2 residual upper bound must be finite and non-negative")]
     InvalidResidualBound,
+    /// Component-wise candidate lower/upper bounds are malformed.
+    #[error("candidate component bounds are invalid at coordinate {index}")]
+    InvalidCandidateComponentBounds {
+        /// Coordinate whose lower/upper bounds failed validation.
+        index: usize,
+    },
 }
 
 /// Result of independently checking an original/reconstruction L2 residual.
@@ -361,6 +367,152 @@ fn square_group(candidate: &[F32Interval; 8]) -> Option<F32Interval> {
 }
 
 impl ContinuousHV {
+    /// Enclose the canonical full-resolution score for every candidate inside
+    /// a component-wise box. This is intended for immutable group/page
+    /// synopses: lower[j] and upper[j] must conservatively enclose coordinate j
+    /// for every original payload in the group.
+    ///
+    /// The extrema are assumed to have been computed/verified against every
+    /// member at segment-build time and bound to the exact membership and
+    /// generation. This method validates only the numeric shape of the box; it
+    /// cannot prove the extrema or corpus membership. All arithmetic after
+    /// admission follows the canonical group-eight/tail f32 score order and
+    /// widens to [-1,1] when numeric uncertainty prevents safe tightening.
+    pub fn similarity_interval_full_resolution_for_component_bounds(
+        &self,
+        candidate_lower: &[f32],
+        candidate_upper: &[f32],
+    ) -> Result<ContinuousHVScoreInterval, ContinuousHVIntervalError> {
+        if candidate_lower.len() != candidate_upper.len() {
+            return Err(ContinuousHVIntervalError::DimensionMismatch {
+                query_dim: candidate_lower.len(),
+                candidate_dim: candidate_upper.len(),
+            });
+        }
+        if self.values.len() != candidate_lower.len() {
+            return Err(ContinuousHVIntervalError::DimensionMismatch {
+                query_dim: self.values.len(),
+                candidate_dim: candidate_lower.len(),
+            });
+        }
+        self.validate_full_resolution_profile("query")?;
+        for (index, (&lower, &upper)) in candidate_lower
+            .iter()
+            .zip(candidate_upper)
+            .enumerate()
+        {
+            if !lower.is_finite()
+                || !upper.is_finite()
+                || !(-1.0..=1.0).contains(&lower)
+                || !(-1.0..=1.0).contains(&upper)
+                || lower > upper
+            {
+                return Err(
+                    ContinuousHVIntervalError::InvalidCandidateComponentBounds { index },
+                );
+            }
+        }
+
+        let query_norm_sq = canonical_norm_squared(&self.values);
+        if !query_norm_sq.is_finite() {
+            return Ok(ContinuousHVScoreInterval::uninformative());
+        }
+        if query_norm_sq == 0.0 {
+            return Ok(ContinuousHVScoreInterval { lower: 0.0, upper: 0.0 });
+        }
+
+        let mut dot = F32Interval::point(0.0);
+        let mut candidate_norm_sq = F32Interval::point(0.0);
+        let mut query_chunks = self.values.chunks_exact(8);
+        let mut lower_chunks = candidate_lower.chunks_exact(8);
+        let mut upper_chunks = candidate_upper.chunks_exact(8);
+
+        for ((query_chunk, lower_chunk), upper_chunk) in query_chunks
+            .by_ref()
+            .zip(lower_chunks.by_ref())
+            .zip(upper_chunks.by_ref())
+        {
+            let candidate_chunk: [F32Interval; 8] = std::array::from_fn(|index| {
+                F32Interval {
+                    lo: lower_chunk[index],
+                    hi: upper_chunk[index],
+                }
+            });
+            let dot_group = match product_group(query_chunk, &candidate_chunk) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+            let norm_group = match square_group(&candidate_chunk) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+            dot = match dot.add(dot_group) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+            candidate_norm_sq = match candidate_norm_sq.add_nonnegative(norm_group) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+        }
+
+        for ((&query_value, &lower), &upper) in query_chunks
+            .remainder()
+            .iter()
+            .zip(lower_chunks.remainder())
+            .zip(upper_chunks.remainder())
+        {
+            let candidate_value = F32Interval { lo: lower, hi: upper };
+            let product = match F32Interval::point(query_value).mul(candidate_value) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+            let square = match candidate_value.square() {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+            dot = match dot.add(product) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+            candidate_norm_sq = match candidate_norm_sq.add_nonnegative(square) {
+                Some(value) => value,
+                None => return Ok(ContinuousHVScoreInterval::uninformative()),
+            };
+        }
+
+        let norm_product = match F32Interval::point(query_norm_sq).mul(candidate_norm_sq) {
+            Some(value) => F32Interval {
+                lo: value.lo.max(0.0),
+                hi: value.hi.max(0.0),
+            },
+            None => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+        let denominator = match norm_product.sqrt_nonnegative() {
+            Some(value) => value,
+            None => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+
+        const CANONICAL_NEAR_ZERO_DENOMINATOR: f32 = 1e-10;
+        if denominator.hi < CANONICAL_NEAR_ZERO_DENOMINATOR {
+            return Ok(ContinuousHVScoreInterval { lower: 0.0, upper: 0.0 });
+        }
+        if denominator.lo < CANONICAL_NEAR_ZERO_DENOMINATOR {
+            return Ok(ContinuousHVScoreInterval::uninformative());
+        }
+
+        let quotient = match dot.div_positive(denominator) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
+        let interval = quotient.clamp_cosine();
+        if interval.is_well_formed() {
+            Ok(interval)
+        } else {
+            Ok(ContinuousHVScoreInterval::uninformative())
+        }
+    }
+
     /// Enclose the canonical full-resolution score for any admitted candidate
     /// x satisfying ||x - reconstruction||_2 <= residual_l2_upper.
     ///
@@ -552,6 +704,68 @@ mod tests {
         assert_eq!(next_up(f32::MAX), f32::INFINITY);
         assert_eq!(next_down(f32::INFINITY), f32::MAX);
         assert_eq!(next_down(-f32::MAX), f32::NEG_INFINITY);
+    }
+
+    #[test]
+    fn component_box_interval_contains_every_group_member_score() {
+        let query = ContinuousHV::from_vec(vec![
+            0.9, -0.8, 0.7, -0.6, 0.5, -0.4, 0.3, -0.2, 0.1,
+        ]);
+        let members = vec![
+            ContinuousHV::from_vec(vec![
+                0.91, -0.79, 0.69, -0.61, 0.51, -0.39, 0.29, -0.21, 0.11,
+            ]),
+            ContinuousHV::from_vec(vec![
+                -0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8, 0.9, -1.0,
+            ]),
+            ContinuousHV::from_vec(vec![
+                0.0, 0.0, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4,
+            ]),
+        ];
+        let dimension = query.values.len();
+        let mut lower = vec![f32::INFINITY; dimension];
+        let mut upper = vec![f32::NEG_INFINITY; dimension];
+        for member in &members {
+            for index in 0..dimension {
+                lower[index] = lower[index].min(member.values[index]);
+                upper[index] = upper[index].max(member.values[index]);
+            }
+        }
+        let interval = query
+            .similarity_interval_full_resolution_for_component_bounds(&lower, &upper)
+            .unwrap();
+        for member in &members {
+            let score = query.similarity_full_resolution(member);
+            assert!(
+                interval.contains(score),
+                "member score {score} escaped [{}, {}]",
+                interval.lower,
+                interval.upper
+            );
+        }
+    }
+
+    #[test]
+    fn component_box_interval_rejects_malformed_extrema() {
+        let query = ContinuousHV::ones(9);
+        let reversed = vec![0.0; 9];
+        let upper = vec![0.0; 9];
+        let mut invalid_lower = reversed;
+        invalid_lower[3] = 0.5;
+        assert!(matches!(
+            query.similarity_interval_full_resolution_for_component_bounds(
+                &invalid_lower,
+                &upper
+            ),
+            Err(ContinuousHVIntervalError::InvalidCandidateComponentBounds { index: 3 })
+        ));
+        assert!(matches!(
+            query.similarity_interval_full_resolution_for_component_bounds(
+                &[0.0; 8],
+                &[0.0; 9]
+            ),
+            Err(ContinuousHVIntervalError::DimensionMismatch { .. })
+        ));
     }
 
     #[test]
