@@ -678,3 +678,22 @@ The query receipt now binds policy/authorization/source-ledger generations, vali
 
 
 The decision-level quantization study is captured in `docs/research/fixtures/hme_quantized_decision_margins_v0.json`: the same residual magnitudes preserve a large-margin ranking but flip a small-margin ranking; same-sign residuals can cancel, while anti-correlated residuals can magnify the pairwise error. This demonstrates why HME's compression evaluation must measure exact-margin-conditioned ranking/pruning flips and paired residual covariance, not global MSE alone. The fixture is arithmetic only.
+
+
+## 2026-11-08 score-contract and exact-profile admission update
+
+The core source now contains a non-breaking full-resolution reference API in `crates/core/symthaea-core/src/hdc/unified_hv.rs`:
+
+- `ContinuousHV::similarity_full_resolution()` visits every coordinate, does not read global `STRIDE`, and does not dispatch on the `simd` feature.
+- `CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1` identifies the score algorithm as `continuous_hv_cosine_full_f32_group8_v1`.
+- `validate_full_resolution_profile()` admits finite components in the closed interval [-1, 1].
+- `validate_full_resolution_pair()` checks equal dimensions and validates query/candidate inputs.
+- `ContinuousHVProfileError` gives typed dimension, non-finite and out-of-range failures.
+
+This profile pins the scalar f32 reduction order: contiguous eight-coordinate groups, then an ordered tail, preserving the scalar near-zero denominator result of 0.0 when the combined denominator is below 1e-10. It is **exact relative to this declared finite-precision score contract**, not exact real arithmetic and not necessarily bitwise identical to SIMD kernels that use a different reduction/FMA order.
+
+The closed [-1, 1] admission interval is an HME exact-profile requirement. Generic ContinuousHV operations such as unrestricted scaling may produce values outside it; such outputs must be normalized/transformed into the declared profile or rejected at HME admission rather than silently accepted.
+
+The query receipt schema now requires the versioned score-contract ID for continuous_f32 + cosine. Its synthetic receipt fixture has been updated to use the same ID. The adversarial admission matrix is [hme_similarity_admission_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_similarity_admission_v0.json).
+
+This source slice is committed, but cargo fmt/check/tests, SIMD differential checks and segment integration have not run. It does not change legacy `similarity()` or migrate existing consumers.
