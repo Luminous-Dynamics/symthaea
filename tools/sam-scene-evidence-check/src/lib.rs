@@ -1427,6 +1427,103 @@ mod tests {
     }
 
     #[test]
+    fn accepts_simulator_oracle_follow_target_only_in_simulation_benchmark() {
+        let (schema, fixture) = load_fixture();
+        validate_values(&schema, &fixture)
+            .expect("simulator oracle should be admissible for a simulation benchmark");
+    }
+
+    #[test]
+    fn rejects_simulator_oracle_follow_target_for_deployment() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
+            Value::String("deployment".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_remote_cooperative_claim_as_follow_target() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
+            Value::String("deployment".into());
+        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
+            Value::String("cooperative-v2x-claim-01".into());
+        fixture["snapshot"]["follow_target_context"]["coordinate_frame_id"] =
+            Value::String("remote-peer-frame-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn accepts_current_local_sensor_follow_target_for_deployment_profile() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
+            Value::String("deployment".into());
+        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
+            Value::String("local-lidar-track-fixture-01".into());
+        validate_values(&schema, &fixture)
+            .expect("current local sensor evidence should satisfy the declared input contract");
+    }
+
+    #[test]
+    fn rejects_stale_local_sensor_follow_target() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
+            Value::String("deployment".into());
+        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
+            Value::String("local-lidar-track-fixture-01".into());
+        fixture["snapshot"]["sources"][4]["currentness"] = Value::String("stale".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_from_wrong_coordinate_frame() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["coordinate_frame_id"] =
+            Value::String("front-camera-image-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_past_declared_maximum_age() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["max_age_ns"] = Value::from(1u64);
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn unknown_follow_target_cannot_retain_oracle_or_remote_fallback() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["status"] = Value::String("unknown".into());
+        for key in [
+            "evidence_source_ref",
+            "scenario_id",
+            "actor_id",
+            "coordinate_frame_id",
+            "observation_tick_ns",
+            "max_age_ns",
+            "gap_m",
+            "relative_speed_mps",
+            "distance_uncertainty_m",
+        ] {
+            context[key] = Value::Null;
+        }
+        validate_values(&schema, &fixture)
+            .expect("unknown target must be explicit and contain no fallback evidence");
+
+        context["evidence_source_ref"] = Value::String("simulator-oracle-truth-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_future_dated_follow_target_observation() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["observation_tick_ns"] =
+            Value::from(13_000_000_000u64);
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
     fn rejects_unknown_source_reference() {
         let (schema, mut fixture) = load_fixture();
         fixture["snapshot"]["object_hypotheses"][0]["source_refs"][0] =
