@@ -810,6 +810,15 @@ pub use trajectory_metrics::{
     TrackSeries, ospa2_track_distance, ospa2_track_sets,
 };
 
+/// Budgeted multi-scenario experimental design with an exhaustive small-set oracle.
+pub mod budgeted_design;
+
+pub use budgeted_design::{
+    BudgetedDesignConfig, BudgetedDesignError, BudgetedDesignReport, DesignScenario,
+    DesignSelectionStep, ExperimentOption, ScenarioDesignScore, exhaustive_budgeted_design,
+    greedy_budgeted_design,
+};
+
 /// Data-only Jacobian rank and singular-spectrum diagnostics.
 pub mod observability;
 
