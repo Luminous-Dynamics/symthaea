@@ -172,8 +172,20 @@
           }
         },
         {
-          "if": { "properties": { "profile_status": { "const": "qualified" } }, "required": ["profile_status"] },
-          "then": { "required": ["capability_profile_sha256"] }
+          "if": {
+            "properties": {
+              "backend": {
+                "properties": { "profile_status": { "const": "qualified" } },
+                "required": ["profile_status"]
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": {
+            "properties": {
+              "backend": { "required": ["capability_profile_sha256"] }
+            }
+          }
         }
       ]
     }
