@@ -493,6 +493,20 @@
         "SPER_at_k"
       ],
       "note": "Token-level synthetic vectors; expected values are formula-checked using the declared deterministic Levenshtein tie-break, but no Rust test, RapidFuzz differential or real-data result is claimed."
+    },
+    {
+      "id": "switch_boundary_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_FORMULA_CHECKED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/switch_boundary_golden_v0.1.json",
+      "schema_path": "docs/research/voice/switch_boundary_golden_v0.1.schema.json",
+      "cases": 6,
+      "linked_issue": 11086,
+      "metrics": [
+        "boundary_precision",
+        "boundary_recall",
+        "boundary_f1"
+      ],
+      "note": "Six synthetic token-aligned language-tag cases with exact-position boundary matching; no tolerance and no audio evidence."
     }
   ]
 }
