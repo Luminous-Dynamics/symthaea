@@ -11,6 +11,7 @@ use crate::semiring::CheckedRational;
 use std::error::Error;
 use std::fmt;
 use std::cmp::Ordering;
+use sha2::{Digest, Sha256};
 
 /// Closed rational interval for one transition probability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -174,12 +175,19 @@ pub struct OccupationFlowLp {
     lp: RationalLp,
     layout: OccupationFlowLayout,
     direction: UtilityDirection,
+    source_model_sha256: [u8; 32],
+    compiled_lp_sha256: [u8; 32],
 }
 
 impl OccupationFlowLp {
     pub fn problem(&self) -> &RationalLp { &self.lp }
     pub fn layout(&self) -> OccupationFlowLayout { self.layout }
     pub fn direction(&self) -> UtilityDirection { self.direction }
+    /// SHA-256 of the versioned canonical source interval-model transcript.
+    pub fn source_model_sha256(&self) -> [u8; 32] { self.source_model_sha256 }
+    /// SHA-256 of the versioned canonical compiled LP transcript, including
+    /// the source model digest, direction, matrix, RHS and objective.
+    pub fn compiled_lp_sha256(&self) -> [u8; 32] { self.compiled_lp_sha256 }
 
     pub fn utility_from_lp_objective(
         &self,
@@ -499,7 +507,96 @@ pub fn build_occupation_flow_lp(
     }
 
     let lp = RationalLp::new(matrix, rhs, objective)?;
-    Ok(OccupationFlowLp { lp, layout, direction })
+    let source_model_sha256 = canonical_interval_model_sha256(model);
+    let compiled_lp_sha256 = canonical_occupation_lp_sha256(
+        &lp,
+        layout,
+        direction,
+        source_model_sha256,
+    );
+    Ok(OccupationFlowLp {
+        lp,
+        layout,
+        direction,
+        source_model_sha256,
+        compiled_lp_sha256,
+    })
+}
+
+/// Versioned canonical SHA-256 identity of a stagewise interval model.
+///
+/// Encoding contract (all integers little-endian):
+/// magic bytes, state count (u64), period count (u64), initial probabilities
+/// in state order (numerator i128, denominator i128), then every transition
+/// interval in stage/source/destination order (lower rational, upper rational).
+/// This is streamed into SHA-256; no full transcript buffer is allocated.
+pub fn canonical_interval_model_sha256(
+    model: &StagewiseIntervalMarkovModel,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-OCCUPATION-MODEL\0\x01");
+    hasher.update((model.state_count() as u64).to_le_bytes());
+    hasher.update((model.period_count() as u64).to_le_bytes());
+    for probability in &model.initial {
+        hash_rational(&mut hasher, *probability);
+    }
+    for stage in &model.transitions {
+        for row in stage {
+            for interval in row {
+                hash_rational(&mut hasher, interval.lower);
+                hash_rational(&mut hasher, interval.upper);
+            }
+        }
+    }
+    hasher.finalize().into()
+}
+
+/// Versioned canonical identity of the compiled standard-form LP.
+/// Source digest and direction are included to bind the semantics, not just
+/// the dimensions and resulting coefficient matrix.
+fn canonical_occupation_lp_sha256(
+    lp: &RationalLp,
+    layout: OccupationFlowLayout,
+    direction: UtilityDirection,
+    source_model_sha256: [u8; 32],
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-OCCUPATION-LP\0\x01");
+    hasher.update(source_model_sha256);
+    hasher.update((layout.period_count() as u64).to_le_bytes());
+    hasher.update((layout.state_count() as u64).to_le_bytes());
+    hasher.update((lp.row_count() as u64).to_le_bytes());
+    hasher.update((lp.column_count() as u64).to_le_bytes());
+    hasher.update([match direction {
+        UtilityDirection::Maximize => 0,
+        UtilityDirection::Minimize => 1,
+    }]);
+    for row in lp.matrix() {
+        for coefficient in row {
+            hash_rational(&mut hasher, *coefficient);
+        }
+    }
+    for rhs in lp.rhs() {
+        hash_rational(&mut hasher, *rhs);
+    }
+    for coefficient in lp.objective() {
+        hash_rational(&mut hasher, *coefficient);
+    }
+    hasher.finalize().into()
+}
+
+fn hash_rational(hasher: &mut Sha256, value: CheckedRational) {
+    hasher.update(value.numerator().to_le_bytes());
+    hasher.update(value.denominator().to_le_bytes());
+}
+
+pub fn sha256_hex(digest: [u8; 32]) -> String {
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
 }
 
 fn zero_row(length: usize) -> Result<Vec<CheckedRational>, OccupationFlowError> {
@@ -857,6 +954,68 @@ mod tests {
         let verified_b = verify_primal_dual_optimality(regret_b.problem(), &certificate_b).unwrap();
         assert_eq!(verified_b.objective, q(22, 25));
         assert!(verified_a.objective < verified_b.objective);
+    }
+
+    #[test]
+    fn canonical_model_and_compiled_lp_digests_bind_inputs_and_objective() {
+        let model = fixture();
+        let model_digest = canonical_interval_model_sha256(&model);
+        assert_eq!(model_digest, canonical_interval_model_sha256(&model));
+        assert_eq!(sha256_hex(model_digest).len(), 64);
+
+        let scores_a = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        let scores_b = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(1, 1), q(0, 1)],
+            vec![q(0, 1), q(0, 1)],
+        ];
+        let a = build_occupation_flow_lp(
+            &model,
+            &scores_a,
+            UtilityDirection::Maximize,
+            budget(504),
+        ).unwrap();
+        let a_replay = build_occupation_flow_lp(
+            &model,
+            &scores_a,
+            UtilityDirection::Maximize,
+            budget(504),
+        ).unwrap();
+        let b = build_occupation_flow_lp(
+            &model,
+            &scores_b,
+            UtilityDirection::Maximize,
+            budget(504),
+        ).unwrap();
+        let a_min = build_occupation_flow_lp(
+            &model,
+            &scores_a,
+            UtilityDirection::Minimize,
+            budget(504),
+        ).unwrap();
+
+        assert_eq!(a.source_model_sha256(), model_digest);
+        assert_eq!(a.source_model_sha256(), a_replay.source_model_sha256());
+        assert_eq!(a.compiled_lp_sha256(), a_replay.compiled_lp_sha256());
+        assert_ne!(a.compiled_lp_sha256(), b.compiled_lp_sha256());
+        assert_ne!(a.compiled_lp_sha256(), a_min.compiled_lp_sha256());
+
+        let altered_model = StagewiseIntervalMarkovModel::new(
+            model.initial.clone(),
+            {
+                let mut transitions = model.transitions.clone();
+                transitions[0][0][0].upper = q(3, 4);
+                transitions
+            },
+        ).unwrap();
+        assert_ne!(
+            model_digest,
+            canonical_interval_model_sha256(&altered_model)
+        );
     }
 
     #[test]
