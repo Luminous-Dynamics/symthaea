@@ -438,8 +438,9 @@ mod tests {
     #[test]
     fn rejects_duplicate_hypothesis_identity() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["object_hypotheses"][1]["hypothesis_id"] =
+        let duplicate_id =
             fixture["snapshot"]["object_hypotheses"][0]["hypothesis_id"].clone();
+        fixture["snapshot"]["object_hypotheses"][1]["hypothesis_id"] = duplicate_id;
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
