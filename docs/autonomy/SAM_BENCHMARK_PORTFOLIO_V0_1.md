@@ -112,6 +112,16 @@ These descriptors describe the system; the four coordinates describe the evidenc
 - **Claim boundary:** simulated agent realism does not validate human behavior generally or certify an ego planner.
 - **Source:** [SOTA2 research board](https://www.sota2.com/research/sota/motion-simulation-on-waymo-open-sim-agents-challenge-2025).
 
+### SAM Traffic Convention Mirror Metamorphic v0.1 — internal synthetic profile
+
+- **Role:** test explicit jurisdiction traffic-side semantics and geometric/control equivariance across left-hand-traffic and right-hand-traffic scenes.
+- **Protocol:** one paired synthetic crossing-actor scene, three versioned profiles (LHT/RHD, RHT/LHD and LHT/LHD layout control), explicit road-frame reflection, lane-role identity and passing-rule profile identity.
+- **Metrics:** paired transform invariants, lane-role preservation, steering-sign equivariance, map/profile identity, and reject/unresolved rate for conflicting or missing rule profiles.
+- **Status:** proposed internal SAM conformance contract, not an external benchmark and not yet independently qualified.
+- **Prospective target:** 100% of exact synthetic invariants and negative-control outcomes; 0 silent inference of traffic-side from steering-wheel position, GPS, map appearance or image pixel orientation.
+- **Claim boundary:** no country-specific legal correctness, vehicle safety or broad LHT/RHT generalization claim.
+- **Source:** [SAM-TRAFFIC-CONVENTION-001 #11123](https://github.com/Luminous-Dynamics/symthaea/issues/11123).
+
 ### NAVSIM v2 / EPDMS — pseudo-simulation, not fully interactive closed loop
 
 - **Role:** scalable planning evaluation using real driving scenes plus pseudo-simulated follow-up scenes.
@@ -218,6 +228,7 @@ The September 3, 2026 survey characterizes model design through state abstractio
 
 | Track | Baseline | Prospective SAM target | Hard comparability requirement |
 |---|---|---|---|
+| SAM Traffic Convention Mirror v0.1 | Internal synthetic contract: one mirrored LHT/RHT pair plus steering-layout control | 100% of transform invariants; 100% conflicting-profile negatives reject/unresolve; 0 silent convention inference | Exact fixture/schema/checker digest; paired road frame, traffic profile, map/profile and vehicle configuration identities |
 | NAVSIM v2 / EPDMS | Official NAVSIM v2.1.2 implementation; SOTA2 secondary snapshot: Human Agent 90.3, LWDrive 89.6 | Reproduce the strongest matched score first; then improve EPDMS and component metrics on sealed slices without worsening the weakest metric | Exact v2.1.2 devkit, split, two-stage manifest, EPDMS evaluator, data privilege and checkpoint |
 | ReactSim-Bench | Author-reported SMART baseline; 2,636 nuPlan deviation scenarios | Beat reproduced response baselines across collision/risk/map/kinematic families; report each metric and worst deviation category separately | Exact scenario/cache version, ego deviation input, actor model, data split and per-metric denominator |
 | Bench2Drive v0.0.4 | LEAD 95.59 DS / 87.28 SR | Exceed strongest reproduced DS while preserving SR, efficiency, comfort and failure-family outcomes | Same 220-route manifest, CARLA/ScenarioRunner, sensor privilege, checkpoint and scoring |
