@@ -84,6 +84,14 @@ jobs:
           assert sum(b["observations"] for b in calibration["bins"]) == 2
           assert report["by_profile"][0]["confidence_calibration"]["observations"] == 2
           assert all(case["profile_id"] == "en-US-general-v1" for case in report["cases"])
+          by_case = {case["case_id"]: case for case in report["cases"]}
+          assert by_case["read-past"]["selected_reference_variant"] == "past"
+          assert by_case["read-present"]["selected_reference_variant"] == "present"
+          assert by_case["lead-noun"]["selected_reference_variant"] == "noun"
+          assert by_case["lead-verb"]["selected_reference_variant"] == "verb"
+          assert all(by_case[case_id]["exact_pronunciation"] is True for case_id in (
+              "read-past", "read-present", "lead-noun", "lead-verb"
+          ))
           PY
 
       - name: Upload synthetic scorer receipt
