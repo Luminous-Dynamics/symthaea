@@ -61,11 +61,11 @@ The JSON Schema validates structure and primitive types. The semantic subset val
 - uniqueness of component and domain identifiers;
 - resolution of every parent, member, dependency and fault-injection target;
 - acyclic parent/dependency relations where required;
-- consistency between declared measurement boundary and available receipts;
-- calibration age and validity at execution time;
-- source/evidence digests and provenance;
-- disjoint training, validation and confirmatory seed sets;
-- independence claims against the actual dependency graph.
+- resolution of verifier and fallback component references;
+- presence of a source-data digest for measured/derived scenarios;
+- stale-calibration status rejection for confirmatory/reproduction phases;
+- required measurement units and an instrument/receipt declaration for measured energy;
+- disjoint training, validation and confirmatory seed ranges.
 
 The same Rust utility has a deliberately narrow domain-outage replay mode. It propagates a declared failed domain to child domains and to domains whose declared dependencies have failed, then computes whether all required candidate components and the verifier component remain available. Supported injections are only `domain_outage` with `parameters.state = "failed"`; all other mechanisms fail closed. The CLI labels the output `PREFLIGHT_ONLY`. It does not execute workload arithmetic, infer a correct result, model time-dependent device physics, estimate probabilities, or measure energy.
 
@@ -77,7 +77,7 @@ cargo run --manifest-path research/physical_compute/manifest-validator/Cargo.tom
   research/physical_compute/scenarios/v1/common_cause_controller_outage.json
 ```
 
-The CLI first runs its implemented semantic subset checks; it does **not** execute a Draft 2020-12 JSON Schema validator. It emits a JSON receipt that conforms structurally to `preflight_receipt_v1.schema.json`, explicitly recording `json_schema_validation = not_performed_by_rust_cli`, `semantic_validation = passed_subset` and `replay_scope = domain_outage_only`. It contains a canonical manifest SHA-256 identity, failed domain/component sets, candidate/verifier availability and a `preflight_classification`. The receipt explicitly sets correctness to `not_evaluated`, latency to `not_measured` and energy to `not_measured`. A stderr `JSON_SCHEMA_VALIDATION_REQUIRED` and `PREFLIGHT_ONLY` notice repeat the evidence boundary. Redirect stdout to preserve the receipt as a file; validate both manifest and receipt against their respective schemas using a separate Draft 2020-12 validator. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both common-cause fixtures, candidate-path component resolution, failed controller/shared-power propagation, verifier co-failure and unsupported replay mechanisms.
+The CLI first runs its implemented semantic subset checks; it does **not** execute a Draft 2020-12 JSON Schema validator or claim that structural validation passed. It emits a JSON receipt that conforms structurally to `preflight_receipt_v1.schema.json`, explicitly recording `json_schema_validation = not_performed_by_rust_cli`, `semantic_validation = passed_subset` and `replay_scope = domain_outage_only`. It contains a canonical manifest SHA-256 identity, failed domain/component sets, candidate/verifier availability and a `preflight_classification`. The receipt explicitly sets correctness to `not_evaluated`, latency to `not_measured` and energy to `not_measured`. A stderr `JSON_SCHEMA_VALIDATION_REQUIRED` and `PREFLIGHT_ONLY` notice repeat the evidence boundary. Redirect stdout to preserve the receipt as a file; validate both manifest and receipt against their respective schemas using a separate Draft 2020-12 validator. The digest is a manifest identity, not proof that its assumptions are true. The checked-in Rust tests cover duplicate IDs, unresolved members, cyclic parent hierarchies, overlapping seed partitions, incomplete energy receipts, malformed scenario IDs, both common-cause fixtures, candidate-path component resolution, failed controller/shared-power propagation, verifier co-failure and unsupported replay mechanisms.
 
 The crate and tests are authored but have not been compiled in this environment because `rustc` / `cargo` are unavailable. Until the JSON Schema and semantic passes have both executed on an exact head, a manifest is not a qualified scenario.
 
