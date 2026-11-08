@@ -194,7 +194,7 @@ def self_test() -> list[str]:
             "Key lesson: retain claim scope",
         ))
         for i, case_id in enumerate(CASE_IDS, 1)
-    ) + "\nnot hidden ground truth not secure blinding not a sealed holdout not a real repository invalidation outcome"
+    ) + "\nnot hidden ground truth not secure blinding not a sealed holdout no real repository invalidation outcome"
     continuity = (
         "## 14.3 Claim-support closure extension\n"
         "CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md\n"
