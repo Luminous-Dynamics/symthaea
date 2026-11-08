@@ -14,12 +14,12 @@ use symthaea_core::weight_space_program::{
     ValidatedWeightCandidate, WeightModelSnapshot, WeightProgram, WeightProgramError,
     WeightProgramReceipt, WeightProgramTarget,
 };
-use thiserror::Error;
 use symthaea_fep::gaussian_model_information_gain::{
-    GaussianModelInformationGainError, GaussianModelInformationGainConfig,
+    GaussianModelInformationGainConfig, GaussianModelInformationGainError,
     GaussianObservationAction, GaussianObservationHypothesis,
     evaluate_gaussian_model_information_gains,
 };
+use thiserror::Error;
 
 use super::network::{
     CfCNetwork, CfCNetworkConfig, CfCParameterGroupId, CfCParameterGroupReplacement,
@@ -601,7 +601,9 @@ pub enum CfCPermutationAlignmentError {
     MissingCanonicalizationGroup(String),
     #[error("CfC parameter group has an unexpected shape for canonicalization: {group}")]
     InvalidCanonicalizationGroupShape { group: String },
-    #[error("exact permutation EIG supports at most {maximum_hypotheses} mappings; layer has {hidden_dim} units")]
+    #[error(
+        "exact permutation EIG supports at most {maximum_hypotheses} mappings; layer has {hidden_dim} units"
+    )]
     ExactPermutationSpaceTooLarge {
         hidden_dim: usize,
         maximum_hypotheses: usize,
@@ -610,7 +612,9 @@ pub enum CfCPermutationAlignmentError {
     GaussianInformationGain(#[from] GaussianModelInformationGainError),
     #[error("permutation activation signatures have an invalid hidden-unit dimension")]
     InvalidPermutationSignatureDimension,
-    #[error("Gaussian permutation EIG accepts at most {maximum_probes} candidate probes, received {actual_probes}")]
+    #[error(
+        "Gaussian permutation EIG accepts at most {maximum_probes} candidate probes, received {actual_probes}"
+    )]
     TooManyGaussianEIGCandidateProbes {
         actual_probes: usize,
         maximum_probes: usize,
@@ -1611,10 +1615,12 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
         return Err(CfCPermutationAlignmentError::EmptyCandidateProbeSet);
     }
     if candidate_probes.len() > MAX_GAUSSIAN_EIG_CANDIDATE_PROBES {
-        return Err(CfCPermutationAlignmentError::TooManyGaussianEIGCandidateProbes {
-            actual_probes: candidate_probes.len(),
-            maximum_probes: MAX_GAUSSIAN_EIG_CANDIDATE_PROBES,
-        });
+        return Err(
+            CfCPermutationAlignmentError::TooManyGaussianEIGCandidateProbes {
+                actual_probes: candidate_probes.len(),
+                maximum_probes: MAX_GAUSSIAN_EIG_CANDIDATE_PROBES,
+            },
+        );
     }
     if !observation_std_dev.is_finite() || observation_std_dev <= 0.0 {
         return Err(GaussianModelInformationGainError::InvalidObservationStdDev(
@@ -1645,10 +1651,12 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
     let hidden_dim = source.config().hidden_dim;
     let hypothesis_count = exact_permutation_count(hidden_dim);
     if hypothesis_count.is_none_or(|count| count > MAX_EXACT_PERMUTATION_HYPOTHESES) {
-        return Err(CfCPermutationAlignmentError::ExactPermutationSpaceTooLarge {
-            hidden_dim,
-            maximum_hypotheses: MAX_EXACT_PERMUTATION_HYPOTHESES,
-        });
+        return Err(
+            CfCPermutationAlignmentError::ExactPermutationSpaceTooLarge {
+                hidden_dim,
+                maximum_hypotheses: MAX_EXACT_PERMUTATION_HYPOTHESES,
+            },
+        );
     }
     let permutations = enumerate_hidden_unit_permutations(hidden_dim);
     if permutations.is_empty() {
@@ -1678,7 +1686,8 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
         validate_signature_hidden_dimension(&source_signatures, hidden_dim)?;
         validate_signature_hidden_dimension(&candidate_signatures, hidden_dim)?;
         for probe_index in 0..existing_probes.len() {
-            let observed = projected_candidate_activation(&candidate_signatures, probe_index, &projection);
+            let observed =
+                projected_candidate_activation(&candidate_signatures, probe_index, &projection);
             let residuals = permutations
                 .iter()
                 .map(|permutation| {
@@ -1691,13 +1700,8 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
                     (observed - predicted).powi(2)
                 })
                 .collect::<Vec<_>>();
-            let best_residual = residuals
-                .iter()
-                .copied()
-                .fold(f64::INFINITY, f64::min);
             for (log_weight, squared_error) in log_posterior.iter_mut().zip(residuals) {
-                *log_weight -= squared_error
-                    / (2.0 * observation_std_dev * observation_std_dev);
+                *log_weight -= squared_error / (2.0 * observation_std_dev * observation_std_dev);
             }
         }
     }
@@ -1709,17 +1713,19 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
         .iter()
         .zip(posterior_probabilities.iter().copied())
         .enumerate()
-        .map(|(index, (permutation, prior_probability))| GaussianObservationHypothesis {
-            hypothesis_id: format!(
-                "perm-{index}:{}",
-                permutation
-                    .iter()
-                    .map(usize::to_string)
-                    .collect::<Vec<_>>()
-                    .join("-")
-            ),
-            prior_probability,
-        })
+        .map(
+            |(index, (permutation, prior_probability))| GaussianObservationHypothesis {
+                hypothesis_id: format!(
+                    "perm-{index}:{}",
+                    permutation
+                        .iter()
+                        .map(usize::to_string)
+                        .collect::<Vec<_>>()
+                        .join("-")
+                ),
+                prior_probability,
+            },
+        )
         .collect::<Vec<_>>();
 
     let mut augmented_probe_digests = Vec::with_capacity(candidate_probes.len());
@@ -1782,8 +1788,7 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
             candidate_index,
             augmented_probe_digest: augmented_probe_digests[candidate_index].clone(),
             model_information_gain_nats: gain.model_information_gain_nats,
-            expected_posterior_permutation_entropy_nats: gain
-                .expected_posterior_model_entropy_nats,
+            expected_posterior_permutation_entropy_nats: gain.expected_posterior_model_entropy_nats,
         })
         .collect::<Vec<_>>();
     let selected_gain = &information_gains[selected_index];
@@ -1810,12 +1815,12 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
         permutation_posterior: permutations
             .into_iter()
             .zip(posterior_probabilities)
-            .map(|(source_to_candidate, posterior_probability)| {
-                CfCPermutationHypothesisPosterior {
+            .map(
+                |(source_to_candidate, posterior_probability)| CfCPermutationHypothesisPosterior {
                     source_to_candidate,
                     posterior_probability,
-                }
-            })
+                },
+            )
             .collect(),
         candidate_scores: scores,
     })
@@ -1896,7 +1901,11 @@ fn deterministic_permutation_projection(
         ]);
         projection.push(2.0 * (raw as f64 / u64::MAX as f64) - 1.0);
     }
-    let norm = projection.iter().map(|value| value * value).sum::<f64>().sqrt();
+    let norm = projection
+        .iter()
+        .map(|value| value * value)
+        .sum::<f64>()
+        .sqrt();
     if norm > 1e-15 {
         for value in &mut projection {
             *value /= norm;
@@ -1954,7 +1963,10 @@ fn projected_permuted_source_activation(
 }
 
 fn normalize_log_weights(log_weights: &[f64]) -> Option<Vec<f64>> {
-    let maximum = log_weights.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let maximum = log_weights
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
     if !maximum.is_finite() {
         return None;
     }
@@ -3868,8 +3880,9 @@ mod tests {
             enable_online_learning: false,
             ..Default::default()
         };
-        let genesis =
-            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-cfc-gaussian-permutation-eig-v1");
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-cfc-gaussian-permutation-eig-v1",
+        );
         let source = CfCNetwork::from_genesis(config, &genesis, "gaussian-permutation-eig");
         let candidate = source.clone();
         let probes = vec![
@@ -3954,8 +3967,9 @@ mod tests {
             enable_online_learning: false,
             ..Default::default()
         };
-        let genesis =
-            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-cfc-gaussian-permutation-posterior-v1");
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-cfc-gaussian-permutation-posterior-v1",
+        );
         let source = CfCNetwork::from_genesis(config, &genesis, "gaussian-permutation-posterior");
         let candidate = source.clone();
         let existing = vec![
