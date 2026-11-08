@@ -120,9 +120,32 @@ The protocol validates A0/A2 structure access, intervention family, action budge
 
 Important boundary: this Rust API is not an OS security sandbox. The agent must run in a separate process and must never receive the evaluator handle or pre-submission score. The v0 digest is computed over this version's serde_json encoding; an agent should echo the digest rather than independently reserialize it in another language.
 
+## Process-facing agent adapter
+
+The `open_world_agent` binary is a newline-delimited JSON (JSONL) process adapter. It reads exactly one public `AgentView` JSON object per input line and writes exactly one `AgentAction` JSON object per output line. It supports the finite enumerator and all seven explicit probe strategies; usage examples:
+
+    cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin open_world_agent
+    cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin open_world_agent -- --strategy maximum_structure_information_gain
+    cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin open_world_agent -- --strategy random:23
+
+Stdout is reserved for action JSONL; errors and diagnostics go to stderr. Input framing is capped at 1 MiB per message, the protocol version is checked, blank lines and submitted episodes are rejected. The adapter has no evaluator constructors or truth arguments. It is a **protocol-facing reference policy**, not yet a bridge to the learned Symthaea research orchestrator. Do not call the process boundary a security sandbox: an external runner must isolate the agent's filesystem, network, environment, process visibility, CPU/memory and wall time.
+
+## Paired A0/A2 campaign manifest
+
+`campaign::CampaignManifest` validates public experimental-design metadata. Every pair contains exactly A0 and A2, shares the same agent artifact, policy config, initial evidence and action/compute budgets, and selects one of two comparison contracts:
+
+- `matched_trace`: both access arms consume the same frozen intervention trace; an intervention-trace SHA-256 is required.
+- `adaptive_budget`: both arms share starting evidence and maximum budgets, while later interventions may differ; a fixed-trace digest is rejected.
+
+The manifest references evaluator-held seed and confirmation ledgers by digest only. It must not contain actual seed values, generating mechanisms, true model parameters or hidden confirmation outcomes. Validation command:
+
+    cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin validate_campaign_manifest < campaign-manifest.json
+
+This validates metadata consistency only; it does not generate secret seeds, run paired worlds, enforce the operating-system sandbox or own the sealed benchmark service. The schema is `schemas/campaign_manifest_v0.schema.json`.
+
 ## Authored tests
 
-Sixty-five Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, and a numeric control where structure-first and model-entropy policies deliberately choose different probes.
+Seventy-five Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, and JSONL agent framing/policy parsing.
 
 The previous exact-head focused runs covered 34 tests on commit 58128d025bdb24995c31822a86cd3afcaec28413. The additional protocol tests and wire contract must be qualified on the new exact branch head before this expanded branch is called green.
 
@@ -130,7 +153,7 @@ The previous exact-head focused runs covered 34 tests on commit 58128d025bdb2499
 
 - The crate is an executable synthetic microcosm and finite exact enumerator, not an agent result.
 - The exhaustive oracle is independent at the trace-construction level, but shares the authored finite model definitions; it is not an external scientific authority.
-- The implementation and source-visible tests are not a blind benchmark.
+- The implementation and source-visible tests are not a blind benchmark. The JSONL executable runs a finite enumerator or experiment-policy baseline, not the learned Symthaea research orchestrator.
 - No AI agent has been evaluated.
 - No empirical physical system, unknown natural law or published scientific result has been reproduced.
 - No Unsatz, Scientist World or FrontierPhysics benchmark score is claimed.
