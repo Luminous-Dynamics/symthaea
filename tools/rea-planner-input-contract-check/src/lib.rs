@@ -575,8 +575,6 @@ mod tests {
         assert!(((nominal_evsi + conservative_evsi) / 2.0 - 0.775).abs() < 1.0e-12);
     }
 
-
-
     #[test]
     fn likelihood_probability_vector_must_bind_exact_outcome_order() {
         let mut value = example();
