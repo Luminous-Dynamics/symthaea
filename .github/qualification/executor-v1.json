@@ -1,0 +1,42 @@
+{
+  "schema_id": "symthaea.qualification-executor-registry.v1",
+  "profiles": {
+    "symthaea-humanoid-default-v1": {
+      "description": "Locked default-feature source qualification for symthaea-humanoid.",
+      "runner": "ubuntu-24.04",
+      "rust_toolchain": "1.96.0",
+      "timeout_minutes": 55,
+      "immutable_paths": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/domains/symthaea-humanoid/Cargo.toml",
+        "crates/domains/symthaea-humanoid/src"
+      ],
+      "commands": [
+        ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+        ["cargo", "fmt", "--check", "-p", "symthaea-humanoid"],
+        ["cargo", "check", "-p", "symthaea-humanoid", "--all-targets", "--locked"],
+        ["cargo", "test", "-p", "symthaea-humanoid", "--lib", "--locked"],
+        ["cargo", "clippy", "-p", "symthaea-humanoid", "--all-targets", "--locked", "--", "-D", "warnings"]
+      ]
+    },
+    "symthaea-humanoid-mujoco-v1": {
+      "description": "Locked MuJoCo-feature compile qualification for symthaea-humanoid.",
+      "runner": "ubuntu-24.04",
+      "rust_toolchain": "1.96.0",
+      "timeout_minutes": 55,
+      "immutable_paths": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "crates/domains/symthaea-humanoid/Cargo.toml",
+        "crates/domains/symthaea-humanoid/src"
+      ],
+      "commands": [
+        ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+        ["cargo", "fmt", "--check", "-p", "symthaea-humanoid"],
+        ["cargo", "check", "-p", "symthaea-humanoid", "--all-targets", "--features", "mujoco", "--locked"],
+        ["cargo", "clippy", "-p", "symthaea-humanoid", "--all-targets", "--features", "mujoco", "--locked", "--", "-D", "warnings"]
+      ]
+    }
+  }
+}
