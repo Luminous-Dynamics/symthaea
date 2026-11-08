@@ -129,7 +129,25 @@ The companion JSON contains five synthetic campaign fixtures:
 
 The values are synthetic and deliberately not vessel design limits or sensor specifications.
 
-## 9. Benchmarks — targets, not results
+## 9. Executable semantic verifier
+
+The branch now includes `crates/domains/symthaea-marine-campaign-evidence`, a small Rust verifier over `serde_json::Value`. It consumes the reference-only campaign record and checks cross-record semantics that JSON Schema alone cannot establish:
+- exact article ↔ mission ↔ per-channel as-built configuration binding;
+- prospective protocol frozen before the run;
+- run start/end ordering and run disposition / abort consistency;
+- instrument identity strength and monotonic measurement range;
+- measured analogue bandwidth versus claimed observable bandwidth;
+- channel-specific sampling-adequacy review presence;
+- calibration currentness and required canonical calibration/epoch/qualification/uncertainty references;
+- sample integrity counters and raw-observation digest presence;
+- source/DAQ/receive synchronization uncertainty against the declared analysis budget;
+- acquisition/evidence-class boundaries for synthetic, measured, replay, HIL and PHIL inputs.
+
+Disposition is fail-closed: `Invalid`, `NotAdmissible`, `Indeterminate`, `SyntheticOnly` or `EligibleForIndependentReview`. The last state is not an engineering or regulatory pass.
+
+Ten Rust unit tests are authored, including the five frozen campaign fixtures plus negative mutations for article/channel mismatch, stale calibration, missing sampling review, clock-budget breach, missing samples, unfrozen protocol, weak instrument identity, safety-aborted run and reversed measurement range. The root workspace dependency lock has an entry for the new crate. **These tests have not been executed** because Cargo/Rust is unavailable in the current execution environment; exact-head CI remains the required compilation/test evidence.
+
+## 10. Benchmarks — targets, not results
 
 - 100% admitted channels bind exact instrument endpoint, quantity, unit, location/frame, calibration status and timebase.
 - 100% runs bind exact protocol, physical article/as-built revision, mission/condition where applicable, raw bundle and analysis profile.
@@ -142,7 +160,7 @@ The values are synthetic and deliberately not vessel design limits or sensor spe
 - independent verifier re-derives campaign disposition; no self-asserted `valid=true`.
 - uncertainty and timing budgets are claim-specific; no universal percent target before a calibrated measurement chain and observable are selected.
 
-## 10. First physical test sequence
+## 11. First physical test sequence
 
 1. Freeze the demonstrator's exact article and measurement boundary.
 2. Select one low-risk watermaker or inert mechanical test case first; do not combine unrelated tests into one physical claim.
@@ -154,6 +172,6 @@ The values are synthetic and deliberately not vessel design limits or sensor spe
 8. Have a reviewer independent of the data-acquisition implementation assess the result.
 9. Only then bind measurements into the watermaker, transient, serviceability or mission evidence owners.
 
-## Claim ceiling
+## 12. Claim ceiling
 
 A valid manifest or synthetic corpus PASS does not establish instrument accuracy, metrological traceability, water potability, electrical safety, power quality, transient stability, habitability, hull performance, seaworthiness, class/flag compliance or authority to operate. Each physical claim is limited to its exact article, configuration, instrument, calibration, method, uncertainty, conditions and competent review authority.
