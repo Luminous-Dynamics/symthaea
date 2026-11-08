@@ -137,7 +137,7 @@ Stdout is reserved for action JSONL; errors and diagnostics go to stderr. Input 
 - `matched_trace`: both access arms consume the same frozen intervention trace; an intervention-trace SHA-256 is required.
 - `adaptive_budget`: both arms share starting evidence and maximum budgets, while later interventions may differ; a fixed-trace digest is rejected.
 
-The manifest references evaluator-held seed and confirmation ledgers by digest only. It must not contain actual seed values, generating mechanisms, true model parameters or hidden confirmation outcomes. Validation command:
+Pair IDs are unique; an opaque world alias may intentionally recur across distinct pairs so one hidden world can be reused for multiple policy comparisons or replicates. The manifest references evaluator-held seed and confirmation ledgers by digest only. It must not contain actual seed values, generating mechanisms, true model parameters or hidden confirmation outcomes. Validation command:
 
     cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin validate_campaign_manifest < campaign-manifest.json
 
@@ -159,7 +159,7 @@ The focused workflow runs the census and fails closed on incomplete exact versio
 
 ## Authored tests
 
-Eighty-one Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, and a serialized AgentView-to-AgentAction episode round trip.
+Eighty-two Rust tests cover the three reference worlds and blind protocol: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, variable relevance, interaction aliasing, adaptive probes, exhaustive oracle equivalence classes, evidence-prefix integrity, claim validation, probe budgets, terminal submissions, exact version-space scoring, structure-versus-parameter identifiability safe-versus-unnecessary abstention scoring, structure-balanced family-prior stability under unchanged within-family outcome distributions, a numeric control where structure-first and model-entropy policies deliberately choose different probes, campaign-pair validation, JSONL agent framing/policy parsing, and a serialized AgentView-to-AgentAction episode round trip.
 
 Test functions include the finite truth-census, paired A0/A2 episode, campaign seed-schedule controls, process JSONL framing/round-trip and campaign manifest negative controls. The exact current-head formatting, Clippy, tests and exhaustive-census status must be read from the focused workflow; do not infer a pass from this authored-test count or an older source SHA.
 
