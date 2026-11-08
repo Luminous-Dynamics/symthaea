@@ -233,7 +233,6 @@ fn run_policy(
         .map(|hypothesis| hypothesis.prior_probability)
         .collect::<Vec<_>>();
 
-    let mut rng = DeterministicRng::new(seed);
     let mut probes_taken = 0;
     let mut selected_action_counts = vec![0; scenario.actions.len()];
     let mut task_loss_sum = 0.0;
@@ -246,7 +245,13 @@ fn run_policy(
     let mut realized_entropy_reduction_sum = 0.0;
     let mut brier_sum = 0.0;
 
-    for _ in 0..episodes {
+    for episode_index in 0..episodes {
+        // Reinitialize per episode so every policy sees the same hidden model
+        // and the same outcome quantile, independent of earlier probe choices.
+        let episode_seed = seed.wrapping_add(
+            (episode_index as u64).wrapping_mul(0x9E3779B97F4A7C15),
+        );
+        let mut rng = DeterministicRng::new(episode_seed);
         let true_hypothesis = sample_categorical(&prior, &mut rng);
         let selected_action = select_action(scenario, &information, policy, config)?;
         let mut posterior = prior.clone();
@@ -531,7 +536,7 @@ mod tests {
         assert!(evsi.mean_total_cost < pure_eig.mean_total_cost - 0.10);
         assert!(evsi.mean_decision_regret < pure_eig.mean_decision_regret);
         assert!(evsi.mean_realized_model_entropy_reduction_nats > 0.0);
-        assert!((no_probe.mean_task_loss - 0.5).abs() < 1e-12);
+        assert!((no_probe.mean_task_loss - 0.5).abs() < 0.03);
     }
 
     #[test]
