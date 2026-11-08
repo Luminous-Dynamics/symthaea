@@ -606,7 +606,10 @@ fn score_choice(
     // to log C(o) before computing D_KL[Q(o) || C(o)]. Omitting this
     // log-normalizer adds a negative constant and can make a valid KL appear
     // negative; clipping that value changes action rankings.
-    let preference_max = preferences.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let preference_max = preferences
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
     let log_preference_normalizer = preference_max
         + preferences
             .iter()
@@ -1114,17 +1117,22 @@ mod tests {
             );
         }
 
-        let base_policy = score_three_ball_gaze_policies(&space, &belief, base)
-            .expect("base policy");
-        let shifted_policy = score_three_ball_gaze_policies(&space, &belief, shifted)
-            .expect("shifted policy");
-        assert_eq!(base_policy.selected_action_index, shifted_policy.selected_action_index);
+        let base_policy =
+            score_three_ball_gaze_policies(&space, &belief, base).expect("base policy");
+        let shifted_policy =
+            score_three_ball_gaze_policies(&space, &belief, shifted).expect("shifted policy");
+        assert_eq!(
+            base_policy.selected_action_index,
+            shifted_policy.selected_action_index
+        );
         for (left, right) in base_policy
             .action_scores
             .iter()
             .zip(shifted_policy.action_scores.iter())
         {
-            assert!((left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-12);
+            assert!(
+                (left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-12
+            );
         }
     }
 
