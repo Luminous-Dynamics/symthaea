@@ -2156,7 +2156,7 @@ mod tests {
             &actions,
             &reversed,
             budget(84),
-            6,
+            minimax_budget(6),
         ).unwrap();
         assert_eq!(verified, replay);
     }
@@ -2251,7 +2251,7 @@ mod tests {
                 &[scores_a.clone(), scores_b.clone()],
                 &[self_pair, witnesses[1].clone()],
                 budget(84),
-                2,
+                minimax_budget(2),
             ),
             Err(OccupationFlowError::PairwiseSelfComparison { action: 0 })
         );
@@ -2264,7 +2264,7 @@ mod tests {
                 &[scores_a.clone(), scores_b.clone()],
                 &changed_source,
                 budget(84),
-                2,
+                minimax_budget(2),
             ),
             Err(OccupationFlowError::CertificateSourceDigestMismatch)
         );
@@ -2277,7 +2277,7 @@ mod tests {
                 &[scores_a.clone(), scores_b.clone()],
                 &changed_lp,
                 budget(84),
-                2,
+                minimax_budget(2),
             ),
             Err(OccupationFlowError::CertificateCompiledLpDigestMismatch)
         );
@@ -2290,7 +2290,7 @@ mod tests {
                 &[scores_a.clone(), scores_b.clone()],
                 &changed_primal,
                 budget(84),
-                2,
+                minimax_budget(2),
             ),
             Err(OccupationFlowError::Lp(_))
         ));
@@ -2300,7 +2300,7 @@ mod tests {
                 &[scores_a.clone()],
                 &[],
                 budget(84),
-                2,
+                minimax_budget(2),
             ),
             Err(OccupationFlowError::InvalidMinimaxRegretActionCount { actual: 1 })
         ));
