@@ -1357,14 +1357,14 @@ mod tests {
             max_variables: 14,
             max_constraints: 36,
             max_matrix_entries: 504,
-            max_rational_bit_width: 4,
+            max_rational_bit_width: 3,
         };
         assert_eq!(
             build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize, tight),
             Err(OccupationFlowError::BudgetExceeded {
                 resource: "rational numerator/denominator bit width",
-                required: 5,
-                limit: 4,
+                required: 4,
+                limit: 3,
             })
         );
     }
