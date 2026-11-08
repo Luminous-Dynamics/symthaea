@@ -3,6 +3,7 @@
 //! closed-form trace construction; this is a finite synthetic reference, not
 //! a general equation-discovery engine or physical-world simulator.
 
+pub mod campaign;
 pub mod interaction;
 pub mod numeric;
 pub mod policy;
