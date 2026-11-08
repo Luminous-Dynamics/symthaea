@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::hierarchical_information_gain::{
-    compute_hierarchical_information_gains, HierarchicalHypothesis,
-    HierarchicalInformationGainError,
+    HierarchicalHypothesis, HierarchicalInformationGainError,
+    compute_hierarchical_information_gains,
 };
 
 const RISK_TOLERANCE: f64 = 1e-10;
@@ -137,22 +137,23 @@ pub enum DecisionDiagnosticError {
         action_index: usize,
         action_count: usize,
     },
-    #[error("outcome index {outcome_index} is outside 0..{outcome_count} for action {action_index}")]
+    #[error(
+        "outcome index {outcome_index} is outside 0..{outcome_count} for action {action_index}"
+    )]
     OutcomeOutOfRange {
         action_index: usize,
         outcome_index: usize,
         outcome_count: usize,
     },
-    #[error("observation {outcome_index} has zero predictive probability under action {action_index}")]
+    #[error(
+        "observation {outcome_index} has zero predictive probability under action {action_index}"
+    )]
     ImpossibleObservation {
         action_index: usize,
         outcome_index: usize,
     },
     #[error("expected posterior Bayes risk {expected_risk} exceeds prior risk {prior_risk}")]
-    NonMonotonicBayesRisk {
-        prior_risk: f64,
-        expected_risk: f64,
-    },
+    NonMonotonicBayesRisk { prior_risk: f64, expected_risk: f64 },
     #[error("decision-risk calculation produced a non-finite value")]
     NonFiniteRisk,
 }
@@ -202,8 +203,11 @@ pub fn evaluate_decision_focused_diagnostics(
             Vec::with_capacity(action_information.outcome_probabilities.len());
         let mut expected_posterior_bayes_risk = 0.0;
 
-        for (outcome_index, outcome_probability) in
-            action_information.outcome_probabilities.iter().copied().enumerate()
+        for (outcome_index, outcome_probability) in action_information
+            .outcome_probabilities
+            .iter()
+            .copied()
+            .enumerate()
         {
             if outcome_probability == 0.0 {
                 posterior_risks.push(None);
@@ -288,12 +292,13 @@ pub fn posterior_model_probabilities(
 ) -> Result<Vec<f64>, DecisionDiagnosticError> {
     let joint = validate_hypotheses(hypotheses)?;
     let information = compute_hierarchical_information_gains(&joint)?;
-    let action = information
-        .get(action_index)
-        .ok_or(DecisionDiagnosticError::ActionOutOfRange {
-            action_index,
-            action_count: information.len(),
-        })?;
+    let action =
+        information
+            .get(action_index)
+            .ok_or(DecisionDiagnosticError::ActionOutOfRange {
+                action_index,
+                action_count: information.len(),
+            })?;
     let outcome_count = action.outcome_probabilities.len();
     if outcome_index >= outcome_count {
         return Err(DecisionDiagnosticError::OutcomeOutOfRange {
@@ -372,7 +377,9 @@ fn validate_actions(actions: &[DiagnosticAction]) -> Result<(), DecisionDiagnost
             return Err(DecisionDiagnosticError::EmptyActionId { action_index });
         }
         if !identifiers.insert(action.id.clone()) {
-            return Err(DecisionDiagnosticError::DuplicateActionId(action.id.clone()));
+            return Err(DecisionDiagnosticError::DuplicateActionId(
+                action.id.clone(),
+            ));
         }
         if !action.observation_cost.is_finite() || action.observation_cost < 0.0 {
             return Err(DecisionDiagnosticError::InvalidObservationCost { action_index });
@@ -493,8 +500,7 @@ mod tests {
         assert!(result.actions[0].expected_posterior_bayes_risk.abs() < 1e-12);
         assert!((result.actions[0].expected_value_of_sample_information - 0.5).abs() < 1e-12);
         assert!(
-            (result.actions[0].model_information_gain_nats - std::f64::consts::LN_2).abs()
-                < 1e-10
+            (result.actions[0].model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10
         );
         assert_eq!(result.actions[1].expected_value_of_sample_information, 0.0);
     }
@@ -511,8 +517,7 @@ mod tests {
 
         assert_eq!(result.selected_action_index, None);
         assert!(
-            (result.actions[0].model_information_gain_nats - std::f64::consts::LN_2).abs()
-                < 1e-10
+            (result.actions[0].model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10
         );
         assert!(result.actions[0].expected_value_of_sample_information.abs() < 1e-12);
     }
