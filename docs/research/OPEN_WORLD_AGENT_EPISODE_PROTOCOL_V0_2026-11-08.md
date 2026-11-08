@@ -18,7 +18,7 @@ flowchart TD
   O --> V
   A -->|Submit| C[Validate claim, citations and prefix digest]
   C --> S[Terminal submission receipt]
-  S --> R[Evaluator computes version-space score]
+  S --> R[Evaluator computes model and structure scores]
 ```
 
 The agent receives only `AgentView` and returns `AgentAction` values. A probe consumes one budget unit and produces one observation. A submission closes the episode. The runner rejects wrong-family interventions, out-of-budget probes, unsupported hypotheses, duplicate model claims, malformed dispositions, duplicate or unknown evidence references, and stale evidence-prefix digests.
@@ -42,7 +42,8 @@ The digest is computed over the v0 Rust `serde_json` serialization of the public
 A claim is a set of compatible typed hypotheses plus one disposition: identified, ambiguous, no-compatible-model, or abstain. It is not forced to nominate a single equation when the evidence leaves multiple models compatible.
 
 After submission, the trusted runner can compute:
-- exact version-space match;
+- exact parameterized-model version-space match;
+- projected structural-family set match and structural identifiability, scored independently from coefficient/sensor identifiability;
 - claimed/oracle/intersection counts (supporting precision and recall calculation);
 - disposition correctness;
 - evidence-reference validity;
@@ -74,7 +75,7 @@ Its current policy tests exercise paired numeric A0/A2 episodes using the same g
 
 ## Current limitations / next falsifiable milestones
 
-This is an interface and protocol-conformance layer, not an evaluated research agent. The evaluator score currently uses an exact finite candidate set; it is not yet a probabilistic posterior score, decision-focused EVSI, or a continuous-world verifier. It does not add stochastic noise, drift, saturation, unknown delay, hidden spatial state, adaptive instrument selection, or external paper-derived tasks.
+This is an interface and protocol-conformance layer, not an evaluated research agent. The evaluator score currently uses exact finite candidate sets and reports structural-family recovery separately from full parameterized-model recovery; it is not yet a probabilistic posterior score, decision-focused EVSI, or a continuous-world verifier. It does not add stochastic noise, drift, saturation, unknown delay, hidden spatial state, adaptive instrument selection, or external paper-derived tasks.
 
 Next milestones:
 1. Connect a Symthaea research-policy adapter that consumes only serialized AgentView messages and emits AgentAction messages.
