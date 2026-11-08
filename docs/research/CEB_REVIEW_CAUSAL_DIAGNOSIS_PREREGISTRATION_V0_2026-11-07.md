@@ -3,7 +3,7 @@
 **Status:** Public research design and preregistration template. No candidate evaluation, task admission, sealed holdout or model-performance result is claimed.  
 **Program owner:** Existing CEB-REVIEW / CEB-HUMAN / causal-diagnosis work; [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723), [#10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419), [#10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367).  
 **Primary CEB contract:** 14 measurement lanes / 56 primary metrics. CEB-REVIEW remains exactly three primary measures: `defect_recall_at_5`, `actionable_precision`, `reviewer_burden`.  
-**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md), and [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) with its [six-case public development challenge](CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md), plus [causal-identifiability protocol](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md) and its [six-case public development challenge](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md).
+**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md), and [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) with its [six-case public development challenge](CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md), plus [causal-identifiability protocol](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md) and its [six-case public development challenge](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md). The [preservation-aware repair-verification protocol](CEB_REVIEW_PRESERVATION_AWARE_REPAIR_VERIFICATION_PROTOCOL_V0_2026-11-08.md) adds a paired target/preservation witness requirement and six public synthetic cases.
 
 ## 1. Research question
 
@@ -342,6 +342,15 @@ Use [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL
 Use [CEB Review Causal-Identifiability Protocol V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md) and its six-case public development challenge to test whether reviewers distinguish identified, partially identified, non-identifiable, contradicted and unresolved causal claims. Require material evidence-compatible alternatives, a disagreement witness, and a minimum safe evidence request that actually separates those alternatives.
 
 Compose an exploratory I0/I1/I2 development contrast: I0 unstructured diagnosis; I1 causal topology; I2 topology plus identifiability, claim ceilings and discriminating evidence requests. This does not add or replace a confirmatory Phase A/B/C arm, primary metric, task schema, receipt, oracle authority, scheduler or execution permission. The six public anchors are development cases, not an independent statistical sample or sealed holdout. Use the dual-annotator addendum to preserve each first-pass compatible-model set, disposition and evidence request.
+
+
+## 12.7 Preservation-aware repair verification extension
+
+Use [CEB Review Preservation-Aware Repair Verification Protocol V0](CEB_REVIEW_PRESERVATION_AWARE_REPAIR_VERIFICATION_PROTOCOL_V0_2026-11-08.md) and its six-case public development challenge to distinguish target-defect evidence from evidence that a proposed correction preserves valid neighboring behavior.
+
+This is an exploratory P0/P1/P2 development contrast: P0 verdict only; P1 verdict plus rationale and proposed patch; P2 verdict plus target witness, preservation witness and independently grounded target/preservation oracle plans. It adds no confirmatory Phase A/B/C arm, no primary metric, task schema, receipt, oracle authority or execution permission. The six paired examples are public development anchors, not independent statistical samples or sealed holdout tasks.
+
+Use the dual-annotator addendum to lock canonical/mutant verdicts, both witnesses, oracle independence and claim ceilings separately. If the contract is ambiguous or the preservation boundary is not qualified, the repair remains unverified even when a target failure is plausible. Candidate-controlled executable validation remains gated by #10064 and independent pristine regrade by #10369.
 
 ## 13. Claim boundary
 
