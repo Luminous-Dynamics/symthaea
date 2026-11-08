@@ -955,7 +955,7 @@ mod tests {
             .predictions
             .iter_mut()
             .find(|record| {
-                record.theory_id == "causal-set-minkowski"
+                record.theory_id == "causal-set"
                     && record.observable_id == "ordering-fraction-1p1"
             })
             .unwrap();
@@ -964,7 +964,7 @@ mod tests {
             ledger.validate(),
             Err(
                 TheoryPredictionError::QuantitativePredictionUncertaintyNotApplicable {
-                    theory_id: "causal-set-minkowski".to_string(),
+                    theory_id: "causal-set".to_string(),
                     observable_id: "ordering-fraction-1p1".to_string(),
                 }
             )
@@ -978,14 +978,14 @@ mod tests {
             .predictions
             .iter_mut()
             .find(|record| {
-                record.theory_id == "causal-set-minkowski"
+                record.theory_id == "causal-set"
                     && record.observable_id == "ordering-fraction-1p1"
             })
             .unwrap();
         record.uncertainty_status = PredictiveUncertaintyStatus::Unspecified;
         let comparison = ledger
             .compare_models(
-                "causal-set-minkowski",
+                "causal-set",
                 "minkowski-continuum",
                 "ordering-fraction-1p1",
             )
