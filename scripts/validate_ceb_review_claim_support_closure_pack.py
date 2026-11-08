@@ -62,6 +62,21 @@ def validate(protocol: str, challenge: str, key: str) -> list[str]:
             if required.lower() not in block.lower():
                 errors.append(f"{case_id} key: missing {required}")
 
+    challenge_by_id = dict(zip(challenge_ids, challenge_blocks))
+    key_by_id = dict(zip(key_ids, key_blocks))
+    for required in ("mutually dependent", "no independent", "circular positive-support"):
+        if required.lower() not in challenge_by_id.get("CCL-S07", "").lower():
+            errors.append(f"CCL-S07: missing circular-support control {required}")
+    for required in ("two-node cycle", "independent evidence root", "unresolved"):
+        if required.lower() not in key_by_id.get("CCL-S07", "").lower():
+            errors.append(f"CCL-S07 key: missing circular-support disposition {required}")
+    for required in ("Known counter-evidence", "contradictory trace", "within the stated supported redelivery horizon"):
+        if required.lower() not in challenge_by_id.get("CCL-S08", "").lower():
+            errors.append(f"CCL-S08: missing counter-evidence control {required}")
+    for required in ("expected disposition is **invalidate**", "counterexample", "new scoped proposition"):
+        if required.lower() not in key_by_id.get("CCL-S08", "").lower():
+            errors.append(f"CCL-S08 key: missing counter-evidence disposition {required}")
+
     required_protocol = (
         "support closure",
         "Closure completeness is itself a claim",
@@ -181,6 +196,8 @@ def self_test() -> list[str]:
 
     mutations = (
         ("case removed", challenge.replace("CCL-S03", "CCL-SXX", 1), key, protocol),
+        ("circular case removed", challenge.replace("CCL-S07", "CCL-SXX", 1), key, protocol),
+        ("counter-evidence case removed", challenge.replace("CCL-S08", "CCL-SXX", 1), key, protocol),
         ("support closure removed", challenge.replace("Support closure:", "Closure omitted:", 1), key, protocol),
         ("answer-key distinction removed", challenge, key.replace("historical signed approval bytes", "signature text"), protocol),
         ("unaffectedness witness removed", challenge, key, protocol.replace("unaffectedness witness", "no unaffectedness proof")),
