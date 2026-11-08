@@ -143,7 +143,7 @@ The external field is already strong:
 - PUMA (Findings of ACL 2026) uses a learnable language token and Universal Language Projection: https://aclanthology.org/2026.findings-acl.17/
 - AfriSwitch reports Sahara v2.5 at 35.93% mean WER over 12 evaluated varieties in its matrix-language-conditioned comparison: https://arxiv.org/abs/2608.26434
 
-The AfriSwitch paper and current Hugging Face card differ materially in duration, utterance count, number of language varieties, split and licence. The card currently describes a 54.41-hour, 14-language test-only artifact under CC BY-NC-SA 4.0 with gated access; the paper describes 61.36 hours and 16 varieties and reports CC BY 4.0. Treat exact artifact lineage and permitted use as unresolved until the owner clarifies it. See [#10999](https://github.com/Luminous-Dynamics/symthaea/issues/10999); do not train on or redistribute the gated artifact.
+The AfriSwitch paper and current Hugging Face card differ materially in duration, utterance count, language varieties, split and licence. Current HF README revision c247482 describes a 54.41-hour, 14-language test-only artifact under CC BY-NC-SA 4.0. The current page exposes public download links, and an independent catalogue reports open access; this differs from an earlier gated/contact-information observation, so access must be rechecked at evaluation time. The paper describes 61.36 hours / 18,861 utterances / 78,333 switch events / 16 varieties and reports CC BY 4.0. Preserve both snapshots and do not assume the paper licence overrides the current card. Since only a test split is listed, AfriSwitch is not a training set regardless of its current access state. See [#10999](https://github.com/Luminous-Dynamics/symthaea/issues/10999).
 
 Fair competitive lanes:
 1. Oracle-language transcription (language provided to every model that requires it).
@@ -327,3 +327,54 @@ The JSON Schema includes explicit structural fields for adaptation arms, labelle
 ### 12.4 Output fidelity diagnostics for generative speech systems
 
 The same switch-aware study flags blank output, truncation, degenerate repetition, length expansion and prompt leakage. These are system-output fidelity diagnostics, not substitutes for WER, PIER or semantic evaluation. Explicit provider finish/stop metadata should be preserved when available; text-length heuristics must be identified as heuristics rather than confirmed truncation. The nine-track matrix now includes these per-utterance flags and rates in the code-switch and semantic lanes.
+
+
+## 14. Additional natural code-switching cohorts
+
+### 14.1 YECS — Yoruba-English Code-Switching Corpus
+
+Mozilla Data Collective's current dataset record describes ~120 hours / 99,930 validated audio-text pairs / 140 Nigerian bilingual speakers, word-level language tags, full Yoruba tone/sub-dot orthography and 16 semantic domains. It uses the Nwulite Obodo Open Data Licence (NOODL-1.0). The record states:
+- commercial entities headquartered in developed/high-income countries must enter a benefit-sharing agreement;
+- speaker identity discovery and individual-speaker voice cloning are prohibited;
+- the corpus must not be the sole training source for high-stakes safety-critical systems;
+- the public test set is audio-only and ground-truth labels are retained by the steward;
+- access is request-based.
+
+Source: https://mozilladatacollective.com/datasets/cmo09pqp300gbnx07xcl42los
+
+This is a promising Yoruba-English adaptation and tone/diacritic evaluation resource, but it is not a South African language benchmark. The NOODL licence host returned 403 during this research session, so its authoritative terms must be obtained from the steward before use. No audio download or training is authorized.
+
+### 14.2 SwitchBoard Tier B — small consequential-intent probe
+
+The current card describes 87 consented utterances, 8 speakers, 8.75 minutes and four language pairs (Nigerian Pidgin-English, Yorùbá-English, Hausa-English, Kiswahili-English). It includes per-token language tags, gold intent/slot labels, domain and noise fields under CC BY-NC-SA 4.0:
+https://huggingface.co/datasets/mosesdaudu/switchboard-tierb-codeswitch
+
+The card explicitly warns that the corpus is too small to train or statistically rank systems; Hausa has only nine utterances and effectively one speaker; all recordings use a headset and read prompts rather than spontaneous telephony; and speaker/device/noise effects are confounded. One prompt also contains an accidental real-person-name collision that the source owner flags for re-recording.
+
+Use it only for scorer smoke tests, slot/number/intent probes and qualitative error analysis after source admission and exclusion/resolution of the flagged item. Do not claim telco generalization or leaderboard ranking.
+
+### 14.3 Vocal Money — reproducible output subset
+
+The current card lists 210 Yoruba-English clips with references and outputs from five systems. The dataset is CC BY-NC-SA 4.0, and its rows identify AfriSwitch as the source:
+https://huggingface.co/datasets/Kimyayd/vocal-money-codeswitch-asr-benchmark
+
+Use it to reproduce scoring code against released predictions and inspect system failure patterns. It is not independent of AfriSwitch and must not be counted as a second confirmatory test cohort.
+
+## 15. Current AfriSwitch release-state reconciliation
+
+The current HF README revision c247482 reports:
+- 54.41 hours;
+- 16,602 utterances;
+- 73,486 switch events;
+- 14 African language configurations paired with English;
+- a single test-only split;
+- CC BY-NC-SA 4.0.
+
+The current HF page exposes direct file links, while an independent catalogue also labels access open. An earlier observation recorded a gate/contact-information requirement. Do not assume access state is static; record date and exact revision at use time. The test-only split means this release is for evaluation, not model training.
+
+Sources:
+- HF README: https://huggingface.co/datasets/intronhealth/AfriSwitch
+- Independent catalogue: https://ngano.dev/datasets/afriswitch
+- Research paper: https://arxiv.org/abs/2608.26434
+
+The previously identified paper/card discrepancies in size, language count, split and licence remain. This reconciliation is additive: preserve the prior observation, mark the access-state difference, and re-check instead of silently overwriting history.
