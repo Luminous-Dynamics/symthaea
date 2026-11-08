@@ -72,8 +72,8 @@ fn evaluate_sweep(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let detunings = [
-        -0.40_f64, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15,
-        0.20, 0.25, 0.30, 0.35, 0.40,
+        -0.40_f64, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15, 0.20,
+        0.25, 0.30, 0.35, 0.40,
     ];
 
     println!("Symthaea exact kicked-Ising finite-sweep frequency-locking experiment");
@@ -86,7 +86,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("target_frequency_cycles_per_drive=0.5");
     println!("frequency_tolerance=0.005");
     println!("minimum_contiguous_points=3");
-    println!("state_class,Jzz,locked_points,longest_contiguous_points,observed_locking_span_rad,min_peak_frequency,max_peak_frequency");
+    println!(
+        "state_class,Jzz,locked_points,longest_contiguous_points,observed_locking_span_rad,min_peak_frequency,max_peak_frequency"
+    );
 
     for state in [("all_up", 0_usize), ("single_defect", 1 << (SPINS - 1))] {
         for coupling in [0.0_f64, 0.5] {
@@ -95,6 +97,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("J=0 is the noninteracting pulse-control baseline.");
-    println!("The report is a finite-system frequency-locking screen; it is not a thermodynamic DTC phase proof.");
+    println!(
+        "The report is a finite-system frequency-locking screen; it is not a thermodynamic DTC phase proof."
+    );
     Ok(())
 }
