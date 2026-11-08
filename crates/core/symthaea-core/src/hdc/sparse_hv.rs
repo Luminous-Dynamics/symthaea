@@ -187,35 +187,35 @@ impl SparseHV {
     /// Fallible counterpart to [Self::random].
     ///
     /// Uses Floyd's fixed-cardinality sampling algorithm with unbiased bounded
-    /// draws. Runtime is O(DIM) to materialize the sorted coordinate set and
-    /// O(k) random draws, where k = floor(density * DIM).
+    /// draws. Sampling takes expected O(k) time and O(k) temporary membership
+    /// storage; sorting the returned coordinates takes O(k log k), where
+    /// k = floor(density * DIM).
     pub fn try_random(seed: u64, density: f32) -> Result<Self, SparseHVError> {
         if !density.is_finite() || !(0.0..=1.0).contains(&density) {
             return Err(SparseHVError::InvalidDensity);
         }
 
         let target_count = (density * Self::DIM as f32).floor() as usize;
-        let mut selected = vec![false; Self::DIM];
+        let mut selected = HashSet::with_capacity(target_count);
         let mut rng = SplitMix64::new(seed ^ 0x5350_4152_5345_4856);
 
         // Floyd's algorithm produces a uniform subset of exactly target_count
         // coordinates without replacement.
         for upper in (Self::DIM - target_count)..Self::DIM {
             let candidate = rng.below((upper + 1) as u64) as usize;
-            let selected_index = if selected[candidate] {
+            let selected_index = if selected.contains(&candidate) {
                 upper
             } else {
                 candidate
             };
-            selected[selected_index] = true;
+            selected.insert(selected_index);
         }
 
-        let mut active_indices = Vec::with_capacity(target_count);
-        for (index, is_active) in selected.into_iter().enumerate() {
-            if is_active {
-                active_indices.push(index as u16);
-            }
-        }
+        let mut active_indices = selected
+            .into_iter()
+            .map(|index| index as u16)
+            .collect::<Vec<_>>();
+        active_indices.sort_unstable();
 
         let cached_density = active_indices.len() as f32 / Self::DIM as f32;
         let lsh_signature = Self::compute_lsh_signature(&active_indices);
