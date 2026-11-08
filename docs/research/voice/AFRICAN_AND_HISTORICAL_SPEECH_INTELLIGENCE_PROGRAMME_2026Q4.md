@@ -756,3 +756,23 @@ Cases cover exact match, fractional feature substitutions, NA masking, separate 
 - A separate JavaScript formula implementation recomputed all numerators, denominators and rates for all ten cases with no mismatches. This is an arithmetic fixture audit only; it is not Rust execution or reproduction of DEAF/HalluAudio.
 
 The receipt schema now pins trial manifest SHA-256, scorer revision, claim-label ontology revision and conflict-axis annotation revision. The design example marks acoustic-faithfulness scoring NOT_USED.
+
+
+### 17.6 Versioned phonological feature profile contract
+
+The generic scorer is only as trustworthy as the profile supplied to it. The profile contract now has:
+- `phonological_feature_profile_v1.schema.json` — JSON Schema Draft 2020-12;
+- `phonological_feature_profile_synthetic_example_v1.json` — synthetic-only demonstration;
+- [#11144 — VOICE-PHON-PROFILE-001](https://github.com/Luminous-Dynamics/symthaea/issues/11144).
+
+A profile pins language and variety, orthography, ordered feature IDs/definitions/categories/applicability, tone feature IDs, value semantics, annotation authority, protocol, reference revision, source lineage, rights/purpose and reviewers.
+
+The schema explicitly distinguishes:
+- zero = NOT_APPLICABLE_ONLY;
+- unknown = unresolved, never coerced to zero;
+- missing annotation = missing, never coerced to zero;
+- native expert phonetic annotation vs native/equivalent/donor G2P vs model-predicted features.
+
+Its QUALIFIED state structurally requires at least two reviewers and EXPERT_NATIVE_PHONETIC_ANNOTATION. This is a structural gate, not proof that a review occurred or that a language profile is scientifically correct.
+
+The FER/TER receipt now records the feature-profile schema version and profile status alongside profile ID/revision/digest, tone dimensions, annotation authority and alignment policy. The current design receipt marks it NOT_USED.
