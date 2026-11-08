@@ -294,10 +294,10 @@ fn sha256_hex(input: &[u8]) -> String {
 }
 
 pub fn canonical_e_process_path_sha256(values: &[Rational]) -> String {
-    let mut encoded = b"symthaea-eprocess-path-v1\\n".to_vec();
+    let mut encoded = b"symthaea-eprocess-path-v1\n".to_vec();
     for value in values {
         encoded.extend_from_slice(value.to_string().as_bytes());
-        encoded.push(b'\\n');
+        encoded.push(b'\n');
     }
     sha256_hex(&encoded)
 }
@@ -889,6 +889,22 @@ mod tests {
         assert_eq!(
             sha256_hex(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn canonical_path_sha256_matches_newline_known_answers() {
+        assert_eq!(
+            canonical_e_process_path_sha256(&[r(1, 1), r(5, 1), r(20, 1)]),
+            "4767ca5ab32c75eda326bbe14738b15f2d2885f9bc3b46110965c19fc18f7a95"
+        );
+        assert_eq!(
+            canonical_e_process_path_sha256(&[r(1, 1), r(4, 1), r(15, 1)]),
+            "5a66e743cdd3661fdb887286fa7017d6f8960872a572009f40463401db6b0486"
+        );
+        assert_eq!(
+            canonical_e_process_path_sha256(&[r(1, 1), r(3, 2), r(2, 1)]),
+            "7b846bebd31980c521f88340af0075690fa6ffffc28dd503afb8db57b1f61765"
         );
     }
 
