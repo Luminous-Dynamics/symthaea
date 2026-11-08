@@ -303,12 +303,18 @@ impl OccupationFlowLp {
         let vector_bytes = capacity_entries
             .checked_mul(std::mem::size_of::<CheckedRational>())
             .ok_or(OccupationFlowError::DimensionOverflow)?;
+        // Peak replay memory also includes the sparse verifier's
+        // column-sized A^T y accumulator, not just the supplied proof vectors.
+        let verifier_scratch_bytes = self.lp.column_count()
+            .checked_mul(std::mem::size_of::<CheckedRational>())
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
         let estimated_bytes = vector_bytes
             .checked_add(std::mem::size_of::<PrimalDualCertificate>())
+            .and_then(|value| value.checked_add(verifier_scratch_bytes))
             .ok_or(OccupationFlowError::DimensionOverflow)?;
         if estimated_bytes > self.budget.max_certificate_memory_bytes {
             return Err(OccupationFlowError::BudgetExceeded {
-                resource: "estimated certificate memory bytes",
+                resource: "estimated certificate plus verifier scratch bytes",
                 required: estimated_bytes,
                 limit: self.budget.max_certificate_memory_bytes,
             });
@@ -1573,7 +1579,8 @@ mod tests {
         let estimated_bytes =
             (proof.primal.capacity() + proof.dual.capacity())
                 * std::mem::size_of::<CheckedRational>()
-            + std::mem::size_of::<PrimalDualCertificate>();
+            + std::mem::size_of::<PrimalDualCertificate>()
+            + 14 * std::mem::size_of::<CheckedRational>();
         let mut memory_budget = budget(84);
         memory_budget.max_certificate_memory_bytes = estimated_bytes - 1;
         let memory_lp = build_occupation_flow_lp(
@@ -1583,7 +1590,7 @@ mod tests {
         assert_eq!(
             memory_lp.verify_bound_optimality(&memory_certificate),
             Err(OccupationFlowError::BudgetExceeded {
-                resource: "estimated certificate memory bytes",
+                resource: "estimated certificate plus verifier scratch bytes",
                 required: estimated_bytes,
                 limit: estimated_bytes - 1,
             })
