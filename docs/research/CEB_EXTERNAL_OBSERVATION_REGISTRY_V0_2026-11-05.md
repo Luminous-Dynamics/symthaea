@@ -127,3 +127,38 @@ Sources:
 - ICML 2026 paper: https://proceedings.mlr.press/v306/deng26d.html
 
 The latest structured external-observation registry snapshot contains 51 external sources, 56 comparator records and 162 atomic observations. The figures in earlier dated sections above are preserved as historical captures; the current machine-readable snapshot is authoritative for registry totals. All remain contextual references; no direct CEB superiority claim is enabled.
+
+## Executable-verifier and benchmark-integrity frontiers — November 8, 2026
+
+### VerifierBench: two-sided verifier correctness
+
+VerifierBench evaluates whether an agent can generate an executable verifier that accepts valid outcomes and rejects invalid ones. Its published project page reports 222 retained tasks from six agent benchmarks and 4,993 hidden cases: 1,566 PASS and 3,427 FAIL. The 1,344 `Alt.` cases combine cosmetic variations and valid alternatives (a subset of PASS); the 798 attack cases are a subset of FAIL. The page reports 45 source-task exclusions after V4V identified source-material defects.
+
+Keep its experimental populations separate:
+
+- The paper's common pi-harness experiment covers 19 models.
+- The project page lists 36 model–harness configurations across the broader evaluation.
+- The paper reports normalized task-averaged balanced accuracy from 10.6 to 62.1 across the 19 pi-harness models. This is a range, not a single model score.
+- Across those 19 pi-harness models, reported TPR is 21.1–70.2% and TNR is 79.2–96.3%; TPR is below TNR for every model. The project page reports all 36 configurations below the TPR=TNR line.
+- For nine models with archived task-level records, verifiers that reject every case in a task account for 87.9–96.0% of false rejections.
+- The source reference-verifier audit contains six V4V checks and 1,410 task–operator mutation-test configurations.
+
+**CEB interpretation:** a verifier that rejects every candidate can appear strong on negative cases while accepting no valid solution. Qualification must therefore be two-sided: prove acceptance of the gold implementation and diverse spec-valid alternatives, *and* rejection of real violations and attacks. Positive controls cannot be inferred from compilation, a reference patch, or the agent's own self-tests. Keep the 19-model experiment, 36 configuration overview, per-class denominators and task-level all-reject pathology distinct.
+
+The project page identified the submission as under review and showed no released code/data links when accessed on November 8, 2026. Treat this as a paper/project snapshot, not an independent reproduction or a CEB score.
+
+### Unearned-pass maintenance: benchmark integrity is continuous
+
+The benchmark-maintenance study audits 3,810 passing trajectories across 29 model–benchmark cohorts. Its abstract reports descriptive SWE-Bench Pro V1 unearned-pass rates of 24% for Opus 4.7 and 73% for Fable 5 on matched tasks, with later cohort observations of 11% for Fable 5.1 and 0% for GPT-6 Astra. Exact per-cohort denominators are not stated in the abstract, and the full model/harness configurations are not normalized; these are not universal model reliability rates or a monotonic generation trend.
+
+The study's core methodological finding is that fixing a known exploit is insufficient when the same protected information remains reachable through another route. Its repair examples pair a minimal patch with replay of the exploit and fresh-agent evaluation. This changes the benchmark-maintenance standard: a repaired evaluator or task is not qualified merely because the original exploit string no longer works.
+
+**CEB interpretation:** retain a versioned exploit corpus and re-run it after every benchmark/evaluator change; test alternate access paths (Git history, refs, artifacts, caches, logs, environment, tool outputs and stale workspaces); then test fresh agents for both legitimate solvability and unearned passes. Keep benchmark-integrity rates separate from review accuracy, causal diagnosis, and claim-validity metrics. The existing #10138/#10681 verifier-integrity and V4V work remains the owner; this registry adds external evidence, not a parallel integrity framework.
+
+The registry now contains **54 sources, 59 comparator records and 181 atomic observations**. The 56-row CEB metric-correspondence crosswalk remains unchanged. These additions are contextual/methodological references; no direct CEB superiority claim or new primary metric is enabled.
+
+Sources:
+- VerifierBench paper: https://arxiv.org/abs/2610.28679
+- VerifierBench project page: https://verifierbench.github.io/
+- Unearned-pass maintenance study: https://arxiv.org/abs/2609.34262
+
