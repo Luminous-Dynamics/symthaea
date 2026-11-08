@@ -203,5 +203,34 @@
     "source_interval_end_frame": null,
     "target_language_supervised_training_hours": 0,
     "selector_output_sha256": null
+  },
+  "phonological_evaluation": {
+    "mode": "NOT_USED",
+    "feature_profile_id": null,
+    "feature_profile_revision": null,
+    "feature_profile_manifest_sha256": null,
+    "feature_dimension_count": null,
+    "tone_dimensions": [],
+    "phonetic_reference_revision": null,
+    "g2p_authority": "NOT_APPLICABLE",
+    "g2p_rule_set_revision": null,
+    "alignment_algorithm": "NOT_APPLICABLE",
+    "alignment_gap_penalty": null,
+    "alignment_tie_policy": null,
+    "unscorable_segment_count": 0
+  },
+  "acoustic_faithfulness": {
+    "mode": "NOT_USED",
+    "stimulus_manifest_sha256": null,
+    "base_audio_manifest_sha256": null,
+    "condition_count": 0,
+    "prompt_revision_sha256": null,
+    "context_revision_sha256": null,
+    "changed_dimensions": [],
+    "audio_access_mode": "NOT_APPLICABLE",
+    "ground_truth_revision": null,
+    "evidence_annotation_revision": null,
+    "output_manifest_sha256": null,
+    "privacy_review_ref": null
   }
 }
