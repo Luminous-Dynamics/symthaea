@@ -1,0 +1,960 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Budgeted multi-scenario experimental design for small linearized systems.
+//!
+//! Each candidate contributes whitened Jacobian rows for each declared
+//! scenario. The greedy selector maximizes expected D-optimal information gain
+//! per unit cost under a scalar budget and optional mutual-exclusion groups.
+//! An exhaustive subset oracle is provided for small candidate sets.
+//!
+//! Important limits:
+//! - This is a local linearized design kernel, not a nonlinear sensor planner.
+//! - Candidate contributions are assumed conditionally independent after
+//!   whitening. Shared calibration/cross-candidate covariance must be modelled
+//!   jointly before constructing these rows; it must not be ignored.
+//! - The greedy expected-logdet objective is useful for screening, but no
+//!   guarantee is claimed for worst-case, nonlinear or correlated objectives.
+//! - Data-only observability is reported separately from prior-regularized
+//!   Bayesian D-optimal utility.
+
+use crate::observability::{
+    MAX_OBSERVABILITY_PARAMETERS, ObservabilityError, analyze_jacobian,
+};
+use std::collections::BTreeSet;
+use std::error::Error;
+use std::fmt;
+
+/// One target/calibration hypothesis used during experimental design.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DesignScenario {
+    pub scenario_id: String,
+    /// Non-normalized positive scenario weight.
+    pub weight: f64,
+    /// Positive-definite prior precision for this scenario.
+    pub prior_precision: Vec<Vec<f64>>,
+}
+
+/// One optional measurement action or sensor-fidelity choice.
+///
+/// `jacobian_rows_by_scenario[s]` contains the candidate's whitened
+/// measurement-Jacobian rows under scenario s. An empty row vector means the
+/// action is unavailable in that scenario. Two options sharing an
+/// `exclusive_group` cannot both be selected (for example, two fidelity
+/// choices for the same physical station).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExperimentOption {
+    pub option_id: String,
+    pub cost: f64,
+    pub exclusive_group: Option<String>,
+    pub jacobian_rows_by_scenario: Vec<Vec<Vec<f64>>>,
+}
+
+/// Constraints for one scalar-resource budget.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BudgetedDesignConfig {
+    pub budget: f64,
+    /// Characteristic physical parameter displacements used to scale columns
+    /// for data-only observability diagnostics.
+    pub parameter_scales: Vec<f64>,
+}
+
+/// Data-only observability and prior-regularized utility for one scenario.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScenarioDesignScore {
+    pub scenario_id: String,
+    pub information_gain_nats: f64,
+    pub data_only_rank: usize,
+    pub data_only_nullity: usize,
+    pub data_only_singular_values: Vec<f64>,
+    pub data_only_condition_number: Option<f64>,
+}
+
+/// One deterministic greedy selection step.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DesignSelectionStep {
+    pub option_id: String,
+    pub cost: f64,
+    pub marginal_expected_gain_nats: f64,
+    pub marginal_gain_per_cost: f64,
+}
+
+/// Final selected design and scenario-level diagnostics.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BudgetedDesignReport {
+    /// Greedy selection order; deterministic tie-breaking uses option ID.
+    pub selected_option_ids: Vec<String>,
+    pub total_cost: f64,
+    pub budget: f64,
+    pub remaining_budget: f64,
+    pub expected_information_gain_nats: f64,
+    pub worst_case_information_gain_nats: f64,
+    pub scenario_scores: Vec<ScenarioDesignScore>,
+    pub steps: Vec<DesignSelectionStep>,
+}
+
+/// Invalid input or numerical failure in budgeted experiment design.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BudgetedDesignError {
+    NoScenarios,
+    NoOptions,
+    InvalidBudget,
+    InvalidScenarioId { index: usize },
+    DuplicateScenarioId(String),
+    InvalidScenarioWeight { scenario_id: String },
+    InvalidPriorShape { scenario_id: String },
+    InvalidPriorSymmetry { scenario_id: String },
+    PriorNotPositiveDefinite { scenario_id: String },
+    InvalidOptionId { index: usize },
+    DuplicateOptionId(String),
+    InvalidOptionCost { option_id: String },
+    EmptyExclusiveGroup { option_id: String },
+    ScenarioCountMismatch {
+        option_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    RaggedJacobian {
+        option_id: String,
+        scenario_index: usize,
+        row_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteJacobian {
+        option_id: String,
+        scenario_index: usize,
+        row_index: usize,
+        column: usize,
+    },
+    ParameterScaleCount {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidParameterScale { column: usize },
+    TooManyOptionsForExhaustive {
+        count: usize,
+        maximum: usize,
+    },
+    NumericalOverflow,
+    CholeskyFailure,
+    Observability(ObservabilityError),
+}
+
+impl fmt::Display for BudgetedDesignError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoScenarios => write!(f, "at least one design scenario is required"),
+            Self::NoOptions => write!(f, "at least one experiment option is required"),
+            Self::InvalidBudget => write!(f, "budget must be finite and non-negative"),
+            Self::InvalidScenarioId { index } => {
+                write!(f, "scenario ID at index {index} must not be empty")
+            }
+            Self::DuplicateScenarioId(id) => write!(f, "duplicate scenario ID {id}"),
+            Self::InvalidScenarioWeight { scenario_id } => {
+                write!(f, "scenario {scenario_id} must have a finite positive weight")
+            }
+            Self::InvalidPriorShape { scenario_id } => {
+                write!(f, "prior precision for scenario {scenario_id} is not square")
+            }
+            Self::InvalidPriorSymmetry { scenario_id } => {
+                write!(f, "prior precision for scenario {scenario_id} is not symmetric")
+            }
+            Self::PriorNotPositiveDefinite { scenario_id } => {
+                write!(f, "prior precision for scenario {scenario_id} is not positive definite")
+            }
+            Self::InvalidOptionId { index } => {
+                write!(f, "option ID at index {index} must not be empty")
+            }
+            Self::DuplicateOptionId(id) => write!(f, "duplicate option ID {id}"),
+            Self::InvalidOptionCost { option_id } => {
+                write!(f, "option {option_id} must have a finite positive cost")
+            }
+            Self::EmptyExclusiveGroup { option_id } => {
+                write!(f, "option {option_id} has an empty exclusive group")
+            }
+            Self::ScenarioCountMismatch {
+                option_id,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "option {option_id} has {actual} scenario Jacobians; expected {expected}"
+            ),
+            Self::RaggedJacobian {
+                option_id,
+                scenario_index,
+                row_index,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "option {option_id}, scenario {scenario_index}, Jacobian row {row_index} has                  {actual} columns; expected {expected}"
+            ),
+            Self::NonFiniteJacobian {
+                option_id,
+                scenario_index,
+                row_index,
+                column,
+            } => write!(
+                f,
+                "option {option_id}, scenario {scenario_index}, Jacobian entry ({row_index},                  {column}) is not finite"
+            ),
+            Self::ParameterScaleCount { expected, actual } => {
+                write!(f, "received {actual} parameter scales; expected {expected}")
+            }
+            Self::InvalidParameterScale { column } => {
+                write!(f, "parameter scale at column {column} is not finite and positive")
+            }
+            Self::TooManyOptionsForExhaustive { count, maximum } => write!(
+                f,
+                "exhaustive design has {count} options; maximum supported is {maximum}"
+            ),
+            Self::NumericalOverflow => write!(f, "information accumulation overflowed"),
+            Self::CholeskyFailure => write!(f, "posterior precision Cholesky factorization failed"),
+            Self::Observability(error) => write!(f, "data-only observability failed: {error}"),
+        }
+    }
+}
+
+impl Error for BudgetedDesignError {}
+
+impl From<ObservabilityError> for BudgetedDesignError {
+    fn from(value: ObservabilityError) -> Self {
+        Self::Observability(value)
+    }
+}
+
+/// Greedily select experiment options by marginal expected log-det gain per
+/// unit cost.
+///
+/// Scenario weights are normalized internally. Posterior information is
+/// `P0 + sum(J_option^T J_option)`; the prior contributes to the utility but
+/// is never included in the data-only rank report. If the candidate actions
+/// include shared/correlated measurement errors, their joint whitening must be
+/// performed before using this additive contribution interface.
+pub fn greedy_budgeted_design(
+    scenarios: &[DesignScenario],
+    options: &[ExperimentOption],
+    config: &BudgetedDesignConfig,
+) -> Result<BudgetedDesignReport, BudgetedDesignError> {
+    let dimension = validate_inputs(scenarios, options, config)?;
+    let weights = normalized_scenario_weights(scenarios);
+
+    let mut selected = Vec::new();
+    let mut selected_set = BTreeSet::new();
+    let mut selected_groups = BTreeSet::new();
+    let mut total_cost = 0.0;
+    let mut steps = Vec::new();
+    let mut current_scores = evaluate_selection(
+        scenarios,
+        options,
+        &selected,
+        &weights,
+        &config.parameter_scales,
+        dimension,
+    )?;
+    let mut current_expected = weighted_gain(&current_scores, &weights);
+
+    loop {
+        let mut best: Option<(usize, f64, f64)> = None;
+
+        for (index, option) in options.iter().enumerate() {
+            if selected_set.contains(&index)
+                || total_cost + option.cost > config.budget + 1.0e-12
+                || option
+                    .exclusive_group
+                    .as_ref()
+                    .is_some_and(|group| selected_groups.contains(group))
+            {
+                continue;
+            }
+
+            let mut trial = selected.clone();
+            trial.push(index);
+            let trial_scores = evaluate_selection(
+                scenarios,
+                options,
+                &trial,
+                &weights,
+                &config.parameter_scales,
+                dimension,
+            )?;
+            let marginal_gain = weighted_gain(&trial_scores, &weights) - current_expected;
+            let gain_per_cost = marginal_gain / option.cost;
+
+            if !marginal_gain.is_finite() || !gain_per_cost.is_finite() {
+                return Err(BudgetedDesignError::NumericalOverflow);
+            }
+
+            let replace = match best {
+                None => true,
+                Some((best_index, best_gain, best_density)) => {
+                    gain_per_cost > best_density + 1.0e-12
+                        || ((gain_per_cost - best_density).abs() <= 1.0e-12
+                            && option.option_id < options[best_index].option_id)
+                        || (gain_per_cost - best_density).abs() <= 1.0e-12
+                            && option.option_id == options[best_index].option_id
+                            && marginal_gain > best_gain
+                }
+            };
+            if replace {
+                best = Some((index, marginal_gain, gain_per_cost));
+            }
+        }
+
+        let Some((best_index, marginal_gain, gain_per_cost)) = best else {
+            break;
+        };
+        if marginal_gain <= 1.0e-12 {
+            break;
+        }
+
+        let option = &options[best_index];
+        selected.push(best_index);
+        selected_set.insert(best_index);
+        if let Some(group) = &option.exclusive_group {
+            selected_groups.insert(group.clone());
+        }
+        total_cost += option.cost;
+        steps.push(DesignSelectionStep {
+            option_id: option.option_id.clone(),
+            cost: option.cost,
+            marginal_expected_gain_nats: marginal_gain,
+            marginal_gain_per_cost: gain_per_cost,
+        });
+
+        current_scores = evaluate_selection(
+            scenarios,
+            options,
+            &selected,
+            &weights,
+            &config.parameter_scales,
+            dimension,
+        )?;
+        current_expected = weighted_gain(&current_scores, &weights);
+    }
+
+    report_from_selection(
+        scenarios,
+        options,
+        config,
+        &selected,
+        total_cost,
+        steps,
+        current_scores,
+        &weights,
+    )
+}
+
+/// Exact subset oracle for small candidate sets (at most 20 options).
+///
+/// The objective is the normalized scenario-weighted expected information
+/// gain. Ties are resolved lexicographically by sorted option-ID lists. This
+/// is intended as a benchmark oracle for measuring greedy optimality gaps,
+/// not as the scalable production selector.
+pub fn exhaustive_budgeted_design(
+    scenarios: &[DesignScenario],
+    options: &[ExperimentOption],
+    config: &BudgetedDesignConfig,
+) -> Result<BudgetedDesignReport, BudgetedDesignError> {
+    let dimension = validate_inputs(scenarios, options, config)?;
+    const MAX_EXHAUSTIVE_OPTIONS: usize = 20;
+    if options.len() > MAX_EXHAUSTIVE_OPTIONS {
+        return Err(BudgetedDesignError::TooManyOptionsForExhaustive {
+            count: options.len(),
+            maximum: MAX_EXHAUSTIVE_OPTIONS,
+        });
+    }
+    let weights = normalized_scenario_weights(scenarios);
+    let subset_count = 1_u64 << options.len();
+
+    let mut best_selection: Vec<usize> = Vec::new();
+    let mut best_cost = 0.0;
+    let mut best_scores = evaluate_selection(
+        scenarios,
+        options,
+        &best_selection,
+        &weights,
+        &config.parameter_scales,
+        dimension,
+    )?;
+    let mut best_gain = weighted_gain(&best_scores, &weights);
+    let mut best_ids: Vec<String> = Vec::new();
+
+    for mask in 1..subset_count {
+        let mut selected = Vec::new();
+        let mut groups = BTreeSet::new();
+        let mut cost = 0.0;
+        let mut feasible = true;
+
+        for (index, option) in options.iter().enumerate() {
+            if mask & (1_u64 << index) == 0 {
+                continue;
+            }
+            cost += option.cost;
+            if cost > config.budget + 1.0e-12 {
+                feasible = false;
+                break;
+            }
+            if let Some(group) = &option.exclusive_group {
+                if !groups.insert(group.clone()) {
+                    feasible = false;
+                    break;
+                }
+            }
+            selected.push(index);
+        }
+        if !feasible {
+            continue;
+        }
+
+        let scores = evaluate_selection(
+            scenarios,
+            options,
+            &selected,
+            &weights,
+            &config.parameter_scales,
+            dimension,
+        )?;
+        let gain = weighted_gain(&scores, &weights);
+        let mut ids: Vec<String> = selected
+            .iter()
+            .map(|index| options[*index].option_id.clone())
+            .collect();
+        ids.sort();
+
+        if gain > best_gain + 1.0e-12
+            || ((gain - best_gain).abs() <= 1.0e-12 && ids < best_ids)
+        {
+            best_selection = selected;
+            best_cost = cost;
+            best_scores = scores;
+            best_gain = gain;
+            best_ids = ids;
+        }
+    }
+
+    // The exhaustive subset is reported in sorted option-ID order, not in the
+    // subset mask's input order.
+    best_selection.sort_by(|left, right| {
+        options[*left].option_id.cmp(&options[*right].option_id)
+    });
+    report_from_selection(
+        scenarios,
+        options,
+        config,
+        &best_selection,
+        best_cost,
+        Vec::new(),
+        best_scores,
+        &weights,
+    )
+}
+
+fn validate_inputs(
+    scenarios: &[DesignScenario],
+    options: &[ExperimentOption],
+    config: &BudgetedDesignConfig,
+) -> Result<usize, BudgetedDesignError> {
+    if scenarios.is_empty() {
+        return Err(BudgetedDesignError::NoScenarios);
+    }
+    if options.is_empty() {
+        return Err(BudgetedDesignError::NoOptions);
+    }
+    if !config.budget.is_finite() || config.budget < 0.0 {
+        return Err(BudgetedDesignError::InvalidBudget);
+    }
+
+    let dimension = config.parameter_scales.len();
+    if dimension == 0 || dimension > MAX_OBSERVABILITY_PARAMETERS {
+        return Err(BudgetedDesignError::ParameterScaleCount {
+            expected: MAX_OBSERVABILITY_PARAMETERS,
+            actual: dimension,
+        });
+    }
+    for (column, scale) in config.parameter_scales.iter().copied().enumerate() {
+        if !scale.is_finite() || scale <= 0.0 {
+            return Err(BudgetedDesignError::InvalidParameterScale { column });
+        }
+    }
+
+    let mut scenario_ids = BTreeSet::new();
+    for (index, scenario) in scenarios.iter().enumerate() {
+        if scenario.scenario_id.trim().is_empty() {
+            return Err(BudgetedDesignError::InvalidScenarioId { index });
+        }
+        if !scenario_ids.insert(scenario.scenario_id.as_str()) {
+            return Err(BudgetedDesignError::DuplicateScenarioId(
+                scenario.scenario_id.clone(),
+            ));
+        }
+        if !scenario.weight.is_finite() || scenario.weight <= 0.0 {
+            return Err(BudgetedDesignError::InvalidScenarioWeight {
+                scenario_id: scenario.scenario_id.clone(),
+            });
+        }
+        if scenario.prior_precision.len() != dimension
+            || scenario
+                .prior_precision
+                .iter()
+                .any(|row| row.len() != dimension)
+        {
+            return Err(BudgetedDesignError::InvalidPriorShape {
+                scenario_id: scenario.scenario_id.clone(),
+            });
+        }
+        for row in &scenario.prior_precision {
+            if row.iter().any(|value| !value.is_finite()) {
+                return Err(BudgetedDesignError::NumericalOverflow);
+            }
+        }
+        let scale = scenario
+            .prior_precision
+            .iter()
+            .flatten()
+            .fold(1.0_f64, |maximum, value| maximum.max(value.abs()));
+        for row in 0..dimension {
+            for column in 0..dimension {
+                if (scenario.prior_precision[row][column]
+                    - scenario.prior_precision[column][row])
+                    .abs()
+                    > 1.0e-12 * scale
+                {
+                    return Err(BudgetedDesignError::InvalidPriorSymmetry {
+                        scenario_id: scenario.scenario_id.clone(),
+                    });
+                }
+            }
+        }
+        if cholesky_log_determinant(&scenario.prior_precision).is_err() {
+            return Err(BudgetedDesignError::PriorNotPositiveDefinite {
+                scenario_id: scenario.scenario_id.clone(),
+            });
+        }
+    }
+
+    let mut option_ids = BTreeSet::new();
+    for (index, option) in options.iter().enumerate() {
+        if option.option_id.trim().is_empty() {
+            return Err(BudgetedDesignError::InvalidOptionId { index });
+        }
+        if !option_ids.insert(option.option_id.as_str()) {
+            return Err(BudgetedDesignError::DuplicateOptionId(
+                option.option_id.clone(),
+            ));
+        }
+        if !option.cost.is_finite() || option.cost <= 0.0 {
+            return Err(BudgetedDesignError::InvalidOptionCost {
+                option_id: option.option_id.clone(),
+            });
+        }
+        if option
+            .exclusive_group
+            .as_ref()
+            .is_some_and(|group| group.trim().is_empty())
+        {
+            return Err(BudgetedDesignError::EmptyExclusiveGroup {
+                option_id: option.option_id.clone(),
+            });
+        }
+        if option.jacobian_rows_by_scenario.len() != scenarios.len() {
+            return Err(BudgetedDesignError::ScenarioCountMismatch {
+                option_id: option.option_id.clone(),
+                expected: scenarios.len(),
+                actual: option.jacobian_rows_by_scenario.len(),
+            });
+        }
+        for (scenario_index, rows) in option.jacobian_rows_by_scenario.iter().enumerate() {
+            for (row_index, row) in rows.iter().enumerate() {
+                if row.len() != dimension {
+                    return Err(BudgetedDesignError::RaggedJacobian {
+                        option_id: option.option_id.clone(),
+                        scenario_index,
+                        row_index,
+                        expected: dimension,
+                        actual: row.len(),
+                    });
+                }
+                for (column, value) in row.iter().copied().enumerate() {
+                    if !value.is_finite() {
+                        return Err(BudgetedDesignError::NonFiniteJacobian {
+                            option_id: option.option_id.clone(),
+                            scenario_index,
+                            row_index,
+                            column,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(dimension)
+}
+
+fn normalized_scenario_weights(scenarios: &[DesignScenario]) -> Vec<f64> {
+    let total: f64 = scenarios.iter().map(|scenario| scenario.weight).sum();
+    scenarios
+        .iter()
+        .map(|scenario| scenario.weight / total)
+        .collect()
+}
+
+fn evaluate_selection(
+    scenarios: &[DesignScenario],
+    options: &[ExperimentOption],
+    selected: &[usize],
+    weights: &[f64],
+    parameter_scales: &[f64],
+    dimension: usize,
+) -> Result<Vec<ScenarioDesignScore>, BudgetedDesignError> {
+    let mut scores = Vec::with_capacity(scenarios.len());
+
+    for (scenario_index, scenario) in scenarios.iter().enumerate() {
+        let mut information = scenario.prior_precision.clone();
+        let mut data_rows = Vec::new();
+
+        for option_index in selected {
+            let rows = &options[*option_index].jacobian_rows_by_scenario[scenario_index];
+            for row in rows {
+                data_rows.push(row.clone());
+                for left in 0..dimension {
+                    for right in left..dimension {
+                        information[left][right] += row[left] * row[right];
+                        if !information[left][right].is_finite() {
+                            return Err(BudgetedDesignError::NumericalOverflow);
+                        }
+                        information[right][left] = information[left][right];
+                    }
+                }
+            }
+        }
+
+        let posterior_logdet =
+            cholesky_log_determinant(&information).map_err(|_| BudgetedDesignError::CholeskyFailure)?;
+        let prior_logdet = cholesky_log_determinant(&scenario.prior_precision)
+            .map_err(|_| BudgetedDesignError::PriorNotPositiveDefinite {
+                scenario_id: scenario.scenario_id.clone(),
+            })?;
+
+        let (data_only_rank, data_only_nullity, data_only_singular_values, data_only_condition_number) =
+            if data_rows.is_empty() {
+                (0, dimension, vec![0.0; dimension], None)
+            } else {
+                let report = analyze_jacobian(&data_rows, parameter_scales, 1.0e-10)?;
+                (
+                    report.numerical_rank,
+                    report.nullity,
+                    report.singular_values,
+                    report.condition_number,
+                )
+            };
+
+        scores.push(ScenarioDesignScore {
+            scenario_id: scenario.scenario_id.clone(),
+            information_gain_nats: posterior_logdet - prior_logdet,
+            data_only_rank,
+            data_only_nullity,
+            data_only_singular_values,
+            data_only_condition_number,
+        });
+    }
+
+    let _ = weights;
+    Ok(scores)
+}
+
+fn weighted_gain(scores: &[ScenarioDesignScore], weights: &[f64]) -> f64 {
+    scores
+        .iter()
+        .zip(weights)
+        .map(|(score, weight)| score.information_gain_nats * weight)
+        .sum()
+}
+
+fn report_from_selection(
+    scenarios: &[DesignScenario],
+    options: &[ExperimentOption],
+    config: &BudgetedDesignConfig,
+    selected: &[usize],
+    total_cost: f64,
+    steps: Vec<DesignSelectionStep>,
+    scenario_scores: Vec<ScenarioDesignScore>,
+    weights: &[f64],
+) -> Result<BudgetedDesignReport, BudgetedDesignError> {
+    let expected_information_gain_nats = weighted_gain(&scenario_scores, weights);
+    let worst_case_information_gain_nats = scenario_scores
+        .iter()
+        .map(|score| score.information_gain_nats)
+        .fold(f64::INFINITY, f64::min);
+    let selected_option_ids = selected
+        .iter()
+        .map(|index| options[*index].option_id.clone())
+        .collect();
+
+    Ok(BudgetedDesignReport {
+        selected_option_ids,
+        total_cost,
+        budget: config.budget,
+        remaining_budget: (config.budget - total_cost).max(0.0),
+        expected_information_gain_nats,
+        worst_case_information_gain_nats,
+        scenario_scores,
+        steps,
+    })
+}
+
+/// Cholesky log-determinant for a symmetric positive-definite matrix.
+fn cholesky_log_determinant(matrix: &[Vec<f64>]) -> Result<f64, ()> {
+    let dimension = matrix.len();
+    let mut lower = vec![vec![0.0; dimension]; dimension];
+    let mut log_determinant = 0.0;
+
+    for row in 0..dimension {
+        for column in 0..=row {
+            let mut value = matrix[row][column];
+            for k in 0..column {
+                value -= lower[row][k] * lower[column][k];
+            }
+
+            if row == column {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(());
+                }
+                lower[row][column] = value.sqrt();
+                log_determinant += 2.0 * lower[row][column].ln();
+            } else {
+                lower[row][column] = value / lower[column][column];
+            }
+        }
+    }
+
+    if log_determinant.is_finite() {
+        Ok(log_determinant)
+    } else {
+        Err(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scenario(scenario_id: &str, weight: f64) -> DesignScenario {
+        DesignScenario {
+            scenario_id: scenario_id.to_string(),
+            weight,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        }
+    }
+
+    fn option(
+        option_id: &str,
+        cost: f64,
+        group: Option<&str>,
+        rows_by_scenario: Vec<Vec<Vec<f64>>>,
+    ) -> ExperimentOption {
+        ExperimentOption {
+            option_id: option_id.to_string(),
+            cost,
+            exclusive_group: group.map(str::to_string),
+            jacobian_rows_by_scenario: rows_by_scenario,
+        }
+    }
+
+    fn config(budget: f64) -> BudgetedDesignConfig {
+        BudgetedDesignConfig {
+            budget,
+            parameter_scales: vec![1.0, 1.0],
+        }
+    }
+
+    #[test]
+    fn greedy_selects_complementary_measurements_and_matches_exhaustive_oracle() {
+        let scenarios = vec![scenario("near", 1.0), scenario("far", 2.0)];
+        let options = vec![
+            option(
+                "measure-x",
+                1.0,
+                None,
+                vec![vec![vec![1.0, 0.0]], vec![vec![1.0, 0.0]]],
+            ),
+            option(
+                "measure-y",
+                1.0,
+                None,
+                vec![vec![vec![0.0, 1.0]], vec![vec![0.0, 1.0]]],
+            ),
+            option(
+                "expensive-x",
+                2.1,
+                None,
+                vec![vec![vec![10.0, 0.0]], vec![vec![10.0, 0.0]]],
+            ),
+        ];
+
+        let greedy = greedy_budgeted_design(&scenarios, &options, &config(2.0)).unwrap();
+        let exact = exhaustive_budgeted_design(&scenarios, &options, &config(2.0)).unwrap();
+
+        assert_eq!(greedy.selected_option_ids, vec!["measure-x", "measure-y"]);
+        assert_eq!(greedy.selected_option_ids, exact.selected_option_ids);
+        assert!((greedy.total_cost - 2.0).abs() < 1.0e-12);
+        assert!(greedy.expected_information_gain_nats > 0.0);
+        assert!(greedy.worst_case_information_gain_nats > 0.0);
+        assert_eq!(greedy.scenario_scores.len(), 2);
+        assert!(greedy.scenario_scores.iter().all(|score| score.data_only_rank == 2));
+    }
+
+    #[test]
+    fn mutual_exclusion_prevents_double_counting_sensor_fidelity_options() {
+        let scenarios = vec![scenario("target-a", 0.5), scenario("target-b", 0.5)];
+        let options = vec![
+            option(
+                "station-low-fidelity",
+                1.0,
+                Some("station-1"),
+                vec![vec![vec![1.0, 0.0]], vec![vec![1.0, 0.0]]],
+            ),
+            option(
+                "station-high-fidelity",
+                1.5,
+                Some("station-1"),
+                vec![vec![vec![2.0, 0.0]], vec![vec![2.0, 0.0]]],
+            ),
+            option(
+                "independent-baseline",
+                1.0,
+                None,
+                vec![vec![vec![0.0, 1.0]], vec![vec![0.0, 1.0]]],
+            ),
+        ];
+
+        let report = greedy_budgeted_design(&scenarios, &options, &config(2.5)).unwrap();
+        let station_choices = report
+            .selected_option_ids
+            .iter()
+            .filter(|id| id.starts_with("station-"))
+            .count();
+        assert_eq!(station_choices, 1);
+        assert!(report.total_cost <= report.budget + 1.0e-12);
+    }
+
+    #[test]
+    fn prior_regularization_does_not_hide_data_only_null_directions() {
+        let scenarios = vec![scenario("nominal", 1.0)];
+        let options = vec![option(
+            "x-only",
+            1.0,
+            None,
+            vec![vec![vec![1.0, 0.0]]],
+        )];
+
+        let report = greedy_budgeted_design(&scenarios, &options, &config(1.0)).unwrap();
+        assert_eq!(report.scenario_scores[0].data_only_rank, 1);
+        assert_eq!(report.scenario_scores[0].data_only_nullity, 1);
+        assert!(report.scenario_scores[0].information_gain_nats.is_finite());
+    }
+
+    #[test]
+    fn scenario_unavailability_is_visible_as_zero_gain_not_zero_noise() {
+        let scenarios = vec![scenario("visible", 0.5), scenario("occluded", 0.5)];
+        let options = vec![option(
+            "bearing-sensor",
+            1.0,
+            None,
+            vec![vec![vec![1.0, 0.0]], vec![]],
+        )];
+
+        let report = greedy_budgeted_design(&scenarios, &options, &config(1.0)).unwrap();
+        assert!(report.scenario_scores[0].information_gain_nats > 0.0);
+        assert!(report.scenario_scores[1].information_gain_nats.abs() < 1.0e-12);
+        assert_eq!(report.scenario_scores[1].data_only_rank, 0);
+        assert_eq!(report.scenario_scores[1].data_only_nullity, 2);
+        assert!(report.worst_case_information_gain_nats.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn option_order_permutation_keeps_ties_deterministic() {
+        let scenarios = vec![scenario("single", 1.0)];
+        let x = option("alpha", 1.0, None, vec![vec![vec![1.0, 0.0]]]);
+        let y = option("beta", 1.0, None, vec![vec![vec![0.0, 1.0]]]);
+        let first = greedy_budgeted_design(
+            &scenarios,
+            &[x.clone(), y.clone()],
+            &config(1.0),
+        )
+        .unwrap();
+        let second =
+            greedy_budgeted_design(&scenarios, &[y, x], &config(1.0)).unwrap();
+
+        assert_eq!(first.selected_option_ids, vec!["alpha"]);
+        assert_eq!(first.selected_option_ids, second.selected_option_ids);
+    }
+
+    #[test]
+    fn malformed_inputs_fail_closed() {
+        let scenarios = vec![scenario("single", 1.0)];
+        let good = option("sensor", 1.0, None, vec![vec![vec![1.0, 0.0]]]);
+
+        assert_eq!(
+            greedy_budgeted_design(&[], &[good.clone()], &config(1.0)),
+            Err(BudgetedDesignError::NoScenarios)
+        );
+        assert_eq!(
+            greedy_budgeted_design(&scenarios, &[], &config(1.0)),
+            Err(BudgetedDesignError::NoOptions)
+        );
+        assert_eq!(
+            greedy_budgeted_design(&scenarios, &[good.clone()], &config(f64::NAN)),
+            Err(BudgetedDesignError::InvalidBudget)
+        );
+        assert!(matches!(
+            greedy_budgeted_design(
+                &scenarios,
+                &[option("bad-cost", -1.0, None, vec![vec![vec![1.0, 0.0]]])],
+                &config(1.0)
+            ),
+            Err(BudgetedDesignError::InvalidOptionCost { .. })
+        ));
+        assert!(matches!(
+            greedy_budgeted_design(
+                &scenarios,
+                &[option("bad-row", 1.0, None, vec![vec![vec![1.0]]])],
+                &config(1.0)
+            ),
+            Err(BudgetedDesignError::RaggedJacobian { .. })
+        ));
+        assert!(matches!(
+            greedy_budgeted_design(
+                &scenarios,
+                &[option("bad-value", 1.0, None, vec![vec![vec![f64::NAN, 0.0]]])],
+                &config(1.0)
+            ),
+            Err(BudgetedDesignError::NonFiniteJacobian { .. })
+        ));
+    }
+
+    #[test]
+    fn exhaustive_oracle_rejects_large_candidate_sets() {
+        let scenarios = vec![scenario("single", 1.0)];
+        let options = (0..21)
+            .map(|index| {
+                option(
+                    &format!("sensor-{index:02}"),
+                    1.0,
+                    None,
+                    vec![vec![vec![1.0, index as f64 + 1.0]]],
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert!(matches!(
+            exhaustive_budgeted_design(&scenarios, &options, &config(2.0)),
+            Err(BudgetedDesignError::TooManyOptionsForExhaustive {
+                count: 21,
+                maximum: 20
+            })
+        ));
+    }
+}
