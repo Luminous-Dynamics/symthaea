@@ -145,13 +145,15 @@ A graph traversal is a candidate generator, not the final semantic verdict. For 
 
 Use the [eight-case Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and its separate [public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md).
 
-The six cases cover:
+The eight cases cover:
 - direct source anchor edit with a derived claim;
 - shared upstream dependency used by two claims with different scopes;
 - build/feature transition;
 - verifier-only revision;
 - authority-root revocation;
-- metadata-only event plus incomplete closure.
+- metadata-only event plus incomplete closure;
+- circular positive support without an independent evidence root;
+- omission of a known contradictory trace.
 
 The cases are public synthetic development material, not admitted task sequences, hidden labels or a sealed holdout.
 
