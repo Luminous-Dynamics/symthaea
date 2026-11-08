@@ -1884,6 +1884,15 @@ mod tests {
         ).unwrap();
         assert_eq!(full_bound.lower_bound, q(0, 1));
         assert_eq!(
+            policy_portfolio_sha256_hex(full.sha256()),
+            "2a46bf3456a75f5b317ebc1a5a7621b322f369b0cb1cb617a775336d157b7c2a"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(full_bound.certificate_sha256),
+            "416007510448185aa153c2e4af0dc2df3b184ae190b0a67edada1ec745124cb3"
+        );
+        assert_eq!(full_bound.dp_multiply_adds, 12);
+        assert_eq!(
             full_bound.per_model.iter().map(|item| (
                 item.unrestricted_optimal_value,
                 item.masked_optimal_value,
