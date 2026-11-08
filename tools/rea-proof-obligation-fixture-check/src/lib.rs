@@ -74,10 +74,6 @@ fn array_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Vec<Value>, Fixtu
     })
 }
 
-/// Check semantic relationships that JSON Schema alone cannot express:
-/// unique identities, referential integrity, evidence admissibility, and
-/// hard authorization/reversibility gates.
-
 fn candidate_has_admissible_obligation_update(
     candidate: &Value,
     obligations: &BTreeMap<String, &Value>,
@@ -222,6 +218,9 @@ fn apply_observed_fixture_outcome(
     Ok(updated)
 }
 
+/// Check semantic relationships that JSON Schema alone cannot express:
+/// unique identities, referential integrity, evidence admissibility, and
+/// hard authorization/reversibility gates.
 pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
     if string_at(value, &["schema_version"])? != "0.1.0"
         || string_at(value, &["dataset_id"])? != "rea-proof-obligation-acquisition"
