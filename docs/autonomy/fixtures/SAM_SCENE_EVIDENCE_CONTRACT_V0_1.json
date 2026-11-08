@@ -126,6 +126,23 @@
         "reference_frame_id": "road-local-01",
         "evidence_kind": "synthetic_observation",
         "currentness": "current_for_fixture"
+      },
+      {
+        "source_id": "local-lidar-track-fixture-01",
+        "modality": "lidar",
+        "failure_domain_id": "synthetic-local-lidar-stack",
+        "source_event_id": "local-lidar-fixture-track-0042",
+        "payload_reference": "synthetic-fixture://crossing-0001/local-lidar/track-0042",
+        "acquisition_tick_ns": 12000000000,
+        "receive_tick_ns": 12005000000,
+        "clock_domain_id": "sim-clock-01",
+        "clock_transform_id": "sim-clock-01-to-scene-clock-v1",
+        "calibration_profile_id": "synthetic-local-lidar-cal-v1",
+        "extrinsic_profile_id": "synthetic-local-lidar-extrinsics-v1",
+        "reference_frame_id": "road-local-01",
+        "evidence_kind": "measurement",
+        "currentness": "current",
+        "source_role": "local_sensor_observation"
       }
     ],
     "ego_state": {
@@ -635,6 +652,19 @@
     ],
     "simulator_truth_refs": [
       "simulator-oracle-truth-01"
-    ]
+    ],
+    "follow_target_context": {
+      "consumer_profile": "simulation_benchmark",
+      "status": "available",
+      "evidence_source_ref": "simulator-oracle-truth-01",
+      "scenario_id": "sam-synth-crossing-0001",
+      "actor_id": "oracle-actor-42",
+      "coordinate_frame_id": "road-local-01",
+      "observation_tick_ns": 12000000000,
+      "max_age_ns": 500000000,
+      "gap_m": 12,
+      "relative_speed_mps": -4,
+      "distance_uncertainty_m": 0
+    }
   }
 }
