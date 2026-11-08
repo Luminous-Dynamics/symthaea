@@ -21,9 +21,182 @@
 //! through prior restrictions represented here.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 const PROBABILITY_TOLERANCE: f64 = 1e-9;
+
+/// One semantically named parameter group in a canonical model parameterization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGroupCoordinateDescriptor {
+    /// Stable group identifier from the architecture's native parameter manifest.
+    pub group_id: String,
+    /// Semantic role, for example projection, bias, gate, or time constant.
+    pub semantic_role: String,
+    /// Tensor shape in native manifest order.
+    pub shape: Vec<usize>,
+    /// Stable names for every flattened scalar coordinate in native order.
+    pub flattened_coordinate_names: Vec<String>,
+}
+
+/// Versioned canonical description of a model's ordered parameter coordinate space.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterizationDescriptor {
+    pub format_version: u32,
+    /// Stable architecture identity, including topology/version where relevant.
+    pub architecture_id: String,
+    /// Groups are ordered; their order is part of the parameterization identity.
+    pub groups: Vec<ParameterGroupCoordinateDescriptor>,
+}
+
+/// Validation errors for canonical parameterization digest construction.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ParameterizationDigestError {
+    #[error("unsupported parameterization descriptor version {0}")]
+    UnsupportedVersion(u32),
+    #[error("architecture ID must not be empty")]
+    EmptyArchitectureId,
+    #[error("at least one parameter group is required")]
+    EmptyGroupSet,
+    #[error("parameter group at index {index} has an empty ID")]
+    EmptyGroupId { index: usize },
+    #[error("duplicate parameter group ID: {0}")]
+    DuplicateGroupId(String),
+    #[error("parameter group {group_id} has an empty semantic role")]
+    EmptySemanticRole { group_id: String },
+    #[error("parameter group {group_id} has an empty shape")]
+    EmptyShape { group_id: String },
+    #[error("parameter group {group_id} has a zero shape dimension at index {dimension_index}")]
+    ZeroShapeDimension { group_id: String, dimension_index: usize },
+    #[error("parameter group {group_id} shape overflows usize")]
+    ShapeOverflow { group_id: String },
+    #[error("parameter group {group_id} has {actual} coordinate names, expected {expected}")]
+    CoordinateCountMismatch { group_id: String, expected: usize, actual: usize },
+    #[error("parameter group {group_id} has an empty coordinate name at index {coordinate_index}")]
+    EmptyCoordinateName { group_id: String, coordinate_index: usize },
+    #[error("parameter group {group_id} has duplicate coordinate name {coordinate_name}")]
+    DuplicateCoordinateName { group_id: String, coordinate_name: String },
+}
+
+/// Construct a stable SHA-256 digest for a parameter-coordinate space.
+///
+/// The digest binds architecture identity, ordered semantic groups, group roles,
+/// tensor shapes, and every flattened coordinate name. A change to any field,
+/// including coordinate order, produces a different digest. The encoding uses
+/// domain separation and explicit little-endian length prefixes; it does not
+/// depend on JSON map ordering, platform endianness, or Rust's Debug formatting.
+///
+/// Coordinate names must be canonical and unique within each group. Callers
+/// should derive them from the same native parameter manifest that supplies
+/// the model's actual flattened parameter order.
+pub fn canonical_parameterization_digest(
+    descriptor: &ParameterizationDescriptor,
+) -> Result<String, ParameterizationDigestError> {
+    if descriptor.format_version != 1 {
+        return Err(ParameterizationDigestError::UnsupportedVersion(descriptor.format_version));
+    }
+    if descriptor.architecture_id.trim().is_empty() {
+        return Err(ParameterizationDigestError::EmptyArchitectureId);
+    }
+    if descriptor.groups.is_empty() {
+        return Err(ParameterizationDigestError::EmptyGroupSet);
+    }
+
+    let mut group_ids = BTreeSet::new();
+    for (index, group) in descriptor.groups.iter().enumerate() {
+        if group.group_id.trim().is_empty() {
+            return Err(ParameterizationDigestError::EmptyGroupId { index });
+        }
+        if !group_ids.insert(group.group_id.clone()) {
+            return Err(ParameterizationDigestError::DuplicateGroupId(group.group_id.clone()));
+        }
+        if group.semantic_role.trim().is_empty() {
+            return Err(ParameterizationDigestError::EmptySemanticRole {
+                group_id: group.group_id.clone(),
+            });
+        }
+        if group.shape.is_empty() {
+            return Err(ParameterizationDigestError::EmptyShape {
+                group_id: group.group_id.clone(),
+            });
+        }
+        let mut coordinate_count = 1_usize;
+        for (dimension_index, dimension) in group.shape.iter().copied().enumerate() {
+            if dimension == 0 {
+                return Err(ParameterizationDigestError::ZeroShapeDimension {
+                    group_id: group.group_id.clone(),
+                    dimension_index,
+                });
+            }
+            coordinate_count = coordinate_count.checked_mul(dimension).ok_or_else(|| {
+                ParameterizationDigestError::ShapeOverflow {
+                    group_id: group.group_id.clone(),
+                }
+            })?;
+        }
+        if group.flattened_coordinate_names.len() != coordinate_count {
+            return Err(ParameterizationDigestError::CoordinateCountMismatch {
+                group_id: group.group_id.clone(),
+                expected: coordinate_count,
+                actual: group.flattened_coordinate_names.len(),
+            });
+        }
+        let mut coordinate_names = BTreeSet::new();
+        for (coordinate_index, coordinate_name) in
+            group.flattened_coordinate_names.iter().enumerate()
+        {
+            if coordinate_name.trim().is_empty() {
+                return Err(ParameterizationDigestError::EmptyCoordinateName {
+                    group_id: group.group_id.clone(),
+                    coordinate_index,
+                });
+            }
+            if !coordinate_names.insert(coordinate_name.clone()) {
+                return Err(ParameterizationDigestError::DuplicateCoordinateName {
+                    group_id: group.group_id.clone(),
+                    coordinate_name: coordinate_name.clone(),
+                });
+            }
+        }
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-fep-parameterization-descriptor-v1\0");
+    hasher.update(descriptor.format_version.to_le_bytes());
+    update_digest_string(&mut hasher, &descriptor.architecture_id);
+    update_digest_length(&mut hasher, descriptor.groups.len());
+    for group in &descriptor.groups {
+        update_digest_string(&mut hasher, &group.group_id);
+        update_digest_string(&mut hasher, &group.semantic_role);
+        update_digest_length(&mut hasher, group.shape.len());
+        for dimension in group.shape.iter().copied() {
+            hasher.update((dimension as u64).to_le_bytes());
+        }
+        update_digest_length(&mut hasher, group.flattened_coordinate_names.len());
+        for coordinate_name in &group.flattened_coordinate_names {
+            update_digest_string(&mut hasher, coordinate_name);
+        }
+    }
+    Ok(encode_lowercase_hex(&hasher.finalize()))
+}
+
+fn update_digest_length(hasher: &mut Sha256, length: usize) {
+    hasher.update((length as u64).to_le_bytes());
+}
+
+fn update_digest_string(hasher: &mut Sha256, value: &str) {
+    update_digest_length(hasher, value.len());
+    hasher.update(value.as_bytes());
+}
+
+fn encode_lowercase_hex(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(output, "{byte:02x}");
+    }
+    output
+}
 
 /// Independent Gaussian coordinates for a parameter vector.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -512,6 +685,119 @@ mod tests {
         }
 
         ((step / 3.0) * weighted_sum).ln()
+    }
+
+    fn parameterization_descriptor() -> ParameterizationDescriptor {
+        ParameterizationDescriptor {
+            format_version: 1,
+            architecture_id: "cfc/v1/layer-1/hidden-2".into(),
+            groups: vec![
+                ParameterGroupCoordinateDescriptor {
+                    group_id: "input_projection".into(),
+                    semantic_role: "projection".into(),
+                    shape: vec![2, 2],
+                    flattened_coordinate_names: vec![
+                        "input_projection[0,0]".into(),
+                        "input_projection[0,1]".into(),
+                        "input_projection[1,0]".into(),
+                        "input_projection[1,1]".into(),
+                    ],
+                },
+                ParameterGroupCoordinateDescriptor {
+                    group_id: "time_constants".into(),
+                    semantic_role: "time_constant".into(),
+                    shape: vec![2],
+                    flattened_coordinate_names: vec!["tau[0]".into(), "tau[1]".into()],
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn canonical_parameterization_digest_is_stable_and_coordinate_order_sensitive() {
+        let descriptor = parameterization_descriptor();
+        let first = canonical_parameterization_digest(&descriptor).expect("canonical digest");
+        let replay = canonical_parameterization_digest(&descriptor).expect("replay digest");
+        assert_eq!(first, replay);
+        assert!(is_sha256_digest(&first));
+
+        let mut reordered = descriptor.clone();
+        reordered.groups[0].flattened_coordinate_names.swap(0, 1);
+        assert_ne!(
+            first,
+            canonical_parameterization_digest(&reordered).expect("reordered digest")
+        );
+
+        let mut changed_role = descriptor.clone();
+        changed_role.groups[0].semantic_role = "recurrent_projection".into();
+        assert_ne!(
+            first,
+            canonical_parameterization_digest(&changed_role).expect("changed role")
+        );
+
+        let mut changed_architecture = descriptor.clone();
+        changed_architecture.architecture_id = "cfc/v2/layer-1/hidden-2".into();
+        assert_ne!(
+            first,
+            canonical_parameterization_digest(&changed_architecture).expect("changed architecture")
+        );
+    }
+
+    #[test]
+    fn canonical_parameterization_digest_rejects_malformed_coordinate_manifests() {
+        let mut descriptor = parameterization_descriptor();
+        descriptor.groups[0].flattened_coordinate_names.pop();
+        assert!(matches!(
+            canonical_parameterization_digest(&descriptor),
+            Err(ParameterizationDigestError::CoordinateCountMismatch { .. })
+        ));
+
+        let mut descriptor = parameterization_descriptor();
+        descriptor.groups[0].flattened_coordinate_names[1] =
+            descriptor.groups[0].flattened_coordinate_names[0].clone();
+        assert!(matches!(
+            canonical_parameterization_digest(&descriptor),
+            Err(ParameterizationDigestError::DuplicateCoordinateName { .. })
+        ));
+
+        let mut descriptor = parameterization_descriptor();
+        descriptor.groups[0].shape = vec![2, 0];
+        assert!(matches!(
+            canonical_parameterization_digest(&descriptor),
+            Err(ParameterizationDigestError::ZeroShapeDimension { .. })
+        ));
+
+        let mut descriptor = parameterization_descriptor();
+        descriptor.groups[1].group_id = descriptor.groups[0].group_id.clone();
+        assert!(matches!(
+            canonical_parameterization_digest(&descriptor),
+            Err(ParameterizationDigestError::DuplicateGroupId(_))
+        ));
+    }
+
+    #[test]
+    fn canonical_parameterization_digest_binds_an_actual_bmr_comparison() {
+        let parameterization_digest =
+            canonical_parameterization_digest(&parameterization_descriptor())
+                .expect("parameterization digest");
+        let make_gaussian = |mean: &[f64], variance: &[f64]| DiagonalGaussian {
+            parameterization_digest: parameterization_digest.clone(),
+            mean: mean.to_vec(),
+            variance: variance.to_vec(),
+        };
+        let posterior = make_gaussian(&[0.2, -0.1], &[0.4, 0.7]);
+        let full_prior = make_gaussian(&[0.0, 0.0], &[1.0, 1.0]);
+        let reduced_prior = make_gaussian(&[0.2, -0.1], &[0.2, 0.3]);
+        let result = reduce_models(
+            &posterior,
+            &full_prior,
+            &[ReducedModelHypothesis {
+                model_id: "same-parameterization-reduced-prior".into(),
+                prior_probability: 1.0,
+                parameter_prior: reduced_prior,
+            }],
+        );
+        assert!(result.is_ok());
     }
 
     #[test]
