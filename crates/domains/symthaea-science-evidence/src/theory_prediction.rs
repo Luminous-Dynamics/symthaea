@@ -222,6 +222,11 @@ pub enum TheoryPredictionError {
         theory_id: String,
         observable_id: String,
     },
+    #[error("quantitative prediction for {theory_id}/{observable_id} cannot mark predictive uncertainty as not applicable")]
+    QuantitativePredictionUncertaintyNotApplicable {
+        theory_id: String,
+        observable_id: String,
+    },
     #[error("quantitative prediction for {theory_id}/{observable_id} has no derivation reference")]
     QuantitativePredictionMissingDerivation {
         theory_id: String,
@@ -395,10 +400,12 @@ impl TheoryPredictionLedger {
             match record.disposition {
                 PredictionDisposition::Quantitative => {
                     if record.uncertainty_status == PredictiveUncertaintyStatus::NotApplicable {
-                        return Err(TheoryPredictionError::NonQuantitativePredictionHasValue {
-                            theory_id: record.theory_id.clone(),
-                            observable_id: record.observable_id.clone(),
-                        });
+                        return Err(
+                            TheoryPredictionError::QuantitativePredictionUncertaintyNotApplicable {
+                                theory_id: record.theory_id.clone(),
+                                observable_id: record.observable_id.clone(),
+                            },
+                        );
                     }
                     let value = record.predicted_value.ok_or_else(|| {
                         TheoryPredictionError::QuantitativePredictionMissingValue {
@@ -585,13 +592,9 @@ impl TheoryPredictionLedger {
         }
         if left.uncertainty_status == PredictiveUncertaintyStatus::Unspecified {
             blockers.push(ComparisonBlocker::LeftPredictiveUncertaintyUnspecified);
-        } else if left.uncertainty_status != PredictiveUncertaintyStatus::PointValueOnly {
-            blockers.push(ComparisonBlocker::LeftNotQuantitative(left.disposition));
         }
         if right.uncertainty_status == PredictiveUncertaintyStatus::Unspecified {
             blockers.push(ComparisonBlocker::RightPredictiveUncertaintyUnspecified);
-        } else if right.uncertainty_status != PredictiveUncertaintyStatus::PointValueOnly {
-            blockers.push(ComparisonBlocker::RightNotQuantitative(right.disposition));
         }
         if observable.noise_model != MeasurementNoiseModel::Gaussian {
             blockers.push(ComparisonBlocker::NonGaussianNoise);
@@ -941,6 +944,23 @@ mod tests {
         )));
         assert!(blockers.contains(&ComparisonBlocker::NonGaussianNoise));
         assert!(blockers.contains(&ComparisonBlocker::NoiseNotCalibrated));
+    }
+
+    #[test]
+    fn quantitative_prediction_cannot_mark_uncertainty_not_applicable() {
+        let mut ledger = fixture();
+        let record = ledger.predictions.iter_mut().find(|record| {
+            record.theory_id == "causal-set-minkowski"
+                && record.observable_id == "ordering-fraction-1p1"
+        }).unwrap();
+        record.uncertainty_status = PredictiveUncertaintyStatus::NotApplicable;
+        assert_eq!(
+            ledger.validate(),
+            Err(TheoryPredictionError::QuantitativePredictionUncertaintyNotApplicable {
+                theory_id: "causal-set-minkowski".to_string(),
+                observable_id: "ordering-fraction-1p1".to_string(),
+            })
+        );
     }
 
     #[test]
