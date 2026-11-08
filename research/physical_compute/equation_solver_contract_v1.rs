@@ -297,12 +297,26 @@ pub fn conjugate_gradient(
         let residual_norm = rs_new.sqrt();
 
         if residual_norm <= threshold {
-            return Ok(IterativeSolution {
-                x,
-                iterations: iteration,
-                converged: true,
-                residual_norm,
-            });
+            // Recompute b - A*x from the matrix and candidate, rather than
+            // trusting the recursively updated CG residual at acceptance.
+            let ax = a.mat_vec(&x)?;
+            let true_residual: Vec<f64> = b.iter().zip(ax).map(|(rhs, lhs)| rhs - lhs).collect();
+            let true_residual_norm = norm2(&true_residual);
+            if true_residual_norm <= threshold {
+                return Ok(IterativeSolution {
+                    x,
+                    iterations: iteration,
+                    converged: true,
+                    residual_norm: true_residual_norm,
+                });
+            }
+
+            // Residual replacement: restart the Krylov direction from the
+            // independently recomputed residual; do not accept recurrence drift.
+            r = true_residual;
+            p = r.clone();
+            rs_old = dot(&r, &r)?;
+            continue;
         }
 
         if rs_old <= 0.0 || !rs_new.is_finite() {
@@ -429,6 +443,13 @@ mod tests {
         let metrics = error_metrics(&a, &b, &bad_candidate, &truth).unwrap();
         assert!(metrics.relative_residual < 1.0e-9);
         assert!(metrics.relative_forward_error > 0.7);
+    }
+
+    #[test]
+    fn conjugate_gradient_breaks_down_on_indefinite_search_direction() {
+        let a = DenseMatrix::new(2, vec![1.0, 0.0, 0.0, -1.0]).unwrap();
+        let result = conjugate_gradient(&a, &[0.0, 1.0], 1.0e-10, 8);
+        assert_eq!(result, Err(MatrixError::Breakdown));
     }
 
     #[test]
