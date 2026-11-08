@@ -41,7 +41,7 @@ pub use model_discrimination::{
     MAX_DISCRIMINATION_EXPERIMENTS, MAX_DISCRIMINATION_HYPOTHESES, MAX_EIG_QUADRATURE_INTERVALS,
     MAX_MODEL_PRIOR_SCENARIOS, ModelDiscriminationConfig, ModelDiscriminationError,
     ModelDiscriminationReport, ModelPriorScenario, ModelUniverseCoverage, PriorScenarioEIG,
-    rank_model_discriminating_experiments,
+    gaussian_predictive_kl_nats, rank_model_discriminating_experiments,
 };
 pub use theory_prediction::{
     ComparisonBlocker, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
