@@ -1,0 +1,120 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-QUERY-WEIGHTED-CODE-ALLOCATION-2026-11-08",
+  "status": "synthetic_error_curve_allocation_example_not_quantizer_measurement",
+  "total_bit_budget": 4,
+  "blocks": [
+    "b0",
+    "b1"
+  ],
+  "synthetic_certified_error_curve": "epsilon_b(m) = 2^(-m)",
+  "profiles": [
+    {
+      "id": "profile_A",
+      "query_block_energy_weights": [
+        10,
+        1
+      ],
+      "allocations": [
+        {
+          "bits": [
+            2,
+            2
+          ],
+          "epsilon": [
+            0.25,
+            0.25
+          ],
+          "weighted_bound": 2.75
+        },
+        {
+          "bits": [
+            3,
+            1
+          ],
+          "epsilon": [
+            0.125,
+            0.5
+          ],
+          "weighted_bound": 1.75
+        },
+        {
+          "bits": [
+            1,
+            3
+          ],
+          "epsilon": [
+            0.5,
+            0.125
+          ],
+          "weighted_bound": 5.125
+        }
+      ],
+      "best_allocation": [
+        3,
+        1
+      ]
+    },
+    {
+      "id": "profile_B_distribution_shift",
+      "query_block_energy_weights": [
+        1,
+        10
+      ],
+      "allocations": [
+        {
+          "bits": [
+            2,
+            2
+          ],
+          "epsilon": [
+            0.25,
+            0.25
+          ],
+          "weighted_bound": 2.75
+        },
+        {
+          "bits": [
+            3,
+            1
+          ],
+          "epsilon": [
+            0.125,
+            0.5
+          ],
+          "weighted_bound": 5.125
+        },
+        {
+          "bits": [
+            1,
+            3
+          ],
+          "epsilon": [
+            0.5,
+            0.125
+          ],
+          "weighted_bound": 1.75
+        }
+      ],
+      "best_allocation": [
+        1,
+        3
+      ]
+    }
+  ],
+  "exact_query_bound": "sum_b ||q_b||_2 * epsilon_b(bits_b)",
+  "offline_allocation_objective": "minimize sum_b w_b * epsilon_b(bits_b), subject to sum_b bits_b <= total_bit_budget and independently validated per-block residual caps",
+  "invariants": [
+    "Each epsilon_b is a per-block worst-case residual certificate validated against the original payload and codebook.",
+    "Query energy weights affect bit allocation only; they do not enter the correctness proof.",
+    "For any finite query admitted by the score profile, the exact bound uses its actual ||q_b|| and stored epsilon_b values.",
+    "Distribution shift can make the chosen allocation inefficient but cannot invalidate a correct worst-case epsilon_b certificate.",
+    "Rebuilds or codebook changes create a new generation and require fresh certificate verification.",
+    "Never replace a deterministic residual certificate with a mean or percentile reconstruction error."
+  ],
+  "nonclaims": [
+    "The epsilon curve is invented for this synthetic allocation example.",
+    "No actual quantizer or bit-allocation optimizer is implemented.",
+    "No benchmark speedup or residual-bound tightness result is represented."
+  ]
+}
