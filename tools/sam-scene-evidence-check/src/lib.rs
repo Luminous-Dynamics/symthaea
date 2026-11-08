@@ -868,12 +868,24 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         }
     }
 
+    check_source_refs(
+        &mut errors,
+        "cooperative_advisory_refs",
+        snapshot.get("cooperative_advisory_refs"),
+        &source_ids,
+    );
     check_source_role_refs(
         &mut errors,
         "cooperative_advisory_refs",
         snapshot.get("cooperative_advisory_refs"),
         &source_roles,
         &["remote_cooperative_claim"],
+    );
+    check_source_refs(
+        &mut errors,
+        "simulator_truth_refs",
+        snapshot.get("simulator_truth_refs"),
+        &source_ids,
     );
     check_source_role_refs(
         &mut errors,
@@ -1123,6 +1135,46 @@ mod tests {
         let (schema, mut fixture) = load_fixture();
         fixture["snapshot"]["vision_hdc_proposals"][0]["metric_geometry_authority"] =
             Value::String("metric".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_remote_cooperative_claim_as_local_track_source() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["object_hypotheses"][0]["source_refs"][0] =
+            Value::String("cooperative-v2x-claim-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_simulator_oracle_as_local_track_source() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["object_hypotheses"][0]["source_refs"][0] =
+            Value::String("simulator-oracle-truth-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_local_sensor_in_cooperative_advisory_refs() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["cooperative_advisory_refs"][0] =
+            Value::String("front-lidar-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_local_sensor_in_simulator_truth_refs() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["simulator_truth_refs"][0] =
+            Value::String("front-camera-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_v2x_modality_mislabeled_as_local_sensor() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["sources"][2]["source_role"] =
+            Value::String("local_sensor_observation".into());
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
