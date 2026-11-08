@@ -198,8 +198,9 @@ pub fn score_alignment(
                     if expected.is_vowel {
                         vowel_onset_errors_ms.push(onset_error_ms);
                     }
-                    offset_errors_ms
-                    .push(expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms);
+                    offset_errors_ms.push(
+                        expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms,
+                    );
                     let expected_duration = expected.end_frame - expected.start_frame;
                     let observed_duration = observed.end_frame - observed.start_frame;
                     exact_reference_duration_frames += u128::from(expected_duration);
@@ -253,7 +254,7 @@ pub fn score_alignment(
         reference_identity_match_fraction,
         prediction_phone_precision,
         timing: TimingMetrics {
-            exact_phone_pairs: counts.exact_matches,
+            exact_phone_pairs: identity_match_count,
             onset_mae_ms: mean(&onset_errors_ms),
             onset_median_ms: median(&onset_errors_ms),
             onset_p95_ms: percentile(&onset_errors_ms, 0.95),
@@ -434,7 +435,7 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
     for i in 1..=n {
         for j in 1..=m {
             let substitution_cost =
-                usize::from(!same_phone_identity(&reference[i - 1], &predicted[j - 1]));
+                usize::from(reference[i - 1].symbol != predicted[j - 1].symbol);
             let diagonal = costs[i - 1][j - 1] + substitution_cost;
             let deletion = costs[i - 1][j] + 1;
             let insertion = costs[i][j - 1] + 1;
@@ -447,7 +448,7 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
     while i > 0 || j > 0 {
         // Deterministic tie-breaking: diagonal, then deletion, then insertion.
         if i > 0 && j > 0 {
-            let cost = usize::from(!same_phone_identity(&reference[i - 1], &predicted[j - 1]));
+            let cost = usize::from(reference[i - 1].symbol != predicted[j - 1].symbol);
             if costs[i][j] == costs[i - 1][j - 1] + cost {
                 if cost == 0 {
                     reversed.push(Edit::Exact {
@@ -674,9 +675,12 @@ mod tests {
         predicted[0].word_index = 1;
 
         let result = score_alignment(16_000, 1_000, &reference, &predicted, &[]).unwrap();
-        assert_eq!(result.edits.exact_matches, 0);
-        assert_eq!(result.edits.substitutions, 1);
-        assert_eq!(result.phone_error_rate, 1.0);
+        assert_eq!(result.edits.exact_matches, 1);
+        assert_eq!(result.edits.substitutions, 0);
+        assert_eq!(result.phone_error_rate, 0.0);
+        assert_eq!(result.reference_phone_match_fraction, 1.0);
+        assert_eq!(result.reference_identity_match_fraction, 0.0);
+        assert_eq!(result.timing.exact_phone_pairs, 0);
         assert_eq!(result.timing.onset_mae_ms, None);
     }
 
@@ -687,8 +691,10 @@ mod tests {
         predicted[0].syllable_index = 1;
 
         let result = score_alignment(16_000, 1_000, &reference, &predicted, &[]).unwrap();
-        assert_eq!(result.edits.exact_matches, 0);
-        assert_eq!(result.edits.substitutions, 1);
+        assert_eq!(result.edits.exact_matches, 1);
+        assert_eq!(result.edits.substitutions, 0);
+        assert_eq!(result.phone_error_rate, 0.0);
+        assert_eq!(result.reference_identity_match_fraction, 0.0);
         assert_eq!(result.timing.onset_mae_ms, None);
     }
 
