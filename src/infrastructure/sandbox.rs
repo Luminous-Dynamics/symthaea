@@ -133,20 +133,48 @@ impl Sandbox {
         Ok(())
     }
 
-    /// Run a command in the sandbox
+    /// Run an allowlisted command in the default working directory.
+    ///
+    /// Real execution remains an explicit host opt-in, not an isolation boundary.
     pub fn run(&mut self, command: &str, args: &[&str]) -> Result<SandboxResult, SandboxError> {
+        let working_directory = self.root.clone();
+        self.run_in(command, args, &working_directory)
+    }
+
+    /// Run an allowlisted command with an explicit working directory.
+    ///
+    /// The command and arguments are passed directly to the operating system; no shell
+    /// is inserted. This prevents callers from turning a path into shell syntax, but
+    /// does not restrict filesystem, network, process, device, or credential access.
+    pub fn run_in(
+        &mut self,
+        command: &str,
+        args: &[&str],
+        working_directory: &Path,
+    ) -> Result<SandboxResult, SandboxError> {
         if !self.initialized {
             self.init()?;
         }
 
-        // Check if command is allowed
         if !self.is_command_allowed(command) {
             return Err(SandboxError::CommandNotAllowed(command.to_string()));
         }
 
+        let working_directory = working_directory.canonicalize().map_err(|e| {
+            SandboxError::ExecutionFailed(format!(
+                "invalid working directory {}: {e}",
+                working_directory.display()
+            ))
+        })?;
+        if !working_directory.is_dir() {
+            return Err(SandboxError::ExecutionFailed(format!(
+                "working directory is not a directory: {}",
+                working_directory.display()
+            )));
+        }
+
         let start = Instant::now();
 
-        // In simulation mode, return simulated output
         if self.simulation_only {
             return Ok(self.simulate_command(command, args));
         }
@@ -155,7 +183,8 @@ impl Sandbox {
             return Err(SandboxError::RealExecutionDisabled);
         }
 
-        let result = self.run_command_with_timeout(command, args, start)?;
+        let result =
+            self.run_command_with_timeout(command, args, start, &working_directory)?;
 
         self.outputs.push(SandboxOutput {
             result: result.clone(),
@@ -202,6 +231,7 @@ impl Sandbox {
                 &format!("nixos-config={}", sandbox_config.display()),
             ],
             start,
+            &self.root,
         )
     }
 
@@ -242,10 +272,11 @@ impl Sandbox {
         command: &str,
         args: &[&str],
         start: Instant,
+        working_directory: &Path,
     ) -> Result<SandboxResult, SandboxError> {
         let mut child = Command::new(command)
             .args(args)
-            .current_dir(&self.root)
+            .current_dir(working_directory)
             .envs(&self.env)
             .env("HOME", self.root.join("home"))
             .env("TMPDIR", self.root.join("tmp"))
@@ -846,4 +877,41 @@ mod tests {
             );
         }
     }
+    #[test]
+    fn test_run_in_rejects_missing_working_directory() {
+        let mut sandbox = Sandbox::new().simulation_only();
+        let missing = sandbox.root().join("missing-working-directory");
+        let error = sandbox.run_in("echo", &["must-not-run"], &missing).unwrap_err();
+        assert!(matches!(error, SandboxError::ExecutionFailed(_)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_run_in_treats_shell_metacharacters_as_path_data() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-host-cwd-{}-{nonce}",
+            std::process::id()
+        ));
+        let working_directory = root.join("repo ; $(not-a-shell-command)");
+        fs::create_dir_all(&working_directory).unwrap();
+
+        let mut sandbox = Sandbox::new()
+            .with_timeout(Duration::from_secs(5))
+            .enable_real_execution();
+        sandbox.allow_command("pwd");
+        let result = sandbox.run_in("pwd", &[], &working_directory).unwrap();
+
+        assert!(!result.simulated);
+        assert_eq!(
+            PathBuf::from(result.stdout.trim()),
+            working_directory.canonicalize().unwrap()
+        );
+
+        fs::remove_dir_all(&root).unwrap();
+    }
+
 }
