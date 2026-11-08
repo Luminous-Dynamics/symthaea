@@ -3,9 +3,9 @@
 
 use std::error::Error;
 use symthaea_uap_observatory::{
-    BudgetedDesignConfig, DesignScenario, EcefVector3, ExperimentOption,
-    SensorPlacementCandidate, SensorToEcefQuaternion, bearing_position_clock_jacobian,
-    exhaustive_budgeted_design, greedy_budgeted_design,
+    BudgetedDesignConfig, DesignScenario, EcefVector3, ExperimentOption, SensorPlacementCandidate,
+    SensorToEcefQuaternion, bearing_position_clock_jacobian, exhaustive_budgeted_design,
+    greedy_budgeted_design,
 };
 
 #[derive(Clone, Copy)]
@@ -29,11 +29,8 @@ fn bearing_option(
     let mut jacobian_rows_by_scenario = Vec::with_capacity(targets.len());
     for (target, sensor_velocity) in targets.iter().zip(sensor_velocity_by_scenario) {
         let relative_velocity = target.velocity_ecef_mps.subtract(*sensor_velocity);
-        let jacobian = bearing_position_clock_jacobian(
-            &sensor,
-            target.position_ecef_m,
-            relative_velocity,
-        )?;
+        let jacobian =
+            bearing_position_clock_jacobian(&sensor, target.position_ecef_m, relative_velocity)?;
         jacobian_rows_by_scenario.push(vec![
             jacobian.azimuth_row.to_vec(),
             jacobian.elevation_row.to_vec(),
