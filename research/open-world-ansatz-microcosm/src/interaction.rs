@@ -56,14 +56,9 @@ impl ModelHypothesis {
             return Err(InteractionError::InvalidCoefficient);
         }
         match self.structure {
-            Structure::SingleInput
-                if self.weight_v == 0 && self.interaction_weight == 0 =>
-            {
-                Ok(())
-            }
+            Structure::SingleInput if self.weight_v == 0 && self.interaction_weight == 0 => Ok(()),
             Structure::AdditiveTwoInput
-                if COEFFICIENT_VALUES.contains(&self.weight_v)
-                    && self.interaction_weight == 0 =>
+                if COEFFICIENT_VALUES.contains(&self.weight_v) && self.interaction_weight == 0 =>
             {
                 Ok(())
             }
@@ -262,11 +257,14 @@ pub fn discover(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
-    let structure_identified =
-        !compatible_models.is_empty() && compatible_structures.len() == 1;
+    let structure_identified = !compatible_models.is_empty() && compatible_structures.len() == 1;
     let model_identified = compatible_models.len() == 1;
     let coefficients_identified = structure_identified && model_identified;
-    let disposition = match (compatible_models.is_empty(), structure_identified, model_identified) {
+    let disposition = match (
+        compatible_models.is_empty(),
+        structure_identified,
+        model_identified,
+    ) {
         (true, _, _) => DiscoveryDisposition::NoCompatibleModel,
         (false, true, true) => DiscoveryDisposition::UniqueModel,
         (false, true, false) => DiscoveryDisposition::StructureIdentifiedParametersAmbiguous,
@@ -397,7 +395,9 @@ pub enum InteractionError {
 impl fmt::Display for InteractionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidCoefficient => write!(f, "bias/coefficients are outside the declared search space"),
+            Self::InvalidCoefficient => {
+                write!(f, "bias/coefficients are outside the declared search space")
+            }
             Self::InvalidStructureBinding => write!(
                 f,
                 "coefficient presence must match the supplied structural family"
@@ -457,7 +457,10 @@ mod tests {
         let report = discover(&log, StructureAccess::Withheld).unwrap();
 
         assert_eq!(report.disposition, DiscoveryDisposition::UniqueModel);
-        assert_eq!(report.compatible_structures, vec![Structure::BilinearInteraction]);
+        assert_eq!(
+            report.compatible_structures,
+            vec![Structure::BilinearInteraction]
+        );
         assert_eq!(report.compatible_models, vec![bilinear_truth()]);
     }
 
@@ -484,7 +487,9 @@ mod tests {
         let world = InteractionWorld::new(bilinear_truth()).unwrap();
         let mut log = world.run(&[[1, 1], [-1, -1]]).unwrap();
         let report = discover(&log, StructureAccess::Withheld).unwrap();
-        let probe = recommend_discriminating_probe(&log, &report).unwrap().unwrap();
+        let probe = recommend_discriminating_probe(&log, &report)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(probe.outcome_partition_count, 4);
         assert_eq!(probe.worst_case_remaining_models, 1);
@@ -498,7 +503,10 @@ mod tests {
     #[test]
     fn full_factorial_oracle_identifies_every_declared_candidate() {
         let classes = oracle_equivalence_classes().unwrap();
-        assert_eq!(classes.len(), candidate_models(StructureAccess::Withheld).len());
+        assert_eq!(
+            classes.len(),
+            candidate_models(StructureAccess::Withheld).len()
+        );
         assert!(classes.iter().all(|class| class.members.len() == 1));
     }
 
@@ -517,17 +525,19 @@ mod tests {
 
     #[test]
     fn invalid_coefficients_and_interventions_fail_closed() {
-        assert!(InteractionWorld::new(ModelHypothesis {
-            weight_v: 1,
-            ..ModelHypothesis {
-                structure: Structure::SingleInput,
-                bias: 0,
-                weight_u: 1,
-                weight_v: 0,
-                interaction_weight: 0,
-            }
-        })
-        .is_err());
+        assert!(
+            InteractionWorld::new(ModelHypothesis {
+                weight_v: 1,
+                ..ModelHypothesis {
+                    structure: Structure::SingleInput,
+                    bias: 0,
+                    weight_u: 1,
+                    weight_v: 0,
+                    interaction_weight: 0,
+                }
+            })
+            .is_err()
+        );
         let world = InteractionWorld::new(bilinear_truth()).unwrap();
         assert!(world.run(&[[2, 0]]).is_err());
     }
@@ -541,6 +551,10 @@ mod tests {
         let report = discover(&log, StructureAccess::Withheld).unwrap();
         assert_eq!(report.disposition, DiscoveryDisposition::NoCompatibleModel);
         assert!(report.compatible_models.is_empty());
-        assert!(recommend_discriminating_probe(&log, &report).unwrap().is_none());
+        assert!(
+            recommend_discriminating_probe(&log, &report)
+                .unwrap()
+                .is_none()
+        );
     }
 }
