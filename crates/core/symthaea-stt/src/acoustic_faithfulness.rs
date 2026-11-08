@@ -309,7 +309,7 @@ pub fn score_acoustic_faithfulness(
 
         match &trial.outcome {
             ModelOutcome::Abstain => {
-                if matches!(trial.audio_truth, AudioTruth::Unanswerable) {
+                if matches!(&trial.audio_truth, AudioTruth::Unanswerable) {
                     appropriate_abstentions += 1;
                 } else {
                     answerable_abstentions += 1;
