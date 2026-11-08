@@ -260,6 +260,16 @@ pub enum ModelDiscriminationError {
         experiment_id: String,
         model_id: String,
     },
+    #[error("quantitative prediction for {experiment_id}/{model_id} is missing its mean")]
+    QuantitativePredictionMissingMean {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("quantitative prediction for {experiment_id}/{model_id} is missing its predictive uncertainty")]
+    QuantitativePredictionMissingUncertainty {
+        experiment_id: String,
+        model_id: String,
+    },
     #[error("non-quantitative prediction for {experiment_id}/{model_id} carries numeric fields")]
     NonQuantitativePredictionHasNumbers {
         experiment_id: String,
@@ -517,13 +527,13 @@ fn validate_experiment(
         match prediction.disposition {
             PredictionDisposition::Quantitative => {
                 let mean = prediction.predictive_mean.ok_or_else(|| {
-                    ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
+                    ModelDiscriminationError::QuantitativePredictionMissingMean {
                         experiment_id: experiment.experiment_id.clone(),
                         model_id: prediction.model_id.clone(),
                     }
                 })?;
                 let sigma = prediction.predictive_sigma.ok_or_else(|| {
-                    ModelDiscriminationError::NonQuantitativePredictionHasNumbers {
+                    ModelDiscriminationError::QuantitativePredictionMissingUncertainty {
                         experiment_id: experiment.experiment_id.clone(),
                         model_id: prediction.model_id.clone(),
                     }
@@ -802,20 +812,26 @@ fn mutual_information_density(
     observation: f64,
     distributions: &[(f64, f64, f64)],
 ) -> Option<f64> {
+    let log_likelihoods: Vec<f64> = distributions
+        .iter()
+        .map(|(mean, sigma, _)| normal_log_density(observation, *mean, *sigma))
+        .collect();
     let log_joint: Vec<f64> = distributions
         .iter()
-        .map(|(mean, sigma, probability)| {
-            probability.ln() + normal_log_density(observation, *mean, *sigma)
-        })
+        .zip(log_likelihoods.iter())
+        .map(|((_, _, probability), log_likelihood)| probability.ln() + log_likelihood)
         .collect();
     let log_mixture = log_sum_exp(&log_joint)?;
     let mut density = 0.0;
-    for (log_probability, log_joint_value) in
-        distributions.iter().map(|(_, _, p)| p.ln()).zip(log_joint.iter().copied())
+    for ((_, _, probability), (log_joint_value, log_likelihood)) in distributions
+        .iter()
+        .zip(log_joint.iter().copied().zip(log_likelihoods.iter().copied()))
     {
         let joint = log_joint_value.exp();
-        density += joint * (log_joint_value - log_mixture);
-        if !density.is_finite() || !log_probability.is_finite() {
+        // I(M;Y) = sum_m pi_m p(y|m) log[p(y|m) / p(y)].
+        // The mixture density includes the prior; the numerator is conditional.
+        density += joint * (log_likelihood - log_mixture);
+        if !density.is_finite() || !probability.is_finite() {
             return None;
         }
     }
