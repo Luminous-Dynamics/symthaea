@@ -271,10 +271,7 @@ pub fn build_pairwise_worst_case_regret_lp(
 ) -> Result<OccupationFlowLp, OccupationFlowError> {
     let periods = model.period_count();
     let states = model.state_count();
-    for (scores, name) in [
-        (selected_scores, "selected"),
-        (comparator_scores, "comparator"),
-    ] {
+    for scores in [selected_scores, comparator_scores] {
         if scores.len() != periods {
             return Err(OccupationFlowError::ScorePeriodCountMismatch {
                 expected: periods,
@@ -290,12 +287,23 @@ pub fn build_pairwise_worst_case_regret_lp(
                 });
             }
         }
-        let _ = name;
     }
 
-    let mut regret_scores = Vec::with_capacity(periods);
+    let mut regret_scores = Vec::new();
+    regret_scores.try_reserve_exact(periods).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "regret score rows",
+            requested: periods,
+        }
+    })?;
     for time in 0..periods {
-        let mut row = Vec::with_capacity(states);
+        let mut row = Vec::new();
+        row.try_reserve_exact(states).map_err(|_| {
+            OccupationFlowError::AllocationFailed {
+                resource: "regret score entries",
+                requested: states,
+            }
+        })?;
         for state in 0..states {
             let comparator = comparator_scores[time][state];
             let selected = selected_scores[time][state];
