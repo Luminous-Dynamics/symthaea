@@ -94,6 +94,46 @@ impl ContinuousHVRealCosineInterval {
     }
 }
 
+
+/// Candidate canonical-f32 score enclosure derived from spherical-cap geometry.
+///
+/// This is kept distinct from ContinuousHVScoreInterval until independent
+/// differential and target qualification is complete. It is not accepted by
+/// the HME global selector.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ContinuousHVSphericalCapF32ScoreInterval {
+    /// Conservative lower canonical f32 score.
+    pub lower: f32,
+    /// Conservative upper canonical f32 score.
+    pub upper: f32,
+}
+
+impl ContinuousHVSphericalCapF32ScoreInterval {
+    /// An interval with no pruning information.
+    pub const fn uninformative() -> Self {
+        Self { lower: -1.0, upper: 1.0 }
+    }
+
+    /// Exact zero score for the canonical denominator-below-threshold branch.
+    pub const fn zero_score() -> Self {
+        Self { lower: 0.0, upper: 0.0 }
+    }
+
+    /// Whether a canonical finite score is enclosed.
+    pub fn contains(&self, score: f32) -> bool {
+        score.is_finite() && self.lower <= score && score <= self.upper
+    }
+
+    /// Structural score-range check.
+    pub fn is_well_formed(&self) -> bool {
+        self.lower.is_finite()
+            && self.upper.is_finite()
+            && -1.0 <= self.lower
+            && self.lower <= self.upper
+            && self.upper <= 1.0
+    }
+}
+
 /// Admission errors for a bounded ContinuousHV score request.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ContinuousHVIntervalError {
@@ -707,6 +747,215 @@ impl ContinuousHV {
             Ok(interval)
         } else {
             Ok(ContinuousHVRealCosineInterval::uninformative())
+        }
+    }
+
+
+    /// Candidate enclosure of the canonical f32 cosine using a spherical-cap
+    /// geometric interval plus a separate reduction/denominator error budget.
+    ///
+    /// This is a research-stage result type and is not yet accepted by the
+    /// global HME exact selector. The derivation bounds the canonical dot and
+    /// norm reductions with gamma/eta envelopes, then includes the final f32
+    /// norm-product, square-root and quotient roundings. It assumes the
+    /// original members are admitted finite [-1,1] vectors and are all within
+    /// the supplied L2 radius of center. The method does not prove membership.
+    ///
+    /// Any ambiguous denominator, nonpositive norm lower bound, overflow or
+    /// insufficient numeric separation returns [-1,1]. A zero radius returns
+    /// the canonical point score. This must pass the full adversarial
+    /// differential corpus and target/compiler inspection before selector use.
+    pub fn similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(
+        &self,
+        center: &Self,
+        residual_l2_upper: f32,
+    ) -> Result<ContinuousHVSphericalCapF32ScoreInterval, ContinuousHVIntervalError> {
+        self.validate_full_resolution_pair(center)?;
+        if !residual_l2_upper.is_finite() || residual_l2_upper < 0.0 {
+            return Err(ContinuousHVIntervalError::InvalidResidualBound);
+        }
+        if self.values.iter().all(|value| *value == 0.0) {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::zero_score());
+        }
+        if residual_l2_upper == 0.0 {
+            let score = self.similarity_full_resolution(center);
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval {
+                lower: score,
+                upper: score,
+            });
+        }
+
+        let (query_sq_lower, query_sq_upper) = f64_sum_squares_bounds(&self.values);
+        let (center_sq_lower, center_sq_upper) = f64_sum_squares_bounds(&center.values);
+        if query_sq_lower <= 0.0 || center_sq_lower <= 0.0 {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+
+        let query_norm = match F64Interval {
+            lo: query_sq_lower,
+            hi: query_sq_upper,
+        }
+        .sqrt_nonnegative()
+        {
+            Some(value) if value.lo > 0.0 => value,
+            _ => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+        let center_norm = match F64Interval {
+            lo: center_sq_lower,
+            hi: center_sq_upper,
+        }
+        .sqrt_nonnegative()
+        {
+            Some(value) if value.lo > 0.0 => value,
+            _ => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+
+        let radius = residual_l2_upper as f64;
+        if radius >= center_norm.lo {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+        let candidate_norm_lower =
+            f64_next_down(center_norm.lo - radius).max(0.0);
+        let candidate_norm_upper =
+            f64_next_up(center_norm.hi + radius);
+        if candidate_norm_lower <= 0.0 || !candidate_norm_upper.is_finite() {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+
+        let real_cosine = self
+            .real_cosine_interval_for_l2_ball_center(center, residual_l2_upper)?;
+        if !real_cosine.is_well_formed()
+            || (real_cosine.lower == -1.0 && real_cosine.upper == 1.0)
+        {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+
+        // Standard dot/norm reduction model: gamma bounds accumulated relative
+        // error; eta bounds the sum of worst-case subnormal absolute errors.
+        let dimension = self.values.len();
+        let operation_count = (dimension as f64) * 2.0;
+        let unit_roundoff = 2.0f64.powi(-24);
+        let nu = operation_count * unit_roundoff;
+        if !nu.is_finite() || nu >= 1.0 {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+        let gamma = f64_next_up(nu / (1.0 - nu));
+        let min_subnormal = f32::from_bits(1) as f64;
+        let eta = f64_next_up(
+            (operation_count * min_subnormal) / (1.0 - nu),
+        );
+
+        let candidate_norm_sq_lower = f64_next_down(
+            candidate_norm_lower * candidate_norm_lower,
+        )
+        .max(0.0);
+        if candidate_norm_sq_lower <= 0.0 {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+        let query_relative_error = f64_next_up(
+            gamma + eta / query_sq_lower,
+        );
+        let candidate_relative_error = f64_next_up(
+            gamma + eta / candidate_norm_sq_lower,
+        );
+        if !query_relative_error.is_finite()
+            || !candidate_relative_error.is_finite()
+            || query_relative_error >= 1.0
+            || candidate_relative_error >= 1.0
+        {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+
+        let one_minus_u = f64_next_down(1.0 - unit_roundoff).max(0.0);
+        let one_plus_u = f64_next_up(1.0 + unit_roundoff);
+        let query_norm_factor = F64Interval {
+            lo: f64_next_down(1.0 - query_relative_error).max(0.0),
+            hi: f64_next_up(1.0 + query_relative_error),
+        };
+        let candidate_norm_factor = F64Interval {
+            lo: f64_next_down(1.0 - candidate_relative_error).max(0.0),
+            hi: f64_next_up(1.0 + candidate_relative_error),
+        };
+        let product_rounding_factor = F64Interval {
+            lo: one_minus_u,
+            hi: one_plus_u,
+        };
+        let sqrt_rounding_factor = F64Interval {
+            lo: one_minus_u,
+            hi: one_plus_u,
+        };
+        let denominator_factor = match query_norm_factor
+            .mul(candidate_norm_factor)
+            .and_then(|value| value.mul(product_rounding_factor))
+            .and_then(F64Interval::sqrt_nonnegative)
+            .and_then(|value| value.mul(sqrt_rounding_factor))
+        {
+            Some(value) if value.lo > 0.0 => value,
+            _ => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+
+        // The canonical near-zero branch is evaluated on f32 sqrt(normA*normB).
+        // Bound its possible denominator before using a quotient interval.
+        let norm_product_lower = f64_next_down(query_norm.lo * candidate_norm_lower);
+        let norm_product_upper = f64_next_up(query_norm.hi * candidate_norm_upper);
+        let denominator_lower =
+            f64_next_down(norm_product_lower * denominator_factor.lo);
+        let denominator_upper =
+            f64_next_up(norm_product_upper * denominator_factor.hi);
+        if !denominator_lower.is_finite() || !denominator_upper.is_finite() {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+        let canonical_threshold = 1.0e-10f32 as f64;
+        if denominator_upper < canonical_threshold {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::zero_score());
+        }
+        if denominator_lower < canonical_threshold {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+
+        // |dot_rounding_error| / (||q|| ||x||) <= gamma + eta / (q_norm*x_norm).
+        let normalized_dot_error = f64_next_up(
+            gamma + eta / norm_product_lower,
+        );
+        if !normalized_dot_error.is_finite() {
+            return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative());
+        }
+        let normalized_dot = F64Interval {
+            lo: f64_next_down(real_cosine.lower - normalized_dot_error),
+            hi: f64_next_up(real_cosine.upper + normalized_dot_error),
+        };
+        let quotient = match normalized_dot.div_positive(denominator_factor) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+        let quotient_rounding_factor = F64Interval {
+            lo: one_minus_u,
+            hi: one_plus_u,
+        };
+        let rounded_quotient = match quotient.mul(quotient_rounding_factor) {
+            Some(value) => value,
+            None => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+
+        // The final division may underflow to a subnormal; a full minimum
+        // subnormal on either side safely covers its absolute rounding error.
+        let lower_f64 = f64_next_down(rounded_quotient.lo - min_subnormal)
+            .max(-1.0);
+        let upper_f64 = f64_next_up(rounded_quotient.hi + min_subnormal)
+            .min(1.0);
+        let lower = match f32_lower_from_f64(lower_f64) {
+            Some(value) => value.clamp(-1.0, 1.0),
+            None => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+        let upper = match f32_upper_from_f64(upper_f64) {
+            Some(value) => value.clamp(-1.0, 1.0),
+            None => return Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative()),
+        };
+        let interval = ContinuousHVSphericalCapF32ScoreInterval { lower, upper };
+        if interval.is_well_formed() {
+            Ok(interval)
+        } else {
+            Ok(ContinuousHVSphericalCapF32ScoreInterval::uninformative())
         }
     }
 
@@ -1554,6 +1803,81 @@ mod tests {
                 assert!(interval.is_well_formed());
             }
         }
+    }
+
+
+    #[test]
+    fn spherical_cap_f32_interval_contains_canonical_high_dimensional_members() {
+        let mut state = 0xF32C_A9E5u32;
+        for dimension in [8usize, 9, 17, 257, 2_048, 16_384] {
+            for scenario in 0..4 {
+                let center = ContinuousHV::from_vec(
+                    (0..dimension)
+                        .map(|index| match scenario {
+                            0 => ((index as f32) * 0.013).sin() * 0.55,
+                            1 => if index % 2 == 0 { 0.7 } else { -0.7 },
+                            2 => pseudo_random_unit(&mut state) * 0.6,
+                            _ => if index == dimension / 2 { 0.7 } else { 0.0 },
+                        })
+                        .collect(),
+                );
+                let query = ContinuousHV::from_vec(
+                    (0..dimension)
+                        .map(|index| match scenario {
+                            0 => center.values[index] * 0.9,
+                            1 => -center.values[index],
+                            2 => pseudo_random_unit(&mut state),
+                            _ => if index == dimension / 2 { 1.0 } else { 0.0 },
+                        })
+                        .collect(),
+                );
+                let actual = ContinuousHV::from_vec(
+                    center
+                        .values
+                        .iter()
+                        .enumerate()
+                        .map(|(index, value)| {
+                            (*value + 0.0001 * ((index as f32) * 0.037).sin())
+                                .clamp(-1.0, 1.0)
+                        })
+                        .collect(),
+                );
+                let radius = 0.02f32;
+                verify_l2_residual_certificate(&actual, &center, radius).unwrap();
+                let interval = query
+                    .similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(
+                        &center,
+                        radius,
+                    )
+                    .unwrap();
+                let exact = query.similarity_full_resolution(&actual);
+                assert!(
+                    interval.contains(exact),
+                    "scenario={scenario}, dimension={dimension}: exact={exact}, interval=[{}, {}]",
+                    interval.lower,
+                    interval.upper
+                );
+                assert!(interval.is_well_formed());
+            }
+        }
+    }
+
+    #[test]
+    fn spherical_cap_f32_interval_handles_zero_radius_and_zero_query() {
+        let query = ContinuousHV::from_vec(vec![0.5, -0.2, 0.7, 0.1, -0.8, 0.3, 0.9, -0.4]);
+        let center = ContinuousHV::from_vec(vec![0.1, 0.2, -0.3, 0.4, 0.5, -0.6, 0.7, -0.8]);
+        let exact = query.similarity_full_resolution(&center);
+        let point = query
+            .similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(&center, 0.0)
+            .unwrap();
+        assert_eq!(point.lower, exact);
+        assert_eq!(point.upper, exact);
+
+        let zero_query = ContinuousHV::zero(8);
+        let zero_score = zero_query
+            .similarity_interval_full_resolution_for_l2_ball_center_spherical_cap(&center, 0.1)
+            .unwrap();
+        assert_eq!(zero_score, ContinuousHVSphericalCapF32ScoreInterval::zero_score());
     }
 
     #[test]
