@@ -1482,4 +1482,203 @@ mod tests {
         let report = audit_ledger(&ledger).unwrap();
         assert_eq!(report.evidence_ids.last().unwrap(), "T8-failed");
     }
+
+    #[test]
+    fn standard_sha256_known_answer_vectors() {
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn ledger_audit_recomputes_each_entry_and_terminal_root() {
+        let ledger = fixture();
+        let audit = audit_ledger(&ledger).unwrap();
+        assert_eq!(audit.integrity_disposition, LedgerIntegrityDisposition::InternallyCommittedUnanchored);
+        assert_eq!(audit.ledger_epoch_id, "epoch-1");
+        assert_eq!(audit.global_filtration_sha256, d('8'));
+        assert_eq!(audit.ledger_chain_root_sha256, ledger.ledger_chain_root_sha256);
+        assert_ne!(audit.ledger_chain_root_sha256, audit.global_filtration_sha256);
+
+        let mut entry_tamper = ledger.clone();
+        entry_tamper.entries[0].entry_commitment_sha256 = d('9');
+        assert!(audit_ledger(&entry_tamper).is_err());
+
+        let mut payload_tamper = ledger.clone();
+        if let LedgerPayload::Evidence(event) = &mut payload_tamper.entries[0].payload {
+            event.source_stream = "rewritten-stream".into();
+        }
+        assert!(audit_ledger(&payload_tamper).is_err());
+
+        let mut root_tamper = ledger;
+        root_tamper.ledger_chain_root_sha256 = d('7');
+        assert!(audit_ledger(&root_tamper).is_err());
+    }
+
+    #[test]
+    fn decision_prefix_hashes_are_recomputed_from_exact_ordered_evidence_roots() {
+        let mut ledger = fixture();
+        let original = match &ledger.entries[3].payload {
+            LedgerPayload::Decision(decision) => decision.input_prefix_sha256.clone(),
+            _ => unreachable!(),
+        };
+        if let LedgerPayload::Decision(decision) = &mut ledger.entries[3].payload {
+            decision.input_prefix_sha256 = d('6');
+        }
+        // The receipt field is included in the entry itself, so even a
+        // syntactically valid replacement invalidates its append commitment.
+        assert!(audit_ledger(&ledger).is_err());
+
+        if let LedgerPayload::Decision(decision) = &mut ledger.entries[3].payload {
+            decision.input_prefix_sha256 = original;
+        }
+        seal_ledger(&mut ledger).unwrap();
+        assert_eq!(
+            audit_ledger(&ledger).unwrap().decisions[1].status,
+            DecisionAuditStatus::Accepted
+        );
+    }
+
+    #[test]
+    fn canonical_payload_distinguishes_unicode_option_timestamps_and_enum_values() {
+        let base = EvidenceEvent {
+            event_id: "trial-µ".into(),
+            evidence_family_id: "family-α".into(),
+            source_stream: "kinematics/左".into(),
+            source_artifact_sha256: d('a'),
+            revision: 0,
+            supersedes_event_id: None,
+            event_time_ms: Some(-7),
+            acquired_at_ms: None,
+            annotated_at_ms: Some(0),
+            qc_at_ms: None,
+            availability_state: AvailabilityState::Provisional,
+            split: EvidenceSplit::Calibration,
+            confirmatory_family_id: None,
+        };
+        let (base_kind, base_bytes) =
+            canonical_payload(&LedgerPayload::Evidence(base.clone())).unwrap();
+        assert_eq!(base_kind, 1);
+        assert!(base_bytes.windows("trial-µ".len()).any(|w| w == "trial-µ".as_bytes()));
+
+        let mut present_option = base.clone();
+        present_option.supersedes_event_id = Some("prior-1".into());
+        assert_ne!(
+            base_bytes,
+            canonical_payload(&LedgerPayload::Evidence(present_option))
+                .unwrap()
+                .1
+        );
+
+        let mut timestamp_changed = base.clone();
+        timestamp_changed.event_time_ms = None;
+        assert_ne!(
+            base_bytes,
+            canonical_payload(&LedgerPayload::Evidence(timestamp_changed))
+                .unwrap()
+                .1
+        );
+
+        let mut enum_changed = base;
+        enum_changed.availability_state = AvailabilityState::Disputed;
+        assert_ne!(
+            base_bytes,
+            canonical_payload(&LedgerPayload::Evidence(enum_changed))
+                .unwrap()
+                .1
+        );
+    }
+
+    #[test]
+    fn payload_kind_discriminants_are_domain_distinct() {
+        let evidence = event(
+            "E1",
+            "family",
+            -1,
+            AvailabilityState::Approved,
+            EvidenceSplit::Exploration,
+        );
+        let freeze = LedgerPayload::FamilyFreeze(FamilyFreeze {
+            family_id: "family".into(),
+            family_commitment_sha256: d('b'),
+            confirmation_lockbox_closed: true,
+        });
+        let decision = decision("D1", &[], &[], DecisionKind::Discovery, None);
+        let (e_kind, e_bytes) = canonical_payload(&evidence).unwrap();
+        let (f_kind, f_bytes) = canonical_payload(&freeze).unwrap();
+        let (d_kind, d_bytes) = canonical_payload(&decision).unwrap();
+        assert_eq!((e_kind, f_kind, d_kind), (1, 2, 3));
+        assert_ne!(e_bytes, f_bytes);
+        assert_ne!(e_bytes, d_bytes);
+        assert_ne!(f_bytes, d_bytes);
+    }
+
+    #[test]
+    fn independent_checkpoint_detects_a_resealed_truncated_prefix() {
+        let complete = fixture();
+        let complete_audit = audit_ledger(&complete).unwrap();
+        let checkpoint = ExpectedTerminalCheckpoint {
+            campaign_id: complete.campaign_id.clone(),
+            global_filtration_id: complete.global_filtration_id.clone(),
+            ledger_epoch_id: complete.ledger_epoch_id.clone(),
+            terminal_sequence: complete_audit.final_sequence,
+            ledger_chain_root_sha256: complete_audit.ledger_chain_root_sha256.clone(),
+        };
+        let pinned_sha = expected_terminal_checkpoint_sha256(&checkpoint).unwrap();
+        let matched =
+            audit_ledger_against_external_checkpoint(&complete, &checkpoint, &pinned_sha).unwrap();
+        assert_eq!(
+            matched.disposition,
+            ExternalCheckpointDisposition::MatchesIndependentlyPinnedCheckpoint
+        );
+
+        let mut truncated = complete.clone();
+        truncated.entries.pop();
+        seal_ledger(&mut truncated).unwrap();
+        let truncated_audit = audit_ledger(&truncated).unwrap();
+        assert_eq!(
+            truncated_audit.integrity_disposition,
+            LedgerIntegrityDisposition::InternallyCommittedUnanchored
+        );
+        assert!(audit_ledger_against_external_checkpoint(
+            &truncated,
+            &checkpoint,
+            &pinned_sha
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn external_checkpoint_digest_itself_must_match_the_pinned_value() {
+        let ledger = fixture();
+        let checkpoint = ExpectedTerminalCheckpoint {
+            campaign_id: ledger.campaign_id.clone(),
+            global_filtration_id: ledger.global_filtration_id.clone(),
+            ledger_epoch_id: ledger.ledger_epoch_id.clone(),
+            terminal_sequence: ledger.entries.len() as u64,
+            ledger_chain_root_sha256: ledger.ledger_chain_root_sha256.clone(),
+        };
+        assert!(audit_ledger_against_external_checkpoint(&ledger, &checkpoint, &d('0')).is_err());
+    }
+
+    #[test]
+    fn every_entry_payload_mutation_changes_its_commitment() {
+        let ledger = fixture();
+        let original = ledger.entries[0].entry_commitment_sha256.clone();
+        let mut changed = ledger.clone();
+        if let LedgerPayload::Evidence(event) = &mut changed.entries[0].payload {
+            event.qc_at_ms = Some(-1);
+        }
+        seal_ledger(&mut changed).unwrap();
+        assert_ne!(original, changed.entries[0].entry_commitment_sha256);
+        assert_ne!(
+            ledger.ledger_chain_root_sha256,
+            changed.ledger_chain_root_sha256
+        );
+    }
 }
