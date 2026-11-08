@@ -15,6 +15,8 @@ A tree or diagram does not establish logical implication. An internal mechanism 
 
 Let H_1,...,H_m be elementary nulls and E_i,t their nonnegative test supermartingales in one common global filtration, each starting at one.
 
+Before an elementary process enters closure, V1 replays the shared `GlobalLedger` and invokes the same `audit_admission` function used by #10982 / PR #10997. Only a typed `ADMITTED_DIRECT_GLOBAL` or `ADMITTED_AFTER_LIFT` receipt is combinable. Local-only and incomparable streams fail closed; a caller-supplied status label is no longer accepted as admission evidence.
+
 For every nonempty subset I define H_I as the intersection of its elementary nulls. Use fixed weights lambda_{I,i} >= 0 summing to one and frozen before outcomes, and define:
 
     E_I,t = sum_{i in I} lambda_{I,i} E_i,t
@@ -22,6 +24,15 @@ For every nonempty subset I define H_I as the intersection of its elementary nul
 Under H_I, every H_i in I is true. Each component process is therefore a supermartingale in the shared filtration, and the fixed convex mixture E_I,t is also a nonnegative test supermartingale starting at one.
 
 The V1 reference uses equal mixture weights lambda_{I,i}=1/|I|. The exact verifier enumerates every nonempty subset (at most 8 leaves / 255 intersections).
+
+Each leaf also binds the exact campaign/process/null, input-process digest, target filtration, proof receipt and output-path digest. The output path digest is recomputed over UTF-8 bytes using the versioned canonical sequence:
+
+    symthaea-eprocess-path-v1\\n
+    <reduced rational E_0>\\n
+    <reduced rational E_1>\\n
+    ...
+
+The admission output digest and this recomputed digest must match. The proof-receipt digest must match the independently reviewed validity receipt. The as-of auditor validates chronology and receipt identity, but it does not prove the direct-global supermartingale or adjuster theorem.
 
 Reject H_I when its running supremum reaches 1/alpha. Reject elementary H_i only when **every** intersection containing i has been rejected.
 
@@ -81,4 +92,4 @@ The closed-testing principle, graphical gatekeeping and online closure are estab
 
 ## 7. Claim ceiling
 
-A passing contract establishes exact mixture and closure semantics for the finite synthetic family, conditional on upstream elementary e-process validity and exact null intersection semantics. It does not authenticate those processes, identify true biological mechanisms, establish direct synaptic causation, or establish FDR/FDR-sup.
+A passing contract establishes exact mixture and closure semantics for the finite synthetic family after replaying each typed as-of admission and recomputing each exact e-process path digest. It still assumes upstream direct-global or adjuster-lifted validity has been independently proved; this crate and the as-of receipt auditor do not prove those statistical theorems. It does not identify true biological mechanisms, establish direct synaptic causation, or establish FDR/FDR-sup.
