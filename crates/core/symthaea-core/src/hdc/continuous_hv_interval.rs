@@ -504,10 +504,6 @@ struct F64Interval {
 }
 
 impl F64Interval {
-    const fn point(value: f64) -> Self {
-        Self { lo: value, hi: value }
-    }
-
     fn mul(self, rhs: Self) -> Option<Self> {
         let products = [
             self.lo * rhs.lo,
@@ -592,7 +588,12 @@ impl ContinuousHV {
     /// This evaluates the equivalent algebraic spherical-cap formula with
     /// outward f64 intervals; it avoids asin/acos and falls back to [-1, 1]
     /// whenever the center ball may contain the origin or arithmetic cannot
-    /// be bounded.
+    /// be bounded. f64 square root is correctly rounded by the Rust primitive
+    /// contract; the implementation expands its endpoints by one adjacent value.
+    ///
+    /// Arithmetic assumes IEEE round-to-nearest for f64 addition, multiplication
+    /// and division, and gradual underflow. Do not compile this module with
+    /// fast-math or reassociation transformations.
     ///
     /// IMPORTANT: this bounds real cosine only. It does not enclose the
     /// canonical f32 score from similarity_full_resolution and is not
@@ -658,7 +659,10 @@ impl ContinuousHV {
 
         // a = sin(alpha) = r / ||center||. Its interval is non-negative.
         let a = F64Interval {
-            lo: (radius / center_norm.hi).max(0.0),
+            // The lower quotient must be rounded downward as well: ordinary
+            // f64 division is nearest-rounded and can otherwise overstate the
+            // smallest admissible cone half-angle.
+            lo: f64_next_down(radius / center_norm.hi).max(0.0),
             hi: f64_next_up(radius / center_norm.lo),
         };
         if !a.lo.is_finite() || !a.hi.is_finite() || a.hi >= 1.0 {
