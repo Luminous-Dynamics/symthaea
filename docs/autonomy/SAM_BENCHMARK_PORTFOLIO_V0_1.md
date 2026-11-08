@@ -133,6 +133,7 @@ These descriptors describe the system; the four coordinates describe the evidenc
 - **Rights:** code repository is Apache-2.0 and the dataset card declares Apache-2.0; retain source-video provenance and review third-party footage rights before commercial redistribution.
 - **Status:** upstream-reported; 14 models evaluated by authors, no SAM reproduction.
 - **Sources:** [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html), [project site](https://drivinggen-bench.github.io/), [code](https://github.com/youngzhou1999/DrivingGen), [dataset card](https://huggingface.co/datasets/yangzhou99/DrivingGen).
+- **SAM reproduction manifest:** [`SAM_DRIVINGGEN_REPRO_MANIFEST_V0_1.json`](fixtures/SAM_DRIVINGGEN_REPRO_MANIFEST_V0_1.json). Status remains `protocol_frozen_not_reproduced`; hosted dataset revision is deliberately unresolved pending an immutable commit SHA and exact sample-ID reconciliation.
 
 ### NAVSIM v2 / EPDMS — pseudo-simulation, not fully interactive closed loop
 
