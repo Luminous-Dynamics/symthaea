@@ -67,15 +67,28 @@ pub enum ParameterizationDigestError {
     #[error("parameter group {group_id} has an empty shape")]
     EmptyShape { group_id: String },
     #[error("parameter group {group_id} has a zero shape dimension at index {dimension_index}")]
-    ZeroShapeDimension { group_id: String, dimension_index: usize },
+    ZeroShapeDimension {
+        group_id: String,
+        dimension_index: usize,
+    },
     #[error("parameter group {group_id} shape overflows usize")]
     ShapeOverflow { group_id: String },
     #[error("parameter group {group_id} has {actual} coordinate names, expected {expected}")]
-    CoordinateCountMismatch { group_id: String, expected: usize, actual: usize },
+    CoordinateCountMismatch {
+        group_id: String,
+        expected: usize,
+        actual: usize,
+    },
     #[error("parameter group {group_id} has an empty coordinate name at index {coordinate_index}")]
-    EmptyCoordinateName { group_id: String, coordinate_index: usize },
+    EmptyCoordinateName {
+        group_id: String,
+        coordinate_index: usize,
+    },
     #[error("parameter group {group_id} has duplicate coordinate name {coordinate_name}")]
-    DuplicateCoordinateName { group_id: String, coordinate_name: String },
+    DuplicateCoordinateName {
+        group_id: String,
+        coordinate_name: String,
+    },
 }
 
 /// Construct a stable SHA-256 digest for a parameter-coordinate space.
@@ -93,7 +106,9 @@ pub fn canonical_parameterization_digest(
     descriptor: &ParameterizationDescriptor,
 ) -> Result<String, ParameterizationDigestError> {
     if descriptor.format_version != 1 {
-        return Err(ParameterizationDigestError::UnsupportedVersion(descriptor.format_version));
+        return Err(ParameterizationDigestError::UnsupportedVersion(
+            descriptor.format_version,
+        ));
     }
     if descriptor.architecture_id.trim().is_empty() {
         return Err(ParameterizationDigestError::EmptyArchitectureId);
@@ -108,7 +123,9 @@ pub fn canonical_parameterization_digest(
             return Err(ParameterizationDigestError::EmptyGroupId { index });
         }
         if !group_ids.insert(group.group_id.clone()) {
-            return Err(ParameterizationDigestError::DuplicateGroupId(group.group_id.clone()));
+            return Err(ParameterizationDigestError::DuplicateGroupId(
+                group.group_id.clone(),
+            ));
         }
         if group.semantic_role.trim().is_empty() {
             return Err(ParameterizationDigestError::EmptySemanticRole {
