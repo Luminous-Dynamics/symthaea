@@ -1,0 +1,104 @@
+name: G2P reference evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/g2p-eval/**"
+      - ".github/workflows/g2p-reference-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-scorer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "G2P_EVAL_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Apply pinned rustfmt and verify canonical output
+        run: |
+          rustfmt +1.96.0 --edition 2024 tools/g2p-eval/src/main.rs
+          rustfmt +1.96.0 --edition 2024 --check tools/g2p-eval/src/main.rs
+
+      - name: Upload canonical formatted source for exact-head review
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2p-eval-formatted-source-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tools/g2p-eval/src/main.rs
+          if-no-files-found: error
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/g2p-eval/Cargo.toml
+
+      - name: Run evaluator contract tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/g2p-eval/Cargo.toml
+
+      - name: Score synthetic positive and negative fixtures
+        run: |
+          cargo +1.96.0 run --locked --manifest-path tools/g2p-eval/Cargo.toml -- \
+            --references tools/g2p-eval/fixtures/references.jsonl \
+            --predictions tools/g2p-eval/fixtures/candidate.jsonl \
+            --output g2p-reference-report.json
+
+      - name: Verify exact synthetic-control expectations
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          with open("g2p-reference-report.json", encoding="utf-8") as f:
+              report = json.load(f)
+          metrics = report["metrics"]
+          assert metrics["phone_error_rate"] == 0.0, metrics
+          assert metrics["exact_pronunciation_rate"] == 1.0, metrics
+          assert metrics["oov_f1"] == 1.0, metrics
+          assert metrics["syllable_boundary_f1"] == 1.0, metrics
+          assert metrics["stress_accuracy"] == 1.0, metrics
+          assert len(report["by_language"]) == 1, report["by_language"]
+          assert len(report["by_profile"]) == 1, report["by_profile"]
+          assert report["by_profile"][0]["profile_id"] == "en-US-general-v1"
+          assert report["by_profile"][0]["phone_error_rate"] == 0.0
+          calibration = metrics["confidence_calibration"]
+          assert calibration["observations"] == 2, calibration
+          assert abs(calibration["brier_score"] - 0.01) < 1e-12, calibration
+          assert abs(calibration["expected_calibration_error"] - 0.1) < 1e-12, calibration
+          assert sum(b["observations"] for b in calibration["bins"]) == 2
+          assert report["by_profile"][0]["confidence_calibration"]["observations"] == 2
+          assert all(case["profile_id"] == "en-US-general-v1" for case in report["cases"])
+          by_case = {case["case_id"]: case for case in report["cases"]}
+          assert by_case["read-past"]["selected_reference_variant"] == "past"
+          assert by_case["read-present"]["selected_reference_variant"] == "present"
+          assert by_case["lead-noun"]["selected_reference_variant"] == "noun"
+          assert by_case["lead-verb"]["selected_reference_variant"] == "verb"
+          assert all(by_case[case_id]["exact_pronunciation"] is True for case_id in (
+              "read-past", "read-present", "lead-noun", "lead-verb"
+          ))
+          PY
+
+      - name: Upload synthetic scorer receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2p-reference-eval-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            g2p-reference-report.json
+            tools/g2p-eval/Cargo.lock
+          if-no-files-found: error

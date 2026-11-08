@@ -1,0 +1,49 @@
+name: Vocal run bundle verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-run-verifier/**"
+      - "examples/muse_vocal_release_gate.rs"
+      - ".github/workflows/vocal-run-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vocal-run-receipt-verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_RUN_VERIFIER_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/vocal-run-verifier/Cargo.toml -- --check
+
+      - name: Resolve isolated verifier dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-run-verifier/Cargo.toml
+
+      - name: Run independent bundle verifier tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-run-verifier/Cargo.toml
+
+      - name: Confirm verifier did not modify its lockfile after resolution
+        run: git diff --exit-code -- tools/vocal-run-verifier/Cargo.lock

@@ -16,6 +16,11 @@ pub struct VocalQualityMetrics {
     pub transition_pitch_p95_cents: f32,
     pub median_onset_error_ms: f32,
     pub duration_error_ms: f32,
+    pub rest_interval_count: usize,
+    /// Rest RMS relative to voiced-note RMS in dB; None when the score has no rest.
+    pub rest_leakage_db: Option<f32>,
+    /// None means no rest interval was available to evaluate.
+    pub rest_leakage_pass: Option<bool>,
     pub peak_sample_delta: f32,
     /// Peak first difference divided by whole-signal RMS. Reported for
     /// cross-level diagnostics; contextual click decisions remain local.
@@ -167,6 +172,8 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     }
     onset_errors.sort_by(f32::total_cmp);
     let median_onset_error_ms = percentile(&onset_errors, 0.5);
+    let (rest_interval_count, rest_leakage_db, rest_leakage_pass) =
+        rest_leakage_metrics(performance, &stem.samples, rate);
     let cleanliness = analyze_render_cleanliness(&stem.samples, rate);
     let peak_sample_delta = cleanliness.peak_sample_delta;
     let normalized_peak_sample_delta = cleanliness.normalized_peak_sample_delta;
@@ -204,6 +211,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         && timing_pass
         && physical_stability_pass
         && render_cleanliness_pass
+        && rest_leakage_pass != Some(false)
         // Raw physical renders intentionally retain diagnostic headroom. The
         // gallery emits a separate loudness-normalized listening copy, so a
         // clean quiet source must not fail the synthesis-quality gate merely
@@ -219,6 +227,9 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         transition_pitch_p95_cents,
         median_onset_error_ms,
         duration_error_ms,
+        rest_interval_count,
+        rest_leakage_db,
+        rest_leakage_pass,
         peak_sample_delta,
         normalized_peak_sample_delta,
         contextual_click_events,
@@ -235,6 +246,72 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         render_cleanliness_pass,
         objective_pass,
     }
+}
+
+fn rest_leakage_metrics(
+    performance: &VocalPerformance,
+    samples: &[f32],
+    sample_rate: u32,
+) -> (usize, Option<f32>, Option<bool>) {
+    let notes: Vec<_> = performance
+        .syllables
+        .iter()
+        .flat_map(|syllable| syllable.notes())
+        .collect();
+    if notes.is_empty() || sample_rate == 0 {
+        return (0, None, None);
+    }
+
+    let mut rest_intervals = Vec::new();
+    let first_start = notes[0].start_time.max(0.0);
+    if first_start > 0.005 {
+        rest_intervals.push((0.0, first_start));
+    }
+    for pair in notes.windows(2) {
+        let previous_end = pair[0].start_time + pair[0].duration;
+        let gap_start = previous_end.max(0.0);
+        let gap_end = pair[1].start_time.max(0.0);
+        if gap_end - gap_start > 0.005 {
+            rest_intervals.push((gap_start, gap_end));
+        }
+    }
+    if rest_intervals.is_empty() {
+        return (0, None, None);
+    }
+
+    let mut rest_energy = 0.0f64;
+    let mut rest_count = 0usize;
+    for (start_s, end_s) in &rest_intervals {
+        let start = ((*start_s * sample_rate as f32).floor() as usize).min(samples.len());
+        let end = ((*end_s * sample_rate as f32).ceil() as usize).min(samples.len());
+        for sample in &samples[start..end.max(start)] {
+            rest_energy += (*sample as f64) * (*sample as f64);
+            rest_count += 1;
+        }
+    }
+
+    let mut voiced_energy = 0.0f64;
+    let mut voiced_count = 0usize;
+    for note in notes {
+        let start =
+            ((note.start_time.max(0.0) * sample_rate as f32).floor() as usize).min(samples.len());
+        let end = (((note.start_time + note.duration).max(0.0) * sample_rate as f32).ceil()
+            as usize)
+            .min(samples.len());
+        for sample in &samples[start..end.max(start)] {
+            voiced_energy += (*sample as f64) * (*sample as f64);
+            voiced_count += 1;
+        }
+    }
+
+    if rest_count == 0 || voiced_count == 0 {
+        return (rest_intervals.len(), None, None);
+    }
+    let rest_rms = (rest_energy / rest_count as f64).sqrt();
+    let voiced_rms = (voiced_energy / voiced_count as f64).sqrt();
+    let leakage_db = (20.0 * (rest_rms / voiced_rms.max(1e-12)).max(1e-12).log10()) as f32;
+    let pass = leakage_db <= -35.0;
+    (rest_intervals.len(), Some(leakage_db), Some(pass))
 }
 
 fn contextual_clicks(samples: &[f32], sample_rate: u32) -> (usize, f32) {
@@ -307,26 +384,7 @@ fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
 }
 
 fn expected_pitch_at(performance: &VocalPerformance, time: f32) -> Option<f32> {
-    let points = &performance.pitch_curve;
-    if points.is_empty() {
-        return None;
-    }
-    for pair in points.windows(2) {
-        if time >= pair[0].time_s && time <= pair[1].time_s {
-            let span = pair[1].time_s - pair[0].time_s;
-            if span <= f32::EPSILON {
-                return Some(pair[1].frequency_hz);
-            }
-            let t = ((time - pair[0].time_s) / span).clamp(0.0, 1.0);
-            return Some(pair[0].frequency_hz + (pair[1].frequency_hz - pair[0].frequency_hz) * t);
-        }
-    }
-    performance
-        .syllables
-        .iter()
-        .flat_map(|s| s.notes())
-        .find(|note| time >= note.start_time && time < note.start_time + note.duration)
-        .map(|note| note.frequency)
+    performance.target_pitch_at(time)
 }
 
 fn percentile(values: &[f32], q: f32) -> f32 {
@@ -415,6 +473,70 @@ mod tests {
         let clicked = analyze_render_cleanliness(&samples, rate);
         assert!(!clicked.render_cleanliness_pass, "{clicked:?}");
         assert!(clicked.contextual_click_events > 0);
+    }
+
+    #[test]
+    fn rest_leakage_is_measured_relative_to_voiced_material() {
+        let notes = [
+            symthaea_muse::Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+            symthaea_muse::Note {
+                frequency: 220.0,
+                start_time: 0.75,
+                duration: 0.5,
+                velocity: 0.8,
+            },
+        ];
+        let performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        let rate = 24_000;
+        let samples: Vec<_> = (0..rate * 5 / 4)
+            .map(|index| {
+                let time = index as f32 / rate as f32;
+                if (time < 0.5) || (0.75..1.25).contains(&time) {
+                    (std::f32::consts::TAU * 220.0 * time).sin() * 0.2
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let (intervals, leakage_db, pass) = rest_leakage_metrics(&performance, &samples, rate);
+        assert_eq!(intervals, 1);
+        assert!(leakage_db.unwrap() <= -35.0);
+        assert_eq!(pass, Some(true));
+
+        let leaked: Vec<_> = (0..rate * 5 / 4)
+            .map(|index| {
+                let time = index as f32 / rate as f32;
+                if (time < 0.5) || (0.75..1.25).contains(&time) {
+                    (std::f32::consts::TAU * 220.0 * time).sin() * 0.2
+                } else {
+                    (std::f32::consts::TAU * 220.0 * time).sin() * 0.02
+                }
+            })
+            .collect();
+        let (_, leaked_db, leaked_pass) = rest_leakage_metrics(&performance, &leaked, rate);
+        assert!(leaked_db.unwrap() > -35.0);
+        assert_eq!(leaked_pass, Some(false));
+    }
+
+    #[test]
+    fn no_rest_has_undefined_rest_leakage_not_a_fake_zero() {
+        let note = symthaea_muse::Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let (intervals, leakage_db, pass) =
+            rest_leakage_metrics(&performance, &[0.0; 12_000], 24_000);
+        assert_eq!(intervals, 0);
+        assert_eq!(leakage_db, None);
+        assert_eq!(pass, None);
     }
 
     #[test]

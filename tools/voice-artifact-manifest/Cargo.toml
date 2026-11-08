@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-voice-artifact-manifest"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Content-addressed, symlink-rejecting model and voicebank artifact manifests"
+
+[dependencies]
+blake3 = "=1.8.2"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.154"
+
+[workspace]

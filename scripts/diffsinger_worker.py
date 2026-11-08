@@ -43,6 +43,8 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+from diffsinger_phonemes import flatten_performance_phones, resolve_language_id
+
 HEAD_FRAMES = 8
 TAIL_FRAMES = 8
 SAMPLE_RATE = 44100
@@ -50,27 +52,6 @@ HOP_SIZE = 512
 FRAME_MS = 1000.0 * HOP_SIZE / SAMPLE_RATE  # ~11.61 ms
 PROTOCOL_VERSION = 1
 PROVIDER_ID = "diffsinger-local"
-
-# IPA -> ARPAbet-style phone (matches src/voice/diffsinger_phonemes.rs's
-# now-removed Rust table 1:1 -- kept here since this is the only remaining
-# copy after the Rust ONNX path was replaced by this worker).
-IPA_TO_ARPABET = {
-    "aɪ": ["ay"], "aʊ": ["aw"], "eɪ": ["ey"], "oʊ": ["ow"], "ɔɪ": ["oy"],
-    "iː": ["iy"], "uː": ["uw"], "ɑː": ["aa"], "ɔː": ["ao"], "ɜː": ["er"],
-    "æ": ["ae"], "ɑ": ["aa"], "ɒ": ["aa"], "ɔ": ["ao"], "ə": ["ax"],
-    "ɛ": ["eh"], "ɪ": ["ih"], "ʊ": ["uh"], "ʌ": ["ah"], "i": ["iy"],
-    "u": ["uw"], "a": ["ah"],
-    "tʃ": ["ch"], "dʒ": ["jh"], "ð": ["dh"], "ŋ": ["ng"], "ɹ": ["r"],
-    "ʃ": ["sh"], "ʒ": ["zh"], "θ": ["th"],
-    "b": ["b"], "d": ["d"], "f": ["f"], "ɡ": ["g"], "g": ["g"], "h": ["hh"],
-    "j": ["y"], "k": ["k"], "l": ["l"], "m": ["m"], "n": ["n"], "p": ["p"],
-    "s": ["s"], "t": ["t"], "v": ["v"], "w": ["w"], "z": ["z"],
-    "ks": ["k", "s"],
-}
-
-
-def ipa_to_arpabet(ipa: str):
-    return IPA_TO_ARPABET.get(ipa, ["ax"])
 
 
 def hz_to_tone(hz: float) -> float:
@@ -117,49 +98,45 @@ class DiffSingerModel:
         return self.phoneme_ids.get(phoneme)
 
     def language_id(self, lang: str) -> int:
-        return self.language_ids.get(lang, 0)
+        return resolve_language_id(self.language_ids, lang)
 
     def build_score(self, performance: dict):
         """Walk a serialized VocalPerformance into (tokens, languages,
         ph_dur, f0) arrays, SP-padded, matching diffsinger_singing.rs's
         (now-removed) design: proportional per-syllable phoneme timing from
-        natural_duration_s, melisma notes held on the syllable's last
-        phoneme."""
-        arpabet_phonemes = []
-        durations_ms = []
-        target_hz = []
-
-        for syllable in performance["syllables"]:
-            phonemes = syllable["phonemes"]
-            total_natural_ms = max(sum(p["natural_duration_s"] * 1000.0 for p in phonemes), 1.0)
-            note_ms = max(syllable["note"]["duration"] * 1000.0, 1.0)
-            last_arpabet = "ax"
-            for phoneme in phonemes:
-                for arpabet in ipa_to_arpabet(phoneme["ipa"]):
-                    arpabet_phonemes.append(arpabet)
-                    share = (phoneme["natural_duration_s"] * 1000.0) / total_natural_ms
-                    durations_ms.append(max(share * note_ms, 1.0))
-                    target_hz.append(syllable["note"]["frequency"])
-                    last_arpabet = arpabet
-            for melisma_note in syllable["melisma_notes"]:
-                arpabet_phonemes.append(last_arpabet)
-                durations_ms.append(max(melisma_note["duration"] * 1000.0, 1.0))
-                target_hz.append(melisma_note["frequency"])
-
-        if not arpabet_phonemes:
+        natural_duration_s, melisma notes held on the syllable's final
+        explicitly marked vowel."""
+        language = performance.get("language")
+        if language != "en":
+            raise ValueError(
+                f"DiffSinger worker currently supports language='en' only; got {language!r}"
+            )
+        language_id = self.language_id(language)
+        events = flatten_performance_phones(performance)
+        if not events:
             return None
+        arpabet_phonemes = [event[0] for event in events]
+        durations_ms = [event[1] for event in events]
+        target_hz = [event[2] for event in events]
 
-        tokens = [self.phoneme_token("SP")]
-        languages = [0]
+        silence_token = self.phoneme_token("SP")
+        if silence_token is None:
+            raise ValueError("voicebank phonemes.json has no entry for 'SP'")
+        tokens = [silence_token]
+        languages = [language_id]
         for arpabet in arpabet_phonemes:
             namespaced = f"en/{arpabet}"
+            if arpabet == "SP":
+                tokens.append(silence_token)
+                languages.append(language_id)
+                continue
             token = self.phoneme_token(namespaced)
             if token is None:
                 raise ValueError(f"voicebank phonemes.json has no entry for '{namespaced}'")
             tokens.append(token)
-            languages.append(self.language_id("en"))
-        tokens.append(self.phoneme_token("SP"))
-        languages.append(0)
+            languages.append(language_id)
+        tokens.append(silence_token)
+        languages.append(language_id)
 
         head_ms = FRAME_MS * HEAD_FRAMES
         tail_ms = FRAME_MS * TAIL_FRAMES
