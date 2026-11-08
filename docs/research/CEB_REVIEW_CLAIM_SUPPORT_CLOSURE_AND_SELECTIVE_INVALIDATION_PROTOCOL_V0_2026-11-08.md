@@ -58,7 +58,7 @@ The closure must include:
 7. authority and authorization roots needed for current use;
 8. upstream claims from which the finding was derived.
 
-A source citation without these relevant dependencies is incomplete for a consequential claim. A complete closure does not mean every file in the repository; it means every dependency necessary for that specific claim and declared scope.
+A source citation without these relevant dependencies is incomplete for a consequential claim. A complete closure does not mean every file in the repository; it means every dependency necessary for that specific claim and declared scope. The closure must be **minimum-sufficient, not maximal**: include a node as validity-bearing only when a change to that node could alter the proposition, applicability scope, authority or evidentiary sufficiency under the stated assumptions. For every such edge, record why it is validity-bearing. Context-only provenance may remain visible, but it must not automatically propagate invalidation. An over-approximated closure inflates false invalidation and revalidation cost; an under-approximated closure creates false retain.
 
 ### 2.2 Closure completeness is itself a claim
 
@@ -226,6 +226,7 @@ Each case family should include controls for:
 - **unknown closure:** missing caller/dependency data must prevent an unjustified retain;
 - **irrelevant metadata:** formatting or a display label does not invalidate claims if evaluation inputs and semantics are identical;
 - **common-origin evidence:** copied tests/logs/docs share one provenance root and are not independent support.
+- **context-only dependency:** a file, service or record is mentioned in the same workflow but cannot affect the claim's truth/scope/authority under the stated contract; it must not become a required support edge solely by proximity.
 
 ## 9. Integration and ownership boundaries
 
