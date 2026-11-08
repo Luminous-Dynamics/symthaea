@@ -13,6 +13,7 @@ ndarray = { workspace = true }
 rusqlite = { workspace = true }
 serde = { workspace = true }
 symthaea-core = { path = "../../core/symthaea-core" }
+blake3 = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
 uuid = { workspace = true }
