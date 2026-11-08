@@ -890,6 +890,16 @@ This is a quotient-space operation: it changes coordinates while preserving the 
 
 ---
 
-## 10. Claim boundary
+## 10. Sequential decision-focused diagnostics
+
+The one-step EVSI kernel is now complemented by a bounded finite-horizon planner in `crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs`.
+
+The planner recomputes Bayesian model beliefs after every candidate observation, chooses follow-up diagnostics conditionally, prohibits action reuse on a path, and includes an explicit stop action at every node. It minimizes expected terminal Bayes risk plus observation-cost and safety-risk penalties. Search is bounded by maximum hypothesis, action, outcome, and belief-node counts; budget exhaustion fails closed.
+
+The critical fixture is a four-hypothesis XOR task. Two diagnostic probes independently reveal two latent fault bits, while the downstream repair decision depends on their XOR. Each probe alone has positive model information gain but zero one-step decision value. A two-probe adaptive sequence identifies the correct downstream decision. This is a mathematical conformance fixture, not an empirical performance result.
+
+Tracking: [issue #11179](https://github.com/Luminous-Dynamics/symthaea/issues/11179). Required next step: extend the paired diagnostic benchmark to compare myopic EVSI and bounded sequential EVSI under identical probe, compute, and cost budgets, including model-likelihood misspecification.
+
+## 11. Claim boundary
 
 This document defines hypotheses and an experiment. It does not claim that current Symthaea FEP action selection performs valid expected-information planning, that WSP is implemented as an autonomous editor, that HDC/CfC/FEP/WSP adapters are integrated, that the architecture exceeds any SOTA system, that weight edits are safe in general, or that any consciousness property has been demonstrated.
