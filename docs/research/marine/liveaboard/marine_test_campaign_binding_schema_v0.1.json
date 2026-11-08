@@ -254,7 +254,8 @@
         "analysis_profile_ref",
         "sampling_adequacy_review_ref",
         "uncertainty_budget_ref",
-        "review_authority_ref"
+        "review_authority_ref",
+        "max_sync_uncertainty_us"
       ],
       "properties": {
         "analysis_profile_ref": {
@@ -278,6 +279,13 @@
             "string",
             "null"
           ]
+        },
+        "max_sync_uncertainty_us": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     },
@@ -324,7 +332,8 @@
         "calibration",
         "clock",
         "observation",
-        "evidence_class"
+        "evidence_class",
+        "as_built_configuration_digest"
       ],
       "properties": {
         "channel_id": {
@@ -595,6 +604,9 @@
             "hil",
             "phil"
           ]
+        },
+        "as_built_configuration_digest": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
