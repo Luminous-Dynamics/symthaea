@@ -1889,9 +1889,9 @@ mod tests {
         );
         assert_eq!(
             policy_portfolio_sha256_hex(full_bound.certificate_sha256),
-            "416007510448185aa153c2e4af0dc2df3b184ae190b0a67edada1ec745124cb3"
+            "a943abfaa5fd8c57bb251b24f6346719a85058db74a4373c6cd930fbb60b1c13"
         );
-        assert_eq!(full_bound.dp_multiply_adds, 12);
+        assert_eq!(full_bound.dp_multiply_adds, 16);
         assert_eq!(
             full_bound.per_model.iter().map(|item| (
                 item.unrestricted_optimal_value,
