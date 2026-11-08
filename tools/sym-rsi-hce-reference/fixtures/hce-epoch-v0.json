@@ -1,0 +1,110 @@
+{
+  "schema_version": "sym-rsi-hce-epoch-v0",
+  "status": "SYNTHETIC_HCE_FIXTURE_NOT_PREREGISTERED",
+  "epoch_id": "hce-synthetic-epoch-001",
+  "task_family_id": "synthetic-continual-learning-family",
+  "candidate_population_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "evaluator_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tool_contract_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "search_budget": {
+    "max_candidates": 64,
+    "max_search_evaluations": 256,
+    "max_wall_clock_hours": 24
+  },
+  "splits": [
+    {
+      "split_id": "train-v0",
+      "role": "train",
+      "task_family_id": "synthetic-continual-learning-family",
+      "case_count": 800,
+      "membership_commitment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "features_visible_to_agent": true,
+      "labels_visible_to_agent": true,
+      "score_visible_to_agent": false,
+      "search_evaluator_access": false,
+      "final_selection_access": false,
+      "confirmation_evaluator_access": false,
+      "transfer_evaluator_access": false,
+      "fresh_family": false,
+      "custodian_id": "custodian-train"
+    },
+    {
+      "split_id": "search-v0",
+      "role": "search",
+      "task_family_id": "synthetic-continual-learning-family",
+      "case_count": 100,
+      "membership_commitment_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "features_visible_to_agent": false,
+      "labels_visible_to_agent": false,
+      "score_visible_to_agent": true,
+      "search_evaluator_access": true,
+      "final_selection_access": false,
+      "confirmation_evaluator_access": false,
+      "transfer_evaluator_access": false,
+      "fresh_family": false,
+      "custodian_id": "custodian-search"
+    },
+    {
+      "split_id": "selection-v0",
+      "role": "selection",
+      "task_family_id": "synthetic-continual-learning-family",
+      "case_count": 100,
+      "membership_commitment_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "features_visible_to_agent": false,
+      "labels_visible_to_agent": false,
+      "score_visible_to_agent": false,
+      "search_evaluator_access": false,
+      "final_selection_access": true,
+      "confirmation_evaluator_access": false,
+      "transfer_evaluator_access": false,
+      "fresh_family": false,
+      "custodian_id": "custodian-selection"
+    },
+    {
+      "split_id": "confirmation-v0",
+      "role": "confirmation",
+      "task_family_id": "synthetic-continual-learning-family",
+      "case_count": 100,
+      "membership_commitment_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "features_visible_to_agent": false,
+      "labels_visible_to_agent": false,
+      "score_visible_to_agent": false,
+      "search_evaluator_access": false,
+      "final_selection_access": false,
+      "confirmation_evaluator_access": true,
+      "transfer_evaluator_access": false,
+      "fresh_family": false,
+      "custodian_id": "custodian-confirmation"
+    },
+    {
+      "split_id": "transfer-v0",
+      "role": "transfer",
+      "task_family_id": "synthetic-new-domain-family",
+      "case_count": 80,
+      "membership_commitment_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "features_visible_to_agent": false,
+      "labels_visible_to_agent": false,
+      "score_visible_to_agent": false,
+      "search_evaluator_access": false,
+      "final_selection_access": false,
+      "confirmation_evaluator_access": false,
+      "transfer_evaluator_access": true,
+      "fresh_family": true,
+      "custodian_id": "custodian-transfer"
+    }
+  ],
+  "selection_policy": {
+    "finalize_search_before_selection": true,
+    "search_cannot_read_selection": true,
+    "selection_score_not_returned_to_search": true,
+    "confirmation_after_candidate_freeze": true,
+    "transfer_after_candidate_freeze": true
+  },
+  "overlap_audit": {
+    "independent_custodian_id": "independent-split-custodian-01",
+    "exact_membership_comparison_completed": true,
+    "zero_overlap_declared": true,
+    "audited_split_count": 5,
+    "audit_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "trace_id": "interactive-react-synthetic-001",
+  "candidate_id": "candidate-react-01",
+  "mode": "interactive_react",
+  "max_steps": 8,
+  "max_tool_calls": 3,
+  "wall_clock_budget_ms": 10000,
+  "max_resource_cost_units": 10,
+  "allowed_tools": [
+    {
+      "tool_id": "artifact-inspector",
+      "permission_id": "perm-read-artifacts"
+    },
+    {
+      "tool_id": "sandbox-executor",
+      "permission_id": "perm-exec-sandbox"
+    }
+  ],
+  "actions": [
+    {
+      "step": 1,
+      "kind": "inspect",
+      "start_ms": 0,
+      "end_ms": 200,
+      "disposition": "succeeded",
+      "tool_call": true,
+      "tool_id": "artifact-inspector",
+      "permission_id": "perm-read-artifacts",
+      "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "resource_cost_units": 0.2
+    },
+    {
+      "step": 2,
+      "kind": "hypothesize",
+      "start_ms": 201,
+      "end_ms": 400,
+      "disposition": "succeeded",
+      "tool_call": false,
+      "tool_id": null,
+      "permission_id": null,
+      "input_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "resource_cost_units": 0.1
+    },
+    {
+      "step": 3,
+      "kind": "execute",
+      "start_ms": 401,
+      "end_ms": 1000,
+      "disposition": "failed",
+      "tool_call": true,
+      "tool_id": "sandbox-executor",
+      "permission_id": "perm-exec-sandbox",
+      "input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "output_sha256": null,
+      "resource_cost_units": 1
+    },
+    {
+      "step": 4,
+      "kind": "observe",
+      "start_ms": 1001,
+      "end_ms": 1100,
+      "disposition": "succeeded",
+      "tool_call": false,
+      "tool_id": null,
+      "permission_id": null,
+      "input_sha256": null,
+      "output_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "resource_cost_units": 0
+    },
+    {
+      "step": 5,
+      "kind": "revise",
+      "start_ms": 1101,
+      "end_ms": 1300,
+      "disposition": "succeeded",
+      "tool_call": false,
+      "tool_id": null,
+      "permission_id": null,
+      "input_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "resource_cost_units": 0.1
+    },
+    {
+      "step": 6,
+      "kind": "execute",
+      "start_ms": 1301,
+      "end_ms": 2200,
+      "disposition": "succeeded",
+      "tool_call": true,
+      "tool_id": "sandbox-executor",
+      "permission_id": "perm-exec-sandbox",
+      "input_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "output_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "resource_cost_units": 2
+    },
+    {
+      "step": 7,
+      "kind": "observe",
+      "start_ms": 2201,
+      "end_ms": 2300,
+      "disposition": "succeeded",
+      "tool_call": false,
+      "tool_id": null,
+      "permission_id": null,
+      "input_sha256": null,
+      "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "resource_cost_units": 0
+    },
+    {
+      "step": 8,
+      "kind": "submit",
+      "start_ms": 2301,
+      "end_ms": 2400,
+      "disposition": "succeeded",
+      "tool_call": false,
+      "tool_id": null,
+      "permission_id": null,
+      "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "output_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "resource_cost_units": 0
+    }
+  ]
+}
