@@ -294,6 +294,20 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
         report.perfect_information_evsi,
         &["exact_information_value_controls", "1", "expected_value_of_sample_information"],
     )?;
+    close_fixture(
+        entropy(&[prior, safe_prior]),
+        &["exact_information_value_controls", "1", "expected_entropy_reduction_bits"],
+    )?;
+    let baseline_action = conditional_decision(
+        prior,
+        losses[0],
+        losses[1],
+        losses[2],
+        losses[3],
+    ).1;
+    if baseline_action != string(fixture, &["decision_model", "baseline_bayes_action"])? {
+        return Err("baseline Bayes action does not match the fixture".to_owned());
+    }
 
     close_fixture(
         report.single_reading.expected_risk,
