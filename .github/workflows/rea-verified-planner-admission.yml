@@ -1,0 +1,71 @@
+name: REA Verified Planner Admission
+
+on:
+  pull_request:
+    paths:
+      - "tools/rea-verified-planner-admission/**"
+      - "crates/domains/symthaea-rea-compat/**"
+      - "crates/domains/symthaea-rea-investigator/**"
+      - ".github/workflows/rea-verified-planner-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-verified-planner-admission-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUSTUP_TOOLCHAIN: "1.99.1"
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.99.1"
+          components: rustfmt, clippy
+
+      - name: Generate isolated adapter lockfile
+        run: cargo generate-lockfile --manifest-path tools/rea-verified-planner-admission/Cargo.toml
+
+      - name: Verify exact revision and toolchain
+        run: |
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          rustc --version --verbose
+          cargo --version
+          sha256sum tools/rea-verified-planner-admission/Cargo.lock
+
+      - name: Normalize Rust formatting for source export
+        run: cargo fmt --manifest-path tools/rea-verified-planner-admission/Cargo.toml
+
+      - name: Archive rustfmt-normalized source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-verified-planner-admission-rustfmt-source
+          path: tools/rea-verified-planner-admission/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Formatting export only
+        run: echo "This run exports rustfmt-normalized source only; compile, tests and Clippy run after the source is committed."
+
+      - name: Archive exact adapter lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-verified-planner-admission-lockfile
+          path: tools/rea-verified-planner-admission/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 7
