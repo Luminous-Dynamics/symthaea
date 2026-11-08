@@ -22,21 +22,26 @@ cd "$(dirname "$0")/.."  # -> symthaea/
 # Member globs — must mirror [workspace].members in Cargo.toml (immediate children).
 MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 
-# Excluded members — must mirror [workspace].exclude in Cargo.toml.
-EXCLUDES=(
-  "crates/core/symthaea-zkproof/methods"
-  "crates/core/symthaea-zkproof/host"
-  "crates/domains/symthaea-spore/fuzz"
-  "crates/domains/spark-engine"
-  "crates/domains/symthaea-lab"
-  # Root-glob directories without a Cargo.toml; see Cargo.toml [workspace].exclude.
-  "crates/core/symthaea"
-  "crates/core/symthaea-iit"
-  "crates/core/symthaea-observation-attestation"
-  "crates/domains/symthaea-architecture-engineering"
-  "crates/domains/symthaea-dishwasher-design"
-  "crates/domains/symthaea-rea-compat"
-  "crates/domains/symthaea-rea-evidence-verifier"
+# Derive exclusions from the actual Cargo manifest so the filesystem guard
+# cannot drift from [workspace].exclude. The workspace block is a simple
+# multiline string array; comments and whitespace are stripped by this parser.
+EXCLUDES=()
+while IFS= read -r excluded_member; do
+  [[ -n "$excluded_member" ]] && EXCLUDES+=("$excluded_member")
+done < <(
+  awk '
+    BEGIN { in_workspace = 0; in_exclude = 0 }
+    /^\[workspace\]$/ { in_workspace = 1; next }
+    /^\[/ { in_workspace = 0; in_exclude = 0; next }
+    in_workspace && /^exclude[[:space:]]*=/ { in_exclude = 1; next }
+    in_exclude && /^[[:space:]]*\]/ { in_exclude = 0; next }
+    in_exclude {
+      line = $0
+      sub(/#.*/, "", line)
+      gsub(/["[:space:],]/, "", line)
+      if (line != "") print line
+    }
+  ' Cargo.toml
 )
 
 is_excluded() {
