@@ -37,8 +37,9 @@ pub mod theory_prediction;
 
 pub use theory_prediction::{
     ComparisonBlocker, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
-    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictionCoverage, PredictionDisposition,
-    THEORY_PREDICTION_SCHEMA, TheoryModel, TheoryModelRole, TheoryPredictionError,
+    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictionCoverage,
+    PredictiveUncertaintyStatus, PredictionDisposition, THEORY_PREDICTION_SCHEMA, TheoryModel,
+    TheoryModelRole, TheoryPredictionError,
     TheoryPredictionLedger, TheoryPredictionRecord,
 };
 
