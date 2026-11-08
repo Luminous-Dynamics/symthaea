@@ -1568,6 +1568,34 @@ fn masked_optimal_value(
     Ok(initial_value)
 }
 
+/// Conservative deterministic rational multiply/add count for one
+/// unrestricted plus one masked Bellman DP on every model in the cluster.
+fn policy_mask_dp_multiply_adds(
+    family: &FiniteUmdpModelFamily,
+    model_count: usize,
+) -> Result<usize, PolicyPortfolioError> {
+    let horizon = family.horizon();
+    let states = family.state_count();
+    let actions = family.action_count();
+    let transition_ops = horizon.saturating_sub(1)
+        .checked_mul(states)
+        .and_then(|value| value.checked_mul(actions))
+        .and_then(|value| value.checked_mul(states))
+        .and_then(|value| value.checked_mul(2))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let step_ops = horizon.checked_mul(states)
+        .and_then(|value| value.checked_mul(actions))
+        .and_then(|value| value.checked_add(
+            horizon.saturating_sub(1).checked_mul(states)?.checked_mul(actions)?
+        ))
+        .and_then(|value| value.checked_add(states.checked_mul(2)?))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    transition_ops.checked_add(step_ops)
+        .and_then(|value| value.checked_mul(model_count))
+        .and_then(|value| value.checked_mul(2))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)
+}
+
 /// Compute an exact rational lower bound for the best common policy in a
 /// finite model cluster under the supplied action mask.
 ///
@@ -1638,24 +1666,10 @@ pub fn compute_policy_mask_cluster_lower_bound(
         });
     }
 
-    let transition_ops = horizon.saturating_sub(1)
-        .checked_mul(states)
-        .and_then(|value| value.checked_mul(actions))
-        .and_then(|value| value.checked_mul(states))
-        .and_then(|value| value.checked_mul(2))
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    let step_ops = horizon.checked_mul(states)
-        .and_then(|value| value.checked_mul(actions))
-        .and_then(|value| value.checked_add(horizon.saturating_sub(1).checked_mul(states)?.checked_mul(actions)?))
-        .and_then(|value| value.checked_add(states.checked_mul(2)?))
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    let one_model_dp_ops = transition_ops.checked_add(step_ops)
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    // One unrestricted DP plus one masked DP for each model in the cluster.
-    let dp_multiply_adds = cluster_model_indices.len()
-        .checked_mul(one_model_dp_ops)
-        .and_then(|value| value.checked_mul(2))
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let dp_multiply_adds = policy_mask_dp_multiply_adds(
+        family,
+        cluster_model_indices.len(),
+    )?;
     if dp_multiply_adds > budget.max_dp_multiply_adds {
         return Err(PolicyPortfolioError::BudgetExceeded {
             resource: "action-mask Bellman multiply-add work",
@@ -2353,7 +2367,7 @@ pub fn solve_exact_cluster_policy_bnb(
         let (forced, forbidden) = mask.split_on_action(
             family, time, state, action, budget.per_node,
         )?;
-        frontier.try_reserve(2).map_err(|_| {
+        frontier.try_reserve_exact(2).map_err(|_| {
             PolicyPortfolioError::AllocationFailed { resource: "cluster B&B child frontier", entries: 2 }
         })?;
         // LIFO: visit the force-action (lower-index) child first.
