@@ -1821,7 +1821,10 @@
         "The project page's 36 model–harness configurations is a separate project-level count and must not replace the paper's 19-model common-harness denominator.",
         "The 4,993 hidden cases include valid alternatives and attacks; the project page identifies 798 attack cases. Positive acceptance and negative rejection must be audited separately.",
         "The paper reports that generated verifiers reject invalid solutions more reliably than they accept all valid alternatives; many false rejections arose from verifiers accepting no tested solution.",
-        "Verifier4Verifier's six checks qualify source verifiers and suites for this benchmark; they do not establish CEB's own evaluator independence, runner isolation, or signer trust."
+        "Verifier4Verifier's six checks qualify source verifiers and suites for this benchmark; they do not establish CEB's own evaluator independence, runner isolation, or signer trust.",
+        "The project page labels the submission under review and displayed no released code/data links when accessed on 2026-11-08; treat these as a paper/project snapshot, not an independent replication.",
+        "The benchmark reports 1,566 positive and 3,427 negative labels; the 1,344 Alt. cases are cosmetic changes plus valid alternatives (a subset of positives), not 1,344 additional tasks.",
+        "The 1,410 task–operator configurations are mutation-testing coverage for the source reference material, not 1,410 independent tasks or generated-verifier model runs."
       ]
     },
     {
@@ -7618,7 +7621,7 @@
         "operator": "reported_qualitative",
         "unit": "qualitative finding",
         "direction": "not_applicable",
-        "raw_display": "Normalized balanced accuracy ranges from 10.6 to 62.1; generated verifiers reject invalid solutions more reliably than they accept all valid alternatives.",
+        "raw_display": "Normalized balanced accuracy is 10.6–62.1 across 19 pi-harness models; TPR is 21.1–70.2% versus TNR 79.2–96.3%, with TPR below TNR for every model.",
         "uncertainty": {
           "status": "not_reported",
           "raw_notation": "not reported for this observation",
@@ -7630,8 +7633,8 @@
         }
       },
       "notes": [
-        "The 10.6–62.1 range is across 19 models, not a single model score; do not rank the endpoints as systems.",
-        "The paper reports many false rejections from verifiers that accepted no tested solution, underscoring the need for explicit positive controls."
+        "The 10.6–62.1 range is across 19 pi-harness models, not a single model score; all 36 project-listed model–harness configurations are reported below the TPR=TNR line.",
+        "For nine models with archived task-level records, verifiers that reject every case in a task account for 87.9–96.0% of false rejections; a high negative-rejection rate can therefore hide zero acceptance of valid solutions."
       ]
     },
     {
@@ -7834,6 +7837,142 @@
       },
       "notes": [
         "Descriptive later cohort observation; do not infer a monotonic trend or generalize to other tasks and harnesses."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-positive-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-case-label-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Aggregate PASS labels"
+      },
+      "metric": {
+        "metric_id": "positive_case_count",
+        "label": "Positive reference cases",
+        "definition": "Number of hidden cases labeled PASS by the reference task requirements.",
+        "value": 1566,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "1,566 PASS",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "positive_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "Positive cases include gold, cosmetic variants and valid alternative solutions."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-negative-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-case-label-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Aggregate FAIL labels"
+      },
+      "metric": {
+        "metric_id": "negative_case_count",
+        "label": "Negative reference cases",
+        "definition": "Number of hidden cases labeled FAIL by the reference task requirements.",
+        "value": 3427,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "3,427 FAIL",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "negative_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The 798 attack cases are a subset of FAIL, not additional cases."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-alternative-positive-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-alternative-case-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Positive variation subset"
+      },
+      "metric": {
+        "metric_id": "alternate-positive_case_count",
+        "label": "Alternative positive cases",
+        "definition": "Number of Alt. cases, combining cosmetic variations and valid alternative solutions, which remain PASS.",
+        "value": 1344,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "1,344 Alt. (cosmetic + valid alternatives)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "alternate-positive_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This is a subset of the 1,566 PASS cases; it is not a separate denominator or a count of only semantic alternatives."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-reference-mutation-configuration-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-reference-mutation-coverage",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Reference-verifier mutation testing"
+      },
+      "metric": {
+        "metric_id": "mutation_test_configuration_count",
+        "label": "Reference mutation-test configurations",
+        "definition": "Number of task–operator configurations used to test whether weakening a source verifier check changes at least one valid decision.",
+        "value": 1410,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "task–operator configurations",
+        "direction": "not_applicable",
+        "raw_display": "1,410 task–operator configurations",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "mutation_test_configuration_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This is mutation coverage for the source reference material, not a model run count or independent task denominator."
       ]
     }
   ]
