@@ -388,9 +388,7 @@ fn validate_decoded_proof_tree(proof: &QbfGameProof) -> Result<(), StrategyPortf
                 ..
             } => {
                 if low_child == high_child {
-                    return Err(StrategyPortfolioError::ProofEncodingInvalid {
-                    offset: parent,
-                });
+                    return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: parent });
                 }
                 [Some(*low_child), Some(*high_child)]
             }
@@ -398,9 +396,7 @@ fn validate_decoded_proof_tree(proof: &QbfGameProof) -> Result<(), StrategyPortf
         };
         for child in children.into_iter().flatten() {
             if child >= parent {
-                return Err(StrategyPortfolioError::ProofEncodingInvalid {
-                    offset: parent,
-                });
+                return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: parent });
             }
             parent_counts[child] = parent_counts[child]
                 .checked_add(1)
@@ -522,10 +518,7 @@ pub fn decode_qbf_game_proof(
             high_child,
         } = &kind
         {
-            if *variable >= variable_count
-                || *low_child >= node_index
-                || *high_child >= node_index
-            {
+            if *variable >= variable_count || *low_child >= node_index || *high_child >= node_index {
                 return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: tag_offset });
             }
         }
