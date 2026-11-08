@@ -376,7 +376,7 @@ impl ModelDiscriminationConfig {
                     actual: scenario.probabilities.len(),
                 });
             }
-            let mut total = 0.0;
+            let mut maximum_probability = 0.0_f64;
             for (probability_index, probability) in
                 scenario.probabilities.iter().copied().enumerate()
             {
@@ -386,9 +386,9 @@ impl ModelDiscriminationConfig {
                         index: probability_index,
                     });
                 }
-                total += probability;
+                maximum_probability = maximum_probability.max(probability);
             }
-            if !total.is_finite() || total <= 0.0 {
+            if maximum_probability <= 0.0 {
                 return Err(ModelDiscriminationError::ZeroPriorProbability(
                     scenario.scenario_id.clone(),
                 ));
@@ -663,10 +663,24 @@ fn score_experiment(
     let mut prior_scenario_scores = Vec::with_capacity(config.prior_scenarios.len());
     let mut worst_case = f64::INFINITY;
     let mut weighted_sum = 0.0;
-    let mut total_scenario_weight = 0.0;
     let mut maximum_error = 0.0_f64;
+    let max_scenario_weight = config
+        .prior_scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_weight)
+        .fold(0.0_f64, f64::max);
+    let normalized_scenario_weights: Vec<f64> = config
+        .prior_scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_weight / max_scenario_weight)
+        .collect();
+    let total_scenario_weight: f64 = normalized_scenario_weights.iter().sum();
 
-    for scenario in &config.prior_scenarios {
+    for (scenario, normalized_scenario_weight) in config
+        .prior_scenarios
+        .iter()
+        .zip(normalized_scenario_weights.iter().copied())
+    {
         let probabilities = normalize_probabilities(&scenario.probabilities);
         let coarse = gaussian_model_identity_eig(
             &normal_predictions,
@@ -691,8 +705,7 @@ fn score_experiment(
         let converged = error <= config.quadrature_tolerance_nats;
         maximum_error = maximum_error.max(error);
         worst_case = worst_case.min(refined);
-        weighted_sum += scenario.scenario_weight * refined;
-        total_scenario_weight += scenario.scenario_weight;
+        weighted_sum += normalized_scenario_weight * refined;
         prior_scenario_scores.push(PriorScenarioEIG {
             scenario_id: scenario.scenario_id.clone(),
             prior_entropy_nats: prior_entropy,
@@ -739,8 +752,12 @@ fn score_experiment(
 }
 
 fn normalize_probabilities(probabilities: &[f64]) -> Vec<f64> {
-    let total: f64 = probabilities.iter().sum();
-    probabilities.iter().map(|value| value / total).collect()
+    let maximum = probabilities.iter().copied().fold(0.0_f64, f64::max);
+    let scaled_total: f64 = probabilities.iter().map(|value| value / maximum).sum();
+    probabilities
+        .iter()
+        .map(|value| (value / maximum) / scaled_total)
+        .collect()
 }
 
 fn discrete_entropy(probabilities: &[f64]) -> f64 {
@@ -828,6 +845,9 @@ fn mutual_information_density(
         .zip(log_joint.iter().copied().zip(log_likelihoods.iter().copied()))
     {
         let joint = log_joint_value.exp();
+        if joint == 0.0 {
+            continue;
+        }
         // I(M;Y) = sum_m pi_m p(y|m) log[p(y|m) / p(y)].
         // The mixture density includes the prior; the numerator is conditional.
         density += joint * (log_likelihood - log_mixture);
