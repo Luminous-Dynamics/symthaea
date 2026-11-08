@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-resource-service:v0.1",
+  "title": "Marine resource service request v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "service_id",
+    "revision",
+    "service_class",
+    "mission_case",
+    "window",
+    "power_profile",
+    "prerequisites",
+    "flexibility",
+    "acceptance",
+    "evidence",
+    "required_output",
+    "input_requirements",
+    "process_residuals"
+  ],
+  "properties": {
+    "service_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "service_class": {
+      "enum": [
+        "critical_non_deferrable",
+        "thermal_protection",
+        "water_production",
+        "domestic_thermal",
+        "flexible_workshop",
+        "externally_fixed_propulsion"
+      ]
+    },
+    "mission_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "required_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quantity",
+        "unit",
+        "quality_acceptance_ref",
+        "carrier"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_acceptance_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "carrier": {
+          "enum": [
+            "electrical_energy",
+            "thermal_energy",
+            "recoverable_heat",
+            "potable_water",
+            "seawater_feed",
+            "fuel",
+            "other_material",
+            "brine_concentrate"
+          ]
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "earliest_start_s",
+        "latest_start_s",
+        "deadline_s",
+        "minimum_run_s"
+      ],
+      "properties": {
+        "earliest_start_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_start_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deadline_s": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_run_s": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "power_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "power_min_w",
+        "power_max_w",
+        "energy_min_wh",
+        "energy_max_wh",
+        "profile_ref",
+        "carrier"
+      ],
+      "properties": {
+        "power_min_w": {
+          "type": "number",
+          "minimum": 0
+        },
+        "power_max_w": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energy_min_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energy_max_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "carrier": {
+          "const": "electrical_energy"
+        }
+      }
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state_id",
+          "operator",
+          "threshold",
+          "unit",
+          "evidence_ref"
+        ],
+        "properties": {
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operator": {
+            "enum": [
+              "lt",
+              "lte",
+              "eq",
+              "gte",
+              "gt",
+              "within",
+              "fresh",
+              "qualified"
+            ]
+          },
+          "threshold": {},
+          "unit": {
+            "type": "string"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "flexibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deferrable",
+        "interruptible",
+        "minimum_off_s",
+        "restart_energy_wh",
+        "hard_block_on_unknown"
+      ],
+      "properties": {
+        "deferrable": {
+          "type": "boolean"
+        },
+        "interruptible": {
+          "type": "boolean"
+        },
+        "minimum_off_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "restart_energy_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hard_block_on_unknown": {
+          "type": "boolean"
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completion_rule",
+        "failure_consequence"
+      ],
+      "properties": {
+        "completion_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure_consequence": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ref",
+        "evidence_class",
+        "design_revision"
+      ],
+      "properties": {
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "model_estimate",
+            "external_source",
+            "measured"
+          ]
+        },
+        "design_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "quantity",
+          "unit",
+          "availability_ref",
+          "quality_constraint_ref"
+        ],
+        "properties": {
+          "carrier": {
+            "enum": [
+              "electrical_energy",
+              "thermal_energy",
+              "recoverable_heat",
+              "potable_water",
+              "seawater_feed",
+              "fuel",
+              "other_material",
+              "brine_concentrate"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "availability_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quality_constraint_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "process_residuals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "expected_quantity",
+          "unit",
+          "disposition_ref",
+          "quality_constraint_ref"
+        ],
+        "properties": {
+          "carrier": {
+            "enum": [
+              "brine_concentrate",
+              "other_material"
+            ]
+          },
+          "expected_quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quality_constraint_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  }
+}

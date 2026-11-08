@@ -1,0 +1,560 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "marine_schedule_result_semantics_v0.1",
+  "status": "synthetic_expected_disposition_fixtures_not_policy_results",
+  "explicit_warning": "These reports are hand-authored synthetic contract fixtures, not the output of an implemented scheduler or measured vessel operation. They validate reporting semantics only.",
+  "reports": [
+    {
+      "report_id": "clear_solar_anchor_complete_v0",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "anchor_clear_sky_v1",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "result_status": "all_required_services_delivered",
+      "service_results": [
+        {
+          "service_id": "watermaker_daily",
+          "request_revision": "0.1.0",
+          "status": "scheduled",
+          "start_offset_s": 28800,
+          "end_offset_s": 32400,
+          "inputs_consumed": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 1.2,
+              "unit": "kWh_e"
+            },
+            {
+              "carrier": "seawater_feed",
+              "quantity": 94.4,
+              "unit": "L"
+            }
+          ],
+          "outputs_delivered": [
+            {
+              "carrier": "potable_water",
+              "quantity": 80,
+              "unit": "L",
+              "quality_status": "accepted",
+              "quality_assessment_ref": "synthetic:water-quality-pass"
+            }
+          ],
+          "quality_status": "accepted",
+          "disposition_reason": "Completed within window; synthetic quality gate accepted.",
+          "evidence_ref": "synthetic:expected-disposition:watermaker_daily",
+          "residuals_generated": [
+            {
+              "carrier": "brine_concentrate",
+              "quantity": 14.4,
+              "unit": "L",
+              "disposition": "contained_for_shore_disposal",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "evidence_ref": "synthetic:brine-meter"
+            }
+          ]
+        },
+        {
+          "service_id": "hot_water_recovery",
+          "request_revision": "0.1.0",
+          "status": "scheduled",
+          "start_offset_s": 36000,
+          "end_offset_s": 37800,
+          "inputs_consumed": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 0.9,
+              "unit": "kWh_e"
+            },
+            {
+              "carrier": "recoverable_heat",
+              "quantity": 1.1,
+              "unit": "kWh_th"
+            }
+          ],
+          "outputs_delivered": [
+            {
+              "carrier": "thermal_energy",
+              "quantity": 2,
+              "unit": "kWh_th",
+              "quality_status": "accepted",
+              "quality_assessment_ref": "synthetic:thermal-service-pass"
+            }
+          ],
+          "quality_status": "accepted",
+          "disposition_reason": "Delivered through synthetic electric plus recoverable-heat inputs.",
+          "evidence_ref": "synthetic:expected-disposition:hot_water_recovery",
+          "residuals_generated": []
+        },
+        {
+          "service_id": "workshop_charge",
+          "request_revision": "0.1.0",
+          "status": "scheduled",
+          "start_offset_s": 46800,
+          "end_offset_s": 54000,
+          "inputs_consumed": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 2.2,
+              "unit": "kWh_e"
+            }
+          ],
+          "outputs_delivered": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 2,
+              "unit": "kWh_e",
+              "quality_status": "accepted",
+              "quality_assessment_ref": "synthetic:charge-complete"
+            }
+          ],
+          "quality_status": "accepted",
+          "disposition_reason": "Task energy stored; synthetic conversion loss retained in input ledger.",
+          "evidence_ref": "synthetic:expected-disposition:workshop_charge",
+          "residuals_generated": []
+        }
+      ],
+      "hard_constraints": [
+        {
+          "constraint_id": "critical_loads_never_shed",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:critical-load-audit"
+        },
+        {
+          "constraint_id": "battery_soc_gte_min",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:battery-reserve-audit"
+        },
+        {
+          "constraint_id": "watermaker_feed_qualified",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:ro-feed-audit"
+        },
+        {
+          "constraint_id": "potable_water_quality_gate",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:water-quality-audit"
+        },
+        {
+          "constraint_id": "service_deadlines",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:deadline-audit"
+        },
+        {
+          "constraint_id": "brine_contained_for_shore_disposal",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:brine-disposition"
+        }
+      ],
+      "carrier_ledger": [
+        {
+          "service_id": "watermaker_daily",
+          "direction": "input",
+          "carrier": "electrical_energy",
+          "quantity": 1.2,
+          "unit": "kWh_e",
+          "source_ref": "synthetic:watermaker-meter"
+        },
+        {
+          "service_id": "watermaker_daily",
+          "direction": "input",
+          "carrier": "seawater_feed",
+          "quantity": 94.4,
+          "unit": "L",
+          "source_ref": "synthetic:intake-meter"
+        },
+        {
+          "service_id": "watermaker_daily",
+          "direction": "output",
+          "carrier": "potable_water",
+          "quantity": 80,
+          "unit": "L",
+          "source_ref": "synthetic:product-meter"
+        },
+        {
+          "service_id": "hot_water_recovery",
+          "direction": "input",
+          "carrier": "electrical_energy",
+          "quantity": 0.9,
+          "unit": "kWh_e",
+          "source_ref": "synthetic:service-meter"
+        },
+        {
+          "service_id": "hot_water_recovery",
+          "direction": "input",
+          "carrier": "recoverable_heat",
+          "quantity": 1.1,
+          "unit": "kWh_th",
+          "source_ref": "synthetic:heat-meter"
+        },
+        {
+          "service_id": "hot_water_recovery",
+          "direction": "output",
+          "carrier": "thermal_energy",
+          "quantity": 2,
+          "unit": "kWh_th",
+          "source_ref": "synthetic:thermal-output-meter"
+        },
+        {
+          "service_id": "workshop_charge",
+          "direction": "input",
+          "carrier": "electrical_energy",
+          "quantity": 2.2,
+          "unit": "kWh_e",
+          "source_ref": "synthetic:workshop-meter"
+        },
+        {
+          "service_id": "workshop_charge",
+          "direction": "output",
+          "carrier": "electrical_energy",
+          "quantity": 2,
+          "unit": "kWh_e",
+          "source_ref": "synthetic:stored-energy"
+        },
+        {
+          "service_id": "watermaker_daily",
+          "direction": "output",
+          "carrier": "brine_concentrate",
+          "quantity": 14.4,
+          "unit": "L",
+          "source_ref": "synthetic:concentrate-flow-meter"
+        }
+      ],
+      "policy": {
+        "policy_id": "synthetic-reference-policy",
+        "revision": "0.1.0",
+        "policy_manifest_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "forecast_manifest_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "input_snapshot_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_class": "synthetic",
+      "authority_mode": "advisory_only_no_actuation",
+      "claim_limitations": [
+        "Synthetic fixture only; no physical performance or safety claim.",
+        "No direct equipment control or actuation authority.",
+        "Carrier quantities and quality dispositions are synthetic inputs."
+      ],
+      "schema_version": "0.1.0"
+    },
+    {
+      "report_id": "cloud_underway_service_degraded_v0",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "underway_cloud_event_v1",
+        "conditions_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "result_status": "service_degraded",
+      "service_results": [
+        {
+          "service_id": "watermaker_replenishment",
+          "request_revision": "0.1.0",
+          "status": "postponed",
+          "start_offset_s": null,
+          "end_offset_s": null,
+          "inputs_consumed": [],
+          "outputs_delivered": [],
+          "quality_status": "unknown",
+          "disposition_reason": "Deferred to preserve battery reserve during low-solar fixed-propulsion segment.",
+          "evidence_ref": "synthetic:expected-disposition:watermaker_replenishment",
+          "residuals_generated": []
+        },
+        {
+          "service_id": "hot_water_optional",
+          "request_revision": "0.1.0",
+          "status": "postponed",
+          "start_offset_s": null,
+          "end_offset_s": null,
+          "inputs_consumed": [],
+          "outputs_delivered": [],
+          "quality_status": "not_applicable",
+          "disposition_reason": "Deferred within declared comfort/service window; no safety-critical service shed.",
+          "evidence_ref": "synthetic:expected-disposition:hot_water_optional",
+          "residuals_generated": []
+        }
+      ],
+      "hard_constraints": [
+        {
+          "constraint_id": "propulsion_profile_fixed_by_route_owner",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:route-profile-locked"
+        },
+        {
+          "constraint_id": "critical_loads_never_shed",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:critical-load-audit"
+        },
+        {
+          "constraint_id": "battery_soc_gte_min",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:battery-reserve-audit"
+        }
+      ],
+      "carrier_ledger": [],
+      "policy": {
+        "policy_id": "synthetic-reference-policy",
+        "revision": "0.1.0",
+        "policy_manifest_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "forecast_manifest_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "input_snapshot_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_class": "synthetic",
+      "authority_mode": "advisory_only_no_actuation",
+      "claim_limitations": [
+        "Synthetic fixture only; no physical performance or safety claim.",
+        "No direct equipment control or actuation authority.",
+        "Carrier quantities and quality dispositions are synthetic inputs."
+      ],
+      "schema_version": "0.1.0"
+    },
+    {
+      "report_id": "low_reserve_service_degraded_v0",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "low_reserve_water_service_v1",
+        "conditions_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "result_status": "service_degraded",
+      "service_results": [
+        {
+          "service_id": "urgent_water_reserve",
+          "request_revision": "0.1.0",
+          "status": "scheduled",
+          "start_offset_s": 28800,
+          "end_offset_s": 33300,
+          "inputs_consumed": [
+            {
+              "carrier": "electrical_energy",
+              "quantity": 1.5,
+              "unit": "kWh_e"
+            },
+            {
+              "carrier": "seawater_feed",
+              "quantity": 118,
+              "unit": "L"
+            }
+          ],
+          "outputs_delivered": [
+            {
+              "carrier": "potable_water",
+              "quantity": 100,
+              "unit": "L",
+              "quality_status": "accepted",
+              "quality_assessment_ref": "synthetic:water-quality-pass"
+            }
+          ],
+          "quality_status": "accepted",
+          "disposition_reason": "Water service delivered; battery reserve remained above declared minimum in the synthetic case.",
+          "evidence_ref": "synthetic:expected-disposition:urgent_water_reserve",
+          "residuals_generated": [
+            {
+              "carrier": "brine_concentrate",
+              "quantity": 18,
+              "unit": "L",
+              "disposition": "contained_for_shore_disposal",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "evidence_ref": "synthetic:brine-meter"
+            }
+          ]
+        },
+        {
+          "service_id": "discretionary_hot_water",
+          "request_revision": "0.1.0",
+          "status": "postponed",
+          "start_offset_s": null,
+          "end_offset_s": null,
+          "inputs_consumed": [],
+          "outputs_delivered": [],
+          "quality_status": "not_applicable",
+          "disposition_reason": "Deferred to protect potable-water and battery reserves.",
+          "evidence_ref": "synthetic:expected-disposition:discretionary_hot_water",
+          "residuals_generated": []
+        }
+      ],
+      "hard_constraints": [
+        {
+          "constraint_id": "battery_soc_gte_min",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:battery-reserve-audit"
+        },
+        {
+          "constraint_id": "watermaker_feed_qualified",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:ro-feed-audit"
+        },
+        {
+          "constraint_id": "potable_water_quality_gate",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:water-quality-audit"
+        },
+        {
+          "constraint_id": "brine_contained_for_shore_disposal",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:brine-disposition"
+        }
+      ],
+      "carrier_ledger": [
+        {
+          "service_id": "urgent_water_reserve",
+          "direction": "input",
+          "carrier": "electrical_energy",
+          "quantity": 1.5,
+          "unit": "kWh_e",
+          "source_ref": "synthetic:watermaker-meter"
+        },
+        {
+          "service_id": "urgent_water_reserve",
+          "direction": "input",
+          "carrier": "seawater_feed",
+          "quantity": 118,
+          "unit": "L",
+          "source_ref": "synthetic:intake-meter"
+        },
+        {
+          "service_id": "urgent_water_reserve",
+          "direction": "output",
+          "carrier": "potable_water",
+          "quantity": 100,
+          "unit": "L",
+          "source_ref": "synthetic:product-meter"
+        },
+        {
+          "service_id": "urgent_water_reserve",
+          "direction": "output",
+          "carrier": "brine_concentrate",
+          "quantity": 18,
+          "unit": "L",
+          "source_ref": "synthetic:concentrate-flow-meter"
+        }
+      ],
+      "policy": {
+        "policy_id": "synthetic-reference-policy",
+        "revision": "0.1.0",
+        "policy_manifest_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "forecast_manifest_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "input_snapshot_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_class": "synthetic",
+      "authority_mode": "advisory_only_no_actuation",
+      "claim_limitations": [
+        "Synthetic fixture only; no physical performance or safety claim.",
+        "No direct equipment control or actuation authority.",
+        "Carrier quantities and quality dispositions are synthetic inputs."
+      ],
+      "schema_version": "0.1.0"
+    },
+    {
+      "report_id": "feed_out_of_domain_not_supported_v0",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "feed_quality_out_of_domain_v1",
+        "conditions_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "result_status": "not_supported",
+      "service_results": [
+        {
+          "service_id": "watermaker_attempt",
+          "request_revision": "0.1.0",
+          "status": "blocked",
+          "start_offset_s": null,
+          "end_offset_s": null,
+          "inputs_consumed": [],
+          "outputs_delivered": [],
+          "quality_status": "unknown",
+          "disposition_reason": "Blocked because seawater feed is outside the synthetic qualified envelope; no water or energy-output credit is permitted.",
+          "evidence_ref": "synthetic:expected-disposition:watermaker_attempt",
+          "residuals_generated": []
+        }
+      ],
+      "hard_constraints": [
+        {
+          "constraint_id": "watermaker_feed_qualified",
+          "status": "violated",
+          "evidence_ref": "synthetic:feed-out-of-domain"
+        },
+        {
+          "constraint_id": "no_output_credit_when_feed_out_of_domain",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:no-credit-control"
+        }
+      ],
+      "carrier_ledger": [],
+      "policy": {
+        "policy_id": "synthetic-reference-policy",
+        "revision": "0.1.0",
+        "policy_manifest_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "forecast_manifest_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "input_snapshot_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_class": "synthetic",
+      "authority_mode": "advisory_only_no_actuation",
+      "claim_limitations": [
+        "Synthetic fixture only; no physical performance or safety claim.",
+        "No direct equipment control or actuation authority.",
+        "Carrier quantities and quality dispositions are synthetic inputs."
+      ],
+      "schema_version": "0.1.0"
+    },
+    {
+      "report_id": "unknown_battery_state_indeterminate_v0",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "anchor_clear_sky_v1",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "result_status": "indeterminate",
+      "service_results": [
+        {
+          "service_id": "watermaker_daily",
+          "request_revision": "0.1.0",
+          "status": "indeterminate",
+          "start_offset_s": null,
+          "end_offset_s": null,
+          "inputs_consumed": [],
+          "outputs_delivered": [],
+          "quality_status": "unknown",
+          "disposition_reason": "No schedule recommendation: battery state-of-charge/temperature telemetry is stale or unavailable.",
+          "evidence_ref": "synthetic:expected-disposition:watermaker_daily",
+          "residuals_generated": []
+        }
+      ],
+      "hard_constraints": [
+        {
+          "constraint_id": "battery_soc_gte_min",
+          "status": "unknown",
+          "evidence_ref": "synthetic:stale-battery-telemetry"
+        },
+        {
+          "constraint_id": "watermaker_feed_qualified",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:feed-ok"
+        }
+      ],
+      "carrier_ledger": [],
+      "policy": {
+        "policy_id": "synthetic-reference-policy",
+        "revision": "0.1.0",
+        "policy_manifest_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "forecast_manifest_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "input_snapshot_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_class": "synthetic",
+      "authority_mode": "advisory_only_no_actuation",
+      "claim_limitations": [
+        "Synthetic fixture only; no physical performance or safety claim.",
+        "No direct equipment control or actuation authority.",
+        "Carrier quantities and quality dispositions are synthetic inputs."
+      ],
+      "schema_version": "0.1.0"
+    }
+  ]
+}
