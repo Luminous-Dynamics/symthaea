@@ -191,3 +191,68 @@ Do not invent absolute WER or phoneme-accuracy targets for Namibian languages be
 ## 9. Claim ceiling
 
 This programme can produce a more accountable, language-sensitive speech and historical-linguistics toolchain. It has not yet demonstrated superiority over SOTA, native recognition of the named Namibian languages, or recovery of ancient Egyptian pronunciation. Those claims require the separately specified data, expert, benchmark and exact-head execution evidence.
+
+
+## 10. Speech-grounded semantics, AfriVox and data-efficiency extensions
+
+### 10.1 AfriVox v1 and v2 are separate evaluation subjects
+
+The EACL 2026 AfriVox paper studies speech LLMs and conventional ASR/AST across African languages and accents, including unscripted and domain-specific speech. It reports up to 54% relative WER reduction after targeted Qwen2.5-Omni adaptation on three Nigerian languages. Those are author-reported results in that paper's task/data setup, not Luminous measurements:
+- Paper: https://aclanthology.org/2026.eacl-long.122/
+
+Current source cards must be recorded as distinct subjects:
+- **AfriVox v1:** card currently reports 64.26 hours, 18 languages and CC BY-NC-SA 4.0 with gated contact-information access: https://huggingface.co/datasets/intronhealth/afrivox
+- **AfriVox-v2:** card currently reports 24 languages, 10 domain labels and a test/evaluation use case; its language table includes Afrikaans, Sesotho, Setswana, Sepedi, isiXhosa and isiZulu. It aggregates Africa Next Voices, Waxal and AfriVox v1, provides entity/number subsets, and says it is not intended for training: https://huggingface.co/datasets/intronhealth/afrivox-v2
+
+The displayed card licences differ (v1 CC BY-NC-SA 4.0; v2 CC BY 4.0). Do not infer that an aggregate v2 card licence overrides upstream source-specific rights, consent, voice-use restrictions or community conditions. Before any evaluation, pin immutable revisions, configs, splits, file hashes, source ancestry and permitted purpose. Do not train on AfriVox-v2.
+
+### 10.2 Speech-grounded semantic understanding
+
+[VOICE-SEM-001 #11057](https://github.com/Luminous-Dynamics/symthaea/issues/11057) establishes a distinct benchmark lane for:
+- spoken semantic slot extraction (entities, quantities, currencies, dates, units, negation, modality, roles and temporal relations);
+- audio-grounded question answering with exact evidence-span localization;
+- speech translation and meaning preservation;
+- unsupported-answer detection and calibrated abstention.
+
+Compare three primary system forms under identical admitted audio:
+1. ASR -> Broca typed semantic pipeline;
+2. speech-native/audio-language model;
+3. hybrid direct-audio + transcript + typed evidence pipeline.
+
+Keep transcription, translation, semantic extraction and QA separate. A fact that is true in the world is not a correct answer if the recording does not support it. Candidate AfriVox-v2 entity/number fields are useful evaluation strata, not complete semantic gold; independent native/bilingual adjudication is still required.
+
+### 10.3 Rust-native PIER scoring
+
+[VOICE-PIER-RUST-001 #11056](https://github.com/Luminous-Dynamics/symthaea/issues/11056) and [draft PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058) add an initial Rust scorer for explicit point-of-interest tags. The scorer reuses the crate's Levenshtein alignment, reports POI hits/substitutions/deletions/insertions, attributes insertions by reference source position, and implements the trailing-insertion rule.
+
+The scorer deliberately:
+- returns a typed non-estimable error when no reference POIs exist;
+- scores all-POI utterances instead of silently skipping them;
+- keeps diacritics/normalization entirely caller-controlled;
+- documents that exact tie-by-tie RapidFuzz parity has not yet been established.
+
+Fourteen synthetic tests are authored in the draft but have not been compiled or executed. No PIER result on AfriSwitch or another real speech corpus is claimed. Parent switch-evaluation protocol remains [#10999](https://github.com/Luminous-Dynamics/symthaea/issues/10999).
+
+### 10.4 Data efficiency becomes an experiment, not an assumption
+
+Paza's work evaluates African ASR models across 1–400 labelled hours and reports architecture-dependent scaling behavior. Its platform summary reports that encoder-only models were roughly 28x faster than multitask speech LLMs in the evaluated setting, saturation around 150–300 labelled hours in some tasks, and up to 83% CER improvement in certain in-domain-data experiments:
+- https://proceedings.mlr.press/v302/nahabwe26a.html
+- https://labs.ai.azure.com/innovations/paza/
+
+These figures are not universal thresholds. Extend [#9661](https://github.com/Luminous-Dynamics/symthaea/issues/9661) with matched data-selection experiments:
+- random selection;
+- language/domain diversity selection;
+- uncertainty sampling;
+- expected-value-of-information selection.
+
+At feasible budgets (e.g. 1/5/10/20/50/100 labelled hours where enough admitted data exists), report WER/CER/PIER, semantic-slot exactness, annotation minutes, label-hour efficiency, per-language worst group and retained capability on previously qualified languages. Speaker/source leakage and held-out domains must be controlled. #5352 and #10942 continue to govern any real data use or training.
+
+## 11. Current implementation and evidence state
+
+- [#11038](https://github.com/Luminous-Dynamics/symthaea/issues/11038): Namibian click-language archive and phonetic-perception research.
+- [#11039](https://github.com/Luminous-Dynamics/symthaea/issues/11039): Egyptian historical phonology and pronunciation.
+- [#11056](https://github.com/Luminous-Dynamics/symthaea/issues/11056) / [PR #11058](https://github.com/Luminous-Dynamics/symthaea/pull/11058): Rust-native PIER scorer, authored but not compiled or tested.
+- [#11057](https://github.com/Luminous-Dynamics/symthaea/issues/11057): audio-grounded semantic understanding benchmark.
+- [#11040](https://github.com/Luminous-Dynamics/symthaea/pull/11040): this programme synthesis.
+
+All new issue and PR artefacts are research or implementation drafts. No dataset has been ingested, no model has been trained or evaluated, and no language capability has been promoted. Skipped CI is not PASS.
