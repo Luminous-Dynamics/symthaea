@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "connectome-asof-filtration"
+version = "0.1.0"
+
+[[package]]
 name = "connectome-closed-anytime-fwer"
 version = "0.1.0"
+dependencies = [
+ "connectome-asof-filtration",
+]
