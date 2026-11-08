@@ -140,6 +140,20 @@ pub fn norm2(x: &[f64]) -> f64 {
     x.iter().fold(0.0_f64, |norm, value| norm.hypot(*value))
 }
 
+fn try_zeroed_vector(length: usize) -> Result<Vec<f64>, MatrixError> {
+    let mut values = Vec::new();
+    values.try_reserve_exact(length).map_err(|_| MatrixError::AllocationFailed)?;
+    values.resize(length, 0.0);
+    Ok(values)
+}
+
+fn try_copy_vector(source: &[f64]) -> Result<Vec<f64>, MatrixError> {
+    let mut values = Vec::new();
+    values.try_reserve_exact(source.len()).map_err(|_| MatrixError::AllocationFailed)?;
+    values.extend_from_slice(source);
+    Ok(values)
+}
+
 /// A reproducible SPD family with a known spectrum:
 ///
 ///     A = lambda * I + alpha * 1 * 1^T
@@ -216,7 +230,7 @@ pub fn cholesky_solve(a: &DenseMatrix, b: &[f64]) -> Result<Vec<f64>, MatrixErro
     }
 
     // Forward substitution: L y = b.
-    let mut y = vec![0.0; n];
+    let mut y = try_zeroed_vector(n)?;
     for row in 0..n {
         let mut sum = b[row];
         for col in 0..row {
@@ -226,7 +240,7 @@ pub fn cholesky_solve(a: &DenseMatrix, b: &[f64]) -> Result<Vec<f64>, MatrixErro
     }
 
     // Back substitution: L^T x = y.
-    let mut x = vec![0.0; n];
+    let mut x = try_zeroed_vector(n)?;
     for row in (0..n).rev() {
         let mut sum = y[row];
         for col in (row + 1)..n {
@@ -287,7 +301,7 @@ pub struct Poisson1d {
 }
 
 impl Poisson1d {
-    pub const MAX_DIMENSION: usize = 16 * 1024 * 1024;
+    pub const MAX_DIMENSION: usize = 1_000_000;
 
     pub fn new(n: usize) -> Result<Self, MatrixError> {
         if n == 0 {
@@ -398,9 +412,9 @@ pub fn conjugate_gradient<A: LinearOperator>(
         return Err(MatrixError::NotSymmetric);
     }
 
-    let mut x = vec![0.0; n];
-    let mut r = b.to_vec();
-    let mut p = r.clone();
+    let mut x = try_zeroed_vector(n)?;
+    let mut r = try_copy_vector(b)?;
+    let mut p = try_copy_vector(&r)?;
     let mut rs_old = dot(&r, &r)?;
     let b_norm = norm2(b);
     let threshold = relative_tolerance * b_norm;
@@ -460,7 +474,7 @@ pub fn conjugate_gradient<A: LinearOperator>(
             // Residual replacement: restart the Krylov direction from the
             // independently recomputed residual; do not accept recurrence drift.
             r = true_residual;
-            p = r.clone();
+            p = try_copy_vector(&r)?;
             rs_old = dot(&r, &r)?;
             continue;
         }
@@ -512,9 +526,10 @@ impl JacobiPreconditioner {
         if residual.iter().any(|value| !value.is_finite()) {
             return Err(MatrixError::NonFinite);
         }
-        let result: Vec<f64> = residual.iter().zip(&self.inverse_diagonal)
-            .map(|(r, inverse)| r * inverse)
-            .collect();
+        let mut result = try_zeroed_vector(residual.len())?;
+        for (out, (r, inverse)) in result.iter_mut().zip(residual.iter().zip(&self.inverse_diagonal)) {
+            *out = r * inverse;
+        }
         if result.iter().any(|value| !value.is_finite()) {
             return Err(MatrixError::NonFinite);
         }
@@ -547,10 +562,10 @@ pub fn preconditioned_conjugate_gradient<A: LinearOperator>(
         return Err(MatrixError::NotSymmetric);
     }
 
-    let mut x = vec![0.0; n];
-    let mut r = b.to_vec();
+    let mut x = try_zeroed_vector(n)?;
+    let mut r = try_copy_vector(b)?;
     let mut z = preconditioner.apply(&r)?;
-    let mut p = z.clone();
+    let mut p = try_copy_vector(&z)?;
     let mut rho = dot(&r, &z)?;
     let b_norm = norm2(b);
     let threshold = relative_tolerance * b_norm;
@@ -598,7 +613,7 @@ pub fn preconditioned_conjugate_gradient<A: LinearOperator>(
             }
             r = true_residual;
             z = preconditioner.apply(&r)?;
-            p = z.clone();
+            p = try_copy_vector(&z)?;
             rho = dot(&r, &z)?;
             if !rho.is_finite() || rho <= 0.0 {
                 return Err(MatrixError::Breakdown);
@@ -650,7 +665,10 @@ pub fn error_metrics<A: LinearOperator>(
         return Err(MatrixError::NonFinite);
     }
     let ax = a.mat_vec(x)?;
-    let residual: Vec<f64> = ax.iter().zip(b).map(|(lhs, rhs)| lhs - rhs).collect();
+    let mut residual = try_zeroed_vector(b.len())?;
+    for (out, (lhs, rhs)) in residual.iter_mut().zip(ax.iter().zip(b)) {
+        *out = lhs - rhs;
+    }
     let residual_norm = norm2(&residual);
     let b_norm = norm2(b);
     let relative_residual = if b_norm == 0.0 {
@@ -666,7 +684,10 @@ pub fn error_metrics<A: LinearOperator>(
         residual_norm / denominator
     };
 
-    let difference: Vec<f64> = x.iter().zip(x_truth).map(|(v, truth)| v - truth).collect();
+    let mut difference = try_zeroed_vector(x.len())?;
+    for (out, (value, truth)) in difference.iter_mut().zip(x.iter().zip(x_truth)) {
+        *out = value - truth;
+    }
     let absolute_forward_error = norm2(&difference);
     let truth_norm = norm2(x_truth);
     let relative_forward_error = if truth_norm == 0.0 {
@@ -736,9 +757,10 @@ impl DiagonalDecayOde {
         if initial.iter().any(|value| !value.is_finite()) {
             return Err(MatrixError::NonFinite);
         }
-        let result: Vec<f64> = initial.iter().zip(&self.rates)
-            .map(|(x0, rate)| x0 * (-rate * time).exp())
-            .collect();
+        let mut result = try_zeroed_vector(initial.len())?;
+        for (out, (x0, rate)) in result.iter_mut().zip(initial.iter().zip(&self.rates)) {
+            *out = x0 * (-rate * time).exp();
+        }
         if result.iter().any(|value| !value.is_finite()) {
             return Err(MatrixError::NonFinite);
         }
@@ -832,10 +854,10 @@ impl DiagonalDecayOde {
                 return Err(MatrixError::NonFinite);
             }
             let reference = self.analytic_state(initial, step_size * index as f64)?;
-            let difference: Vec<f64> = candidate.iter().zip(&reference)
-                .map(|(actual, expected)| actual - expected)
-                .collect();
-            let absolute = norm2(&difference);
+            let mut absolute = 0.0_f64;
+            for (actual, expected) in candidate.iter().zip(&reference) {
+                absolute = absolute.hypot(actual - expected);
+            }
             let reference_norm = norm2(&reference);
             let relative = if reference_norm == 0.0 { absolute } else { absolute / reference_norm };
             maximum_absolute_error = maximum_absolute_error.max(absolute);
