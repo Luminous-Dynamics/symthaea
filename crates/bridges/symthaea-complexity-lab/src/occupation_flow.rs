@@ -944,9 +944,7 @@ fn compare_nonnegative(left: CheckedRational, right: CheckedRational) -> Orderin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lp_certificate::{
-        verify_primal_dual_optimality, PrimalDualCertificate,
-    };
+    use crate::lp_certificate::PrimalDualCertificate;
 
     fn q(n: i128, d: i128) -> CheckedRational {
         CheckedRational::new(n, d).unwrap()
@@ -1191,8 +1189,10 @@ mod tests {
                 &[(0,11,25),(2,9,10),(4,9,10),(6,9,10),(8,9,10),(11,7,5),(14,23,10),(27,1,1),(30,1,1),(34,1,1)],
             ),
         };
-        let verified_a = verify_primal_dual_optimality(regret_a.problem(), &certificate_a).unwrap();
-        assert_eq!(verified_a.objective, q(11, 25));
+        let verified_a = regret_a
+            .verify_bound_optimality(&regret_a.bind_certificate(certificate_a))
+            .unwrap();
+        assert_eq!(verified_a.utility, q(11, 25));
 
         let regret_b = build_pairwise_worst_case_regret_lp(
             &model,
@@ -1210,9 +1210,11 @@ mod tests {
                 &[(0,22,25),(2,9,5),(5,1,2),(6,9,5),(9,1,2),(10,9,5),(15,23,10),(26,1,1),(31,1,1),(35,1,1)],
             ),
         };
-        let verified_b = verify_primal_dual_optimality(regret_b.problem(), &certificate_b).unwrap();
-        assert_eq!(verified_b.objective, q(22, 25));
-        assert!(verified_a.objective < verified_b.objective);
+        let verified_b = regret_b
+            .verify_bound_optimality(&regret_b.bind_certificate(certificate_b))
+            .unwrap();
+        assert_eq!(verified_b.utility, q(22, 25));
+        assert!(verified_a.utility < verified_b.utility);
     }
 
     #[test]
