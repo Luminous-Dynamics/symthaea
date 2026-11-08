@@ -1,0 +1,983 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "LOS18_SERVICEABILITY_SYNTHETIC_CORPUS_V0_1",
+  "status": "synthetic_contract_fixtures_not_real_vessel_data",
+  "explicit_warning": "All dimensions, masses, times, identities and evidence references are synthetic. They are not real equipment ratings, approved maintenance procedures, stability data, high-voltage limits or safe-work instructions.",
+  "mission_binding": {
+    "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+    "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "cases": [
+    {
+      "schema_version": "0.1.0",
+      "case_id": "prefilter_cartridge_secured_afloat",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset": {
+        "asset_id": "wm_prefilter_A",
+        "asset_type": "watermaker_prefilter",
+        "serial": "SYN-PF-001",
+        "part_number": "SYN-PF-CARTRIDGE",
+        "revision": "R1",
+        "as_built_geometry_ref": "synthetic:asbuilt:wm_prefilter_A",
+        "installed_location": "service-bay-port",
+        "parent_assembly": "watermaker-A"
+      },
+      "task": {
+        "task_id": "prefilter_cartridge_secured_afloat_task",
+        "trigger": "synthetic condition-based service trigger",
+        "task_type": "consumable_replace",
+        "approved_procedure_ref": "synthetic:approved-task-profile:prefilter",
+        "permission_state": "permitted_for_declared_context"
+      },
+      "operating_context": {
+        "location_context": "afloat_secured",
+        "vessel_state": "stationary_secured",
+        "environment_evidence": "synthetic:environment-profile:prefilter_cartridge_secured_afloat",
+        "task_envelope_ref": "synthetic:secured-afloat-only"
+      },
+      "personnel": {
+        "crew_count_min": 1,
+        "required_authorizations": [],
+        "skills_refs": [
+          "synthetic:marine-service-technician"
+        ],
+        "tooling_refs": [
+          "synthetic:standard-tool-kit"
+        ]
+      },
+      "safety_preconditions": [
+        {
+          "hazard_domain": "fluid_flooding",
+          "procedure_or_evidence_ref": "synthetic:precondition:fluid_flooding"
+        },
+        {
+          "hazard_domain": "pressure",
+          "procedure_or_evidence_ref": "synthetic:precondition:pressure"
+        },
+        {
+          "hazard_domain": "spill_residual",
+          "procedure_or_evidence_ref": "synthetic:precondition:spill_residual"
+        }
+      ],
+      "access": {
+        "geometry_ref": "synthetic:geometry:LOS18-layout-A",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "access_path_ref": "synthetic:access-path",
+        "required_clearance_mm": 500,
+        "available_clearance_mm": 650,
+        "obstructing_assets": [],
+        "unrelated_critical_removal_required": false,
+        "temporary_disassembly_steps": []
+      },
+      "handling": {
+        "module_mass_kg": 8,
+        "centre_of_gravity_ref": "synthetic:cog",
+        "lift_or_manual_handling_ref": "synthetic:handling-envelope",
+        "handling_capacity_kg": 15,
+        "handling_status": "qualified_for_declared_task"
+      },
+      "spare": {
+        "spare_id": "SYN-PF-CARTRIDGE",
+        "revision": "R1",
+        "compatibility": "exact_match",
+        "availability": "onboard_stock",
+        "custody_ref": "synthetic:custody:SYN-PF-CARTRIDGE",
+        "lead_time_days": 0
+      },
+      "task_phases": [
+        {
+          "phase": "isolate",
+          "duration_min_estimate": 2,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:isolate"
+        },
+        {
+          "phase": "diagnose",
+          "duration_min_estimate": 3,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:diagnose"
+        },
+        {
+          "phase": "prepare",
+          "duration_min_estimate": 4,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:prepare"
+        },
+        {
+          "phase": "access_disassemble",
+          "duration_min_estimate": 5,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:access_disassemble"
+        },
+        {
+          "phase": "extract",
+          "duration_min_estimate": 3,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:extract"
+        },
+        {
+          "phase": "repair_replace",
+          "duration_min_estimate": 8,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:repair_replace"
+        },
+        {
+          "phase": "reinstall",
+          "duration_min_estimate": 6,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:reinstall"
+        },
+        {
+          "phase": "reconnect",
+          "duration_min_estimate": 3,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:reconnect"
+        },
+        {
+          "phase": "test",
+          "duration_min_estimate": 8,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:test"
+        },
+        {
+          "phase": "configuration_update",
+          "duration_min_estimate": 2,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:configuration_update"
+        },
+        {
+          "phase": "authorized_release",
+          "duration_min_estimate": 1,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:authorized_release"
+        }
+      ],
+      "post_maintenance": {
+        "required_tests": [
+          "leak_check",
+          "flow_check",
+          "quality_requalification"
+        ],
+        "completed_tests": [
+          "leak_check",
+          "flow_check"
+        ],
+        "independent_authorization_ref": "synthetic:independent-review",
+        "configuration_update_ref": "synthetic:configuration-update",
+        "return_to_service_state": "requirements_satisfied_synthetic_only"
+      },
+      "residuals": [
+        {
+          "stream": "spent_filter_media",
+          "quantity": 1,
+          "unit": "unit",
+          "disposition": "retained_onboard",
+          "evidence_ref": "synthetic:residual:spent_filter_media"
+        }
+      ],
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-serviceability-corpus-v0.1",
+        "raw_artifact_digest": null,
+        "measurement_status": "not_measured",
+        "uncertainty_status": "not_applicable"
+      },
+      "expected_disposition": "synthetic_task_feasible",
+      "claim_limitations": [
+        "Synthetic benchmark record only; not actual vessel geometry, equipment specification or maintenance instruction.",
+        "No permission or authorization to perform a physical maintenance task is implied.",
+        "No stability, electrical, pressure, watertight, fire or seaworthiness conclusion is established."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "hp_pump_extraction_blocked_by_inverter_rack",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset": {
+        "asset_id": "wm_hp_pump_A",
+        "asset_type": "watermaker_high_pressure_pump",
+        "serial": "SYN-HP-001",
+        "part_number": "SYN-HP-PUMP",
+        "revision": "R1",
+        "as_built_geometry_ref": "synthetic:asbuilt:wm_hp_pump_A",
+        "installed_location": "machinery-space-forward",
+        "parent_assembly": "watermaker-A"
+      },
+      "task": {
+        "task_id": "hp_pump_extraction_blocked_by_inverter_rack_task",
+        "trigger": "synthetic condition-based service trigger",
+        "task_type": "module_replace",
+        "approved_procedure_ref": "synthetic:approved-task-profile:hp-pump",
+        "permission_state": "permitted_for_declared_context"
+      },
+      "operating_context": {
+        "location_context": "afloat_secured",
+        "vessel_state": "stationary_secured",
+        "environment_evidence": "synthetic:environment-profile:hp_pump_extraction_blocked_by_inverter_rack",
+        "task_envelope_ref": "synthetic:secured-afloat-only"
+      },
+      "personnel": {
+        "crew_count_min": 2,
+        "required_authorizations": [],
+        "skills_refs": [
+          "synthetic:marine-mechanic",
+          "synthetic:electrical-authorized-person"
+        ],
+        "tooling_refs": [
+          "synthetic:standard-tool-kit"
+        ]
+      },
+      "safety_preconditions": [
+        {
+          "hazard_domain": "electrical_isolation",
+          "procedure_or_evidence_ref": "synthetic:precondition:electrical_isolation"
+        },
+        {
+          "hazard_domain": "pressure",
+          "procedure_or_evidence_ref": "synthetic:precondition:pressure"
+        },
+        {
+          "hazard_domain": "fluid_flooding",
+          "procedure_or_evidence_ref": "synthetic:precondition:fluid_flooding"
+        },
+        {
+          "hazard_domain": "mechanical_load",
+          "procedure_or_evidence_ref": "synthetic:precondition:mechanical_load"
+        }
+      ],
+      "access": {
+        "geometry_ref": "synthetic:geometry:LOS18-layout-A",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "access_path_ref": "synthetic:access-path",
+        "required_clearance_mm": 600,
+        "available_clearance_mm": 520,
+        "obstructing_assets": [
+          "dc_inverter_rack",
+          "pipe-manifold"
+        ],
+        "unrelated_critical_removal_required": true,
+        "temporary_disassembly_steps": []
+      },
+      "handling": {
+        "module_mass_kg": 38,
+        "centre_of_gravity_ref": "synthetic:cog",
+        "lift_or_manual_handling_ref": "synthetic:handling-envelope",
+        "handling_capacity_kg": 50,
+        "handling_status": "qualified_for_declared_task"
+      },
+      "spare": {
+        "spare_id": "SYN-HP-PUMP",
+        "revision": "R1",
+        "compatibility": "exact_match",
+        "availability": "onboard_stock",
+        "custody_ref": "synthetic:custody:SYN-HP-PUMP",
+        "lead_time_days": 0
+      },
+      "task_phases": [
+        {
+          "phase": "isolate",
+          "duration_min_estimate": 5,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:isolate"
+        },
+        {
+          "phase": "diagnose",
+          "duration_min_estimate": 10,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:diagnose"
+        },
+        {
+          "phase": "prepare",
+          "duration_min_estimate": 10,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:prepare"
+        },
+        {
+          "phase": "access_disassemble",
+          "duration_min_estimate": 35,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:access_disassemble"
+        },
+        {
+          "phase": "extract",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:extract"
+        },
+        {
+          "phase": "repair_replace",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:repair_replace"
+        }
+      ],
+      "post_maintenance": {
+        "required_tests": [
+          "pressure_test",
+          "leak_test",
+          "output_quality_check"
+        ],
+        "completed_tests": [],
+        "independent_authorization_ref": null,
+        "configuration_update_ref": null,
+        "return_to_service_state": "blocked"
+      },
+      "residuals": [
+        {
+          "stream": "flush_water",
+          "quantity": null,
+          "unit": "L",
+          "disposition": "unknown",
+          "evidence_ref": "synthetic:residual:flush_water"
+        }
+      ],
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-serviceability-corpus-v0.1",
+        "raw_artifact_digest": null,
+        "measurement_status": "not_measured",
+        "uncertainty_status": "not_applicable"
+      },
+      "expected_disposition": "blocked",
+      "claim_limitations": [
+        "Synthetic benchmark record only; not actual vessel geometry, equipment specification or maintenance instruction.",
+        "No permission or authorization to perform a physical maintenance task is implied.",
+        "No stability, electrical, pressure, watertight, fire or seaworthiness conclusion is established."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "seachest_underway_no_flood_boundary",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset": {
+        "asset_id": "seachest_intake_A",
+        "asset_type": "seawater_strainer",
+        "serial": "SYN-SC-001",
+        "part_number": "SYN-SEA-CHEST-STRAINER",
+        "revision": "R1",
+        "as_built_geometry_ref": "synthetic:asbuilt:seachest_intake_A",
+        "installed_location": "port-hull-intake",
+        "parent_assembly": "raw-water-system"
+      },
+      "task": {
+        "task_id": "seachest_underway_no_flood_boundary_task",
+        "trigger": "synthetic condition-based service trigger",
+        "task_type": "inspect",
+        "approved_procedure_ref": null,
+        "permission_state": "not_permitted"
+      },
+      "operating_context": {
+        "location_context": "afloat_underway",
+        "vessel_state": "underway",
+        "environment_evidence": "synthetic:environment-profile:seachest_underway_no_flood_boundary",
+        "task_envelope_ref": "synthetic:task-envelope:seachest_underway_no_flood_boundary"
+      },
+      "personnel": {
+        "crew_count_min": 2,
+        "required_authorizations": [
+          "synthetic:approved-underway-task-authorization"
+        ],
+        "skills_refs": [
+          "synthetic:mechanical-technician"
+        ],
+        "tooling_refs": [
+          "synthetic:standard-tool-kit"
+        ]
+      },
+      "safety_preconditions": [
+        {
+          "hazard_domain": "fluid_flooding",
+          "status": "unknown",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "pressure",
+          "status": "missing",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "mechanical_load",
+          "procedure_or_evidence_ref": "synthetic:precondition:mechanical_load"
+        }
+      ],
+      "access": {
+        "geometry_ref": "synthetic:geometry:unknown",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "access_path_ref": "synthetic:access-path",
+        "required_clearance_mm": 400,
+        "available_clearance_mm": 500,
+        "obstructing_assets": [],
+        "unrelated_critical_removal_required": false,
+        "temporary_disassembly_steps": []
+      },
+      "handling": {
+        "module_mass_kg": 5,
+        "centre_of_gravity_ref": "synthetic:cog",
+        "lift_or_manual_handling_ref": "synthetic:handling-envelope",
+        "handling_capacity_kg": null,
+        "handling_status": "unknown"
+      },
+      "spare": {
+        "spare_id": null,
+        "revision": null,
+        "compatibility": "unknown",
+        "availability": "unknown",
+        "custody_ref": null,
+        "lead_time_days": null
+      },
+      "task_phases": [
+        {
+          "phase": "diagnose",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:diagnose"
+        },
+        {
+          "phase": "prepare",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:prepare"
+        },
+        {
+          "phase": "access_disassemble",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:access_disassemble"
+        }
+      ],
+      "post_maintenance": {
+        "required_tests": [
+          "flood-boundary-integrity-check"
+        ],
+        "completed_tests": [],
+        "independent_authorization_ref": null,
+        "configuration_update_ref": null,
+        "return_to_service_state": "blocked"
+      },
+      "residuals": [
+        {
+          "stream": "seawater",
+          "quantity": null,
+          "unit": "L",
+          "disposition": "unknown",
+          "evidence_ref": "synthetic:residual:seawater"
+        }
+      ],
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-serviceability-corpus-v0.1",
+        "raw_artifact_digest": null,
+        "measurement_status": "not_measured",
+        "uncertainty_status": "not_applicable"
+      },
+      "expected_disposition": "blocked",
+      "claim_limitations": [
+        "Synthetic benchmark record only; not actual vessel geometry, equipment specification or maintenance instruction.",
+        "No permission or authorization to perform a physical maintenance task is implied.",
+        "No stability, electrical, pressure, watertight, fire or seaworthiness conclusion is established."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "hvac_compressor_alongside_spare_unavailable",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset": {
+        "asset_id": "hvac_compressor_A",
+        "asset_type": "hvac_compressor",
+        "serial": "SYN-HVAC-001",
+        "part_number": "SYN-HVAC-COMP",
+        "revision": "R2",
+        "as_built_geometry_ref": "synthetic:asbuilt:hvac_compressor_A",
+        "installed_location": "machinery-space-aft",
+        "parent_assembly": "hvac-loop"
+      },
+      "task": {
+        "task_id": "hvac_compressor_alongside_spare_unavailable_task",
+        "trigger": "synthetic condition-based service trigger",
+        "task_type": "module_replace",
+        "approved_procedure_ref": "synthetic:approved-task-profile:hvac-compressor",
+        "permission_state": "permitted_for_declared_context"
+      },
+      "operating_context": {
+        "location_context": "alongside",
+        "vessel_state": "stationary_secured",
+        "environment_evidence": "synthetic:environment-profile:hvac_compressor_alongside_spare_unavailable",
+        "task_envelope_ref": "synthetic:alongside-service-only"
+      },
+      "personnel": {
+        "crew_count_min": 2,
+        "required_authorizations": [
+          "synthetic:refrigerant-technician"
+        ],
+        "skills_refs": [
+          "synthetic:mechanical-technician"
+        ],
+        "tooling_refs": [
+          "synthetic:standard-tool-kit"
+        ]
+      },
+      "safety_preconditions": [
+        {
+          "hazard_domain": "electrical_isolation",
+          "procedure_or_evidence_ref": "synthetic:precondition:electrical_isolation"
+        },
+        {
+          "hazard_domain": "refrigerant",
+          "procedure_or_evidence_ref": "synthetic:precondition:refrigerant"
+        },
+        {
+          "hazard_domain": "stored_energy",
+          "procedure_or_evidence_ref": "synthetic:precondition:stored_energy"
+        },
+        {
+          "hazard_domain": "thermal",
+          "procedure_or_evidence_ref": "synthetic:precondition:thermal"
+        }
+      ],
+      "access": {
+        "geometry_ref": "synthetic:geometry:LOS18-layout-A",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "access_path_ref": "synthetic:access-path",
+        "required_clearance_mm": 700,
+        "available_clearance_mm": 760,
+        "obstructing_assets": [],
+        "unrelated_critical_removal_required": false,
+        "temporary_disassembly_steps": []
+      },
+      "handling": {
+        "module_mass_kg": 42,
+        "centre_of_gravity_ref": "synthetic:cog",
+        "lift_or_manual_handling_ref": "synthetic:handling-envelope",
+        "handling_capacity_kg": 65,
+        "handling_status": "qualified_for_declared_task"
+      },
+      "spare": {
+        "spare_id": "SYN-HVAC-COMP",
+        "revision": "R2",
+        "compatibility": "exact_match",
+        "availability": "order_required",
+        "custody_ref": "synthetic:custody:SYN-HVAC-COMP",
+        "lead_time_days": 21
+      },
+      "task_phases": [
+        {
+          "phase": "isolate",
+          "duration_min_estimate": 10,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:isolate"
+        },
+        {
+          "phase": "diagnose",
+          "duration_min_estimate": 15,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:diagnose"
+        },
+        {
+          "phase": "prepare",
+          "duration_min_estimate": 20,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:prepare"
+        },
+        {
+          "phase": "access_disassemble",
+          "duration_min_estimate": 20,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:access_disassemble"
+        },
+        {
+          "phase": "extract",
+          "duration_min_estimate": 15,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:extract"
+        },
+        {
+          "phase": "repair_replace",
+          "duration_min_estimate": 60,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:repair_replace"
+        },
+        {
+          "phase": "reinstall",
+          "duration_min_estimate": 20,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:reinstall"
+        },
+        {
+          "phase": "reconnect",
+          "duration_min_estimate": 25,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:reconnect"
+        },
+        {
+          "phase": "test",
+          "duration_min_estimate": 30,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:test"
+        },
+        {
+          "phase": "configuration_update",
+          "duration_min_estimate": 5,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:configuration_update"
+        },
+        {
+          "phase": "authorized_release",
+          "duration_min_estimate": 5,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:authorized_release"
+        }
+      ],
+      "post_maintenance": {
+        "required_tests": [
+          "pressure_test",
+          "refrigerant_leak_check",
+          "electrical_test",
+          "thermal_performance_test"
+        ],
+        "completed_tests": [],
+        "independent_authorization_ref": null,
+        "configuration_update_ref": null,
+        "return_to_service_state": "blocked"
+      },
+      "residuals": [
+        {
+          "stream": "refrigerant",
+          "quantity": null,
+          "unit": "kg",
+          "disposition": "contained_for_shore_disposal",
+          "evidence_ref": "synthetic:residual:refrigerant"
+        }
+      ],
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-serviceability-corpus-v0.1",
+        "raw_artifact_digest": null,
+        "measurement_status": "not_measured",
+        "uncertainty_status": "not_applicable"
+      },
+      "expected_disposition": "blocked",
+      "claim_limitations": [
+        "Synthetic benchmark record only; not actual vessel geometry, equipment specification or maintenance instruction.",
+        "No permission or authorization to perform a physical maintenance task is implied.",
+        "No stability, electrical, pressure, watertight, fire or seaworthiness conclusion is established."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "converter_replacement_geometry_stale",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset": {
+        "asset_id": "dc_dc_converter_A",
+        "asset_type": "power_converter",
+        "serial": "SYN-DC-001",
+        "part_number": "SYN-DC-DC",
+        "revision": "R3",
+        "as_built_geometry_ref": "synthetic:stale-asbuilt-digest",
+        "installed_location": "electrical-locker",
+        "parent_assembly": "dc-bus"
+      },
+      "task": {
+        "task_id": "converter_replacement_geometry_stale_task",
+        "trigger": "synthetic condition-based service trigger",
+        "task_type": "module_replace",
+        "approved_procedure_ref": "synthetic:approved-task-profile:converter",
+        "permission_state": "permitted_for_declared_context"
+      },
+      "operating_context": {
+        "location_context": "afloat_secured",
+        "vessel_state": "stationary_secured",
+        "environment_evidence": "synthetic:environment-profile:converter_replacement_geometry_stale",
+        "task_envelope_ref": "synthetic:task-envelope:converter_replacement_geometry_stale"
+      },
+      "personnel": {
+        "crew_count_min": 2,
+        "required_authorizations": [
+          "synthetic:authorized-electrical-person"
+        ],
+        "skills_refs": [
+          "synthetic:mechanical-technician"
+        ],
+        "tooling_refs": [
+          "synthetic:standard-tool-kit"
+        ]
+      },
+      "safety_preconditions": [
+        {
+          "hazard_domain": "electrical_isolation",
+          "status": "unknown",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "stored_energy",
+          "status": "unknown",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "thermal",
+          "procedure_or_evidence_ref": "synthetic:precondition:thermal"
+        },
+        {
+          "hazard_domain": "fire_containment",
+          "procedure_or_evidence_ref": "synthetic:precondition:fire_containment"
+        }
+      ],
+      "access": {
+        "geometry_ref": "synthetic:stale-asbuilt-digest",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "access_path_ref": "synthetic:access-path",
+        "required_clearance_mm": null,
+        "available_clearance_mm": null,
+        "obstructing_assets": [],
+        "unrelated_critical_removal_required": false,
+        "temporary_disassembly_steps": []
+      },
+      "handling": {
+        "module_mass_kg": null,
+        "centre_of_gravity_ref": null,
+        "lift_or_manual_handling_ref": "synthetic:handling-envelope",
+        "handling_capacity_kg": null,
+        "handling_status": "unknown"
+      },
+      "spare": {
+        "spare_id": "SYN-DC-DC",
+        "revision": "R3",
+        "compatibility": "exact_match",
+        "availability": "onboard_stock",
+        "custody_ref": "synthetic:custody:SYN-DC-DC",
+        "lead_time_days": 0
+      },
+      "task_phases": [
+        {
+          "phase": "isolate",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:isolate"
+        },
+        {
+          "phase": "diagnose",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:diagnose"
+        },
+        {
+          "phase": "prepare",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:prepare"
+        },
+        {
+          "phase": "access_disassemble",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:access_disassemble"
+        },
+        {
+          "phase": "extract",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:extract"
+        }
+      ],
+      "post_maintenance": {
+        "required_tests": [
+          "insulation_resistance_test",
+          "functional_test",
+          "configuration_verification"
+        ],
+        "completed_tests": [],
+        "independent_authorization_ref": null,
+        "configuration_update_ref": null,
+        "return_to_service_state": "unknown"
+      },
+      "residuals": [],
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-serviceability-corpus-v0.1",
+        "raw_artifact_digest": null,
+        "measurement_status": "not_measured",
+        "uncertainty_status": "not_applicable"
+      },
+      "expected_disposition": "indeterminate",
+      "claim_limitations": [
+        "Synthetic benchmark record only; not actual vessel geometry, equipment specification or maintenance instruction.",
+        "No permission or authorization to perform a physical maintenance task is implied.",
+        "No stability, electrical, pressure, watertight, fire or seaworthiness conclusion is established."
+      ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "case_id": "battery_module_blocked_missing_hv_authority",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SERVICEABILITY_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "asset": {
+        "asset_id": "battery_module_A",
+        "asset_type": "battery_module",
+        "serial": "SYN-BAT-001",
+        "part_number": "SYN-BAT-MOD",
+        "revision": "R1",
+        "as_built_geometry_ref": "synthetic:asbuilt:battery_module_A",
+        "installed_location": "battery-compartment",
+        "parent_assembly": "battery-bank"
+      },
+      "task": {
+        "task_id": "battery_module_blocked_missing_hv_authority_task",
+        "trigger": "synthetic condition-based service trigger",
+        "task_type": "module_replace",
+        "approved_procedure_ref": null,
+        "permission_state": "not_permitted"
+      },
+      "operating_context": {
+        "location_context": "drydock_service_yard",
+        "vessel_state": "in_yard",
+        "environment_evidence": "synthetic:environment-profile:battery_module_blocked_missing_hv_authority",
+        "task_envelope_ref": "synthetic:task-envelope:battery_module_blocked_missing_hv_authority"
+      },
+      "personnel": {
+        "crew_count_min": 3,
+        "required_authorizations": [],
+        "skills_refs": [
+          "synthetic:qualified-electrician-required"
+        ],
+        "tooling_refs": [
+          "synthetic:standard-tool-kit"
+        ]
+      },
+      "safety_preconditions": [
+        {
+          "hazard_domain": "electrical_isolation",
+          "status": "missing",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "stored_energy",
+          "status": "missing",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "thermal",
+          "status": "unknown",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "fire_containment",
+          "status": "unknown",
+          "procedure_or_evidence_ref": null
+        },
+        {
+          "hazard_domain": "mechanical_load",
+          "status": "unknown",
+          "procedure_or_evidence_ref": null
+        }
+      ],
+      "access": {
+        "geometry_ref": "synthetic:geometry:battery-compartment",
+        "coordinate_frame": "LOS18_LOCAL_SYNTH_MM",
+        "access_path_ref": "synthetic:access-path",
+        "required_clearance_mm": 900,
+        "available_clearance_mm": 950,
+        "obstructing_assets": [],
+        "unrelated_critical_removal_required": false,
+        "temporary_disassembly_steps": []
+      },
+      "handling": {
+        "module_mass_kg": 125,
+        "centre_of_gravity_ref": "synthetic:cog",
+        "lift_or_manual_handling_ref": "synthetic:handling-envelope",
+        "handling_capacity_kg": 150,
+        "handling_status": "qualified_for_declared_task"
+      },
+      "spare": {
+        "spare_id": "SYN-BAT-MOD",
+        "revision": "R1",
+        "compatibility": "exact_match",
+        "availability": "onboard_stock",
+        "custody_ref": "synthetic:custody:SYN-BAT-MOD",
+        "lead_time_days": 0
+      },
+      "task_phases": [
+        {
+          "phase": "diagnose",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:diagnose"
+        },
+        {
+          "phase": "prepare",
+          "duration_min_estimate": null,
+          "duration_evidence_class": "synthetic",
+          "evidence_ref": "synthetic:phase:prepare"
+        }
+      ],
+      "post_maintenance": {
+        "required_tests": [
+          "approved_hv_isolation_verification",
+          "battery_monitoring_recommission",
+          "thermal_system_check",
+          "independent_authorized_release"
+        ],
+        "completed_tests": [],
+        "independent_authorization_ref": null,
+        "configuration_update_ref": null,
+        "return_to_service_state": "blocked"
+      },
+      "residuals": [],
+      "evidence": {
+        "evidence_class": "synthetic",
+        "source_ref": "synthetic:marine-serviceability-corpus-v0.1",
+        "raw_artifact_digest": null,
+        "measurement_status": "not_measured",
+        "uncertainty_status": "not_applicable"
+      },
+      "expected_disposition": "blocked",
+      "claim_limitations": [
+        "Synthetic benchmark record only; not actual vessel geometry, equipment specification or maintenance instruction.",
+        "No permission or authorization to perform a physical maintenance task is implied.",
+        "No stability, electrical, pressure, watertight, fire or seaworthiness conclusion is established."
+      ]
+    }
+  ]
+}
