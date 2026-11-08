@@ -39,6 +39,43 @@ jobs:
       - name: Run tests
         run: cargo test --manifest-path research/open-world-ansatz-microcosm/Cargo.toml
 
+      - name: Run paired A0/A2 through a separate child-agent process
+        run: |
+          set -euo pipefail
+          manifest="research/open-world-ansatz-microcosm/Cargo.toml"
+          target_dir="$(cargo metadata --format-version 1 --no-deps --manifest-path "$manifest" | jq -r '.target_directory')"
+          cargo build --manifest-path "$manifest" --bin open_world_agent --bin process_episode_smoke
+          report="$RUNNER_TEMP/open-world-process-pair-smoke.json"
+          "$target_dir/debug/process_episode_smoke" \
+            --agent "$target_dir/debug/open_world_agent" \
+            --strategy maximum_structure_information_gain > "$report"
+          jq -e '
+            .report_version == "symthaea-blind-process-pair-smoke-v0" and
+            .campaign_kind == "paired_process_baseline_smoke" and
+            .same_agent_artifact == true and
+            .comparison_design == "adaptive_budget" and
+            .a0.agent.executable_sha256 == .a2.agent.executable_sha256 and
+            .a0.agent.arguments == .a2.agent.arguments and
+            .a0.agent.environment_inherited == false and
+            .a2.agent.environment_inherited == false and
+            .a0.process_exit_code == 0 and
+            .a2.process_exit_code == 0 and
+            .a0.evaluator_score.generating_model_in_version_space and
+            .a2.evaluator_score.generating_model_in_version_space and
+            .a0.evaluator_score.set_score.exact_version_space_match and
+            .a2.evaluator_score.set_score.exact_version_space_match and
+            .a0.evaluator_score.evidence_references_valid and
+            .a2.evaluator_score.evidence_references_valid and
+            .a0.evaluator_score.probe_count <= 6 and
+            .a2.evaluator_score.probe_count <= 6 and
+            (.a0.action_records | length) > 0 and
+            (.a2.action_records | length) > 0 and
+            all(.a0.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$"))) and
+            all(.a2.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")))
+          ' "$report"
+          printf '%s\\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-process-pair-smoke.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
+
       - name: Run exhaustive finite A0/A2 policy census
         run: |
           report="$RUNNER_TEMP/open-world-finite-policy-census.json"
@@ -89,5 +126,8 @@ jobs:
             ${{ runner.temp }}/open-world-finite-policy-census.json
             ${{ runner.temp }}/open-world-finite-policy-census.json.sha256
             ${{ runner.temp }}/open-world-finite-policy-census.source-sha
+            ${{ runner.temp }}/open-world-process-pair-smoke.json
+            ${{ runner.temp }}/open-world-process-pair-smoke.json.sha256
+            ${{ runner.temp }}/open-world-process-pair-smoke.source-sha
           if-no-files-found: error
           retention-days: 90
