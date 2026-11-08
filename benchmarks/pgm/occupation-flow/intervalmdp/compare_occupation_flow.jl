@@ -45,14 +45,18 @@ model = IntervalMarkovChain(ambiguity, [1])
 # Rewards at t=0, t=1, t=2, t=3 respectively. The terminal reward is zero.
 const ACTION_A = Q[q(0), q(0), q(0), q(1), q(0), q(1), q(0), q(0)]
 const ACTION_B = Q[q(0), q(0), q(1), q(0), q(0), q(0), q(0), q(0)]
+const ACTION_C = (ACTION_A .+ ACTION_B) ./ q(2)
 
-# Regret is optimized on one shared transition process:
-#   regret(A) = U_B - U_A
-#   regret(B) = U_A - U_B
-# IntervalMDP supports signed finite-horizon rewards, so no artificial
-# path-dependent or arbitrary reward shift is needed.
-const REGRET_A = ACTION_B .- ACTION_A
-const REGRET_B = ACTION_A .- ACTION_B
+# Pairwise regret uses one shared transition process:
+#   regret(a,b) = max_M [ U_b(M) - U_a(M) ].
+# All six directed comparisons are evaluated; independently optimized
+# utility intervals are never subtracted.
+const REGRET_A_B = ACTION_B .- ACTION_A
+const REGRET_A_C = ACTION_C .- ACTION_A
+const REGRET_B_A = ACTION_A .- ACTION_B
+const REGRET_B_C = ACTION_C .- ACTION_B
+const REGRET_C_A = ACTION_A .- ACTION_C
+const REGRET_C_B = ACTION_B .- ACTION_C
 
 function solve_reward(scores::Vector{Q}, mode, bellman_algorithm)
     property = FiniteTimeReward(scores, q(1), 3)
@@ -73,8 +77,14 @@ const QUERIES = [
     ("action_a_max", ACTION_A, Optimistic, q(32, 25)),
     ("action_b_min", ACTION_B, Pessimistic, q(2, 5)),
     ("action_b_max", ACTION_B, Optimistic, q(4, 5)),
-    ("regret_a_max", REGRET_A, Optimistic, q(11, 25)),
-    ("regret_b_max", REGRET_B, Optimistic, q(22, 25)),
+    ("action_c_min", ACTION_C, Pessimistic, q(29, 50)),
+    ("action_c_max", ACTION_C, Optimistic, q(21, 25)),
+    ("regret_a_b_max", REGRET_A_B, Optimistic, q(11, 25)),
+    ("regret_a_c_max", REGRET_A_C, Optimistic, q(11, 50)),
+    ("regret_b_a_max", REGRET_B_A, Optimistic, q(22, 25)),
+    ("regret_b_c_max", REGRET_B_C, Optimistic, q(11, 25)),
+    ("regret_c_a_max", REGRET_C_A, Optimistic, q(11, 25)),
+    ("regret_c_b_max", REGRET_C_B, Optimistic, q(11, 50)),
 ]
 
 # Compare two independent IntervalMDP Bellman algorithms:
@@ -107,4 +117,5 @@ for (algorithm_name, algorithm) in ALGORITHMS
 end
 
 println()
-println("PASS: exact rational values match all six preregistered endpoints.")
+println("PASS: exact rational values match all 12 preregistered utility and directed-regret queries.")
+println("Minimax-regret actions: A and C (both 11/25); action B has regret 22/25.")
