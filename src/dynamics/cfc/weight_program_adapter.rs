@@ -610,6 +610,11 @@ pub enum CfCPermutationAlignmentError {
     GaussianInformationGain(#[from] GaussianModelInformationGainError),
     #[error("permutation activation signatures have an invalid hidden-unit dimension")]
     InvalidPermutationSignatureDimension,
+    #[error("Gaussian permutation EIG accepts at most {maximum_probes} candidate probes, received {actual_probes}")]
+    TooManyGaussianEIGCandidateProbes {
+        actual_probes: usize,
+        maximum_probes: usize,
+    },
     #[error("permutation posterior normalization failed")]
     InvalidPermutationPosterior,
     #[error("canonicalization would not change any parameters")]
@@ -1580,7 +1585,8 @@ pub fn select_cfc_disambiguating_probe(
     })
 }
 
-const MAX_EXACT_PERMUTATION_HYPOTHESES: usize = 1024;
+const MAX_EXACT_PERMUTATION_HYPOTHESES: usize = 120;
+const MAX_GAUSSIAN_EIG_CANDIDATE_PROBES: usize = 32;
 
 /// Select a CfC functional probe by prospective mutual information over exact
 /// hidden-unit permutation hypotheses.
@@ -1604,6 +1610,18 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
     if candidate_probes.is_empty() {
         return Err(CfCPermutationAlignmentError::EmptyCandidateProbeSet);
     }
+    if candidate_probes.len() > MAX_GAUSSIAN_EIG_CANDIDATE_PROBES {
+        return Err(CfCPermutationAlignmentError::TooManyGaussianEIGCandidateProbes {
+            actual_probes: candidate_probes.len(),
+            maximum_probes: MAX_GAUSSIAN_EIG_CANDIDATE_PROBES,
+        });
+    }
+    if !observation_std_dev.is_finite() || observation_std_dev <= 0.0 {
+        return Err(GaussianModelInformationGainError::InvalidObservationStdDev(
+            observation_std_dev,
+        )
+        .into());
+    }
 
     let source_fingerprint = source
         .fingerprint()
@@ -1625,12 +1643,16 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
     }
 
     let hidden_dim = source.config().hidden_dim;
-    let permutations = enumerate_hidden_unit_permutations(hidden_dim);
-    if permutations.is_empty() || permutations.len() > MAX_EXACT_PERMUTATION_HYPOTHESES {
+    let hypothesis_count = exact_permutation_count(hidden_dim);
+    if hypothesis_count.is_none_or(|count| count > MAX_EXACT_PERMUTATION_HYPOTHESES) {
         return Err(CfCPermutationAlignmentError::ExactPermutationSpaceTooLarge {
             hidden_dim,
             maximum_hypotheses: MAX_EXACT_PERMUTATION_HYPOTHESES,
         });
+    }
+    let permutations = enumerate_hidden_unit_permutations(hidden_dim);
+    if permutations.is_empty() {
+        return Err(CfCPermutationAlignmentError::InvalidPermutationSignatureDimension);
     }
 
     let projection = deterministic_permutation_projection(
@@ -1799,6 +1821,20 @@ pub fn select_cfc_disambiguating_probe_by_gaussian_eig(
             .collect(),
         candidate_scores: scores,
     })
+}
+
+fn exact_permutation_count(hidden_dim: usize) -> Option<usize> {
+    if hidden_dim == 0 {
+        return None;
+    }
+    let mut count = 1_usize;
+    for factor in 2..=hidden_dim {
+        count = count.checked_mul(factor)?;
+        if count > MAX_EXACT_PERMUTATION_HYPOTHESES {
+            return Some(count);
+        }
+    }
+    Some(count)
 }
 
 fn enumerate_hidden_unit_permutations(hidden_dim: usize) -> Vec<Vec<usize>> {
