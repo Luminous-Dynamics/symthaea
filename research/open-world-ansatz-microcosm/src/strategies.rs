@@ -3,12 +3,12 @@
 //! These are policy controls, not claims of optimality. Every strategy sees the
 //! same AgentView and scores only the interventions legal in the public task.
 
-use crate::{self, interaction, numeric};
+use crate::{interaction, numeric};
 use crate::protocol::{
     AgentIntervention, AgentMeasurement, AgentView, EpisodeStatus, StructureAccess,
 };
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProbeStrategy {
@@ -266,8 +266,10 @@ fn score_interaction(view: &AgentView) -> Result<Vec<ProbeMetrics>, StrategyErro
         return Err(StrategyError::NoCompatibleModels);
     }
 
+    let observed: BTreeSet<[i64; 2]> = log.interventions.iter().copied().collect();
     interaction::FACTORIAL_DESIGN
         .into_iter()
+        .filter(|input| !observed.contains(input))
         .map(|input| {
             let predictions = hypotheses.iter().map(|hypothesis| {
                 hypothesis
@@ -423,6 +425,29 @@ mod tests {
             let response = interaction_episode.apply(AgentAction::Probe { intervention }).unwrap();
             assert_eq!(response.view.observations.len(), 1);
         }
+    }
+
+    #[test]
+    fn interaction_strategy_never_recommends_an_already_observed_design_point() {
+        let mut episode = BlindEpisode::new_interaction(
+            "strategy-no-repeat-01",
+            interaction::ModelHypothesis {
+                structure: interaction::Structure::BilinearInteraction,
+                bias: 0,
+                weight_u: 1,
+                weight_v: 1,
+                interaction_weight: 1,
+            },
+            StructureAccess::InteractionWithheld,
+            9,
+        ).unwrap();
+        let first_view = episode.view().unwrap();
+        let first = choose_probe(&first_view, ProbeStrategy::FixedGrid).unwrap();
+        episode.apply(AgentAction::Probe { intervention: first }).unwrap();
+        let second_view = episode.view().unwrap();
+        let remaining = score_available_probes(&second_view).unwrap();
+        assert_eq!(remaining.len(), 8);
+        assert!(!remaining.iter().any(|metric| metric.intervention == first));
     }
 
     #[test]
