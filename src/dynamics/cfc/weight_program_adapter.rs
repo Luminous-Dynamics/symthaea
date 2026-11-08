@@ -516,6 +516,8 @@ pub struct CfCProjectionNoiseCalibration {
     pub calibration_probe_digest: String,
     pub method: CfCProjectionNoiseCalibrationMethod,
     pub sample_count: usize,
+    /// Ordered repeated scalar-projection samples used to reproduce statistics and receipt digest.
+    pub repeated_projection_samples: Vec<f64>,
     pub sample_mean: f64,
     pub observation_std_dev: f64,
     pub calibration_digest: String,
@@ -540,6 +542,12 @@ pub fn calibrate_cfc_projection_observation_noise(
         return Err(CfCPermutationAlignmentError::InsufficientNoiseCalibrationSamples {
             actual: repeated_projection_samples.len(),
             minimum: 2,
+        });
+    }
+    if repeated_projection_samples.len() > MAX_NOISE_CALIBRATION_SAMPLES {
+        return Err(CfCPermutationAlignmentError::TooManyNoiseCalibrationSamples {
+            actual: repeated_projection_samples.len(),
+            maximum: MAX_NOISE_CALIBRATION_SAMPLES,
         });
     }
     if !is_lowercase_hex_digest(calibration_probe_digest) {
@@ -622,6 +630,7 @@ pub fn calibrate_cfc_projection_observation_noise(
         calibration_probe_digest: calibration_probe_digest.to_owned(),
         method,
         sample_count: repeated_projection_samples.len(),
+        repeated_projection_samples: repeated_projection_samples.to_vec(),
         sample_mean,
         observation_std_dev,
         calibration_digest,
@@ -813,6 +822,11 @@ pub enum CfCPermutationAlignmentError {
     InsufficientNoiseCalibrationSamples {
         actual: usize,
         minimum: usize,
+    },
+    #[error("noise calibration has {actual} samples; maximum supported is {maximum}")]
+    TooManyNoiseCalibrationSamples {
+        actual: usize,
+        maximum: usize,
     },
     #[error("noise calibration sample {index} is non-finite")]
     NonFiniteNoiseCalibrationSample { index: usize },
@@ -1794,6 +1808,7 @@ pub fn select_cfc_disambiguating_probe(
 
 const MAX_EXACT_PERMUTATION_HYPOTHESES: usize = 120;
 const MAX_GAUSSIAN_EIG_CANDIDATE_PROBES: usize = 32;
+const MAX_NOISE_CALIBRATION_SAMPLES: usize = 4096;
 
 /// Select a CfC functional probe by prospective mutual information over exact
 /// hidden-unit permutation hypotheses.
