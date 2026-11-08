@@ -83,3 +83,39 @@ Scenario weights and likelihood matrices are still caller-supplied. They are not
 Do not pass ad hoc cell-wise lower/upper probability bounds and renormalize them as though they were a valid joint uncertainty set. If adding interval bounds later, use a mathematically valid simplex-constrained uncertainty set or a reviewed robust-optimization formulation.
 
 The robust tests are additive to the point-planner tests. The dedicated planner workflow runs both through the same isolated locked harness.
+
+
+## Decision-aware extension
+
+This crate now supports a separate decision-aware planner in addition to point-EIG and scenario-robust EIG:
+
+- Point-EIG measures expected entropy reduction.
+- Robust EIG exposes expected, worst-case and lower-tail information gain across caller-supplied scenarios.
+- EVSI evaluates whether an observation is expected to change or improve a declared terminal decision.
+- **Minimax regret** performs an exact bounded search over deterministic outcome-to-decision policies and minimizes the maximum expected regret across the supplied finite scenarios.
+
+The minimax policy search is capped by `DecisionAwareConfig.max_policy_evaluations` (default 65,536). If the finite policy space exceeds that cap, the experiment is rejected with `PolicySearchBudgetExceeded`; there is no silent fallback to the scenario-mixture Bayes policy. Policy ties are broken lexicographically by decision IDs in declared outcome order.
+
+The planner still only scores proposed investigations. It does not execute probes or terminal decisions, and its caller-supplied likelihoods, scenario weights and utility matrices are neither authenticated nor calibrated by this crate.
+
+Run the focused harness:
+
+```bash
+cargo test --manifest-path tools/rea-investigator-harness/Cargo.toml --locked
+```
+
+
+## Minimax-regret interpretation and evaluation boundary
+
+The exact minimax-regret search is exact over the finite deterministic outcome-to-decision policy space that the caller declares, subject to `max_policy_evaluations`. It minimizes the maximum *scenario-specific expected regret* over the supplied finite likelihood scenarios.
+
+This is not a distribution-free or global adversarial guarantee. In particular:
+
+- The true data-generating process may be outside the supplied scenarios.
+- Scenario weights and likelihood matrices remain caller inputs; this crate does not authenticate, calibrate, or establish their coverage.
+- Exact policy enumeration does not make the scenario set complete.
+- The selected policy is a proposal for downstream decision support; the planner does not execute the terminal decision or authorize target changes.
+- The policy-search cap is a hard bound. Exceeding it must remain an explicit rejection, never a silent fallback to scenario-mixture Bayes or point-EIG.
+- Report regret in each supplied scenario and separately measure held-out/out-of-ensemble regret. Do not label the finite-scenario maximum as a universal worst case.
+
+A benchmark comparison must freeze the utility matrix and scenario ensemble before evaluation, keep held-out data-generating processes out of every planner input, and report target-impact/resource constraints identically across policy arms. Utility is caller-owned value judgment, not a property inferred from the model's posterior.

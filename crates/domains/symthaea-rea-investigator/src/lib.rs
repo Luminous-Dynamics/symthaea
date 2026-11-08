@@ -1231,6 +1231,7 @@ mod tests {
     fn one_hypothesis_abstains_instead_of_inventing_a_competition() {
         let mut only = hypotheses();
         only.pop();
+        only[0].prior_probability = 1.0;
         let plan = plan_next_experiment(
             &evidence(),
             &only,
@@ -1361,5 +1362,7 @@ mod tests {
     }
 }
 
+/// Decision-aware EVSI and bounded minimax-regret planning.
+pub mod decision;
 /// Robust expected / worst-case / lower-tail EIG planning over likelihood scenarios.
 pub mod robust;

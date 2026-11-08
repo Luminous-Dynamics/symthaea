@@ -44,3 +44,22 @@ pub use symthaea_rea_investigator::{
     measure_observed_information_gain,
     plan_next_experiment,
 };
+
+pub use symthaea_rea_investigator::decision::{
+    plan_next_experiment_decision_aware,
+    DecisionAbstentionReason,
+    DecisionAwareConfig,
+    DecisionAwareExperimentResult,
+    DecisionAwarePlan,
+    DecisionClaimCeiling,
+    DecisionError,
+    DecisionErrorKind,
+    DecisionOutcomeResult,
+    DecisionRankingPolicy,
+    DecisionRejectionReason,
+    DecisionScenarioResult,
+    HypothesisUtility,
+    RejectedDecisionExperiment,
+    SharedPolicyOutcome,
+    TerminalDecision,
+};
