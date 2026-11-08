@@ -19,15 +19,14 @@ use super::quantified_proof::{
 };
 use super::quantified_scope::ValidatedQuantifierPrefix;
 use super::quantified_strategy::{
-    QbfEvaluationResult, QuantifiedEvaluationBudget, QuantifiedStrategyError,
-    StrategyVerificationReport,
+    QbfEvaluationResult, QuantifiedEvaluationBudget, StrategyVerificationReport,
 };
 use super::strategy_aig::{
     AigLiteral, AigNode, StrategyAig, StrategyAigBudget, StrategyAigError, StrategyAigReport,
     compile_strategy_function_to_aig_with_order, verify_aig_matches_strategy_function,
 };
 use super::strategy_bdd::{
-    BddRef, CompiledStrategyFunction, StrategyBddBudget, StrategyBddError, StrategyBddReport,
+    BddRef, StrategyBddBudget, StrategyBddError, StrategyBddReport,
     VerifiedStrategyCompilationError, verify_and_compile_qbf_strategy,
     verify_robdd_matches_strategy_function,
 };
@@ -717,11 +716,9 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
 #[cfg(test)]
 mod tests {
     use super::super::decomposition::Literal;
-    use super::super::quantified_proof::{
-        QbfProofNodeKind, QuantifiedProofBudget, build_qbf_game_proof,
-    };
+    use super::super::quantified_proof::{QuantifiedProofBudget, build_qbf_game_proof};
     use super::super::quantified_scope::{Quantifier, QuantifierBlock, ValidatedQuantifierPrefix};
-    use super::super::quantified_strategy::{StrategyOwner, evaluate_qbf_with_strategy};
+    use super::super::quantified_strategy::evaluate_qbf_with_strategy;
     use super::*;
 
     fn qbf_budget() -> QuantifiedEvaluationBudget {
@@ -744,6 +741,7 @@ mod tests {
             max_support_checks: 1 << 8,
             max_interaction_checks: 1 << 8,
             max_weighted_interaction_checks: 1 << 8,
+            max_anf_transform_checks: 1 << 8,
             max_frontier_order_evaluations: 1 << 8,
             max_frontier_refinement_passes: 1,
             max_variable_order_evaluations: 1 << 8,
