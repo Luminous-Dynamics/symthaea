@@ -166,6 +166,72 @@ fn same_phones(
         })
 }
 
+/// Replace Muse's fixed vibrato with the per-note controls frozen in VocalPerformance.
+fn apply_note_pitch_controls(
+    frames: &mut [FormantFrame],
+    performance: &VocalPerformance,
+) {
+    let mut previous_frequency: Option<f32> = None;
+    let mut previous_end = 0.0f32;
+    for syllable in &performance.syllables {
+        for note in syllable.notes() {
+            let note_start = note.start_time;
+            let note_end = note.start_time + note.duration;
+            let gap_before = note_start - previous_end;
+            let from_frequency = if gap_before > FRAME_DT_S * 1.5 {
+                note.frequency
+            } else {
+                previous_frequency.unwrap_or(note.frequency)
+            };
+            let transition_s = note.duration * syllable.portamento.clamp(0.0, 1.0);
+            let vibrato_start = note_start + note.duration * syllable.vibrato_onset.clamp(0.0, 1.0);
+            let vibrato_ramp_s = 0.05f32;
+            let edge_ramp_s = 0.015f32;
+
+            for frame in frames.iter_mut().filter(|frame| {
+                frame.time >= note_start && frame.time < note_end
+            }) {
+                let elapsed = (frame.time - note_start).max(0.0);
+                let transition = if transition_s > f32::EPSILON {
+                    (elapsed / transition_s).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                // Interpolate in log-frequency so the transition is uniform in cents.
+                let pitch = if from_frequency > 0.0 && note.frequency > 0.0 {
+                    from_frequency
+                        * (note.frequency / from_frequency).powf(transition)
+                } else {
+                    note.frequency
+                };
+
+                let attack = (elapsed / edge_ramp_s).clamp(0.0, 1.0);
+                let release = ((note_end - frame.time) / edge_ramp_s).clamp(0.0, 1.0);
+                let envelope = attack.min(release);
+                let vibrato_gate = if syllable.vibrato_depth_cents > 0.0
+                    && syllable.vibrato_rate_hz > 0.0
+                    && frame.time >= vibrato_start
+                {
+                    let onset_gate = ((frame.time - vibrato_start) / vibrato_ramp_s).clamp(0.0, 1.0);
+                    onset_gate * release
+                } else {
+                    0.0
+                };
+                let phase = std::f32::consts::TAU
+                    * syllable.vibrato_rate_hz
+                    * (frame.time - vibrato_start).max(0.0);
+                let vibrato_cents =
+                    syllable.vibrato_depth_cents * phase.sin() * vibrato_gate;
+                let vibrato_ratio = 2.0f32.powf(vibrato_cents / 1200.0);
+                frame.f0 = pitch * envelope * vibrato_ratio;
+            }
+
+            previous_frequency = Some(note.frequency);
+            previous_end = note_end;
+        }
+    }
+}
+
 /// Put irregularly timed formant frames on a fixed 200 Hz timeline. Long gaps
 /// become explicit silent frames; nearby frames are interpolated. FormantVocoder
 /// consumes uniformly sampled frames, so leaving gaps implicit would compress
@@ -394,13 +460,13 @@ impl SingingVoiceEngine for FormantSingingEngine {
                 ),
                 capability(
                     SingingControl::Vibrato,
-                    CapabilitySupport::Approximated,
-                    "uses a fixed 5.5 Hz / 30 cent vibrato independent of per-syllable settings",
+                    CapabilitySupport::Native,
+                    "per-syllable vibrato onset, rate, and depth drive the F0 curve with attack/release gating",
                 ),
                 capability(
                     SingingControl::Portamento,
-                    CapabilitySupport::Unsupported,
-                    "custom per-syllable portamento values are not consumed",
+                    CapabilitySupport::Native,
+                    "per-syllable portamento fraction drives a log-frequency glide from the preceding contiguous note",
                 ),
                 capability(
                     SingingControl::Articulation,
@@ -425,6 +491,8 @@ impl SingingVoiceEngine for FormantSingingEngine {
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
         let aligned = self.aligned_syllables(performance)?;
         let raw = render_sung_frames(&aligned, FRAME_RATE_HZ);
+        let mut raw = raw;
+        apply_note_pitch_controls(&mut raw, performance);
         let mut frames = complete_timeline(&raw, performance.duration_s())?;
         apply_phrase_expression(&mut frames, performance);
         let samples = self.vocoder.synthesize(&frames);
@@ -587,6 +655,87 @@ mod tests {
         let bandwidth_scale = (1.0 + 0.08 * 0.8) * (1.2 - 0.4 * 0.9);
         assert!((frames[0].b1 - 60.0 * bandwidth_scale).abs() < 1e-4);
         assert!((frames[0].b2 - 90.0 * bandwidth_scale).abs() < 1e-4);
+    }
+
+    #[test]
+    fn per_syllable_vibrato_onset_rate_and_depth_control_the_rendered_f0() {
+        let note = note(0.0, 1.0, 220.0);
+        let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        performance.syllables[0].portamento = 0.0;
+        performance.syllables[0].vibrato_onset = 0.25;
+        performance.syllables[0].vibrato_rate_hz = 5.0;
+        performance.syllables[0].vibrato_depth_cents = 20.0;
+
+        let aligned = FormantSingingEngine::default()
+            .aligned_syllables(&performance)
+            .unwrap();
+        let mut frames = render_sung_frames(&aligned, FRAME_RATE_HZ);
+        apply_note_pitch_controls(&mut frames, &performance);
+
+        let before_onset: Vec<_> = frames
+            .iter()
+            .filter(|frame| frame.time >= 0.10 && frame.time <= 0.20)
+            .map(|frame| frame.f0)
+            .collect();
+        assert!(!before_onset.is_empty());
+        let before_spread = before_onset.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+            - before_onset.iter().copied().fold(f32::INFINITY, f32::min);
+        assert!(
+            before_spread < 0.1,
+            "vibrato must remain inactive before its onset: spread={before_spread}"
+        );
+
+        let after_onset: Vec<_> = frames
+            .iter()
+            .filter(|frame| frame.time >= 0.45 && frame.time <= 0.90)
+            .map(|frame| frame.f0)
+            .collect();
+        assert!(!after_onset.is_empty());
+        let after_spread = after_onset.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+            - after_onset.iter().copied().fold(f32::INFINITY, f32::min);
+        assert!(
+            after_spread > 3.0,
+            "configured vibrato depth must measurably modulate F0: spread={after_spread}"
+        );
+        let mean = after_onset.iter().sum::<f32>() / after_onset.len() as f32;
+        assert!((mean - 220.0).abs() < 2.0, "vibrato should remain centered on the score pitch: {mean}");
+    }
+
+    #[test]
+    fn per_syllable_portamento_glides_in_log_frequency_and_reaches_target() {
+        let notes = [note(0.0, 0.5, 220.0), note(0.5, 0.5, 440.0)];
+        let mut performance =
+            VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        performance.syllables[0].vibrato_depth_cents = 0.0;
+        performance.syllables[1].vibrato_depth_cents = 0.0;
+        performance.syllables[1].vibrato_onset = 1.0;
+        performance.syllables[1].portamento = 0.5;
+
+        let aligned = FormantSingingEngine::default()
+            .aligned_syllables(&performance)
+            .unwrap();
+        let mut frames = render_sung_frames(&aligned, FRAME_RATE_HZ);
+        apply_note_pitch_controls(&mut frames, &performance);
+
+        let at_transition = frames
+            .iter()
+            .find(|frame| (frame.time - 0.60).abs() < 0.002)
+            .expect("frame at 100ms into portamento");
+        let expected = 220.0 * 2.0f32.powf(0.2);
+        assert!(
+            (at_transition.f0 - expected).abs() < 3.0,
+            "log-frequency portamento at 20% of glide should be {expected}, got {}",
+            at_transition.f0
+        );
+        let at_target = frames
+            .iter()
+            .find(|frame| (frame.time - 0.76).abs() < 0.002)
+            .expect("frame after portamento completes");
+        assert!(
+            (at_target.f0 - 440.0).abs() < 3.0,
+            "portamento must reach the target note: {}",
+            at_target.f0
+        );
     }
 
     #[test]
