@@ -697,3 +697,31 @@ The closed [-1, 1] admission interval is an HME exact-profile requirement. Gener
 The query receipt schema now requires the versioned score-contract ID for continuous_f32 + cosine. Its synthetic receipt fixture has been updated to use the same ID. The adversarial admission matrix is [hme_similarity_admission_v0.json](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_similarity_admission_v0.json).
 
 This source slice is committed, but cargo fmt/check/tests, SIMD differential checks and segment integration have not run. It does not change legacy `similarity()` or migrate existing consumers.
+
+## 2026-11-08 research extension: per-query guarantees and refinement-first exact retrieval
+
+The competitive baseline now includes Recast (arXiv:2611.02765, 2026-11-02) alongside PQR-Search (arXiv:2611.07579, 2026-11-05), ANNiE, QBAT, DARTH+ and Ada-ef.
+
+Three query/retrieval plans are now explicitly distinguished:
+
+1. **Progressive exact** (#10945): evaluate candidate payloads incrementally and prune only when an admissible conservative upper bound is strictly below the exact kth threshold.
+2. **Global interval select-and-refine** (#11078): scan compact interval metadata for every eligible record, compute the kth-largest certified lower bound, retain every item whose upper bound can still reach it, then exact-score all survivors. This is deterministic only when every eligible record is covered and intervals contain the #10918 canonical f32 score.
+3. **Probabilistic interval refinement**: RecastQ-style uncertainty models may reduce refinements when approximation is permitted, but directional-isotropy and other probability assumptions remain explicit. These intervals cannot authorize ExactComplete.
+
+New workstreams:
+- [#11022 — per-query recall guarantee audit](https://github.com/Luminous-Dynamics/symthaea/issues/11022).
+- [#11041 — query-cost prediction and proof-guided value of computation](https://github.com/Luminous-Dynamics/symthaea/issues/11041).
+- [#11078 — global interval selection and selective exact refinement](https://github.com/Luminous-Dynamics/symthaea/issues/11078).
+
+Protocols:
+- [Per-query reliability](HME_PER_QUERY_RELIABILITY_2026-11-07.md).
+- [Query-cost / proof-guided scheduling](HME_QUERY_COST_AND_PROOF_GUIDED_SCHEDULING_2026-11-07.md).
+- [Global interval select-and-refine](HME_INTERVAL_SELECT_REFINE_2026-11-08.md).
+- [Updated industry benchmark crosswalk](HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md).
+
+A deterministic generated property sweep checked 50,000 small integer interval-selection cases (N=1..32, valid containing intervals, stable score/ID tie order) with zero false-prune disagreements against full exact top-k. This is a check of the selection rule only, not a production certificate or floating-point proof.
+
+The compression programme also now evaluates query-weighted block bit allocation:
+minimize sum_b w_b epsilon_b(m_b), subject to a fixed code budget, where each epsilon_b is independently verified as a worst-case residual certificate. Workload weights influence storage allocation, never query-time correctness. Distribution shift may reduce efficiency but cannot invalidate a true worst-case certificate.
+
+No HME production segment selector, quantizer, f32 outward-rounding proof, PQR/Recast reproduction or SOTA result is claimed by these research additions. The #10918 full-resolution scalar score API and profile validators are present in source, but Cargo formatting/build/tests and SIMD differential qualification have not been confirmed in this tranche.
