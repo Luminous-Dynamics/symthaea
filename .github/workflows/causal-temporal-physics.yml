@@ -17,6 +17,7 @@ on:
       - "crates/domains/symthaea-science-evidence/**"
       - "crates/domains/symthaea-uap-observatory/**"
       - "docs/research/CAUSAL_TEMPORAL_GEOMETRIC_PHYSICS_PROGRAM_2026-11-06.md"
+      - "docs/research/**"
       - "docs/research/*reference-results-v0.*.md"
       - "docs/research/uap-bearing-triangulation-reference-v0.1.md"
       - "docs/research/dtc-phase-rigidity-benchmark-v0.1.md"
