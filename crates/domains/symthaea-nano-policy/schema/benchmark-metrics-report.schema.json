@@ -1,0 +1,612 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-benchmark-metrics-report:v2",
+  "title": "Independent nanotechnology benchmark metrics report",
+  "description": "Derived metrics from exact post-outcome ledger bytes. Report validity is not proof of scientific validity or correct group definitions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluator_version",
+    "outcome_ledger_sha256",
+    "benchmark_id",
+    "task_contract_sha256",
+    "evaluation_manifest_sha256",
+    "source_manifest_sha256",
+    "loss_name",
+    "loss_unit",
+    "success_threshold",
+    "query_budget",
+    "cost_unit",
+    "baseline_arm_id",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "arms",
+    "comparisons",
+    "limitations",
+    "shift_manifest_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-benchmark-metrics-v2"
+    },
+    "evaluator_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "outcome_ledger_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "task_contract_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "loss_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "loss_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "success_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "query_budget": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "cost_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "baseline_arm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 10000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "policy_id",
+          "target_query_count",
+          "independent_group_count",
+          "oracle_attempts",
+          "evaluated_attempts",
+          "failed_attempts",
+          "valid_query_rate",
+          "repeated_candidate_query_rate",
+          "covered_target_queries",
+          "target_coverage_at_budget",
+          "successful_target_queries",
+          "success_rate_at_budget",
+          "normalized_success_auc",
+          "success_curve",
+          "mean_best_loss_given_coverage",
+          "median_best_loss_given_coverage",
+          "mean_cost_per_target_query",
+          "median_cost_to_success",
+          "targets",
+          "worst_group_success_rate_at_budget",
+          "worst_group_normalized_success_auc",
+          "worst_group_target_coverage_at_budget",
+          "group_metrics"
+        ],
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "policy_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "target_query_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "independent_group_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "oracle_attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "evaluated_attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "failed_attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "valid_query_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "repeated_candidate_query_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "covered_target_queries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "target_coverage_at_budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "successful_target_queries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "success_rate_at_budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "normalized_success_auc": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "success_curve": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "query_count",
+                "success_rate"
+              ],
+              "properties": {
+                "query_count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "success_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "mean_best_loss_given_coverage": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "median_best_loss_given_coverage": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "mean_cost_per_target_query": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000000000
+          },
+          "median_cost_to_success": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000000000000000
+          },
+          "targets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target_query_id",
+                "group_id",
+                "oracle_attempts",
+                "evaluated_attempts",
+                "repeated_candidate_attempts",
+                "best_loss_at_budget",
+                "success_at_budget",
+                "normalized_success_auc",
+                "total_cost",
+                "cost_to_success"
+              ],
+              "properties": {
+                "target_query_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "group_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "oracle_attempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "evaluated_attempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "repeated_candidate_attempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "best_loss_at_budget": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1000000000000
+                },
+                "success_at_budget": {
+                  "type": "boolean"
+                },
+                "normalized_success_auc": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "total_cost": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000000000000000
+                },
+                "cost_to_success": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1000000000000000
+                }
+              }
+            }
+          },
+          "worst_group_success_rate_at_budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "worst_group_normalized_success_auc": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "worst_group_target_coverage_at_budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "group_metrics": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "group_id",
+                "target_query_count",
+                "covered_target_queries",
+                "target_coverage_at_budget",
+                "successful_target_queries",
+                "success_rate_at_budget",
+                "normalized_success_auc",
+                "mean_cost_per_target_query",
+                "success_curve"
+              ],
+              "properties": {
+                "group_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "target_query_count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2000
+                },
+                "covered_target_queries": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2000
+                },
+                "target_coverage_at_budget": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "successful_target_queries": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2000
+                },
+                "success_rate_at_budget": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "normalized_success_auc": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "mean_cost_per_target_query": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000000000000000
+                },
+                "success_curve": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 1000,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "query_count",
+                      "success_rate"
+                    ],
+                    "properties": {
+                      "query_count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "success_rate": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 14,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "baseline_arm_id",
+          "comparison_arm_id",
+          "metric",
+          "estimated_delta",
+          "confidence_interval_lower",
+          "confidence_interval_upper",
+          "confidence_level",
+          "practical_margin",
+          "independent_group_count",
+          "covered_target_count",
+          "total_target_count",
+          "bootstrap_replicates",
+          "disposition"
+        ],
+        "properties": {
+          "baseline_arm_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "comparison_arm_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "metric": {
+            "enum": [
+              "success_rate_at_budget",
+              "normalized_success_auc",
+              "best_loss_reduction_at_budget",
+              "worst_group_success_rate_at_budget",
+              "worst_group_normalized_success_auc"
+            ]
+          },
+          "estimated_delta": {
+            "type": "number",
+            "minimum": -1000000000000,
+            "maximum": 1000000000000,
+            "description": "Positive means the candidate improves relative to baseline; for best-loss reduction this is baseline loss minus candidate loss."
+          },
+          "confidence_interval_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
+          },
+          "confidence_interval_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
+          },
+          "confidence_level": {
+            "const": 0.95
+          },
+          "practical_margin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "independent_group_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "bootstrap_replicates": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000
+          },
+          "disposition": {
+            "enum": [
+              "improvement_beyond_margin",
+              "regression_beyond_margin",
+              "inconclusive",
+              "insufficient_independent_groups",
+              "insufficient_target_coverage",
+              "insufficient_within_group_replication"
+            ]
+          },
+          "covered_target_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "total_target_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "const": "insufficient_independent_groups"
+                }
+              },
+              "required": [
+                "disposition"
+              ]
+            },
+            "then": {
+              "properties": {
+                "confidence_interval_lower": {
+                  "type": "null"
+                },
+                "confidence_interval_upper": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "const": "insufficient_target_coverage"
+                }
+              },
+              "required": [
+                "disposition"
+              ]
+            },
+            "then": {
+              "properties": {
+                "confidence_interval_lower": {
+                  "type": "null"
+                },
+                "confidence_interval_upper": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "shift_manifest_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Optional shift-manifest digest copied from the input outcome ledger so per-group metrics remain auditable when detached; this evaluator checks its format, not the referenced file bytes."
+    }
+  }
+}

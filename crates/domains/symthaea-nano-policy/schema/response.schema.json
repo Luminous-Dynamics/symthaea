@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-policy-response:v1",
+  "title": "Symthaea nano-policy response",
+  "description": "JSONL receipt contract. A completed selection is not a physical prediction or scientific validation.",
+  "oneOf": [
+    {
+      "title": "Successful selection",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "policy",
+        "seed",
+        "request_sha256",
+        "feature_contract_sha256",
+        "candidate_count",
+        "requested_budget",
+        "selected_count",
+        "selected",
+        "limitations",
+        "cost_unit"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "nano-policy-request-v1"
+        },
+        "status": {
+          "const": "completed"
+        },
+        "policy": {
+          "enum": [
+            "random_seeded",
+            "farthest_first",
+            "group_balanced_farthest_first",
+            "cost_aware_farthest_first"
+          ]
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "feature_contract_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "requested_budget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "selected_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "selected": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rank",
+              "candidate_id",
+              "family_id",
+              "min_distance",
+              "reason",
+              "estimated_cost"
+            ],
+            "properties": {
+              "rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "candidate_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "family_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "min_distance": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "estimated_cost": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cost_unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        }
+      }
+    },
+    {
+      "title": "Rejected input",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "request_sha256",
+        "error_code",
+        "message"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "nano-policy-request-v1"
+        },
+        "status": {
+          "const": "rejected_input"
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "error_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 300
+        }
+      }
+    },
+    {
+      "title": "Fallback serialization error",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "request_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "nano-policy-request-v1"
+        },
+        "status": {
+          "const": "internal_serialization_error"
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  ]
+}
