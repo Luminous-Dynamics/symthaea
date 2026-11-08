@@ -52,11 +52,18 @@ pub struct GlobalIdentifiabilityConfig {
     pub min_scaled_parameter_separation: f64,
 }
 
+/// Maximum number of supplied candidates for the O(K^2 * M) pair screen.
+pub const MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES: usize = 512;
+
 /// Input error or numerical failure during global ambiguity screening.
 #[derive(Clone, Debug, PartialEq)]
 pub enum GlobalIdentifiabilityError {
     NoObservations,
     NoCandidates,
+    TooManyCandidates {
+        count: usize,
+        maximum: usize,
+    },
     EmptySolutionId {
         index: usize,
     },
@@ -108,6 +115,10 @@ impl fmt::Display for GlobalIdentifiabilityError {
         match self {
             Self::NoObservations => write!(f, "observation vector is empty"),
             Self::NoCandidates => write!(f, "candidate solution set is empty"),
+            Self::TooManyCandidates { count, maximum } => write!(
+                f,
+                "candidate solution set has {count} entries; maximum supported is {maximum}"
+            ),
             Self::EmptySolutionId { index } => {
                 write!(f, "candidate solution ID at index {index} is empty")
             }
@@ -226,6 +237,12 @@ pub fn screen_global_ambiguities(
     }
     if candidates.is_empty() {
         return Err(GlobalIdentifiabilityError::NoCandidates);
+    }
+    if candidates.len() > MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES {
+        return Err(GlobalIdentifiabilityError::TooManyCandidates {
+            count: candidates.len(),
+            maximum: MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES,
+        });
     }
     if config.parameter_scales.is_empty() {
         return Err(GlobalIdentifiabilityError::NoParameters);
@@ -685,6 +702,65 @@ mod tests {
         let right =
             screen_global_ambiguities(&observations, &[b, a], &config).unwrap();
         assert_eq!(left, right);
+    }
+
+    #[test]
+    fn observation_order_is_invariant_when_all_measurement_vectors_are_permuted() {
+        let observations = [1.0, 2.0, 3.0];
+        let candidate = CandidateSolution {
+            solution_id: "same".to_string(),
+            parameters: vec![0.0, 1.0],
+            predicted_observations: vec![1.01, 1.99, 3.0],
+        };
+        let config = GlobalIdentifiabilityConfig {
+            parameter_scales: vec![1.0, 1.0],
+            observation_sigmas: vec![0.1, 0.2, 0.3],
+            max_rms_standardized_residual: 1.0,
+            max_abs_standardized_residual: 1.0,
+            max_rms_prediction_difference: 0.1,
+            max_abs_prediction_difference: 0.1,
+            min_scaled_parameter_separation: 1.0,
+        };
+        let original =
+            screen_global_ambiguities(&observations, std::slice::from_ref(&candidate), &config)
+                .unwrap();
+        let permuted = screen_global_ambiguities(
+            &[3.0, 1.0, 2.0],
+            &[CandidateSolution {
+                solution_id: "same".to_string(),
+                parameters: candidate.parameters.clone(),
+                predicted_observations: vec![3.0, 1.01, 1.99],
+            }],
+            &GlobalIdentifiabilityConfig {
+                observation_sigmas: vec![0.3, 0.1, 0.2],
+                ..config
+            },
+        )
+        .unwrap();
+        assert_eq!(original, permuted);
+    }
+
+    #[test]
+    fn candidate_limit_is_enforced_before_pair_enumeration() {
+        let candidate = CandidateSolution {
+            solution_id: "candidate".to_string(),
+            parameters: vec![0.0, 0.0, 0.0],
+            predicted_observations: vec![1.0],
+        };
+        let candidates = vec![
+            CandidateSolution {
+                solution_id: "candidate-0".to_string(),
+                ..candidate.clone()
+            };
+            MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES + 1
+        ];
+        assert_eq!(
+            screen_global_ambiguities(&[1.0], &candidates, &mirror_config(1)),
+            Err(GlobalIdentifiabilityError::TooManyCandidates {
+                count: MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES + 1,
+                maximum: MAX_GLOBAL_IDENTIFIABILITY_CANDIDATES,
+            })
+        );
     }
 
     #[test]
