@@ -122,6 +122,14 @@ pub enum UtilityDirection {
     Minimize,
 }
 
+/// Hard pre-allocation limits for dense occupation-flow LP construction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OccupationFlowBudget {
+    pub max_variables: usize,
+    pub max_constraints: usize,
+    pub max_matrix_entries: usize,
+}
+
 /// Canonical variable layout for the occupation-flow LP.
 ///
 /// First are all occupancy variables in (time, state) order, followed by all
@@ -202,6 +210,15 @@ pub enum OccupationFlowError {
     ScoreStateCountMismatch { time: usize, expected: usize, actual: usize },
     ArithmeticOverflow,
     DimensionOverflow,
+    BudgetExceeded {
+        resource: &'static str,
+        required: usize,
+        limit: usize,
+    },
+    AllocationFailed {
+        resource: &'static str,
+        requested: usize,
+    },
     Lp(LpCertificateError),
 }
 
@@ -219,6 +236,14 @@ impl fmt::Display for OccupationFlowError {
             Self::ScoreStateCountMismatch { time, expected, actual } => write!(f, "score at time {time} has {actual} states; expected {expected}"),
             Self::ArithmeticOverflow => write!(f, "checked rational overflow in occupation-flow construction"),
             Self::DimensionOverflow => write!(f, "occupation-flow LP dimensions overflow usize"),
+            Self::BudgetExceeded { resource, required, limit } => write!(
+                f,
+                "occupation-flow {resource} requires {required}; configured limit is {limit}"
+            ),
+            Self::AllocationFailed { resource, requested } => write!(
+                f,
+                "unable to reserve occupation-flow {resource} capacity {requested}"
+            ),
             Self::Lp(error) => write!(f, "LP construction failed: {error}"),
         }
     }
@@ -246,6 +271,7 @@ pub fn build_occupation_flow_lp(
     model: &StagewiseIntervalMarkovModel,
     state_scores: &[Vec<CheckedRational>],
     direction: UtilityDirection,
+    budget: OccupationFlowBudget,
 ) -> Result<OccupationFlowLp, OccupationFlowError> {
     let periods = model.period_count();
     let states = model.state_count();
@@ -273,6 +299,27 @@ pub fn build_occupation_flow_lp(
         .ok_or(OccupationFlowError::DimensionOverflow)?;
     let variable_count = occupancy_count.checked_add(flow_count)
         .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let constraint_count = states.checked_mul(2)
+        .and_then(|initial_rows| {
+            let per_stage = states.checked_mul(4)?
+                .checked_add(states.checked_mul(states)?.checked_mul(2)?)?;
+            model.transitions.len().checked_mul(per_stage)?
+                .checked_add(initial_rows)
+        })
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    let matrix_entries = constraint_count.checked_mul(variable_count)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+
+    for (resource, required, limit) in [
+        ("variables", variable_count, budget.max_variables),
+        ("constraints", constraint_count, budget.max_constraints),
+        ("dense matrix entries", matrix_entries, budget.max_matrix_entries),
+    ] {
+        if required > limit {
+            return Err(OccupationFlowError::BudgetExceeded { resource, required, limit });
+        }
+    }
+
     let layout = OccupationFlowLayout {
         periods,
         states,
@@ -281,11 +328,23 @@ pub fn build_occupation_flow_lp(
     };
 
     let mut matrix: Vec<Vec<CheckedRational>> = Vec::new();
+    matrix.try_reserve_exact(constraint_count).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "constraint rows",
+            requested: constraint_count,
+        }
+    })?;
     let mut rhs: Vec<CheckedRational> = Vec::new();
+    rhs.try_reserve_exact(constraint_count).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "right-hand-side entries",
+            requested: constraint_count,
+        }
+    })?;
 
     // Initial occupancy: omega[0,i] = initial[i].
     for state in 0..states {
-        let mut row = zero_row(variable_count);
+        let mut row = zero_row(variable_count)?;
         row[layout.occupancy_variable(0, state).unwrap()] = CheckedRational::one();
         add_equality(&mut matrix, &mut rhs, row, model.initial[state])?;
     }
@@ -358,8 +417,14 @@ pub fn build_occupation_flow_lp(
     Ok(OccupationFlowLp { lp, layout, direction })
 }
 
-fn zero_row(length: usize) -> Vec<CheckedRational> {
-    vec![CheckedRational::zero(); length]
+fn zero_row(length: usize) -> Result<Vec<CheckedRational>, OccupationFlowError> {
+    let mut row = Vec::new();
+    row.try_reserve_exact(length).map_err(|_| OccupationFlowError::AllocationFailed {
+        resource: "dense constraint row",
+        requested: length,
+    })?;
+    row.resize(length, CheckedRational::zero());
+    Ok(row)
 }
 
 fn add_inequality(
@@ -378,15 +443,21 @@ fn add_equality(
     row: Vec<CheckedRational>,
     value: CheckedRational,
 ) -> Result<(), OccupationFlowError> {
-    matrix.push(row.clone());
-    rhs.push(value);
-    let mut negated = Vec::with_capacity(row.len());
-    for coefficient in row {
+    let mut negated = Vec::new();
+    negated.try_reserve_exact(row.len()).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "negated equality row",
+            requested: row.len(),
+        }
+    })?;
+    for coefficient in &row {
         let numerator = coefficient.numerator().checked_neg()
             .ok_or(OccupationFlowError::ArithmeticOverflow)?;
         negated.push(CheckedRational::new(numerator, coefficient.denominator())
             .map_err(|_| OccupationFlowError::ArithmeticOverflow)?);
     }
+    matrix.push(row);
+    rhs.push(value);
     let negative_value = CheckedRational::new(
         value.numerator().checked_neg().ok_or(OccupationFlowError::ArithmeticOverflow)?,
         value.denominator(),
@@ -464,6 +535,14 @@ mod tests {
         ).unwrap()
     }
 
+    fn budget(max_entries: usize) -> OccupationFlowBudget {
+        OccupationFlowBudget {
+            max_variables: 14,
+            max_constraints: 36,
+            max_matrix_entries: max_entries,
+        }
+    }
+
     fn sparse_vector(
         length: usize,
         entries: &[(usize, i128, i128)],
@@ -483,7 +562,7 @@ mod tests {
             vec![q(0, 1), q(1, 1)],
             vec![q(0, 1), q(1, 1)],
         ];
-        let built = build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize).unwrap();
+        let built = build_occupation_flow_lp(&model, &scores, UtilityDirection::Maximize, budget(504)).unwrap();
         assert_eq!(built.layout().period_count(), 3);
         assert_eq!(built.layout().state_count(), 2);
         assert_eq!(built.layout().variable_count(), 14);
@@ -537,7 +616,7 @@ mod tests {
         ];
 
         for (scores, direction, expected_utility, primal_entries, dual_entries) in certificates {
-            let built = build_occupation_flow_lp(&model, scores, direction).unwrap();
+            let built = build_occupation_flow_lp(&model, scores, direction, budget(504)).unwrap();
             let certificate = PrimalDualCertificate {
                 primal: sparse_vector(14, &primal_entries),
                 dual: sparse_vector(36, &dual_entries),
@@ -564,9 +643,32 @@ mod tests {
         let model = fixture();
         let bad_scores = vec![vec![q(0, 1), q(0, 1)]];
         assert!(matches!(
-            build_occupation_flow_lp(&model, &bad_scores, UtilityDirection::Maximize),
+            build_occupation_flow_lp(&model, &bad_scores, UtilityDirection::Maximize, budget(504)),
             Err(OccupationFlowError::ScorePeriodCountMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn rejects_occupation_flow_budget_before_dense_matrix_allocation() {
+        let model = fixture();
+        let scores = vec![
+            vec![q(0, 1), q(0, 1)],
+            vec![q(0, 1), q(1, 1)],
+            vec![q(0, 1), q(1, 1)],
+        ];
+        assert_eq!(
+            build_occupation_flow_lp(
+                &model,
+                &scores,
+                UtilityDirection::Maximize,
+                budget(503),
+            ),
+            Err(OccupationFlowError::BudgetExceeded {
+                resource: "dense matrix entries",
+                required: 504,
+                limit: 503,
+            })
+        );
     }
 
     #[test]
@@ -583,6 +685,11 @@ mod tests {
             valid.as_ref().unwrap(),
             &vec![vec![q(1, 1), q(0, 1)], vec![q(0, 1), q(1, 1)]],
             UtilityDirection::Maximize,
+            OccupationFlowBudget {
+                max_variables: 6,
+                max_constraints: 20,
+                max_matrix_entries: 120,
+            },
         ).unwrap();
         assert_eq!(built.problem().row_count(), 20);
         assert_eq!(built.problem().column_count(), 6);
