@@ -28,6 +28,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
+/// Closed-set candidate selection guard for external transcript selectors.
+pub mod candidate_selection;
+
 /// Default beam width for search
 pub const DEFAULT_BEAM_WIDTH: usize = 10;
 
