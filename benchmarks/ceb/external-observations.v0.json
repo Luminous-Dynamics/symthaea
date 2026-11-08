@@ -1428,7 +1428,7 @@
       "supporting_source_ids": [],
       "comparison_class": "methodological_reference",
       "caveats": [
-        "Task is natural-language requirement conformance on paired canonical and buggy implementations, not PR review or CEB-REVIEW finding adjudication.",
+        "Task is natural-language requirement conformance on paired canonical and buggy implementations, not PR review and not CEB-REVIEW finding adjudication.",
         "False-negative rate here measures rejection of a canonical correct implementation (over-correction); false-positive rate measures acceptance of a buggy implementation. Do not equate FNR with CEB defect recall or actionable precision.",
         "Fix-guided Verification Filter uses the model-proposed patch with benchmark and specification-constrained tests; generated tests and benchmark oracles can be incomplete.",
         "Average FNR reductions are reported across five models under Full prompting. Exact per-model/per-task raw denominators and uncertainty intervals are not represented in these summary observations.",
