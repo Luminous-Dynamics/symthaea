@@ -288,6 +288,131 @@ pub struct TargetHypothesis {
     pub weight: f64,
 }
 
+/// Whitened bearing-measurement Jacobian for target XYZ and sensor-clock offset.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BearingPositionClockJacobian {
+    /// d(azimuth / sigma_azimuth) / d(target_x, target_y, target_z, clock_offset).
+    pub azimuth_row: [f64; 4],
+    /// d(elevation / sigma_elevation) / d(target_x, target_y, target_z, clock_offset).
+    pub elevation_row: [f64; 4],
+    pub predicted_azimuth_rad: f64,
+    pub predicted_elevation_rad: f64,
+}
+
+/// Linearize one bearing sensor's observation with respect to target position
+/// and an additive sensor-clock offset.
+///
+/// `relative_velocity_ecef_mps` is target velocity minus sensor velocity in
+/// ECEF coordinates at the linearization epoch. The fourth Jacobian column is
+/// therefore the derivative induced by shifting the observation epoch by one
+/// second. The rows are whitened by the candidate's declared angular standard
+/// deviations. Correlated errors and uncertainty in the relative velocity are
+/// not modelled by this local primitive.
+///
+/// The parameter order is (target_x_m, target_y_m, target_z_m, clock_offset_s).
+/// The sensor quaternion maps body coordinates to ECEF; the target displacement
+/// and relative velocity are rotated back into the sensor frame before
+/// differentiating azimuth and elevation.
+pub fn bearing_position_clock_jacobian(
+    candidate: &SensorPlacementCandidate,
+    target_ecef_m: Vector3,
+    relative_velocity_ecef_mps: Vector3,
+) -> Result<BearingPositionClockJacobian, TriangulationError> {
+    if candidate.sensor_id.trim().is_empty() {
+        return Err(TriangulationError::EmptySensorId);
+    }
+    if !candidate.origin_ecef_m.is_finite()
+        || !target_ecef_m.is_finite()
+        || !relative_velocity_ecef_mps.is_finite()
+    {
+        return Err(TriangulationError::NonFiniteVector);
+    }
+    if !candidate.sigma_azimuth_rad.is_finite()
+        || candidate.sigma_azimuth_rad <= 0.0
+        || !candidate.sigma_elevation_rad.is_finite()
+        || candidate.sigma_elevation_rad <= 0.0
+    {
+        return Err(TriangulationError::InvalidAngularUncertainty);
+    }
+
+    let displacement_ecef = target_ecef_m.subtract(candidate.origin_ecef_m);
+    let displacement = candidate
+        .sensor_to_ecef
+        .inverse_rotate_vector(displacement_ecef)?;
+    let relative_velocity = candidate
+        .sensor_to_ecef
+        .inverse_rotate_vector(relative_velocity_ecef_mps)?;
+
+    let horizontal_squared = displacement.x * displacement.x + displacement.y * displacement.y;
+    let horizontal = horizontal_squared.sqrt();
+    let range_squared = horizontal_squared + displacement.z * displacement.z;
+    if !horizontal_squared.is_finite()
+        || !horizontal.is_finite()
+        || !range_squared.is_finite()
+    {
+        return Err(TriangulationError::NonFiniteIntermediate);
+    }
+    if horizontal_squared <= VECTOR_EPSILON * VECTOR_EPSILON {
+        return Err(TriangulationError::AzimuthSingularity);
+    }
+    if range_squared <= VECTOR_EPSILON * VECTOR_EPSILON {
+        return Err(TriangulationError::ZeroRange(candidate.sensor_id.clone()));
+    }
+
+    let azimuth_rad = displacement.y.atan2(displacement.x);
+    let elevation_rad = displacement.z.atan2(horizontal);
+    let inverse_horizontal_squared = 1.0 / horizontal_squared;
+    let inverse_range_squared = 1.0 / range_squared;
+
+    let azimuth_gradient = [
+        -displacement.y * inverse_horizontal_squared,
+        displacement.x * inverse_horizontal_squared,
+        0.0,
+    ];
+    let elevation_gradient = [
+        -displacement.x * displacement.z * inverse_range_squared / horizontal,
+        -displacement.y * displacement.z * inverse_range_squared / horizontal,
+        horizontal * inverse_range_squared,
+    ];
+
+    let azimuth_time_derivative = azimuth_gradient[0] * relative_velocity.x
+        + azimuth_gradient[1] * relative_velocity.y
+        + azimuth_gradient[2] * relative_velocity.z;
+    let elevation_time_derivative = elevation_gradient[0] * relative_velocity.x
+        + elevation_gradient[1] * relative_velocity.y
+        + elevation_gradient[2] * relative_velocity.z;
+
+    let azimuth_sigma = candidate.sigma_azimuth_rad;
+    let elevation_sigma = candidate.sigma_elevation_rad;
+    let azimuth_row = [
+        azimuth_gradient[0] / azimuth_sigma,
+        azimuth_gradient[1] / azimuth_sigma,
+        azimuth_gradient[2] / azimuth_sigma,
+        azimuth_time_derivative / azimuth_sigma,
+    ];
+    let elevation_row = [
+        elevation_gradient[0] / elevation_sigma,
+        elevation_gradient[1] / elevation_sigma,
+        elevation_gradient[2] / elevation_sigma,
+        elevation_time_derivative / elevation_sigma,
+    ];
+
+    if azimuth_row.iter().any(|value| !value.is_finite())
+        || elevation_row.iter().any(|value| !value.is_finite())
+        || !azimuth_rad.is_finite()
+        || !elevation_rad.is_finite()
+    {
+        return Err(TriangulationError::NonFiniteIntermediate);
+    }
+
+    Ok(BearingPositionClockJacobian {
+        azimuth_row,
+        elevation_row,
+        predicted_azimuth_rad: azimuth_rad,
+        predicted_elevation_rad: elevation_rad,
+    })
+}
+
 /// Robust placement score aggregated over a finite target-region hypothesis set.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RobustSensorPlacementScore {
