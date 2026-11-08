@@ -161,6 +161,20 @@ For larger cases, study constrained stochastic shortest-path / POMDP approximati
 
 Evidence is not always a monotone accumulation process. A newly verified contradiction, expiry, revocation, artifact mismatch or discovery of shared provenance may move an obligation from satisfied to conflicted/unknown and revoke a previous readiness result. Benchmark sequences must include such invalidation events; the planner/verifier must not keep a stale success certificate.
 
+## 3.0.1 Executable readiness reference
+
+The standalone fixture checker defines a small, deterministic readiness rule:
+
+- Ready iff every mandatory obligation's current, independently assessed status is exactly `satisfied`.
+- `unknown`, `unsatisfied`, `conflicted`, `incomplete` and `contradicted` all block readiness.
+- Optional obligations do not block readiness.
+- Candidate predictions do not change the current obligation state.
+- A fixture-only simulator can apply the grader's effect for an explicitly supplied *observed* candidate outcome; it checks that the candidate is authorized, reversible, non-destructive, that the outcome was declared, and that the evidence class is admissible.
+
+Tests cover a high-information static probe that leaves readiness unchanged, an exact manifest observation that closes only the binding obligation, a page reconciliation that closes enumeration/acquisition, conflict persistence under score averaging, configuration-bound reproduction that resolves a conflict, and bounded no-event evidence that does not prove universal absence.
+
+This executable reference is intentionally narrow. It does not authenticate actual Evidence records, verify producer signatures, execute target experiments, choose actions, optimize acquisition cost, or establish that the synthetic oracle matches the real world. The grader data is public development-only and is not a hidden benchmark.
+
 ## 3.1 Agent-visible and grader-only views
 
 The combined fixture JSON is a development authoring source only. It must never be used directly as the agent prompt or planner input.
