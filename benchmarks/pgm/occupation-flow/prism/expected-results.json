@@ -1,0 +1,42 @@
+{
+  "schema": "symthaea.pgm.occupation-flow.prism-expected.v1",
+  "status": "oracle-values-only-not-prism-executed",
+  "source_fixture": "Rust StagewiseIntervalMarkovModel two-state three-period fixture",
+  "model_semantics": {
+    "model_class": "IDTMC",
+    "initial_state": "t=0,s=0",
+    "reward_layers": [1, 2],
+    "terminal_state": "t=3",
+    "transition_uncertainty": "stagewise-independent-row-separable-intervals"
+  },
+  "expected": {
+    "action_a": {
+      "minimum": "9/25",
+      "maximum": "32/25",
+      "minimum_decimal": 0.36,
+      "maximum_decimal": 1.28
+    },
+    "action_b": {
+      "minimum": "2/5",
+      "maximum": "4/5",
+      "minimum_decimal": 0.4,
+      "maximum_decimal": 0.8
+    },
+    "regret_a": {
+      "worst_case": "11/25",
+      "prism_shift": "2",
+      "shifted_maximum": "61/25"
+    },
+    "regret_b": {
+      "worst_case": "22/25",
+      "prism_shift": "1",
+      "shifted_maximum": "47/25"
+    }
+  },
+  "qualification": {
+    "prism_version": "4.11",
+    "prism_executed": false,
+    "numeric_comparison_tolerance": "to-be-preregistered",
+    "independent_symthaea_lp_certificate_required": true
+  }
+}
