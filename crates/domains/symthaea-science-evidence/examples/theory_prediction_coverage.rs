@@ -4,8 +4,8 @@
 use std::error::Error;
 use symthaea_science_evidence::{
     ArtifactDigest, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
-    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictiveUncertaintyStatus,
-    PredictionDisposition, THEORY_PREDICTION_SCHEMA, TheoryModel, TheoryModelRole,
+    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictionDisposition,
+    PredictiveUncertaintyStatus, THEORY_PREDICTION_SCHEMA, TheoryModel, TheoryModelRole,
     TheoryPredictionLedger, TheoryPredictionRecord,
 };
 
