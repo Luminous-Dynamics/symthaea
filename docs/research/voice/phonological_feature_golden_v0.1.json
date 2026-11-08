@@ -63,7 +63,33 @@
           "denominator": 1,
           "value": 0,
           "reason": null
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
       }
     },
     {
@@ -101,7 +127,33 @@
           "denominator": 1,
           "value": 0,
           "reason": null
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 1,
+            "error_rate": 1
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
       }
     },
     {
@@ -140,7 +192,33 @@
           "denominator": 1,
           "value": null,
           "reason": "NO_ACTIVE_REFERENCE_TONE_FEATURES"
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
       }
     },
     {
@@ -178,7 +256,33 @@
           "denominator": 1,
           "value": 1,
           "reason": null
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 1,
+            "error_rate": 1
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
       }
     },
     {
@@ -216,7 +320,33 @@
           "denominator": 1,
           "value": 0,
           "reason": null
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 1,
+            "error_rate": 1
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
       }
     },
     {
@@ -252,7 +382,33 @@
           "denominator": 1,
           "value": null,
           "reason": "NO_TONE_DIMENSIONS_CONFIGURED"
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
       }
     },
     {
@@ -296,7 +452,33 @@
           "denominator": 2,
           "value": 0.5,
           "reason": null
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
       }
     },
     {
@@ -340,7 +522,33 @@
           "denominator": 1,
           "value": null,
           "reason": "NO_TONE_DIMENSIONS_CONFIGURED"
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
       },
       "tone_dimensions": []
     },
@@ -385,7 +593,33 @@
           "denominator": 1,
           "value": null,
           "reason": "NO_ACTIVE_REFERENCE_TONE_FEATURES"
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
       }
     },
     {
@@ -420,7 +654,33 @@
           "denominator": 1,
           "value": null,
           "reason": "NO_ACTIVE_REFERENCE_TONE_FEATURES"
-        }
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
       }
     }
   ]
