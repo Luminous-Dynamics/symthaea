@@ -57,7 +57,18 @@ default-members = ["."]
 [workspace.package]
 edition = "2024"
 EOF
-  expected=
+  expected="$(printf '%s\n' 'crates/core/example-only' 'crates/domains/deferred')"
+  actual="$(workspace_exclusions_from_manifest "$tmp")"
+  rm -f "$tmp"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FAIL: workspace exclude parser self-test" >&2
+    printf 'expected:\n%s\nactual:\n%s\n' "$expected" "$actual" >&2
+    return 1
+  fi
+}
+
+self_test_workspace_exclude_parser || exit 1
+mapfile -t EXCLUDES < <(workspace_exclusions_from_manifest Cargo.toml)
 
 is_excluded() {
   local d="$1" e
