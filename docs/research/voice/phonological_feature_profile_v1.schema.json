@@ -410,7 +410,20 @@
       "then": {
         "properties": {
           "reviewers": {
-            "minItems": 2
+            "type": "array",
+            "minItems": 2,
+            "contains": {
+              "type": "object",
+              "required": [
+                "independent_of_other_reviewers"
+              ],
+              "properties": {
+                "independent_of_other_reviewers": {
+                  "const": true
+                }
+              }
+            },
+            "minContains": 2
           },
           "annotation_authority": {
             "const": "EXPERT_NATIVE_PHONETIC_ANNOTATION"
