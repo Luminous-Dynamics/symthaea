@@ -9,6 +9,7 @@ This crate validates:
 - exact-byte SHA-256 digests;
 - leakage-resistant dataset split manifests;
 - pairwise common-mode/failure-domain relationships between observation sources;
+- separate RF acquisition qualification and open-set recognition with a derived, non-compensatory consumer disposition;
 - separate, provenance-bearing run receipts with independent-verifier evidence.
 
 It does **not** implement an RF detector, infer hostile intent, prove physical truth, authorize an operational action, or certify safety.
@@ -31,7 +32,7 @@ The crate is an explicit workspace package under `crates/domains/*`; it is not c
 - `verify_run_receipt_input_bindings` recomputes catalogue, split and ground-truth manifest hashes over exact bytes; checks that the split refers to the exact imported dataset/version; verifies every payload file; and compares the payload digest set with the receipt. The ground-truth manifest's semantics and source independence are a separate qualification task (#10826).
 - A pending rights record may remain in the discovery catalogue, but cannot authorize binary ingestion.
 - Event and recording groups may not cross train/validation/test partitions. Receiver, campaign and location dimensions are additionally held out when declared by an experiment.
-- Pairwise source relations are `shared_failure_domain`, `unknown`, or `no_declared_common_domain`. All profiles must share one immutable snapshot ID and one valid RFC 3339 `as_of` timestamp. The last relation means only that both declared inventories are complete and no dependency identifier overlaps. It is not proof of physical independence.
+- Pairwise source relations are `shared_failure_domain`, `unknown`, or `no_declared_common_domain`. RF dual-axis evaluation delegates this check to the same common-mode owner; different receiver IDs do not establish independence when clock/pipeline domains overlap. All profiles must share one immutable snapshot ID and one valid RFC 3339 `as_of` timestamp. The last relation means only that both declared inventories are complete and no dependency identifier overlaps. It is not proof of physical independence.
 - A run receipt binds exact code, model, configuration, dataset, split, toolchain and environment identities. Each case binds its exact output-artifact SHA-256. The independent verifier identity must differ from the declared executor identity, and verifier/report artifacts are digest-bound. This identity separation is a structural check, not proof of organizational independence.
 - Design fixtures contain no measurements. Only separate run receipts carry observed outcomes.
 - A structurally valid receipt is not a detector-performance pass, operational safety case, certification, or data-rights opinion.
@@ -56,3 +57,10 @@ The common-mode dependency graph also binds every source profile to one immutabl
 - `docs/research/emsr-v0.1/emsr-split-manifest-example-v0.1.json` is synthetic-only and illustrates separate event, recording, receiver, campaign and location partitions.
 
 Tracking: Symthaea EMSR-002 (#10814), Mycelix common-mode evidence (#5904).
+
+
+## RF dual-axis conformance
+
+`rf_dual_axis::validate_rf_dual_axis_fixture_pack` executes the frozen 12-case acquisition × recognition matrix. The acquisition state is non-compensatory: a model's candidate or confidence cannot override degraded, unqualified or unknown capture evidence. A separate 4×3 reference decision table checks the consumer disposition, while exact fixture discovery, strict unknown-field rejection and forged-admission mutation tests provide negative controls. The module's pairwise RF source helper delegates to the existing `assess_common_mode_independence` implementation rather than defining a second dependency graph.
+
+The result is synthetic contract conformance only. It is not physical RF instrument qualification or evidence of RF model performance.

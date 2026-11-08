@@ -597,7 +597,10 @@ pub fn validate_rf_dual_axis_fixture_pack(source_bytes: &[u8]) -> Result<Value, 
         let reference_agrees = primary == reference;
         let submitted_derived_matches = outcome_matches_derived(&primary, &fixture.assessment.derived);
         let expected_matches = outcome_matches_expected(&primary, &fixture.expected);
-        let false_accept = primary.candidate_admitted
+        // Count a false admission presented by the assessment producer. The
+        // primary evaluator should never generate one; forged/legacy outputs
+        // still need to be visible in the benchmark's hard-gate denominator.
+        let false_accept = fixture.assessment.derived.candidate_admitted
             && (fixture.assessment.acquisition.qualification != AcquisitionQualification::Qualified
                 || fixture.assessment.recognition.disposition != RecognitionDisposition::KnownClass);
         if false_accept {
@@ -719,6 +722,10 @@ mod tests {
 
     const FIXTURES: &str =
         include_str!("../../../../docs/research/emsr-v0.1/emsr-rf-dual-axis-fixtures-v0.1.json");
+    const FIXTURE_SCHEMA: &str =
+        include_str!("../../../../docs/research/emsr-v0.1/emsr-rf-dual-axis-contract-v0.1.schema.json");
+    const REPORT_SCHEMA: &str =
+        include_str!("../../../../tools/schema/emsr-rf-dual-axis-conformance-report-v0.1.schema.json");
 
     fn fixture_document() -> Value {
         serde_json::from_str(FIXTURES).expect("RF dual-axis fixtures parse")
@@ -735,8 +742,21 @@ mod tests {
         assert_eq!(report["failure_count"], 0);
         assert_eq!(report["reference_disagreement_count"], 0);
         assert_eq!(report["false_accept_count"], 0);
-        assert_eq!(report["high_confidence_acquisition_fault_cases_blocked"], 1);
+        assert_eq!(report["high_confidence_acquisition_fault_cases_blocked"], 3);
         assert_eq!(report["verification"]["status"], "passed");
+    }
+
+    #[test]
+    fn committed_input_and_report_schemas_are_pinned_and_parseable() {
+        let input_schema: Value =
+            serde_json::from_str(FIXTURE_SCHEMA).expect("RF input schema parses");
+        let report_schema: Value =
+            serde_json::from_str(REPORT_SCHEMA).expect("RF report schema parses");
+        assert_eq!(input_schema["$id"], "urn:luminous:emsr:rf-dual-axis-assessment:0.1");
+        assert_eq!(input_schema["properties"]["state"]["const"], FIXTURE_STATE);
+        assert_eq!(report_schema["$id"], "urn:luminous:emsr:rf-dual-axis-conformance-report:0.1");
+        assert_eq!(report_schema["properties"]["report_contract"]["const"], REPORT_SCHEMA);
+        assert_eq!(report_schema["additionalProperties"], false);
     }
 
     #[test]
@@ -777,7 +797,8 @@ mod tests {
             .expect("forged derived output is reported as a conformance failure");
         assert_eq!(report["status"], "failed");
         assert_eq!(report["per_fixture"][3]["submitted_derived_matches"], false);
-        assert_eq!(report["per_fixture"][3]["false_accept"], false);
+        assert_eq!(report["per_fixture"][3]["false_accept"], true);
+        assert_eq!(report["false_accept_count"], 1);
     }
 
     #[test]
