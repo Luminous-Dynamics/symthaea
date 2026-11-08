@@ -6,7 +6,7 @@
 
 use std::ffi::OsString;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use open_world_ansatz_microcosm::numeric::{Mechanism, ModelHypothesis, SensorMap};
@@ -67,7 +67,7 @@ fn child_args(strategy: &str) -> Vec<OsString> {
 }
 
 fn run_arm(
-    executable: &PathBuf,
+    executable: &Path,
     strategy: &str,
     access: StructureAccess,
     episode_id: &str,
