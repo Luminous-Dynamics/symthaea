@@ -488,7 +488,6 @@ mod tests {
 
         fn check_profile(
             problem: &CnfProblem,
-            prefix: &ValidatedQuantifierPrefix,
             layouts: &[(usize, Vec<usize>)],
             tables: &[Vec<bool>],
             universal_variables: &[usize],
@@ -530,7 +529,6 @@ mod tests {
             if function_index == layouts.len() {
                 return u128::from(check_profile(
                     problem,
-                    prefix,
                     layouts,
                     tables,
                     universal_variables,
@@ -837,6 +835,82 @@ mod tests {
                         actual.winning_strategy_profiles,
                         expected,
                         "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn generated_three_variable_exact_counts_match_independent_profile_enumerator() {
+        let mut state = 0x510e_527f_ade6_82d1u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(2_862_933_555_777_941_757)
+                .wrapping_add(3_037_000_493);
+            state
+        };
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+            Literal::positive(2),
+            Literal::negative(2),
+        ];
+        let orders = [
+            [0usize, 1usize, 2usize],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+
+        for formula_index in 0..32 {
+            let clause_count = (next() % 5) as usize;
+            let mut clauses = Vec::with_capacity(clause_count);
+            for _ in 0..clause_count {
+                let literal_count = (next() % 5) as usize;
+                let mut clause = Vec::with_capacity(literal_count);
+                for _ in 0..literal_count {
+                    clause.push(literals[(next() % literals.len() as u64) as usize]);
+                }
+                clauses.push(clause);
+            }
+            let problem = CnfProblem {
+                variables: vec!["x".into(), "y".into(), "z".into()],
+                clauses,
+            };
+
+            for order in orders {
+                for quantifier_mask in 0..8usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = prefix(3, blocks);
+                    let actual =
+                        count_qbf_winning_strategy_profiles(&problem, &prefix, budget()).unwrap();
+                    let expected = independent_profile_count(&problem, &prefix);
+                    assert_eq!(
+                        actual.winning_strategy_profiles,
+                        expected,
+                        "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
+                    );
+                    assert_eq!(
+                        actual.candidate_profiles_checked,
+                        actual.candidate_strategy_profiles
                     );
                 }
             }
