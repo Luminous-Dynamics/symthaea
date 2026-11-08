@@ -450,7 +450,7 @@ fn strict_formant_target(phone: &Phone) -> Result<(f32, f32, f32, SourceType)> {
         "iː" | "i" | "ɪ" | "ɛ" | "æ" | "ɑ" | "ɑː" | "ɒ" | "ɔ" | "ɔː" | "ʌ" | "ʊ"
             | "uː" | "u" | "ə" | "ɜː" | "eɪ" | "aɪ" | "oʊ" | "aʊ" | "m" | "n" | "ŋ"
             | "p" | "b" | "t" | "d" | "k" | "ɡ" | "f" | "v" | "θ" | "ð" | "s" | "z"
-            | "ʃ" | "ʒ" | "h" | "tʃ" | "dʒ" | "l" | "ɹ" | "w" | "j" | "ks"
+            | "ʃ" | "ʒ" | "h" | "tʃ" | "dʒ" | "l" | "ɹ" | "w" | "j"
     );
     if !supported {
         bail!(
@@ -1188,6 +1188,22 @@ mod tests {
         assert_eq!(frame_at(1.5).source_type, SourceType::Silent);
         assert_eq!(frame_at(3.0).source_type, SourceType::Vowel);
         assert!((frame_at(3.0).f0 - 246.94).abs() < 0.01);
+    }
+
+    #[test]
+    fn resolved_plan_renderer_rejects_composite_phone_sequences_as_single_phones() {
+        let mut pronunciation = resolved_read_now_fixture().0;
+        pronunciation.words[0].candidates[0].syllables[0].phones[0].ipa = "ks".to_string();
+        let alignment = resolved_read_now_fixture().1;
+        let mut engine = FormantSingingEngine::default();
+        let error = engine
+            .resolved_plan_frames(&pronunciation, &alignment)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("outside the calibrated legacy formant inventory"),
+            "{error}"
+        );
     }
 
     #[test]
