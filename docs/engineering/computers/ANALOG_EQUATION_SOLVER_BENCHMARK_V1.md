@@ -22,13 +22,13 @@ This is a workload-to-primitive-and-substrate selection experiment, not a claim 
 
 - Dense finite-valued matrix representation with a 16,777,216-element ceiling.
 - A shared `LinearOperator` interface for dense and matrix-free structured systems.
-- Matrix-free 1-D Poisson operator with O(n) storage, O(n) MVM and exact spectral condition number.
+- Matrix-free 1-D and 2-D Dirichlet Poisson operators with O(N) vector storage, O(N) MVM and exact spectral condition numbers.
 - Stable diagonal-decay ODE with an analytic trajectory oracle and a classical RK4 digital baseline.
 - Reproducible symmetric positive-definite family `A = λI + α11ᵀ`, with a known exact spectrum and condition number.
 - Known-answer RHS generation from a frozen solution vector.
 - Direct Cholesky solve.
 - A matrix-free linear-operator interface shared by dense and structured workloads.
-- Matrix-free 1-D Poisson operator (second-difference stencil) with O(n) storage and O(n) MVM; its exact condition number is available from the discrete spectrum.
+- Matrix-free 1-D and 2-D Poisson operators (three-/five-point stencils) with O(N) storage and O(N) MVM; their exact condition numbers are available from the discrete spectra.
 - Unpreconditioned conjugate-gradient solve with explicit tolerance and iteration budget; it recomputes the true residual before acceptance and restarts the recurrence if residual replacement is needed.
 - Jacobi-preconditioned conjugate gradient, with a fixed diagonal preconditioner, positive-diagonal checks and independent true-residual acceptance.
 - Compensated dot-product accumulation in the digital reference to reduce avoidable summation error.
@@ -50,7 +50,7 @@ rustc --edition=2021 --test research/physical_compute/equation_solver_contract_v
 /tmp/equation_solver_tests
 ```
 
-The 19 Rust unit tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
+The 23 Rust unit tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
 
 ## 3. Workload portfolio
 
@@ -68,11 +68,13 @@ Generate matrices with declared eigenvalue spectra and orthogonal basis. Record 
 
 ### M4 — sparse and structured systems
 
-The first executable M4 case is the matrix-free 1-D Poisson operator:
+The first executable M4 cases are matrix-free 1-D and 2-D Poisson operators. The 1-D operator is:
 
 `(Ax)_i = 2x_i - x_{i-1} - x_{i+1}`
 
-with zero-boundary convention. Its eigenvalues are `4 sin²(kπ/(2(n+1)))`; therefore the exact 2-norm condition number is `cot²(π/(2(n+1)))`. It requires O(n) storage and O(n) work per MVM, unlike a dense matrix representation. This makes it a better baseline for sparse scientific workloads and a bridge toward discretized PDEs.
+with homogeneous Dirichlet boundary conditions. Its eigenvalues are `4 sin²(kπ/(2(n+1)))`; therefore its exact 2-norm condition number is `cot²(π/(2(n+1)))`.
+
+The 2-D five-point operator on an `nx × ny` interior grid applies `4x[i,j] - x[i-1,j] - x[i+1,j] - x[i,j-1] - x[i,j+1]`, omitting out-of-domain neighbors under the same zero-boundary convention. Its exact eigenvalues are `4 sin²(pπ/(2(nx+1))) + 4 sin²(qπ/(2(ny+1)))`; the 2-norm condition number is the largest such eigenvalue divided by the smallest. Both operators require O(N) vector storage and O(N) work per MVM, unlike dense matrix representation. The 2-D workload is still a controlled scalar-coefficient stencil, not a complete CFD, elasticity, heterogeneous-media or production PDE benchmark.
 
 Next include banded, Toeplitz, circulant, graph-Laplacian-derived and block-structured systems. Count sparsity, storage, data movement and preconditioner cost. Do not compare a matrix-free operator to a dense solver without counting the difference in representation and memory traffic.
 
@@ -95,7 +97,7 @@ Next extensions: coupled linear systems, oscillatory systems, stiff systems and 
 - Random dense full-rank systems.
 - A perturbation that passes a residual threshold but violates forward-error tolerance.
 
-The first Rust oracle currently implements M1, a matrix-free 1-D Poisson M4 workload and selected M5 negative controls. M2, M3, broader M4 families and the nonsymmetric solver lane remain protocol targets, not completed generators.
+The first Rust oracle currently implements M1, matrix-free 1-D and 2-D Poisson M4 workloads and selected M5 negative controls. M2, M3, broader M4 families and the nonsymmetric solver lane remain protocol targets, not completed generators.
 
 ## 4. Numerical correctness contract
 
@@ -184,6 +186,36 @@ Do not use a composite scalar to hide a reliability/availability trade-off. Repo
 - Sun et al., *Precise and scalable analogue matrix equation solving using resistive random-access memory chips*, Nature Electronics (2025): https://www.nature.com/articles/s41928-025-01477-0. Demonstrated 16×16 RRAM-chip inversion at 24-bit fixed-point precision using 3-bit devices and block/iterative methods. The paper separately reports low-precision behavior varying with conditioning (e.g. about 2.4 bits at κ=7.7 and 4–5 bits at κ=1.6), and studies high-precision solving at κ=2.5, 5, 33 and 34. Keep the fixed-point output precision, effective low-precision primitive accuracy and tested condition numbers separate. This is a paper-matched reproduction target, not evidence for arbitrary large or ill-conditioned systems.
 - Mannocci et al., *Achieving high precision in analog in-memory computing systems*, npj Unconventional Computing (2026): https://www.nature.com/articles/s44335-025-00044-2. Relevant methods include bit slicing, RNS, ECC and mixed-precision iterative refinement.
 
-## 10. Claim ceiling
+
+## 10. Industry comparison and next performance frontier
+
+Use the official [HPCG benchmark](https://www.hpcg-benchmark.org/) as a workload-family and implementation-quality reference, not as a score Symthaea has already attained. HPCG exercises sparse matrix-vector multiplication, vector updates, global dot products, a local symmetric Gauss-Seidel smoother, sparse triangular solves and a multigrid-preconditioned conjugate-gradient algorithm over nested coarse grids. The current Rust oracle is **not** an HPCG implementation: it currently has unpreconditioned CG and Jacobi-PCG, but no multigrid hierarchy, distributed reductions, halo exchange or HPCG-conformant input/verification path.
+
+The near-term apples-to-apples comparison should include:
+- matrix-free 1-D and 2-D Poisson with exact spectrum and frozen known solutions;
+- a tuned digital CG baseline;
+- a tuned Jacobi-PCG baseline, counting preconditioner construction/application;
+- a geometric multigrid-preconditioned CG baseline when implemented;
+- an analog-MVM-assisted CG/PCG implementation, counting ADC/DAC, conversion, host movement and all refinement;
+- direct analog or native-dynamics results only where the same problem and output-quality contract are supported.
+
+Keep both algorithm-matched and best-co-designed tracks. Record grid shape, coefficient field, stencil, boundary condition, RHS spectrum/smoothness, initial guess, condition number, tolerance, iteration budget, preconditioner setup, operator applications and all verification costs. Include 32×32, 64×64, 128×128 and 256×256 screening grids, then larger sizes only when memory and hardware constraints are explicitly declared. Use anisotropic coefficients and heterogeneous coefficients as held-out follow-on cases; do not infer that a homogeneous Poisson win transfers to them.
+
+The next algorithmic frontier is not adding more unpreconditioned CG iterations. It is testing whether a physically implemented approximate inverse or coarse-grid correction acts as a useful preconditioner, followed by independent high-precision residual/forward-error verification. A valid win must survive full-system accounting and held-out operators. Do not compare an analog core's MVM latency to an entire digital linear solve.
+
+The 2026 fully integrated SRAM analogue closed-loop accelerator provides a relevant industry reference: its demonstrated device uses two 64×64 arrays and includes operational amplifiers, DACs and ADCs; its paper also provides system-level energy/latency/area comparisons and an explicitly labelled 14-nm projection. Treat measured 90-nm test-chip results and projected 14-nm figures as separate evidence classes; do not present the projection as measured silicon. See https://www.nature.com/articles/s41928-025-01549-1.
+
+A second frontier is **adaptive representation under non-ideal hardware**. The 2026 fault-tolerant memristor work represents a target matrix as a product of adjustable submatrices to bypass defective devices; it reports >99.999% DFT-matrix cosine similarity despite 39% device faults, along with other cross-domain demonstrations. This motivates a Symthaea experiment on workload-dependent matrix factorization, device-aware mapping, and exact task-level acceptance under faults. Matrix similarity is a mapping metric, not a guarantee of solution accuracy: test the resulting `Ax=b` solution and forward error directly.
+
+Proposed evaluation outputs:
+1. **Correctness:** residual, backward error, forward error, condition number, convergence and false-accept bound.
+2. **Whole-system performance:** p50/p95/p99 latency and joules per correct accepted solution, including setup, conversion, calibration, refinement, verifier and recovery.
+3. **Resource efficiency:** area, usable cells, arrays, peripheral circuitry, memory footprint, data movement and energy boundary.
+4. **Robustness:** yield, stuck-at faults, spatial clustering, drift, temperature, common-cause outages, abstention and recovery.
+5. **Generalization:** held-out sizes, spectra, coefficient fields, RHS classes and fault geometries.
+
+No numeric energy or speedup threshold is asserted before a common physical measurement boundary and a qualified hardware implementation exist.
+
+## 11. Claim ceiling
 
 A software solver passing known-answer tests does not prove analog hardware correctness. A small residual does not prove a small forward error. A paper-specific 16×16 experiment does not establish arbitrary-size scaling. A condition-number stress bin is not a universal substrate capability threshold. Algorithmic complexity, analog-core energy and end-to-end joules per correct accepted task are separate evidence classes. The error sources should also be recorded using the cross-layer mechanism taxonomy in `CROSS_LAYER_ERROR_BUDGET_V1.md`; never collapse device, circuit, conversion and system errors into a single rate.
