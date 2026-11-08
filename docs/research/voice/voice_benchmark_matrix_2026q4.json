@@ -932,7 +932,12 @@
         "scorer_revision",
         "pair_type_counts",
         "exact_pair_metric_numerators_and_denominators",
-        "pair_split_revision"
+        "pair_split_revision",
+        "preference_training_pair_manifest_sha256",
+        "held_out_evaluation_pair_manifest_sha256",
+        "training_evaluation_disjointness_audit_sha256",
+        "training_evaluation_overlap_count",
+        "training_evaluation_disjointness_status"
       ],
       "required_controls": [
         "same_audio_same_truth_text_context_changed",
@@ -950,7 +955,8 @@
         "text_invariance_reported_with_joint_correctness_and_joint_abstention",
         "audio_sensitivity_requires_both_outputs_match_distinct_truths",
         "acoustic_nuisance_stability_conditioned_on_joint_answer_coverage",
-        "preference_training_pairs_disjoint_from_held_out_evaluation_pairs"
+        "preference_training_pairs_disjoint_from_held_out_evaluation_pairs",
+        "zero_preference_training_to_held_out_evaluation_pair_overlap_audited_by_manifest"
       ],
       "profile_requirements": [
         "PAIR_MANIFEST_SHA256",
