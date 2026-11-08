@@ -90,13 +90,14 @@ A consonant-only fragment is not silently turned into a vowel-bearing syllable. 
 
 Score events should include:
 - note: pitch, onset, duration, velocity, beat location and stable score ID;
+- a beat-domain source timeline with explicit tempo-map segments, integrated to seconds only at renderer admission;
 - rest: explicit silence span;
 - tie: relationship between note events that sustain the same sounding pitch;
 - grace note: short ornament with explicit attachment and timing policy;
 - ornament: trill, turn, mordent, scoop, slide or other typed event;
 - tempo/time-signature metadata and bar/beat coordinate.
 
-Seconds alone are not enough for a music representation. Retain beat-domain coordinates and a tempo map so tempo changes can be evaluated and replayed deterministically.
+Seconds alone are not enough for a music representation. Retain beat-domain coordinates and a tempo map so tempo changes can be evaluated and replayed deterministically. The first contract accepts quarter-note beat coordinates and piecewise-constant BPM; it must not be mistaken for full MusicXML/MIDI semantics until meter, tuplets, ties and tempo curves are modelled.
 
 ### 3.4 Alignment edges
 
@@ -107,7 +108,9 @@ An `AlignmentEdge` links one phoneme or syllable event to one or more score even
 - hard/soft constraint class;
 - confidence/evidence and optional solver rationale.
 
-The research prototype now supports both important directions at the symbolic score-event interval layer:
+The research prototype now has an additive `BeatDomainScore` source timeline with quarter-note beat coordinates and a piecewise-constant tempo map. It integrates tempo segments into seconds, including tempo changes inside a note, and materializes canonical seconds-domain events for existing validators/renderers. The original beat events and tempo map remain separately serializable for provenance. The prototype does not yet encode time signatures, tuplets as typed events, ties, grace notes or tempo ramps; those remain explicit v3 extensions.
+
+The research prototype supports both important directions at the symbolic score-event interval layer:
 
 **Fast syllabic passage:** one long notated note/beat span may be divided into several non-overlapping syllable intervals. Each syllable receives a half-open `ScoreEventSpan` with offsets relative to the note onset. The validator sorts these spans and requires exact interval coverage of the note, rejecting overlap and gaps.
 
