@@ -603,6 +603,163 @@ fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignm
 }
 
 
+/// Whether the factor graph has any positive-weight complete assignment.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExactMapSupportStatus {
+    PositiveSupport,
+    NoPositiveSupport,
+}
+
+/// One complete assignment attaining the global full-MAP score.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExactMapAssignment {
+    pub assignment: Vec<usize>,
+    pub score: CheckedRational,
+}
+
+/// Bounded exhaustive full-MAP result. The optimum set is complete because
+/// every complete assignment was evaluated under the declared hard limit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundedExactMapResult {
+    pub optimum_score: CheckedRational,
+    /// Every tied optimum, in canonical mixed-radix assignment order.
+    pub optimal_assignments: Vec<ExactMapAssignment>,
+    pub support_status: ExactMapSupportStatus,
+    pub evaluated_assignments: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BoundedMapError {
+    AssignmentSpaceOverflow,
+    AssignmentLimitExceeded { required: usize, limit: usize },
+    ArithmeticOverflow,
+}
+
+impl fmt::Display for BoundedMapError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AssignmentSpaceOverflow => write!(f, "full MAP assignment space overflowed usize"),
+            Self::AssignmentLimitExceeded { required, limit } => write!(
+                f,
+                "exact MAP requires {required} assignments; configured limit is {limit}"
+            ),
+            Self::ArithmeticOverflow => write!(f, "checked rational overflow during exact MAP scoring"),
+        }
+    }
+}
+
+impl Error for BoundedMapError {}
+
+/// Exact bounded exhaustive full MAP for nonnegative rational factor graphs.
+///
+/// This is a small-instance oracle, not a scalable MAP solver. It evaluates
+/// every complete assignment, directly multiplies the original factor values,
+/// and returns the complete optimum tie set. The hard cap is checked before
+/// enumeration. Factor multiplication order is canonicalized to make results
+/// invariant to factor insertion order under the same bounded rational domain.
+///
+/// This routine does not sum hidden variables: every variable is assigned.
+/// It also does not establish CPT normalization or empirical calibration.
+pub fn exhaustive_max_times_map_bounded(
+    graph: &ExactFactorGraph<MaxTimesRational>,
+    max_full_assignments: usize,
+) -> Result<BoundedExactMapResult, BoundedMapError> {
+    let assignment_count = graph.cardinalities.iter().try_fold(1usize, |count, &cardinality| {
+        count.checked_mul(cardinality)
+    }).ok_or(BoundedMapError::AssignmentSpaceOverflow)?;
+
+    if assignment_count > max_full_assignments {
+        return Err(BoundedMapError::AssignmentLimitExceeded {
+            required: assignment_count,
+            limit: max_full_assignments,
+        });
+    }
+
+    let mut ordered_factors = graph.factors.iter().collect::<Vec<_>>();
+    ordered_factors.sort_by(|left, right| {
+        let scope_order = left.scope.cmp(&right.scope);
+        if scope_order != Ordering::Equal {
+            return scope_order;
+        }
+        for (left_value, right_value) in left.values.iter().zip(&right.values) {
+            let value_order = left_value.compare(*right_value);
+            if value_order != Ordering::Equal {
+                return value_order;
+            }
+        }
+        left.values.len().cmp(&right.values.len())
+    });
+
+    let mut best_score: Option<CheckedRational> = None;
+    let mut optimal_assignments = Vec::new();
+    let mut assignment = vec![0usize; graph.cardinalities.len()];
+
+    for full_index in 0..assignment_count {
+        decode_assignment(
+            full_index,
+            &(0..graph.cardinalities.len()).collect::<Vec<_>>(),
+            &graph.cardinalities,
+            &mut assignment,
+        );
+
+        let mut score = CheckedRational::one();
+        for factor in &ordered_factors {
+            let table_index = factor.table_index(&assignment, &graph.cardinalities);
+            score = score.checked_mul(factor.values[table_index].value())
+                .map_err(|_| BoundedMapError::ArithmeticOverflow)?;
+            if score.is_zero() {
+                break;
+            }
+        }
+
+        match best_score {
+            None => {
+                best_score = Some(score);
+                optimal_assignments.push(ExactMapAssignment {
+                    assignment: assignment.clone(),
+                    score,
+                });
+            }
+            Some(current) => match compare_nonnegative_rationals(
+                score.numerator() as u128,
+                score.denominator() as u128,
+                current.numerator() as u128,
+                current.denominator() as u128,
+            ) {
+                Ordering::Greater => {
+                    best_score = Some(score);
+                    optimal_assignments.clear();
+                    optimal_assignments.push(ExactMapAssignment {
+                        assignment: assignment.clone(),
+                        score,
+                    });
+                }
+                Ordering::Equal => {
+                    optimal_assignments.push(ExactMapAssignment {
+                        assignment: assignment.clone(),
+                        score,
+                    });
+                }
+                Ordering::Less => {}
+            },
+        }
+    }
+
+    let optimum_score = best_score.unwrap_or_else(CheckedRational::zero);
+    let support_status = if optimum_score.is_zero() {
+        ExactMapSupportStatus::NoPositiveSupport
+    } else {
+        ExactMapSupportStatus::PositiveSupport
+    };
+
+    Ok(BoundedExactMapResult {
+        optimum_score,
+        optimal_assignments,
+        support_status,
+        evaluated_assignments: assignment_count,
+    })
+}
+
 /// Declared algebraic capabilities of an exact coefficient domain.
 ///
 /// This is a planner contract, not a proof that the laws hold. Each concrete
@@ -790,6 +947,114 @@ mod tests {
 
     fn max_times(numerator: i128, denominator: i128) -> MaxTimesRational {
         MaxTimesRational::new(rational(numerator, denominator)).unwrap()
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_returns_exact_assignment_and_score() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0, 1],
+            vec![
+                max_times(1, 10),
+                max_times(3, 10),
+                max_times(2, 5),
+                max_times(1, 5),
+            ],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, 4).unwrap();
+        assert_eq!(result.optimum_score, rational(2, 5));
+        assert_eq!(result.support_status, ExactMapSupportStatus::PositiveSupport);
+        assert_eq!(result.evaluated_assignments, 4);
+        assert_eq!(result.optimal_assignments.len(), 1);
+        assert_eq!(result.optimal_assignments[0].assignment, vec![1, 0]);
+        assert_eq!(result.optimal_assignments[0].score, rational(2, 5));
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_reports_all_tied_assignments() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0],
+            vec![max_times(1, 1), max_times(1, 1)],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, 2).unwrap();
+        assert_eq!(result.optimum_score, rational(1, 1));
+        assert_eq!(
+            result.optimal_assignments.iter().map(|item| item.assignment.clone()).collect::<Vec<_>>(),
+            vec![vec![0], vec![1]]
+        );
+        assert!(result.optimal_assignments.iter().all(|item| item.score == rational(1, 1)));
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_distinguishes_zero_support() {
+        let mut graph = ExactFactorGraph::new(
+            vec![2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        graph.add_factor(
+            vec![0],
+            vec![MaxTimesRational::zero(), MaxTimesRational::zero()],
+        ).unwrap();
+
+        let result = exhaustive_max_times_map_bounded(&graph, 2).unwrap();
+        assert_eq!(result.optimum_score, rational(0, 1));
+        assert_eq!(result.support_status, ExactMapSupportStatus::NoPositiveSupport);
+        assert_eq!(result.optimal_assignments.len(), 2);
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_enforces_full_assignment_limit() {
+        let graph = ExactFactorGraph::new(
+            vec![2, 2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        assert_eq!(
+            exhaustive_max_times_map_bounded(&graph, 7),
+            Err(BoundedMapError::AssignmentLimitExceeded { required: 8, limit: 7 })
+        );
+    }
+
+    #[test]
+    fn exhaustive_max_times_map_is_factor_insertion_order_invariant() {
+        let mut left = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        left.add_factor(vec![0], vec![max_times(1, 2), max_times(1, 3)]).unwrap();
+        left.add_factor(
+            vec![0, 1],
+            vec![max_times(1, 4), max_times(1, 2), max_times(1, 1), max_times(1, 5)],
+        ).unwrap();
+
+        let mut right = ExactFactorGraph::new(
+            vec![2, 2],
+            MaxTimesRational::zero(),
+            MaxTimesRational::one(),
+        ).unwrap();
+        right.add_factor(
+            vec![0, 1],
+            vec![max_times(1, 4), max_times(1, 2), max_times(1, 1), max_times(1, 5)],
+        ).unwrap();
+        right.add_factor(vec![0], vec![max_times(1, 2), max_times(1, 3)]).unwrap();
+
+        assert_eq!(
+            exhaustive_max_times_map_bounded(&left, 4).unwrap(),
+            exhaustive_max_times_map_bounded(&right, 4).unwrap()
+        );
     }
 
     #[test]
