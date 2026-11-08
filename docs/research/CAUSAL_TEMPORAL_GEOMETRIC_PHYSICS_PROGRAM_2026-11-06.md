@@ -726,6 +726,44 @@ physical fidelity only count after matched benchmarks.
 - **Scientific scope:** no extrapolation beyond the tested dimension,
   Hamiltonian, coordinate chart, sensor calibration domain or claim boundary.
 
+## Research expansion — 8 November 2026
+
+The programme now has three explicit extensions beyond the initial causal-set / time-crystal / GR / UAP integration:
+
+### Measurement observability before trajectory estimation
+
+- [UAP-ASYNC-001 #11029](https://github.com/Luminous-Dynamics/symthaea/issues/11029) specifies gauge-aware joint timing, pose/boresight calibration and trajectory observability.
+- `symthaea-uap-observatory::observability::analyze_jacobian` reports singular values, numerical rank, nullity and weak parameter directions from a scaled **data-only** Jacobian. It accepts no priors, so posterior regularization cannot mask a data null direction.
+- Its present implementation is a small-block Jacobi eigensolver over the Gram matrix (J^T J), capped at 64 parameters. This is a reference diagnostic, not yet a production SVD or an end-to-end asynchronous tracker. Squaring the condition number in the Gram construction is a known numerical limitation; compare against rank-revealing QR/SVD before using it for high-dynamic-range calibration problems.
+- The current bearing triangulator remains a common-epoch, known-pose local geometry primitive. Clock offset/drift, platform pose, boresight covariance and correlated calibration uncertainty remain unimplemented in the estimator.
+
+### Time-crystal frequency locking and sensing
+
+- [DTC-PHASE-001 #11033](https://github.com/Luminous-Dynamics/symthaea/issues/11033) separates a period-two signal from phase rigidity, finite-size lifetime scaling and metastability.
+- `symthaea-fractal-time-lab::frequency_locking` adds a finite-sweep subharmonic peak and frequency-locking diagnostic. It reports FFT grid spacing separately from observation-limited resolution. It is a signal-level diagnostic, never a DTC phase classifier.
+- [DTC-SENSE-001 #11128](https://github.com/Luminous-Dynamics/symthaea/issues/11128) now targets the 2026 interaction-assisted DTC magnetic-sensing literature. The relevant diamond experiment reports 0.5–50 kHz operation and sub-70 mHz linewidths, with an AC-resonant lifetime-extension mechanism. Symthaea has not reproduced that experiment; its exact-state-vector model is capped at 20 spins and its anisotropic-Heisenberg dynamics are second-order Trotterized.
+- The next physics step is to report classical readout Fisher information and total experiment-time-normalized sensitivity, separately from quantum Fisher information and finite-window subharmonic amplitude.
+
+### Causal interval abundance and finite-geometry comparison
+
+- [CAUSAL-GEOMETRY-001 #11129](https://github.com/Luminous-Dynamics/symthaea/issues/11129) adds a full interval-abundance profile and continuum-closeness research target, motivated by Surya, Phys. Rev. D 113, 024034 (2026).
+- `symthaea-causal-set-lab::IntervalAbundanceProfile` retains both the open-interval cardinality histogram and the fraction of incomparable pairs, and provides fixed-width total-variation, Hellinger and Jensen–Shannon statistical distances.
+- These generic statistical distances are **not** the published Lorentzian closeness function and are not Lorentzian Gromov–Hausdorff distances. The paper-faithful construction must be implemented separately from its exact definition.
+- [CAUSAL-INTERVAL-PERF-001 #11035](https://github.com/Luminous-Dynamics/symthaea/issues/11035) tracks the observed algorithm crossover between the persistent-tree and bitset interval histogram implementations.
+
+## Industry and SOTA comparison — honest baseline
+
+| Area | External benchmark frontier | Current Symthaea level | What would constitute a genuine advance |
+|---|---|---|---|
+| DTC phase identification | 2D anisotropic-Heisenberg and clean 2D DTC experiments on IBM hardware; small-system ED, tensor networks and finite-size scaling | Exact kicked-Ising state vector up to 20 spins; finite-graph anisotropic Heisenberg with second-order Suzuki–Trotter | Correct phase-vs-signal discrimination, held-out parameter-region rigidity, initial-state and metastability controls, exact/Trotter/tensor-network convergence |
+| DTC sensing | 2026 13C diamond sensor: 0.5–50 kHz and <70 mHz linewidth using AC-resonant order-parameter lifetime extension | No faithful sensor reproduction yet; frequency-locking signal diagnostic | Matched total-time sensitivity, calibrated classical FI, open-system noise model, independent data reproduction |
+| Asynchronous sensor fusion | Joint timing/geometry/target calibration, factor graphs, delayed-measurement tracking and real-world collaborative localization are current literature/industry baselines | Known-pose/common-epoch bearing triangulation, local FIM placement and data-only small-block rank diagnostic | Joint clock/pose/target estimator with gauge-aware identifiability, calibrated uncertainty and field dataset performance under matched information |
+| Causal-set continuum tests | Ordering fraction, interval abundance, BDG actions and coarse-graining/continuum-likeness studies | 1+1D to 3+1D flat sprinkling, boost invariants, interval histograms, BDG references and new normalized abundance profiles | Held-out geometry discrimination and density/coarse-graining stability beyond scalar dimension recovery, with exact independent reference |
+| GR / metric engineering | Einstein Toolkit / SpECTRE class infrastructure: nonlinear evolution, matter coupling, gauge control and standardized analytic/benchmark solutions | Metric kernel with analytic Minkowski/Schwarzschild references and geodesic invariants; GravCraft remains speculative | Full metric-derived connection/curvature, constraint propagation, convergence and Einstein-implied stress-energy/boundary consistency before any engineered-metric claim |
+| Scientific discovery | Bayesian experimental design, model selection, factor graphs, independent reproducible numerical pipelines | Science-evidence receipts and a scalar discrete-model discrimination kernel | Active design that values expected discrimination, open-world alternatives, nuisance parameters, cost, falsifiability and sealed holdouts |
+
+The frontier is not to claim a larger simulator than an industry or academic platform. The near-term competitive proposition is **epistemic integrity as a measurable capability**: expose unobservable directions, calibration dependence, phase-vs-signal ambiguity, false confidence, numerical error and resource cost. A claim of performance superiority still requires a pinned baseline, matched information and compute, held-out data and independent reproduction.
+
 ## Immediate next actions
 
 1. Run `cargo fmt --check` and targeted `cargo test -p ...` for all new
