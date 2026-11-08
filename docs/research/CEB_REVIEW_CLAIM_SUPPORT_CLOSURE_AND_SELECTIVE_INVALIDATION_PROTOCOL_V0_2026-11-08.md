@@ -141,7 +141,7 @@ When a node changes, propagate impact through the typed dependency graph using t
 
 A graph traversal is a candidate generator, not the final semantic verdict. For example, a new test/grader may invalidate a historical grade without invalidating the source-level claim; a revoked signer may invalidate the authority of a receipt without proving that the recorded test never passed.
 
-## 6. Six public development cases
+## 6. Eight public development cases
 
 Use the [eight-case Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and its separate [public answer key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md).
 
