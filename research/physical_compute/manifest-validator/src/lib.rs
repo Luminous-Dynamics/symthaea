@@ -41,6 +41,15 @@ fn array_at<'a>(value: &'a Value, key: &str) -> Option<&'a Vec<Value>> {
     value.get(key).and_then(Value::as_array)
 }
 
+fn is_sha256_digest(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+
 fn canonicalize(value: &Value) -> Value {
     match value {
         Value::Object(object) => {
@@ -301,6 +310,64 @@ pub fn validate_manifest(value: &Value) -> ValidationReport {
     }
 
     let workload = value.get("workload").unwrap_or(&Value::Null);
+    let error_budget = value.get("error_budget").unwrap_or(&Value::Null);
+    match string_at(error_budget, "dependence_assumption") {
+        Some("unknown_or_correlated") => {
+            if !error_budget.get("dependence_evidence_sha256").unwrap_or(&Value::Null).is_null() {
+                errors.push("error_budget.dependence_evidence_sha256: must be null when dependence is unknown/correlated".to_owned());
+            }
+        }
+        Some("independent_declared") => {
+            match string_at(error_budget, "dependence_evidence_sha256") {
+                Some(digest) if is_sha256_digest(digest) => {}
+                _ => errors.push("error_budget.dependence_evidence_sha256: independent assumption requires a SHA-256 evidence reference".to_owned()),
+            }
+        }
+        _ => errors.push("error_budget.dependence_assumption: missing or unsupported".to_owned()),
+    }
+    match error_budget.get("task_sensitivity_bound") {
+        Some(Value::Null) => {
+            if !error_budget.get("sensitivity_evidence_sha256").unwrap_or(&Value::Null).is_null() {
+                errors.push("error_budget.sensitivity_evidence_sha256: must be null when task sensitivity is unknown".to_owned());
+            }
+        }
+        Some(Value::Number(number)) if number.as_f64().is_some_and(|v| v.is_finite() && v >= 0.0) => {
+            match string_at(error_budget, "sensitivity_evidence_sha256") {
+                Some(digest) if is_sha256_digest(digest) => {}
+                _ => errors.push("error_budget.sensitivity_evidence_sha256: task sensitivity requires a SHA-256 evidence reference".to_owned()),
+            }
+        }
+        _ => errors.push("error_budget.task_sensitivity_bound: expected a non-negative bound or null".to_owned()),
+    }
+    if let Some(contributions) = array_at(error_budget, "contributions") {
+        let mut contribution_ids = BTreeSet::new();
+        for (index, contribution) in contributions.iter().enumerate() {
+            match string_at(contribution, "contribution_id") {
+                Some(id) if !id.is_empty() => {
+                    if !contribution_ids.insert(id.to_owned()) {
+                        errors.push(format!("error_budget.contributions[{index}]: duplicate contribution_id {id}"));
+                    }
+                }
+                _ => errors.push(format!("error_budget.contributions[{index}].contribution_id: missing or empty")),
+            }
+            let magnitude = contribution.get("magnitude").and_then(Value::as_f64);
+            let gain = contribution.get("propagation_gain").and_then(Value::as_f64);
+            if !magnitude.is_some_and(|value| value.is_finite() && value >= 0.0) {
+                errors.push(format!("error_budget.contributions[{index}].magnitude: must be finite and non-negative"));
+            }
+            if !gain.is_some_and(|value| value.is_finite() && value >= 0.0) {
+                errors.push(format!("error_budget.contributions[{index}].propagation_gain: must be finite and non-negative"));
+            }
+            if matches!(string_at(contribution, "evidence_status"), Some("measured" | "derived")) {
+                match string_at(contribution, "evidence_sha256") {
+                    Some(digest) if is_sha256_digest(digest) => {}
+                    _ => errors.push(format!("error_budget.contributions[{index}].evidence_sha256: measured/derived contribution requires a SHA-256 evidence reference")),
+                }
+            }
+        }
+    } else {
+        errors.push("error_budget.contributions: expected an array".to_owned());
+    }
     let oracle = workload.get("oracle").unwrap_or(&Value::Null);
     if bool_at(oracle, "independent_of_candidate") != Some(true) {
         errors.push("workload.oracle.independent_of_candidate: must be true".to_owned());
@@ -664,6 +731,37 @@ mod tests {
         let mut value = fixture_value();
         value["fault_injections"][0]["mechanism"] = Value::String("read_noise".into());
         assert!(replay_domain_outages(&value).is_err());
+    }
+
+    #[test]
+    fn independent_error_assumption_requires_evidence_digest() {
+        let mut value = fixture_value();
+        value["error_budget"]["dependence_assumption"] = Value::String("independent_declared".into());
+        assert!(validate_manifest(&value).errors.iter().any(|e| e.contains("dependence_evidence_sha256")));
+    }
+
+    #[test]
+    fn task_sensitivity_requires_separate_evidence() {
+        let mut value = fixture_value();
+        value["error_budget"]["task_sensitivity_bound"] = serde_json::json!(4.0);
+        assert!(validate_manifest(&value).errors.iter().any(|e| e.contains("sensitivity_evidence_sha256")));
+    }
+
+    #[test]
+    fn measured_error_contribution_requires_provenance() {
+        let mut value = fixture_value();
+        value["error_budget"]["contributions"] = serde_json::json!([{
+            "contribution_id":"adc-q",
+            "kind":"output_quantization",
+            "layer":"data_conversion",
+            "magnitude":0.01,
+            "units":"normalized_output_l2",
+            "propagation_gain":1.0,
+            "magnitude_kind":"deterministic_upper_bound",
+            "evidence_status":"measured",
+            "evidence_sha256":null
+        }]);
+        assert!(validate_manifest(&value).errors.iter().any(|e| e.contains("measured/derived contribution requires")));
     }
 
     #[test]
