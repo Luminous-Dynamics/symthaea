@@ -714,3 +714,57 @@ The 98% value is a stretch project target, not a current result or a direct cros
 A JavaScript binary32-model sanity experiment reports, for a deliberately clustered synthetic corpus, 4,138/4,320 groups pruned and 33,104/34,560 potential member payloads not requiring refinement, with zero observed false-prune disagreements. The same simulation does not represent disk bytes or latency; its member perturbations are deliberately small. Separate dimension/norm stress covered dimensions up to 16,384 and observed zero interval escapes across 8,000 member scores, with 144 conservative [-1,1] fallbacks. These results are captured in `hme_group_envelope_js_sanity_v0.json` and are not Rust tests or a proof.
 
 The decisive next comparison is against unclustered/random and low-margin groups, then actual HME segment/page data. If group radii saturate, fall back to per-vector certificates (#10978), progressive exact (#10945), or full scan. No group-level speedup or storage-byte savings should be claimed until #10917 persists the synopsis and measures actual reads.
+
+
+## 12. EMNLP 2026: evaluate memory utilization and natural integration, not only Direct QA
+
+Recent EMNLP 2026 papers materially change the benchmark matrix:
+
+| Work | New evaluation axis | HME implication |
+|---|---|---|
+| UTILMEM (1,717 instances, five domains) | Dense-history reasoning, implicit relevance, distributed evidence synthesis, semantically similar distractors | Evaluate evidence integration and distractor resistance after retrieval; raw recall is insufficient |
+| LoCoMo-Conv | Dialog, implicit, counterfactual and composed queries; retrieval and free-form response quality; supportive_memory beyond original gold evidence | Add query-style stratification and additional supporting-evidence coverage |
+| MemUse | Natural integration on real user-cued conversation moments; four-month deployment with 40 users and 1,872 sessions | Measure helpful use, missed relevant context and intrusive false-positive mentions, not only fact recall when explicitly asked |
+| PRAGMA | Personalized guidance over evolving preferences, histories and incorrect assumptions | Evaluate multi-session guidance, temporal preference alignment and assumption correction |
+| MemLoc | Retrieve–Localize–Generate: multi-granularity units, inner/cross-memory graphs, coarse-to-fine retrieval, evidence localization, source location IDs | Localize source fragments after candidate retrieval; keep original source positions to ground the reader |
+
+Important reported findings:
+- MemUse reports Direct QA accuracy ranging from 19.7% to 70.1% across seven memory conditions without corresponding satisfaction changes; one condition with 78.8% Direct QA referenced only 7.9% of those facts in conversation. This reveals a retrieval-to-natural-use gap; it is not a 71-point answer-accuracy difference.
+- UTILMEM authors report that even successful retrieval frequently fails at multi-session evidence synthesis and distractor discrimination.
+- LoCoMo-Conv's released data includes 1,069 composed multi-memory clusters and per-query supportive-memory annotations.
+- MemLoc's abstract reports state-of-the-art results on four benchmarks, but this crosswalk does not import a raw paper claim as an HME result; it specifies a reproduce-and-ablate comparison.
+
+Sources:
+- UTILMEM, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.1639/
+- LoCoMo-Conv, Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1289/
+- LoCoMo-Conv data/code: https://github.com/MiuLab/LoCoMo-Conv
+- MemUse, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.804/
+- PRAGMA, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.2628/
+- MemLoc, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.1211/
+- MemLoc code: https://github.com/Nikol-coder/MemLoc
+
+### New evaluation model
+
+Treat HME/Broca quality as four linked but independently measured stages:
+1. **Context detection:** does prior memory matter to this new turn or action?
+2. **Candidate retrieval:** were the right sessions/events/claims considered?
+3. **Evidence localization and sufficiency:** were the right source fragments selected, with provenance, valid-time, authority and alternative proof dependencies?
+4. **Natural integration:** was the evidence used appropriately in the answer/action, or correctly left unused?
+
+The retrieval stage reports Recall@K / strict evidence recall-all@K. Localization reports span precision/recall, redundancy and source-position integrity. Evidence integration reports supported-claim precision/recall, synthesis, contradiction and distractor robustness. Natural integration reports useful context use, missed relevant context, intrusive use and response/action correctness. These metrics must not be collapsed to one score.
+
+### Architecture comparator
+
+MemLoc is a direct retrieve–localize–generate baseline. Compare:
+- fixed-size turn chunks vs multi-granularity turns/fragments/events/summaries;
+- no graph vs inner-session and cross-session semantic/temporal graph;
+- session retrieval only vs coarse-to-fine retrieval;
+- retrieved whole-session context vs evidence-localized spans with stable location IDs;
+- reader without source positions vs reader grounded to original source fragments;
+- no proof-aware packet vs #9177's alternative OR-of-AND sufficient evidence packet.
+
+A lexical margin, HDC similarity, graph edge or learned relevance score may rank/order candidates; none alone proves source truth, freshness, authorization or sufficiency.
+
+### Promotion rule
+
+For every memory substrate comparison, freeze the reader/backbone, prompt, context budget, evaluator, corpus history and query panel. Report direct QA, context-driven conversation and evidence utilization separately. A Direct QA gain cannot substitute for a natural-integration or task-guidance gain. Dataset access, privacy, licensing and benchmark-specific user consent must be checked before using deployment-derived data.
