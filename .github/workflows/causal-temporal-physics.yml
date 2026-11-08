@@ -123,6 +123,20 @@ jobs:
             echo "- Result: exact CSV match"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run DTC initial-state ensemble and 2D Heisenberg sweep
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-fractal-time-lab --example initial_state_ensemble | tee dtc-initial-state-ensemble.csv
+          cargo run --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep | tee dtc-heisenberg-2d-sweep.csv
+          {
+            echo "## DTC finite-system initial-state and 2D Heisenberg diagnostics"
+            echo "- Initial-state corpus: all-up/down, defects, random products, Haar-like references; J=0 and J=0.5"
+            echo "- Heisenberg protocol: finite 2D XYZ graphs, declared Trotter refinement"
+            echo "- Claim boundary: finite-system signal and numerical convergence only; not thermodynamic DTC phase proof"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
