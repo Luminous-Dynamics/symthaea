@@ -67,7 +67,27 @@ Do not claim the signature never existed. Do not continue treating it as current
 
 **Key lesson:** metadata-only reuse does not authorize a claim whose original support closure was never complete.
 
-## 8. Cross-case errors
+
+## 8. CCL-S07 — circular authorization support
+
+**C1 and C2 dispositions:** both are **unresolved**. The submitted support graph is a two-node cycle with no independent evidence root. The existence of the two claims does not independently support either claim. The metadata-only display-label correction has no bearing on the cycle and does not complete the closure.
+
+**Required break in the cycle:** obtain an independently authoritative policy revision/registry record, trust-root verification or authorization statement whose provenance does not depend on C1 or C2. Then reassess each proposition against its own scope. Do not use the candidate's repeated assertion or a second copy of the same record as independent evidence.
+
+**Key lesson:** graph connectivity is not evidential sufficiency. A closed positive-support cycle without an independent root remains unresolved.
+
+## 9. CCL-S08 — omitted contradictory trace
+
+**C1 — broad “all valid attempts” claim:** expected disposition is **invalidate** for current decision use. The integration trace is within the claim's declared supported horizon and contradicts the universal claim. The original source anchor and unit-test result remain historically true but cannot override the qualifying counterexample.
+
+**Narrower successor claim:** a restricted claim about the ordinary retry path may be considered only after its scope is explicitly reduced and the trace's boundary condition is independently adjudicated. The narrower claim is a new scoped proposition; it is not an automatic retain of C1.
+
+**Required evidence handling:** include the independent trace, exact run identity, workload/horizon, source/build identity and adjudication of whether the trace is valid. If the trace's authority or environment cannot be established, use unresolved rather than silently dropping it.
+
+**Key lesson:** support closure must include material counter-evidence. A collection of true supporting facts does not prove a broader statement when a valid counterexample exists.
+
+
+## 10. Cross-case errors
 
 - Reusing implementation-conformance evidence after the directly referenced source anchor changes.
 - Treating a source/doc statement as proof of runtime conformance.
@@ -79,7 +99,7 @@ Do not claim the signature never existed. Do not continue treating it as current
 - Retaining an all-caller claim when the caller inventory is incomplete.
 - Equating “no matching path in the diff” with proven non-impact.
 
-## 9. Adjudicator worksheet
+## 11. Adjudicator worksheet
 
 For each claim/event pair, record:
 1. original claim and time/scope;
@@ -93,6 +113,6 @@ For each claim/event pair, record:
 
 If reviewers disagree on whether the closure is complete, preserve the disagreement and use unresolved until an independent adjudicator can ground the missing dependency.
 
-## 10. Claim boundary
+## 12. Claim boundary
 
-This key is a synthetic expected-answer guide. It reports no model score, no human reliability estimate and no real repository invalidation outcome. The challenge is public development material and permanently ineligible as a sealed holdout.
+This key is a synthetic expected-answer guide. It reports no model score, no human reliability estimate and no real repository invalidation outcome. The eight-case challenge is public development material and permanently ineligible as a sealed holdout.
