@@ -615,7 +615,7 @@
     },
     {
       "id": "packed_binaryhv_bundle_capacity_pilot",
-      "environment": "Fixed 16,384-bit packed Symthaea BinaryHV; majority-vote bundling at loads 1,3,7,15,31,63,127,255,511; 8 deterministic trials, 512 independent negative queries for threshold calibration, and a separate 512 held-out negative queries per load. The runner outputs mean member/non-member cosine similarity, pairwise AUC, TPR at the empirical 1% FPR threshold, and observed FPR. This pilot measures one implementation and one logical dimension only.",
+      "environment": "Fixed 16,384-bit packed Symthaea BinaryHV; majority-vote bundling at loads 1,3,7,15,31,63,127,255,511; 8 deterministic trials, 512 independent negative queries for threshold calibration, and a separate 512 held-out negative queries per load. The runner outputs mean member/non-member cosine similarity, pairwise AUC, TPR at the empirical 1% FPR threshold, and observed FPR. This pilot measures one implementation and one logical dimension only. The member-similarity curve is also compared against the independent-bit majority-bundle expectation C(2m,m)/4^m for load 2m+1.",
       "primary_outcomes": [
         "mean_member_cosine",
         "mean_nonmember_cosine",
@@ -632,7 +632,10 @@
         "threshold_tie_behavior",
         "negative_threshold_calibration_query_count",
         "held_out_negative_query_count",
-        "held_out_fpr_at_calibrated_threshold"
+        "held_out_fpr_at_calibrated_threshold",
+        "theoretical_member_cosine",
+        "empirical_member_cosine_minus_theory",
+        "majority_bundle_analytic_reference_error"
       ],
       "negative_controls": [
         "single_item_bundle_exact_round_trip",
@@ -1400,7 +1403,8 @@
     "The packed BinaryHV pilot must state the fixed logical dimension and packed byte width; it cannot be compared to i8/f32/complex baselines without separately reporting physical storage and precision.",
     "A single-item majority bundle must round-trip exactly; member and nonmember score distributions, pairwise AUC, empirical false-positive rate, and TPR at the declared operating point are all reported across every registered load.",
     "The packed BinaryHV pilot is labelled a fixed-dimension implementation characterization; it is not a theoretical capacity proof, a full VSA comparison, or a SOTA result.",
-    "The packed BinaryHV operating threshold is calibrated on a dedicated negative-query set; empirical false-positive rate is measured on a disjoint negative-query set that was not used to choose the threshold."
+    "The packed BinaryHV operating threshold is calibrated on a dedicated negative-query set; empirical false-positive rate is measured on a disjoint negative-query set that was not used to choose the threshold.",
+    "The packed BinaryHV pilot must compare empirical mean member similarity to the analytic independent-bipolar majority-bundle expectation C(2m,m)/4^m for odd load 2m+1, preserving the exact discrete formula separately from its asymptotic approximation."
   ],
   "research_references": [
     {
