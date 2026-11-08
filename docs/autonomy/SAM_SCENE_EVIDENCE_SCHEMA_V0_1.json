@@ -465,7 +465,8 @@
         "vision_hdc_proposals",
         "prediction_set_refs",
         "admission",
-        "unresolved"
+        "unresolved",
+        "traffic_convention_profile_id"
       ],
       "properties": {
         "snapshot_id": {
@@ -895,6 +896,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "traffic_convention_profile_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
