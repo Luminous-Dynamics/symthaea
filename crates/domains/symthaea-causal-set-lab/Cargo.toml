@@ -29,3 +29,7 @@ path = "examples/interval_histogram_benchmark.rs"
 [[example]]
 name = "curved_frw_sweep"
 path = "examples/curved_frw_sweep.rs"
+
+[[example]]
+name = "curved_order_inversion"
+path = "examples/curved_order_inversion.rs"
