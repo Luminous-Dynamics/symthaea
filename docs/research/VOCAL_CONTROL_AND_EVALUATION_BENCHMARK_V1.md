@@ -294,6 +294,79 @@ Source and terms:
 
 A separate singing corpus must be assembled with explicit, documented consent for recording, training, evaluation, identity use and commercial redistribution where applicable. Language qualification is task-specific: ASR support does not imply G2P, speech synthesis or singing support.
 
+
+## South African language and phonology track — 8 November 2026
+
+The resource audit has identified a grounded starting point: the pinned NWU-MuST za_lex snapshot at commit 59a93768d72b5804f8b87bc3dd409320c8f0c328. It contains candidate lexical resources for Afrikaans, South African English, Sesotho, Setswana, isiXhosa and isiZulu, including word dictionaries, grapheme sets, IPA/HTS/NCHLT mappings, context-sensitive rules, phone inventories, syllabification support and isiZulu morphology rules.
+
+The active branch records only source paths, per-file Git blob SHA-1 values, sizes, language-level license metadata and limitations in tools/za-lex-audit/resource-manifest.json. The audit workflow checks out the exact external commit and verifies every listed file. No third-party dictionary or rule source is copied into Symthaea. The audit is provenance metadata, not legal advice or a production-language implementation.
+
+### Important resource distinctions
+
+- Afrikaans: CC BY-SA 2.5 South Africa derivative dictionary; upstream says stress markup remains work-in-progress.
+- South African English: CC BY 4.0 directory notice with underlying NCHLT CC BY 3.0 attribution; the dictionary is a limited manual subset and explicitly lacks contextual heteronym variants.
+- Sesotho, Setswana, isiXhosa and isiZulu: NCHLT-derived resources marked CC BY 3.0 with attribution to DAC, CSIR and NWU.
+- isiXhosa/isiZulu: preserve click features as atomic, typed phones; the NCHLT 2013 resource notes do not encode tone, and should not be mistaken for a complete singing prosody model.
+- isiZulu: morphological rules are a separate resource; a pronunciation pipeline that ignores morphology may split or normalize agglutinative words incorrectly.
+- The repository snapshot is old (last pushed in 2017). It is useful as a research seed, not assumed to represent modern community usage.
+
+### What counts as a valid multilingual singing benchmark
+
+Do not score a whole-language G2P model with the same lexicon used to write its rules and call that accuracy. The historical upstream comments reporting 14,941/15,000 Sesotho, 14,811/15,000 Setswana (with simplified vowel diacritics), 14,999/15,000 isiXhosa and 14,942/15,000 isiZulu are comparisons with the associated NCHLT-inlang dictionary used in rule development. They are not independently speaker-verified held-out results.
+
+Build a separate language-specific reference set with community and phonetic review. Keep speakers, sessions and source dictionaries separated between development and test. Track these dimensions separately:
+
+| Dimension | Metric |
+|---|---|
+| Orthography and morphology | exact grapheme coverage, segmentation accuracy, morphology boundary F1 |
+| Phones | PER, phone confusion matrix, click-place/phonation accuracy |
+| Syllables | boundary F1, nucleus accuracy, syllabic consonant accuracy |
+| Prosody | stress accuracy, tone/contour accuracy where relevant, duration-model error |
+| Uncertainty | OOV precision/recall, selective accuracy vs coverage, Brier score and ECE |
+| Code switching | switch-boundary error, language/profile selection accuracy, cross-language phone confusion |
+| Singing alignment | consonant release/onset, vowel onset, note-vowel binding, tone/F0 separation, melisma continuity |
+| Human perception | word comprehension, pronunciation naturalness, listener confidence, community acceptance |
+
+### Proposed qualification gates
+
+Targets below are research aspirations, not achieved performance:
+- At least 97% phone accuracy on independently adjudicated in-vocabulary words in each declared language/dialect profile before calling its G2P qualified.
+- At least 0.95 syllable-boundary F1 where the annotation protocol defines boundaries.
+- At least 0.95 click-class/phonation accuracy for the tested click inventory, with each click class reported separately.
+- At least 0.90 stress/tone accuracy only where independently annotated and phonologically applicable; report undefined when the profile lacks a validated tone representation.
+- OOV precision and recall both at least 0.95 on a deliberately constructed, independently verified OOV challenge set.
+- No unsupported phone, diacritic, click, syllabic consonant or code-switch transition silently discarded or mapped to schwa.
+- Separate held-out singing evaluation must pass before the corresponding language profile is advertised as singing-capable.
+
+A small pilot should estimate annotator agreement and variance first; final confidence bounds and human sample size must come from a power analysis. Include more than one dialect and age group where community review supports it. The system must permit correction and retain the correction provenance without storing reviewer identity in public artifacts.
+
+### Paradigm shift: one language-independent performance graph, many validated phonological profiles
+
+The score and vocal motor plan should be language-agnostic. The phonological profile supplies canonical phones, syllabification, morphology, stress/tone evidence and allowed articulatory realizations. The score alignment graph then binds these units to beats, notes, rests, phrase spans and melisma. A renderer receives a fully resolved, versioned plan; it does not re-run a heuristic G2P at render time.
+
+This is the clean separation:
+1. orthography/morphology -> candidate pronunciation lattice;
+2. human/policy selection -> resolved pronunciation;
+3. resolved pronunciation + beat-domain score -> explicit alignment graph;
+4. alignment + expressive motor controls -> renderer-specific realization;
+5. independent phonetic, musical and perceptual evaluation -> evidence-qualified release decision.
+
+This avoids embedding English assumptions in the musical score model while preventing unsupported languages from being silently treated as English.
+
+### External comparison discipline
+
+SoulX-Singer remains the highest-priority open score-conditioned comparator: its paper reports more than 42,000 hours of vocal training and Mandarin, English and Cantonese support, with MIDI/score and F0-conditioned generation. SoulX-Singer-Eval separately measures singing aesthetics, spectral quality, ASR WER/CER, speaker similarity and melodic FFE/GPE/VDE. Compare on the same lyrics/scores and the same rights-compatible split; do not infer quality in South African languages from Mandarin/English results.
+
+A recent third-party SVS dashboard also reports results for an in-house SVS and VITA-QinYu, but its model, dataset and evaluation details need verification before treating its quality scores as a defensible SOTA claim. A dashboard number is not a benchmark protocol.
+
+Whole-song commercial preference (Artificial Analysis AA-Music-Vocal) remains a separate prompt-to-song track. It must not be merged with score-conditioned SVS results.
+
+Sources:
+- za_lex: https://github.com/NWU-MuST/za_lex/tree/59a93768d72b5804f8b87bc3dd409320c8f0c328
+- SoulX-Singer: https://arxiv.org/abs/2602.07803
+- SoulX-Singer-Eval metrics: https://github.com/Soul-AILab/SoulX-Singer-Eval
+- Current third-party SVS benchmark dashboard (use only as a discovery index until protocol verified): https://www.sota2.com/research/task/singing-voice-synthesis
+
 ## Immediate implementation mapping
 
 - MEL-VOCAL-001 supplies phone-sequence scoring and melisma coverage.
