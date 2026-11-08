@@ -62,16 +62,27 @@ pub struct ProcessAgentIdentity {
     pub executable_path: String,
     pub executable_sha256: String,
     pub arguments: Vec<String>,
+    pub working_directory: Option<String>,
+    pub max_input_frame_bytes: usize,
+    pub max_output_frame_bytes: usize,
     pub environment_inherited: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProcessActionRecord {
     pub action_index: usize,
+    pub agent_view_frame_sha256: String,
+    pub agent_action_frame_sha256: String,
     pub evidence_prefix_before: String,
     pub action: AgentAction,
     pub evidence_prefix_after: String,
     pub resulting_status: EpisodeStatus,
+}
+
+struct ProcessActionExchange {
+    action: AgentAction,
+    agent_view_frame_sha256: String,
+    agent_action_frame_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -127,6 +138,14 @@ impl ProcessAgent {
             .iter()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
+        let working_directory = config
+            .working_directory
+            .as_ref()
+            .map(fs::canonicalize)
+            .transpose()
+            .map_err(|error| {
+                ProcessError::Io(format!("cannot resolve agent working directory: {error}"))
+            })?;
 
         let mut command = Command::new(&executable);
         command
@@ -136,11 +155,8 @@ impl ProcessAgent {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
 
-        if let Some(directory) = &config.working_directory {
-            let canonical_directory = fs::canonicalize(directory).map_err(|error| {
-                ProcessError::Io(format!("cannot resolve agent working directory: {error}"))
-            })?;
-            command.current_dir(canonical_directory);
+        if let Some(directory) = &working_directory {
+            command.current_dir(directory);
         }
 
         let mut child = command
@@ -161,6 +177,11 @@ impl ProcessAgent {
                 executable_path: executable.display().to_string(),
                 executable_sha256,
                 arguments,
+                working_directory: working_directory
+                    .as_ref()
+                    .map(|directory| directory.display().to_string()),
+                max_input_frame_bytes: config.max_input_frame_bytes,
+                max_output_frame_bytes: config.max_output_frame_bytes,
                 environment_inherited: false,
             },
             max_input_frame_bytes: config.max_input_frame_bytes,
@@ -172,7 +193,7 @@ impl ProcessAgent {
         &self.identity
     }
 
-    pub fn next_action(&mut self, view: &AgentView) -> Result<AgentAction, ProcessError> {
+    pub fn next_action(&mut self, view: &AgentView) -> Result<ProcessActionExchange, ProcessError> {
         if view.task.protocol_version != PROTOCOL_VERSION {
             return Err(ProcessError::Protocol(format!(
                 "unsupported public protocol version: {}",
@@ -195,6 +216,7 @@ impl ProcessAgent {
             });
         }
         input.push(b'\n');
+        let agent_view_frame_sha256 = sha256_frame(&input);
 
         let stdin = self.stdin.as_mut().ok_or_else(|| {
             ProcessError::Protocol("agent stdin was already closed".to_owned())
@@ -223,6 +245,7 @@ impl ProcessAgent {
                 )))
             }
             BoundedLine::Line => {
+                let agent_action_frame_sha256 = sha256_frame(&output);
                 while output
                     .last()
                     .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
@@ -234,8 +257,13 @@ impl ProcessAgent {
                         "agent emitted a blank stdout frame".to_owned(),
                     ));
                 }
-                serde_json::from_slice(&output)
-                    .map_err(|error| ProcessError::MalformedAction(error.to_string()))
+                let action = serde_json::from_slice(&output)
+                    .map_err(|error| ProcessError::MalformedAction(error.to_string()))?;
+                Ok(ProcessActionExchange {
+                    action,
+                    agent_view_frame_sha256,
+                    agent_action_frame_sha256,
+                })
             }
         }
     }
@@ -289,6 +317,10 @@ impl Drop for ProcessAgent {
             let _ = child.wait();
         }
     }
+}
+
+fn sha256_frame(bytes: &[u8]) -> String {
+    format!("sha256:{:x}", Sha256::digest(bytes))
 }
 
 enum BoundedLine {
@@ -355,14 +387,16 @@ pub fn run_process_episode(
         let before = episode
             .view()
             .map_err(|error| ProcessError::Protocol(error.to_string()))?;
-        let action = agent.next_action(&before)?;
+        let exchange = agent.next_action(&before)?;
         let response = episode
-            .apply(action.clone())
+            .apply(exchange.action.clone())
             .map_err(|error| ProcessError::Protocol(format!("episode rejected agent action: {error}")))?;
         action_records.push(ProcessActionRecord {
             action_index,
+            agent_view_frame_sha256: exchange.agent_view_frame_sha256,
+            agent_action_frame_sha256: exchange.agent_action_frame_sha256,
             evidence_prefix_before: before.evidence_prefix_sha256,
-            action,
+            action: exchange.action,
             evidence_prefix_after: response.view.evidence_prefix_sha256,
             resulting_status: response.status,
         });
