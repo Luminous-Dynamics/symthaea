@@ -457,3 +457,8 @@ The proposed hybrid should carry explicit evidence status: AUDIO_SUPPORTED, CONT
 ## 17. Updated benchmark matrix
 
 The machine-readable matrix now contains ten tracks, including cross-implementation metric conformance. The code-switch lane now records pooled/micro and utterance-macro aggregation separately; the semantic lane explicitly compares modular ASR→Broca, speech-native, SAMA-style semantic anchoring and acoustic-veto hybrid systems.
+
+
+### 16.5 Exact switch-boundary conformance vectors
+
+The programme also links [`switch_boundary_golden_v0.1.json`](./switch_boundary_golden_v0.1.json) and its Draft 2020-12 schema. These six synthetic sequences independently exercise exact boundary TP/FP/FN, precision, recall and F1, including empty-boundary states and one-token shifts. A second formula audit recomputed all six cases successfully. These vectors measure tag-boundary scoring only; they do not test audio-based language identification or recognition output.
