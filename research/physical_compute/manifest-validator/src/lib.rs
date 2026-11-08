@@ -29,6 +29,14 @@ fn bool_at(value: &Value, key: &str) -> Option<bool> {
     value.get(key).and_then(Value::as_bool)
 }
 
+fn is_stable_identifier(id: &str) -> bool {
+    id.len() >= 3
+        && id.as_bytes().first().is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        && id.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b".-_".contains(&byte)
+        })
+}
+
 fn array_at<'a>(value: &'a Value, key: &str) -> Option<&'a Vec<Value>> {
     value.get(key).and_then(Value::as_array)
 }
@@ -135,13 +143,7 @@ pub fn validate_manifest(value: &Value) -> ValidationReport {
     }
 
     let scenario_id = string_at(value, "scenario_id");
-    if !scenario_id.is_some_and(|id| {
-        id.len() >= 3
-            && id.as_bytes()[0].is_ascii_lowercase().then_some(true).unwrap_or(false)
-                || id.len() >= 3
-                    && id.as_bytes()[0].is_ascii_digit()
-                    && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b".-_".contains(&b))
-    }) {
+    if !scenario_id.is_some_and(is_stable_identifier) {
         errors.push("scenario_id: expected a lowercase stable identifier".to_owned());
     }
 
@@ -311,7 +313,16 @@ pub fn validate_manifest(value: &Value) -> ValidationReport {
     }
 
     if let Some(injections) = array_at(value, "fault_injections") {
+        let mut injection_ids = BTreeSet::new();
         for (index, injection) in injections.iter().enumerate() {
+            match string_at(injection, "injection_id") {
+                Some(id) if !id.is_empty() => {
+                    if !injection_ids.insert(id.to_owned()) {
+                        errors.push(format!("fault_injections[{index}]: duplicate injection_id {id}"));
+                    }
+                }
+                _ => errors.push(format!("fault_injections[{index}].injection_id: missing or empty")),
+            }
             match string_at(injection, "target_id") {
                 Some(target)
                     if component_ids.contains(target) || domain_ids.contains(target) => {}
@@ -344,6 +355,16 @@ pub fn validate_manifest(value: &Value) -> ValidationReport {
     }
     if phase == Some("confirmatory") && seed_policy != Some("independent_held_out") {
         errors.push("experiment.seed_policy: confirmatory phase requires independent_held_out".to_owned());
+    }
+    let expected_phase = match scenario_class {
+        Some("screening") => Some("screening"),
+        Some("confirmatory") => Some("confirmatory"),
+        Some("negative_control") => Some("negative_control"),
+        Some("reproduction") => Some("reproduction"),
+        _ => None,
+    };
+    if expected_phase.is_some() && phase != expected_phase {
+        errors.push("experiment.phase: must match scenario_class".to_owned());
     }
     let training = parse_seed_range(experiment.get("training_seed_range"), "experiment.training_seed_range", &mut errors);
     let validation = parse_seed_range(experiment.get("validation_seed_range"), "experiment.validation_seed_range", &mut errors);
@@ -422,6 +443,13 @@ mod tests {
         assert!(report.is_valid(), "{:?}", report.errors);
         assert!(report.canonical_sha256.starts_with("sha256:"));
         assert_eq!(report.canonical_sha256.len(), 71);
+    }
+
+    #[test]
+    fn malformed_scenario_identifier_is_rejected() {
+        let mut value = fixture_value();
+        value["scenario_id"] = Value::String("Not A Stable ID".into());
+        assert!(validate_manifest(&value).errors.iter().any(|e| e.contains("scenario_id")));
     }
 
     #[test]
