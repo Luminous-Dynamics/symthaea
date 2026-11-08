@@ -154,6 +154,8 @@ pub enum DiagnosticBenchmarkError {
     },
     #[error("scenario identifier does not match")]
     ScenarioIdMismatch,
+    #[error("paired policy episode counts differ: reference {reference}, candidate {candidate}")]
+    PairedEpisodeCountMismatch { reference: usize, candidate: usize },
 }
 
 /// Run the fixed five-policy suite using paired deterministic episode seeds.
@@ -209,7 +211,7 @@ pub fn run_diagnostic_policy_benchmark(
                 &candidate.1,
             )
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(DiagnosticPolicyBenchmark {
         scenario_id: scenario.scenario_id.clone(),
@@ -414,8 +416,14 @@ fn paired_policy_contrast(
     reference: &[DiagnosticEpisodeMetrics],
     candidate_policy: DiagnosticPolicy,
     candidate: &[DiagnosticEpisodeMetrics],
-) -> DiagnosticPolicyContrast {
-    let episodes = reference.len().min(candidate.len());
+) -> Result<DiagnosticPolicyContrast, DiagnosticBenchmarkError> {
+    if reference.len() != candidate.len() {
+        return Err(DiagnosticBenchmarkError::PairedEpisodeCountMismatch {
+            reference: reference.len(),
+            candidate: candidate.len(),
+        });
+    }
+    let episodes = reference.len();
     let task_loss_differences = reference
         .iter()
         .zip(candidate)
@@ -438,7 +446,7 @@ fn paired_policy_contrast(
     let (mean_total_cost_difference, total_cost_difference_ci95) =
         paired_mean_ci95(&cost_differences);
 
-    DiagnosticPolicyContrast {
+    Ok(DiagnosticPolicyContrast {
         reference_policy,
         candidate_policy,
         episodes,
@@ -449,7 +457,7 @@ fn paired_policy_contrast(
         mean_total_cost_difference,
         total_cost_difference_ci95,
         confidence_interval_method: "paired_normal_approximation_95".to_owned(),
-    }
+    })
 }
 
 /// Mean and normal-approximation 95% interval for paired episode differences.
