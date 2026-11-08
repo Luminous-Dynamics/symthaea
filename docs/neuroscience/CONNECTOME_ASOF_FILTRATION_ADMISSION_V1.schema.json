@@ -12,7 +12,9 @@
     "global_filtration_sha256",
     "entries",
     "admissions",
-    "oracle_expectations"
+    "oracle_expectations",
+    "ledger_epoch_id",
+    "ledger_chain_root_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -52,7 +54,14 @@
       "required": [
         "decision_statuses",
         "admission_statuses",
-        "final_sequence"
+        "final_sequence",
+        "entry_commitment_sha256",
+        "decision_input_prefix_sha256",
+        "decision_history_prefix_sha256",
+        "ledger_chain_root_sha256",
+        "terminal_checkpoint_sha256",
+        "sha256_empty",
+        "sha256_abc"
       ],
       "properties": {
         "decision_statuses": {
@@ -82,8 +91,46 @@
         "final_sequence": {
           "type": "integer",
           "minimum": 1
+        },
+        "entry_commitment_sha256": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sha64"
+          }
+        },
+        "decision_input_prefix_sha256": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha64"
+          }
+        },
+        "decision_history_prefix_sha256": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha64"
+          }
+        },
+        "ledger_chain_root_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "terminal_checkpoint_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "sha256_empty": {
+          "const": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "sha256_abc": {
+          "const": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         }
       }
+    },
+    "ledger_epoch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ledger_chain_root_sha256": {
+      "$ref": "#/$defs/sha64"
     }
   },
   "$defs": {
