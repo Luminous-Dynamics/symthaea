@@ -1379,29 +1379,19 @@ mod tests {
         let mut invalid = VocalPhraseSpec::with_end(1);
         invalid.expression.energy_multiplier[1] = f32::NAN;
         assert!(
-            VocalPerformance::from_melody_with_phrase_specs(
-                "light",
-                &[note],
-                "en",
-                &[invalid],
-            )
-            .unwrap_err()
-            .to_string()
-            .contains("energy multipliers")
+            VocalPerformance::from_melody_with_phrase_specs("light", &[note], "en", &[invalid],)
+                .unwrap_err()
+                .to_string()
+                .contains("energy multipliers")
         );
 
         let mut invalid = VocalPhraseSpec::with_end(1);
         invalid.breath_after_s = 6.0;
         assert!(
-            VocalPerformance::from_melody_with_phrase_specs(
-                "light",
-                &[note],
-                "en",
-                &[invalid],
-            )
-            .unwrap_err()
-            .to_string()
-            .contains("breath durations")
+            VocalPerformance::from_melody_with_phrase_specs("light", &[note], "en", &[invalid],)
+                .unwrap_err()
+                .to_string()
+                .contains("breath durations")
         );
     }
 
