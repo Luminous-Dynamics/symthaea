@@ -43,6 +43,15 @@ pub struct IntervalCoverageCounts {
     pub unbounded_unopened_partitions: usize,
 }
 
+/// One exact canonical score and its stable record identifier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExactScoreRecord<Id> {
+    /// Stable record identifier.
+    pub id: Id,
+    /// Canonical finite similarity score in [-1, 1].
+    pub score: f32,
+}
+
 /// The deterministic refinement set for one larger-is-better top-k query.
 ///
 /// This plan selects records that must receive exact payload scoring. It is not
@@ -85,6 +94,11 @@ pub enum IntervalSelectionError {
         /// Index of the first invalid input record.
         record_index: usize,
     },
+    /// An exact result score is non-finite or outside the canonical score range.
+    InvalidExactScore {
+        /// Index of the first invalid input score.
+        record_index: usize,
+    },
     /// Stable IDs are not unique within the eligible population.
     DuplicateId {
         /// First occurrence of the duplicate ID.
@@ -112,6 +126,9 @@ impl std::fmt::Display for IntervalSelectionError {
             ),
             Self::InvalidInterval { record_index } => {
                 write!(f, "record {record_index} has an invalid score interval")
+            }
+            Self::InvalidExactScore { record_index } => {
+                write!(f, "record {record_index} has an invalid exact score")
             }
             Self::DuplicateId { first_index, duplicate_index } => write!(
                 f,
@@ -216,6 +233,58 @@ where
     })
 }
 
+/// Apply the canonical score-descending / stable-ID-ascending top-k order.
+///
+/// Numerically equal scores use the ID tiebreak; in particular, +0.0 and -0.0
+/// compare as equal scores instead of being ordered by their sign bit. The
+/// canonical score profile guarantees finite values in [-1, 1], and this
+/// helper rejects violations rather than using a NaN-tolerant comparator.
+pub fn stable_exact_top_k<Id>(
+    scores: &[ExactScoreRecord<Id>],
+    top_k: usize,
+) -> Result<Vec<Id>, IntervalSelectionError>
+where
+    Id: Ord + Clone,
+{
+    if top_k == 0 || top_k > scores.len() {
+        return Err(IntervalSelectionError::InvalidTopK {
+            top_k,
+            eligible_records: scores.len(),
+        });
+    }
+
+    let mut first_index_by_id = BTreeMap::new();
+    let mut ordered: Vec<&ExactScoreRecord<Id>> = Vec::with_capacity(scores.len());
+    for (record_index, record) in scores.iter().enumerate() {
+        if !record.score.is_finite() || !(-1.0..=1.0).contains(&record.score) {
+            return Err(IntervalSelectionError::InvalidExactScore { record_index });
+        }
+        if let Some(first_index) = first_index_by_id.get(&record.id).copied() {
+            return Err(IntervalSelectionError::DuplicateId {
+                first_index,
+                duplicate_index: record_index,
+            });
+        }
+        first_index_by_id.insert(record.id.clone(), record_index);
+        ordered.push(record);
+    }
+
+    ordered.sort_by(|left, right| {
+        let score_order = if left.score == right.score {
+            std::cmp::Ordering::Equal
+        } else {
+            right.score.total_cmp(&left.score)
+        };
+        score_order.then_with(|| left.id.cmp(&right.id))
+    });
+
+    Ok(ordered
+        .into_iter()
+        .take(top_k)
+        .map(|record| record.id.clone())
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -250,8 +319,11 @@ mod tests {
         ];
         let plan = select_refinement_set(&records, 2, complete_coverage(7)).unwrap();
         assert_eq!(plan.threshold, 0.82);
-        assert_eq!(plan.refinement_ids, vec!["a", "b", "c", "d", "g"]);
-        assert_eq!(plan.excluded_ids, vec!["e", "f"]);
+        assert_eq!(
+            plan.refinement_ids,
+            vec!["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned(), "g".to_owned()]
+        );
+        assert_eq!(plan.excluded_ids, vec!["e".to_owned(), "f".to_owned()]);
     }
 
     #[test]
@@ -341,37 +413,66 @@ mod tests {
             )
             .unwrap();
 
-            let mut full_order = exact_scores.clone();
-            full_order.sort_by(|left, right| {
-                right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
-            });
-            let expected: Vec<String> = full_order
+            let full_scores: Vec<ExactScoreRecord<String>> = exact_scores
                 .iter()
-                .take(top_k)
-                .map(|(id, _)| id.clone())
+                .map(|(id, score)| ExactScoreRecord {
+                    id: id.clone(),
+                    score: *score,
+                })
                 .collect();
+            let expected = stable_exact_top_k(&full_scores, top_k).unwrap();
 
             let refinement_members: BTreeSet<String> =
                 plan.refinement_ids.iter().cloned().collect();
-            let mut refined_order: Vec<(String, f32)> = exact_scores
+            let refined_scores: Vec<ExactScoreRecord<String>> = exact_scores
                 .iter()
                 .filter(|(id, _)| refinement_members.contains(id))
-                .cloned()
+                .map(|(id, score)| ExactScoreRecord {
+                    id: id.clone(),
+                    score: *score,
+                })
                 .collect();
-            refined_order.sort_by(|left, right| {
-                right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
-            });
-            let actual: Vec<String> = refined_order
-                .iter()
-                .take(top_k)
-                .map(|(id, _)| id.clone())
-                .collect();
+            let actual = stable_exact_top_k(&refined_scores, top_k).unwrap();
 
             assert_eq!(
                 actual, expected,
                 "false-prune disagreement in generated case {case_index}"
             );
         }
+    }
+
+    #[test]
+    fn exact_rerank_uses_numeric_score_then_stable_id_including_signed_zero() {
+        let scores = vec![
+            ExactScoreRecord { id: "z".to_owned(), score: 0.0 },
+            ExactScoreRecord { id: "b".to_owned(), score: -0.0 },
+            ExactScoreRecord { id: "a".to_owned(), score: 0.0 },
+            ExactScoreRecord { id: "c".to_owned(), score: 0.5 },
+        ];
+        assert_eq!(
+            stable_exact_top_k(&scores, 3).unwrap(),
+            vec!["c".to_owned(), "a".to_owned(), "b".to_owned()]
+        );
+    }
+
+    #[test]
+    fn exact_rerank_rejects_non_finite_or_out_of_range_scores() {
+        let scores = vec![ExactScoreRecord {
+            id: "nan".to_owned(),
+            score: f32::NAN,
+        }];
+        assert_eq!(
+            stable_exact_top_k(&scores, 1),
+            Err(IntervalSelectionError::InvalidExactScore { record_index: 0 })
+        );
+        let out_of_range = vec![ExactScoreRecord {
+            id: "large".to_owned(),
+            score: 1.01,
+        }];
+        assert_eq!(
+            stable_exact_top_k(&out_of_range, 1),
+            Err(IntervalSelectionError::InvalidExactScore { record_index: 0 })
+        );
     }
 
     #[test]
