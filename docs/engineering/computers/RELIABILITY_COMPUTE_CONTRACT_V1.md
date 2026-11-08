@@ -1,6 +1,6 @@
 # Reliability compute contract v1 — runner-independent reference model
 
-**Status:** draft source; not yet compiled or CI-qualified.  
+**Status:** draft source; revised static-review findings addressed in source; still not compiled or CI-qualified.  
 **Owner:** RELIABILITY-COMPUTE-001 #10993.  
 **Purpose:** define an executable, deterministic semantic slice for task-level outcomes under physical-compute faults.
 
@@ -9,6 +9,13 @@
 A surviving channel count is not an end-to-end correctness guarantee. The evaluator separately classifies correct/on-time acceptance, silent corruption, detected rejection, verifier unavailability, deadline misses, hardware unavailability and unverifiable outcomes. Recovery is counted independently so it cannot erase the initial failure.
 
 ## Included in the Rust reference
+
+- Fallible allocation for the synthetic fault map.
+- Zero-seed normalization for the deterministic fixture generator.
+- Distinct abstention, resource-infeasibility and hardware-unavailability outcomes.
+- Evaluator ground truth is passed separately from verifier-facing observations.
+- Numerically stable zero-failure upper bound using `expm1`.
+- Deadline boundary test and zero-seed non-degeneracy test.
 
 - Checked two-dimensional cell map.
 - Deterministic independent stuck-off / stuck-on injection with fixed seed.
@@ -35,6 +42,27 @@ The current authoring environment did not contain rustc. Source compilation and 
 This is a first executable slice, not the complete nested dependency graph in #10993. It does not model subarray/die/wafer/lot hierarchies, realistic spatial stochastic fields, device I-V behavior, conductance mapping, differential pairs, ADC/DAC/readout, noise spectra, write physics, drift, endurance, thermal feedback, real task arithmetic, measured latency, physical energy, area, cost or yield.
 
 The evaluator-only ground-truth field must not be visible to the verifier being tested. A verifier that receives its own expected answer is not independent.
+
+## Versioned scenario manifest
+
+The machine-readable v1 contract is:
+
+- `research/physical_compute/scenario_manifest_v1.schema.json`
+- `research/physical_compute/scenarios/v1/common_cause_controller_outage.json`
+
+The example is a deterministic **negative-control fixture**, not a probability estimate. It injects a controller-domain outage and declares that adding healthy cells must not make the workload executable.
+
+The JSON Schema validates structure and primitive types. A semantic validator is still required to check:
+- uniqueness of component and domain identifiers;
+- resolution of every parent, member, dependency and fault-injection target;
+- acyclic parent/dependency relations where required;
+- consistency between declared measurement boundary and available receipts;
+- calibration age and validity at execution time;
+- source/evidence digests and provenance;
+- disjoint training, validation and confirmatory seed sets;
+- independence claims against the actual dependency graph.
+
+Until that validator exists, a schema-valid file is not a qualified scenario.
 
 ## Required next steps
 
