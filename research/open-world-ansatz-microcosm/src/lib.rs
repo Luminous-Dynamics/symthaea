@@ -9,6 +9,7 @@ pub mod interaction;
 pub mod numeric;
 pub mod policy;
 pub mod protocol;
+pub mod process;
 pub mod strategies;
 
 use serde::{Deserialize, Serialize};
