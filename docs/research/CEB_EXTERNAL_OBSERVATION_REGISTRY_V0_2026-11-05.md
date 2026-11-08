@@ -94,7 +94,21 @@ The limits must remain attached to these figures: the aggregate test-reduction c
 
 Source: https://diffci.com/research/diffci-open-evidence-2026
 
-The structured registry now contains **44 sources, 49 comparator records and 143 atomic observations**. The 56-row metric correspondence crosswalk is unchanged; the new observations are not mapped as direct equivalents to CEB-CONTINUITY primary metrics.
+The structured registry now contains **51 sources, 56 comparator records and 162 atomic observations**. The 56-row metric correspondence crosswalk is unchanged; the new observations are not mapped as direct equivalents to CEB-CONTINUITY primary metrics.
+
+
+## Branch and merge-history comparators — November 8, 2026
+
+Two adjacent research sources have been added to the machine-readable registry:
+
+- **ConflictBench** evaluates five software merge tools on Java merge-conflict cases. It is a methodological reference for merge-resolution controls, not an agent benchmark and not a measure of evidence continuity. The exact case denominator is not reported in the abstract summary.
+- **Change propagation channels mined from evolution history** reports a dataset of 5,032 project versions across five maintained projects and 40 relationship-channel types. These channels can seed candidate impact hypotheses, but co-change/history association does not prove semantic causation or branch-scoped claim invalidation.
+
+These comparators motivate BHC-S02/BHC-S04 and the requirement to compare first-parent/path heuristics with full-parent history and an independent clean-recomputation oracle. They do not supply directly comparable CEB scores. The existing 56-row metric-correspondence crosswalk remains unchanged.
+
+Sources:
+- ConflictBench: https://doi.org/10.1016/j.jss.2024.112084
+- Change propagation history mining: https://www.sciencedirect.com/science/article/pii/S0164121223003072
 
 ## SWE-Milestone v1.0.2 normalized observations (2026-11-05)
 
@@ -112,4 +126,4 @@ Sources:
 - Official leaderboard: https://swe-milestone.com/
 - ICML 2026 paper: https://proceedings.mlr.press/v306/deng26d.html
 
-The latest structured external-observation registry snapshot contains 44 external sources, 49 comparator records and 143 atomic observations. The figures in earlier dated sections above are preserved as historical captures; the current machine-readable snapshot is authoritative for registry totals. All remain contextual references; no direct CEB superiority claim is enabled.
+The latest structured external-observation registry snapshot contains 51 external sources, 56 comparator records and 162 atomic observations. The figures in earlier dated sections above are preserved as historical captures; the current machine-readable snapshot is authoritative for registry totals. All remain contextual references; no direct CEB superiority claim is enabled.
