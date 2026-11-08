@@ -13,11 +13,11 @@
 //! remains the authority for whether the Skolem/Herbrand functions win.
 
 use super::decomposition::CnfProblem;
-use super::quantified_scope::ValidatedQuantifierPrefix;
 use super::quantified_proof::{
     QbfGameProof, QbfProofNodeKind, QbfProofVerificationReport, QuantifiedProofBudget,
     QuantifiedProofError, verify_qbf_game_proof,
 };
+use super::quantified_scope::ValidatedQuantifierPrefix;
 use super::quantified_strategy::{
     QbfEvaluationResult, QuantifiedEvaluationBudget, QuantifiedStrategyError,
     StrategyVerificationReport,
@@ -79,9 +79,17 @@ pub enum StrategyPortfolioError {
     BddVerification(StrategyBddError),
     AigCompilation(StrategyAigError),
     AigVerification(StrategyAigError),
-    RepresentationTooLarge { required: usize, limit: usize },
-    TotalPortfolioTooLarge { required: usize, limit: usize },
-    EncodingIndexOverflow { value: usize },
+    RepresentationTooLarge {
+        required: usize,
+        limit: usize,
+    },
+    TotalPortfolioTooLarge {
+        required: usize,
+        limit: usize,
+    },
+    EncodingIndexOverflow {
+        value: usize,
+    },
     ResourceAccountingOverflow,
 }
 
@@ -360,16 +368,29 @@ fn read_proof_usize(bytes: &[u8], offset: &mut usize) -> Result<usize, StrategyP
 }
 
 fn validate_decoded_proof_tree(proof: &QbfGameProof) -> Result<(), StrategyPortfolioError> {
-    if proof.nodes.is_empty() || proof.root >= proof.nodes.len() || proof.root != proof.nodes.len() - 1 {
+    if proof.nodes.is_empty()
+        || proof.root >= proof.nodes.len()
+        || proof.root != proof.nodes.len() - 1
+    {
         return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: 0 });
     }
     let mut parent_counts = vec![0usize; proof.nodes.len()];
     for (parent, node) in proof.nodes.iter().enumerate() {
         let children = match &node.kind {
-            QbfProofNodeKind::ExistsDecision { low_child, high_child, .. }
-            | QbfProofNodeKind::ForAllDecision { low_child, high_child, .. } => {
+            QbfProofNodeKind::ExistsDecision {
+                low_child,
+                high_child,
+                ..
+            }
+            | QbfProofNodeKind::ForAllDecision {
+                low_child,
+                high_child,
+                ..
+            } => {
                 if low_child == high_child {
-                    return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: parent });
+                    return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                    offset: parent,
+                });
                 }
                 [Some(*low_child), Some(*high_child)]
             }
@@ -377,7 +398,9 @@ fn validate_decoded_proof_tree(proof: &QbfGameProof) -> Result<(), StrategyPortf
         };
         for child in children.into_iter().flatten() {
             if child >= parent {
-                return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: parent });
+                return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                    offset: parent,
+                });
             }
             parent_counts[child] = parent_counts[child]
                 .checked_add(1)
@@ -419,10 +442,14 @@ pub fn decode_qbf_game_proof(
     let node_count = read_proof_usize(bytes, &mut offset)?;
 
     if variable_count > proof_budget.max_variables {
-        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: MAGIC.len() });
+        return Err(StrategyPortfolioError::ProofEncodingInvalid {
+            offset: MAGIC.len(),
+        });
     }
     if node_count > proof_budget.max_proof_nodes {
-        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: MAGIC.len() + 16 });
+        return Err(StrategyPortfolioError::ProofEncodingInvalid {
+            offset: MAGIC.len() + 16,
+        });
     }
     // Every node needs at least prefix_position:u64 + value:u8 + tag:u8.
     let minimum_node_bytes = node_count
@@ -433,7 +460,9 @@ pub fn decode_qbf_game_proof(
         return Err(StrategyPortfolioError::ProofEncodingInvalid { offset });
     }
     if node_count == 0 || root != node_count - 1 {
-        return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: MAGIC.len() + 8 });
+        return Err(StrategyPortfolioError::ProofEncodingInvalid {
+            offset: MAGIC.len() + 8,
+        });
     }
 
     let mut nodes = Vec::new();
@@ -449,7 +478,11 @@ pub fn decode_qbf_game_proof(
         let value = match read_proof_byte(bytes, &mut offset)? {
             0 => false,
             1 => true,
-            _ => return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: value_offset }),
+            _ => {
+                return Err(StrategyPortfolioError::ProofEncodingInvalid {
+                    offset: value_offset,
+                });
+            }
         };
         let tag_offset = offset;
         let tag = read_proof_byte(bytes, &mut offset)?;
@@ -478,10 +511,21 @@ pub fn decode_qbf_game_proof(
         };
         // Bound source-position fields and proof edges before exposing the
         // parsed object to the source-bound verifier.
-        if let QbfProofNodeKind::ExistsDecision { variable, low_child, high_child }
-        | QbfProofNodeKind::ForAllDecision { variable, low_child, high_child } = &kind
+        if let QbfProofNodeKind::ExistsDecision {
+            variable,
+            low_child,
+            high_child,
+        }
+        | QbfProofNodeKind::ForAllDecision {
+            variable,
+            low_child,
+            high_child,
+        } = &kind
         {
-            if *variable >= variable_count || *low_child >= node_index || *high_child >= node_index {
+            if *variable >= variable_count
+                || *low_child >= node_index
+                || *high_child >= node_index
+            {
                 return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: tag_offset });
             }
         }
@@ -521,9 +565,8 @@ pub fn verify_and_compile_qbf_evidence_portfolio(
     aig_budget: StrategyAigBudget,
     encoding_budget: StrategyPortfolioBudget,
 ) -> Result<VerifiedQbfEvidencePortfolio, StrategyPortfolioError> {
-    let game_proof_verification =
-        verify_qbf_game_proof(problem, prefix, proof, proof_budget)
-            .map_err(StrategyPortfolioError::GameProof)?;
+    let game_proof_verification = verify_qbf_game_proof(problem, prefix, proof, proof_budget)
+        .map_err(StrategyPortfolioError::GameProof)?;
     if game_proof_verification.root_value != candidate.value {
         return Err(StrategyPortfolioError::GameProofResultMismatch {
             proof_value: game_proof_verification.root_value,
@@ -531,17 +574,12 @@ pub fn verify_and_compile_qbf_evidence_portfolio(
         });
     }
     let game_proof_bytes = encode_qbf_game_proof(proof, encoding_budget)?;
-    let decoded_proof = decode_qbf_game_proof(
-        &game_proof_bytes,
-        proof_budget,
-        encoding_budget,
-    )?;
+    let decoded_proof = decode_qbf_game_proof(&game_proof_bytes, proof_budget, encoding_budget)?;
     if decoded_proof != *proof {
         return Err(StrategyPortfolioError::ProofEncodingRoundTripMismatch);
     }
-    let decoded_verification =
-        verify_qbf_game_proof(problem, prefix, &decoded_proof, proof_budget)
-            .map_err(StrategyPortfolioError::GameProof)?;
+    let decoded_verification = verify_qbf_game_proof(problem, prefix, &decoded_proof, proof_budget)
+        .map_err(StrategyPortfolioError::GameProof)?;
     if decoded_verification != game_proof_verification {
         return Err(StrategyPortfolioError::ProofEncodingRoundTripMismatch);
     }
@@ -685,11 +723,11 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
 #[cfg(test)]
 mod tests {
     use super::super::decomposition::Literal;
-    use super::super::quantified_scope::{Quantifier, QuantifierBlock, ValidatedQuantifierPrefix};
-    use super::super::quantified_strategy::{StrategyOwner, evaluate_qbf_with_strategy};
     use super::super::quantified_proof::{
         QbfProofNodeKind, QuantifiedProofBudget, build_qbf_game_proof,
     };
+    use super::super::quantified_scope::{Quantifier, QuantifierBlock, ValidatedQuantifierPrefix};
+    use super::super::quantified_strategy::{StrategyOwner, evaluate_qbf_with_strategy};
     use super::*;
 
     fn qbf_budget() -> QuantifiedEvaluationBudget {
@@ -923,8 +961,8 @@ mod tests {
     fn game_proof_and_strategy_are_bound_in_one_evidence_portfolio() {
         let (problem, prefix) = equality_qbf();
         let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         let portfolio = verify_and_compile_qbf_evidence_portfolio(
             &problem,
             &prefix,
@@ -940,7 +978,10 @@ mod tests {
 
         assert!(portfolio.value);
         assert!(portfolio.game_proof_verification.root_value);
-        assert_eq!(portfolio.game_proof_verification.proof_nodes_checked, proof.nodes.len());
+        assert_eq!(
+            portfolio.game_proof_verification.proof_nodes_checked,
+            proof.nodes.len()
+        );
         assert!(portfolio.game_proof_bytes.starts_with(b"LD-QBFPROOF1"));
         assert_eq!(portfolio.strategy_portfolio.value, portfolio.value);
         assert_eq!(
@@ -955,8 +996,8 @@ mod tests {
     fn proof_encoding_round_trips_and_independently_verifies_decoded_artifact() {
         let (problem, prefix) = equality_qbf();
         let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         let bytes = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
         let decoded =
             decode_qbf_game_proof(&bytes, QuantifiedProofBudget::default(), encoding_budget())
@@ -975,8 +1016,8 @@ mod tests {
     #[test]
     fn proof_decoder_rejects_truncation_unknown_tag_bad_boolean_and_trailing_bytes() {
         let (problem, prefix) = equality_qbf();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         let bytes = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
 
         assert!(matches!(
@@ -1027,8 +1068,8 @@ mod tests {
     #[test]
     fn proof_decoder_checks_variable_node_and_byte_budgets_before_allocation() {
         let (problem, prefix) = equality_qbf();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         let bytes = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
         let small_nodes = QuantifiedProofBudget {
             max_proof_nodes: 1,
@@ -1052,8 +1093,8 @@ mod tests {
     fn game_proof_mutation_is_rejected_before_strategy_compilation() {
         let (problem, prefix) = equality_qbf();
         let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         let mut tampered = proof.clone();
         tampered.nodes[tampered.root].value = false;
         assert!(matches!(
@@ -1078,8 +1119,8 @@ mod tests {
     fn game_proof_and_candidate_truth_must_agree() {
         let (problem, prefix) = equality_qbf();
         let mut candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         candidate.value = false;
         assert_eq!(
             verify_and_compile_qbf_evidence_portfolio(
@@ -1105,8 +1146,8 @@ mod tests {
     fn proof_encoding_is_deterministic_and_single_representation_bounded() {
         let (problem, prefix) = equality_qbf();
         let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        let (proof, _) = build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default())
-            .unwrap();
+        let (proof, _) =
+            build_qbf_game_proof(&problem, &prefix, QuantifiedProofBudget::default()).unwrap();
         let first = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
         let second = encode_qbf_game_proof(&proof, encoding_budget()).unwrap();
         assert_eq!(first, second);
