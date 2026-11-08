@@ -7,5 +7,5 @@ pub mod interval_select;
 
 pub use interval_select::{
     ExactScoreRecord, IntervalCoverageCounts, IntervalSelectionError, IntervalSelectionPlan,
-    ScoreIntervalRecord, select_refinement_set, stable_exact_top_k,
+    ScoreIntervalBuildError, ScoreIntervalRecord, select_refinement_set, stable_exact_top_k,
 };
