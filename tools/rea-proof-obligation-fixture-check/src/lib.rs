@@ -105,6 +105,25 @@ fn candidate_has_admissible_obligation_update(
     Ok(false)
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimReadiness {
+    Ready,
+    NotReady,
+}
+
+/// Evaluate readiness from current, independently assessed obligation states.
+/// Predicted candidate outcomes are not inputs to this function.
+pub fn evaluate_claim_readiness(case: &Value) -> Result<ClaimReadiness, FixtureError> {
+    let obligations = array_at(case, &["obligations"])?;
+    for obligation in obligations {
+        if bool_at(obligation, &["required"])? && string_at(obligation, &["status"])? != "satisfied" {
+            return Ok(ClaimReadiness::NotReady);
+        }
+    }
+    Ok(ClaimReadiness::Ready)
+}
+
 pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
     if string_at(value, &["schema_version"])? != "0.1.0"
         || string_at(value, &["dataset_id"])? != "rea-proof-obligation-acquisition"
@@ -232,7 +251,6 @@ pub fn validate_fixture(value: &Value) -> Result<(), FixtureError> {
                 // obligation into a stronger/newly resolved state.
                 if !class_is_admissible
                     && resulting_status != initial_status
-                    && resulting_status != "unknown"
                 {
                     return Err(FixtureError(format!(
                         "inadmissible evidence class {evidence_class} changes obligation {obligation_id} from {initial_status} to {resulting_status} in {case_id}/{experiment_id}"
@@ -462,7 +480,6 @@ fn validate_split_values(agent: &Value, grader: &Value) -> Result<(), FixtureErr
 
                 if !admissible
                     && resulting_status != initial_status
-                    && resulting_status != "unknown"
                 {
                     return Err(FixtureError(format!(
                         "inadmissible grader evidence {evidence_class} upgrades {id}/{obligation_id} from {initial_status} to {resulting_status}"
@@ -798,6 +815,51 @@ mod tests {
             "evidence_class":"instrumented_full_session",
             "source_family_id":"synthetic:session-control-012"
         }]);
+        assert!(validate_fixture(&value).is_err());
+    }
+
+
+    #[test]
+    fn readiness_requires_every_mandatory_obligation_to_be_satisfied() {
+        let mut case = fixture()["cases"][0].clone();
+        assert_eq!(evaluate_claim_readiness(&case).unwrap(), ClaimReadiness::NotReady);
+        case["obligations"][0]["status"] = Value::String("satisfied".to_owned());
+        case["obligations"][1]["status"] = Value::String("satisfied".to_owned());
+        case["obligations"][2]["status"] = Value::String("satisfied".to_owned());
+        assert_eq!(evaluate_claim_readiness(&case).unwrap(), ClaimReadiness::Ready);
+    }
+
+    #[test]
+    fn optional_unsatisfied_obligation_does_not_block_readiness() {
+        let mut case = fixture()["cases"][0].clone();
+        case["obligations"][0]["status"] = Value::String("satisfied".to_owned());
+        case["obligations"][1]["status"] = Value::String("satisfied".to_owned());
+        case["obligations"][2]["required"] = Value::Bool(false);
+        case["obligations"][2]["status"] = Value::String("unknown".to_owned());
+        assert_eq!(evaluate_claim_readiness(&case).unwrap(), ClaimReadiness::Ready);
+    }
+
+    #[test]
+    fn every_non_satisfied_mandatory_status_blocks_readiness() {
+        for status in ["unsatisfied", "conflicted", "unknown", "incomplete", "contradicted"] {
+            let mut case = fixture()["cases"][0].clone();
+            case["obligations"][0]["status"] = Value::String(status.to_owned());
+            assert_eq!(
+                evaluate_claim_readiness(&case).unwrap(),
+                ClaimReadiness::NotReady,
+                "mandatory status {status} must block readiness"
+            );
+        }
+    }
+
+    #[test]
+    fn inadmissible_evidence_cannot_downgrade_or_upgrade_obligation_state() {
+        let mut value = fixture();
+        let case = value["cases"].as_array_mut().unwrap().iter_mut()
+            .find(|case| case["case_id"] == "REA-POA-001").unwrap();
+        case["obligations"][0]["status"] = Value::String("satisfied".to_owned());
+        case["candidates"][0]["effects"][0]["resulting_status"] =
+            Value::String("unknown".to_owned());
         assert!(validate_fixture(&value).is_err());
     }
 
