@@ -163,7 +163,8 @@
       "member_component_ids": [
         "array-0",
         "controller-0",
-        "verifier-0"
+        "verifier-0",
+        "power-0"
       ],
       "failure_probability": null,
       "failure_model": "common_cause",
