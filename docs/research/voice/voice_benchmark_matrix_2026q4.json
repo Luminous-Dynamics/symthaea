@@ -492,7 +492,9 @@
         "non_estimable_state_exactness",
         "alignment_policy_conformance",
         "micro_macro_weighting_consistency",
-        "fixture_schema_conformance"
+        "fixture_schema_conformance",
+        "boundary_precision_recall_f1_exactness",
+        "boundary_empty_set_non_estimable_exactness"
       ],
       "required_outputs": [
         "metric_vector_id",
@@ -514,6 +516,12 @@
           "id": "voice_metric_vectors_v1_schema",
           "status": "SYNTHETIC_ONLY_SCHEMA",
           "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.schema.json"
+        },
+        {
+          "id": "switch_boundary_golden_v0_1",
+          "status": "SYNTHETIC_ONLY_NO_LANGUAGE_EVIDENCE",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_boundary_golden_v0.1.json",
+          "note": "Six synthetic reference/predicted language-tag sequences for exact switch-boundary TP/FP/FN/precision/recall/F1. Independent formula audit recomputes all six cases successfully. This is not language identification evaluation or model output."
         }
       ],
       "note": "All scorer implementations should consume identical frozen vectors. Validate metric counts and denominators separately from floating-point presentation; real-corpus results require additional independent evidence."
