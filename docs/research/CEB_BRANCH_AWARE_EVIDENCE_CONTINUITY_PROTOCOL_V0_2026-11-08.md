@@ -44,6 +44,8 @@ The authoring worksheet may refer to the following concepts while reusing the ex
 - **Branch tip:** a named ref observed at a declared time, resolved to an exact commit.
 - **Event:** a fork, commit, merge, cherry-pick, backport, rebase, squash, revert, ref movement, policy change or evidence/evaluator change.
 - **Claim scope:** the branches/revisions, configuration worlds, contract/policy epoch, runtime environment and time interval for which the proposition is asserted.
+
+A **branch scope** names the lineage/branch-tip domain within which the claim is proposed for use; it must not be inferred from a mutable branch label alone.
 - **Evidence scope:** the corresponding identity and applicability domain of the source, test, build, measurement, authorization or attestation supporting the claim.
 - **Merge result:** the exact resulting tree plus all parent identities and any conflict-resolution evidence.
 
