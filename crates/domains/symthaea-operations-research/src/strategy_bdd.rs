@@ -2876,17 +2876,15 @@ mod tests {
         let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
         assert!(report.anf_transform_checks > 0);
         assert!(report.anf_hyperedge_count > 0);
+        let anf = strategy_anf_interaction_hypergraph(&source, budget()).unwrap();
+        let anf_order = anf_hypergraph_min_fill_order(4, &anf.hyperedges).unwrap();
+        let anf_reverse: Vec<usize> = anf_order.iter().copied().rev().collect();
         assert!(
             report
                 .seed_orders
                 .iter()
-                .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFill)
-        );
-        assert!(
-            report
-                .seed_orders
-                .iter()
-                .any(|(seed, _)| *seed == StrategyBddOrderSeed::AnfHypergraphMinFillReverse)
+                .any(|(_, order)| *order == anf_order || *order == anf_reverse),
+            "the ANF-derived order or its reverse must be evaluated; identical orders are deduplicated"
         );
         verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
     }
