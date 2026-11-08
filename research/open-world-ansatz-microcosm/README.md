@@ -53,6 +53,8 @@ The numeric exhaustive oracle uses a closed-form state response and enumerates a
 
 This model family is intentionally small and integer-valued. It is a protocol/control benchmark, not yet a continuous, stochastic, delayed, spatial or empirical scientific world.
 
+The numeric operator CLI accepts evaluator-side scenario values and prints matched A0/A2 reports plus the oracle class count. Its truth-bearing arguments and oracle report are not an agent-facing interface.
+
 ## Independent structural oracle
 
 The world simulator advances an explicit hidden state. The exhaustive oracle does not call the simulator or the hypothesis transition method. Instead, it uses a closed-form trace relation and enumerates every binary intervention sequence at the requested horizon.
@@ -75,6 +77,7 @@ From the Symthaea repository root:
     cargo clippy --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --all-targets -- -D warnings
     cargo test --manifest-path research/open-world-ansatz-microcosm/Cargo.toml
     cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml -- hidden_lag identity 0 1,0,0 a2
+    cargo run --manifest-path research/open-world-ansatz-microcosm/Cargo.toml --bin numeric_microcosm -- leaky 2 1 1 identity 1,-1,1,0
 
 CLI scenario arguments identify the hidden evaluator-side world. They are for an operator-controlled local run; do not expose them to the agent process in a blind evaluation. The JSON output includes an oracle summary and is an evaluator report, not an agent observation packet.
 
@@ -82,7 +85,7 @@ For the matched A0 control, use the same world and intervention sequence, changi
 
 ## Authored tests
 
-Twenty-three Rust tests cover the binary and numeric worlds: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, partition probe selection, exhaustive oracle equivalence classes, distorted measurements, inconsistent evidence, invalid parameter bindings and horizon bounds.
+Twenty-four Rust tests cover the binary and numeric worlds: hidden-state transitions, matched A0/A2 access, coefficient recovery, sensor-gain equivalence, passive and sensor-induced non-identifiability, partition probe selection, exhaustive oracle equivalence classes, distorted measurements, inconsistent evidence, invalid parameter bindings and horizon bounds.
 
 Tests are authored. The binary v1 implementation has passed the focused Rust format, Clippy and test workflow on commit f40e2dd. The numeric extension is newer and awaits its own exact-head workflow result.
 
