@@ -112,9 +112,10 @@ pub fn episode_reward_with_follow_target(
     evidence: Option<&FollowTargetEvidence>,
     profile: &FollowConsumerProfile,
 ) -> Result<f64, FollowEvidenceError> {
-    let admitted = admit_follow_target(evidence, profile)?;
     let follow_gap_m = match task {
-        VehicleTask::Follow { .. } => Some(admitted.gap_lower_bound_m),
+        VehicleTask::Follow { .. } => {
+            Some(admit_follow_target(evidence, profile)?.gap_lower_bound_m)
+        }
         _ => None,
     };
     Ok(episode_reward_with_gap(
@@ -259,17 +260,13 @@ mod tests {
 
     #[test]
     fn test_follow_reward_on_target() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 30.0;
-        let r = follow_distance_reward(state.nearest_peer_distance, 30.0);
+        let r = follow_distance_reward(30.0, 30.0);
         assert!((r - 1.0).abs() < 1e-6, "At target gap should be 1.0: {r}");
     }
 
     #[test]
     fn test_follow_reward_off_target() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 60.0;
-        let r = follow_distance_reward(state.nearest_peer_distance, 30.0);
+        let r = follow_distance_reward(60.0, 30.0);
         assert!(r < 0.1, "Far from target gap should be low: {r}");
     }
 
