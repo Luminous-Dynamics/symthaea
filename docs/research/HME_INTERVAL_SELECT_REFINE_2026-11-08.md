@@ -175,3 +175,19 @@ Project targets, not external standards or measured results:
 ## 9. Nonclaims
 
 No Recast reproduction, HME interval selector, certified ContinuousHV quantizer, f32 outward interval proof, runtime performance result or SOTA win is claimed by this protocol. The fixture does not prove any production interval is valid. The probabilistic RecastQ interval and deterministic HME residual certificate are different guarantee classes.
+
+
+### Additional generated selector-property check (2026-11-08)
+
+Added [hme_interval_select_refine_sweep_v0.json](fixtures/hme_interval_select_refine_sweep_v0.json).
+
+A deterministic xorshift32 generator (seed 0x5eed1234) produced 50,000 small integer-valued cases:
+- N from 1 to 32;
+- k uniformly chosen from 1 to N;
+- exact scores in [-5,5];
+- lower/upper interval slack independently chosen from [0,5], so every generated interval contains its exact integer score;
+- stable tie ordering by score descending, ID ascending.
+
+The global interval selector produced zero false-prune disagreements with full exact top-k across these 50,000 generated cases. Threshold equality occurred frequently and was retained.
+
+This is a small-domain property sweep of the selection rule. It does not validate a production residual encoder, floating-point outward rounding, canonical f32 score containment, metadata freshness or whole-corpus eligibility coverage. It is not a formal proof and not a runtime benchmark.
