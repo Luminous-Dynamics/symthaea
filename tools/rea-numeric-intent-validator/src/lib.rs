@@ -55,6 +55,8 @@ pub struct NumericPathResult {
     pub intent: String,
     pub status: String,
     pub precision_warning: bool,
+    /// Exact source token status. Raw bytes remain bound by source_raw_sha256.
+    pub raw_value_status: String,
     pub canonical_binary64: Option<String>,
     pub unit_quantity_reference_status: Option<String>,
 }
@@ -172,6 +174,25 @@ pub fn validate_inputs(
         )
     })?;
 
+    let supplied_schema_id = value_schema
+        .get("$id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            ValidationError::new(
+                "value_schema_id_missing",
+                "value schema must declare $id matching the profile schema_id",
+            )
+        })?;
+    if supplied_schema_id != profile.value_schema.schema_id {
+        return Err(ValidationError::new(
+            "value_schema_id_mismatch",
+            format!(
+                "profile binds schema_id {} but supplied schema declares $id {}",
+                profile.value_schema.schema_id, supplied_schema_id
+            ),
+        ));
+    }
+
     let computed_value_schema_digest = jcs_sha256(&value_schema)?;
     if computed_value_schema_digest != profile.value_schema.sha256 {
         return Err(ValidationError::new(
@@ -212,10 +233,16 @@ pub fn validate_inputs(
         .map(|path| evaluate_path(path, &document, &warnings_by_pointer))
         .collect::<Result<Vec<_>>>()?;
 
-    let overall_status = if path_results.iter().all(path_result_is_conformant) {
-        "conformant"
-    } else {
+    let values_conformant = path_results.iter().all(path_result_is_conformant);
+    let has_unresolved_authority_references = path_results
+        .iter()
+        .any(|result| result.unit_quantity_reference_status.is_some());
+    let overall_status = if !values_conformant {
         "nonconformant"
+    } else if has_unresolved_authority_references {
+        "conformant_with_unresolved_authority_references"
+    } else {
+        "conformant"
     };
 
     Ok(NumericIntentValidationReport {
@@ -524,7 +551,7 @@ fn evaluate_path(
             }
             "opaque_numeric" => {
                 if value.is_number() {
-                    ("opaque_preserved_arithmetic_forbidden", None)
+                    ("opaque_numeric_no_arithmetic_authority", None)
                 } else {
                     ("type_mismatch", None)
                 }
@@ -544,12 +571,22 @@ fn evaluate_path(
         } else {
             None
         };
+    let raw_value_status = match path.intent.as_str() {
+        "exact_integer_string" | "fixed_decimal_string" => {
+            "decoded_string_value_exact_source_bytes_committed"
+        }
+        "safe_integer" => "integer_value_checked_source_bytes_committed",
+        "binary64" => "jcs_binary64_value_source_bytes_committed",
+        "opaque_numeric" => "opaque_no_arithmetic_exact_lexeme_not_materialized",
+        _ => "unsupported_numeric_intent",
+    };
 
     Ok(NumericPathResult {
         json_pointer: path.json_pointer.clone(),
         intent: path.intent.clone(),
         status: status.to_owned(),
         precision_warning,
+        raw_value_status: raw_value_status.to_owned(),
         canonical_binary64,
         unit_quantity_reference_status,
     })
@@ -562,7 +599,7 @@ fn path_result_is_conformant(result: &NumericPathResult) -> bool {
             | "valid_safe_integer"
             | "valid_exact_integer_string"
             | "valid_fixed_decimal_string"
-            | "opaque_preserved_arithmetic_forbidden"
+            | "opaque_numeric_no_arithmetic_authority"
     )
 }
 
@@ -793,6 +830,7 @@ mod tests {
     fn profile_and_schema() -> (Vec<u8>, Vec<u8>) {
         let value_schema = json!({
             "$schema": DRAFT_2020_12,
+            "$id": "urn:example:schema:test",
             "type": "object",
             "additionalProperties": false,
             "required": ["counter", "account_id", "price", "reading", "vendor_metric"],
@@ -910,7 +948,11 @@ mod tests {
         );
         assert_eq!(
             report.path_results[4].status,
-            "opaque_preserved_arithmetic_forbidden"
+            "opaque_numeric_no_arithmetic_authority"
+        );
+        assert_eq!(
+            report.path_results[4].raw_value_status,
+            "opaque_no_arithmetic_exact_lexeme_not_materialized"
         );
         assert!(report.numeric_precision_warnings.iter().any(|warning| {
             warning.json_pointer == "/vendor_metric"
@@ -986,6 +1028,47 @@ mod tests {
             br#"{"counter":42,"counter":43,"account_id":"5","price":"0.10","reading":1,"vendor_metric":2}"#,
         );
         assert_eq!(result.unwrap_err().kind, "document_raw_audit");
+    }
+
+    #[test]
+    fn unresolved_unit_and_quantity_references_prevent_unqualified_conformance() {
+        let (profile, schema) = profile_and_schema();
+        let mut profile_value: Value = serde_json::from_slice(&profile).unwrap();
+        profile_value["numeric_paths"][0]["quantity_kind_ref"] =
+            json!("urn:example:quantity:length");
+        profile_value["numeric_paths"][0]["unit_code_ref"] =
+            json!("urn:example:unit:metre");
+        let profile_body = profile_body_without_digest(&profile_value).unwrap();
+        profile_value["profile_sha256"] = json!(jcs_sha256(&profile_body).unwrap());
+
+        let report = validate_inputs(
+            &serde_json::to_vec(&profile_value).unwrap(),
+            &schema,
+            br#"{"counter":42,"account_id":"5","price":"0.10","reading":1,"vendor_metric":2}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.path_results[0].unit_quantity_reference_status.as_deref(),
+            Some("unresolved_authority_reference_not_validated")
+        );
+        assert_eq!(
+            report.overall_status,
+            "conformant_with_unresolved_authority_references"
+        );
+    }
+
+    #[test]
+    fn value_schema_id_must_match_the_profile_binding() {
+        let (profile, schema) = profile_and_schema();
+        let mut value_schema: Value = serde_json::from_slice(&schema).unwrap();
+        value_schema["$id"] = json!("urn:example:schema:substituted");
+        let result = validate_inputs(
+            &profile,
+            &serde_json::to_vec(&value_schema).unwrap(),
+            br#"{"counter":42,"account_id":"5","price":"0.10","reading":1,"vendor_metric":2}"#,
+        );
+        assert_eq!(result.unwrap_err().kind, "value_schema_id_mismatch");
     }
 
     #[test]
