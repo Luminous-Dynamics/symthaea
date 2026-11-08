@@ -6,6 +6,10 @@ on:
       - "docs/research/REA_PLANNER_INPUT_CONTRACT_V0_1_2026Q4.md"
       - "docs/research/rea-planner-input-contract-v0-1.schema.json"
       - "docs/research/rea-planner-input-contract-v0-1-example-math-only.json"
+      - "docs/research/rea-planner-policy-disagreement-v0-1-agent-input.json"
+      - "docs/research/rea-planner-policy-disagreement-v0-1-grader.json"
+      - "docs/research/rea-planner-policy-disagreement-v0-1-grader.schema.json"
+      - "docs/research/REA_PLANNER_POLICY_DISAGREEMENT_V0_1_2026Q4.md"
       - "tools/rea-planner-input-contract-check/**"
       - ".github/workflows/rea-planner-input-contract.yml"
   workflow_dispatch:
