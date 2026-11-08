@@ -539,21 +539,27 @@ pub fn calibrate_cfc_projection_observation_noise(
     repeated_projection_samples: &[f64],
 ) -> Result<CfCProjectionNoiseCalibration, CfCPermutationAlignmentError> {
     if repeated_projection_samples.len() < 2 {
-        return Err(CfCPermutationAlignmentError::InsufficientNoiseCalibrationSamples {
-            actual: repeated_projection_samples.len(),
-            minimum: 2,
-        });
+        return Err(
+            CfCPermutationAlignmentError::InsufficientNoiseCalibrationSamples {
+                actual: repeated_projection_samples.len(),
+                minimum: 2,
+            },
+        );
     }
     if repeated_projection_samples.len() > MAX_NOISE_CALIBRATION_SAMPLES {
-        return Err(CfCPermutationAlignmentError::TooManyNoiseCalibrationSamples {
-            actual: repeated_projection_samples.len(),
-            maximum: MAX_NOISE_CALIBRATION_SAMPLES,
-        });
+        return Err(
+            CfCPermutationAlignmentError::TooManyNoiseCalibrationSamples {
+                actual: repeated_projection_samples.len(),
+                maximum: MAX_NOISE_CALIBRATION_SAMPLES,
+            },
+        );
     }
     if !is_lowercase_hex_digest(calibration_probe_digest) {
-        return Err(CfCPermutationAlignmentError::InvalidNoiseCalibrationDigest {
-            field: "calibration_probe_digest",
-        });
+        return Err(
+            CfCPermutationAlignmentError::InvalidNoiseCalibrationDigest {
+                field: "calibration_probe_digest",
+            },
+        );
     }
     if let Some(index) = repeated_projection_samples
         .iter()
@@ -587,8 +593,8 @@ pub fn calibrate_cfc_projection_observation_noise(
         });
     }
 
-    let sample_mean = repeated_projection_samples.iter().sum::<f64>()
-        / repeated_projection_samples.len() as f64;
+    let sample_mean =
+        repeated_projection_samples.iter().sum::<f64>() / repeated_projection_samples.len() as f64;
     let sample_variance = repeated_projection_samples
         .iter()
         .map(|sample| (sample - sample_mean).powi(2))
@@ -690,24 +696,59 @@ fn validate_cfc_projection_noise_calibration(
         });
     }
     for (field, value) in [
-        ("source_model_digest", calibration.source_model_digest.as_str()),
-        ("candidate_model_digest", calibration.candidate_model_digest.as_str()),
-        ("architecture_digest", calibration.architecture_digest.as_str()),
+        (
+            "source_model_digest",
+            calibration.source_model_digest.as_str(),
+        ),
+        (
+            "candidate_model_digest",
+            calibration.candidate_model_digest.as_str(),
+        ),
+        (
+            "architecture_digest",
+            calibration.architecture_digest.as_str(),
+        ),
         ("manifest_digest", calibration.manifest_digest.as_str()),
         ("projection_digest", calibration.projection_digest.as_str()),
-        ("calibration_probe_digest", calibration.calibration_probe_digest.as_str()),
-        ("calibration_digest", calibration.calibration_digest.as_str()),
+        (
+            "calibration_probe_digest",
+            calibration.calibration_probe_digest.as_str(),
+        ),
+        (
+            "calibration_digest",
+            calibration.calibration_digest.as_str(),
+        ),
     ] {
         if !is_lowercase_hex_digest(value) {
             return Err(CfCPermutationAlignmentError::InvalidNoiseCalibrationDigest { field });
         }
     }
     for (field, expected, actual) in [
-        ("source model digest", source_model_digest, calibration.source_model_digest.as_str()),
-        ("candidate model digest", candidate_model_digest, calibration.candidate_model_digest.as_str()),
-        ("architecture digest", architecture_digest, calibration.architecture_digest.as_str()),
-        ("manifest digest", manifest_digest, calibration.manifest_digest.as_str()),
-        ("projection digest", projection_digest, calibration.projection_digest.as_str()),
+        (
+            "source model digest",
+            source_model_digest,
+            calibration.source_model_digest.as_str(),
+        ),
+        (
+            "candidate model digest",
+            candidate_model_digest,
+            calibration.candidate_model_digest.as_str(),
+        ),
+        (
+            "architecture digest",
+            architecture_digest,
+            calibration.architecture_digest.as_str(),
+        ),
+        (
+            "manifest digest",
+            manifest_digest,
+            calibration.manifest_digest.as_str(),
+        ),
+        (
+            "projection digest",
+            projection_digest,
+            calibration.projection_digest.as_str(),
+        ),
     ] {
         if expected != actual {
             return Err(CfCPermutationAlignmentError::StaleNoiseCalibration { field });
@@ -734,10 +775,7 @@ fn validate_cfc_projection_noise_calibration(
         return Err(CfCPermutationAlignmentError::NonFiniteNoiseCalibrationSample { index });
     }
 
-    let recomputed_mean = calibration
-        .repeated_projection_samples
-        .iter()
-        .sum::<f64>()
+    let recomputed_mean = calibration.repeated_projection_samples.iter().sum::<f64>()
         / calibration.sample_count as f64;
     let recomputed_variance = calibration
         .repeated_projection_samples
@@ -928,16 +966,12 @@ pub enum CfCPermutationAlignmentError {
     },
     #[error("permutation posterior normalization failed")]
     InvalidPermutationPosterior,
-    #[error("noise calibration has {actual} repeated projection samples; at least {minimum} are required")]
-    InsufficientNoiseCalibrationSamples {
-        actual: usize,
-        minimum: usize,
-    },
+    #[error(
+        "noise calibration has {actual} repeated projection samples; at least {minimum} are required"
+    )]
+    InsufficientNoiseCalibrationSamples { actual: usize, minimum: usize },
     #[error("noise calibration has {actual} samples; maximum supported is {maximum}")]
-    TooManyNoiseCalibrationSamples {
-        actual: usize,
-        maximum: usize,
-    },
+    TooManyNoiseCalibrationSamples { actual: usize, maximum: usize },
     #[error("noise calibration sample {index} is non-finite")]
     NonFiniteNoiseCalibrationSample { index: usize },
     #[error("noise calibration has zero or invalid sample variance")]
@@ -4265,7 +4299,10 @@ mod tests {
         .expect("small exact permutation EIG selection");
 
         assert_eq!(receipt.format_version, 1);
-        assert_eq!(receipt.noise_calibration_digest, calibration.calibration_digest);
+        assert_eq!(
+            receipt.noise_calibration_digest,
+            calibration.calibration_digest
+        );
         assert_eq!(
             receipt.noise_calibration_method,
             CfCProjectionNoiseCalibrationMethod::RepeatedProjectionRuns
