@@ -7,8 +7,8 @@
 //! Belief likelihoods and ground-truth outcome distributions are stored
 //! separately so that well-specified and deliberately misspecified agents can
 //! be evaluated without silently sampling from their own predictions.
-//! The harness compares no-probe, pure-EIG, cost-aware EVSI, and always-inspect
-//! policies on paired deterministic episodes.
+//! The harness compares no-probe, pure model-EIG, targeted decision-EIG,
+//! cost-aware EVSI, and always-inspect policies on paired deterministic episodes.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
