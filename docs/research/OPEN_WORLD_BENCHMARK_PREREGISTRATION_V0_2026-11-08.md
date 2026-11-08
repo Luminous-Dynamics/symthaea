@@ -52,6 +52,30 @@ The public campaign manifest is metadata, not the seed ledger. It pins the sourc
 - The actual seed ledger and sealed confirmation ledger remain evaluator-controlled; the public manifest stores only their content digests. Never commit their contents, low-entropy raw seed values, generating truth or confirmation outcomes.
 - The Rust validator checks shape, digest syntax, pair uniqueness, A0/A2 arm order, nonzero budgets and design/trace consistency. It does not authenticate execution, prove seed custody or replace #9332.
 
+## 3A. Methodological-guidance gradient (separate from A0/A2)
+
+For project-level research tasks with an official B1–B4 contract, add a separate methodological-autonomy experiment:
+
+| Level | Policy-visible guidance | Construct measured |
+|---|---|---|
+| B1 | Full scientific method and procedure | Execution/implementation ceiling with method supplied |
+| B2 | Intended method and constraints; implementation details omitted | Ability to operationalize a known method |
+| B3 | Objective, inputs, constraints and required outputs only | Autonomous method selection |
+| B4 | B3 plus factually correct but non-essential context | Distractor robustness / invariance |
+
+This factor is **not** the A0/A2 structure-access treatment. A0/A2 changes disclosure of the true structural family in a synthetic world; B1–B4 changes methodological instruction. Do not relabel one as the other. Where a task supports both, preregister a factorial design and keep the cells separately identifiable; otherwise run B1–B4 as a standalone adapter over the task owner's official harness.
+
+The ASI-Bench paper reports 60 project-level tasks across 11 domains and an aggregate mean decline from 50.91 at B1 to 29.10 at B2 and 26.62 at B3 over 18 Agent×Model configurations. Its current supplied leaderboard snapshot ranks GPT-5.6 Sol/Codex Ultra at 55.84 overall; the snapshot's adopted round counts vary by configuration. These are reference values, not directly comparable Symthaea results until the task revision, runner, rounds, model/harness, resource limits and scorer are matched.
+
+Prospective Symthaea gates for an exact B1–B4 adapter:
+- improve B3 against a frozen same-model/harness incumbent by a preregistered margin, without relying on greater total resources;
+- preserve B1 performance within a predeclared non-inferiority margin;
+- keep B4 within a small predeclared tolerance of B3 when the extra facts are specified as non-essential;
+- publish each level's valid-artifact rate and cost, not only the overall mean;
+- keep refusal, timeout, invalid artifact and failed verifier attempts in the denominator.
+
+Terminal-Bench Science is an adjacent execution/reliability track, not a scientific-law score. The vendor's Nov 5, 2026 table lists 70 tasks, an eight-hour cap, 62.86% for GPT-6 Astra, 52.86% for GPT-6.1 Sol and 47.14% for Claude Opus 5.5, with costs from $3.44 to $20.80 per task among these leading rows. Treat these as a changing vendor snapshot. A Symthaea comparison requires the same task/verifier revision, harness, task access, timeout, attempt count and cost accounting.
+
 ## 4. Matched experimental arms
 
 ### 4.1 Structure-access treatment
@@ -234,3 +258,5 @@ This lane owns the matched benchmark experiment and thin adapter only. It does n
 - SciAgentArena: https://www.microsoft.com/en-us/research/publication/benchmarking-ai-agents-for-addressing-scientific-challenges-across-scales/
 - ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
 - AstaBench: https://allenai.org/asta/bench
+- ASI-Bench: https://arxiv.org/abs/2608.17271 ; leaderboard: https://asibench.apexin.ai/leaderboard/ ; prompt guidance FAQ: https://asibench.apexin.ai/faq/
+- Terminal-Bench Science: https://vals-ai.com/benchmarks/terminal-bench-science
