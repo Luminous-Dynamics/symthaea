@@ -29,6 +29,19 @@ The crate now also includes an additive `BeatDomainScore` source representation:
 
 This removes the current constructor's "surplus notes become final-syllable melisma" assumption from the target architecture. The current production constructor remains a compatibility adapter until a separately reviewed integration is made.
 
+
+## Versioned language-profile contract
+
+The library now defines a separate `LanguageProfileManifest` and a `ProfiledPronunciationPlan` wrapper. This binds an exact pronunciation plan to a specific profile ID, profile digest, BCP-47 tag, dialect, orthography, phone-inventory version, source revision, per-resource license/attribution receipts, and explicit task qualifications.
+
+The phone inventory attaches typed feature labels to IPA units (click class/place, aspiration, ejective/implosive, voicing, syllabicity, vowel length/quality). This is deliberately separate from spelling: a multi-letter click grapheme may normalize to one click phone; the phone inventory—not the count of letters—defines the linguistic unit.
+
+The profile lists capability status independently for G2P, syllabification, morphology, tone prediction, speech synthesis and singing synthesis. A task marked `research_only`, `not_evaluated` or `unsupported` cannot be used as a qualified renderer capability. `validate_for_task` permits rendering qualification only when the exact profile marks the requested task `qualified` with both an evidence reference and digest. A language's G2P status does not imply singing support.
+
+Resource receipts include the exact source repository/revision/path, source blob digest, license-document path/digest, license expression, attribution and rights-review status. Metadata-audited is not equivalent to legal approval. Excluded resources cannot appear in an active profile. The profile digest is externally computed over a canonical payload excluding the digest field; the profile loader/registry must verify the stored manifest bytes before supplying it to this contract.
+
+Synthetic tests exercise an isiXhosa-like click inventory, syllabic consonant feature consistency, unknown phone rejection, mismatched profile binding, and refusal to qualify singing from a research-only profile. These are contract fixtures, not evidence that isiXhosa singing is supported.
+
 ## Integration path
 
 1. Adapt the exact Piper Plus and current Muse outputs into candidate records without discarding raw outputs.
