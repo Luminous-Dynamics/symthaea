@@ -100,6 +100,8 @@ pub enum CounterfactualPairError {
     EmptyPairId,
     DuplicatePairId(String),
     InvalidTrialIndex,
+    InvalidTrialMetadata,
+    InvalidTrialDigest,
     MissingTrial(String),
     SameTrialReference,
     ReusedTrial(String),
@@ -124,6 +126,8 @@ impl fmt::Display for CounterfactualPairError {
             Self::EmptyPairId => write!(f, "counterfactual pair ID is empty"),
             Self::DuplicatePairId(id) => write!(f, "duplicate counterfactual pair ID: {id}"),
             Self::InvalidTrialIndex => write!(f, "trial set contains an empty or duplicate trial ID"),
+            Self::InvalidTrialMetadata => write!(f, "trial set contains an empty pair ID"),
+            Self::InvalidTrialDigest => write!(f, "trial contains an invalid source-audio SHA-256"),
             Self::MissingTrial(id) => write!(f, "missing trial: {id}"),
             Self::SameTrialReference => write!(f, "baseline and variant refer to the same trial"),
             Self::ReusedTrial(id) => write!(f, "trial reused by multiple pair roles: {id}"),
@@ -165,6 +169,12 @@ pub fn score_counterfactual_pairs(
             || index.insert(trial.trial_id.as_str(), trial).is_some()
         {
             return Err(CounterfactualPairError::InvalidTrialIndex);
+        }
+        if trial.pair_id.trim().is_empty() {
+            return Err(CounterfactualPairError::InvalidTrialMetadata);
+        }
+        if !is_sha256(&trial.source_audio_sha256) {
+            return Err(CounterfactualPairError::InvalidTrialDigest);
         }
     }
 
