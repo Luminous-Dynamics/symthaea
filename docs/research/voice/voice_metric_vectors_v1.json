@@ -1047,5 +1047,243 @@
         }
       }
     }
+  ],
+  "aggregate_vectors": [
+    {
+      "id": "A01-pier-micro-macro-divergence",
+      "metric": "PIER",
+      "utterances": [
+        {
+          "reference_tokens": [
+            "a",
+            "poi1"
+          ],
+          "hypothesis_tokens": [
+            "a",
+            "wrong"
+          ],
+          "poi_tags": [
+            false,
+            true
+          ]
+        },
+        {
+          "reference_tokens": [
+            "b",
+            "poi2",
+            "poi3"
+          ],
+          "hypothesis_tokens": [
+            "b",
+            "poi2",
+            "poi3"
+          ],
+          "poi_tags": [
+            false,
+            true,
+            true
+          ]
+        }
+      ],
+      "expected": {
+        "utterances": 2,
+        "estimable_utterances": 2,
+        "non_estimable_utterances": 0,
+        "corpus_reference_tokens": 5,
+        "corpus_hypothesis_tokens": 5,
+        "totals": {
+          "hits": 2,
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "poi_denominator": 3,
+          "pier_numerator": 1
+        },
+        "micro_pier_percent": 33.333333333333336,
+        "macro_pier_percent": 50
+      },
+      "explanation": "Utterance PIER values are 100% and 0%. Pooled/micro PIER is 1/3 = 33.333...%; macro PIER is (100+0)/2 = 50%."
+    },
+    {
+      "id": "A02-switch-micro-macro-with-no-switch-utterance",
+      "metric": "SETER_SPER",
+      "window_radii": [
+        0,
+        1
+      ],
+      "utterances": [
+        {
+          "reference_tokens": [
+            "a",
+            "b"
+          ],
+          "hypothesis_tokens": [
+            "a",
+            "wrong"
+          ],
+          "language_tags": [
+            "en",
+            "zu"
+          ]
+        },
+        {
+          "reference_tokens": [
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "hypothesis_tokens": [
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "language_tags": [
+            "en",
+            "zu",
+            "en",
+            "zu"
+          ]
+        },
+        {
+          "reference_tokens": [
+            "g",
+            "h"
+          ],
+          "hypothesis_tokens": [
+            "g",
+            "h"
+          ],
+          "language_tags": [
+            "af",
+            "af"
+          ]
+        }
+      ],
+      "expected": {
+        "utterances": 3,
+        "switch_utterances": 2,
+        "no_switch_utterances": 1,
+        "corpus_reference_tokens": 8,
+        "corpus_hypothesis_tokens": 8,
+        "totals": {
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0
+        },
+        "wer": 0.125,
+        "seter": {
+          "micro": {
+            "selected_tokens": 4,
+            "errors": 1,
+            "fraction": 0.25
+          },
+          "macro": {
+            "estimable_utterances": 2,
+            "mean_fraction": 0.5
+          }
+        },
+        "sper": [
+          {
+            "radius": 0,
+            "micro": {
+              "selected_tokens": 4,
+              "errors": 1,
+              "fraction": 0.25
+            },
+            "macro": {
+              "estimable_utterances": 2,
+              "mean_fraction": 0.5
+            }
+          },
+          {
+            "radius": 1,
+            "micro": {
+              "selected_tokens": 6,
+              "errors": 1,
+              "fraction": 0.16666666666666666
+            },
+            "macro": {
+              "estimable_utterances": 2,
+              "mean_fraction": 0.25
+            }
+          }
+        ],
+        "per_language": [
+          {
+            "language": "en",
+            "selected_tokens": 3,
+            "errors": 0,
+            "fraction": 0
+          },
+          {
+            "language": "zu",
+            "selected_tokens": 3,
+            "errors": 1,
+            "fraction": 0.3333333333333333
+          },
+          {
+            "language": "af",
+            "selected_tokens": 2,
+            "errors": 0,
+            "fraction": 0
+          }
+        ]
+      },
+      "explanation": "The no-switch utterance is counted but excluded from switch-metric macro means. Windows are unioned within each utterance; they never cross utterance boundaries."
+    },
+    {
+      "id": "A03-pier-non-estimable-utterance-kept-in-corpus-token-total",
+      "metric": "PIER",
+      "utterances": [
+        {
+          "reference_tokens": [
+            "m",
+            "poi"
+          ],
+          "hypothesis_tokens": [
+            "m",
+            "poi"
+          ],
+          "poi_tags": [
+            false,
+            true
+          ]
+        },
+        {
+          "reference_tokens": [
+            "x",
+            "y"
+          ],
+          "hypothesis_tokens": [
+            "x",
+            "y"
+          ],
+          "poi_tags": [
+            false,
+            false
+          ]
+        }
+      ],
+      "expected": {
+        "utterances": 2,
+        "estimable_utterances": 1,
+        "non_estimable_utterances": 1,
+        "corpus_reference_tokens": 4,
+        "corpus_hypothesis_tokens": 4,
+        "totals": {
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "poi_denominator": 1,
+          "pier_numerator": 0
+        },
+        "micro_pier_percent": 0,
+        "macro_pier_percent": 0
+      },
+      "explanation": "The second utterance is not a zero-error PIER observation. It is explicitly non-estimable, excluded from PIER means, but its reference/hypothesis token counts remain in corpus totals."
+    }
   ]
 }
