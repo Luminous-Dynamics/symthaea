@@ -782,3 +782,71 @@ Before that comparison, add a separately versioned planner-input layer with:
 - exact digests and a split policy binding agent-visible model inputs to grader-only realized outcomes.
 
 Do not infer likelihoods or utilities from the expected-policy rationale, and do not make those parameters from the hidden world-state oracle. Keep the same candidates, resource budgets, target-impact gates, and evidence obligations across every matched policy arm. Until that layer exists and is independently validated, report #11110 as an obligation/admissibility fixture qualification only.
+
+## 9. External benchmark alignment — November 8, 2026
+
+The benchmark landscape has advanced. REA must compare against task-level reverse-engineering results without presenting its evidence-quality metrics as interchangeable with their solve scores.
+
+### SRE-Bench (updated October 2026)
+
+The current DAPLab release reports 19 private programs, 262 binary instances, 1,572 deterministically graded tasks, five reverse-engineering domains, four source languages and 44 anti-analysis mechanisms. Its public-facing table reports GPT-6 Astra with 149 fully solved instances out of 181 graded (82.3%); crucially, 181/262 instances were graded, so the solved percentage is conditional on graded coverage, not all eligible instances. The benchmark also reports mean task score per binary and zero-credit instances separately.
+
+Reference: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+
+REA comparison protocol:
+- Preserve the benchmark's exact score and denominator.
+- Report attempted, graded, refused, timed-out, ungraded and eligible counts separately.
+- Do not claim an 82.3% whole-population solve rate when only 181/262 instances were graded.
+- Keep the five RE domains and their cohort results distinct; aggregate score cannot conceal a weak domain or unsupported claim pattern.
+
+### AgentRE-Bench v3.1 (November 5, 2026)
+
+The current release reports 33 distinct binary challenges across Linux and Windows. Its v3.1 Windows PE track evaluates 20 artifacts (ten programs, stripped and unstripped), six models, five attempts per artifact and 600 episodes. The top reported means are Muse Wonder 87.37 and GPT-6 Astra 87.04, each with 100/100 valid answers. Their reported 95% intervals overlap (85.18–89.56 and 85.80–88.29), so the small score difference does not establish a statistically separated winner. The benchmark records tool calls, evidence, time, coverage, failures and structured claims, and its November 5 update says all 600 scores were independently reproduced.
+
+Reference: https://www.agentre-bench.ai/
+
+REA comparison protocol:
+- Run the same task/artifact/attempt budget where access and benchmark terms permit.
+- Preserve official scoring unchanged.
+- Add a separate REA evidence overlay: claim-to-observation binding, exact artifact/scope, admissible evidence, source-lineage family, unsupported force, replay result and claim-readiness.
+- Report paired per-artifact differences and uncertainty; do not claim victory from a 0.33-point mean difference or from a non-comparable cohort.
+
+### Reveree (September 2026)
+
+Reveree diagnoses reverse-engineering trajectories across 88 picoCTF and NYU-CTF challenges. It separates solve rate, milestone progress through an eight-stage RE schema, and behavioral profiles. Comprehension stages use an outcome-blinded LLM judge validated against a human expert; other stages are checked deterministically. Its reported analysis finds failures concentrated in comprehension stages and indicates that additional budget/persistence rescues relatively few of them.
+
+Reference: https://arxiv.org/abs/2609.01185
+
+REA opportunity:
+- Attach exact observation/evidence and proof-obligation transitions to each important trajectory milestone.
+- Measure whether a tool action generated a new observation, merely transformed an existing one, or repeated a source-family dependency.
+- Score whether the final proposition is no stronger than the evidence, and whether a later contradiction/revocation correctly invalidates earlier readiness.
+- Keep judge-derived comprehension measures separate from deterministic replay and identity checks. Human adjudication remains necessary for semantic warrant labels.
+
+### The proposed REA evidence-quality overlay
+
+The external task benchmark remains the task-performance axis. REA adds a separate, non-composite assurance profile:
+
+| Axis | Operational measure |
+|---|---|
+| Task outcome | Official benchmark score and unchanged denominator |
+| Coverage | Eligible / attempted / graded / refused / unavailable / timed out |
+| Claim traceability | Accepted claims bound to exact Evidence IDs, bytes, artifact and operation |
+| Warrant fidelity | Unsupported-force acceptance and calibrated-claim acceptance |
+| Evidence completeness | Required-premise and population completeness; missing-premise rate |
+| Source independence | False-independent corroboration on shared-root controls |
+| Replayability | Independent exact-input result reproduction |
+| Decision quality | Cost to sufficient admissible evidence, realized regret and unsafe action rate |
+| Temporal continuity | Correct invalidation/revalidation under source, artifact and policy changes |
+
+### Qualification gates
+
+Proposed release targets, not achieved results:
+- Zero false-ready accepts on deterministic and hidden negative controls.
+- Zero false independence uplift on explicit common-root controls.
+- 100% traceability for accepted critical claims in the deterministic qualification corpus.
+- Zero readiness upgrades from predicted outcomes, provider self-reports where local verification is required, filtered views where whole-population coverage is required, or stale evidence where current applicability is required.
+- Useful claim coverage strictly above an always-abstain baseline at the same false-ready ceiling.
+- All task scores, evidence metrics, cost and coverage remain separately visible; no single composite leaderboard number.
+
+This positioning lets REA compare fairly with SRE-Bench and AgentRE-Bench while pursuing a distinct capability: not merely recovering program behavior, but establishing which exact conclusions are warranted by the observed binary, tool execution, environment, lineage and scope.
