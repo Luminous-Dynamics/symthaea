@@ -747,6 +747,34 @@ mod tests {
     }
 
     #[test]
+    fn every_three_input_boolean_function_matches_its_source_truth_table() {
+        for function_mask in 0..256usize {
+            let values: Vec<bool> = (0..8)
+                .map(|assignment| ((function_mask >> assignment) & 1) != 0)
+                .collect();
+            let source = function(&[0, 1, 2], &values);
+            let aig = compile_strategy_function_to_aig(&source, budget()).unwrap();
+            let report = verify_aig_matches_strategy_function(&aig, &source, budget()).unwrap();
+            assert_eq!(
+                report.assignments_checked,
+                8,
+                "function truth-table mask {function_mask}"
+            );
+        }
+    }
+
+    #[test]
+    fn verifier_rejects_mismatched_semantic_scope() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let mut aig = compile_strategy_function_to_aig(&source, budget()).unwrap();
+        aig.dependencies = vec![1, 0];
+        assert!(matches!(
+            verify_aig_matches_strategy_function(&aig, &source, budget()),
+            Err(StrategyAigError::DependencyScopeMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn xor_function_uses_complemented_edges_and_checks_all_rows() {
         let source = function(&[0, 1], &[false, true, true, false]);
         let aig = compile_strategy_function_to_aig(&source, budget()).unwrap();
@@ -830,8 +858,7 @@ mod tests {
         };
         assert!(matches!(
             validate_strategy_aig(&aig, budget()),
-            Err(StrategyAigError::ConstantAndInputNotReduced { .. })
-                | Err(StrategyAigError::ChildNodeOutOfRange { .. })
+            Err(StrategyAigError::NonTopologicalEdge { .. })
         ));
     }
 }
