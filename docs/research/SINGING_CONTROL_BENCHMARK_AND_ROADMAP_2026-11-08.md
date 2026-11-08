@@ -34,7 +34,7 @@ The source object should preserve:
 - syllable-to-note intervals, phrase ranges and melisma nucleus identity;
 - backend capability manifest and exact renderer/model/voicebank revisions.
 
-The tools/pronunciation-plan crate is the first research implementation of the pronunciation and score-alignment portion. Its validation requires every non-whitespace source character to be covered by a lexical span, every selected word to have a receipt, and every sung note interval to be assigned exactly once. Its beat-domain score carries tempo changes explicitly and converts to seconds only at the renderer boundary.
+The tools/pronunciation-plan crate is the first implementation of the pronunciation and score-alignment portion. Its validation requires every non-whitespace source character to be covered by a lexical span, every selected word to have a receipt, and every sung note interval to be assigned exactly once. Its beat-domain score carries tempo changes explicitly and converts to seconds only at the renderer boundary. The root formant-vocoder backend now has opt-in resolved-plan and beat-domain render methods that consume this selected pronunciation/alignment contract without rerunning Muse G2P. This is an initial source-filter adapter, not a general or neural score-conditioned singer.
 
 ### 2. From one pronunciation string to a contextual pronunciation lattice
 
@@ -55,7 +55,9 @@ The research crate tests these cases, including tempo changes within events, exp
 “Kokoro”, “DiffSinger” and “formant” do not imply equivalent musical control. Every backend must declare whether each control is native, approximated, conditional or unsupported, with a rationale. A missing declaration is unsupported by default.
 
 Current engineering direction:
-- **Formant-vocoder:** deterministic score-conditioned baseline; current Muse G2P must exactly match the frozen phone sequence. It now consumes per-syllable log-frequency portamento, vibrato onset/rate/depth, note pitch, approximate duration, phrase expression and explicit timing. It is not a neural singer and does not yet provide personalized voice identity or a full breath-tract model.
+- **Formant-vocoder v2 path:** deterministic compatibility baseline; current Muse G2P must exactly match the frozen phone sequence. It consumes per-syllable log-frequency portamento, vibrato onset/rate/depth, note pitch, approximate duration, phrase expression and explicit timing.
+- **Formant-vocoder resolved-plan path:** opt-in renderer method consumes a selected PronunciationPlan plus VocalScoreAlignment or BeatDomainScore. It does not rerun G2P, validates exact score interval coverage, preserves explicit rests, subdivides long notes across syllables and sustains a designated vowel across melisma. It uses a strict allowlist of the existing formant table, fixed consonant/nucleus timing heuristics and 200 Hz frame grid. It currently does not synthesize breath events, continuous pitch/expression controls or identity conditioning. It is a new build/test integration path, not a validated quality result.
+- Neither formant path is a neural singer, personalized identity system, full physiological tract solver, or production winner on naturalness.
 - **Kokoro singing:** uses a natural speech voice source and retimes/retunes syllable and vowel material; coarticulation and speech naturalness are useful, but many fine controls remain approximations or unsupported. It should not be described as a singing-native model.
 - **DiffSinger:** local ONNX worker accepts explicit phones and score events and uses a licensed local voicebank. It still does not consume every performance control; arbitrary continuous F0 curves, phrase curves, tension, breathiness, energy and localized edits remain unsupported or approximated.
 - **Research-only physical tract:** do not present an unintegrated waveguide/gesture prototype as a selectable production backend.
@@ -66,7 +68,7 @@ A renderer should emit audio plus an evidence receipt. An independent analyzer s
 
 The analyzer must compare against the frozen performance plan, not rerun a different frontend and silently change the target. Human ratings then assess naturalness, intelligibility, expressiveness, identity consistency and control fidelity. The score, renderer, analyzer and listener bundle should all identify the same input revision and artifact digests.
 
-The current singing_quality module measures pitch, voiced/unvoiced errors, onset, duration, clicks, clipping, DC and cleanliness. Its target-pitch calculation now delegates to the shared performance contract so vibrato and portamento are not evaluated against a stale or different curve.
+The current singing_quality module measures pitch, voiced/unvoiced errors, onset, duration, clicks, clipping, DC and cleanliness. Its target-pitch calculation now delegates to the shared performance contract so vibrato and portamento are not evaluated against a stale or different curve. The resolved-plan renderer uses a selected candidate/score graph directly, so its future evaluation must use that same plan as ground truth rather than the v2 legacy G2P target.
 
 ### 6. From global regeneration to local, bounded edits
 
