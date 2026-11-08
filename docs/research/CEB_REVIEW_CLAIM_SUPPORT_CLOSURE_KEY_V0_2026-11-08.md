@@ -70,7 +70,7 @@ Do not claim the signature never existed. Do not continue treating it as current
 
 ## 8. CCL-S07 — circular authorization support
 
-**C1 and C2 dispositions:** both are **unresolved**. The submitted support graph is a two-node cycle with no independent evidence root. The existence of the two claims does not independently support either claim. The metadata-only display-label correction has no bearing on the cycle and does not complete the closure.
+**Expected disposition:** unresolved for both C1 and C2. The submitted support graph is a two-node cycle with no independent evidence root. The existence of the two claims does not independently support either claim. The metadata-only display-label correction has no bearing on the cycle and does not complete the closure.
 
 **Required break in the cycle:** obtain an independently authoritative policy revision/registry record, trust-root verification or authorization statement whose provenance does not depend on C1 or C2. Then reassess each proposition against its own scope. Do not use the candidate's repeated assertion or a second copy of the same record as independent evidence.
 
