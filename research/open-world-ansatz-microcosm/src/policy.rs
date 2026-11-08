@@ -290,8 +290,28 @@ mod tests {
         assert!(score_a2.decision_correct);
         assert!(score_a0.evidence_references_valid);
         assert!(score_a2.evidence_references_valid);
+        assert!(score_a0.generating_model_in_version_space);
+        assert!(score_a2.generating_model_in_version_space);
         assert!(score_a0.probe_count <= 12);
         assert!(score_a2.probe_count <= 12);
+    }
+
+    #[test]
+    fn boolean_baseline_discovers_hidden_lag_and_preserves_generator_model() {
+        let mut episode = BlindEpisode::new_boolean(
+            "baseline-boolean-a2",
+            crate::Mechanism::HiddenLag,
+            crate::MeasurementMap::Identity,
+            Some(false),
+            StructureAccess::BooleanWithheld,
+            6,
+        ).unwrap();
+        run_to_submission(&mut episode, 6).unwrap();
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.decision_correct);
+        assert!(score.generating_model_in_version_space);
+        assert!(score.evidence_references_valid);
     }
 
     #[test]
@@ -313,6 +333,7 @@ mod tests {
         let score = episode.evaluate_after_submission().unwrap();
         assert!(score.set_score.exact_version_space_match);
         assert!(score.decision_correct);
+        assert!(score.generating_model_in_version_space);
     }
 
     #[test]
