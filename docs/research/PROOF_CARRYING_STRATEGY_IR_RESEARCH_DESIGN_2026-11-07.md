@@ -521,3 +521,41 @@ This deliberately separates three claims:
 The current proof is a tree, not a DAG. A DAG is a future optimization only after a cache key captures the complete residual formula, assigned-prefix context and rule obligations. Naive structural hash-consing can merge the same-looking subproof under different contexts and is not acceptable.
 
 For proof-system comparisons, include QBFcert/DepQBF syntactic QRP proof checking and extraction where available, CAQE partial QDIMACS outputs as a partial-assignment interface (never assumed complete), and the SAT 2026 synthesis proof system as a theoretical target for intermediate game values and extracted strategies. Keep #QBF counting separate from all these decision/strategy-evaluation claims.
+
+
+## 21. Algebraic hypergraph ordering and workload-aware representation portfolios
+
+The ROBDD ordering system should no longer rely on a single pairwise graph. It has three complementary structural signals:
+- GF(2) mixed derivatives;
+- arithmetic weighted mixed finite differences;
+- exact ANF monomial supports obtained from the Boolean Möbius transform.
+
+The ANF support hypergraph preserves higher-order monomials. It contributes deterministic min-fill and reverse seed orders to the same bounded multi-start ordering budget. All hypergraph vertices are local positions in the validated function dependency scope. These graph/hypergraph signals are heuristics only; the semantic support reduction and prefix-legal dependency list remain authoritative.
+
+An exhaustive three-input function corpus checks ANF reconstruction, support reduction and ROBDD equivalence. This is a finite correctness base, not evidence that an ANF hypergraph heuristic beats SOTA at larger scale. A promotion experiment needs held-out generated functions and QBF strategies, exact order oracles on small scopes, and a full ablation of natural/reverse, GF(2), arithmetic, frontier and ANF starts.
+
+### Representation portfolio is multi-objective
+
+A verified strategy function is compiled into both a canonical ROBDD and a canonical AIG. The portfolio records:
+- encoded byte size;
+- internal decision/gate nodes;
+- logic depth;
+- worst-case evaluation work (the ROBDD follows one decision path; the current AIG evaluator traverses its complete straight-line node list);
+- a deterministic structural estimate of independent verification work.
+
+The nondominated set is preserved. The default chooses the smallest byte-size candidate within that frontier, but the API exposes both candidates for workload-specific storage/latency/checker decisions. The estimate is not wall-clock timing, and no target-hardware performance claim should be based on it.
+
+Next, benchmark each candidate on the same pinned CPU and memory envelope:
+1. compile time and peak memory;
+2. cold and warm evaluation latency across the full strategy input distribution;
+3. checker time/memory over all assignments (bounded finite scope) and on larger external proof-check workloads;
+4. encoded size and transfer size;
+5. energy if a stable hardware measurement is available.
+
+### The fair QBF baseline rule
+
+QBFGallery's documented 2026 command-line protocol returns exit 10 for TRUE and 20 for FALSE. This does not guarantee a complete winning function family or proof certificate. Compare decision-only CAQE/DepQBF/Qute runs separately from proof-logging and strategy-extraction modes. CAQE partial-assignment output must not be treated as a complete strategy without scope/completeness and source-matrix checks.
+
+The 2026 Gallery's PCNF, crafted, random, 2QBF, prenex non-CNF and DQBF tracks are distinct. DQBF cannot be collapsed into the prenex dependency validator. The 2023 results can serve as a historical, track-specific calibration point, but current 2026 numerical SOTA must wait until the exact public benchmark and score artifacts are pinned.
+
+The long-term scientific breakthrough remains proof-derived synthesis: the SAT 2026 synthesis proof system proposes extracting Skolem/Herbrand functions and intermediate game values in polynomial time from proofs in that system. The finite recursive engine is the oracle for small cases; the research workstream must study and implement an exact published rule subset, then compare proof-derived extraction against the finite oracle without letting the proof producer certify itself.
