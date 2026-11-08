@@ -29,8 +29,18 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     commit = source.get("commit")
     if not isinstance(commit, str) or len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
         raise fail("source commit must be a lowercase 40-character Git SHA")
-    if manifest.get("status", {}).get("integration") != "not_integrated":
+    status = manifest.get("status")
+    if not isinstance(status, dict):
+        raise fail("status must be an object")
+    if status.get("integration") != "not_integrated":
         raise fail("resource audit must not imply production integration")
+    for field in (
+        "model_training_rights",
+        "speech_synthesis_rights",
+        "singing_synthesis_rights",
+    ):
+        if status.get(field) != "not_assessed_and_not_inferred":
+            raise fail(f"{field} must remain explicitly unassessed and not inferred")
 
     entries = manifest.get("files")
     if not isinstance(entries, list) or not entries:
@@ -73,15 +83,29 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if profile.get("license") in (None, "", "unknown", "NOASSERTION"):
             raise fail(f"{profile_id}: license is not explicit")
         resources = profile.get("resource_files")
-        if not isinstance(resources, list) or not resources or len(set(resources)) != len(resources):
-            raise fail(f"{profile_id}: resource_files must be a non-empty unique list")
+        if (
+            not isinstance(resources, list)
+            or not resources
+            or any(not isinstance(resource, str) or not resource for resource in resources)
+            or len(set(resources)) != len(resources)
+        ):
+            raise fail(f"{profile_id}: resource_files must be a non-empty unique string list")
         unknown = sorted(set(resources) - seen)
         if unknown:
             raise fail(f"{profile_id}: untracked resources: {unknown}")
-        if not profile.get("rights_notes") or not isinstance(profile.get("capabilities"), dict):
+        rights_notes = profile.get("rights_notes")
+        capabilities = profile.get("capabilities")
+        if (
+            not isinstance(rights_notes, list)
+            or not rights_notes
+            or any(not isinstance(note, str) or not note.strip() for note in rights_notes)
+            or not isinstance(capabilities, dict)
+        ):
             raise fail(f"{profile_id}: rights notes and capabilities are required")
-        if not profile.get("qualification"):
-            raise fail(f"{profile_id}: qualification status is required")
+        if profile.get("qualification") != "research_only_not_integrated_not_singing_qualified":
+            raise fail(f"{profile_id}: qualification must remain research-only and not singing-qualified")
+        if capabilities.get("singing_synthesis") is not False:
+            raise fail(f"{profile_id}: source profile cannot claim singing synthesis qualification")
 
 
 def audit(root: Path, manifest: dict[str, Any], expected_commit: str) -> dict[str, Any]:
