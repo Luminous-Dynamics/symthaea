@@ -755,6 +755,90 @@ mod tests {
     }
 
     #[test]
+    fn independent_evaluator_detects_an_incomplete_claimed_version_space() {
+        let mut episode = BlindEpisode::new_boolean(
+            "blind-independent-oracle-01",
+            Mechanism::Direct,
+            MeasurementMap::Identity,
+            None,
+            StructureAccess::BooleanWithheld,
+            2,
+        ).unwrap();
+        episode.apply(AgentAction::Probe {
+            intervention: AgentIntervention::Boolean(true),
+        }).unwrap();
+        let log = ObservationLog {
+            interventions: vec![true],
+            measurements: vec![true],
+        };
+        let mut compatible = crate::discover(&log, crate::StructureAccess::Withheld)
+            .unwrap()
+            .compatible_hypotheses;
+        assert!(compatible.len() > 1);
+        compatible.pop();
+        let count = compatible.len();
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Boolean {
+                compatible_models: compatible,
+                disposition: claim_disposition(count),
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec!["E0001".to_string()],
+            rationale: "Deliberately incomplete set for evaluator negative control.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(!score.set_score.exact_version_space_match);
+        assert_eq!(score.set_score.claimed_model_count + 1, score.set_score.oracle_model_count);
+        assert_eq!(score.set_score.correct_model_count, score.set_score.claimed_model_count);
+    }
+
+    #[test]
+    fn independent_evaluator_detects_an_allowed_but_incompatible_model() {
+        let mut episode = BlindEpisode::new_numeric(
+            "blind-independent-oracle-02",
+            direct_numeric_truth(),
+            StructureAccess::NumericWithheld,
+            2,
+        ).unwrap();
+        episode.apply(AgentAction::Probe {
+            intervention: AgentIntervention::Numeric(1),
+        }).unwrap();
+        let mut compatible = numeric::candidate_models(numeric::StructureAccess::Withheld)
+            .into_iter()
+            .filter(|model| {
+                model.mechanism == numeric::Mechanism::DirectResponse
+                    && model.gain == 2
+                    && model.sensor == numeric::SensorMap::Identity
+            })
+            .collect::<Vec<_>>();
+        assert!(!compatible.is_empty());
+        compatible.push(numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 1,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::Identity,
+        });
+        let count = compatible.len();
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                compatible_models: compatible,
+                disposition: claim_disposition(count),
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: vec!["E0001".to_string()],
+            rationale: "Deliberately contaminated set for evaluator negative control.".to_string(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        let score = episode.evaluate_after_submission().unwrap();
+        assert!(!score.set_score.exact_version_space_match);
+        assert!(score.set_score.correct_model_count < score.set_score.claimed_model_count);
+    }
+
+    #[test]
     fn public_view_does_not_serialize_boolean_world_truth() {
         let episode = BlindEpisode::new_boolean(
             "blind-boolean-01",
