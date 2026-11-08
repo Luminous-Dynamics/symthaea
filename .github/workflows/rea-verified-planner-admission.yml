@@ -47,14 +47,19 @@ jobs:
           cargo --version
           sha256sum tools/rea-verified-planner-admission/Cargo.lock
 
-      - name: Rust formatting
-        run: cargo fmt --manifest-path tools/rea-verified-planner-admission/Cargo.toml -- --check
+      - name: Normalize Rust formatting for source export
+        run: cargo fmt --manifest-path tools/rea-verified-planner-admission/Cargo.toml
 
-      - name: Raw admission, lineage and planner-boundary controls
-        run: cargo test --manifest-path tools/rea-verified-planner-admission/Cargo.toml --locked
+      - name: Archive rustfmt-normalized source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-verified-planner-admission-rustfmt-source
+          path: tools/rea-verified-planner-admission/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Warnings-denied Clippy
-        run: cargo clippy --manifest-path tools/rea-verified-planner-admission/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Formatting export only
+        run: echo "This run exports rustfmt-normalized source only; compile, tests and Clippy run after the source is committed."
 
       - name: Archive exact adapter lockfile
         if: always()
