@@ -5,7 +5,7 @@
 //! an OS sandbox: run the agent in a separate process and never give it the
 //! evaluator handle or evaluator score before submission.
 
-use crate::{HiddenWorld, Hypothesis, Mechanism, MeasurementMap, ObservationLog};
+use crate::{HiddenWorld, Hypothesis, MeasurementMap, Mechanism, ObservationLog};
 use crate::{interaction, numeric};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -211,7 +211,9 @@ impl BlindEpisode {
         match access {
             StructureAccess::BooleanWithheld => {}
             StructureAccess::BooleanSupplied(supplied) if supplied == mechanism => {}
-            StructureAccess::BooleanSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
+            StructureAccess::BooleanSupplied(_) => {
+                return Err(ProtocolError::SuppliedStructureMismatch);
+            }
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
         let truth = Hypothesis::new(mechanism, measurement_map, initial_hidden_state)
@@ -240,7 +242,9 @@ impl BlindEpisode {
         match access {
             StructureAccess::NumericWithheld => {}
             StructureAccess::NumericSupplied(supplied) if supplied == truth.mechanism => {}
-            StructureAccess::NumericSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
+            StructureAccess::NumericSupplied(_) => {
+                return Err(ProtocolError::SuppliedStructureMismatch);
+            }
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
         let world = numeric::NumericWorld::new(truth)
@@ -267,7 +271,9 @@ impl BlindEpisode {
         match access {
             StructureAccess::InteractionWithheld => {}
             StructureAccess::InteractionSupplied(supplied) if supplied == truth.structure => {}
-            StructureAccess::InteractionSupplied(_) => return Err(ProtocolError::SuppliedStructureMismatch),
+            StructureAccess::InteractionSupplied(_) => {
+                return Err(ProtocolError::SuppliedStructureMismatch);
+            }
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
         let world = interaction::InteractionWorld::new(truth)
@@ -321,7 +327,10 @@ impl BlindEpisode {
         let bytes = serde_json::to_vec(&(&self.manifest, &self.observations))
             .map_err(|error| ProtocolError::SerializationFailure(error.to_string()))?;
         let digest = Sha256::digest(bytes);
-        let hex = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        let hex = digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
         Ok(AgentView {
             task: self.manifest.clone(),
             observations: self.observations.clone(),
@@ -420,28 +429,84 @@ impl BlindEpisode {
         }
 
         match (&submission.claim, self.manifest.structure_access) {
-            (AgentClaim::Boolean { compatible_models, disposition }, StructureAccess::BooleanWithheld) => {
-                validate_models(compatible_models, &reference_boolean_candidates(crate::StructureAccess::Withheld)?)?;
+            (
+                AgentClaim::Boolean {
+                    compatible_models,
+                    disposition,
+                },
+                StructureAccess::BooleanWithheld,
+            ) => {
+                validate_models(
+                    compatible_models,
+                    &reference_boolean_candidates(crate::StructureAccess::Withheld)?,
+                )?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
-            (AgentClaim::Boolean { compatible_models, disposition }, StructureAccess::BooleanSupplied(mechanism)) => {
-                validate_models(compatible_models, &reference_boolean_candidates(crate::StructureAccess::Supplied(mechanism))?)?;
+            (
+                AgentClaim::Boolean {
+                    compatible_models,
+                    disposition,
+                },
+                StructureAccess::BooleanSupplied(mechanism),
+            ) => {
+                validate_models(
+                    compatible_models,
+                    &reference_boolean_candidates(crate::StructureAccess::Supplied(mechanism))?,
+                )?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
-            (AgentClaim::Numeric { compatible_models, disposition }, StructureAccess::NumericWithheld) => {
-                validate_models(compatible_models, &reference_numeric_candidates(numeric::StructureAccess::Withheld))?;
+            (
+                AgentClaim::Numeric {
+                    compatible_models,
+                    disposition,
+                },
+                StructureAccess::NumericWithheld,
+            ) => {
+                validate_models(
+                    compatible_models,
+                    &reference_numeric_candidates(numeric::StructureAccess::Withheld),
+                )?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
-            (AgentClaim::Numeric { compatible_models, disposition }, StructureAccess::NumericSupplied(mechanism)) => {
-                validate_models(compatible_models, &reference_numeric_candidates(numeric::StructureAccess::Supplied(mechanism)))?;
+            (
+                AgentClaim::Numeric {
+                    compatible_models,
+                    disposition,
+                },
+                StructureAccess::NumericSupplied(mechanism),
+            ) => {
+                validate_models(
+                    compatible_models,
+                    &reference_numeric_candidates(numeric::StructureAccess::Supplied(mechanism)),
+                )?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
-            (AgentClaim::Interaction { compatible_models, disposition }, StructureAccess::InteractionWithheld) => {
-                validate_models(compatible_models, &reference_interaction_candidates(interaction::StructureAccess::Withheld))?;
+            (
+                AgentClaim::Interaction {
+                    compatible_models,
+                    disposition,
+                },
+                StructureAccess::InteractionWithheld,
+            ) => {
+                validate_models(
+                    compatible_models,
+                    &reference_interaction_candidates(interaction::StructureAccess::Withheld),
+                )?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
-            (AgentClaim::Interaction { compatible_models, disposition }, StructureAccess::InteractionSupplied(structure)) => {
-                validate_models(compatible_models, &reference_interaction_candidates(interaction::StructureAccess::Supplied(structure)))?;
+            (
+                AgentClaim::Interaction {
+                    compatible_models,
+                    disposition,
+                },
+                StructureAccess::InteractionSupplied(structure),
+            ) => {
+                validate_models(
+                    compatible_models,
+                    &reference_interaction_candidates(interaction::StructureAccess::Supplied(
+                        structure,
+                    )),
+                )?;
                 validate_disposition(compatible_models.len(), *disposition)
             }
             _ => Err(ProtocolError::ClaimFamilyMismatch),
@@ -451,7 +516,10 @@ impl BlindEpisode {
     /// Evaluator-only: call after submission, inside the trusted runner process.
     /// Returns aggregate scores, not the oracle's hidden model set.
     pub fn evaluate_after_submission(&self) -> Result<EvaluatorScore, ProtocolError> {
-        let submission = self.submission.as_ref().ok_or(ProtocolError::NotSubmitted)?;
+        let submission = self
+            .submission
+            .as_ref()
+            .ok_or(ProtocolError::NotSubmitted)?;
         let evidence_references_valid = {
             let known: BTreeSet<&str> = self
                 .observations
@@ -467,77 +535,154 @@ impl BlindEpisode {
 
         let (set_score, disposition, generating_model_in_version_space) =
             match (&self.world, &self.generating_truth, &submission.claim) {
-            (WorldState::Boolean(_), GeneratingTruth::Boolean(truth), AgentClaim::Boolean { compatible_models, disposition }) => {
-                let log = ObservationLog {
-                    interventions: self.observations.iter().map(|record| record.intervention).map(|intervention| match intervention {
-                        AgentIntervention::Boolean(value) => value,
-                        _ => unreachable!("action family is checked before a record is appended"),
-                    }).collect(),
-                    measurements: self.observations.iter().map(|record| record.measurement).map(|measurement| match measurement {
-                        AgentMeasurement::Boolean(value) => value,
-                        _ => unreachable!("measurement family follows the world family"),
-                    }).collect(),
-                };
-                let model_access = match self.manifest.structure_access {
-                    StructureAccess::BooleanWithheld => crate::StructureAccess::Withheld,
-                    StructureAccess::BooleanSupplied(mechanism) => crate::StructureAccess::Supplied(mechanism),
-                    _ => return Err(ProtocolError::ClaimFamilyMismatch),
-                };
-                let oracle_models = reference_boolean_version_space(&log, model_access)?;
-                let truth_present = oracle_models.contains(truth);
-                if !truth_present {
-                    return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                (
+                    WorldState::Boolean(_),
+                    GeneratingTruth::Boolean(truth),
+                    AgentClaim::Boolean {
+                        compatible_models,
+                        disposition,
+                    },
+                ) => {
+                    let log = ObservationLog {
+                        interventions: self
+                            .observations
+                            .iter()
+                            .map(|record| record.intervention)
+                            .map(|intervention| match intervention {
+                                AgentIntervention::Boolean(value) => value,
+                                _ => unreachable!(
+                                    "action family is checked before a record is appended"
+                                ),
+                            })
+                            .collect(),
+                        measurements: self
+                            .observations
+                            .iter()
+                            .map(|record| record.measurement)
+                            .map(|measurement| match measurement {
+                                AgentMeasurement::Boolean(value) => value,
+                                _ => unreachable!("measurement family follows the world family"),
+                            })
+                            .collect(),
+                    };
+                    let model_access = match self.manifest.structure_access {
+                        StructureAccess::BooleanWithheld => crate::StructureAccess::Withheld,
+                        StructureAccess::BooleanSupplied(mechanism) => {
+                            crate::StructureAccess::Supplied(mechanism)
+                        }
+                        _ => return Err(ProtocolError::ClaimFamilyMismatch),
+                    };
+                    let oracle_models = reference_boolean_version_space(&log, model_access)?;
+                    let truth_present = oracle_models.contains(truth);
+                    if !truth_present {
+                        return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                    }
+                    (
+                        compare_model_sets(compatible_models, &oracle_models)?,
+                        *disposition,
+                        truth_present,
+                    )
                 }
-                (compare_model_sets(compatible_models, &oracle_models)?, *disposition, truth_present)
-            }
-            (WorldState::Numeric(_), GeneratingTruth::Numeric(truth), AgentClaim::Numeric { compatible_models, disposition }) => {
-                let log = numeric::ObservationLog {
-                    interventions: self.observations.iter().map(|record| record.intervention).map(|intervention| match intervention {
-                        AgentIntervention::Numeric(value) => value,
-                        _ => unreachable!("action family is checked before a record is appended"),
-                    }).collect(),
-                    measurements: self.observations.iter().map(|record| record.measurement).map(|measurement| match measurement {
-                        AgentMeasurement::Numeric(value) => value,
-                        _ => unreachable!("measurement family follows the world family"),
-                    }).collect(),
-                };
-                let access = match self.manifest.structure_access {
-                    StructureAccess::NumericWithheld => numeric::StructureAccess::Withheld,
-                    StructureAccess::NumericSupplied(mechanism) => numeric::StructureAccess::Supplied(mechanism),
-                    _ => return Err(ProtocolError::ClaimFamilyMismatch),
-                };
-                let oracle_models = reference_numeric_version_space(&log, access);
-                let truth_present = oracle_models.contains(truth);
-                if !truth_present {
-                    return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                (
+                    WorldState::Numeric(_),
+                    GeneratingTruth::Numeric(truth),
+                    AgentClaim::Numeric {
+                        compatible_models,
+                        disposition,
+                    },
+                ) => {
+                    let log = numeric::ObservationLog {
+                        interventions: self
+                            .observations
+                            .iter()
+                            .map(|record| record.intervention)
+                            .map(|intervention| match intervention {
+                                AgentIntervention::Numeric(value) => value,
+                                _ => unreachable!(
+                                    "action family is checked before a record is appended"
+                                ),
+                            })
+                            .collect(),
+                        measurements: self
+                            .observations
+                            .iter()
+                            .map(|record| record.measurement)
+                            .map(|measurement| match measurement {
+                                AgentMeasurement::Numeric(value) => value,
+                                _ => unreachable!("measurement family follows the world family"),
+                            })
+                            .collect(),
+                    };
+                    let access = match self.manifest.structure_access {
+                        StructureAccess::NumericWithheld => numeric::StructureAccess::Withheld,
+                        StructureAccess::NumericSupplied(mechanism) => {
+                            numeric::StructureAccess::Supplied(mechanism)
+                        }
+                        _ => return Err(ProtocolError::ClaimFamilyMismatch),
+                    };
+                    let oracle_models = reference_numeric_version_space(&log, access);
+                    let truth_present = oracle_models.contains(truth);
+                    if !truth_present {
+                        return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                    }
+                    (
+                        compare_model_sets(compatible_models, &oracle_models)?,
+                        *disposition,
+                        truth_present,
+                    )
                 }
-                (compare_model_sets(compatible_models, &oracle_models)?, *disposition, truth_present)
-            }
-            (WorldState::Interaction(_), GeneratingTruth::Interaction(truth), AgentClaim::Interaction { compatible_models, disposition }) => {
-                let log = interaction::ObservationLog {
-                    interventions: self.observations.iter().map(|record| record.intervention).map(|intervention| match intervention {
-                        AgentIntervention::Pair(value) => value,
-                        _ => unreachable!("action family is checked before a record is appended"),
-                    }).collect(),
-                    measurements: self.observations.iter().map(|record| record.measurement).map(|measurement| match measurement {
-                        AgentMeasurement::Numeric(value) => value,
-                        _ => unreachable!("measurement family follows the world family"),
-                    }).collect(),
-                };
-                let access = match self.manifest.structure_access {
-                    StructureAccess::InteractionWithheld => interaction::StructureAccess::Withheld,
-                    StructureAccess::InteractionSupplied(structure) => interaction::StructureAccess::Supplied(structure),
-                    _ => return Err(ProtocolError::ClaimFamilyMismatch),
-                };
-                let oracle_models = reference_interaction_version_space(&log, access);
-                let truth_present = oracle_models.contains(truth);
-                if !truth_present {
-                    return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                (
+                    WorldState::Interaction(_),
+                    GeneratingTruth::Interaction(truth),
+                    AgentClaim::Interaction {
+                        compatible_models,
+                        disposition,
+                    },
+                ) => {
+                    let log = interaction::ObservationLog {
+                        interventions: self
+                            .observations
+                            .iter()
+                            .map(|record| record.intervention)
+                            .map(|intervention| match intervention {
+                                AgentIntervention::Pair(value) => value,
+                                _ => unreachable!(
+                                    "action family is checked before a record is appended"
+                                ),
+                            })
+                            .collect(),
+                        measurements: self
+                            .observations
+                            .iter()
+                            .map(|record| record.measurement)
+                            .map(|measurement| match measurement {
+                                AgentMeasurement::Numeric(value) => value,
+                                _ => unreachable!("measurement family follows the world family"),
+                            })
+                            .collect(),
+                    };
+                    let access = match self.manifest.structure_access {
+                        StructureAccess::InteractionWithheld => {
+                            interaction::StructureAccess::Withheld
+                        }
+                        StructureAccess::InteractionSupplied(structure) => {
+                            interaction::StructureAccess::Supplied(structure)
+                        }
+                        _ => return Err(ProtocolError::ClaimFamilyMismatch),
+                    };
+                    let oracle_models = reference_interaction_version_space(&log, access);
+                    let truth_present = oracle_models.contains(truth);
+                    if !truth_present {
+                        return Err(ProtocolError::GeneratingTruthMissingFromOracle);
+                    }
+                    (
+                        compare_model_sets(compatible_models, &oracle_models)?,
+                        *disposition,
+                        truth_present,
+                    )
                 }
-                (compare_model_sets(compatible_models, &oracle_models)?, *disposition, truth_present)
-            }
-            _ => return Err(ProtocolError::ClaimFamilyMismatch),
-        };
+                _ => return Err(ProtocolError::ClaimFamilyMismatch),
+            };
 
         let expected = match set_score.oracle_model_count {
             0 => ClaimDisposition::NoCompatibleModel,
@@ -598,9 +743,7 @@ fn reference_boolean_candidates(
     Ok(models)
 }
 
-fn reference_numeric_candidates(
-    access: numeric::StructureAccess,
-) -> Vec<numeric::ModelHypothesis> {
+fn reference_numeric_candidates(access: numeric::StructureAccess) -> Vec<numeric::ModelHypothesis> {
     let mechanisms = match access {
         numeric::StructureAccess::Withheld => vec![
             numeric::Mechanism::DirectResponse,
@@ -619,15 +762,13 @@ fn reference_numeric_candidates(
         for gain in [1_i64, 2, 3] {
             for sensor in sensors {
                 match mechanism {
-                    numeric::Mechanism::DirectResponse => models.push(
-                        numeric::ModelHypothesis {
-                            mechanism,
-                            gain,
-                            decay: None,
-                            initial_state: None,
-                            sensor,
-                        },
-                    ),
+                    numeric::Mechanism::DirectResponse => models.push(numeric::ModelHypothesis {
+                        mechanism,
+                        gain,
+                        decay: None,
+                        initial_state: None,
+                        sensor,
+                    }),
                     numeric::Mechanism::LeakyMemory => {
                         for decay in [0_i64, 1, 2] {
                             for initial_state in [-1_i64, 0, 1] {
@@ -802,7 +943,12 @@ fn reference_numeric_version_space(
                 };
                 let next = state
                     .and_then(|value| decay.checked_mul(value))
-                    .and_then(|value| model.gain.checked_mul(input).and_then(|drive| value.checked_add(drive)));
+                    .and_then(|value| {
+                        model
+                            .gain
+                            .checked_mul(input)
+                            .and_then(|drive| value.checked_add(drive))
+                    });
                 if next.is_none() {
                     matches = false;
                     break;
@@ -827,24 +973,21 @@ fn reference_interaction_version_space(
         let mut matches = true;
         for (input, &observed) in log.interventions.iter().zip(&log.measurements) {
             let [u, v] = *input;
-            let response = model
-                .weight_u
-                .checked_mul(u)
-                .and_then(|u_term| {
-                    model.weight_v.checked_mul(v).and_then(|v_term| {
-                        model
-                            .interaction_weight
-                            .checked_mul(u)
-                            .and_then(|term| term.checked_mul(v))
-                            .and_then(|interaction_term| {
-                                model
-                                    .bias
-                                    .checked_add(u_term)
-                                    .and_then(|value| value.checked_add(v_term))
-                                    .and_then(|value| value.checked_add(interaction_term))
-                            })
-                    })
-                });
+            let response = model.weight_u.checked_mul(u).and_then(|u_term| {
+                model.weight_v.checked_mul(v).and_then(|v_term| {
+                    model
+                        .interaction_weight
+                        .checked_mul(u)
+                        .and_then(|term| term.checked_mul(v))
+                        .and_then(|interaction_term| {
+                            model
+                                .bias
+                                .checked_add(u_term)
+                                .and_then(|value| value.checked_add(v_term))
+                                .and_then(|value| value.checked_add(interaction_term))
+                        })
+                })
+            });
             if response != Some(observed) {
                 matches = false;
                 break;
@@ -973,13 +1116,12 @@ mod tests {
                 truth.mechanism,
                 truth.measurement_map,
                 truth.initial_hidden_state,
-            ).unwrap();
+            )
+            .unwrap();
             let log = world.run(&inputs);
             let inferred = crate::discover(&log, crate::StructureAccess::Withheld).unwrap();
-            let evaluated = reference_boolean_version_space(
-                &log,
-                crate::StructureAccess::Withheld,
-            ).unwrap();
+            let evaluated =
+                reference_boolean_version_space(&log, crate::StructureAccess::Withheld).unwrap();
             assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_hypotheses, evaluated, "truth={truth:?}");
         }
@@ -992,10 +1134,8 @@ mod tests {
             let mut world = numeric::NumericWorld::new(truth).unwrap();
             let log = world.run(&inputs).unwrap();
             let inferred = numeric::discover(&log, numeric::StructureAccess::Withheld).unwrap();
-            let evaluated = reference_numeric_version_space(
-                &log,
-                numeric::StructureAccess::Withheld,
-            );
+            let evaluated =
+                reference_numeric_version_space(&log, numeric::StructureAccess::Withheld);
             assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_models, evaluated, "truth={truth:?}");
         }
@@ -1006,14 +1146,10 @@ mod tests {
         for truth in interaction::candidate_models(interaction::StructureAccess::Withheld) {
             let world = interaction::InteractionWorld::new(truth).unwrap();
             let log = world.run(&interaction::FACTORIAL_DESIGN).unwrap();
-            let inferred = interaction::discover(
-                &log,
-                interaction::StructureAccess::Withheld,
-            ).unwrap();
-            let evaluated = reference_interaction_version_space(
-                &log,
-                interaction::StructureAccess::Withheld,
-            );
+            let inferred =
+                interaction::discover(&log, interaction::StructureAccess::Withheld).unwrap();
+            let evaluated =
+                reference_interaction_version_space(&log, interaction::StructureAccess::Withheld);
             assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_models, evaluated, "truth={truth:?}");
         }
@@ -1028,10 +1164,13 @@ mod tests {
             None,
             StructureAccess::BooleanWithheld,
             2,
-        ).unwrap();
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Boolean(true),
-        }).unwrap();
+        )
+        .unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Boolean(true),
+            })
+            .unwrap();
         let log = ObservationLog {
             interventions: vec![true],
             measurements: vec![true],
@@ -1055,8 +1194,14 @@ mod tests {
         episode.apply(AgentAction::Submit { submission }).unwrap();
         let score = episode.evaluate_after_submission().unwrap();
         assert!(!score.set_score.exact_version_space_match);
-        assert_eq!(score.set_score.claimed_model_count + 1, score.set_score.oracle_model_count);
-        assert_eq!(score.set_score.correct_model_count, score.set_score.claimed_model_count);
+        assert_eq!(
+            score.set_score.claimed_model_count + 1,
+            score.set_score.oracle_model_count
+        );
+        assert_eq!(
+            score.set_score.correct_model_count,
+            score.set_score.claimed_model_count
+        );
     }
 
     #[test]
@@ -1066,10 +1211,13 @@ mod tests {
             direct_numeric_truth(),
             StructureAccess::NumericWithheld,
             2,
-        ).unwrap();
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Numeric(1),
-        }).unwrap();
+        )
+        .unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Numeric(1),
+            })
+            .unwrap();
         let mut compatible = numeric::candidate_models(numeric::StructureAccess::Withheld)
             .into_iter()
             .filter(|model| {
@@ -1153,9 +1301,11 @@ mod tests {
             1,
         )
         .unwrap();
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Boolean(true),
-        }).unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Boolean(true),
+            })
+            .unwrap();
         assert_eq!(
             episode.apply(AgentAction::Probe {
                 intervention: AgentIntervention::Boolean(false),
@@ -1213,9 +1363,11 @@ mod tests {
         )
         .unwrap();
         for value in [-1, 0, 1] {
-            episode.apply(AgentAction::Probe {
-                intervention: AgentIntervention::Numeric(value),
-            }).unwrap();
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Numeric(value),
+                })
+                .unwrap();
         }
 
         let log = numeric::ObservationLog {
@@ -1230,7 +1382,11 @@ mod tests {
                 disposition: claim_disposition(count),
             },
             evidence_prefix_sha256: episode.view().unwrap().evidence_prefix_sha256,
-            cited_evidence_ids: vec!["E0001".to_string(), "E0002".to_string(), "E0003".to_string()],
+            cited_evidence_ids: vec![
+                "E0001".to_string(),
+                "E0002".to_string(),
+                "E0003".to_string(),
+            ],
             rationale: "The evidence identifies a compatible version space.".to_string(),
         };
         episode.apply(AgentAction::Submit { submission }).unwrap();
@@ -1252,9 +1408,11 @@ mod tests {
             2,
         )
         .unwrap();
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Boolean(true),
-        }).unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Boolean(true),
+            })
+            .unwrap();
         let submission = AgentSubmission {
             claim: AgentClaim::Boolean {
                 compatible_models: crate::candidate_hypotheses(crate::StructureAccess::Withheld),
@@ -1285,22 +1443,33 @@ mod tests {
             truth,
             StructureAccess::InteractionWithheld,
             interaction::FACTORIAL_DESIGN.len(),
-        ).unwrap();
+        )
+        .unwrap();
         for input in interaction::FACTORIAL_DESIGN {
-            episode.apply(AgentAction::Probe {
-                intervention: AgentIntervention::Pair(input),
-            }).unwrap();
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Pair(input),
+                })
+                .unwrap();
         }
         let current = episode.view().unwrap();
         let log = interaction::ObservationLog {
-            interventions: current.observations.iter().map(|record| match record.intervention {
-                AgentIntervention::Pair(value) => value,
-                _ => unreachable!(),
-            }).collect(),
-            measurements: current.observations.iter().map(|record| match record.measurement {
-                AgentMeasurement::Numeric(value) => value,
-                _ => unreachable!(),
-            }).collect(),
+            interventions: current
+                .observations
+                .iter()
+                .map(|record| match record.intervention {
+                    AgentIntervention::Pair(value) => value,
+                    _ => unreachable!(),
+                })
+                .collect(),
+            measurements: current
+                .observations
+                .iter()
+                .map(|record| match record.measurement {
+                    AgentMeasurement::Numeric(value) => value,
+                    _ => unreachable!(),
+                })
+                .collect(),
         };
         let oracle = interaction::discover(&log, interaction::StructureAccess::Withheld).unwrap();
         let count = oracle.compatible_models.len();
@@ -1310,8 +1479,13 @@ mod tests {
                 disposition: claim_disposition(count),
             },
             evidence_prefix_sha256: current.evidence_prefix_sha256.clone(),
-            cited_evidence_ids: current.observations.iter().map(|record| record.evidence_id.clone()).collect(),
-            rationale: "The factorial design distinguishes variable relevance and interaction.".to_string(),
+            cited_evidence_ids: current
+                .observations
+                .iter()
+                .map(|record| record.evidence_id.clone())
+                .collect(),
+            rationale: "The factorial design distinguishes variable relevance and interaction."
+                .to_string(),
         };
         episode.apply(AgentAction::Submit { submission }).unwrap();
         let score = episode.evaluate_after_submission().unwrap();
@@ -1328,10 +1502,13 @@ mod tests {
             None,
             StructureAccess::BooleanWithheld,
             2,
-        ).unwrap();
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Boolean(true),
-        }).unwrap();
+        )
+        .unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Boolean(true),
+            })
+            .unwrap();
         let submission = AgentSubmission {
             claim: AgentClaim::Boolean {
                 compatible_models: crate::candidate_hypotheses(crate::StructureAccess::Withheld),
@@ -1358,7 +1535,8 @@ mod tests {
                 None,
                 StructureAccess::BooleanSupplied(Mechanism::HiddenLag),
                 2,
-            ).err(),
+            )
+            .err(),
             Some(ProtocolError::SuppliedStructureMismatch)
         );
     }
@@ -1372,11 +1550,14 @@ mod tests {
             None,
             StructureAccess::BooleanWithheld,
             2,
-        ).unwrap();
+        )
+        .unwrap();
         let before = episode.view().unwrap().evidence_prefix_sha256;
-        episode.apply(AgentAction::Probe {
-            intervention: AgentIntervention::Boolean(true),
-        }).unwrap();
+        episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Boolean(true),
+            })
+            .unwrap();
         let after = episode.view().unwrap().evidence_prefix_sha256;
         assert_ne!(before, after);
     }
