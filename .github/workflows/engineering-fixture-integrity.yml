@@ -1,0 +1,46 @@
+name: Engineering Fixture Integrity
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "benchmarks/engineering-fixture-integrity/**"
+      - ".github/workflows/engineering-fixture-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "benchmarks/engineering-fixture-integrity/**"
+      - ".github/workflows/engineering-fixture-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-binding:
+    name: Manifest binding and fail-closed negative controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Verify pure-stdlib manifest preflight
+        run: |
+          python --version
+          python -m unittest discover \
+            -s benchmarks/engineering-fixture-integrity \
+            -p 'test_manifest_binding.py' \
+            -v
+
+      - name: Compile audit and test modules
+        run: |
+          python -m py_compile \
+            benchmarks/engineering-fixture-integrity/audit_openscad_cgal_mesh.py \
+            benchmarks/engineering-fixture-integrity/test_manifest_binding.py
