@@ -473,6 +473,36 @@ mod tests {
     }
 
     #[test]
+    fn radius_two_covers_the_entire_admitted_candidate_domain() {
+        let query = ContinuousHV::from_vec(vec![1.0, -1.0, 0.5, -0.5, 0.25, -0.25, 0.75, -0.75]);
+        let reconstruction = ContinuousHV::zero(8);
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_residual(&reconstruction, 2.0)
+            .unwrap();
+        assert_eq!(interval, ContinuousHVScoreInterval::uninformative());
+    }
+
+    #[test]
+    fn coordinate_box_contains_multiple_coordinate_residuals_within_l2_radius() {
+        let query = ContinuousHV::from_vec(vec![0.9, -0.8, 0.7, -0.6, 0.5, -0.4, 0.3, -0.2, 0.1]);
+        let actual = ContinuousHV::from_vec(vec![0.91, -0.79, 0.69, -0.61, 0.51, -0.39, 0.29, -0.21, 0.11]);
+        let reconstruction = ContinuousHV::from_vec(vec![0.9, -0.8, 0.7, -0.6, 0.5, -0.4, 0.3, -0.2, 0.1]);
+        let radius = (9.0f32 * 0.0001).sqrt() + 1.0e-6;
+        let residual_sq = actual
+            .values
+            .iter()
+            .zip(&reconstruction.values)
+            .map(|(left, right)| (left - right) * (left - right))
+            .sum::<f32>();
+        assert!(residual_sq.sqrt() <= radius);
+        let interval = query
+            .similarity_interval_full_resolution_for_l2_residual(&reconstruction, radius)
+            .unwrap();
+        let score = query.similarity_full_resolution(&actual);
+        assert!(interval.contains(score));
+    }
+
+    #[test]
     fn invalid_residual_bounds_are_rejected() {
         let query = ContinuousHV::ones(8);
         let reconstruction = ContinuousHV::ones(8);
