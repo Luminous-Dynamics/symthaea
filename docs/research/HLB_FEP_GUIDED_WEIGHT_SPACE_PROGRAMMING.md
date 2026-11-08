@@ -519,6 +519,20 @@ The evaluator reports: trials to any 16-nat commitment, trials to *correct* sema
 
 Do not demand that posterior entropy decreases after every realised observation. A surprising observation can increase posterior entropy; the mutual-information identity constrains the expectation over all possible outcomes. Qualification should check finite traces and expected information accounting, not false per-sample monotonicity.
 
+### F.1 Source-fidelity boundary and remaining epistemic layer
+
+The [2026 Nature Communications three-ball paper](https://www.nature.com/articles/s41467-026-77209-5) specifies five latent factors (left, centre, right, gaze, choice), a visual and feedback likelihood, six within-trial time points, 81 candidate likelihood mappings, and a reported 79 unique rules. It uses relative log preferences `[0, 2, -6]`, normalized as a categorical preference distribution, and accumulates Dirichlet evidence before model reduction and model commitment.
+
+The current Symthaea implementation is intentionally **not an exact reproduction**:
+- `three_ball_partial_observation.rs` performs a two-step receding-horizon approximation: gaze → observe one colour → choose. It maintains a finite joint posterior over rule identity and hidden ball colours; it does not represent the full six-time-point policy tree.
+- `three_ball_sequential_discovery.rs` repeats this two-step policy over fresh hidden scenes, retaining model belief while resetting trial-specific state belief. It records deterministic paired policy arms and seed-level receipts.
+- `three_ball_rule_space.rs` reconstructs the 81 ordered hypotheses from pinned public SPM sources. Its exact feedback-tensor equivalence check finds 75 distinct tensors, whereas the paper reports 79 unique rules. This discrepancy is retained and source-bound. It is not resolved by changing the published count or silently altering the model family.
+- `dirichlet_model_reduction.rs` contains both strict structural-zero Dirichlet BMR and an explicitly SPM-compatible smoothing mode, plus prospective model information gain from action-conditioned predicted outcomes. These are separate from the finite-hypothesis two-step policy; there is no claim that the current episode runner carries the source Dirichlet posterior through every trial or reproduces the paper's model-commitment trajectory.
+
+A material correctness fix was made in the two-step policy: the source preferences are *relative* log weights, not normalized log probabilities. Before calculating pragmatic risk, the implementation now normalizes them with log-sum-exp and computes (D_{KL}(Q(o)\|C(o))). A regression test shifts all three log preferences by +13 nats and requires identical pragmatic risk, expected-free-energy scores, and selected policy. This tests the required invariance of categorical probabilities to a common additive constant.
+
+**Next research increment:** connect the action-conditioned Dirichlet predictive model and BMR into the partial-observation policy, so the agent can distinguish state information, parameter/likelihood novelty, and model-structure information without collapsing them into one entropy term. Preserve the current finite-hypothesis policy as a transparent baseline. Exact reproduction must wait until the 79-versus-75 model-space discrepancy and six-time-point planning path are reconciled.
+
 ## 6. Baselines and fairness requirements
 
 ### Temporal models
