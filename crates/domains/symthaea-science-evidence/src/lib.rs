@@ -32,6 +32,16 @@ use thiserror::Error;
 
 pub const SCIENCE_EVIDENCE_SCHEMA: &str = "symthaea-science-evidence-v2";
 
+/// Theory prediction completeness and cross-model comparability contracts.
+pub mod theory_prediction;
+
+pub use theory_prediction::{
+    ComparisonBlocker, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
+    OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictionCoverage, PredictionDisposition,
+    THEORY_PREDICTION_SCHEMA, TheoryModel, TheoryModelRole, TheoryPredictionError,
+    TheoryPredictionLedger, TheoryPredictionRecord,
+};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ClaimBoundary {
     /// Code-path or data-contract implementation check only.
