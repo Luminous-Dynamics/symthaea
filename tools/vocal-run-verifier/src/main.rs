@@ -437,7 +437,7 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
     blind_allowed.extend(audio_names.iter().map(|name| name.to_string()));
     validate_directory_layout(&blind_root, &blind_allowed, "blind")?;
 
-    let mut private_allowed = BTreeSet::from([
+    let private_allowed = BTreeSet::from([
         "run_manifest.json".to_string(),
         "private_backend_key.json".to_string(),
         "objective_report.json".to_string(),
@@ -726,7 +726,9 @@ mod tests {
         let lyrics = "hello world".to_string();
         let melody = vec![note()];
         let score_blake3 = digest(&serde_json::to_vec(&melody).unwrap());
-        let performance_blake3 = "b".repeat(64);
+        let performance_canonical_json =
+            r#"{"synthetic_fixture":true}"#.to_string();
+        let performance_blake3 = digest(performance_canonical_json.as_bytes());
         let case = CaseReceipt {
             case_id: 0,
             seed: 9001,
@@ -742,8 +744,8 @@ mod tests {
             transpose_semitones: 0.0,
             melody,
             score_blake3: score_blake3.clone(),
-            performance_canonical_json: r#"{"synthetic_fixture":true}"#.to_string(),
-            performance_blake3: digest(br#"{"synthetic_fixture":true}"#),
+            performance_canonical_json,
+            performance_blake3: performance_blake3.clone(),
         };
         let run = RunManifest {
             schema: RUN_SCHEMA.into(),
