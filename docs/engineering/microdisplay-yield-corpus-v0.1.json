@@ -1,0 +1,695 @@
+{
+  "title": "Micro-LED AR microdisplay yield-aware co-design workload corpus",
+  "corpus_id": "MICRODISP-YIELD-CORPUS-001",
+  "schema_version": "0.1.0",
+  "status": "UNQUALIFIED",
+  "created_date": "2026-10-17",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7868",
+  "case_count": 20,
+  "minimum_case_count": 20,
+  "references": [
+    {
+      "id": "microled-cmos-2026",
+      "url": "https://doi.org/10.1002/lpor.71634",
+      "title": "Micro-LED/CMOS Integration Technologies for High-Resolution AR Microdisplays: Scaling Limits, Yield, and Reliability (2026)",
+      "use": "Qualitative bottleneck map across pitch, yield, placement, interconnect, thermal and process integration"
+    },
+    {
+      "id": "microled-yield-2026",
+      "url": "https://doi.org/10.1088/2631-7990/ae25a8",
+      "title": "Assembly and integration of micro-LED displays: a review of transfer methods targeting near-perfect yield (2026)",
+      "use": "Yield, transfer strategies, defect control, redundancy and repair framing; frontier only, not an achieved target"
+    },
+    {
+      "id": "semi-inspection",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5914",
+      "title": "SEMI-EQP-MET-001A synthetic inspection benchmark constitution",
+      "use": "Reuse existing metrology/coverage/calibration semantics"
+    },
+    {
+      "id": "phot-engineering",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+      "title": "PHOT-ENG-000 photonics engineering architecture",
+      "use": "Reuse existing photonic component and model boundaries"
+    },
+    {
+      "id": "mycelix-evidence",
+      "url": "https://github.com/Luminous-Dynamics/mycelix/issues/5157",
+      "title": "Mycelix visual benchmark evidence profile",
+      "use": "Evidence class, provenance, raw artifact and replication boundaries"
+    }
+  ],
+  "evidence_lanes": {
+    "software_math": "Independent yield arithmetic and domain checks; no manufacturing result.",
+    "software_synthetic": "Deterministic simulated labels/design scenarios; no fabrication or physical inspection claim.",
+    "model_sensitivity": "Declared, uncertainty-aware models only; not physical component qualification."
+  },
+  "cases": [
+    {
+      "id": "MICLED-YIELD-ARITH-001",
+      "title": "Yield arithmetic on a declared emitter denominator",
+      "domain": "yield_arithmetic",
+      "inputs": {
+        "population_count": 100000000,
+        "per_emitter_success_probability": 0.9999,
+        "assumption": "independent Bernoulli trials"
+      },
+      "expected_behavior": "Compute expected failures from the stated denominator and failure probability; output labels must say expected count under an independence model, not a guarantee or assembled-panel yield.",
+      "metrics": [
+        "expected failures",
+        "denominator validation",
+        "assumption disclosure"
+      ],
+      "negative_controls": [
+        "zero denominator",
+        "success probability outside [0,1]",
+        "probability mislabeled as observed yield"
+      ],
+      "claim_limit": "Analytical/synthetic arithmetic only; not a fabrication result.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
+    },
+    {
+      "id": "MICLED-YIELD-ARITH-002",
+      "title": "Near-perfect yield arithmetic and frontier semantics",
+      "domain": "yield_arithmetic",
+      "inputs": {
+        "population_count": 100000000,
+        "per_emitter_success_probability": 0.9999999,
+        "assumption": "independent Bernoulli trials"
+      },
+      "expected_behavior": "Calculate the expectation separately from observed yield and prohibit automatic adoption of a literature frontier as a pass threshold.",
+      "metrics": [
+        "expected failures",
+        "assumption disclosure",
+        "claim scope"
+      ],
+      "negative_controls": [
+        "frontier treated as achieved",
+        "expected value treated as deterministic count"
+      ],
+      "claim_limit": "The cited near-perfect figure is a research frontier, not an achieved Luminous result.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
+    },
+    {
+      "id": "MICLED-YIELD-ARITH-003",
+      "title": "Reject mismatched inspection denominator",
+      "domain": "yield_arithmetic",
+      "inputs": {
+        "manufactured_count": 1000000,
+        "inspected_count": 900000,
+        "failed_count": 100,
+        "claim_scope": "whole panel"
+      },
+      "expected_behavior": "A whole-population claim is blocked when inspected denominator/coverage is incomplete or unknown; report observed subset separately.",
+      "metrics": [
+        "coverage fraction",
+        "denominator closure",
+        "claim disposition"
+      ],
+      "negative_controls": [
+        "inspection coverage omitted",
+        "subset yield generalized to full population"
+      ],
+      "claim_limit": "No population-level yield is accepted without denominator and coverage evidence.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
+    },
+    {
+      "id": "MICLED-DEFECT-INDEPENDENCE-004",
+      "title": "Correlated and clustered defect negative control",
+      "domain": "defect_spatial_model",
+      "inputs": {
+        "grid": "deterministic synthetic array",
+        "patterns": [
+          "uniform independent defects",
+          "clustered defects",
+          "row/column interconnect failure"
+        ]
+      },
+      "expected_behavior": "Keep spatial/cluster statistics separate from independent Bernoulli arithmetic; refuse to use an independence confidence interval when clustering is known or not justified.",
+      "metrics": [
+        "defect fraction",
+        "cluster metrics",
+        "assumption state"
+      ],
+      "negative_controls": [
+        "clustered map fed to independent-yield estimate"
+      ],
+      "claim_limit": "Synthetic spatial patterns do not describe a real process without measured process data.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "semi-inspection"
+      ]
+    },
+    {
+      "id": "MICLED-INSPECT-PRECISION-005",
+      "title": "Inspection precision/recall on seeded defect labels",
+      "domain": "inspection",
+      "inputs": {
+        "ground_truth": "synthetic known-label map",
+        "classes": [
+          "dead",
+          "dim",
+          "color-shift",
+          "misplaced",
+          "interconnect"
+        ],
+        "imbalance": true
+      },
+      "expected_behavior": "Compute confusion counts, per-class precision/recall and false-positive burden on a frozen ground-truth map; preserve denominator by defect class.",
+      "metrics": [
+        "precision by class",
+        "recall by class",
+        "false positives",
+        "coverage"
+      ],
+      "negative_controls": [
+        "macro-average hides failed rare class",
+        "positive-only test set"
+      ],
+      "claim_limit": "Synthetic detector performance is not physical inspection capability.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "semi-inspection"
+      ]
+    },
+    {
+      "id": "MICLED-INSPECT-COVERAGE-006",
+      "title": "Local inspection cannot imply whole-array quality",
+      "domain": "inspection",
+      "inputs": {
+        "coverage": [
+          "center only",
+          "center and edge",
+          "full array"
+        ],
+        "defect_location": "seeded at uninspected edge"
+      },
+      "expected_behavior": "Reject whole-array defect claims when inspection coverage omits known or unknown regions; preserve local-only disposition.",
+      "metrics": [
+        "inspected area fraction",
+        "coverage gaps",
+        "claim scope"
+      ],
+      "negative_controls": [
+        "center-only capture labeled complete"
+      ],
+      "claim_limit": "Coverage metadata does not demonstrate actual optical instrument resolution.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "semi-inspection"
+      ]
+    },
+    {
+      "id": "MICLED-PLACEMENT-007",
+      "title": "Placement/alignment tolerance propagation",
+      "domain": "placement_alignment",
+      "inputs": {
+        "error_distributions": [
+          "bounded",
+          "normal with declared truncation",
+          "unknown"
+        ],
+        "interfaces": [
+          "emitter-to-CMOS",
+          "array-to-optics",
+          "module-to-housing"
+        ]
+      },
+      "expected_behavior": "Propagate only declared distributions through an explicit geometric model and return unknown bounds where distributions or correlations are absent.",
+      "metrics": [
+        "alignment residual",
+        "uncertainty range",
+        "sensitivity by interface"
+      ],
+      "negative_controls": [
+        "unknown distribution replaced by point estimate",
+        "independent errors assumed without basis"
+      ],
+      "claim_limit": "Modelled tolerance is not as-built dimensional accuracy.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
+    },
+    {
+      "id": "MICLED-INTERCONNECT-008",
+      "title": "Interconnect and drive-path failure accounting",
+      "domain": "electrical_integration",
+      "inputs": {
+        "failure_classes": [
+          "open",
+          "short",
+          "high-resistance",
+          "intermittent"
+        ],
+        "maps": "synthetic array-level topology"
+      },
+      "expected_behavior": "Report electrical connectivity/drive failures separately from emitter-transfer failures and color/optical defects; prevent double counting across stage denominators.",
+      "metrics": [
+        "failures by stage",
+        "cross-stage identity",
+        "unclassified fraction"
+      ],
+      "negative_controls": [
+        "same unit counted twice",
+        "optical dimness automatically labeled open circuit"
+      ],
+      "claim_limit": "No circuit/process recipe or measured failure rate is included.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
+    },
+    {
+      "id": "MICLED-STAGE-YIELD-009",
+      "title": "Stage-wise yield composition with dependency assumptions",
+      "domain": "yield_arithmetic",
+      "inputs": {
+        "stages": [
+          "emitter quality",
+          "transfer",
+          "interconnect",
+          "CMOS interface",
+          "optical assembly",
+          "test/repair"
+        ],
+        "dependency_model": [
+          "independent",
+          "correlated",
+          "unknown"
+        ]
+      },
+      "expected_behavior": "Calculate a stage product only under an explicit independence assumption; otherwise require joint data or provide a bounded scenario instead of presenting the product as actual final yield.",
+      "metrics": [
+        "stage yields",
+        "expected end-to-end yield",
+        "dependency assumption",
+        "uncertainty"
+      ],
+      "negative_controls": [
+        "correlated stage failures multiplied as independent"
+      ],
+      "claim_limit": "Stage arithmetic is not module yield until validated with linked production counts.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
+    },
+    {
+      "id": "MICLED-REPAIR-010",
+      "title": "Repair-adjusted yield versus first-pass yield",
+      "domain": "repair",
+      "inputs": {
+        "synthetic_failures": 1000,
+        "repair_candidates": [
+          "replace",
+          "redundant-channel remap",
+          "leave defective"
+        ],
+        "constraints": [
+          "repair success probability",
+          "collateral damage",
+          "retest required"
+        ]
+      },
+      "expected_behavior": "Report first-pass yield, repair success, post-repair yield, residual defects and retest burden independently.",
+      "metrics": [
+        "first-pass yield",
+        "repair-adjusted yield",
+        "repair cost per good unit",
+        "residual defect count"
+      ],
+      "negative_controls": [
+        "repair success assumed 100%",
+        "repaired unit counted without retest",
+        "collateral damage omitted"
+      ],
+      "claim_limit": "No actual repair process is asserted.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
+    },
+    {
+      "id": "MICLED-REDUNDANCY-011",
+      "title": "Redundancy trade-off under area and power constraints",
+      "domain": "repair",
+      "inputs": {
+        "architectures": [
+          "no redundancy",
+          "declared redundant channel",
+          "spare emitter/remap"
+        ],
+        "budgets": [
+          "area",
+          "power",
+          "routing",
+          "inspection burden"
+        ]
+      },
+      "expected_behavior": "Compare defect tolerance against power, area, routing, thermal and test costs; reject designs whose hard constraints fail even if yield improves.",
+      "metrics": [
+        "post-fault function",
+        "area overhead",
+        "power overhead",
+        "thermal limit",
+        "repairability"
+      ],
+      "negative_controls": [
+        "redundancy benefits counted while its power/area costs are hidden"
+      ],
+      "claim_limit": "Synthetic design-space comparison, not a proposed production layout.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
+    },
+    {
+      "id": "MICLED-THERMAL-012",
+      "title": "Electro-thermal-optical uncertainty propagation",
+      "domain": "thermal_optical",
+      "inputs": {
+        "parameters": [
+          "power density",
+          "thermal resistance",
+          "temperature coefficient",
+          "optical efficiency",
+          "uncertainty distribution"
+        ],
+        "ranges": "illustrative bounded ranges only"
+      },
+      "expected_behavior": "Propagate ranges/sensitivities through an explicitly identified reduced-order model; unknown material/device coefficients remain unknown rather than being silently defaulted.",
+      "metrics": [
+        "temperature range",
+        "luminance efficiency range",
+        "color shift sensitivity",
+        "power",
+        "uncertainty"
+      ],
+      "negative_controls": [
+        "unsourced coefficient treated as measured",
+        "thermal output reported without model ID"
+      ],
+      "claim_limit": "No physical thermal behavior is established by a synthetic reduced-order model.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
+    },
+    {
+      "id": "MICLED-QUALITY-013",
+      "title": "Yield optimization subject to optical utility floors",
+      "domain": "visual_utility",
+      "inputs": {
+        "metrics": [
+          "usable FOV",
+          "MTF by angle",
+          "luminance by angle",
+          "color shift",
+          "eye-box"
+        ],
+        "quality_policy": "preregistered hard floors"
+      },
+      "expected_behavior": "Only compare candidate design points that meet all stated optical-quality constraints; preserve infeasible points and identify the metric that disqualifies each.",
+      "metrics": [
+        "feasible design fraction",
+        "repair-adjusted yield",
+        "quality violations",
+        "Pareto dominance"
+      ],
+      "negative_controls": [
+        "higher yield accepted after luminance or usable FOV falls below floor"
+      ],
+      "claim_limit": "Predicted optical utility remains model evidence until measured.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
+    },
+    {
+      "id": "MICLED-AGING-014",
+      "title": "Thermal soak and reliability state separation",
+      "domain": "reliability",
+      "inputs": {
+        "states": [
+          "initial",
+          "thermal-soak",
+          "repeated-cycle",
+          "post-repair"
+        ],
+        "measurements": [
+          "luminance",
+          "color",
+          "dead/dim pixel count",
+          "power"
+        ]
+      },
+      "expected_behavior": "Keep initial, post-soak, aged and post-repair outcomes separate; unknown duration and stress exposure prevent extrapolation to lifetime.",
+      "metrics": [
+        "drift by metric",
+        "survival/count by class",
+        "repeatability",
+        "test duration"
+      ],
+      "negative_controls": [
+        "initial bright-frame result generalized to lifetime"
+      ],
+      "claim_limit": "No lifetime or reliability claim without real accelerated/field evidence.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
+    },
+    {
+      "id": "MICLED-CAL-015",
+      "title": "Calibration identity and stale-profile gate",
+      "domain": "metrology",
+      "inputs": {
+        "mutations": [
+          "module ID changed",
+          "optical stack changed",
+          "calibration expired",
+          "instrument profile mismatch"
+        ]
+      },
+      "expected_behavior": "Invalidate or requalify dependent measurements when module/configuration/calibration identity changes; do not reuse a sibling module's profile by name alone.",
+      "metrics": [
+        "stale-profile detection",
+        "correct scope",
+        "requalification disposition"
+      ],
+      "negative_controls": [
+        "profile silently reused after configuration change"
+      ],
+      "claim_limit": "Tests metadata logic only.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "semi-inspection",
+        "mycelix-evidence"
+      ]
+    },
+    {
+      "id": "MICLED-RAW-016",
+      "title": "Raw artifact and provenance completeness",
+      "domain": "evidence",
+      "inputs": {
+        "mutations": [
+          "raw image absent",
+          "calibration record absent",
+          "inspection denominator absent",
+          "digest mismatch",
+          "uncertainty removed"
+        ]
+      },
+      "expected_behavior": "Block physical-yield or optical-quality claims when required evidence is incomplete or corrupted; keep derived images traceable to raw observations.",
+      "metrics": [
+        "negative-control detection",
+        "lineage completeness",
+        "claim disposition"
+      ],
+      "negative_controls": [
+        "derived scalar treated as raw evidence",
+        "missing file treated as clean panel"
+      ],
+      "claim_limit": "Evidence integrity does not establish physical truth.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "semi-inspection",
+        "mycelix-evidence"
+      ]
+    },
+    {
+      "id": "MICLED-CONFIG-017",
+      "title": "Architecture and process configuration identity",
+      "domain": "configuration",
+      "inputs": {
+        "mutations": [
+          "pixel pitch changed",
+          "transfer method changed",
+          "CMOS interface revision changed",
+          "optics revision changed",
+          "firmware changed"
+        ]
+      },
+      "expected_behavior": "Separate results across architecture/configuration revisions unless an explicit transferability study covers the changes.",
+      "metrics": [
+        "configuration mismatch detection",
+        "claim scope",
+        "data lineage"
+      ],
+      "negative_controls": [
+        "results from unlike revisions merged into one denominator"
+      ],
+      "claim_limit": "Similar product names do not prove equivalent configurations.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "semi-inspection",
+        "mycelix-evidence"
+      ]
+    },
+    {
+      "id": "MICLED-COST-018",
+      "title": "Cost per qualified-good display",
+      "domain": "economics",
+      "inputs": {
+        "cost_components": [
+          "known unit process costs",
+          "inspection",
+          "repair",
+          "retest",
+          "scrap",
+          "calibration",
+          "energy/reliability reserve"
+        ],
+        "evidence_state": "known/estimated/unknown labels"
+      },
+      "expected_behavior": "Compute cost per qualified-good unit only when denominator and included costs are explicit; publish exclusions and sensitivity intervals.",
+      "metrics": [
+        "cost per good unit",
+        "scrap burden",
+        "repair burden",
+        "sensitivity",
+        "unknown cost share"
+      ],
+      "negative_controls": [
+        "initial assembly cost divided by first-pass units only while repair/retest omitted"
+      ],
+      "claim_limit": "Economic model result is scenario analysis, not a vendor quote.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "microled-yield-2026"
+      ]
+    },
+    {
+      "id": "MICLED-FRONTIER-019",
+      "title": "Multi-objective frontier without an opaque scalar score",
+      "domain": "optimization",
+      "inputs": {
+        "axes": [
+          "repair-adjusted yield",
+          "MTF",
+          "usable FOV",
+          "luminance",
+          "power",
+          "temperature",
+          "cost per good unit",
+          "calibration burden"
+        ],
+        "constraints": "explicit feasibility floors"
+      },
+      "expected_behavior": "Report nondominated candidates and all per-axis values; preserve infeasible candidates with reason codes and refuse to hide trade-offs in a single weighted average.",
+      "metrics": [
+        "Pareto front membership",
+        "constraint violations",
+        "dominance consistency"
+      ],
+      "negative_controls": [
+        "weight choice makes a hard-constraint violation appear best"
+      ],
+      "claim_limit": "The computed frontier is only as credible as its declared model and inputs.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "microled-yield-2026"
+      ]
+    },
+    {
+      "id": "MICLED-SOURCE-020",
+      "title": "Research source identity and frontier-claim boundary",
+      "domain": "provenance",
+      "inputs": {
+        "sources": [
+          "micro-LED/CMOS scaling review 2026",
+          "micro-LED transfer-yield review 2026"
+        ],
+        "required": [
+          "DOI/version",
+          "publication date",
+          "claim scope",
+          "reuse rights where data/code is reused"
+        ]
+      },
+      "expected_behavior": "Bind each numerical research claim to its source and date; do not label a literature stretch target as observed Luminous performance. Unknown data rights block republishing source artifacts.",
+      "metrics": [
+        "source completeness",
+        "claim-scope consistency",
+        "rights disposition"
+      ],
+      "negative_controls": [
+        "DOI citation treated as permission",
+        "review target reported as achieved yield"
+      ],
+      "claim_limit": "Citation/provenance handling is not reproduction of the published experiments.",
+      "status": "UNQUALIFIED",
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "microled-yield-2026",
+        "mycelix-evidence"
+      ]
+    }
+  ]
+}

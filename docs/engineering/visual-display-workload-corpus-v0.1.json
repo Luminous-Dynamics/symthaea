@@ -1,0 +1,1046 @@
+{
+  "title": "Conventional Display Software and Measurement Workload Corpus",
+  "corpus_id": "VIS-DISP-CORPUS-001",
+  "schema_version": "0.1.0",
+  "status": "UNQUALIFIED",
+  "created_date": "2026-10-17",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7853",
+  "case_count": 32,
+  "minimum_case_count": 24,
+  "reference_sources": [
+    {
+      "id": "srgb",
+      "url": "https://www.w3.org/TR/2026/CRD-css-color-4-20261008/",
+      "title": "W3C CSS Color Module Level 4 sRGB transfer functions",
+      "use": "software transfer-function references"
+    },
+    {
+      "id": "bt2100",
+      "url": "https://www.itu.int/rec/R-REC-BT.2100-3-202502-I/en",
+      "title": "ITU-R BT.2100-3 (2025)",
+      "use": "PQ/HLG transfer and HDR signal semantics"
+    },
+    {
+      "id": "displayhdr",
+      "url": "https://displayhdr.org/performance-criteria/",
+      "title": "VESA DisplayHDR CTS 1.2 criteria",
+      "use": "physical HDR luminance/color/temporal benchmark alignment; not certification"
+    },
+    {
+      "id": "clearmr",
+      "url": "https://vesa.org/featured-articles/vesa-brings-clarity-to-motion-blur-in-digital-displays-with-new-compliance-test-specification-and-logo-program/",
+      "title": "VESA ClearMR compliance test framework",
+      "use": "motion blur metric method when exact CTS conditions are met"
+    }
+  ],
+  "evidence_lanes": {
+    "software_math": "Known-answer equations and numerical error/domain checks; no physical claim.",
+    "software_synthetic": "Deterministic synthetic work/load; no physical or human-perception claim.",
+    "physical_measurement": "Requires named device, pinned mode/protocol, calibrated instrument, raw data and uncertainty.",
+    "human_task_study": "Requires consent, preregistered task/endpoints, governed data and statistical reporting."
+  },
+  "cases": [
+    {
+      "id": "VIS-DISP-SRGB-ANCHORS-001",
+      "title": "sRGB transfer-function anchor points",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb"
+      ],
+      "stimulus": {
+        "generator": "scalar_values",
+        "encoded": [
+          0,
+          0.04045,
+          0.5,
+          1
+        ]
+      },
+      "expected_behavior": "Match the piecewise sRGB decode reference at the defined anchors within a declared numerical tolerance; keep the transfer threshold and branch explicit.",
+      "metrics": [
+        "absolute transfer error",
+        "finite output"
+      ],
+      "failure_modes": [
+        "wrong breakpoint",
+        "gamma-only approximation",
+        "non-finite output"
+      ],
+      "claim_limit": "This qualifies transfer math only, not a physical monitor.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-SRGB-ROUNDTRIP-002",
+      "title": "sRGB encode/decode round-trip",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb"
+      ],
+      "stimulus": {
+        "generator": "deterministic_scalar_grid",
+        "samples": 257,
+        "domain": [
+          0,
+          1
+        ],
+        "include_branch_neighbors": true
+      },
+      "expected_behavior": "Decode then encode in-gamut values and preserve the encoded input within the declared numerical tolerance.",
+      "metrics": [
+        "maximum round-trip error",
+        "monotonicity"
+      ],
+      "failure_modes": [
+        "branch discontinuity",
+        "non-monotonic output",
+        "range escape"
+      ],
+      "claim_limit": "Round-trip correctness does not establish colorimetric accuracy on a display.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-SRGB-INVALID-003",
+      "title": "Reject invalid sRGB inputs",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb"
+      ],
+      "stimulus": {
+        "runtime_inputs": [
+          "-0.01",
+          "1.01",
+          "NaN",
+          "+Infinity",
+          "-Infinity"
+        ]
+      },
+      "expected_behavior": "Out-of-domain values are rejected; non-finite values never become a plausible finite color output.",
+      "metrics": [
+        "rejection classification",
+        "non-finite propagation"
+      ],
+      "failure_modes": [
+        "silent clamping without declared policy",
+        "NaN leakage",
+        "wrong error class"
+      ],
+      "claim_limit": "The fixture tests software input handling only.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-REL-LUMA-004",
+      "title": "Relative luminance from sRGB primaries",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb"
+      ],
+      "stimulus": {
+        "generator": "rgb_primaries_and_white",
+        "colors": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "expected_behavior": "Linearize channels before computing normalized relative luminance with the declared Rec.709/sRGB coefficients.",
+      "metrics": [
+        "absolute luminance-formula error",
+        "range"
+      ],
+      "failure_modes": [
+        "encoded-channel weighting",
+        "wrong coefficient order",
+        "confusion with cd/m2"
+      ],
+      "claim_limit": "Output is normalized relative luminance Y, not absolute luminance.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-PQ-100NITS-005",
+      "title": "PQ encoding at 100 cd/m²",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "pq_eotf_oetf_reference",
+        "luminance_nits": 100
+      },
+      "expected_behavior": "PQ encode the stated luminance and decode it back within the tolerance selected from the pinned BT.2100 implementation.",
+      "metrics": [
+        "signal error",
+        "luminance round-trip error"
+      ],
+      "failure_modes": [
+        "wrong constants",
+        "wrong exponent order",
+        "absolute-vs-normalized luminance confusion"
+      ],
+      "claim_limit": "Computed transfer values are not measured panel output.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-PQ-HIGH-006",
+      "title": "PQ high-luminance anchors and domain",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "pq_eotf_oetf_reference",
+        "luminance_nits": [
+          0,
+          203,
+          1000,
+          10000
+        ],
+        "invalid_nits": [
+          -1,
+          10001
+        ]
+      },
+      "expected_behavior": "Match the pinned PQ reference at dark, typical white, highlight and nominal upper-range anchors; reject out-of-domain luminance.",
+      "metrics": [
+        "signal error",
+        "luminance error",
+        "rejection"
+      ],
+      "failure_modes": [
+        "clipping hidden as successful encode",
+        "range error",
+        "round-trip drift"
+      ],
+      "claim_limit": "Does not qualify mastering, tone mapping, or panel brightness.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-HLG-LOW-007",
+      "title": "HLG scene OETF lower-branch boundary",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "hlg_scene_oetf",
+        "scene_linear": [
+          0,
+          0.01,
+          0.08333333333333333,
+          0.083334
+        ]
+      },
+      "expected_behavior": "Match the pinned HLG scene OETF on the square-root branch and immediately around the branch point.",
+      "metrics": [
+        "signal error",
+        "branch continuity"
+      ],
+      "failure_modes": [
+        "incorrect threshold",
+        "using PQ math for HLG",
+        "scene/display semantics conflated"
+      ],
+      "claim_limit": "This is the scene OETF only, not the display-side HLG OOTF/EOTF.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-HLG-HIGH-008",
+      "title": "HLG scene OETF logarithmic branch and white",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "hlg_scene_oetf",
+        "scene_linear": [
+          0.083334,
+          0.18,
+          0.5,
+          1
+        ]
+      },
+      "expected_behavior": "Match the pinned logarithmic branch and canonical white endpoint.",
+      "metrics": [
+        "signal error",
+        "branch continuity",
+        "monotonicity"
+      ],
+      "failure_modes": [
+        "incorrect constants",
+        "unstable log input",
+        "endpoint drift"
+      ],
+      "claim_limit": "Normalized HLG signal is not display luminance.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-HLG-MONOTONIC-009",
+      "title": "HLG OETF monotonicity grid",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "deterministic_scalar_grid",
+        "function": "hlg_scene_oetf",
+        "samples": 1001,
+        "domain": [
+          0,
+          1
+        ]
+      },
+      "expected_behavior": "Output is finite, within the declared signal domain and monotonically non-decreasing.",
+      "metrics": [
+        "monotonicity violations",
+        "non-finite count",
+        "range violations"
+      ],
+      "failure_modes": [
+        "branch jump",
+        "negative output",
+        "output > 1"
+      ],
+      "claim_limit": "Mathematical monotonicity is not perceived HDR-quality evidence.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-METADATA-REJECT-010",
+      "title": "Reject transfer-function metadata mismatch",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb",
+        "bt2100"
+      ],
+      "stimulus": {
+        "cases": [
+          {
+            "signal_tag": "PQ",
+            "declared_transform": "sRGB"
+          },
+          {
+            "signal_tag": "HLG",
+            "declared_transform": "PQ"
+          },
+          {
+            "signal_tag": "sRGB",
+            "primaries": "BT.2020",
+            "unresolved_conversion": true
+          }
+        ]
+      },
+      "expected_behavior": "Reject or require an explicit, versioned conversion when signal metadata and transform/primaries do not agree.",
+      "metrics": [
+        "mismatch detection",
+        "explicit fallback status"
+      ],
+      "failure_modes": [
+        "silent transform substitution",
+        "wrong transfer default",
+        "unreported gamut conversion"
+      ],
+      "claim_limit": "The test does not establish OS/color-management correctness.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-TONEMAP-ORDER-011",
+      "title": "Tone-map order and highlight-detail synthetic test",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "highlight_ramp_with_small_peaks",
+        "scene_levels": [
+          0,
+          0.01,
+          0.1,
+          0.5,
+          1,
+          2,
+          4,
+          8,
+          16
+        ],
+        "include_small_highlight": true
+      },
+      "expected_behavior": "Candidate tone mapping reports explicit input/output domains and preserves declared ordering/target detail constraints without falsely claiming a fixed physical luminance.",
+      "metrics": [
+        "highlight-order preservation",
+        "clipping fraction",
+        "local contrast retention"
+      ],
+      "failure_modes": [
+        "hard clipping of all peaks",
+        "non-monotonic mapping",
+        "hidden reference-white change"
+      ],
+      "claim_limit": "Synthetic tone-map result is not a hardware HDR measurement.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-GREY-RAMP-012",
+      "title": "Neutral ramp monotonicity and banding diagnostics",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "srgb",
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "neutral_ramp",
+        "bit_depths": [
+          8,
+          10
+        ],
+        "length_samples": 1024,
+        "output_transfer": [
+          "sRGB",
+          "PQ"
+        ],
+        "include_dithered_variant": true
+      },
+      "expected_behavior": "Report monotonicity, distinct output levels and banding-risk measures separately for reference and candidate paths.",
+      "metrics": [
+        "monotonicity",
+        "distinct output steps",
+        "banding proxy"
+      ],
+      "failure_modes": [
+        "banding metric mislabeled as human perception",
+        "hidden quantization",
+        "color-channel divergence on neutral ramp"
+      ],
+      "claim_limit": "A software banding proxy is not a subjective visual-quality study.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-NEARBLACK-013",
+      "title": "Near-black monotonicity and black-crush pattern",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "generator": "near_black_steps",
+        "nominal_levels_cd_m2": [
+          0,
+          0.05,
+          0.1,
+          0.3,
+          0.5
+        ],
+        "mode": "declared reference transform"
+      },
+      "expected_behavior": "The digital pattern encodes the intended distinct low-level steps; measured panel luminance must later be checked independently.",
+      "metrics": [
+        "reference code monotonicity",
+        "measured luminance step order when instrumented"
+      ],
+      "failure_modes": [
+        "code-value collapse",
+        "confusion of encoded values with measured luminance"
+      ],
+      "claim_limit": "Software result does not establish physical black-crush performance.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-LOCAL-HIGHLIGHT-014",
+      "title": "Small highlight with low average-picture-level background",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "generator": "center_patch",
+        "patch_area_percent": 8,
+        "background_average_picture_level_percent": 2,
+        "include_surrounding_detail": true
+      },
+      "expected_behavior": "Produce a deterministic input pattern and compare candidate tone mapping without clipping the surrounding reference details.",
+      "metrics": [
+        "highlight detail",
+        "surround contrast",
+        "GPU time"
+      ],
+      "failure_modes": [
+        "halo/overshoot proxy regression",
+        "surrounding detail collapse",
+        "unreported peak normalization"
+      ],
+      "claim_limit": "This mirrors a pattern concept but is not the official DisplayHDR CTS pattern.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-PHYSICAL-PEAK-015",
+      "title": "DisplayHDR 8% center-patch peak luminance",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition/tier pattern",
+        "window_area_percent": 8,
+        "background_apl_percent": 2
+      },
+      "expected_behavior": "Measure peak luminance, device mode, instrument/calibration and all official pattern conditions for the selected tier.",
+      "metrics": [
+        "peak luminance cd/m2",
+        "repeatability",
+        "uncertainty",
+        "device mode"
+      ],
+      "failure_modes": [
+        "wrong CTS edition/tier",
+        "screen capture used as measurement",
+        "missing calibration"
+      ],
+      "claim_limit": "This is a planned physical test, not VESA certification.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-PHYSICAL-FLASH-016",
+      "title": "Full-screen HDR flash peak",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition/tier",
+        "pattern": "full-screen flash white"
+      },
+      "expected_behavior": "Measure short-duration full-field luminance and rise behavior per the declared standard profile.",
+      "metrics": [
+        "peak luminance cd/m2",
+        "rise time",
+        "repeatability"
+      ],
+      "failure_modes": [
+        "using center-patch peak as full-screen peak",
+        "measurement window mismatch"
+      ],
+      "claim_limit": "No certification claim without official conformance procedures.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-PHYSICAL-SUSTAINED-017",
+      "title": "Sustained full-screen luminance and thermal behavior",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition/tier",
+        "pattern": "full-screen long-duration white",
+        "record_time_series": true
+      },
+      "expected_behavior": "Report sustained luminance over time, thermal throttling and recovery rather than only a brief peak.",
+      "metrics": [
+        "luminance time series",
+        "power W",
+        "temperature when available",
+        "sustain duration"
+      ],
+      "failure_modes": [
+        "brief flash substituted for sustained brightness",
+        "missing warm-up conditions"
+      ],
+      "claim_limit": "A measured result applies only to the named device/mode/test environment.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-BLACK-CORNERS-018",
+      "title": "Black level under bright-corner stress",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition/tier",
+        "pattern": "dual bright-corner boxes with center black"
+      },
+      "expected_behavior": "Measure center black while declared bright regions remain active.",
+      "metrics": [
+        "black luminance cd/m2",
+        "corner white luminance",
+        "spatial uniformity"
+      ],
+      "failure_modes": [
+        "full-black screen substituted",
+        "instrument floor not declared"
+      ],
+      "claim_limit": "Does not qualify contrast under other patterns or rooms.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-ACTIVE-DIMMING-019",
+      "title": "Active dimming and checkerboard contrast",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition/tier",
+        "pattern": "declared checkerboard at specified luminance"
+      },
+      "expected_behavior": "Measure white/black performance under the specified same-image stress pattern and report active-dimming settings.",
+      "metrics": [
+        "checkerboard contrast",
+        "black luminance",
+        "white luminance",
+        "power W"
+      ],
+      "failure_modes": [
+        "cross-pattern ratios presented as same-image contrast",
+        "missing local-dimming mode"
+      ],
+      "claim_limit": "Do not infer local-dimming quality from an ideal backlight model alone.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-COLOR-VOLUME-020",
+      "title": "Gamut, color accuracy and color volume by luminance",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr",
+        "bt2100"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition",
+        "patterns": [
+          "declared RGB/ColorChecker patches",
+          "multiple luminance levels"
+        ]
+      },
+      "expected_behavior": "Record color space, white point, instrument spectral assumptions and accuracy across the defined luminance levels.",
+      "metrics": [
+        "gamut coverage",
+        "Delta-ITP or profile metric",
+        "color luminance",
+        "measurement uncertainty"
+      ],
+      "failure_modes": [
+        "gamut area mistaken for color volume",
+        "uncalibrated camera RGB used as colorimeter"
+      ],
+      "claim_limit": "Only claims the exact tested display mode and method.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-EOTF-021",
+      "title": "PQ EOTF and white-point tracking on a physical HDR display",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr",
+        "bt2100"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition",
+        "signal": "known PQ patch sequence",
+        "record_input_codes": true
+      },
+      "expected_behavior": "Compare encoded input and calibrated absolute luminance/white point at required points; keep calculated PQ reference separate from measured panel output.",
+      "metrics": [
+        "Delta-ITP",
+        "absolute luminance error",
+        "white-point error",
+        "uncertainty"
+      ],
+      "failure_modes": [
+        "PQ equation output mislabeled as measurement",
+        "wrong display mode",
+        "missing raw readings"
+      ],
+      "claim_limit": "Does not imply DisplayHDR certification unless full CTS performed.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-SUBTITLE-FLICKER-022",
+      "title": "Subtitle/local-dimming temporal interaction",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition",
+        "pattern": "constant luminance patch with subtitles toggled on/off",
+        "record_time_series": true
+      },
+      "expected_behavior": "Measure neighboring patch luminance over subtitle transitions and report transient and steady change.",
+      "metrics": [
+        "luminance delta percent",
+        "settling time",
+        "flicker/temporal trace"
+      ],
+      "failure_modes": [
+        "single-frame measurement misses transient",
+        "scene APL not controlled"
+      ],
+      "claim_limit": "A simulation cannot establish measured subtitle flicker.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-RISE-TIME-023",
+      "title": "Black-to-peak HDR rise-time response",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "profile": "pinned DisplayHDR CTS edition/tier",
+        "pattern": "declared black-to-maximum transition"
+      },
+      "expected_behavior": "Record the luminance time series and derive rise time using the pinned method and sampling rate.",
+      "metrics": [
+        "rise time",
+        "overshoot",
+        "settling",
+        "sample rate"
+      ],
+      "failure_modes": [
+        "nominal refresh rate substituted for measured rise time",
+        "unspecified photometer sampling"
+      ],
+      "claim_limit": "Only applies to the tested panel mode and pattern.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-MOTION-CLEARM-024",
+      "title": "Motion-blur test against a pinned ClearMR method",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "clearmr"
+      ],
+      "stimulus": {
+        "profile": "pinned ClearMR CTS version",
+        "pattern": "official moving-edge/measurement patterns",
+        "camera": "calibrated high-speed capture or the prescribed apparatus"
+      },
+      "expected_behavior": "Compute the specified clear-to-blurry pixel metric using matched timing, overdrive and camera conditions; preserve raw sequences.",
+      "metrics": [
+        "Clear Motion Ratio under pinned method",
+        "ghosting/overshoot diagnostics",
+        "uncertainty"
+      ],
+      "failure_modes": [
+        "refresh rate used as motion-blur proxy",
+        "different pattern/camera method",
+        "untracked overdrive setting"
+      ],
+      "claim_limit": "Not an official ClearMR result unless every required test condition is met.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-CADENCE-025",
+      "title": "Frame cadence, judder and frame-time spikes",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "clearmr"
+      ],
+      "stimulus": {
+        "generator": "known motion sequence",
+        "cadence_hz": [
+          24,
+          30,
+          60,
+          90,
+          120,
+          144
+        ],
+        "include_repeat_drop_and_jitter": true
+      },
+      "expected_behavior": "Measure delivered frame cadence and end-to-end display timing; do not use nominal refresh as proof that the source cadence is represented faithfully.",
+      "metrics": [
+        "frame-time distribution",
+        "dropped/repeated frames",
+        "motion-position error",
+        "latency"
+      ],
+      "failure_modes": [
+        "average FPS hides spikes",
+        "capture timestamp not synchronized"
+      ],
+      "claim_limit": "Needs instrumented capture to assert physical presentation timing.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-POWER-026",
+      "title": "Energy per matched visual workload",
+      "lane": "physical_measurement",
+      "minimum_evidence_class": "BENCH_MEASURED",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "generator": "pinned representative workload suite",
+        "workloads": [
+          "desktop/text",
+          "HDR highlights",
+          "dark scene with subtitles",
+          "moving edges"
+        ],
+        "record_sustained_load": true
+      },
+      "expected_behavior": "Compare candidate and baseline on identical device/workload/output conditions; separate GPU energy from complete system/display input power.",
+      "metrics": [
+        "wall power W",
+        "energy per workload J",
+        "GPU time ms",
+        "luminance/quality constraints"
+      ],
+      "failure_modes": [
+        "GPU time equated to wall power",
+        "quality degraded to save power",
+        "short run hides thermal effects"
+      ],
+      "claim_limit": "No energy improvement claim without meter calibration and matched visual-output gates.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-TEXT-SCALING-027",
+      "title": "Text and interface legibility under scaling",
+      "lane": "human_task_study",
+      "minimum_evidence_class": "HUMAN_STUDY",
+      "reference_ids": [
+        "displayhdr"
+      ],
+      "stimulus": {
+        "generator": "deterministic text/line corpus",
+        "scales": [
+          0.75,
+          1,
+          1.25,
+          1.5,
+          2
+        ],
+        "include_subpixel_edges": true
+      },
+      "expected_behavior": "Use a preregistered text-reading/detection task to verify that candidate scaling/rendering does not reduce task success; record display subpixel configuration and viewing geometry.",
+      "metrics": [
+        "task error rate",
+        "completion time",
+        "confidence interval",
+        "artifact visibility"
+      ],
+      "failure_modes": [
+        "image similarity used as legibility proof",
+        "font/subpixel settings differ between conditions"
+      ],
+      "claim_limit": "No universal accessibility/comfort claim from one cohort.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-COLOR-GRADIENT-028",
+      "title": "Color-gradient banding and neutral stability",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "srgb",
+        "bt2100"
+      ],
+      "stimulus": {
+        "generator": "2D gradients and neutral ramps",
+        "bit_depths": [
+          8,
+          10
+        ],
+        "include_dither_on_off": true,
+        "include_low_light_and_highlight_ranges": true
+      },
+      "expected_behavior": "Report code-value continuity, visible-band proxy and channel neutrality separately; a claimed visual improvement needs blinded/controlled perceptual review.",
+      "metrics": [
+        "step continuity",
+        "banding proxy",
+        "neutral-channel mismatch",
+        "compute cost"
+      ],
+      "failure_modes": [
+        "proxy represented as human outcome",
+        "dither causes temporal artifacts"
+      ],
+      "claim_limit": "Synthetic gradients do not establish perceived or physical banding.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-ALPHA-BLEND-029",
+      "title": "Linear-light alpha blend reference",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb"
+      ],
+      "stimulus": {
+        "generator": "known foreground/background pairs",
+        "alpha": [
+          0,
+          0.25,
+          0.5,
+          0.75,
+          1
+        ],
+        "color_pairs": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ]
+        ]
+      },
+      "expected_behavior": "Compare encoded-space blending with a reference that decodes to linear light, blends, then re-encodes; make the declared compositing space explicit.",
+      "metrics": [
+        "channel error vs reference",
+        "edge artifact proxy"
+      ],
+      "failure_modes": [
+        "blending nonlinear codes while claiming linear-light output",
+        "unmentioned premultiplication mode"
+      ],
+      "claim_limit": "Does not establish a specific compositor follows this pipeline.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-STALE-PROFILE-030",
+      "title": "Stale or mismatched display profile negative control",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "srgb",
+        "bt2100"
+      ],
+      "stimulus": {
+        "profile_a_digest": "profile-A",
+        "active_device_digest": "device-B",
+        "calibration_validity": "expired"
+      },
+      "expected_behavior": "Mark the evaluation unqualified or require recalibration when profile identity, device identity or calibration validity conflicts.",
+      "metrics": [
+        "stale-profile detection",
+        "qualification status"
+      ],
+      "failure_modes": [
+        "automatic pass with stale calibration",
+        "identity mismatch ignored"
+      ],
+      "claim_limit": "Synthetic metadata test only; hardware calibration state needs trusted records.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-RAW-EVIDENCE-031",
+      "title": "Missing or corrupted raw measurement blocks qualification",
+      "lane": "software_synthetic",
+      "minimum_evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "displayhdr",
+        "clearmr"
+      ],
+      "stimulus": {
+        "cases": [
+          "measurement file missing",
+          "digest mismatch",
+          "unknown instrument calibration",
+          "missing pattern/firmware metadata"
+        ]
+      },
+      "expected_behavior": "Report evidence integrity or applicability as failed/unknown and prevent a candidate's declared pass from becoming independently qualified.",
+      "metrics": [
+        "negative-control detection",
+        "correct unqualified state"
+      ],
+      "failure_modes": [
+        "missing artifact treated as pass",
+        "producer-declared status trusted"
+      ],
+      "claim_limit": "This tests evidence handling, not the physical measurement itself.",
+      "status": "UNQUALIFIED"
+    },
+    {
+      "id": "VIS-DISP-CORPUS-INTEGRITY-032",
+      "title": "Frozen workload and oracle integrity negative control",
+      "lane": "software_math",
+      "minimum_evidence_class": "ANALYTIC_REFERENCE",
+      "reference_ids": [
+        "srgb",
+        "bt2100",
+        "displayhdr",
+        "clearmr"
+      ],
+      "stimulus": {
+        "mutations": [
+          "case id swap",
+          "expected output changed",
+          "duplicate id",
+          "oracle version changed without manifest version",
+          "input transform edited after freeze"
+        ]
+      },
+      "expected_behavior": "The validator detects manifest/corpus drift and reports a distinct integrity failure rather than scoring altered fixtures as the same benchmark.",
+      "metrics": [
+        "mutation detection",
+        "canonical manifest digest match",
+        "duplicate ID detection"
+      ],
+      "failure_modes": [
+        "case ID collision",
+        "silent golden-vector update",
+        "producer modifies oracle and candidate together"
+      ],
+      "claim_limit": "Digest identity protects versioning; it does not authenticate physical truth.",
+      "status": "UNQUALIFIED"
+    }
+  ]
+}

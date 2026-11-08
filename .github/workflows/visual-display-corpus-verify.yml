@@ -1,0 +1,60 @@
+name: Visual Display Corpus Verifier
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "tools/visual-display-corpus-verify/**"
+      - "docs/engineering/visual-display-workload-corpus-v0.1.json"
+      - "docs/engineering/visual-display-workload-corpus.schema.json"
+      - "docs/engineering/DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md"
+      - "docs/engineering/display-manufacturing-route-profiles-v0.1.json"
+      - "docs/engineering/display-manufacturing-route-profiles.schema.json"
+      - ".github/workflows/visual-display-corpus-verify.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/visual-display-corpus-verify/**"
+      - "docs/engineering/visual-display-workload-corpus-v0.1.json"
+      - "docs/engineering/visual-display-workload-corpus.schema.json"
+      - "docs/engineering/DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md"
+      - "docs/engineering/display-manufacturing-route-profiles-v0.1.json"
+      - "docs/engineering/display-manufacturing-route-profiles.schema.json"
+      - ".github/workflows/visual-display-corpus-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-display-corpus-verifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Validate frozen display corpus
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # actions/checkout v4.2.2, pinned to an immutable commit.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy --component rustfmt
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/visual-display-corpus-verify/Cargo.toml -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/visual-display-corpus-verify/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run unit and mutation tests
+        run: cargo test --manifest-path tools/visual-display-corpus-verify/Cargo.toml
+
+      - name: Verify repository corpus
+        run: cargo run --manifest-path tools/visual-display-corpus-verify/Cargo.toml
