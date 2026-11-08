@@ -198,10 +198,10 @@
           "then": {
             "properties": {
               "applicability": {
-                "enum": [
-                  "unknown",
-                  "synthetic_fixture"
-                ]
+                "const": "unknown"
+              },
+              "passing_side_sign": {
+                "const": null
               }
             }
           }
