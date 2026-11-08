@@ -644,6 +644,10 @@ fn evaluate(
     let mut confidence_count = 0usize;
 
     for reference in references {
+        let language = language_totals
+            .entry(reference.language.clone())
+            .or_default();
+        language.cases += 1;
         let candidate = prediction_by_id[reference.case_id.as_str()];
         let selected = choose_variant(&reference.accepted_variants, candidate);
         let (
@@ -690,6 +694,8 @@ fn evaluate(
         if !reference.expected_oov {
             total_reference_phones += reference_phones;
             total_edits += edits.total();
+            language.reference_phone_count += reference_phones;
+            language.phone_edits += edits.total();
         }
         if let Some(exact) = exact {
             in_vocabulary_cases += 1;
