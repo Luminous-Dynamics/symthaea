@@ -187,6 +187,48 @@ pub fn verify_campaign(value: &Value) -> VerificationReport {
         ),
     }
 
+    match string_at(value, &["run", "run_disposition"]) {
+        Some("synthetic_fixture") | Some("completed") => {}
+        Some("aborted_safety")
+        | Some("aborted_operator")
+        | Some("instrumentation_failure")
+        | Some("protocol_deviation")
+        | Some("infrastructure_failure") => report.add(
+            CampaignDisposition::NotAdmissible,
+            "run_not_completed",
+            "run.run_disposition",
+            "Aborted, failed or protocol-deviant runs cannot satisfy a completed campaign analysis.",
+        ),
+        Some("inconclusive") => report.add(
+            CampaignDisposition::Indeterminate,
+            "run_inconclusive",
+            "run.run_disposition",
+            "The run is explicitly inconclusive.",
+        ),
+        _ => report.add(
+            CampaignDisposition::Invalid,
+            "run_disposition_missing",
+            "run.run_disposition",
+            "Run disposition is absent or unrecognized.",
+        ),
+    }
+
+    if at(value, &["run", "abort_events"])
+        .and_then(Value::as_array)
+        .is_some_and(|events| !events.is_empty())
+        && matches!(
+            string_at(value, &["run", "run_disposition"]),
+            Some("completed")
+        )
+    {
+        report.add(
+            CampaignDisposition::Invalid,
+            "completed_run_contains_abort",
+            "run.abort_events",
+            "A run with recorded abort events cannot be labelled completed.",
+        );
+    }
+
     let channels = match at(value, &["channels"]).and_then(Value::as_array) {
         Some(items) if !items.is_empty() => items,
         _ => {
@@ -209,6 +251,40 @@ pub fn verify_campaign(value: &Value) -> VerificationReport {
         let base = format!("channels[{index}]");
 
         let channel_id = string_at(channel, &["channel_id"]).unwrap_or("<missing-channel-id>");
+        match string_at(channel, &["identity_strength"]) {
+            Some("unknown") | Some("logical_only") | None => {
+                known_non_admissible = true;
+                report.add(
+                    CampaignDisposition::NotAdmissible,
+                    "instrument_identity_too_weak",
+                    format!("{base}.identity_strength"),
+                    format!(
+                        "Channel {channel_id} does not bind an adequately identified physical or fixture-bound instrument endpoint."
+                    ),
+                );
+            }
+            _ => {}
+        }
+
+        match (
+            number_at(channel, &["range_min"]),
+            number_at(channel, &["range_max"]),
+        ) {
+            (Some(min), Some(max)) if min < max => {}
+            (Some(_), Some(_)) => report.add(
+                CampaignDisposition::Invalid,
+                "instrument_range_invalid",
+                format!("{base}.range_min"),
+                format!("Channel {channel_id} has a non-increasing measurement range."),
+            ),
+            _ => report.add(
+                CampaignDisposition::Invalid,
+                "instrument_range_missing",
+                format!("{base}.range_min"),
+                format!("Channel {channel_id} lacks numeric range bounds."),
+            ),
+        }
+
         let channel_config = string_at(channel, &["as_built_configuration_digest"]);
 
         if article_config.is_some() && channel_config != article_config.as_deref() {
@@ -408,6 +484,41 @@ pub fn verify_campaign(value: &Value) -> VerificationReport {
         }
     }
 
+    let channel_classes: Vec<&str> = channels
+        .iter()
+        .filter_map(|channel| string_at(channel, &["evidence_class"]))
+        .collect();
+
+    match string_at(value, &["raw_bundle", "acquisition_class"]) {
+        Some("measured_physical")
+            if channel_classes.iter().any(|class| *class != "measured") =>
+        {
+            report.add(
+                CampaignDisposition::NotAdmissible,
+                "physical_acquisition_class_mismatch",
+                "channels.evidence_class",
+                "A physical acquisition bundle contains a channel not classified as measured.",
+            );
+        }
+        Some("hil") if channel_classes.iter().any(|class| *class != "hil") => {
+            report.add(
+                CampaignDisposition::NotAdmissible,
+                "hil_evidence_class_mismatch",
+                "channels.evidence_class",
+                "HIL bundle and channel evidence classes disagree.",
+            );
+        }
+        Some("phil") if channel_classes.iter().any(|class| *class != "phil") => {
+            report.add(
+                CampaignDisposition::NotAdmissible,
+                "phil_evidence_class_mismatch",
+                "channels.evidence_class",
+                "PHIL bundle and channel evidence classes disagree.",
+            );
+        }
+        _ => {}
+    }
+
     let acquisition_class = string_at(value, &["raw_bundle", "acquisition_class"]);
     let run_disposition = string_at(value, &["run", "run_disposition"]);
     if acquisition_class == Some("synthetic")
@@ -525,6 +636,37 @@ mod tests {
         assert_eq!(
             verify_campaign(&campaign).disposition,
             CampaignDisposition::NotAdmissible
+        );
+    }
+
+    #[test]
+    fn logical_only_instrument_identity_is_not_admissible_for_physical_evidence() {
+        let mut campaign = fixtures()["campaigns"][0].clone();
+        campaign["channels"][0]["identity_strength"] = Value::String("logical_only".into());
+        assert_eq!(
+            verify_campaign(&campaign).disposition,
+            CampaignDisposition::NotAdmissible
+        );
+    }
+
+    #[test]
+    fn safety_aborted_run_cannot_be_admitted_as_completed() {
+        let mut campaign = fixtures()["campaigns"][0].clone();
+        campaign["run"]["run_disposition"] = Value::String("aborted_safety".into());
+        assert_eq!(
+            verify_campaign(&campaign).disposition,
+            CampaignDisposition::NotAdmissible
+        );
+    }
+
+    #[test]
+    fn reversed_instrument_range_is_invalid() {
+        let mut campaign = fixtures()["campaigns"][0].clone();
+        campaign["channels"][0]["range_min"] = Value::from(10.0);
+        campaign["channels"][0]["range_max"] = Value::from(1.0);
+        assert_eq!(
+            verify_campaign(&campaign).disposition,
+            CampaignDisposition::Invalid
         );
     }
 
