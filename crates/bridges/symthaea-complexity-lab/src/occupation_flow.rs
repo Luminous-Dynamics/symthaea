@@ -961,7 +961,10 @@ mod tests {
         let model = fixture();
         let model_digest = canonical_interval_model_sha256(&model);
         assert_eq!(model_digest, canonical_interval_model_sha256(&model));
-        assert_eq!(sha256_hex(model_digest).len(), 64);
+        assert_eq!(
+            sha256_hex(model_digest),
+            "b1fb89c3775613d7b9aeb20857e6eb1a15b4133419e6fa3a307ddec6c906c466"
+        );
 
         let scores_a = vec![
             vec![q(0, 1), q(0, 1)],
@@ -1001,6 +1004,10 @@ mod tests {
         assert_eq!(a.source_model_sha256(), model_digest);
         assert_eq!(a.source_model_sha256(), a_replay.source_model_sha256());
         assert_eq!(a.compiled_lp_sha256(), a_replay.compiled_lp_sha256());
+        assert_eq!(
+            sha256_hex(a.compiled_lp_sha256()),
+            "882d77b1c59cede87ee5f04f69bf8345d85d26f4ad6443d2840cfbd839186ce4"
+        );
         assert_ne!(a.compiled_lp_sha256(), b.compiled_lp_sha256());
         assert_ne!(a.compiled_lp_sha256(), a_min.compiled_lp_sha256());
 
