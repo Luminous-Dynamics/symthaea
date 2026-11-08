@@ -2,6 +2,8 @@
   "schema": "symthaea.pgm.occupation-flow.intervalmdp-expected.v1",
   "status": "oracle-values-only-julia-not-executed",
   "competitor": "Zinoex/IntervalMDP.jl",
+  "source_model_sha256": "b1fb89c3775613d7b9aeb20857e6eb1a15b4133419e6fa3a307ddec6c906c466",
+  
   "competitor_version": "0.7.0",
   "julia_compat": "1.11",
   "arithmetic": "Rational{BigInt}",
