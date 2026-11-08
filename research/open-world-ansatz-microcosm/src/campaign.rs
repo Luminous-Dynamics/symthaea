@@ -232,9 +232,11 @@ mod tests {
     #[test]
     fn public_manifest_does_not_contain_truth_or_seed_fields() {
         let serialized = serde_json::to_string(&valid_manifest()).unwrap();
-        assert!(!serialized.contains("mechanism"));
+        assert!(!serialized.contains("\\\"mechanism\\\""));
         assert!(!serialized.contains("ground_truth"));
         assert!(!serialized.contains("world_seed"));
         assert!(!serialized.contains("true_model"));
+        assert!(serialized.contains("numeric_mechanism"));
+        assert!(serialized.contains("\\\"seed_ledger_sha256\\\""));
     }
 }
