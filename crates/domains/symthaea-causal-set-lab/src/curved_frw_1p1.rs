@@ -43,9 +43,14 @@ pub enum CurvedFrwError {
 impl fmt::Display for CurvedFrwError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidProperTime => write!(f, "proper-time coordinate extent must be finite and positive"),
+            Self::InvalidProperTime => write!(
+                f,
+                "proper-time coordinate extent must be finite and positive"
+            ),
             Self::InvalidCurvature => write!(f, "kappa must be finite and non-negative"),
-            Self::ExponentialOverflow => write!(f, "curvature and region size overflow the volume density"),
+            Self::ExponentialOverflow => {
+                write!(f, "curvature and region size overflow the volume density")
+            }
             Self::NumericalFailure => write!(f, "curved-volume quadrature or inverse CDF failed"),
             Self::CausalSet(error) => write!(f, "causal-set construction failed: {error}"),
         }
@@ -200,7 +205,8 @@ impl ConformalFrw1p1 {
             let right = (index + 1) as f64 * step;
             let middle = 0.5 * (left + right);
             let f = |radius: f64| {
-                radius * radius
+                radius
+                    * radius
                     * radial_density(radius, self.proper_time_coordinate_extent, self.kappa)
             };
             integral += step / 6.0 * (f(left) + 4.0 * f(middle) + f(right));
@@ -265,11 +271,9 @@ impl ConformalFrw1p1 {
 
         for _ in 0..CDF_BISECTION_STEPS {
             let middle = 0.5 * (low + high);
-            let partial = simpson_integral(
-                left,
-                middle,
-                |radius| radial_density(radius, self.proper_time_coordinate_extent, self.kappa),
-            );
+            let partial = simpson_integral(left, middle, |radius| {
+                radial_density(radius, self.proper_time_coordinate_extent, self.kappa)
+            });
             if partial < local_target {
                 low = middle;
             } else {
@@ -354,9 +358,11 @@ mod tests {
         let right = metric.sprinkle_fixed_cardinality(0xC0FFEE, 512).unwrap();
         assert_eq!(left.events(), right.events());
         assert_eq!(left.len(), 512);
-        assert!(left.events().iter().all(|event| {
-            (0.0..=2.0).contains(&event.u) && (0.0..=2.0).contains(&event.v)
-        }));
+        assert!(
+            left.events()
+                .iter()
+                .all(|event| { (0.0..=2.0).contains(&event.u) && (0.0..=2.0).contains(&event.v) })
+        );
     }
 
     #[test]
@@ -372,8 +378,8 @@ mod tests {
                 let x_first = first.coordinate_space();
                 let eta_second = second.coordinate_time() - 1.0;
                 let x_second = second.coordinate_space();
-                let expected = eta_second > eta_first
-                    && eta_second - eta_first >= (x_second - x_first).abs();
+                let expected =
+                    eta_second > eta_first && eta_second - eta_first >= (x_second - x_first).abs();
                 assert_eq!(first.causally_precedes(*second), expected);
             }
         }
