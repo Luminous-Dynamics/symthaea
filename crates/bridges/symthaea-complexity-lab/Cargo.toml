@@ -11,3 +11,4 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 path = "src/lib.rs"
 
 [dependencies]
+sha2 = { workspace = true }
