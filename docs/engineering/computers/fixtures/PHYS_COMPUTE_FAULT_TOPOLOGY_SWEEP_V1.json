@@ -1,0 +1,290 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "physical-compute-fault-topology-pilot-v1",
+  "status": "independent_toy_cpu_model_not_paper_reproduction_not_physical_measurement",
+  "protocol": {
+    "dimension": 32,
+    "fault_rate_setting": 0.39,
+    "k_values": [
+      8,
+      16,
+      24,
+      32
+    ],
+    "factor_seeds": 2,
+    "direct_seeds": 3,
+    "steps": 800,
+    "learning_rate": 0.03,
+    "topologies": [
+      "independent_cell",
+      "output_row_loss",
+      "output_column_loss",
+      "latent_channel_loss"
+    ],
+    "target_seed": 2026
+  },
+  "results": {
+    "dft_real": {
+      "rank": 17,
+      "independent_cell": {
+        "direct": 0.7835,
+        "k16": 0.9523,
+        "k24": 0.9998,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8102,
+        "k16": 0.813,
+        "k24": 0.813,
+        "k32": 0.813
+      },
+      "output_column_loss": {
+        "direct": 0.8102,
+        "k16": 0.813,
+        "k24": 0.813,
+        "k32": 0.813
+      },
+      "latent_channel_loss": {
+        "direct": 0.7835,
+        "k16": 0.723,
+        "k24": 0.9388,
+        "k32": 1
+      }
+    },
+    "hadamard": {
+      "rank": 32,
+      "independent_cell": {
+        "direct": 0.7808,
+        "k16": 0.7071,
+        "k24": 0.866,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "output_column_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "latent_channel_loss": {
+        "direct": 0.7808,
+        "k16": 0.527,
+        "k24": 0.6843,
+        "k32": 0.8099
+      }
+    },
+    "rank8": {
+      "rank": 8,
+      "independent_cell": {
+        "direct": 0.7692,
+        "k16": 0.9967,
+        "k24": 1,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8032,
+        "k16": 0.794,
+        "k24": 0.794,
+        "k32": 0.794
+      },
+      "output_column_loss": {
+        "direct": 0.8111,
+        "k16": 0.7965,
+        "k24": 0.7965,
+        "k32": 0.7965
+      },
+      "latent_channel_loss": {
+        "direct": 0.7692,
+        "k16": 0.9904,
+        "k24": 1,
+        "k32": 1
+      }
+    },
+    "random_orthogonal": {
+      "rank": 32,
+      "independent_cell": {
+        "direct": 0.7678,
+        "k16": 0.7071,
+        "k24": 0.866,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "output_column_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "latent_channel_loss": {
+        "direct": 0.7678,
+        "k16": 0.527,
+        "k24": 0.6843,
+        "k32": 0.8099
+      }
+    }
+  },
+  "caveats": [
+    "Fault topologies have different physical denominators; row/column and latent-channel failure cannot be treated as the same cell-level rate.",
+    "Survival fractions vary slightly with sampled masks; exact values are in full local results artifact.",
+    "Simplified real-valued factors only; no conductance mapping, circuitry, noise, temperature, calibration or physical device data.",
+    "No area/energy/yield/SOTA claim."
+  ],
+  "expected_latent_overprovisioning": {
+    "expected_value_only": {
+      "active_channels_required": 32,
+      "nominal_failure_probability": 0.39,
+      "expected_installed_channels": 52.459016393442624,
+      "rounded_up_installed_channels": 53,
+      "probability_of_at_least_32_active_at_53": 0.5960826243149094,
+      "caveat": "Expectation-only; not an availability design."
+    },
+    "independent_binomial_reliability": {
+      "active_channels_required": 32,
+      "channel_survival_probability": 0.61,
+      "minimum_installed_channels_for_availability": {
+        "0.95": {
+          "n": 63,
+          "probability_at_n": 0.9620473809111428,
+          "probability_at_n_minus_1": 0.9488219334514043,
+          "raw_parameter_ratio_2n_over_32": 3.9375
+        },
+        "0.99": {
+          "n": 68,
+          "probability_at_n": 0.9928775713132509,
+          "probability_at_n_minus_1": 0.9898207317355343,
+          "raw_parameter_ratio_2n_over_32": 4.25
+        },
+        "0.999": {
+          "n": 74,
+          "probability_at_n": 0.9993221076875388,
+          "probability_at_n_minus_1": 0.998973058226003,
+          "raw_parameter_ratio_2n_over_32": 4.625
+        },
+        "0.9999": {
+          "n": 79,
+          "probability_at_n": 0.9999249981069271,
+          "probability_at_n_minus_1": 0.9998816557449044,
+          "raw_parameter_ratio_2n_over_32": 4.9375
+        }
+      },
+      "assumption": "Independent identical Bernoulli channel failures only.",
+      "caveat": "Spatially correlated defects, common-mode failures, nonuniform channel quality and aging invalidate the simple binomial model; use empirical device distributions and explicit availability requirements."
+    }
+  },
+  "beta_binomial_correlated_channel_survival": {
+    "model": "exchangeable_beta_binomial",
+    "purpose": "stress-test sensitivity to common-cause variation in channel survival; not a spatial fault model or device-specific yield estimate",
+    "required_active_channels": 32,
+    "marginal_mean_survival": 0.61,
+    "parameterization": {
+      "rho_0": "independent binomial limit",
+      "rho_positive": "P~Beta(alpha,beta); X|P~Binomial(n,P); alpha=p*(1/rho-1), beta=(1-p)*(1/rho-1)",
+      "intraclass_correlation": "rho = 1/(alpha+beta+1)"
+    },
+    "rows": [
+      {
+        "rho": 0,
+        "p_at_least_32_with_53_installed": 0.5960826243149102,
+        "targets": {
+          "0.95": 63,
+          "0.99": 68,
+          "0.999": 74,
+          "0.9999": 79
+        }
+      },
+      {
+        "rho": 0.001,
+        "p_at_least_32_with_53_installed": 0.5940681649530533,
+        "targets": {
+          "0.95": 63,
+          "0.99": 68,
+          "0.999": 75,
+          "0.9999": 80
+        }
+      },
+      {
+        "rho": 0.005,
+        "p_at_least_32_with_53_installed": 0.5873589192735172,
+        "targets": {
+          "0.95": 64,
+          "0.99": 71,
+          "0.999": 78,
+          "0.9999": 85
+        }
+      },
+      {
+        "rho": 0.01,
+        "p_at_least_32_with_53_installed": 0.5811106773392263,
+        "targets": {
+          "0.95": 66,
+          "0.99": 73,
+          "0.999": 83,
+          "0.9999": 92
+        }
+      },
+      {
+        "rho": 0.02,
+        "p_at_least_32_with_53_installed": 0.5727056513714209,
+        "targets": {
+          "0.95": 69,
+          "0.99": 79,
+          "0.999": 93,
+          "0.9999": 107
+        }
+      },
+      {
+        "rho": 0.05,
+        "p_at_least_32_with_53_installed": 0.5608718919191079,
+        "targets": {
+          "0.95": 79,
+          "0.99": 98,
+          "0.999": 128,
+          "0.9999": 165
+        }
+      },
+      {
+        "rho": 0.1,
+        "p_at_least_32_with_53_installed": 0.5545789718231642,
+        "targets": {
+          "0.95": 96,
+          "0.99": 137,
+          "0.999": 220,
+          "0.9999": 344
+        }
+      },
+      {
+        "rho": 0.2,
+        "p_at_least_32_with_53_installed": 0.5536988624987238,
+        "targets": {
+          "0.95": 146,
+          "0.99": 289,
+          "0.999": 755,
+          "0.9999": 1951
+        }
+      }
+    ],
+    "caveats": [
+      "Intraclass correlations are hypothetical stress-test parameters, not measured device values.",
+      "Exchangeable correlation is not spatial correlation; it does not model adjacent-cell clusters, row/column geometry or wafer maps.",
+      "At rho=0.2 and 99% target, n=289 is a model output, not a production recommendation.",
+      "Physical design must use multi-die, multi-lot, temperature and aging measurements and a spatial/hierarchical reliability model.",
+      "Raw two-factor parameter ratio excludes differential pairs, compensation, routing, peripheral circuits, calibration, power/control domains and yield."
+    ],
+    "reproducibility": {
+      "script": "research/physical_compute/beta_binomial_redundancy.py",
+      "dependencies": "Python standard library only",
+      "validation": "Executed locally; 99% minimum channel counts match independent SciPy beta-binomial calculations to numerical tolerance.",
+      "status": "research calculator, not production reliability software"
+    }
+  }
+}

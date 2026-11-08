@@ -1,0 +1,140 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "physical-compute-fault-rate-sensitivity-v1",
+  "status": "independent_cpu_sensitivity_probe_not_paper_reproduction_not_physical_measurement",
+  "protocol": {
+    "dimension": 32,
+    "fault_rates": [
+      0.1,
+      0.25,
+      0.5
+    ],
+    "k_values": [
+      8,
+      16,
+      24,
+      32
+    ],
+    "factor_seeds": 2,
+    "direct_seeds": 3,
+    "steps": 800,
+    "learning_rate": 0.03,
+    "target_seed": 2026,
+    "threads": 2,
+    "fault_model": "independent Bernoulli stuck-off cells"
+  },
+  "target_ranks": {
+    "dft_real": 17,
+    "hadamard": 32,
+    "rank8": 8,
+    "random_orthogonal": 32
+  },
+  "direct_cosine": {
+    "0.1": {
+      "dft_real": 0.9502037116281823,
+      "hadamard": 0.9467893420277763,
+      "rank8": 0.9513604293717162,
+      "random_orthogonal": 0.9429602636996837
+    },
+    "0.25": {
+      "dft_real": 0.8618864220232608,
+      "hadamard": 0.8605496017985735,
+      "rank8": 0.8544836778366416,
+      "random_orthogonal": 0.8503315742563995
+    },
+    "0.5": {
+      "dft_real": 0.7091097130394427,
+      "hadamard": 0.7077765511156958,
+      "rank8": 0.6975546023997978,
+      "random_orthogonal": 0.6986876741773894
+    }
+  },
+  "factorized_cosine_mean": {
+    "0.1": {
+      "dft_real": {
+        "8": 0.6859942264249291,
+        "16": 0.9701425001329517,
+        "24": 0.999999992153304,
+        "32": 0.9999999450685502
+      },
+      "hadamard": {
+        "8": 0.5,
+        "16": 0.7071067811865475,
+        "24": 0.8660254037844386,
+        "32": 1
+      },
+      "rank8": {
+        "8": 0.9988272637457797,
+        "16": 0.9999999983547454,
+        "24": 0.9999999999999953,
+        "32": 0.9999999999997584
+      },
+      "random_orthogonal": {
+        "8": 0.4999999999999999,
+        "16": 0.7071067811865472,
+        "24": 0.8660254037844384,
+        "32": 0.9999999999999998
+      }
+    },
+    "0.25": {
+      "dft_real": {
+        "8": 0.6858318811254644,
+        "16": 0.9695362008061094,
+        "24": 0.9999971642541463,
+        "32": 0.9999999848230794
+      },
+      "hadamard": {
+        "8": 0.5,
+        "16": 0.7071067811865477,
+        "24": 0.8660254037844386,
+        "32": 0.9999999999999998
+      },
+      "rank8": {
+        "8": 0.9587250839016002,
+        "16": 0.9999910968118678,
+        "24": 0.9999999980539577,
+        "32": 0.9999999997122372
+      },
+      "random_orthogonal": {
+        "8": 0.49999999999999983,
+        "16": 0.7071067811865474,
+        "24": 0.8660254037844384,
+        "32": 0.9999999999999998
+      }
+    },
+    "0.5": {
+      "dft_real": {
+        "8": 0.6357037852771187,
+        "16": 0.8895538749415777,
+        "24": 0.9882656797551012,
+        "32": 0.9998564083963575
+      },
+      "hadamard": {
+        "8": 0.4987702686416768,
+        "16": 0.7065114514041515,
+        "24": 0.8647755506084414,
+        "32": 0.9982557394723959
+      },
+      "rank8": {
+        "8": 0.7670768827660834,
+        "16": 0.9589292614071834,
+        "24": 0.9967631162591156,
+        "32": 0.9999894063101656
+      },
+      "random_orthogonal": {
+        "8": 0.4988996461718993,
+        "16": 0.7066311954124591,
+        "24": 0.8651758238780893,
+        "32": 0.9982955766854329
+      }
+    }
+  },
+  "metric": "cosine_similarity(mean across seeds)",
+  "raw_parameter_ratio": "2*k/n; not physical cell count",
+  "interpretation_constraints": [
+    "Independent stuck-off masks only.",
+    "Unconstrained real-valued factors; no conductance mapping, differential pair, compensation or circuits.",
+    "No read/write noise, drift, retention, endurance, temperature, ADC/DAC, area or energy measurement.",
+    "Exploratory seed counts; no inferential benchmark claim."
+  ]
+}
