@@ -102,7 +102,11 @@ impl ModelHypothesis {
                 state = Some(
                     decay
                         .checked_mul(state.ok_or(NumericError::InvalidParameterBinding)?)
-                        .and_then(|value| self.gain.checked_mul(*input).and_then(|drive| value.checked_add(drive)))
+                        .and_then(|value| {
+                            self.gain
+                                .checked_mul(*input)
+                                .and_then(|drive| value.checked_add(drive))
+                        })
                         .ok_or(NumericError::ArithmeticOverflow)?,
                 );
             }
@@ -124,7 +128,11 @@ impl ModelHypothesis {
                 state = Some(
                     decay
                         .checked_mul(state.ok_or(NumericError::InvalidParameterBinding)?)
-                        .and_then(|value| self.gain.checked_mul(*input).and_then(|drive| value.checked_add(drive)))
+                        .and_then(|value| {
+                            self.gain
+                                .checked_mul(*input)
+                                .and_then(|drive| value.checked_add(drive))
+                        })
                         .ok_or(NumericError::ArithmeticOverflow)?,
                 );
             }
@@ -333,7 +341,6 @@ pub fn discover(
 
     let structure_identified =
         !compatible_models.is_empty() && compatible_structures.len() == 1;
-    let coefficients_identified = compatible_models.len() == 1;
     let coefficient_tuples: BTreeSet<(i64, Option<i64>)> = compatible_models
         .iter()
         .map(|model| (model.gain, model.decay))
