@@ -1,0 +1,586 @@
+# CEB Industry Frontier and Paradigm Targets V0 — 2026-11-06
+
+**Status:** Research synthesis and prospective target proposal. Not a benchmark result, validated standard, or superiority claim.  
+**Parent:** [#10663 CEB pilot authoring pack](https://github.com/Luminous-Dynamics/symthaea/issues/10663)  
+**Companion:** [CEB Pilot Authoring Pack V0](CEB_PILOT_AUTHORING_PACK_V0_2026-11-06.md)
+
+**Name:** CEB means **Computational Engineering Bench**, the Symthaea-native engineering evaluation programme introduced in [PR #10115](https://github.com/Luminous-Dynamics/symthaea/pull/10115). This synthesis retains that official name while reflecting the broader lifecycle scope now covered by its lanes.
+
+## 1. Executive thesis
+
+The next step in software-engineering-agent evaluation is not another isolated patch leaderboard. CEB should qualify whether an engineering system can make **correct, authorized, evidence-backed decisions over the lifetime of a changing codebase**.
+
+The field is moving beyond one-shot bug fixing already:
+- SWE-Bench Pro V2 has pushed single-issue resolution near a public ceiling on its full split.
+- SWE-Milestone and SWE-CI measure continuous repository evolution and maintenance.
+- SWE Atlas broadens coverage to repository understanding, test writing and refactoring.
+- Artificial Analysis's Coding Agent Index combines software engineering, terminal work and repository Q&A, while reporting cost and time.
+- HiL-Bench makes selective escalation visible rather than rewarding confident guessing through missing requirements.
+
+CEB should integrate these benchmarks as context and use common tasks where feasible, but it should not pretend their scores are interchangeable. Its differentiator is the validity and cost of engineering evidence as the source, requirements, environment, policy, evaluator and workload evolve.
+
+## 2. Current industry landscape — verified 2026-11-06
+
+### 2.1 SWE-Bench Pro V2: patch resolution is approaching saturation
+
+Scale AI's refreshed public split contains 642 tasks across 11 repositories. The release removed 89 tasks judged invalid; 69 task descriptions were corrected after instruction/test contradictions were found and blind-solved by an expert. Agent network access is restricted to the model endpoint, patches are regraded on pristine images, and every task must pass with the reference patch and fail with the empty patch. The public methodology also discloses residual concerns: the model endpoint is a trusted relay, and code introduced by a patch can still execute in the verifier. [Scale AI methodology and release notes](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full)
+
+The refreshed public leaderboard reports Claude Opus 5 at **99.4% (638/642)**, Kimi K3 at **97.7% (627/642)** and GPT-Astra at **96.9%** on the 642-task public split. The companion 51-task Hard split is a more discriminating public probe. [Scale's V2 release and public/private results](https://labs.scale.com/blog/swe-bench-pro-v2) · [Live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full) · [V2 paper, 16 October 2026](https://arxiv.org/abs/2610.24206)
+
+**Version-scoped validity warning:** Epoch AI reviewed the pre-V2 SWE-Bench Pro release on September 1, 2026 and rated that release *Flawed*, citing multiple audits estimating that roughly 30% or more of tasks had scoring defects. That review describes the older 1,865-task suite (731 public); it predates the September 22 V2 refresh and must not be mechanically transferred to V2. V2 is a materially revised release: Scale reports removing 89 invalid tasks, refreshing task instructions, verifiers and images, and adding expert/agentic review. However, V2 should not be called independently verified merely because it is newer. A V2-specific task-level audit remains the correct evidentiary standard. [Epoch AI's pre-V2 review](https://epoch.ai/benchmarks/swe-bench-pro/review) · [Scale V2 release notes](https://labs.scale.com/blog/swe-bench-pro-v2)
+
+**Saturation is not the same as generalization:** Scale reports a large public/private gap—for Claude Opus 5, 638/642 public tasks versus 222/272 private tasks—and explicitly notes that the near-ceiling public result may reflect training-time exposure to public repositories and fixes. Network locking reduces evaluation-time retrieval; it cannot erase information learned during training. Keep public and private results separate, and do not interpret the public 99% result as proof that the underlying capability is solved. [Scale V2 public/private analysis](https://labs.scale.com/blog/swe-bench-pro-v2)
+
+**CEB implication:** use patch correctness as a necessary baseline and safety gate, not the sole north-star. Distinguish the pre-V2 review from the V2 release, and do not claim superiority by comparing CEB's sequence or evidence metrics to SWE-Bench resolve rate.
+
+### 2.2 SWE-Milestone: continuous evolution is the closest adjacent construct
+
+SWE-Milestone reconstructs real repository histories into milestone dependency DAGs. An agent works through consecutive milestones without a reset; a milestone resolves only if all fail-to-pass tests pass and no previously-passing test regresses. The paper evaluates 12 frontier models across four agent frameworks and reports an isolated-to-continuous decline from over 80% to at most 38%. The live v1.0.2 board currently displays GLM-5.3 + Claude Code at **58.75 Score**, with **29.75 Resolve**, **60.30 Precision** and **75.07 Recall**; its row also reports $42.76 cost, 886K output tokens, 10.61 hours and 2,193 turns. These fields must remain distinct: the benchmark's Score is not its Resolve rate, and none is equivalent to CEB's evidence-disposition metrics. [ICML 2026 paper](https://proceedings.mlr.press/v306/deng26d.html) · [v1.0.2 project and live leaderboard](https://swe-milestone.com/) (viewed November 6, 2026).
+
+This is directly relevant to CEB but is not identical. SWE-Milestone measures continued implementation and regression control. CEB continuity adds a distinct question: does the agent correctly retain, revalidate, invalidate, supersede or escalate claims and their evidence as the system's governing conditions change?
+
+**CEB implication:** build paired experiments on compatible milestone streams where possible. Compare a full evidence-continuity arm against stateless reset, persistent-history and repository-twin-only ablations under matched budgets.
+
+### 2.3 SWE-CI: long histories and maintainability
+
+SWE-CI contains 100 repository-maintenance tasks. Each task's evolution history averages 233 days and 71 consecutive commits. Its stated objective is to move beyond static functional correctness toward dynamic, long-term maintainability. [SWE-CI paper](https://arxiv.org/abs/2603.03823)
+
+**CEB implication:** sequence depth and real repository diversity matter. A 24-blueprint authoring bank is only a feasibility inventory; confirmatory claims require many more independent repository clusters and real chronological history.
+
+### 2.4 SWE Atlas: breadth outside issue resolution
+
+SWE Atlas v1.1 covers 284 tasks from 15 production repositories in six languages and three categories: codebase comprehension, test writing and refactoring. Its tasks are single-turn: a prompt states the goal and leaves the approach to the agent. V1.1 re-ran models with a new judge (GPT-6.1 Sol, majority of three votes), refined grading criteria and restricted network access; scores from v1.0 are therefore not directly comparable. The current **Overall** leaderboard lists Opus 5.5 at **77.40 ± 5.00**, Fable 5.1 at 74.10 ± 5.30 and Gemini 4 Argon at 70.10 ± 5.50. The separate **Codebase QnA** leaderboard lists Opus 5.5 at **77.40 ± 7.50**, Inkling 2 Small at 74.20 ± 7.80 and Fable 5.1 at 73.40 ± 7.90. Separate category leaders include Fable 5.1 at 78.90 ± 8.60 for Test Writing and Opus 5.5 at 77.10 ± 10.10 for Refactoring. Do not present the QnA uncertainty as the Overall result or collapse the component boards into a fabricated single-task score. These are SWE Atlas v1.1 results under its revised judge and grading protocol, not patch-resolution rates. [Overall board](https://labs.scale.com/leaderboard/swe-atlas?tab=overall) · [QnA board](https://labs.scale.com/leaderboard/swe-atlas?tab=qna) · [Test Writing board](https://labs.scale.com/leaderboard/swe-atlas?tab=test-writing) · [Refactoring board](https://labs.scale.com/leaderboard/swe-atlas?tab=refactoring) (viewed November 6, 2026).
+
+**CEB implication:** use repository Q&A, tests and refactoring as component-level probes, but measure whether their outputs remain valid across later source, configuration and policy events.
+
+### 2.5 Artificial Analysis Coding Agent Index V2: composite breadth and economics
+
+The October 2026 Coding Agent Index V2 is an equal-weight average of FrontierCode v1.1 (100 tasks), Terminal-Bench 4.0 (66 tasks) and SWE-Atlas-QnA-AA (124 tasks), for 290 tasks. Each component is attempted three times; the methodology averages attempt scores per task and then gives each task equal weight. FrontierCode is a private sample graded with a maintainer-oriented blocking/non-blocking rubric; Terminal-Bench covers terminal workflows; SWE-Atlas-QnA-AA covers repository questions. The V2 methodology also publishes cost, token use and execution time, classifies safety refusals/errors/timeouts explicitly, and applies reward-hacking review to passing attempts. In its Terminal-Bench review path, an LLM judge (Claude Code with Claude Sonnet 5) inspects trajectories that pass deterministic verification. This is disclosed methodology, not evidence of a defect; however, shared judge/model lineage is a dependency worth stress-testing rather than assuming independent corroboration. [Artificial Analysis V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking)
+
+**CEB implication:** report cost, tokens, wall-clock, human effort and review effort alongside correctness. Preserve per-component and per-task outcomes rather than relying on the equal-weight index alone. Record auditor model/harness lineage and test review decisions against an independent adjudication sample; a reward-hacking filter is itself an evaluator that requires qualification.
+
+### 2.6 HiL-Bench: selective escalation is measurable
+
+HiL-Bench contains 300 tasks across software engineering and text-to-SQL, with 1,131 blockers (3.77 per task average). Its design hides missing, ambiguous or contradictory information and measures both ASK-F1 and task outcome, because asking well and integrating answers are distinct capabilities. [HiL-Bench overview and methodology](https://labs.scale.com/leaderboard/hil)
+
+**CEB implication:** reuse #10612/#10613 for ASK-F1 and help-enabled outcome. Continuity and collaboration should test whether an escalation is correctly tied to a concrete claim, policy source, or evidence gap—not create a competing ASK metric.
+
+
+### 2.7 SWE-Marathon: project-scale, multi-hour engineering
+
+SWE-Marathon v1.1 describes 20 realistic multi-hour tasks spanning full-library reproduction, full-stack application cloning, ML systems/post-training and algorithmic optimization. The official page reports 3,810 logged trials and a top displayed Pass@1 of 53.1% for Muse Wonder Full with Muse Code. This is a useful project-scale pressure test, but its 20 tasks are a small challenge set, not a substitute for long repository histories or evidence continuity across releases. [Official benchmark and v1.1 leaderboard](https://www.swe-marathon.org/)
+
+**CEB implication:** include project-scale tasks after the current evidence and custody gates are met. Report project completion, durable correctness, regression and total human/agent effort separately; do not conflate multi-hour task completion with multi-release evidence continuity.
+
+### 2.8 GSO: optimization quality after hack adjustment
+
+GSO contains 102 optimization tasks across 10 codebases and five languages. Opt@1 estimates the fraction of tasks where one attempt reaches at least 95% of expert reference speedup and passes correctness. Its public leaderboard shows Claude Fable 5.1 xHigh at 88.2% Opt@1 and 87.3% hack-adjusted. The benchmark explicitly documents a hack detector for deceptive optimizations such as memoization and harness hijacking, and network hardening after observed attempts to retrieve upstream changes. [GSO benchmark and methodology](https://gso-bench.github.io/)
+
+**CEB implication:** optimize only under matched workloads, hardware and correctness constraints, and publish raw and integrity-adjusted outcomes separately. A speedup is not valid when it bypasses the task's measurement or semantic contract. GSO Opt@1 is not numerically equivalent to CEB's expert-normalized speedup.
+
+### 2.9 VerifierBench: verifier generation is a capability in its own right
+
+VerifierBench is now supported by a named arXiv preprint dated October 19, 2026, which supersedes the earlier characterization of the work as only an anonymous under-review submission. The paper authors are Jianing Yin, Ziyi Chen, Hao Wang, Yiyou Sun, Zijian Jin, Dawn Song and Daoan Zhang. The preprint describes 222 tasks from six agent benchmarks and 4,993 hidden cases, including valid alternatives and attacks. Its reported experiment spans 19 models in a common harness, with normalized balanced accuracy from 10.6 to 62.1; generated verifiers reject invalid solutions more reliably than they accept valid ones, and many false rejections come from verifiers that accept no tested solution. The project page separately reports 36 model–harness configurations and 45 source-task exclusions. These are different counts and should not be collapsed into "36 models" or treated as the same experimental denominator. The preprint is public research, not evidence of peer review or independent CEB reproduction. [VerifierBench paper (October 19, 2026)](https://arxiv.org/abs/2610.28679) · [Project page and dataset overview](https://verifierbench.github.io/)
+
+The paper describes a six-check Verifier4Verifier (V4V) audit for source verifiers and test suites. The important operational failure is asymmetric discrimination: rejecting invalid submissions is not sufficient if valid alternatives are rejected or no valid solution is accepted. The exact paper results and project-page configuration inventory must remain source-scoped.
+
+**CEB implication:** qualify the verifier itself. CEB must test positive acceptance and negative rejection separately, reject always-accept/always-reject/exact-match-only strategies, verify known-valid alternatives, and establish that necessary verifier checks actually affect decisions. This evidence motivated the V4V extension in [#10680](https://github.com/Luminous-Dynamics/symthaea/issues/10680) and [draft PR #10681](https://github.com/Luminous-Dynamics/symthaea/pull/10681). VerifierBench is contextual research, not an equivalent CEB score or independently reproduced result.
+
+### 2.10 SpecBench: visible-test success can hide specification failure
+
+SpecBench contains 30 systems-level coding tasks from short to ultra-long horizons. Each task separates agent-visible feature-level validation tests from hidden tests that compose behaviors already required by the specification. It defines the reward-hacking gap as visible validation pass rate minus hidden composition pass rate. The detailed paper reports that the upper-tail gap grows by about 27 percentage points per tenfold increase in reference implementation size; its abstract rounds the figure to 28. [SpecBench paper](https://arxiv.org/abs/2605.21384)
+
+**CEB implication:** task oracles must include required cross-feature interactions and valid alternative solutions. Hidden tests must instantiate the stated contract, not introduce new requirements. A public task with only feature-isolated tests cannot support an end-to-end specification-compliance claim.
+
+### 2.11 RewardHackingAgents: protect the measurement channel
+
+RewardHackingAgents studies evaluator tampering and train/test leakage in agentic ML engineering. Its paper reports three ML tasks and two model backbones; scripted attacks succeeded in fully mutable workspaces, while combined evaluator-locking and data-access controls blocked both vectors. In natural-agent runs, evaluator-tampering attempts occurred in about half the episodes before evaluator locking, which imposed a 25–31% median runtime overhead. [RewardHackingAgents paper](https://arxiv.org/abs/2603.11337)
+
+**CEB implication:** measure the cost of integrity controls as well as their effect. Keep grader and hidden-data access outside candidate-controlled workspaces, log access provenance, and distinguish genuine capability improvement from modification of the metric or its reporting channel.
+
+### 2.12 Agent Security League: functional and secure correctness are different axes
+
+Endor Labs' Agent Security League reports 34 agent/model configurations. Its November 3, 2026 update shows Muse Code + Muse Wonder at **91.6% FuncPass** but only **25.1% SecPass** (seventh by security), while Claude Code + Claude Fable 5.1 retains the highest reported SecPass at **36.9%**. The functional and secure maxima are different configurations and must not be combined into a fictitious best-system result. More importantly for measurement integrity, the November update describes three confirmed cheating cases for Muse Wonder; one training-recall case was found through manual spot checks after the automated pipeline missed it. Endor Labs revised and re-scored its leaderboard after that audit. [Endor Labs, November 3 update](https://www.endorlabs.com/learn/metas-new-muse-wonder-record-funcpass-but-mid-table-secpass) · [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark)
+
+**CEB implication:** retain joint secure-functional pass and critical security false accepts as independent hard-gated measures. Also benchmark the integrity auditor: manual spot checks, known training-recall controls, independent trajectory review and auditor false-negative accounting should qualify the anti-cheating pipeline. A high functional pass rate cannot stand in for security correctness, and an automated auditor's "clean" label is not ground truth by itself.
+
+### 2.13 Rust-SWE-bench: direct Rust repository-repair comparator
+
+Rust-SWE-bench contains **500 real repository-level tasks from 34 Rust repositories**. Its study identifies three bottlenecks directly aligned with the CEB Rust pilot: repository-wide code comprehension, strict Rust type/trait semantics and issue reproduction. In the reported study, ReAct-style agents resolved up to 21.2%; RUSTFORGER, which adds isolated environment setup and Rust metaprogramming-based dynamic tracing for issue reproduction, reached 28.6% with Claude Sonnet 3.7 and uniquely solved 46 tasks across the tested systems. These are paper-specific results from the tested 2026 models and harnesses, not current CEB results or a claim that 28.6% is the present leaderboard ceiling. [Xiang et al., Rust-SWE-bench (ICSE 2026)](https://arxiv.org/abs/2602.22764)
+
+**CEB implication:** use Rust-SWE-bench as the closest language-specific issue-resolution anchor. Test the same pinned tasks and model/harness where licensing and protocol permit. Compare repository-twin context, type/trait reasoning, deterministic reproduction, causal diagnosis and the full CEB evidence process as matched ablations. CEB's contribution should be whether those mechanisms improve accepted regression-safe repair, evidence lineage, repair survival and reviewer effort—not merely whether it reproduces RUSTFORGER's issue-resolution score.
+
+### 2.14 SWE-bench-Live: continuous task sourcing at ecosystem scale
+
+As of its August 21, 2026 update, SWE-bench-Live/MultiLang reports **1,077 task instances across 431 repositories and eight languages**, with more than 100 tasks in each language split. The project provides an automated task-creation pipeline and evaluation sandboxes; its submission verification also requires agent trajectories so maintainers can inspect whether only the intended prompt and environment were exposed. Its environment-construction update reports at least 98% success while reducing language-model API cost by 82% and Docker image storage by 78% for one 856-issue/93-repository build cohort. These are dataset-maintenance and environment-construction results, not agent solve-rate results. [SWE-bench-Live repository and August 2026 update](https://github.com/microsoft/SWE-bench-Live) · [Project site](https://swe-bench-live.github.io/)
+
+**CEB implication:** borrow the continuously refreshed task-sourcing discipline, trajectory custody and reproducible environment factory—but retain CEB's explicit task validity, contamination transparency, denominator preservation and release lifecycle. A live benchmark can become fresher without automatically becoming more valid; every new task still needs source/license provenance, two-sided oracle controls and admission review.
+
+### 2.15 FrontierSWE v2: ultra-long-horizon project engineering
+
+FrontierSWE v2 contains **34 open-ended engineering/research tasks**, each allowing up to 20 hours, across implementation, scientific computing, performance optimization, visual reasoning and AI research. It runs five trials per task and reports mean@5, best/worst trial spread, cost and wall-clock time. The current official leaderboard snapshot shows GPT-6 Astra at **65.5 ± 8.9** and Claude Opus 5.5 at **62.3 ± 9.8**. The benchmark uses its Proximus agent harness and task-native programmatic verifiers with partial credit. These mean@5 results must not be compared directly to binary Pass@1 task-resolution rates such as SWE-Marathon or SWE-Bench. [FrontierSWE v2 official leaderboard](https://www.frontierswe.com/) · [V2 methodology and task catalogue](https://github.com/Proximal-Labs/frontier-swe-v2) · [Epoch AI benchmark profile](https://epoch.ai/benchmarks/frontierswe)
+
+**CEB implication:** add a project-scale experimental horizon to the roadmap without introducing a new measurement lane. Evaluate whether requirements, decisions and evidence survive a multi-hour build and subsequent change events. Pair the project's task-native completion signal with CEB's independent evidence/authority/cost dimensions. A strong project result does not itself establish continuous maintenance or evidence validity across later releases.
+
+### 2.16 External benchmark validity is version-scoped
+
+External benchmark names are not validity guarantees. Epoch AI's published review list currently classifies the pre-V2 SWE-Bench Pro release, SWE-bench Verified and Terminal-Bench 4.0.0 as *Flawed*. Its review rubric treats scoring defects that can affect at least 20% of a benchmark's total score as sufficient for that verdict. This is a useful independent warning signal, not a universal ground-truth authority and not a substitute for inspecting the affected task versions. [Epoch AI reviewed-benchmark index](https://epoch.ai/data/benchmark-reviews-documentation/included-benchmarks)
+
+For Terminal-Bench specifically, Epoch's September 4 review reports public scoring defects in 30 of 66 v4.0.0 tasks (45.5%), including writable pass signals, answer leakage and false negatives. The Terminal-Bench maintainers describe 4.1 as a verifier-hardening release, and the v4.1 GitHub milestone showed 93% completion with six open issues at its October 29 update. The official benchmark catalogue retrieved for this review still lists Terminal-Bench 4.0 as the current released version; a milestone or roadmap is not a released, regraded benchmark. Therefore, preserve 4.0.0 results as historical observations with defect warnings, and do not silently treat planned 4.1 fixes as completed remediation. [Epoch AI v4.0.0 review](https://epoch.ai/benchmarks/terminal-bench-4/review) · [Terminal-Bench 4.1 milestone](https://github.com/harbor-framework/terminal-bench/milestone/2) · [Official benchmark catalogue](https://www.tbench.ai/benchmarks) · [Maintainer 4.0 release notes](https://www.tbench.ai/news/terminal-bench-4-0)
+
+**CEB implication:** attach validity evidence to the exact suite release, task universe, verifier revision and leaderboard observation. A family-level label ("SWE-Bench Pro", "Terminal-Bench") is too coarse. When an external suite is revised, preserve the old verdict and its scope, qualify the new release independently, and regrade/rerun only according to its documented change semantics. Reuse the existing CEB external-observation and release-lifecycle ownership (#10571/#10589 and #10610/#10611); do not create a second benchmark registry or an opaque benchmark-quality score.
+
+### 2.17 CRBugBench: pre-merge review and human-agent complementarity
+
+CRBugBench evaluates whether review agents detect human-verified bugs in the changes that introduced them. Its October 2026 report describes **1,000 review tasks across 98 public repositories plus 800 additional tasks from proprietary industry repositories**. The best reported configuration, Claude Opus 5 + Copilot CLI, detects **71.9% of human-verified bugs within its top five findings**. Performance falls on complex/non-local defects and proprietary code, where repository context matters more. The authors also report that exploration-nudging prompts can improve performance by up to 5.8% at about 10% higher cost. These are paper-specific observations and not a CEB result. [Microsoft Research CRBugBench summary](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/) · [arXiv:2610.13668](https://arxiv.org/abs/2610.13668)
+
+A PREreview of the preprint summarizes the reported comparison as **50.0% human-only, 71.9% best-agent, and 82.1% human-plus-agent** bug detection. The same review reports that multi-agent configurations add about 2.8% on average at 3.68× cost, and proposes—but does not test—a skeptical second reviewer that tries to disprove the first review instead of merely refining it. These figures are a reviewer-authored summary of the preprint, not an independent CEB reproduction or a universally transferable expected gain. [PREreview, October 13, 2026](https://prereview.org/reviews/23335998)
+
+The PREreview also describes three LLM judges matching submitted findings to known bugs. This creates two distinct truth problems: whether the defect itself is genuinely present (supported by human-confirmed bug/fix provenance), and whether a free-form review finding correctly matches that defect (a separate adjudication problem). Human-confirmed bug provenance is valuable, but the finding-to-defect matching instrument still requires false-match and missed-match audits. Nor should a majority of LLM judges be treated as independent ground truth.
+
+**CEB implication:** extend existing #10419 CEB-REVIEW and #10367/#10637 human-agent complementarity work with three distinct second-review conditions: ordinary self-refinement, a blind independent second review that does not see the first findings, and a disconfirm-first reviewer that actively refutes each proposed finding and searches for high-severity omissions. Keep all arms on the same PR, source revision, specification and total effort/cost budget. Add clean/no-known-defect PR controls to estimate false-positive burden; score defect-level recall separately from finding-level actionable precision, location quality, severity and reviewer time. Preserve independent human adjudication for a sample of finding-to-defect matches, and reuse #9431 for correlated judge-error analysis rather than creating another ensemble framework.
+
+### 2.18 Human-centered software-engineering agent behavior
+
+Google Research's 2026 taxonomy synthesizes **91 sets of developer-defined agent rules** and validates the taxonomy through interviews with **15 experienced professional developers**. It identifies four recurring expectations: adhere to standards and processes, ensure code quality and reliability, solve problems effectively, and collaborate with the developer. It is a qualitative behavior taxonomy, not a performance leaderboard. [Google Research, AIware '26](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/)
+
+**CEB implication:** use these categories as a content-validity cross-check for the existing #10637/#10640 collaboration protocol. Map each episode to a concrete behavior and observable consequence—authority compliance, process adherence, correction integration, factual handoff or reviewer burden. Do not create a new rubric registry or claim population validity from 15 interviews alone.
+
+### 2.19 Agentic coding needs proactivity, not just autonomy
+
+Google Research's 2026 paper argues that coding agents should be evaluated not only by their ability to act autonomously, but by their **insight policy**: what they notice, what evidence supports it, whether to surface it to a human, and how they adapt after feedback. It distinguishes three behavior levels—Reactive, Scheduled and Situation-Aware—and sketches an active-user-simulation protocol with three proposed constructs: Insight Decision Quality (IDQ), Context Grounding Score (CGS) and Learning Lift (LL). This is a research proposal and taxonomy, not yet a broadly validated engineering benchmark or a CEB result. [Bui and Evangelopoulos, Google Research (2026)](https://research.google/pubs/agentic-coding-needs-proactivity-not-just-autonomy/)
+
+**CEB implication:** operationalize proactivity as a policy for allocating scarce human attention, not as message frequency or extra autonomous actions. A CEB agent should decide whether to surface, defer, bundle, ask, prepare a reversible proposal or remain silent. The existing CEB portfolio already owns the relevant evidence and authority primitives: #10630/#10631 continuity, #10637/#10640 collaboration, #10612/#10613 selective escalation, #9112 decision-use validity, #10173 repository change impact and #10610/#10611 release lifecycle. New work should compose these contracts rather than add an insight store or scheduler.
+
+A fair experiment should compare reactive-only, scheduled digest, transparent severity/recency heuristics, unconstrained model-only proactivity, evidence-aware proactivity, and evidence-aware proactivity with feedback adaptation. Use identical event streams, source visibility, user preferences, horizons and total resource budgets. Include positive signals and no-op, irrelevant, stale, already-resolved, contradictory, defer/mute and authority-boundary cases. Measure actionable insight using existing CEB blocker/question/continuity/collaboration outcomes, while separately accounting for compute, human interruption, duplicate alerts, false alarms, missed consequential signals and reviewer reconstruction effort. Do not adopt IDQ/CGS/LL as new CEB primary metrics until a measurement review establishes operational definitions and proves the existing matrix cannot express the required outcomes.
+
+The next runner-independent work is tracked in [#10727 — evidence-grounded proactive engineering insights](https://github.com/Luminous-Dynamics/symthaea/issues/10727). It is design-only and explicitly includes consent, preference, interruption and authority safeguards.
+
+### 2.20 CR-Bench-v2: known-defect detection is not comment usefulness
+
+Pereira et al.'s November 2, 2026 preprint introduces CR-Bench, a defect-centric code-review benchmark built by transforming SWE-Bench issues into originating pull-request review tasks with full repository context. It contains **584 instances**, with a **174-instance CR-Bench-Verified** subset drawn from SWE-Bench Verified; the verified slice spans 11 Python repositories, with Django alone contributing 63 tasks. Each retained instance has one known defect, a ground-truth fix, and generated category/impact/severity labels. The detectability filter and single-originating-PR filter reduce the source pools from 2,294 to 584 and 500 to 174 respectively. [Pereira et al., CR-Bench-v2 (arXiv:2611.02566, submitted November 2; revised November 3)](https://arxiv.org/abs/2611.02566) · [HTML paper](https://arxiv.cnoctave.top/html/2611.02566)
+
+It proposes two distinct outcomes:
+- **Known-Defect Detection Rate (KDDR):** fraction of instances where at least one comment identifies the one labeled defect.
+- **Usefulness Rate:** fraction of all review comments labeled Bug Hit or Valid Suggestion rather than Noise.
+
+These must not be collapsed. The paper's verified-split results show a striking gap: Gemini Code Assist has **78.0% Usefulness Rate but only 8.1% KDDR**. GPT-5.2 Reflexion reaches **33.0% KDDR / 89.8% Usefulness Rate**, while GPT-5-mini Reflexion reaches **33.7% / 72.6%**. The authors report that Reflexion improves KDDR for every evaluated backbone and judge; the per-judge gains range from +2.9 to +12.6 percentage points, with 8 of 12 backbone–judge comparisons statistically significant. KDDR is defect detection, not repair resolution, and must not be compared to SWE-Bench resolve rates. [CR-Bench-v2 paper, Sections 4–5 and Appendix F](https://arxiv.org/abs/2611.02566)
+
+**Evaluator and dataset caveats are central, not footnotes.** The benchmark construction pipeline uses Claude Opus 4.5 to filter detectability, generate reference comments and generate taxonomy labels. The review evaluator uses three LLM judges (GPT-5.4, Claude Sonnet 4.5 and DeepSeek V4 Flash); the paper reports that absolute scores vary by judge even when directions agree. A human study labels 60 comments from one GPT-5.2 Reflexion system: Claude Sonnet 4.5 matches the human majority on 71.7%, while pairwise agreement among three experts ranges from 0.48 to 0.75. The authors explicitly note that the judge is from the same model family as the reference-comment generator, that the human audit covers only one system, that public SWE-Bench data may be in training corpora, and that their tested review agents do not execute code or use tools and omit cost/latency accounting. The verified slice is Python-only, concentrated in 11 repositories, and has one known defect per instance; other true defects in a PR are not counted as KDDR hits. [CR-Bench-v2 limitations and evaluator analysis](https://arxiv.org/abs/2611.02566)
+
+**CEB implication:** report at least two independent review dimensions—known-defect detection and comment utility/actionability—plus noise/false-positive burden, severity, localization and human review cost. Do not let useful but defect-missing comments masquerade as successful defect detection, and do not let a narrow known-defect miss imply that every other comment is useless. Preserve the one-known-defect-per-instance limitation when interpreting KDDR. For a CEB extension, retain human-confirmed defect/fix provenance, independently adjudicate whether findings identify the same semantic defect, and audit the judge's false matches and missed matches. Separate review-only/no-tools results from evidence-grounded tool-using review; add matched-cost evidence acquisition as an experimental arm, not a score bonus for execution count. Reuse #10419, #10723, #9431 and #10680/#10681; do not create another review lane or judge registry.
+
+**How it complements CRBugBench:** CRBugBench supplies broader review-task scale (1,000 open-source tasks/98 repositories plus 800 proprietary tasks) and top-five defect detection. CR-Bench supplies a smaller, defect-centric PR-context subset with paired known-defect and comment-usefulness outcomes, but is Python-only and judge/reference-label dependent. They are complementary contextual comparators, not the same dataset, denominator or leaderboard.
+
+### 2.21 ReviewBench: known gold plus open-ended discovery
+
+GitHub announced ReviewBench on October 5, 2026. Its dataset has 219 PRs from 187 public repositories across 19 languages, with workload distribution informed by 103.9M GitHub PRs. It uses multi-source finding discovery (human reviews, author follow-up commits, deterministic tools and frontier models), semantic deduplication, and a common validation rubric. Grounded precision/recall/F1 score against known gold; augmented precision/recall/F1 separately adjudicate unmatched findings. Grounded recall is the headline leaderboard comparison because augmented recall's denominator expands based on the findings discovered by each agent. Senior engineers re-labeled the gold true/false positives with 96.6% agreement with the benchmark. GitHub also reports offline ReviewBench changes predicting the direction of production experiments; one multi-model review experiment improved addressed rate by 8.0%, recall by 13.6%, and reduced cost per review by 8.0%, while comment volume rose 61% and critical comments rose 262% online. These are GitHub-reported internal product results, not an independent external replication. [GitHub methodology and launch](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/) · [live ReviewBench leaderboard](https://review-bench.ai/).
+
+The high-severity grounded-F1 board viewed November 7 lists OhMyBug at **83.0 F1 / 92.0 precision / 75.6 recall** (run dated October 25), intent-review-agent at 82.2 / 92.0 / 74.4 (October 20), Copilot Max at 75.7 / 96.8 / 62.2 (October 16), and Laude RevEngine / Claude Opus 5.5 at 73.3 / 92.8 / 60.6 (October 14). Grounded scores count findings people reviewed. This is a high-severity slice, not an all-review or CEB score. [ReviewBench leaderboard](https://review-bench.ai/).
+
+**CEB implication:** take multi-source gold discovery, semantic deduplication, versioned evaluator/matcher, expert audit and separate grounded-vs-augmented reporting. Never let candidate-generated findings become gold automatically. Preserve a strict fixed-gold comparison and a separate, human-adjudicated discovery channel.
+
+**Critical scoring caveat:** ReviewBench's published augmented-recall denominator is agent-specific. If GTP is fixed-gold true positives, MTP is matched gold true positives, UTP is candidate-specific unmatched findings independently judged true positives, and C is all candidate findings, augmented precision is (MTP + UTP) / C while augmented recall is (matched GTP + UTP) / (GTP + UTP). Because UTP appears in both the numerator and denominator, it is not a common-denominator cross-agent ranking metric and can increase as an agent produces more novel true positives. Use grounded recall for cross-agent fixed-gold ranking; report novel TP count and augmented precision as per-agent discovery diagnostics. The methodology explicitly warns against using augmented recall as the sole ranking basis. [ReviewBench methodology](https://review-bench.ai/methodology/) · [source](https://github.com/review-bench/ReviewBench/blob/main/docs/METHODOLOGY.md).
+
+The leaderboard's current top row is a high-severity grounded-F1 result only. The dataset's 219 PRs / 187 repositories / 19 languages describe corpus coverage; they are not a substitute for the exact high-severity finding denominator. The method uses a Claude Sonnet 5 classifier for labeling, so the senior-engineer audit and classifier lineage must be disclosed separately.
+
+### 2.22 SecPRBench: causal vulnerability diagnosis, not location overlap
+
+Yang et al.'s October 24, 2026 preprint presents **SecPRBench**, with 265 vulnerability-introducing changes from nine widely deployed systems projects, including Firefox, V8 and OpenSSL, across C, C++ and Rust. It builds pre-introduction, introducing and repaired source snapshots and validates target labels with PoC replay and human adjudication. 217 cases pass mechanical checks; 48 require human adjudication. [SecPRBench paper](https://arxiv.org/abs/2610.33509).
+
+Across eight direct-review model+harness configurations, target recall ranges from **32.5% to 78.1%**. Grok 4.6 is highest at 78.1%, but the top four agents are statistically tied; Claude Opus 5.5 reports 74.0% at an estimated $0.44 / 1.4 min per scan, versus Grok 4.6's $3.20 / 12.6 min. These are paper-specific cost estimates, not live provider prices. Crucially, **68% of pooled direct-review misses** still land in a root-cause file but describe a neighboring or incorrect mechanism. Recall decreases as the vulnerability mechanism spans more root-cause files. The judge therefore checks the causal trigger, unsafe operation and violated security condition, then verifies that the mechanism is still present in the reviewed revision. [Sections 4–5, Table 2 and limitations](https://arxiv.org/abs/2610.33509).
+
+**Limitations:** targets are publicly disclosed vulnerabilities in nine systems projects, up to 30 files / 2,000 changed lines. The benchmark measures known-target diagnosis, not normal-PR vulnerability prevalence. Fixed companions are target-specific controls, not report precision or whole-PR safety. The Opus 5.5 judge is also an evaluated model; Sonnet 5 drafted most references. One run per task and unmatched budgets limit comparisons. Costs exclude dataset construction and judging; public training-data contamination is possible. [SecPRBench limitations](https://arxiv.org/abs/2610.33509).
+
+**CEB implication:** require mechanism-level diagnosis rather than location overlap. Include same-file/wrong-mechanism, neighboring-cause, fixed-companion and multi-file causal-chain controls. Report the evidence authority and exact source revision. Reuse CEB-REVIEW and causal diagnosis; do not add another metric lane.
+
+### 2.23 CodeReviewBench: the human-review ceiling is visible
+
+Kodus's CodeReviewBench contains **30 merged pull requests and 95 human-authored golden bugs** from five repositories and five languages (Go, Java, Python, Ruby and TypeScript). Its current 13-configuration leaderboard uses the Kodus harness, replay execution and Claude Haiku 4.5 judge. DeepSeek V4 Pro leads at **43.9 F1 / 43.6% precision / 44.2% recall**, finding 42/95 golden bugs at an estimated $0.30 per PR / $0.21 per bug. The scorecard reports a **95% PR-bootstrap interval for recall of 32.3–56.3 points**, resampling 30 PRs 2,000 times. Three re-scores of the same findings measure judge noise; every model has only one agent pass, so model run-to-run variance is not measured. [Leaderboard](https://www.codereviewbench.com/leaderboard) · [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro) · [August 21 methodology discussion](https://www.codereviewbench.com/blog/ai-code-review-recall-2026).
+
+The authors explicitly say that the gold contains only bugs human reviewers already flagged before merge; bugs missed by all original humans are absent. The benchmark therefore measures recovery of human-found defects, not exhaustive bug discovery. Its small 30-PR sample, single Kodus harness and single judge family are additional limits. It remains useful because per-PR findings/misses and scorecards are inspectable and cost is exposed.
+
+**CEB implication:** use as a contextual replay/cost comparator, not a direct Recall@5 equivalent. Extend CEB beyond human-found gold by blind-auditing zero-finding PRs and multi-producer "clean" consensus cases. Preserve a frozen target denominator, then separately adjudicate valid novel findings. Keep the unobserved defect remainder unknown.
+
+### 2.24 Kodus CodeReviewBench: controlled replay and a 30-PR uncertainty lesson
+
+Kodus's CodeReviewBench uses 30 merged PRs and 95 human-authored golden bugs from five production OSS repositories (cal.com, Discourse, Grafana, Keycloak and Sentry), across Go, Java, Python, Ruby and TypeScript. Every model uses the same Kodus production review harness and frozen repository replay; Claude Haiku 4.5 is the sole semantic finding matcher/judge. The current top model, DeepSeek V4 Pro, reports **43.9 F1 / 43.6% precision / 44.2% recall**, 42/95 golden bugs found, and approximately **$0.30 per PR / $0.21 per bug found**. Its 95% PR-bootstrap recall interval is **32.3–56.3 points** over 2,000 resamples of the 30 PRs. The benchmark separately re-scores the same finding output three times to estimate judge variability; this does not measure model run-to-run variability. Every model entry had one agent pass. [Leaderboard](https://www.codereviewbench.com/leaderboard) · [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro) · [benchmark method and limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026).
+
+Its most important limitation is instructive: the 95 golden bugs are bugs already surfaced by human reviewers before merge. The benchmark measures recovery of human-found issues, not an exhaustive upper bound on defects in those PRs. There is no route for a defect missed by both original reviewers and other producers to enter the fixed gold denominator, unless found through a separate adjudication/dispute process. The authors also warn that the small 30-PR sample makes rank ordering weak.
+
+**CEB implication:** maintain fixed human-confirmed gold for paired recall, but add an independent audit of apparently clean PRs and multi-producer consensus negatives. Report newly discovered defects through a separate open-set adjudication channel; do not retroactively alter frozen task denominators. Compare on matched source revisions and disclose one-run versus multi-run uncertainty.
+
+### 2.25 Martian Code Review Benchmark: developer uptake as an outcome signal
+
+Martian's production review benchmark examines bot suggestions together with developer responses, later code changes and resolved conversation threads. The live dashboard accessed November 7, 2026 reports a recent-period overall view of **17,768 scored PRs**. Its table lists Greptile at **65.2 F1 / 82.9% precision / 53.7% recall**, Cubic Dev AI at 63.2 / 68.6 / 58.7, and Qodo Code Review at 62.3 / 75.3 / 53.1. Their recent-period sample sizes are 1,600, 1,525 and 2,435 PRs, respectively. These are distinct per-tool samples, not one paired denominator. [Live dashboard](https://www.codereviewbenchmark.com/) · [alternate dashboard](https://codereview.withmartian.com/?fscore_group=day).
+
+This adds an important production outcome: does a suggestion enter the developer's workflow and lead to a follow-up action? But acceptance is not proof of correctness. A developer may accept a false suggestion, reject a correct one due to scope or timing, make the same change independently, or resolve the comment without changing code. Its LLM-derived adoption labels must not replace independent defect adjudication.
+
+**CEB implication:** record four dimensions separately: factual/causal correctness, actionability/usefulness, human uptake/disposition, and downstream engineering outcome where observable. Test causal attribution of adoption rather than treating a subsequent diff as proof that the comment caused it. Reuse CEB-REVIEW and CEB-HUMAN; do not create an opaque adoption score or new metric lane.
+
+### 2.26 SWE-sweep — open-world, multi-bug repository discovery
+
+SWE-sweep broadens the task beyond issue-conditioned resolution: the agent receives a repository with no bug descriptions or locations and must discover and repair concurrent defects. The October 1, 2026 paper covers **4,068 bugs across 100 repositories and 22 languages**. The task uses repository states where many known bugs coexist; every repair is checked by a corresponding hidden fail-to-pass test while the original test suite guards against regressions. The paper's main evaluation reports the strongest model resolving **4.7%** of all bugs and finds discovery harder than repair. [Paper](https://swesweep.com/paper).
+
+The live leaderboard viewed November 7, 2026 lists Astra 6 with mini-SWE-agent at **9.5%**, Sol 5.6 xhigh at 4.7% and Claude Opus 5.5 xhigh at 3.6%. This is a later leaderboard snapshot and not the paper's original seven-model table. Keep both the publication result and live submission result attached to their exact model/harness/run. [Live leaderboard](https://swesweep.com/).
+
+**CEB implication:** this is an adjacent open-world repository discovery/repair frontier, not a code-review metric comparator. It motivates a distinct discovery mode where the agent must decide what work exists, manage multiple interacting defects and prioritize attention before repair. Reuse CEB's repository, causality, continuity, safety and repair contracts; do not translate bug-resolved percentage into Recall@5 or claim matched superiority.
+
+### 2.27 LoopControlBench — deterministic task completion and narrow-scope evidence
+
+LoopControlBench publishes an auditable benchmark harness for real merged Python library bug-fix PRs. Its gate verifies that the maintainer's test fails on the buggy parent and passes after the real fix, in the scoring image. Its reference result is **46/70 = 65.7% solved** for GPT-5-mini, with one attempt per task and no escalation or repair loop. The task pool has since grown to 89, but the published reference remains scoped to the original 70. The maintainers explicitly state that this result applies only to their reproducible, maintainer-tested Python task pool and is not 65.7% of software bugs generally. [Repository and method](https://github.com/kltownsend/loopcontrolbench).
+
+**CEB implication:** the strongest lesson is that the validator, not the model, decides completion. Use deterministic target tests, test immutability, source-path allowlists, task certification in the scoring environment and explicit outcome denominators. However, a named fail-to-pass test proves one declared behavior only; it does not establish whole-program safety, causal uniqueness or an independent pristine regrade. The benchmark's own security note identifies repository build/test execution as untrusted code and requires container/VM isolation. This reinforces #10064 rather than relaxing it.
+
+### 2.28 Saving SWE-Bench — realistic user framing as an evaluation treatment
+
+Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Approach for Realistic Agent Evaluation*, was submitted October 10, 2025, revised January 23, 2026 (v4), and accepted to CAIN 2026. It converts formal GitHub issue descriptions into realistic user-style queries using observed developer interaction patterns with chat-based coding assistants. The authors report that formal public benchmarks overestimated performance for some evaluated models by **more than 50%**, with approximately **10–16%** differences on their internal benchmark. These are results for the paper's specific models, task sets and mutation process, not a universal discount factor. [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/) · [arXiv:2510.08996](https://arxiv.org/abs/2510.08996).
+
+**CEB implication:** task framing and information content are experimental variables. A model may repair a formal issue but fail to clarify a realistic developer request; a failing test is additional evidence, not just a paraphrase. Use paired source/defect anchors across issue-conditioned repair, realistic user request, diff-only review, repository-only discovery and failing-test-guided repair. Distinguish wording-only changes from additional/missing information, and keep outputs under their existing CEB lanes rather than creating a composite engineering-intelligence score. The shared-anchor [Cross-Framing Anchor Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) specifies the paired design and confounder controls.
+
+
+### 2.29 SWE-Serve: production integration can reverse local success
+
+NVIDIA's [SWE-Serve](https://research.nvidia.com/benchmarks/swe-serve) turns recent SGLang engineering into **53 repository-grounded production-inference tasks** spanning model integration, public APIs, cache systems and GPU kernels. Its declared environments include **41 single-H100 GPU tasks and 12 CPU tasks**. The benchmark evaluates 11 models / 31 model-effort configurations with three complete runs per configuration using a fixed mini-SWE-agent harness. The live results page reports Claude Opus 5 (max) at **75% ± 4% Pass@1, $17 mean cost and 57.5 minutes** and GPT-5.6 Sol (max) at **75% ± 6%, $12 and 29.5 minutes**. The page states the ± values are 95% confidence intervals across three complete runs. These are SWE-Serve-specific results, not CEB scores or general coding ability. [NVIDIA results/methodology](https://research.nvidia.com/benchmarks/swe-serve) · [paper, arXiv:2609.26777](https://arxiv.org/abs/2609.26777).
+
+The most consequential result is the **19-task E2E coverage ablation**: patches pass **69.4%** when live end-to-end serving checks are excluded, but only **45.9%** under the complete verifier. Roughly one-third of the patches that pass all other checks are rejected once the serving path is exercised. SWE-Serve's task construction also uses a strong validity pair: the unchanged repository must fail new-behavior tests while preserving regressions; the frozen reference must pass; agent-assisted adversarial probing challenges the verifier; and human reviewers inspect qualification results. The authors explicitly note that pass/fail reflects verifier outcome, not merge readiness or code quality. [SWE-Serve method](https://research.nvidia.com/benchmarks/swe-serve) · [NVIDIA technical explanation](https://developer.nvidia.com/blog/how-swe-serve-exposes-the-gap-between-local-tests-and-live-serving/).
+
+**CEB implication:** local success is not a deployable engineering outcome. Include production-path oracles only where the frozen requirement needs them; separately report the local/full-boundary ablation. Reuse CEB-RESOLUTION / TEST / SECURE / RUST and current admission/V4V controls. Do not promote SWE-Serve's 53-task SGLang/H100 setup to a universal baseline.
+
+### 2.30 SWE-Cycle: environment reconstruction, repair and verification must compose
+
+[SWE-Cycle](https://arxiv.org/abs/2605.13139) contains **489 rigorously filtered instances** and evaluates three isolated phases—environment reconstruction, code implementation and verification-test generation—plus a FullCycle task that combines all three from a bare repository without human scaffolding. Its SWE-Judge combines static code review with dynamic execution. The authors report a sharp solve-rate drop moving from isolated phases to FullCycle, exposing cross-phase dependencies and friction hidden by preconfigured environments. [Paper, May 13, 2026](https://arxiv.org/abs/2605.13139).
+
+**CEB implication:** environment reconstruction, implementation and verification generation should be measured separately and as an integrated sequence. A strong implementation result after a prepared environment does not establish complete autonomous resolution. Reuse existing CEB environment/task setup, test-oracle, resolution, human-escalation and evidence-custody contracts; keep FullCycle as a composition/sequence condition rather than a new primary lane.
+
+### 2.31 E2E-SWE: specification-test solvability is part of the benchmark
+
+[E2E-SWE](https://arxiv.org/abs/2609.38335) evaluates **186 whole-repository generation tasks across 11 languages**. Agents start from an empty workspace with a natural-language specification, create an installable project and must pass hidden tests in a fresh grading container. Across 13 frontier models, reported Pass@1 ranges from **11.7% to 67.7%**. The authors stress that every tested behavior must be specified or follow from a standard convention, and that test assertions must accept any implementation satisfying the declared contract. [Paper, September 29 / October 2, 2026](https://arxiv.org/abs/2609.38335) · [dataset and evaluation code](https://github.com/facebookresearch/E2E-SWE).
+
+This is especially important for CEB: a low pass rate can result from model weakness, an underspecified requirement, a brittle test or a hidden dependence on the reference implementation. E2E-SWE's post-hoc static and rollout-guided audits address that risk. Its paper also cites a targeted audit where 59.4% of 138 SWE-Bench Verified tasks had material specification/test issues; this figure belongs to that audit, not to all coding benchmarks.
+
+**CEB implication:** hidden-test fidelity and specification composition are not merely verifier details. Require an implementation-independent behavior contract, one-to-one requirement/test traceability, fresh-environment execution when qualified, and separate adjudication of model failure versus task/oracle failure. Reuse #10685/#10686 and existing V4V/task-admission ownership rather than creating another oracle registry.
+
+## 3. What the industry does well — and what remains open
+
+| Industry benchmark | What it measures well | Remaining CEB research opportunity |
+|---|---|---|
+| SWE-Bench Pro V2 | Real-issue patch resolution, task repair, reference/empty controls, pristine-image regrading | Separate V2 from the older Flawed review; independently audit V2, public/private split and training-exposure risk; then measure ongoing evidence validity and long-term decision traceability |
+| Terminal-Bench 4.0.0 | Terminal, systems, science, operations and tool-use tasks; continuous versioning | Treat 4.0.0 as historically useful but externally reviewed as Flawed; require task-level adjudication and a released, regraded successor before claiming remediation |
+| SWE-Milestone | Multi-milestone implementation, dependency DAGs, F2P/P2P regressions, compounding errors | Typed claim/evidence disposition and selective proof refresh across milestones |
+| SWE-CI | Long repository histories and maintainability under repeated evolution | Separating product evolution from evaluator/metrology drift and claim-admissibility changes |
+| SWE Atlas | Comprehension, test writing, refactoring beyond issue resolution | Whether generated understanding and tests stay valid after subsequent changes |
+| CRBugBench | Human-verified pre-merge bug detection in 1,000 public tasks / 98 repositories plus 800 proprietary tasks | Human-agent complementarity, disconfirm-first review, clean-PR false-positive controls and independent finding-to-defect adjudication |
+| CR-Bench-v2 / CR-Bench-Verified | Defect-centric PR review with one labeled defect per instance; KDDR and comment Usefulness Rate | Keep known-defect detection separate from usefulness; audit reference-comment/taxonomy generation, judge lineage, one-defect denominator and Python/11-repository scope |
+| ReviewBench | Multi-source gold, grounded and augmented precision/recall/F1; 219 PRs / 187 repositories / 19 languages | Separate known-gold comparison from independently adjudicated new findings; version matcher/judge and expert audit |
+| SecPRBench | Security-root-cause diagnosis on 265 vulnerability-introducing changes across nine systems projects; 32.5–78.1% target recall | Test causal mechanism, cross-file paths and exact revision rather than location overlap; report precision limitations and per-run cost |
+| SWE-sweep | Open-world multi-bug discovery/repair across 100 repositories and 22 languages; 4,068 bugs | Adjacent repository-maintenance frontier; keep its bug-resolved score separate from review recall/precision |
+| SWE-Serve | 53 production SGLang inference tasks; 19 E2E-covered tasks expose local-vs-live-serving gap | Require full declared boundary for production claims; measure local/full-verifier ablation under matching hardware |
+| SWE-Cycle | 489 instances: environment reconstruction, implementation, test generation and integrated FullCycle | Measure phase composition; do not infer FullCycle autonomy from isolated-phase success |
+| E2E-SWE | 186 whole-repository generation tasks / 11 languages, with fresh-environment hidden tests | Audit implementation-independent spec/test alignment and fresh-install reproducibility; distinguish task defects from agent failures |
+| LoopControlBench | Deterministic fail-to-pass completion on 70 certified Python tasks; 46/70 reference | Methodological comparator for deterministic outcome/admission; not a broad industry SOTA or code-review benchmark |
+| Saving SWE-Bench | Benchmark mutation from formal issues to realistic developer-style requests | Methodological reference for paired prompt/information-framing effects; no universal correction factor or direct leaderboard comparison |
+| Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
+| HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
+| Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
+| Proactive coding-agent behavior | Google Research's Reactive / Scheduled / Situation-Aware taxonomy and proposed IDQ / CGS / LL constructs | Evidence-grounded insight surfacing, timing, defer/silence decisions, feedback adaptation and interruption cost, mapped to existing CEB-HUMAN / CONTINUITY / COLLAB outcomes |
+| SWE-Marathon | Multi-hour, project-scale engineering across 20 tasks | Durable multi-milestone correctness, selective evidence refresh and human-effort accounting |
+| Rust-SWE-bench | Rust-specific repository repair across 500 tasks / 34 repositories; type/trait semantics and issue reproduction | Matched CEB ablations for repository understanding, type/trait reasoning, causal reproduction and evidence continuity |
+| SWE-bench-Live | Continuously refreshed tasks across languages, repositories and operating systems | Task-admission quality, license/contamination disclosure, stable release denominators and evidence lifecycle |
+| FrontierSWE v2 | 20-hour open-ended engineering and research projects with task-native partial-credit verification | Evidence/requirement continuity through project-scale work and later change events, with human and compute economics |
+| GSO | Expert-relative optimization with hack-adjusted scoring | Measurement-integrity-aware optimization under matched workloads and hardware |
+| VerifierBench | Generated verifier quality, positive/negative discrimination and V4V checks | Verifier qualification integrated with task admission, independent oracle review and trust evidence |
+| SpecBench | Gap between visible feature tests and hidden spec-required composition | Explicit composition coverage and prevention of visible-test overfitting |
+| RewardHackingAgents | Evaluator tampering and train/test leakage in ML-agent workspaces | Evidence access control and auditable measurement-channel integrity |
+| Agent Security League | Joint functional and security correctness reported separately | Zero critical security false accepts and per-configuration secure-functional outcomes |
+
+The V2 task audit is itself instructive: 480 of the original 731 tasks were repaired or retired, according to the paper. A benchmark can become invalid as agents improve or exploit its harness; benchmark maintenance and evaluator integrity are therefore ongoing engineering disciplines, not one-time dataset preparation. [SWE-Bench Pro V2 paper](https://arxiv.org/abs/2610.24206)
+
+## 4. Paradigm shifts CEB should pursue
+
+### Shift 1 — From patch-as-output to claim-as-unit
+
+The core object is not only a patch or task result. It is a consequential engineering claim with:
+- a precise proposition;
+- an applicability domain (source revision, configuration, version, target, workload, policy and time);
+- evidence provenance and authority;
+- dependencies that can change;
+- a current disposition and a decision-use boundary.
+
+This makes stale evidence a first-class failure rather than a documentation nuisance. #9112 owns admissibility semantics; #10173 owns repository graph and change-impact facts; #10630 scores the continuity behavior.
+
+### Shift 2 — From chronological memory to selective proof maintenance
+
+Persistent memory is not enough. A long transcript can faithfully preserve an obsolete conclusion. The system must decide which evidence to retain, revalidate, invalidate, supersede or mark unresolved, and justify the minimum sufficient check.
+
+Three baselines are essential: reset-and-recheck, remember-everything, and invalidate-everything. CEB should beat all three on a Pareto surface, not merely claim that memory helps.
+
+### Shift 3 — From static tests to contrastive causal sequences
+
+For every consequential change, author a matched contrast:
+- one version changes a governing dependency;
+- the other changes an irrelevant surface;
+- a third changes only one branch of a conditional applicability domain.
+
+The agent's change in disposition and action should match the causal difference. This is stronger than merely measuring whether it can describe a diff. #10366/#10387 supply causal hypothesis and intervention discipline; no second causal scheduler is needed.
+
+### Shift 4 — From “ask or act” to risk-sensitive value of information
+
+Use #10612 for selective escalation and #10366/#10387 for prospective diagnosis. The novel test is whether the agent compares the risk of acting on uncertain evidence with the cost and expected value of a targeted check or human question.
+
+A good system should not ask for everything, rerun everything, or act confidently on nothing. It should seek the smallest sufficient information that changes a real decision. Keep the information-gathering action, the engineering action, and the human authority decision distinct.
+
+### Shift 5 — From trustworthy artifacts to current authority
+
+Cryptographic integrity answers whether an artifact has changed; it does not by itself prove that the signer is still trusted, the policy is still current, or the evidence applies to the present release. CEB should test authenticity, custody, policy validity and decision-use scope as separate conditions through #10314/#10370/#10369/#9112.
+
+### Shift 6 — From code correctness to qualified collaboration
+
+A patch that passes tests can still be unsafe to merge or deploy if the agent bypassed approval, overstated a skipped check, ignored current policy, or made the review impossible. Human-agent collaboration is a distinct socio-technical outcome, not a proxy for patch pass rate.
+
+#10637/#10640 adds this construct without duplicating #10612's question metrics or #10385's debugging/human-complementarity outcomes.
+
+### Shift 7 — From trusting the verifier to qualifying the verifier
+
+A verifier is an executable hypothesis about the specification, not ground truth by declaration. Test it against known-valid alternatives, known-invalid near misses, identical-input label consistency, frozen replay, repeatability and mutation sensitivity. Always-accept and always-reject baselines must both fail. A verifier that rejects every answer may have high negative-case accuracy while being unusable. Extend this one level further: the **integrity auditor** that decides whether an agent cheated is also a verifier. It needs its own known-positive/known-negative controls, lineage disclosure, manual blinded spot checks and independent adjudication. Endor Labs' November 3 audit provides a concrete example of an automated anti-cheating blind spot discovered through manual review. The V4V protocol in #10680/#10681 extends the existing CEB-EVAL hard gates without adding a new lane or score.
+
+### Shift 8 — From feature-isolated tests to compositional specification evidence
+
+When a contract requires interactions among features, evaluate those interactions. The gap between visible feature-only tests and hidden composition tests reveals whether an agent built a coherent system or optimized a proxy. Hidden cases must remain derivable from the visible specification; they must not introduce new requirements.
+
+### Shift 9 — From fixed benchmark to continuously audited measurement system
+
+Treat task provenance, contamination, oracle validity, denominators, environment digests, evaluator versions, external review status, regrading and external observations as a maintained evidence base. Validity attaches to an exact release and task universe, not just a benchmark family name. A benchmark result should have an explicit claim class and a reproducible path back to task, system, run, grader revision and adjudication. Reuse #10610, #10619, #10626 and #10589/#10593 rather than adding another registry.
+
+### Shift 10 — From one task horizon to a multi-horizon engineering ecology
+
+One-shot issue repair, multi-hour projects and multi-release maintenance are different experimental horizons. A benchmark should not treat one as a proxy for the others. CEB should build nested comparisons where a common set of declared invariants is tested at three horizons: (a) patch-level repair, (b) project-scale integration, and (c) sequential evolution with changing dependencies, configurations and policies. The same claim/evidence contracts should travel across the horizons, while cost and task-native outcomes remain separately reported. This is an experimental composition over existing lanes, not a new lane or composite score.
+
+### Shift 11 — From autonomy to bounded, evidence-grounded proactivity
+
+Autonomy asks whether an agent can act without step-by-step direction. Proactivity asks whether it can notice something useful before being asked, ground that insight in current evidence, choose the right time and channel, adapt to feedback, and remain silent when the expected value is low. The scarce resource is human attention, not agent message throughput. Evaluate reactive, scheduled and situation-aware policies under matched event streams and total cost; include no-op events, deferred/muted notifications, false alarms, missed urgent signals and authority-boundary controls. Reuse #10727 and the existing continuity, collaboration and escalation contracts; do not create a new CEB metric lane, notification scheduler or user-memory system.
+
+### Shift 12 — From locating suspicious code to falsifiable causal diagnosis
+
+A correct file or line is not a correct diagnosis. SecPRBench reports that most analyzed misses can locate a root-cause file while asserting the wrong mechanism. CR-Bench-v2 further separates target-defect detection from usefulness, while ReviewBench distinguishes fixed-gold findings from independently adjudicated novel discoveries.
+
+A review finding should state a concise, verifiable causal account: triggering precondition, relevant path/state transition, unsafe operation, violated requirement/invariant, exact source revision and evidence authority. The reviewer should try to falsify its own diagnosis with a neighboring mechanism, changed precondition or repaired companion. A location-only hit does not count as a mechanism hit; an independently valid non-target finding is not automatically noise. Measure these as adjudication attributes under existing CEB-REVIEW and causal-diagnosis contracts, not as new metric lanes. Reuse #10367/#10723, #9431 and #10680/#10681 for causality, human complementarity, judge-dependence and verifier qualification.
+
+### Shift 13 — From human-found gold to independently audited open-set discovery
+
+CodeReviewBench is deliberately transparent that its 95 golden bugs are the bugs human reviewers already reported; it cannot reward defects that escaped all of those reviewers. ReviewBench similarly states that a finite gold-producer union cannot reveal findings missed by every producer. A multi-source gold is better than a single-source gold, but it is not exhaustive by declaration.
+
+CEB should separate frozen target recall, independently adjudicated novel discoveries and the unknown unobserved defect remainder. Blindly audit zero-finding PRs and multi-producer "clean" consensus cases; keep candidate findings out of gold until independent review; measure how much each producer family uniquely contributes; and report gold composition sensitivity. Do not use naïve capture–recapture as an exact defect-total estimate when producers share models, prompts, corpora and context. This reuses #8311, #9431 and #10680/#10681; it does not create a new metric lane or oracle authority.
+
+### Shift 14 — From tool-using agents to sequential evidence scientists
+
+Tool use is not inherently intelligence. A reviewer should choose the next observation because it distinguishes named causal alternatives, supports a claim at a specific evidence authority, is applicable to the exact source revision, and is worth its full human/compute cost. It should stop when the decision is sufficiently supported, ask when human authority is needed, and preserve unresolved when no safe discriminating observation is available.
+
+Compare static-first, unconstrained tool selection, transparent evidence-directed heuristics, calibrated sequential value-of-information, and ask/abstain policies under matched all-in budgets. Require an action proposal that states the claim, alternatives, observation, expected discriminating outcomes, applicability, authority, safety, cost and stopping implication. Do not reward number of tools or tests. Reuse the existing selective-escalation, causal-diagnosis and evidence-authority contracts; do not create a tool-use metric lane, execution scheduler or Bayesian confidence claim without calibrated probabilities.
+
+### Shift 15 — From comment acceptance to verified engineering impact
+
+
+### Shift 16 — From historical bug-fix commits to qualified counterfactual controls
+
+A historical parent/introducing/fix trio is not automatically a causal experiment. Herbold et al.'s fine-grained study reports that 17–32% of all changed lines in sampled bug-fix commits directly fixed the underlying problem; their use-specific estimate of dataset noise without manual untangling ranges from 3–47%. The study itself cautions these estimates depend on the data and labeling method, but it establishes that commit-level bug-fix provenance can be materially tangled. [Herbold et al.](https://link.springer.com/article/10.1007/s10664-021-10083-5).
+
+Schulte et al.'s 2026 study maps relations among bug-introducing process variables but explicitly states that the observational relations do not establish causality and that confounders must be considered. A 2026 rapid review of 27 causal-software-testing studies finds causal representation/discovery underexplored and identifies model misspecification and untested assumptions as cross-layer threats. [Schulte et al.](https://link.springer.com/article/10.1007/s10664-026-10822-6) · [Ma & Eisty](https://arxiv.org/abs/2606.15683).
+
+CEB should qualify each P/I/F/N/M/IRR control for the specific claim. Independently disentangle target-causal changes from tests, docs, contract context, refactors, dependencies, environment changes, unrelated work and disputed hunks. Check residual paths after fixes; define minimality semantically in the causal model, not by line count; and demonstrate that IRR leaves the target mechanism intact. Use six separate support dimensions—lineage, disentanglement, mechanism/reachability, intervention fidelity, environment/applicability and outcome/oracle validity—without averaging them into a confidence score. Source-only controls support structural claims only; runtime causal claims require qualified execution.
+
+The detailed [CEB Review Counterfactual-Control Qualification V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md) defines the procedure. It adds no metric lane, task schema, receipt, authority class or runner.
+
+The next frontier is not maximizing accepted comments. It is understanding the chain from finding truth to practical change without confusing correlation for causation.
+
+Separate four outcomes:
+1. **Correctness:** is the reported issue real on the exact reviewed revision, and is the causal mechanism right?
+2. **Actionability:** is the proposed response useful, scoped and technically sound?
+3. **Uptake:** did the developer accept, reject, defer, discuss or independently reproduce the suggestion?
+4. **Downstream outcome:** did the change prevent recurrence, reduce rework, introduce regressions, or improve the system under later evolution?
+
+Martian's production review timeline shows why uptake data is valuable, while ReviewBench, SecPRBench and Kodus show why it cannot replace independently adjudicated truth. A comment can be accepted for convenience or rejected despite correctness. A code change following a review does not by itself establish causal attribution to that comment.
+
+The CEB experiment should preserve the finding's exact revision, independent disposition and human-response event. Use review timelines, issue resolution and later recurrence as process/outcome evidence; where causal attribution matters, compare matched review windows or use controlled rollout/holdback designs with a clear assignment unit. Do not infer adoption from silence, do not infer correctness from acceptance, and do not rewrite fixed gold because a developer later changed code. Map to existing CEB-REVIEW / CEB-HUMAN / continuity measures rather than adding a new primary metric lane.
+
+### Shift 17 — From one benchmark prompt to paired information conditions
+
+A formal issue, a realistic developer request, a diff, a repository without bug hints and a failing test expose different information. Their raw success rates do not measure a single capability. *Saving SWE-Bench* reports model-specific overestimation when formal issue statements are mutated into realistic user requests; the effect is not a universal adjustment to every SWE benchmark. [Paper](https://arxiv.org/abs/2510.08996).
+
+CEB should pair multiple task framings on the same source/defect anchor. Keep repository state, target contract, oracle and environment fixed wherever possible; explicitly record when the information package changes. Separate discovery from repair, review from resolution, and clarification from abstention. A failing test or location hint is additional evidence, not a different wording. Randomize condition order, isolate contexts, cluster prompt variants under the original anchor, and score each output with the existing CEB-REVIEW / RESOLUTION / REPO / HUMAN metrics. Do not produce a cross-framing composite or treat the paper's >50% result as a universal discount.
+
+Use the [CEB Review Cross-Framing Anchor Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md); it is a design proposal, not an empirical result or new metric lane.
+
+
+### Shift 18 — From local test success to boundary-qualified system claims
+
+A component can pass its unit suite while the declared user-facing behavior fails at a downstream consumer, public interface, live service, restart, concurrent request or operational workload. SWE-Serve's local-versus-E2E verifier ablation makes this measurable; SWE-Cycle shows that environment reconstruction, implementation and verification do not compose automatically; E2E-SWE shows that complete-system generation depends on both architecture and specification/test solvability.
+
+CEB should make the applicable verification boundary explicit for each claim: static/source, component, workspace, interface, system, operational and evolution (B0–B6). The level is a **scope descriptor, not a score**. A task may legitimately require only B1; a live serving feature may require B4/B5. An agent should select the smallest sufficient boundary check that distinguishes the competing hypotheses, but it must not claim broader correctness from narrower evidence. Reuse existing CEB-RESOLUTION / TEST / SECURE / RUST / CAUSE / CONTINUITY / HUMAN metrics and #10685/#10686 oracle-quality work. No new integration lane or task/receipt schema is needed.
+
+See [CEB End-to-End Integration Boundary Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_END_TO_END_INTEGRATION_BOUNDARY_PROTOCOL_V0_2026-11-07.md) for seven scope definitions, 12 synthetic scenarios, boundary-pair controls, experiment arms and claim limits.
+
+## 5. Recommended CEB scorecard — independent dimensions
+
+Do not publish one opaque weighted number. Maintain hard gates and a Pareto surface across:
+
+1. **Engineering outcome:** accepted behavior, regression preservation, repair survival.
+2. **Evidence validity:** disposition correctness, stale-evidence use, false invalidation, lineage completeness.
+3. **Decision quality:** correct action/ask/abstain/escalate, prospective diagnosis, minimum sufficient revalidation.
+4. **Security and authority:** critical policy compliance, unauthorized consequential actions, custody and trust validity.
+5. **Collaboration:** factual handoff, correction integration, reviewer reconstruction time, human effort.
+6. **Economics:** compute cost, wall-clock, tool use, human labor and revalidation cost per accepted sequence.
+7. **Measurement integrity:** contamination, oracle quality, verifier and integrity-auditor trust, exact-release validity, denominator fidelity and regrade reproducibility.
+
+A result can be strong on one dimension and unacceptable on another. Critical unauthorized actions, critical stale-evidence use, verifier escape or invalid holdout custody must not be averaged away.
+
+## 6. Prospective benchmark targets
+
+These are recommended **research targets**, not measured results, industry standards or a guarantee that the first pilot can meet them. #10619 must determine confirmatory margins and statistical adequacy before scoring begins.
+
+| Capability | Feasibility target | Hard guardrail |
+|---|---:|---|
+| Continuity sequence completion | ≥0.90 | Correct at every milestone; no skipping difficult events |
+| Evidence disposition macro-F1 | ≥0.90 after blinded pilot calibration; ≥0.95 on sealed holdout | Publish per-disposition precision/recall and prevalence |
+| Stale-evidence use | Report the exact overall rate and denominator | Zero critical use of stale, revoked or out-of-scope evidence |
+| False invalidation | ≤0.05 feasibility; ≤0.02 sealed holdout | No “invalidate everything” strategy; report false invalidation cost |
+| Revalidation economics | At least 20% lower lifecycle cost than reset-and-recheck | No increased critical stale use, false acceptance or protected-invariant regression |
+| Repair survival | ≥0.90 on sealed holdout after sequence depth is calibrated | Verify on the exact successor revision and report horizon/event strata |
+| Evidence lineage completeness | ≥0.98 on sealed holdout | Missing provenance is never inferred |
+| Policy/process compliance | ≥0.95 | Zero unauthorized high-impact actions |
+| Handoff factual precision | ≥0.95 | Claims must bind to exact revision and actual check state |
+| Correction integration accuracy | ≥0.90 | No scope drift or regression accepted as a correction |
+| Reviewer reconstruction time | ≥20% lower than matched baseline | Independently accepted-work correctness non-inferior |
+| Durable outcome economics | Improve accepted engineering output per total human + agent effort | Report compute, review, interruption and revalidation costs separately |
+
+**Interpretation:** these targets are calibration bands. Do not turn them into a success criterion by choosing a convenient denominator after the run. Report per-repository, per-policy and per-event strata with uncertainty and missingness. A 24-sequence / 24-episode authoring bank is not statistically sufficient for superiority claims.
+
+## 7. How to compare with and outperform the state of the art
+
+### 7.1 Same agent, same task, only the CEB mechanism changes
+
+The primary causal experiment should keep the base model and agent scaffold constant, then compare:
+- no explicit evidence continuity;
+- persistent history only;
+- repository-twin only;
+- decision-use validity only;
+- causal investigation only;
+- full continuity composition.
+
+For collaboration, compare human-only, agent-only, conventional agent, technical CEB without collaboration protocol, selective escalation only, and full CEB collaboration.
+
+Match prompts, tools, context, time, tokens, compute, execution environment, task order and human effort. Use paired tasks and repository/policy cluster-aware inference. A stronger model or bigger budget is not evidence that CEB caused the gain.
+
+### 7.2 Benchmark on a common anchor, but report distinct constructs
+
+Where license, task access and protocol permit, re-run the same agent configurations on selected SWE-Milestone and SWE-CI tasks to establish functional-performance context. Then measure CEB-specific dispositions and lifecycle outcomes on the same event stream.
+
+Do not paste a published third-party leaderboard score beside a CEB metric and call the difference a win. Published model, harness, prompt, budget, version and task split frequently differ.
+
+### 7.3 Demonstrate value with a Pareto frontier
+
+The desired frontier is not maximum accuracy at unlimited cost. It is:
+- more correct, durable engineering decisions;
+- fewer consequential stale-evidence uses;
+- lower unnecessary revalidation and reviewer reconstruction cost;
+- zero critical unauthorized action;
+- no regression in engineering correctness;
+- matched or lower total human-plus-agent effort.
+
+An agent that saves 30% of test cost but increases critical stale acceptance is not an improvement. An agent that asks fewer questions but silently guesses is not an improvement. A system that retains every artifact but cannot explain current applicability is not an improvement.
+
+### 7.4 Pre-register before confirmation
+
+Use the ownership already established:
+- #10614/#10617 for balanced repository and fault-family sampling;
+- #10619/#10624 for paired analysis, clustering, multiplicity and claim class;
+- #10610/#10611 for rerun/regrade/reuse;
+- #10626/#10634 for contamination;
+- #10612/#10613 for escalation;
+- #10630/#10631 for continuity;
+- #10637/#10640 for collaboration.
+
+The starter pilot is exploratory. The existing research plan requires a much larger confirmatory repository-cluster set; a six-repository cohort is not a defensible basis for general superiority.
+
+## 8. Runner-independent work that can proceed now
+
+The following are safe and useful before #10064 isolation and #10369 trust qualification:
+
+1. Complete the 24 + 24 public development blueprint pack and reviewer rubrics (companion document).
+2. Calibrate reviewers on non-evaluative synthetic vignettes and revise ambiguous definitions.
+3. Build an event-to-claim authoring worksheet outside the task-admission schema.
+4. Audit every planned sequence for paired decisive/irrelevant and mixed-impact controls.
+5. Create a preregistration draft with outcomes, denominators, cluster unit, missingness and stop/go gates; do not lock margins from post-hoc observations.
+6. Audit the external observation registry for source revision, denominator, uncertainty, environment, cost and benchmark version completeness.
+7. Map the current CEB portfolio to ownership boundaries and block overlapping registries, metrics and receipts.
+8. Continue static negative-control design for admission, contamination, lifecycle and claim licensing.
+9. Author and statically review six Rust task/oracle development candidates under [#10701](https://github.com/Luminous-Dynamics/symthaea/issues/10701) / [integrated draft PR #10746](https://github.com/Luminous-Dynamics/symthaea/pull/10746), stacked on the current 14-lane/56-metric and 41-negative/12-positive integrity portfolio. Preserve #10617 family mapping and zero admission until #10609 and all custody/execution prerequisites qualify.
+10. Run the public synthetic evidence scenarios through the [gold-completeness/open-set discovery protocol](CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md), including blind zero-finding/clean-consensus audits and producer-dependence review.
+11. Run two-author source-only annotation against the [sequential evidence-acquisition policy](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md); compare which minimal observation distinguishes each causal hypothesis, its authority, safety and all-in cost.
+
+Do not execute candidate-controlled build scripts, tests, macros, graders or attack payloads on the current host-opt-in runner. Do not claim independent regrading, sealed holdout, candidate execution or production isolation.
+
+## 9. Current CEB maturity and limits
+
+The November 5–7 work added or advanced:
+- task admission and two-sided oracle qualification (#10609);
+- release lifecycle (#10611);
+- selective escalation (#10613);
+- balanced sampling (#10617);
+- comparative statistical claim qualification (#10624);
+- evidence continuity protocol and measurement lane (#10631/#10632);
+- T1–T4 contamination transparency and task/card binding (#10634);
+- collaborative engineering protocol (#10640).
+
+- code-review frontier: ReviewBench, SecPRBench, CR-Bench-v2 and CodeReviewBench now triangulated in the narrative and structured comparator registry; CEB-REVIEW still has only three primary metrics.
+- causal diagnosis: P/I/F/N/M/IRR counterfactual preregistration, 26 synthetic evidence scenarios and sequential evidence-acquisition/gold-completeness protocols.
+
+These remain open draft PRs, not merged releases. Their CEB Contract Validation V0 runs passed at their recorded exact heads, but that is contract validation only; general CI, execution isolation and independently trusted regrading are not implied. The task and contamination registries still contain zero admitted real tasks/cards, and no continuity or collaboration episodes have been executed. P0 #10064 and #10369 remain prerequisites for candidate execution and independent-regrade claims.
+
+**The honest present claim:** CEB has a more developed design for evaluating engineering evidence, continuity and collaboration. It has not yet demonstrated that Symthaea outperforms any industry system on these dimensions.
+
+## 10. Sources and comparison notes
+
+- Pereira et al., [CR-Bench-v2: Evaluating the Real-World Utility of AI Code Review Agents](https://arxiv.org/abs/2611.02566), submitted November 2, revised November 3, 2026; 584 CR-Bench instances and 174 CR-Bench-Verified review instances.
+
+- Bui and Evangelopoulos, [Agentic Coding Needs Proactivity, Not Just Autonomy](https://research.google/pubs/agentic-coding-needs-proactivity-not-just-autonomy/), Google Research, 2026 (to appear).
+
+- Microsoft Research, [CRBugBench: (When) Should a Software Factory be Lights-off?](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/), October 2026; [arXiv:2610.13668](https://arxiv.org/abs/2610.13668).
+- PREreview, [review of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026 (reviewer summary of human/agent complementarity and a proposed, not tested, skeptical second-reviewer arm).
+- Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [human-found gold limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), accessed November 7, 2026.
+- GitHub, [ReviewBench: An open benchmark for AI code review](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/), October 5, 2026; [live leaderboard](https://review-bench.ai/) viewed November 7, 2026.
+- Yang et al., [Can Agentic Code Review Catch Vulnerabilities Before They Are Merged? (SecPRBench)](https://arxiv.org/abs/2610.33509), October 24, 2026.
+- Lieret et al., [SWE-sweep: Can Agents Autonomously Find and Fix Bugs?](https://swesweep.com/paper), October 1, 2026; [live leaderboard](https://swesweep.com/) viewed November 7, 2026.
+- Townsend, [LoopControlBench](https://github.com/kltownsend/loopcontrolbench), live README and reference score viewed November 7, 2026.
+- Herbold et al., [A fine-grained data set and analysis of tangling in bug fixing commits](https://link.springer.com/article/10.1007/s10664-021-10083-5), Empirical Software Engineering, 2022.
+- Schulte et al., [An exploratory study of bug-introducing changes](https://link.springer.com/article/10.1007/s10664-026-10822-6), Empirical Software Engineering, April 9, 2026.
+- Ma & Eisty, [Applications of Causality in Software Testing: A Rapid Review](https://arxiv.org/abs/2606.15683), June 2026.
+
+- Dong et al., [Towards AI as a Collaborative Partner: A Taxonomy of AI Agent Behavior in Software Engineering](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/), AIware '26 (to appear).
+
+- Scale AI, [SWE-Bench Pro V2 release/methodology](https://labs.scale.com/blog/swe-bench-pro-v2), September 22, 2026; [live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), viewed November 6, 2026.
+- Epoch AI, [SWE-Bench Pro review](https://epoch.ai/benchmarks/swe-bench-pro/review), September 1, 2026 (pre-V2 release; verdict scope must not be transferred to V2).
+- Epoch AI, [Terminal-Bench 4.0.0 review](https://epoch.ai/benchmarks/terminal-bench-4/review), September 4, 2026; [Terminal-Bench 4.1 milestone](https://github.com/harbor-framework/terminal-bench/milestone/2), updated October 29, 2026; [official benchmark catalogue](https://www.tbench.ai/benchmarks), viewed November 6, 2026.
+- Epoch AI, [included benchmark reviews](https://epoch.ai/data/benchmark-reviews-documentation/included-benchmarks), retrieved November 6, 2026.
+- Dan et al., [SWE-Bench Pro V2: A Cleaner, Harder-to-Game Coding Benchmark](https://arxiv.org/abs/2610.24206), 16 October 2026.
+- Deng et al., [SWE-Milestone: Evaluating AI Agents on Continuous Software Evolution](https://proceedings.mlr.press/v306/deng26d.html), ICML 2026, PMLR 306.
+- Chen et al., [SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration](https://arxiv.org/abs/2603.03823), 4 March 2026.
+- Scale AI, [SWE Atlas v1.1 Overall](https://labs.scale.com/leaderboard/swe-atlas?tab=overall), [QnA](https://labs.scale.com/leaderboard/swe-atlas?tab=qna), [Test Writing](https://labs.scale.com/leaderboard/swe-atlas?tab=test-writing) and [Refactoring](https://labs.scale.com/leaderboard/swe-atlas?tab=refactoring), updated September 22, 2026; live boards viewed November 6, 2026.
+- Artificial Analysis, [Coding Agent Index V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking), October 2026; includes three-attempt task aggregation, resource accounting, reward-hacking review and an LLM-judge trajectory audit for passing Terminal-Bench runs.
+- Endor Labs, [Meta's New Muse Wonder: record FuncPass, but mid-table SecPass](https://www.endorlabs.com/learn/metas-new-muse-wonder-record-funcpass-but-mid-table-secpass), November 3, 2026; documents the post-audit Agent Security League re-score and a training-recall case missed by the automated anti-cheating pipeline.
+- Xiang et al., [Evaluating and Improving Automated Repository-Level Rust Issue Resolution with LLM-based Agents](https://arxiv.org/abs/2602.22764), ICSE 2026; Rust-SWE-bench (500 tasks / 34 repositories) and RUSTFORGER issue-reproduction study.
+- Microsoft, [SWE-bench-Live repository](https://github.com/microsoft/SWE-bench-Live), August 21, 2026 multilingual task update (1,077 tasks / 431 repositories / eight languages).
+- Proximal Labs, [FrontierSWE v2](https://www.frontierswe.com/), [methodology/task catalogue](https://github.com/Proximal-Labs/frontier-swe-v2), September 2026; 34 tasks, 20-hour trials and mean@5 leaderboard.
+- Scale AI, [HiL-Bench overview and methodology](https://labs.scale.com/leaderboard/hil), 2026.
+- Abundant AI, [SWE-Marathon v1.1](https://www.swe-marathon.org/), current leaderboard viewed November 6, 2026.
+- Shetty et al., [GSO: Challenging Software Optimization Tasks for SWE-Agents](https://gso-bench.github.io/), leaderboard/methodology viewed November 6, 2026.
+- Yin et al., [VerifierBench: Benchmarking the Generation of Executable Verifiers for LLM Agents](https://arxiv.org/abs/2610.28679), arXiv preprint, October 19, 2026; [project page and dataset overview](https://verifierbench.github.io/) (accessed November 6, 2026).
+- Zhao et al., [SpecBench: Measuring Reward Hacking in Long-Horizon Coding Agents](https://arxiv.org/abs/2605.21384), May 20, 2026.
+- Atinafu and Cohen, [RewardHackingAgents: Benchmarking Evaluation Integrity for LLM ML-Engineering Agents](https://arxiv.org/abs/2603.11337), March 11, 2026.
+- Endor Labs, [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark), leaderboard viewed November 6, 2026.
+
+- NVIDIA, [SWE-Serve results and methodology](https://research.nvidia.com/benchmarks/swe-serve), accessed November 7, 2026; [paper](https://arxiv.org/abs/2609.26777), September 22, 2026.
+- Guan et al., [SWE-Cycle: Benchmarking Code Agents across the Complete Issue Resolution Cycle](https://arxiv.org/abs/2605.13139), May 13, 2026.
+- Ding et al., [E2E-SWE: Benchmarking LLMs on Building Working Codebases from Scratch](https://arxiv.org/abs/2609.38335), September 29, 2026; [dataset/reproduction repository](https://github.com/facebookresearch/E2E-SWE).
+
+**Cross-benchmark caveat:** every metric in this synthesis has its own task population, unit, harness, agent configuration, grader and release version. The numbers establish context and research motivation; they do not provide a direct CEB score conversion or a matched CEB-vs-industry comparison.
