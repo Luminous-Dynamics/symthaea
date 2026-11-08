@@ -1330,6 +1330,16 @@ mod tests {
             solve_finite_family_policy_portfolio(&family, q(1, 2), 2, budget(2, 2)),
             Err(PolicyPortfolioError::BudgetExceeded { resource: "portfolio candidates", required: 3, limit: 2 })
         );
+        let mut comparison_tight = budget(2, 3);
+        comparison_tight.max_portfolio_member_comparisons = 7;
+        assert_eq!(
+            solve_finite_family_policy_portfolio(&family, q(1, 2), 2, comparison_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "portfolio member comparisons",
+                required: 8,
+                limit: 7,
+            })
+        );
     }
 
     #[test]
