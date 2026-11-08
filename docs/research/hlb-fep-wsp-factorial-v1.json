@@ -256,7 +256,14 @@
         "assignment_margin_at_fixed_probe_budget",
         "multilayer_function_equivalence_error",
         "multilayer_alignment_transfer_success",
-        "multilayer_heldout_function_retention"
+        "multilayer_heldout_function_retention",
+        "permutation_posterior_brier_score",
+        "held_out_permutation_accuracy",
+        "alignment_abstention_precision",
+        "alignment_abstention_recall",
+        "probe_cost_to_accepted_alignment",
+        "posterior_predictive_calibration_by_width",
+        "finite_permutation_eig_gap_to_exact_oracle"
       ],
       "diagnostics": [
         "permutation_alignment_precision",
@@ -286,7 +293,13 @@
         "canonicalization_native_digest_recovery_rate",
         "cross_layer_permutation_coupling_error",
         "activation_margin_vs_alignment_error_pareto",
-        "alignment_cost_vs_hidden_dimension"
+        "alignment_cost_vs_hidden_dimension",
+        "probe_noise_sigma_calibration_error",
+        "permutation_posterior_entropy_nats",
+        "expected_information_gain_about_permutation_nats",
+        "held_out_probe_distribution_shift",
+        "soft_assignment_sinkhorn_residual",
+        "probe_selection_cost_per_candidate"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
@@ -304,7 +317,11 @@
         "missing_layer_alignment",
         "duplicate_layer_alignment",
         "residual_topology_rejected_until_supported",
-        "backbone_topology_rejected_until_supported"
+        "backbone_topology_rejected_until_supported",
+        "miscalibrated_observation_noise",
+        "zero_noise_model_must_not_claim_positive_eig",
+        "probe_order_permutation_invariance",
+        "exact_enumeration_width_limit_enforced"
       ]
     },
     {
@@ -918,6 +935,26 @@
     {
       "id": "navon_et_al_icml_2024_deep_align",
       "scope": "Deep-Align learned weight alignment baseline from Navon et al. (ICML 2024), restricted to supported architecture/layer families; report unsupported topologies and alignment quality separately"
+    },
+    {
+      "id": "maximum_assignment_margin_probe_selection",
+      "scope": "Deterministic probe selector maximizing the alternating-cycle assignment margin; not Bayesian EIG"
+    },
+    {
+      "id": "minimum_functional_fit_error_probe_selection",
+      "scope": "Select probes minimizing assignment-matched activation MSE; diagnostic baseline"
+    },
+    {
+      "id": "finite_permutation_posterior_eig_small_width",
+      "scope": "Exact finite-permutation posterior and action-conditioned EIG for small widths only, with empirically calibrated observation noise; factorial-cost oracle, not scalable"
+    },
+    {
+      "id": "sinkhorn_soft_assignment_probe_selection",
+      "scope": "Approximate soft-assignment/entropy-based alignment for widths beyond exact permutation enumeration"
+    },
+    {
+      "id": "fep_epistemic_alignment_probe_selection",
+      "scope": "Candidate FEP probe policy maximizing calibrated expected information gain about hidden-unit correspondence under a registered observation-noise model"
     }
   ],
   "seeds": {
@@ -1020,7 +1057,11 @@
       "model_entropy_trajectory",
       "source_to_candidate_permutation_accuracy",
       "canonicalization_native_digest_recovery_rate",
-      "cross_layer_permutation_coupling_error"
+      "cross_layer_permutation_coupling_error",
+      "permutation_posterior_brier_score",
+      "held_out_permutation_accuracy",
+      "expected_information_gain_about_permutation_nats",
+      "probe_cost_to_accepted_alignment"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1099,7 +1140,11 @@
       "negative_pragmatic_kl_risk_rejection_count",
       "dayan_2026_wsn_protocol_fidelity",
       "deep_align_2024_protocol_fidelity",
-      "canonicalization_native_digest_mismatch_rate"
+      "canonicalization_native_digest_mismatch_rate",
+      "probe_noise_sigma_calibration_error",
+      "permutation_posterior_calibration_error",
+      "zero_noise_eig_claim_rejection_rate",
+      "exact_permutation_width_limit_violation_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -1211,7 +1256,9 @@
     "Policy ablation runs must preserve the same model family, true rule, scene seeds, scene reset schedule, trial horizon, action costs, and evaluator information; only the declared policy component may change.",
     "The pinned SPM rule generator fixture must retain all 81 labelled hypotheses and their source prior mass, and must verify that the only exact feedback-tensor duplicate groups are the three triplicate constant-criterion mappings (75 exact tensors). The paper-reported 79-unique count must remain an explicit unresolved discrepancy; no relabeling or silent replacement is allowed.",
     "The native CfC sequential WSP integration fixture must materialize two consecutive frozen-template evidence batches through candidate-only native snapshots, prove verifier rejection does not advance the session, prove accepted batches bind to the prior accepted native fingerprint and advance exactly once, and prove the original live/source network fingerprint remains unchanged.",
-    "Feedback log preferences are treated as relative log weights: normalize with a stable log-sum-exp before evaluating KL pragmatic risk, and verify that adding a common constant to all preference logits leaves every action's risk and policy ranking invariant."
+    "Feedback log preferences are treated as relative log weights: normalize with a stable log-sum-exp before evaluating KL pragmatic risk, and verify that adding a common constant to all preference logits leaves every action's risk and policy ranking invariant.",
+    "Bayesian expected information gain over hidden-unit permutations is claimed only when an explicit observation/measurement-noise likelihood is independently calibrated from repeat-run, device/precision, or stochastic-model variation; a deterministic margin heuristic is labelled as such and is not called EIG.",
+    "Exact finite-permutation enumeration is restricted to declared small-width oracle fixtures and must report factorial scaling; larger-width methods report approximation residuals, calibration, ambiguity abstention, and compute."
   ],
   "research_references": [
     {
