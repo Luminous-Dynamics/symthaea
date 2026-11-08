@@ -464,9 +464,8 @@ impl BlindEpisode {
                     StructureAccess::BooleanSupplied(mechanism) => crate::StructureAccess::Supplied(mechanism),
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
-                let oracle = crate::discover(&log, model_access)
-                    .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
-                (compare_model_sets(compatible_models, &oracle.compatible_hypotheses)?, *disposition)
+                let oracle_models = reference_boolean_version_space(&log, model_access)?;
+                (compare_model_sets(compatible_models, &oracle_models)?, *disposition)
             }
             (WorldState::Numeric(_), AgentClaim::Numeric { compatible_models, disposition }) => {
                 let log = numeric::ObservationLog {
@@ -484,9 +483,8 @@ impl BlindEpisode {
                     StructureAccess::NumericSupplied(mechanism) => numeric::StructureAccess::Supplied(mechanism),
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
-                let oracle = numeric::discover(&log, access)
-                    .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
-                (compare_model_sets(compatible_models, &oracle.compatible_models)?, *disposition)
+                let oracle_models = reference_numeric_version_space(&log, access);
+                (compare_model_sets(compatible_models, &oracle_models)?, *disposition)
             }
             (WorldState::Interaction(_), AgentClaim::Interaction { compatible_models, disposition }) => {
                 let log = interaction::ObservationLog {
@@ -504,9 +502,8 @@ impl BlindEpisode {
                     StructureAccess::InteractionSupplied(structure) => interaction::StructureAccess::Supplied(structure),
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
-                let oracle = interaction::discover(&log, access)
-                    .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
-                (compare_model_sets(compatible_models, &oracle.compatible_models)?, *disposition)
+                let oracle_models = reference_interaction_version_space(&log, access);
+                (compare_model_sets(compatible_models, &oracle_models)?, *disposition)
             }
             _ => return Err(ProtocolError::ClaimFamilyMismatch),
         };
@@ -527,6 +524,128 @@ impl BlindEpisode {
             probe_count: self.observations.len(),
         })
     }
+}
+
+/// Independent evaluator-side trace filters. These deliberately do not call
+/// the agent-facing discovery or prediction implementations. They share
+/// declared candidate types/families, but use separate transition logic.
+fn reference_boolean_version_space(
+    log: &ObservationLog,
+    access: crate::StructureAccess,
+) -> Result<Vec<Hypothesis>, ProtocolError> {
+    if log.interventions.len() != log.measurements.len() || log.interventions.is_empty() {
+        return Err(ProtocolError::InvalidEvaluatorTrace);
+    }
+    let mut compatible = Vec::new();
+    for hypothesis in crate::candidate_hypotheses(access) {
+        let mut latent_state = hypothesis.initial_hidden_state;
+        let mut matches = true;
+        for (&input, &measurement) in log.interventions.iter().zip(&log.measurements) {
+            let latent = match hypothesis.mechanism {
+                Mechanism::Direct => input,
+                Mechanism::HiddenLag => match latent_state {
+                    Some(value) => value,
+                    None => {
+                        matches = false;
+                        break;
+                    }
+                },
+            };
+            let expected = match hypothesis.measurement_map {
+                MeasurementMap::Identity => latent,
+                MeasurementMap::Invert => !latent,
+                MeasurementMap::ConstantZero => false,
+            };
+            if expected != measurement {
+                matches = false;
+                break;
+            }
+            if hypothesis.mechanism == Mechanism::HiddenLag {
+                latent_state = Some(input);
+            }
+        }
+        if matches {
+            compatible.push(hypothesis);
+        }
+    }
+    compatible.sort();
+    Ok(compatible)
+}
+
+fn reference_numeric_version_space(
+    log: &numeric::ObservationLog,
+    access: numeric::StructureAccess,
+) -> Vec<numeric::ModelHypothesis> {
+    let mut compatible = Vec::new();
+    for model in numeric::candidate_models(access) {
+        let mut state = model.initial_state;
+        let mut matches = true;
+        for (&input, &observed) in log.interventions.iter().zip(&log.measurements) {
+            let latent = match model.mechanism {
+                numeric::Mechanism::DirectResponse => model.gain.checked_mul(input),
+                numeric::Mechanism::LeakyMemory => state,
+            };
+            let Some(latent) = latent else {
+                matches = false;
+                break;
+            };
+            let expected = match model.sensor {
+                numeric::SensorMap::Identity => Some(latent),
+                numeric::SensorMap::Negate => latent.checked_neg(),
+                numeric::SensorMap::Double => latent.checked_mul(2),
+                numeric::SensorMap::ConstantZero => Some(0),
+            };
+            if expected != Some(observed) {
+                matches = false;
+                break;
+            }
+            if model.mechanism == numeric::Mechanism::LeakyMemory {
+                let Some(decay) = model.decay else {
+                    matches = false;
+                    break;
+                };
+                let next = state
+                    .and_then(|value| decay.checked_mul(value))
+                    .and_then(|value| model.gain.checked_mul(input).and_then(|drive| value.checked_add(drive)));
+                if next.is_none() {
+                    matches = false;
+                    break;
+                }
+                state = next;
+            }
+        }
+        if matches {
+            compatible.push(model);
+        }
+    }
+    compatible.sort();
+    compatible
+}
+
+fn reference_interaction_version_space(
+    log: &interaction::ObservationLog,
+    access: interaction::StructureAccess,
+) -> Vec<interaction::ModelHypothesis> {
+    let mut compatible = Vec::new();
+    for model in interaction::candidate_models(access) {
+        let mut matches = true;
+        for (input, &observed) in log.interventions.iter().zip(&log.measurements) {
+            let [u, v] = *input;
+            let response = model.bias
+                .checked_add(model.weight_u.checked_mul(u).unwrap_or(i64::MAX))
+                .and_then(|value| value.checked_add(model.weight_v.checked_mul(v)?))
+                .and_then(|value| value.checked_add(model.interaction_weight.checked_mul(u)?.checked_mul(v)?));
+            if response != Some(observed) {
+                matches = false;
+                break;
+            }
+        }
+        if matches {
+            compatible.push(model);
+        }
+    }
+    compatible.sort();
+    compatible
 }
 
 fn validate_models<T: Serialize>(claimed: &[T], allowed: &[T]) -> Result<(), ProtocolError> {
@@ -602,6 +721,7 @@ pub enum ProtocolError {
     NotSubmitted,
     WorldFailure(String),
     SerializationFailure(String),
+    InvalidEvaluatorTrace,
 }
 
 impl fmt::Display for ProtocolError {
