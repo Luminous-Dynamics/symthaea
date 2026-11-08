@@ -532,6 +532,174 @@ pub fn error_metrics<A: LinearOperator>(
     })
 }
 
+/// Stable diagonal linear ODE: dx_i/dt = -rate_i * x_i.
+///
+/// This is a small analytic trajectory oracle for the differential-equation
+/// benchmark lane. It is not a model of a particular analog circuit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DiagonalDecayOde {
+    rates: Vec<f64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TrajectoryMetrics {
+    pub final_absolute_error: f64,
+    pub final_relative_error: f64,
+    pub maximum_absolute_error: f64,
+    pub maximum_relative_error: f64,
+}
+
+impl DiagonalDecayOde {
+    pub const MAX_DIMENSION: usize = 1_000_000;
+    pub const MAX_TRAJECTORY_SCALARS: usize = 16 * 1024 * 1024;
+
+    pub fn new(rates: Vec<f64>) -> Result<Self, MatrixError> {
+        if rates.is_empty() {
+            return Err(MatrixError::Empty);
+        }
+        if rates.len() > Self::MAX_DIMENSION {
+            return Err(MatrixError::TooLarge);
+        }
+        if rates.iter().any(|rate| !rate.is_finite() || *rate < 0.0) {
+            return Err(MatrixError::InvalidParameter);
+        }
+        Ok(Self { rates })
+    }
+
+    pub fn dimension(&self) -> usize {
+        self.rates.len()
+    }
+
+    pub fn analytic_state(
+        &self,
+        initial: &[f64],
+        time: f64,
+    ) -> Result<Vec<f64>, MatrixError> {
+        if initial.len() != self.dimension() {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if !time.is_finite() || time < 0.0 {
+            return Err(MatrixError::InvalidParameter);
+        }
+        if initial.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        let result: Vec<f64> = initial.iter().zip(&self.rates)
+            .map(|(x0, rate)| x0 * (-rate * time).exp())
+            .collect();
+        if result.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        Ok(result)
+    }
+
+    /// Classical explicit RK4 trajectory. The returned vector includes the
+    /// initial state followed by one state per integration step.
+    pub fn rk4_trajectory(
+        &self,
+        initial: &[f64],
+        step_size: f64,
+        steps: usize,
+    ) -> Result<Vec<Vec<f64>>, MatrixError> {
+        if initial.len() != self.dimension() {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if !step_size.is_finite() || step_size <= 0.0 || steps == 0 {
+            return Err(MatrixError::InvalidTolerance);
+        }
+        if initial.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::NonFinite);
+        }
+        let points = steps.checked_add(1).ok_or(MatrixError::TooLarge)?;
+        let total_scalars = points.checked_mul(self.dimension()).ok_or(MatrixError::TooLarge)?;
+        if total_scalars > Self::MAX_TRAJECTORY_SCALARS {
+            return Err(MatrixError::TooLarge);
+        }
+        if !(step_size * steps as f64).is_finite() {
+            return Err(MatrixError::NonFinite);
+        }
+
+        let mut trajectory = Vec::new();
+        trajectory.try_reserve_exact(points).map_err(|_| MatrixError::AllocationFailed)?;
+        let mut state = Vec::new();
+        state.try_reserve_exact(self.dimension()).map_err(|_| MatrixError::AllocationFailed)?;
+        state.extend_from_slice(initial);
+        trajectory.push(state.clone());
+
+        for _ in 0..steps {
+            let mut next = Vec::new();
+            next.try_reserve_exact(self.dimension()).map_err(|_| MatrixError::AllocationFailed)?;
+            for (value, rate) in state.iter().zip(&self.rates) {
+                let k1 = -rate * value;
+                let k2 = -rate * (value + 0.5 * step_size * k1);
+                let k3 = -rate * (value + 0.5 * step_size * k2);
+                let k4 = -rate * (value + step_size * k3);
+                let updated = value + (step_size / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+                if !updated.is_finite() {
+                    return Err(MatrixError::NonFinite);
+                }
+                next.push(updated);
+            }
+            state = next;
+            let mut saved = Vec::new();
+            saved.try_reserve_exact(state.len()).map_err(|_| MatrixError::AllocationFailed)?;
+            saved.extend_from_slice(&state);
+            trajectory.push(saved);
+        }
+        Ok(trajectory)
+    }
+
+    /// Evaluator-side comparison against the analytic trajectory. Keep these
+    /// metrics outside the candidate/online-verifier API.
+    pub fn trajectory_error(
+        &self,
+        initial: &[f64],
+        step_size: f64,
+        trajectory: &[Vec<f64>],
+    ) -> Result<TrajectoryMetrics, MatrixError> {
+        if initial.len() != self.dimension() || trajectory.is_empty() {
+            return Err(MatrixError::DimensionMismatch);
+        }
+        if !step_size.is_finite() || step_size <= 0.0 {
+            return Err(MatrixError::InvalidTolerance);
+        }
+        let expected_len = trajectory.len();
+        let mut maximum_absolute_error = 0.0_f64;
+        let mut maximum_relative_error = 0.0_f64;
+        let mut final_absolute_error = 0.0_f64;
+        let mut final_relative_error = 0.0_f64;
+
+        for (index, candidate) in trajectory.iter().enumerate() {
+            if candidate.len() != self.dimension() {
+                return Err(MatrixError::DimensionMismatch);
+            }
+            if candidate.iter().any(|value| !value.is_finite()) {
+                return Err(MatrixError::NonFinite);
+            }
+            let reference = self.analytic_state(initial, step_size * index as f64)?;
+            let difference: Vec<f64> = candidate.iter().zip(&reference)
+                .map(|(actual, expected)| actual - expected)
+                .collect();
+            let absolute = norm2(&difference);
+            let reference_norm = norm2(&reference);
+            let relative = if reference_norm == 0.0 { absolute } else { absolute / reference_norm };
+            maximum_absolute_error = maximum_absolute_error.max(absolute);
+            maximum_relative_error = maximum_relative_error.max(relative);
+            if index + 1 == expected_len {
+                final_absolute_error = absolute;
+                final_relative_error = relative;
+            }
+        }
+
+        Ok(TrajectoryMetrics {
+            final_absolute_error,
+            final_relative_error,
+            maximum_absolute_error,
+            maximum_relative_error,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -596,6 +764,41 @@ mod tests {
 
         let nonsymmetric = DenseMatrix::new(2, vec![1.0, 2.0, 0.0, 1.0]).unwrap();
         assert_eq!(cholesky_solve(&nonsymmetric, &[1.0, 1.0]), Err(MatrixError::NotSymmetric));
+    }
+
+    #[test]
+    fn diagonal_decay_ode_rk4_converges_with_fourth_order_step_refinement() {
+        let ode = DiagonalDecayOde::new(vec![1.0]).unwrap();
+        let initial = [1.0];
+        let coarse = ode.rk4_trajectory(&initial, 0.1, 10).unwrap();
+        let fine = ode.rk4_trajectory(&initial, 0.05, 20).unwrap();
+        let coarse_error = ode.trajectory_error(&initial, 0.1, &coarse).unwrap();
+        let fine_error = ode.trajectory_error(&initial, 0.05, &fine).unwrap();
+        assert!(coarse_error.final_absolute_error > fine_error.final_absolute_error * 10.0);
+        assert!(fine_error.final_relative_error < 1.0e-7);
+    }
+
+    #[test]
+    fn diagonal_decay_ode_handles_multiple_timescales() {
+        let ode = DiagonalDecayOde::new(vec![0.5, 2.0, 10.0]).unwrap();
+        let initial = [1.0, -0.5, 0.25];
+        let trajectory = ode.rk4_trajectory(&initial, 0.005, 200).unwrap();
+        let metrics = ode.trajectory_error(&initial, 0.005, &trajectory).unwrap();
+        assert!(metrics.maximum_relative_error < 1.0e-7);
+        assert!(metrics.final_absolute_error < 1.0e-8);
+    }
+
+    #[test]
+    fn diagonal_decay_ode_rejects_bad_inputs_and_oversized_trajectories() {
+        assert_eq!(DiagonalDecayOde::new(vec![]), Err(MatrixError::Empty));
+        assert_eq!(DiagonalDecayOde::new(vec![f64::NAN]), Err(MatrixError::InvalidParameter));
+        let ode = DiagonalDecayOde::new(vec![1.0, 2.0]).unwrap();
+        assert_eq!(ode.analytic_state(&[1.0], 1.0), Err(MatrixError::DimensionMismatch));
+        assert_eq!(ode.rk4_trajectory(&[1.0, 2.0], 0.0, 10), Err(MatrixError::InvalidTolerance));
+        assert_eq!(
+            ode.rk4_trajectory(&[1.0, 2.0], 1.0e-3, DiagonalDecayOde::MAX_TRAJECTORY_SCALARS),
+            Err(MatrixError::TooLarge)
+        );
     }
 
     #[test]
