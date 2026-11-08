@@ -272,6 +272,16 @@ fn evaluate_service(
                         rate = e.delivered_rate_after; restoration.get_or_insert(t);
                     } else { rejected = rejected.saturating_add(1); }
                 }
+                // Maintenance workflow evidence does not itself measure delivered
+                // service or restore operational flow. Only an accepted release can
+                // transition service delivery after the repair/requalification chain.
+                EventKind::RepairStarted
+                | EventKind::RepairCompleted
+                | EventKind::PostTestPassed
+                | EventKind::PostTestFailed
+                | EventKind::ConfigurationUpdated
+                | EventKind::SpareArrived
+                | EventKind::SpareRejected => {},
                 _ => rate = e.delivered_rate_after,
             }
         }
@@ -542,6 +552,21 @@ mod tests {
         assert_eq!(prior.disposition, ContinuityDisposition::UnsafeNotAuthorized);
         assert_eq!(prior.services[0].accepted_restoration_seconds, None);
         assert_eq!(prior.services[0].rejected_release_attempts, 1);
+    }
+
+    #[test]
+    fn repair_and_post_test_events_do_not_restore_delivery_before_release() {
+        let events = vec![
+            event("failure", 10, EventKind::ComponentFailure, 0.0),
+            task_event("repair", 20, EventKind::RepairCompleted, 80.0),
+            task_event("test", 30, EventKind::PostTestPassed, 80.0),
+            task_event("config", 40, EventKind::ConfigurationUpdated, 80.0),
+        ];
+        let out = evaluate_service_continuity(&case(events, vec![task()], 60)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds, None);
+        assert_eq!(out.services[0].last_floor_recovery_seconds, None);
+        assert_eq!(out.services[0].time_below_floor_seconds, 50);
+        assert_eq!(out.services[0].floor_breach_episodes, 1);
     }
 
     #[test]
