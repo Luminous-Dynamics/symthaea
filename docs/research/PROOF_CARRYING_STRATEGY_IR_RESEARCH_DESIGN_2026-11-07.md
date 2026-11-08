@@ -489,3 +489,35 @@ Keep two independent checks:
 The graph checker cannot stand in for the game checker. A compact AIG that computes an invalid strategy is still invalid.
 
 The next compilation selection step should use one pinned serialization and a multi-objective cost: serialized bytes, compile peak memory, construction work, evaluation time, independent checker time/memory, and support width. Do not minimize raw node count across representation types. Test candidate BDD decision orders and AIG Shannon decomposition orders under a shared aggregate compute budget, with explicit incomplete-search metadata.
+
+
+## 20. Portable game-proof artifacts and three-layer verification
+
+The bounded QBF implementation now exposes a proof trace in addition to Skolem/Herbrand strategies. Its finite rules are:
+- matrix leaf: evaluate the original CNF under a complete prefix assignment;
+- early TRUE: every source clause has an already assigned satisfying literal;
+- early FALSE: a cited clause is fully assigned and all of its literals are false;
+- EXISTS decision: both children are checked and the parent value is their disjunction;
+- FORALL decision: both children are checked and the parent value is their conjunction.
+
+The verifier rebuilds the variable/quantifier order from the source `ValidatedQuantifierPrefix`, reconstructs each branch assignment, rejects non-postorder or unreachable tree structure, and independently evaluates each source-matrix witness. It does not trust stored intermediate node values.
+
+The canonical `LD-QBFPROOF1` format is now a portable byte artifact. Its bounded decoder rejects invalid magic, truncated integers/nodes, invalid Boolean bytes, unknown node tags, out-of-budget variable/node counts, invalid tree edges and trailing bytes. The evidence-portfolio builder round-trips the in-memory proof through the encoder/decoder and re-verifies the decoded artifact against the original matrix and prefix before returning it.
+
+The new `verify_and_compile_qbf_evidence_portfolio` makes the following trust boundaries mandatory and ordered:
+1. independently verify the game proof against source CNF and ordered prefix;
+2. require the proof root truth value to agree with the claimed QBF result;
+3. serialize, decode and independently reverify the proof bytes;
+4. independently verify the Skolem/Herbrand strategy against every opponent assignment;
+5. compile support-minimized ROBDD and AIG circuits;
+6. independently verify both graph representations against their source Boolean functions;
+7. enforce the aggregate byte budget across game proof, BDD and AIG.
+
+This deliberately separates three claims:
+- **game validity:** the quantified formula is TRUE or FALSE;
+- **strategy validity:** the extracted function family is winning for the appropriate player;
+- **representation validity:** each graph computes exactly the corresponding source strategy function.
+
+The current proof is a tree, not a DAG. A DAG is a future optimization only after a cache key captures the complete residual formula, assigned-prefix context and rule obligations. Naive structural hash-consing can merge the same-looking subproof under different contexts and is not acceptable.
+
+For proof-system comparisons, include QBFcert/DepQBF syntactic QRP proof checking and extraction where available, CAQE partial QDIMACS outputs as a partial-assignment interface (never assumed complete), and the SAT 2026 synthesis proof system as a theoretical target for intermediate game values and extracted strategies. Keep #QBF counting separate from all these decision/strategy-evaluation claims.
