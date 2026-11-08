@@ -1422,7 +1422,11 @@ mod tests {
         );
         assert!(result.maximax_optima.iter().all(|item| item.probability == q(7, 10)));
         assert!(result.maximin_optima.iter().all(|item| item.probability == q(3, 10)));
-        let maximax = result.maximax.unwrap();
+        assert_eq!(result.maximax_optima[0].witness_model, id_b);
+        assert_eq!(result.maximax_optima[1].witness_model, id_a);
+        assert_eq!(result.maximin_optima[0].witness_model, id_a);
+        assert_eq!(result.maximin_optima[1].witness_model, id_b);
+        let maximax = result.maximax.as_ref().unwrap();
         assert_eq!(maximax.assignment, vec![0]);
         assert_eq!(maximax.probability, q(7, 10));
         assert_eq!(maximax.witness_model, id_b);
