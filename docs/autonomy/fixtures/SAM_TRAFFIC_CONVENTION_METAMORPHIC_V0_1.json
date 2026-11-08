@@ -54,7 +54,9 @@
           "relative_lateral_sign": -1
         }
       ],
-      "declared_passing_side_sign": -1
+      "declared_passing_side_sign": -1,
+      "travel_frame_id": "road-local-lht-v1",
+      "map_traffic_convention_profile_id": "synthetic-lht-rhd-v1"
     },
     {
       "scene_id": "synthetic-crossing-rht",
@@ -98,7 +100,9 @@
           "relative_lateral_sign": 1
         }
       ],
-      "declared_passing_side_sign": 1
+      "declared_passing_side_sign": 1,
+      "travel_frame_id": "road-local-rht-v1",
+      "map_traffic_convention_profile_id": "synthetic-rht-lhd-v1"
     }
   ],
   "expected_equivariance": {
@@ -155,6 +159,53 @@
       "id": "unknown-traffic-side",
       "mutate": "set traffic_side to unknown and attempt a rule-sensitive passing decision",
       "expected": "unresolved_no_rule_authority"
+    }
+  ],
+  "profiles": [
+    {
+      "profile_id": "synthetic-lht-rhd-v1",
+      "jurisdiction_profile_id": "synthetic-left-traffic-demo",
+      "traffic_side": "left",
+      "steering_wheel_position": "right",
+      "travel_frame_id": "road-local-lht-v1",
+      "keep_side_sign": 1,
+      "kerbside_sign": 1,
+      "median_side_sign": -1,
+      "passing_side_sign": -1,
+      "passing_rule_profile_id": "synthetic-lht-passing-v1",
+      "passing_rule_profile_version": "1.0.0",
+      "lane_ordering_profile_id": "kerb-to-median-lht-v1",
+      "applicability": "synthetic_fixture"
+    },
+    {
+      "profile_id": "synthetic-rht-lhd-v1",
+      "jurisdiction_profile_id": "synthetic-right-traffic-demo",
+      "traffic_side": "right",
+      "steering_wheel_position": "left",
+      "travel_frame_id": "road-local-rht-v1",
+      "keep_side_sign": -1,
+      "kerbside_sign": -1,
+      "median_side_sign": 1,
+      "passing_side_sign": 1,
+      "passing_rule_profile_id": "synthetic-rht-passing-v1",
+      "passing_rule_profile_version": "1.0.0",
+      "lane_ordering_profile_id": "kerb-to-median-rht-v1",
+      "applicability": "synthetic_fixture"
+    },
+    {
+      "profile_id": "synthetic-lht-lhd-layout-control-v1",
+      "jurisdiction_profile_id": "synthetic-left-traffic-layout-control",
+      "traffic_side": "left",
+      "steering_wheel_position": "left",
+      "travel_frame_id": "road-local-lht-control-v1",
+      "keep_side_sign": 1,
+      "kerbside_sign": 1,
+      "median_side_sign": -1,
+      "passing_side_sign": -1,
+      "passing_rule_profile_id": "synthetic-lht-passing-v1",
+      "passing_rule_profile_version": "1.0.0",
+      "lane_ordering_profile_id": "kerb-to-median-lht-v1",
+      "applicability": "synthetic_fixture"
     }
   ]
 }
