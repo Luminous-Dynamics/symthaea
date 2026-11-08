@@ -101,6 +101,23 @@ struct CaseScore {
 }
 
 #[derive(Debug, Serialize)]
+struct CalibrationBin {
+    lower_bound: f64,
+    upper_bound: f64,
+    observations: usize,
+    mean_confidence: Option<f64>,
+    observed_accuracy: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct ConfidenceCalibration {
+    observations: usize,
+    brier_score: Option<f64>,
+    expected_calibration_error: Option<f64>,
+    bins: Vec<CalibrationBin>,
+}
+
+#[derive(Debug, Serialize)]
 struct AggregateMetrics {
     cases: usize,
     candidate_id: String,
