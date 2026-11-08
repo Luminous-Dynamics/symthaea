@@ -137,6 +137,8 @@ The exact tiny-world oracle may enumerate future branches only for its declared 
 
 A critical leakage event, false unique claim on a known non-identifiable task, or invalid confirmation is a **non-compensatory failure**. It cannot be averaged away by a higher prediction score.
 
+For the finite v0 protocol, an abstention is considered safe only when (a) the agent submits the exact evaluator-compatible version space and (b) more than one parameterized model remains compatible. An exact singleton accompanied by abstention is recorded as unnecessary abstention. This limited known-support rule does not replace #8669's future calibration and support-omission scoring.
+
 ## 7. Minimum controls and acceptance gates
 
 Before a confirmatory AI-policy result is interpretable:
