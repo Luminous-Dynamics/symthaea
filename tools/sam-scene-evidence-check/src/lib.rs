@@ -253,6 +253,22 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
     let Some(profiles) = profiles else {
         return errors;
     };
+    let evidence_records = fixture
+        .get("evidence_records")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut evidence_index = std::collections::BTreeMap::new();
+    for (index, evidence) in evidence_records.iter().enumerate() {
+        let Some(id) = evidence.get("evidence_id").and_then(Value::as_str) else {
+            errors.push(format!("evidence_records[{index}]: missing evidence_id"));
+            continue;
+        };
+        if evidence_index.insert(id.to_owned(), evidence).is_some() {
+            errors.push(format!("duplicate traffic evidence_id: {id}"));
+        }
+    }
+
     let mut profile_index = std::collections::BTreeMap::new();
     for (index, profile) in profiles.iter().enumerate() {
         let Some(id) = profile.get("profile_id").and_then(Value::as_str) else {
@@ -335,6 +351,47 @@ fn validate_traffic_semantics(fixture: &Value) -> Vec<String> {
             {
                 errors.push(format!(
                     "profiles[{index}]: verified applicability requires an ordered YYYY-MM-DD validity interval"
+                ));
+            }
+
+            let mut has_rule_authority_evidence = false;
+            if let Some(references) = evidence_refs {
+                for reference in references {
+                    let evidence_id = reference.as_str().unwrap_or_default();
+                    let Some(evidence) = evidence_index.get(evidence_id).copied() else {
+                        errors.push(format!(
+                            "profiles[{index}]: verification evidence reference {evidence_id:?} does not resolve in evidence_records"
+                        ));
+                        continue;
+                    };
+                    if evidence.get("jurisdiction_profile_id") != profile.get("jurisdiction_profile_id")
+                        || evidence.get("jurisdiction_profile_version")
+                            != profile.get("jurisdiction_profile_version")
+                    {
+                        errors.push(format!(
+                            "profiles[{index}]: evidence {evidence_id:?} is for a different jurisdiction profile/version"
+                        ));
+                    }
+                    let evidence_kind = evidence.get("evidence_kind").and_then(Value::as_str);
+                    if matches!(evidence_kind, Some("traffic_law" | "road_authority")) {
+                        has_rule_authority_evidence = true;
+                    }
+                    let evidence_from = evidence.get("effective_from").and_then(Value::as_str);
+                    let evidence_until = evidence.get("effective_until").and_then(Value::as_str);
+                    if from.zip(evidence_from).is_some_and(|(profile_from, source_from)| {
+                        profile_from < source_from
+                    }) || until.zip(evidence_until).is_some_and(|(profile_until, source_until)| {
+                        profile_until > source_until
+                    }) {
+                        errors.push(format!(
+                            "profiles[{index}]: verification validity exceeds evidence {evidence_id:?} effective dates"
+                        ));
+                    }
+                }
+            }
+            if !has_rule_authority_evidence {
+                errors.push(format!(
+                    "profiles[{index}]: verified applicability requires at least one traffic_law or road_authority evidence record"
                 ));
             }
         }
@@ -1098,10 +1155,95 @@ mod tests {
         let (schema, mut profiles, _) = load_traffic_fixtures();
         profiles["profiles"][0]["traffic_side"] = Value::String("unknown".into());
         profiles["profiles"][0]["passing_side_sign"] = Value::Null;
+        profiles["profiles"][0]["passing_rule_profile_id"] = Value::Null;
+        profiles["profiles"][0]["passing_rule_profile_version"] = Value::Null;
         profiles["profiles"][0]["applicability"] = Value::String("unknown".into());
         assert!(validate_traffic_values(&schema, &profiles).is_ok());
 
         profiles["profiles"][0]["passing_side_sign"] = Value::from(-1);
+        assert!(validate_traffic_values(&schema, &profiles).is_err());
+    }
+
+    #[test]
+    fn rejects_verified_traffic_profile_without_evidence_records() {
+        let (schema, mut profiles, _) = load_traffic_fixtures();
+        profiles["profiles"][0]["applicability"] =
+            Value::String("verified_for_declared_context".into());
+        profiles["profiles"][0]["verification_evidence_refs"] =
+            Value::Array(vec![Value::String("law-evidence-1".into())]);
+        profiles["profiles"][0]["verification_method_id"] =
+            Value::String("independent-rule-review-v1".into());
+        profiles["profiles"][0]["verification_record_id"] =
+            Value::String("review-2026-11-08-001".into());
+        profiles["profiles"][0]["verification_valid_from"] =
+            Value::String("2026-01-01".into());
+        profiles["profiles"][0]["verification_valid_until"] =
+            Value::String("2026-12-31".into());
+        assert!(validate_traffic_values(&schema, &profiles).is_err());
+    }
+
+    #[test]
+    fn accepts_verified_traffic_profile_with_matching_rule_evidence() {
+        let (schema, mut profiles, _) = load_traffic_fixtures();
+        profiles["profiles"][0]["applicability"] =
+            Value::String("verified_for_declared_context".into());
+        profiles["profiles"][0]["verification_evidence_refs"] =
+            Value::Array(vec![Value::String("law-evidence-1".into())]);
+        profiles["profiles"][0]["verification_method_id"] =
+            Value::String("independent-rule-review-v1".into());
+        profiles["profiles"][0]["verification_record_id"] =
+            Value::String("review-2026-11-08-001".into());
+        profiles["profiles"][0]["verification_valid_from"] =
+            Value::String("2026-01-01".into());
+        profiles["profiles"][0]["verification_valid_until"] =
+            Value::String("2026-12-31".into());
+        profiles["evidence_records"] = Value::Array(vec![serde_json::json!({
+            "evidence_id":"law-evidence-1",
+            "jurisdiction_profile_id":"synthetic-left-traffic-demo",
+            "jurisdiction_profile_version":"synthetic-1.0.0",
+            "evidence_kind":"traffic_law",
+            "issuer":"Synthetic Authority",
+            "title":"Synthetic traffic-side rule profile",
+            "reference_uri":"synthetic-evidence://lht/profile-v1",
+            "content_digest":format!("sha256:{}", "a".repeat(64)),
+            "published_at":"2025-12-01",
+            "effective_from":"2025-12-01",
+            "effective_until":"2027-12-31",
+            "retrieved_at":"2026-11-08"
+        })]);
+        validate_traffic_values(&schema, &profiles)
+            .expect("verified profile with matching rule evidence should validate");
+    }
+
+    #[test]
+    fn rejects_verified_traffic_profile_evidence_for_another_jurisdiction() {
+        let (schema, mut profiles, _) = load_traffic_fixtures();
+        profiles["profiles"][0]["applicability"] =
+            Value::String("verified_for_declared_context".into());
+        profiles["profiles"][0]["verification_evidence_refs"] =
+            Value::Array(vec![Value::String("law-evidence-1".into())]);
+        profiles["profiles"][0]["verification_method_id"] =
+            Value::String("independent-rule-review-v1".into());
+        profiles["profiles"][0]["verification_record_id"] =
+            Value::String("review-2026-11-08-001".into());
+        profiles["profiles"][0]["verification_valid_from"] =
+            Value::String("2026-01-01".into());
+        profiles["profiles"][0]["verification_valid_until"] =
+            Value::String("2026-12-31".into());
+        profiles["evidence_records"] = Value::Array(vec![serde_json::json!({
+            "evidence_id":"law-evidence-1",
+            "jurisdiction_profile_id":"different-jurisdiction",
+            "jurisdiction_profile_version":"synthetic-1.0.0",
+            "evidence_kind":"traffic_law",
+            "issuer":"Synthetic Authority",
+            "title":"Wrong jurisdiction source",
+            "reference_uri":"synthetic-evidence://wrong-jurisdiction",
+            "content_digest":format!("sha256:{}", "b".repeat(64)),
+            "published_at":"2025-12-01",
+            "effective_from":"2025-12-01",
+            "effective_until":"2027-12-31",
+            "retrieved_at":"2026-11-08"
+        })]);
         assert!(validate_traffic_values(&schema, &profiles).is_err());
     }
 
