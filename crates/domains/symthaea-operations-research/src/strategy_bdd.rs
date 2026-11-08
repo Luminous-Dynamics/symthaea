@@ -2170,7 +2170,16 @@ pub fn evaluate_robdd_with_budget(
             actual: assignment.len(),
         });
     }
+    evaluate_validated_robdd(bdd, assignment)
+}
 
+/// Evaluate a diagram after its structure and assignment width have already
+/// been validated. Kept separate so exhaustive equivalence checking validates
+/// the untrusted graph once, rather than re-walking every node for every row.
+fn evaluate_validated_robdd(
+    bdd: &ReducedOrderedBdd,
+    assignment: &[bool],
+) -> Result<bool, StrategyBddError> {
     let mut current = bdd.root;
     let mut steps = 0usize;
     loop {
@@ -2220,7 +2229,7 @@ pub fn verify_robdd_matches_strategy_function(
         let Some(&table_value) = function.table.get(&assignment) else {
             return Err(StrategyBddError::MissingTruthTableRow { key: assignment });
         };
-        let bdd_value = evaluate_robdd_with_budget(bdd, &assignment, budget)?;
+        let bdd_value = evaluate_validated_robdd(bdd, &assignment)?;
         if table_value != bdd_value {
             return Err(StrategyBddError::SemanticMismatch {
                 assignment,
