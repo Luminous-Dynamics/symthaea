@@ -50,6 +50,16 @@ jobs:
             .pair_count == 2751 and
             .episode_count == 5502 and
             (.results | length) == 21 and
+            (.pair_records | length) == 2751 and
+            ([.pair_records[].pair_id] | unique | length) == 2751 and
+            all(.pair_records[];
+              .a0.generating_model_in_version_space and
+              .a2.generating_model_in_version_space and
+              .a0.set_score.exact_version_space_match and
+              .a2.set_score.exact_version_space_match and
+              .a0.evidence_references_valid and
+              .a2.evidence_references_valid
+            ) and
             all(.results[];
               .a0.episodes == .generating_model_count and
               .a2.episodes == .generating_model_count and
