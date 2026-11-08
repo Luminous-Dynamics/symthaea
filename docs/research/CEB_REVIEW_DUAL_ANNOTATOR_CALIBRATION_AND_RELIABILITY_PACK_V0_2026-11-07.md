@@ -287,7 +287,7 @@ The two reviewers adjudicate claim truth and evidence authority; they do not cer
 
 ### 6.5 Claim-support closure worksheet (CCL cases only)
 
-Use the six public [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) cases to independently annotate each claim's dependency closure and event impact before viewing the public key.
+Use the eight public [Claim-Support Closure Challenge V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) cases to independently annotate each claim's dependency closure and event impact before viewing the public key.
 
 | Field | Reviewer response |
 |---|---|
