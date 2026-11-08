@@ -1472,6 +1472,562 @@
         }
       ],
       "additionalProperties": false
+    },
+    "phonological_evaluation": {
+      "type": "object",
+      "description": "Optional language-profiled FER/TER scoring configuration. Feature inventories and G2P are caller-governed; this receipt records what was actually used.",
+      "required": [
+        "mode",
+        "feature_profile_id",
+        "feature_profile_revision",
+        "feature_profile_manifest_sha256",
+        "feature_dimension_count",
+        "tone_dimensions",
+        "phonetic_reference_revision",
+        "g2p_authority",
+        "g2p_rule_set_revision",
+        "alignment_algorithm",
+        "alignment_gap_penalty",
+        "alignment_tie_policy",
+        "unscorable_segment_count"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "NOT_USED",
+            "FER_ONLY",
+            "FER_TER"
+          ]
+        },
+        "feature_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feature_profile_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feature_profile_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "feature_dimension_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "tone_dimensions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uniqueItems": true
+        },
+        "phonetic_reference_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "g2p_authority": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "EXPERT_NATIVE_PHONETIC_ANNOTATION",
+            "NATIVE_RULE_G2P",
+            "EQUIVALENT_RULE_G2P",
+            "DONOR_RULE_G2P",
+            "MODEL_PREDICTED",
+            "UNKNOWN"
+          ]
+        },
+        "g2p_rule_set_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "alignment_algorithm": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "NEEDLEMAN_WUNSCH",
+            "OTHER"
+          ]
+        },
+        "alignment_gap_penalty": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "alignment_tie_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unscorable_segment_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "NOT_USED"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "feature_profile_id": {
+                "type": "null"
+              },
+              "feature_profile_revision": {
+                "type": "null"
+              },
+              "feature_profile_manifest_sha256": {
+                "type": "null"
+              },
+              "feature_dimension_count": {
+                "type": "null"
+              },
+              "tone_dimensions": {
+                "maxItems": 0
+              },
+              "phonetic_reference_revision": {
+                "type": "null"
+              },
+              "g2p_authority": {
+                "const": "NOT_APPLICABLE"
+              },
+              "g2p_rule_set_revision": {
+                "type": "null"
+              },
+              "alignment_algorithm": {
+                "const": "NOT_APPLICABLE"
+              },
+              "alignment_gap_penalty": {
+                "type": "null"
+              },
+              "alignment_tie_policy": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "FER_ONLY",
+                  "FER_TER"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "feature_profile_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "feature_profile_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "feature_profile_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "feature_dimension_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "phonetic_reference_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "g2p_authority": {
+                "not": {
+                  "const": "NOT_APPLICABLE"
+                }
+              },
+              "alignment_algorithm": {
+                "enum": [
+                  "NEEDLEMAN_WUNSCH",
+                  "OTHER"
+                ]
+              },
+              "alignment_gap_penalty": {
+                "type": "number",
+                "minimum": 0
+              },
+              "alignment_tie_policy": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "FER_ONLY"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tone_dimensions": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "FER_TER"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tone_dimensions": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "acoustic_faithfulness": {
+      "type": "object",
+      "description": "Optional controlled audio/text/prompt conflict evaluation receipt. This does not authorize real-speaker identity or sensitive attribute inference.",
+      "required": [
+        "mode",
+        "stimulus_manifest_sha256",
+        "base_audio_manifest_sha256",
+        "condition_count",
+        "prompt_revision_sha256",
+        "context_revision_sha256",
+        "changed_dimensions",
+        "audio_access_mode",
+        "ground_truth_revision",
+        "evidence_annotation_revision",
+        "output_manifest_sha256",
+        "privacy_review_ref"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "NOT_USED",
+            "SYNTHETIC_CONFLICT_SUITE",
+            "ADMITTED_REAL_AUDIO_CONFLICT_SUITE"
+          ]
+        },
+        "stimulus_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "base_audio_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prompt_revision_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "context_revision_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "changed_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "LEXICAL_CONTENT",
+              "NEGATION",
+              "NUMBER_UNIT_DATE",
+              "PARTICIPANT_ROLE",
+              "CODE_SWITCH",
+              "PROSODY",
+              "BACKGROUND_SOUND",
+              "SPEAKER_SESSION_PSEUDONYM",
+              "PROMPT_TEXT",
+              "CONTEXT_TEXT",
+              "MIXED_AUDIO",
+              "SILENCE_OR_MISSING_EVIDENCE"
+            ]
+          }
+        },
+        "audio_access_mode": {
+          "enum": [
+            "NOT_APPLICABLE",
+            "DIRECT_AUDIO",
+            "TRANSCRIPT_ONLY",
+            "AUDIO_AND_TRANSCRIPT",
+            "MIXED_AUDIO"
+          ]
+        },
+        "ground_truth_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_annotation_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "privacy_review_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "NOT_USED"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stimulus_manifest_sha256": {
+                "type": "null"
+              },
+              "base_audio_manifest_sha256": {
+                "type": "null"
+              },
+              "condition_count": {
+                "const": 0
+              },
+              "prompt_revision_sha256": {
+                "type": "null"
+              },
+              "context_revision_sha256": {
+                "type": "null"
+              },
+              "changed_dimensions": {
+                "maxItems": 0
+              },
+              "audio_access_mode": {
+                "const": "NOT_APPLICABLE"
+              },
+              "ground_truth_revision": {
+                "type": "null"
+              },
+              "evidence_annotation_revision": {
+                "type": "null"
+              },
+              "output_manifest_sha256": {
+                "type": "null"
+              },
+              "privacy_review_ref": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "SYNTHETIC_CONFLICT_SUITE",
+                  "ADMITTED_REAL_AUDIO_CONFLICT_SUITE"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stimulus_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "base_audio_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "condition_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "prompt_revision_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "context_revision_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "changed_dimensions": {
+                "minItems": 1
+              },
+              "ground_truth_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_annotation_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "ADMITTED_REAL_AUDIO_CONFLICT_SUITE"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "privacy_review_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
     }
   },
   "$defs": {
