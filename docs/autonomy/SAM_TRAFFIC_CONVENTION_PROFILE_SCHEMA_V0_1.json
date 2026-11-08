@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/SAM_TRAFFIC_CONVENTION_PROFILE_SCHEMA_V0_1.json",
+  "title": "SAM Traffic Convention Profile Registry v0.1",
+  "description": "Jurisdiction-bound traffic-side, lane-side and vehicle-layout semantics. Structural validity is not proof that a rule profile is legally correct or current.",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "schema_version",
+    "claim_ceiling",
+    "profiles"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "luminous.sam.traffic-convention-profiles"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_convention_semantics_only"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": [
+        "profile_id",
+        "jurisdiction_profile_id",
+        "traffic_side",
+        "steering_wheel_position",
+        "travel_frame_id",
+        "keep_side_sign",
+        "kerbside_sign",
+        "median_side_sign",
+        "passing_side_sign",
+        "passing_rule_profile_id",
+        "passing_rule_profile_version",
+        "lane_ordering_profile_id",
+        "applicability"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdiction_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traffic_side": {
+          "enum": [
+            "left",
+            "right",
+            "unknown"
+          ]
+        },
+        "steering_wheel_position": {
+          "enum": [
+            "left",
+            "right",
+            "center",
+            "unknown"
+          ]
+        },
+        "travel_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keep_side_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "kerbside_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "median_side_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "passing_side_sign": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            -1,
+            1,
+            null
+          ]
+        },
+        "passing_rule_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passing_rule_profile_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane_ordering_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applicability": {
+          "enum": [
+            "synthetic_fixture",
+            "jurisdiction_profile_unverified",
+            "verified_for_declared_context",
+            "unknown"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "traffic_side": {
+                "const": "left"
+              }
+            },
+            "required": [
+              "traffic_side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "keep_side_sign": {
+                "const": 1
+              },
+              "kerbside_sign": {
+                "const": 1
+              },
+              "median_side_sign": {
+                "const": -1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "traffic_side": {
+                "const": "right"
+              }
+            },
+            "required": [
+              "traffic_side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "keep_side_sign": {
+                "const": -1
+              },
+              "kerbside_sign": {
+                "const": -1
+              },
+              "median_side_sign": {
+                "const": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "traffic_side": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "traffic_side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "applicability": {
+                "enum": [
+                  "unknown",
+                  "synthetic_fixture"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
