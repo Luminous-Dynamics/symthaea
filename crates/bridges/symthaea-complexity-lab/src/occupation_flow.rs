@@ -230,6 +230,46 @@ pub struct VerifiedOccupationFlowGap {
     pub absolute_gap: CheckedRational,
 }
 
+/// A source-bound exact primal/dual witness for one ordered action comparison.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PairwiseRegretWitness {
+    pub selected_action: usize,
+    pub comparator_action: usize,
+    pub certificate: OccupationFlowCertificate,
+}
+
+/// Verified maximum of U(comparator) - U(selected) over the shared uncertainty set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerifiedPairwiseRegret {
+    pub selected_action: usize,
+    pub comparator_action: usize,
+    /// This difference may be negative; the selected action's regret contribution
+    /// is max(0, maximum_difference).
+    pub maximum_difference: CheckedRational,
+    pub regret_contribution: CheckedRational,
+    pub compiled_lp_sha256: [u8; 32],
+    pub certificate_sha256: [u8; 32],
+}
+
+/// Worst-case regret of one candidate action, maximized across all comparators.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerifiedActionRegret {
+    pub action_index: usize,
+    pub worst_case_regret: CheckedRational,
+}
+
+/// Complete minimax-regret result, including all tied minimizing actions.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedSharedDynamicsMinimaxRegret {
+    pub source_model_sha256: [u8; 32],
+    pub pairwise_regrets: Vec<VerifiedPairwiseRegret>,
+    pub action_regrets: Vec<VerifiedActionRegret>,
+    pub minimax_actions: Vec<usize>,
+    pub minimax_regret: CheckedRational,
+    /// Aggregate identity over every ordered-pair proof and the final decision.
+    pub decision_certificate_sha256: [u8; 32],
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OccupationFlowLp {
     lp: SparseRationalLp,
@@ -451,6 +491,12 @@ pub enum OccupationFlowError {
     },
     CertificateSourceDigestMismatch,
     CertificateCompiledLpDigestMismatch,
+    InvalidMinimaxRegretActionCount { actual: usize },
+    PairwiseWitnessCountMismatch { expected: usize, actual: usize },
+    PairwiseActionIndexOutOfBounds { action: usize, action_count: usize },
+    PairwiseSelfComparison { action: usize },
+    DuplicatePairwiseWitness { selected_action: usize, comparator_action: usize },
+    MissingPairwiseWitness { selected_action: usize, comparator_action: usize },
     Lp(LpCertificateError),
 }
 
@@ -482,6 +528,28 @@ impl fmt::Display for OccupationFlowError {
             Self::CertificateCompiledLpDigestMismatch => {
                 write!(f, "occupation-flow compiled-LP digest mismatch")
             }
+            Self::InvalidMinimaxRegretActionCount { actual } => {
+                write!(f, "minimax regret requires at least two actions; received {actual}")
+            }
+            Self::PairwiseWitnessCountMismatch { expected, actual } => write!(
+                f,
+                "minimax regret requires {expected} ordered-pair witnesses; received {actual}"
+            ),
+            Self::PairwiseActionIndexOutOfBounds { action, action_count } => write!(
+                f,
+                "pairwise action index {action} is outside action count {action_count}"
+            ),
+            Self::PairwiseSelfComparison { action } => {
+                write!(f, "pairwise minimax regret witness compares action {action} with itself")
+            }
+            Self::DuplicatePairwiseWitness { selected_action, comparator_action } => write!(
+                f,
+                "duplicate pairwise minimax regret witness ({selected_action}, {comparator_action})"
+            ),
+            Self::MissingPairwiseWitness { selected_action, comparator_action } => write!(
+                f,
+                "missing pairwise minimax regret witness ({selected_action}, {comparator_action})"
+            ),
             Self::Lp(error) => write!(f, "LP construction failed: {error}"),
         }
     }
@@ -709,6 +777,229 @@ pub fn build_pairwise_worst_case_regret_lp(
     }
 
     build_occupation_flow_lp(model, &regret_scores, UtilityDirection::Maximize, budget)
+}
+
+/// Verify a complete finite-action minimax-regret certificate over shared
+/// stagewise interval dynamics.
+///
+/// For selected action a and comparator b, the pairwise LP maximizes
+/// U_b(omega) - U_a(omega) over one common feasible occupation-flow trajectory.
+/// The worst-case regret of a is max(0, max_b max_omega(U_b-U_a)); the minimax
+/// action minimizes this value. Every ordered pair a != b must have one exact
+/// digest-bound primal/dual certificate. All minimizing ties are returned.
+///
+/// This is valid only when all candidate score functions share the same
+/// uncertain transition process. It is not a regret solver for action-dependent
+/// transition kernels, policy-dependent occupancies or nonrectangular coupling.
+pub fn verify_shared_dynamics_minimax_regret(
+    model: &StagewiseIntervalMarkovModel,
+    action_scores: &[Vec<Vec<CheckedRational>>],
+    witnesses: &[PairwiseRegretWitness],
+    budget: OccupationFlowBudget,
+    max_pairwise_lp_count: usize,
+) -> Result<VerifiedSharedDynamicsMinimaxRegret, OccupationFlowError> {
+    let action_count = action_scores.len();
+    if action_count < 2 {
+        return Err(OccupationFlowError::InvalidMinimaxRegretActionCount {
+            actual: action_count,
+        });
+    }
+    let expected_pairs = action_count.checked_mul(action_count - 1)
+        .ok_or(OccupationFlowError::DimensionOverflow)?;
+    if expected_pairs > max_pairwise_lp_count {
+        return Err(OccupationFlowError::BudgetExceeded {
+            resource: "pairwise regret LP count",
+            required: expected_pairs,
+            limit: max_pairwise_lp_count,
+        });
+    }
+    if witnesses.len() != expected_pairs {
+        return Err(OccupationFlowError::PairwiseWitnessCountMismatch {
+            expected: expected_pairs,
+            actual: witnesses.len(),
+        });
+    }
+
+    let mut ordered = Vec::new();
+    ordered.try_reserve_exact(witnesses.len()).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "pairwise minimax-regret witness references",
+            requested: witnesses.len(),
+        }
+    })?;
+    for witness in witnesses {
+        for action in [witness.selected_action, witness.comparator_action] {
+            if action >= action_count {
+                return Err(OccupationFlowError::PairwiseActionIndexOutOfBounds {
+                    action,
+                    action_count,
+                });
+            }
+        }
+        if witness.selected_action == witness.comparator_action {
+            return Err(OccupationFlowError::PairwiseSelfComparison {
+                action: witness.selected_action,
+            });
+        }
+        ordered.push(witness);
+    }
+    ordered.sort_unstable_by_key(|witness| {
+        (witness.selected_action, witness.comparator_action)
+    });
+
+    for adjacent in ordered.windows(2) {
+        if adjacent[0].selected_action == adjacent[1].selected_action
+            && adjacent[0].comparator_action == adjacent[1].comparator_action
+        {
+            return Err(OccupationFlowError::DuplicatePairwiseWitness {
+                selected_action: adjacent[0].selected_action,
+                comparator_action: adjacent[0].comparator_action,
+            });
+        }
+    }
+
+    let mut action_regrets = Vec::new();
+    action_regrets.try_reserve_exact(action_count).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "minimax-regret action summaries",
+            requested: action_count,
+        }
+    })?;
+    action_regrets.resize(action_count, CheckedRational::zero());
+
+    let mut pairwise_regrets = Vec::new();
+    pairwise_regrets.try_reserve_exact(expected_pairs).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "verified pairwise regret results",
+            requested: expected_pairs,
+        }
+    })?;
+
+    let mut witness_cursor = 0usize;
+    for selected_action in 0..action_count {
+        for comparator_action in 0..action_count {
+            if comparator_action == selected_action {
+                continue;
+            }
+            let witness = ordered[witness_cursor];
+            witness_cursor += 1;
+            if witness.selected_action != selected_action
+                || witness.comparator_action != comparator_action
+            {
+                return Err(OccupationFlowError::MissingPairwiseWitness {
+                    selected_action,
+                    comparator_action,
+                });
+            }
+
+            let pairwise_lp = build_pairwise_worst_case_regret_lp(
+                model,
+                &action_scores[selected_action],
+                &action_scores[comparator_action],
+                budget,
+            )?;
+            let verified = pairwise_lp.verify_bound_optimality(&witness.certificate)?;
+            let regret_contribution = if verified.utility.is_negative() {
+                CheckedRational::zero()
+            } else {
+                verified.utility
+            };
+            if compare_nonnegative(regret_contribution, action_regrets[selected_action])
+                == Ordering::Greater
+            {
+                action_regrets[selected_action] = regret_contribution;
+            }
+            pairwise_regrets.push(VerifiedPairwiseRegret {
+                selected_action,
+                comparator_action,
+                maximum_difference: verified.utility,
+                regret_contribution,
+                compiled_lp_sha256: verified.compiled_lp_sha256,
+                certificate_sha256: verified.certificate_sha256,
+            });
+        }
+    }
+
+    let mut minimum_regret = action_regrets[0];
+    for &regret in action_regrets.iter().skip(1) {
+        if compare_nonnegative(regret, minimum_regret) == Ordering::Less {
+            minimum_regret = regret;
+        }
+    }
+
+    let mut minimax_actions = Vec::new();
+    minimax_actions.try_reserve_exact(action_count).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "minimax-regret tied action set",
+            requested: action_count,
+        }
+    })?;
+    let mut action_summaries = Vec::new();
+    action_summaries.try_reserve_exact(action_count).map_err(|_| {
+        OccupationFlowError::AllocationFailed {
+            resource: "minimax-regret action results",
+            requested: action_count,
+        }
+    })?;
+    for (action_index, &worst_case_regret) in action_regrets.iter().enumerate() {
+        action_summaries.push(VerifiedActionRegret {
+            action_index,
+            worst_case_regret,
+        });
+        if worst_case_regret == minimum_regret {
+            minimax_actions.push(action_index);
+        }
+    }
+
+    let source_model_sha256 = canonical_interval_model_sha256(model);
+    let decision_certificate_sha256 = canonical_minimax_regret_decision_sha256(
+        source_model_sha256,
+        &pairwise_regrets,
+        &action_summaries,
+        &minimax_actions,
+        minimum_regret,
+    );
+
+    Ok(VerifiedSharedDynamicsMinimaxRegret {
+        source_model_sha256,
+        pairwise_regrets,
+        action_regrets: action_summaries,
+        minimax_actions,
+        minimax_regret: minimum_regret,
+        decision_certificate_sha256,
+    })
+}
+
+fn canonical_minimax_regret_decision_sha256(
+    source_model_sha256: [u8; 32],
+    pairwise: &[VerifiedPairwiseRegret],
+    action_regrets: &[VerifiedActionRegret],
+    minimax_actions: &[usize],
+    minimax_regret: CheckedRational,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-SHARED-DYNAMICS-MINIMAX-REGRET\\0\\x01");
+    hasher.update(source_model_sha256);
+    hasher.update((pairwise.len() as u64).to_le_bytes());
+    for pair in pairwise {
+        hasher.update((pair.selected_action as u64).to_le_bytes());
+        hasher.update((pair.comparator_action as u64).to_le_bytes());
+        hash_rational(&mut hasher, pair.maximum_difference);
+        hash_rational(&mut hasher, pair.regret_contribution);
+        hasher.update(pair.compiled_lp_sha256);
+        hasher.update(pair.certificate_sha256);
+    }
+    hasher.update((action_regrets.len() as u64).to_le_bytes());
+    for action in action_regrets {
+        hasher.update((action.action_index as u64).to_le_bytes());
+        hash_rational(&mut hasher, action.worst_case_regret);
+    }
+    hasher.update((minimax_actions.len() as u64).to_le_bytes());
+    for action in minimax_actions {
+        hasher.update((*action as u64).to_le_bytes());
+    }
+    hash_rational(&mut hasher, minimax_regret);
+    hasher.finalize().into()
 }
 
 /// Build the exact occupation-flow LP for cumulative finite-horizon utility.
