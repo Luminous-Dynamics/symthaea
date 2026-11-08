@@ -9,9 +9,12 @@
 //! fraction of incomparable endpoint pairs.
 
 use crate::causal_set_nd::CausalSetNd;
-use crate::{CausalSet2D, CausalSetError};
+use crate::CausalSet2D;
 use std::error::Error;
 use std::fmt;
+
+/// Maximum number of fixed-width profile bins accepted by one comparison.
+pub const MAX_INTERVAL_PROFILE_BINS: usize = 4_096;
 
 /// Errors while validating or comparing interval-abundance profiles.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,6 +33,10 @@ pub enum IntervalProfileError {
     },
     NoPairSamples,
     ZeroProfileBins,
+    TooManyProfileBins {
+        requested: usize,
+        maximum: usize,
+    },
     IncompatibleBinCount {
         left: usize,
         right: usize,
@@ -58,6 +65,10 @@ impl fmt::Display for IntervalProfileError {
                 write!(f, "at least two events are required for a normalized pair profile")
             }
             Self::ZeroProfileBins => write!(f, "normalized profile requires at least one bin"),
+            Self::TooManyProfileBins { requested, maximum } => write!(
+                f,
+                "requested {requested} profile bins; maximum supported is {maximum}"
+            ),
             Self::IncompatibleBinCount { left, right } => write!(
                 f,
                 "profile bin count mismatch: left has {left}, right has {right}"
@@ -187,6 +198,12 @@ impl IntervalAbundanceProfile {
     ) -> Result<Vec<f64>, IntervalProfileError> {
         if profile_bin_count == 0 {
             return Err(IntervalProfileError::ZeroProfileBins);
+        }
+        if profile_bin_count > MAX_INTERVAL_PROFILE_BINS {
+            return Err(IntervalProfileError::TooManyProfileBins {
+                requested: profile_bin_count,
+                maximum: MAX_INTERVAL_PROFILE_BINS,
+            });
         }
         if self.total_pairs == 0 {
             return Err(IntervalProfileError::NoPairSamples);
@@ -386,6 +403,12 @@ mod tests {
                 .normalized_bins(0),
             Err(IntervalProfileError::ZeroProfileBins)
         );
+        assert!(matches!(
+            IntervalAbundanceProfile::from_histogram(3, vec![1, 0])
+                .unwrap()
+                .normalized_bins(MAX_INTERVAL_PROFILE_BINS + 1),
+            Err(IntervalProfileError::TooManyProfileBins { .. })
+        ));
     }
 
     #[test]
