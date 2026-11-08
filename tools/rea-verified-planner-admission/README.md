@@ -10,6 +10,7 @@ Standalone Rust adapter that composes the existing REA raw Evidence verifier wit
 - The original caller-declared origin is retained in the admission report with `CallerDeclaredUnverified` qualification.
 - Because the existing planner has no unverified-origin state, v0 deliberately projects caller-declared `IndependentObservation` and `IndependentDerivation` records as `ExternalReference`. They cannot ground a production planner hypothesis until a separate acquisition-attestation policy is implemented.
 - The planner wrapper verifies every hypothesis support/contradiction ID is present in the raw-byte-admitted catalog and rejects common-mode root multiplicity within a hypothesis support closure before invoking the existing planner.
+- The adapter computes a canonical `planner_request_sha256` over the admitted raw/semantic digests, lineage manifest, hypotheses, likelihood rows, experiment constraints and planner configuration. It is a request integrity commitment, not a signed run receipt.
 - The returned claim ceiling explicitly leaves producer authentication, origin authentication, source independence, observation truth and issuer-history completeness unestablished.
 
 ## Run
