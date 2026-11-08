@@ -1558,6 +1558,74 @@ mod tests {
     }
 
     #[test]
+    fn spherical_cap_real_cosine_interval_property_residual_directions() {
+        let mut state = 0xB0A1_5EEDu32;
+        for dimension in [1usize, 7, 8, 9, 17, 257, 2_048, 16_384] {
+            for _ in 0..32 {
+                let center = ContinuousHV::from_vec(
+                    (0..dimension)
+                        .map(|_| pseudo_random_unit(&mut state) * 0.5)
+                        .collect(),
+                );
+                let query = ContinuousHV::from_vec(
+                    (0..dimension)
+                        .map(|_| pseudo_random_unit(&mut state))
+                        .collect(),
+                );
+                let center_norm = center
+                    .values
+                    .iter()
+                    .map(|value| (*value as f64) * (*value as f64))
+                    .sum::<f64>()
+                    .sqrt();
+                if center_norm <= 1.0e-6 {
+                    continue;
+                }
+                // A range of small-to-large balls, all strictly separated
+                // from the origin, while preserving headroom in [-1, 1].
+                let radius = (center_norm * 0.05).min(0.2) as f32;
+                let mut direction: Vec<f32> = (0..dimension)
+                    .map(|_| pseudo_random_unit(&mut state))
+                    .collect();
+                let direction_norm = direction
+                    .iter()
+                    .map(|value| (*value as f64) * (*value as f64))
+                    .sum::<f64>()
+                    .sqrt();
+                if direction_norm == 0.0 {
+                    direction[0] = 1.0;
+                }
+                let direction_norm = direction
+                    .iter()
+                    .map(|value| (*value as f64) * (*value as f64))
+                    .sum::<f64>()
+                    .sqrt();
+                let scale = (radius as f64 * 0.9) / direction_norm;
+                let actual = ContinuousHV::from_vec(
+                    center
+                        .values
+                        .iter()
+                        .zip(direction.iter())
+                        .map(|(c, d)| ((*c as f64 + *d as f64 * scale) as f32).clamp(-1.0, 1.0))
+                        .collect(),
+                );
+                verify_l2_residual_certificate(&actual, &center, radius).unwrap();
+
+                let interval = query
+                    .real_cosine_interval_full_resolution_for_l2_ball_center(&center, radius)
+                    .unwrap();
+                let exact_real = exact_real_cosine(&query.values, &actual.values);
+                assert!(
+                    interval.contains(exact_real),
+                    "dimension={dimension}: real cosine={exact_real}, interval=[{}, {}]",
+                    interval.lower,
+                    interval.upper
+                );
+            }
+        }
+    }
+
+    #[test]
     fn spherical_cap_saturates_aligned_and_antipodal_directions() {
         let center = ContinuousHV::from_vec(vec![0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         let aligned = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
