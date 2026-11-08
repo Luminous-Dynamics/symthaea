@@ -476,11 +476,12 @@ fn validate_grader_case(
             "{context} held-out DGP must cover every candidate"
         )));
     }
-    let mut hidden_covered = BTreeSet::new();
-    let mut hidden_differs = false;
+    let mut hidden_by_candidate = BTreeMap::<String, &Value>::new();
     for entry in hidden {
         let experiment_id = string(entry, "experiment_id", context)?;
-        if !candidate_ids.contains(experiment_id) || !hidden_covered.insert(experiment_id.to_owned()) {
+        if !candidate_ids.contains(experiment_id)
+            || hidden_by_candidate.insert(experiment_id.to_owned(), entry).is_some()
+        {
             return Err(ManifestError(format!(
                 "{context} held-out DGP has unknown or duplicate candidate {experiment_id}"
             )));
@@ -490,32 +491,59 @@ fn validate_grader_case(
             .find(|item| item.get("id").and_then(Value::as_str) == Some(experiment_id))
             .expect("candidate was checked");
         let outcome_count = array(candidate, "outcomes", context)?.len();
-        let rows = array(entry, "likelihoods", context)?;
         validate_likelihood_rows(
-            rows,
+            array(entry, "likelihoods", context)?,
             &hypothesis_ids,
             outcome_count,
             &format!("{context}/held_out/{experiment_id}"),
         )?;
+    }
+    if hidden_by_candidate.keys().cloned().collect::<BTreeSet<_>>() != candidate_ids {
+        return Err(ManifestError(format!("{context} hidden DGP candidate coverage mismatch")));
+    }
 
+    let testable = bool_value(grader_case, "out_of_ensemble_testable", context)?;
+    let reason = grader_case.get("not_testable_reason");
+    if testable {
+        if reason.is_some_and(|value| !value.is_null()) {
+            return Err(ManifestError(format!(
+                "{context} testable held-out DGP must not carry a not-testable reason"
+            )));
+        }
+        // A held-out DGP must differ from every complete declared scenario,
+        // not merely from at least one scenario.
         for scenario in scenarios {
-            let scenario_entry = array(scenario, "experiments", context)?
-                .iter()
-                .find(|item| item.get("experiment_id").and_then(Value::as_str) == Some(experiment_id))
-                .expect("scenario coverage was validated");
-            let scenario_rows = array(scenario_entry, "likelihoods", context)?;
-            if !canonical_value_equal(rows, scenario_rows) {
-                hidden_differs = true;
+            let experiments = array(scenario, "experiments", context)?;
+            let matches_entire_scenario = experiments.iter().all(|declared| {
+                let id = declared["experiment_id"].as_str().unwrap_or("");
+                hidden_by_candidate.get(id).is_some_and(|hidden_entry| {
+                    canonical_value_equal(
+                        &hidden_entry["likelihoods"],
+                        &declared["likelihoods"],
+                    )
+                })
+            });
+            if matches_entire_scenario {
+                return Err(ManifestError(format!(
+                    "{context} held-out DGP duplicates declared scenario {}",
+                    string(scenario, "scenario_id", context)?
+                )));
             }
         }
-    }
-    if !hidden_differs {
-        return Err(ManifestError(format!(
-            "{context} held-out DGP duplicates every declared scenario"
-        )));
-    }
-    if hidden_covered != candidate_ids {
-        return Err(ManifestError(format!("{context} hidden DGP candidate coverage mismatch")));
+    } else {
+        if !reason.is_some_and(Value::is_string) {
+            return Err(ManifestError(format!(
+                "{context} non-testable case must explain its outcome-space limitation"
+            )));
+        }
+        if !planner_candidates
+            .iter()
+            .all(|candidate| array(candidate, "outcomes", context).is_ok_and(|items| items.len() == 1))
+        {
+            return Err(ManifestError(format!(
+                "{context} is marked not-testable although it has a multi-outcome candidate"
+            )));
+        }
     }
 
     let realized_hypothesis = string(grader_case, "realized_hypothesis_id", context)?;
@@ -744,6 +772,30 @@ mod tests {
         )
         .is_err());
         assert!(!case_id.is_empty());
+    }
+
+    #[test]
+    fn single_outcome_negative_control_declares_held_out_shift_not_testable() {
+        let grader_value = grader();
+        let case = grader_value["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["case_id"] == "REA-POA-012")
+            .unwrap();
+        assert_eq!(case["out_of_ensemble_testable"], Value::Bool(false));
+        assert!(case["not_testable_reason"].as_str().is_some());
+    }
+
+    #[test]
+    fn source_agent_view_candidate_mutation_is_rejected() {
+        let mut value = planner();
+        value["cases"][0]["candidates"][0]["outcomes"][0] = Value::String("invented".into());
+        let source: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let case_id = value["cases"][0]["case_id"].as_str().unwrap();
+        let source_case = source["cases"].as_array().unwrap().iter()
+            .find(|item| item["case_id"] == case_id).unwrap();
+        assert!(validate_case(&value["cases"][0], source_case, "mutated").is_err());
     }
 
     #[test]
