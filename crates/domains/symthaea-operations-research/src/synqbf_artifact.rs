@@ -476,7 +476,7 @@ pub fn decode_synqbf_proof(
     // one-byte constant literals. Reserve one byte for the output literal.
     // Reject impossible node counts before Vec::with_capacity can allocate.
     let minimum_node_bytes = node_count
-        .checked_mul(5)
+        .checked_mul(3)
         .and_then(|bytes| bytes.checked_add(1))
         .ok_or(SynQbfArtifactError::ResourceAccountingOverflow)?;
     if minimum_node_bytes > reader.remaining() {
