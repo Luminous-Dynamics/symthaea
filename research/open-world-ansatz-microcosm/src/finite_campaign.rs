@@ -85,6 +85,14 @@ pub struct ArmAggregate {
     pub maximum_probe_actions_in_episode: usize,
 }
 
+fn bool_count(value: bool) -> usize {
+    if value {
+        1
+    } else {
+        0
+    }
+}
+
 impl ArmAggregate {
     fn new() -> Self {
         Self {
@@ -108,20 +116,20 @@ impl ArmAggregate {
 
     fn record(&mut self, score: &EvaluatorScore) {
         self.episodes += 1;
-        self.exact_version_space_matches += usize::from(score.set_score.exact_version_space_match);
-        self.exact_structure_set_matches += usize::from(score.structure_score.exact_structure_set_match);
-        self.generating_model_retained += usize::from(score.generating_model_in_version_space);
-        self.decision_correct += usize::from(score.decision_correct);
-        self.evidence_references_valid += usize::from(score.evidence_references_valid);
-        self.oracle_singleton_model_cases += usize::from(score.set_score.oracle_model_count == 1);
-        self.oracle_identified_structure_cases += usize::from(score.structure_score.oracle_structure_identified);
-        self.false_unique_structure_claims += usize::from(
+        self.exact_version_space_matches += bool_count(score.set_score.exact_version_space_match);
+        self.exact_structure_set_matches += bool_count(score.structure_score.exact_structure_set_match);
+        self.generating_model_retained += bool_count(score.generating_model_in_version_space);
+        self.decision_correct += bool_count(score.decision_correct);
+        self.evidence_references_valid += bool_count(score.evidence_references_valid);
+        self.oracle_singleton_model_cases += bool_count(score.set_score.oracle_model_count == 1);
+        self.oracle_identified_structure_cases += bool_count(score.structure_score.oracle_structure_identified);
+        self.false_unique_structure_claims += bool_count(
             !score.structure_score.oracle_structure_identified
                 && score.structure_score.claimed_structure_identified,
         );
-        self.abstentions += usize::from(score.abstained);
-        self.safe_abstentions += usize::from(score.safe_abstention);
-        self.unnecessary_abstentions += usize::from(score.unnecessary_abstention);
+        self.abstentions += bool_count(score.abstained);
+        self.safe_abstentions += bool_count(score.safe_abstention);
+        self.unnecessary_abstentions += bool_count(score.unnecessary_abstention);
         self.total_probe_actions += score.probe_count;
         self.total_probe_cost_units += score.probe_count as u64;
         self.maximum_probe_actions_in_episode =
