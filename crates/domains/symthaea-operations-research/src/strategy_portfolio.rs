@@ -321,9 +321,9 @@ pub fn encode_qbf_game_proof(
                 high_child,
             } => {
                 append_byte(&mut bytes, 4, encoding_budget)?;
-                append_u64(&mut bytes, variable, encoding_budget)?;
-                append_u64(&mut bytes, low_child, encoding_budget)?;
-                append_u64(&mut bytes, high_child, encoding_budget)?;
+                append_u64(&mut bytes, *variable, encoding_budget)?;
+                append_u64(&mut bytes, *low_child, encoding_budget)?;
+                append_u64(&mut bytes, *high_child, encoding_budget)?;
             }
         }
     }
@@ -334,14 +334,14 @@ fn read_proof_byte(bytes: &[u8], offset: &mut usize) -> Result<u8, StrategyPortf
     let Some(&value) = bytes.get(*offset) else {
         return Err(StrategyPortfolioError::ProofEncodingInvalid { offset: *offset });
     };
-    *offset = offset
+    *offset = (*offset)
         .checked_add(1)
         .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
     Ok(value)
 }
 
 fn read_proof_u64(bytes: &[u8], offset: &mut usize) -> Result<u64, StrategyPortfolioError> {
-    let end = offset
+    let end = (*offset)
         .checked_add(8)
         .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
     let Some(slice) = bytes.get(*offset..end) else {
