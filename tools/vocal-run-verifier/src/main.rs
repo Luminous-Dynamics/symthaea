@@ -127,8 +127,8 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {
             path.display()
         )));
     }
-    let bytes = fs::read(path)
-        .map_err(|error| fail(format!("cannot read {}: {error}", path.display())))?;
+    let bytes =
+        fs::read(path).map_err(|error| fail(format!("cannot read {}: {error}", path.display())))?;
     serde_json::from_slice(&bytes)
         .map_err(|error| fail(format!("invalid JSON in {}: {error}", path.display())))
 }
@@ -288,8 +288,12 @@ fn validate_case(case: &CaseReceipt) -> Result<(), String> {
         previous_end = end;
     }
 
-    let score_bytes = serde_json::to_vec(&case.melody)
-        .map_err(|error| fail(format!("cannot encode case {} score: {error}", case.case_id)))?;
+    let score_bytes = serde_json::to_vec(&case.melody).map_err(|error| {
+        fail(format!(
+            "cannot encode case {} score: {error}",
+            case.case_id
+        ))
+    })?;
     let observed_score = blake3::hash(&score_bytes).to_hex().to_string();
     if case.score_blake3 != observed_score {
         return Err(fail(format!(
@@ -303,8 +307,8 @@ fn validate_case(case: &CaseReceipt) -> Result<(), String> {
             case.case_id
         )));
     }
-    let performance_value: Value = serde_json::from_str(&case.performance_canonical_json)
-        .map_err(|error| {
+    let performance_value: Value =
+        serde_json::from_str(&case.performance_canonical_json).map_err(|error| {
             fail(format!(
                 "case {} canonical performance JSON is invalid: {error}",
                 case.case_id
@@ -335,7 +339,9 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         || blind_root.starts_with(&private_root)
         || private_root.starts_with(&blind_root)
     {
-        return Err(fail("blind and private bundle directories must be disjoint"));
+        return Err(fail(
+            "blind and private bundle directories must be disjoint",
+        ));
     }
 
     let clips: Vec<BlindClip> = read_json(&blind_root.join("blind_manifest.json"))?;
@@ -349,7 +355,9 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         return Err(fail("run manifest schema or case_count is invalid"));
     }
     if !valid_git_sha(&run.source_revision) || run.voice_id.trim().is_empty() {
-        return Err(fail("run manifest requires an exact lowercase Git SHA and voice ID"));
+        return Err(fail(
+            "run manifest requires an exact lowercase Git SHA and voice ID",
+        ));
     }
     match (&run.diffsinger_worker, &run.diffsinger_worker_blake3) {
         (Some(path), Some(digest)) if !path.trim().is_empty() && is_hex_digest(digest) => {}
@@ -454,7 +462,6 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         }
     }
 
-
     let mut key_by_id = BTreeMap::new();
     let mut backend_names = BTreeSet::new();
     let mut model_count = 0usize;
@@ -469,9 +476,12 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
                 entry.clip_id
             )));
         }
-        let clip = clip_by_id
-            .get(entry.clip_id.as_str())
-            .ok_or_else(|| fail(format!("private key references unknown clip {}", entry.clip_id)))?;
+        let clip = clip_by_id.get(entry.clip_id.as_str()).ok_or_else(|| {
+            fail(format!(
+                "private key references unknown clip {}",
+                entry.clip_id
+            ))
+        })?;
         let expected_id = expected_blind_id(&key.salt, &entry.backend, entry.case_id);
         if expected_id != entry.clip_id {
             return Err(fail(format!(
@@ -503,12 +513,18 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
                 .get(&entry.case_id)
                 .ok_or_else(|| fail(format!("model clip {} has no case", entry.clip_id)))?;
             let performance_digest = entry.performance_blake3.as_deref().ok_or_else(|| {
-                fail(format!("model clip {} has no performance digest", entry.clip_id))
+                fail(format!(
+                    "model clip {} has no performance digest",
+                    entry.clip_id
+                ))
             })?;
-            let capability_digest = entry
-                .capability_manifest_blake3
-                .as_deref()
-                .ok_or_else(|| fail(format!("model clip {} has no capability digest", entry.clip_id)))?;
+            let capability_digest =
+                entry.capability_manifest_blake3.as_deref().ok_or_else(|| {
+                    fail(format!(
+                        "model clip {} has no capability digest",
+                        entry.clip_id
+                    ))
+                })?;
             if !is_hex_digest(performance_digest)
                 || !is_hex_digest(capability_digest)
                 || clip.performance_blake3.as_deref() != Some(performance_digest)
@@ -547,9 +563,11 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         if objective_by_id.insert(clip_id, objective).is_some() {
             return Err(fail(format!("duplicate objective entry {clip_id}")));
         }
-        let key_entry = key_by_id
-            .get(clip_id)
-            .ok_or_else(|| fail(format!("objective report references unknown clip {clip_id}")))?;
+        let key_entry = key_by_id.get(clip_id).ok_or_else(|| {
+            fail(format!(
+                "objective report references unknown clip {clip_id}"
+            ))
+        })?;
         if key_entry.backend == "human-reference" {
             return Err(fail(format!(
                 "human reference {clip_id} must not have a generated objective entry"
@@ -562,7 +580,8 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         let case_id = objective
             .get("case_id")
             .and_then(Value::as_u64)
-            .ok_or_else(|| fail(format!("objective {clip_id} has invalid case_id")))? as usize;
+            .ok_or_else(|| fail(format!("objective {clip_id} has invalid case_id")))?
+            as usize;
         let capability_digest = objective
             .get("capability_manifest_blake3")
             .and_then(Value::as_str)
@@ -570,16 +589,23 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
         let capability_canonical_json = objective
             .get("capability_manifest_canonical_json")
             .and_then(Value::as_str)
-            .ok_or_else(|| fail(format!("objective {clip_id} has no canonical capability JSON")))?;
+            .ok_or_else(|| {
+                fail(format!(
+                    "objective {clip_id} has no canonical capability JSON"
+                ))
+            })?;
         let decoded_capability: Value =
             serde_json::from_str(capability_canonical_json).map_err(|error| {
-                fail(format!("objective {clip_id} canonical capability JSON is invalid: {error}"))
+                fail(format!(
+                    "objective {clip_id} canonical capability JSON is invalid: {error}"
+                ))
             })?;
         let capability_value = objective
             .get("capability_manifest")
             .ok_or_else(|| fail(format!("objective {clip_id} has no capability manifest")))?;
-        let observed_capability_digest =
-            blake3::hash(capability_canonical_json.as_bytes()).to_hex().to_string();
+        let observed_capability_digest = blake3::hash(capability_canonical_json.as_bytes())
+            .to_hex()
+            .to_string();
         if backend != key_entry.backend
             || case_id != key_entry.case_id
             || Some(capability_digest) != key_entry.capability_manifest_blake3.as_deref()
@@ -614,12 +640,16 @@ fn verify(blind_dir: &Path, private_dir: &Path) -> Result<VerifiedBundle, String
                 receipt.case_id
             )));
         }
-        let key_entry = key.entries.iter().find(|entry| {
-            entry.backend == "human-reference" && entry.case_id == receipt.case_id
-        }).ok_or_else(|| fail(format!(
-            "human reference receipt {} has no corresponding private key entry",
-            receipt.case_id
-        )))?;
+        let key_entry = key
+            .entries
+            .iter()
+            .find(|entry| entry.backend == "human-reference" && entry.case_id == receipt.case_id)
+            .ok_or_else(|| {
+                fail(format!(
+                    "human reference receipt {} has no corresponding private key entry",
+                    receipt.case_id
+                ))
+            })?;
         let clip = clip_by_id
             .get(key_entry.clip_id.as_str())
             .ok_or_else(|| fail("human reference key is missing its blind clip"))?;
@@ -661,7 +691,9 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     let result = (|| {
         if args.first().map(String::as_str) != Some("verify") {
-            return Err(fail("usage: vocal-run-verifier verify --blind-dir DIR --private-dir DIR"));
+            return Err(fail(
+                "usage: vocal-run-verifier verify --blind-dir DIR --private-dir DIR",
+            ));
         }
         let blind_dir = arg(&args, "--blind-dir")?;
         let private_dir = arg(&args, "--private-dir")?;
@@ -741,8 +773,7 @@ mod tests {
         let lyrics = "hello world".to_string();
         let melody = vec![note()];
         let score_blake3 = digest(&serde_json::to_vec(&melody).unwrap());
-        let performance_canonical_json =
-            r#"{"synthetic_fixture":true}"#.to_string();
+        let performance_canonical_json = r#"{"synthetic_fixture":true}"#.to_string();
         let performance_blake3 = digest(performance_canonical_json.as_bytes());
         let case = CaseReceipt {
             case_id: 0,
@@ -792,8 +823,7 @@ mod tests {
         let capability_manifest = serde_json::json!({"backend_id": backend});
         let capability_manifest_canonical_json =
             serde_json::to_string(&capability_manifest).unwrap();
-        let capability_manifest_blake3 =
-            digest(capability_manifest_canonical_json.as_bytes());
+        let capability_manifest_blake3 = digest(capability_manifest_canonical_json.as_bytes());
         let mut entries = vec![KeyEntry {
             clip_id: clip_id.clone(),
             backend: backend.into(),
@@ -858,10 +888,7 @@ mod tests {
             }),
         );
         bundle.write_json("private/objective_report.json", &objectives);
-        bundle.write_json(
-            "private/human_reference_receipts.json",
-            &reference_receipts,
-        );
+        bundle.write_json("private/human_reference_receipts.json", &reference_receipts);
         bundle.write_json(
             "private/release_status.json",
             &serde_json::json!({
@@ -901,7 +928,9 @@ mod tests {
         let (blind, private) = bundle.roots();
         fs::write(blind.join("private_backend_key.json"), b"leak").unwrap();
         assert!(
-            verify(&blind, &private).unwrap_err().contains("possible blind/private data leak")
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("possible blind/private data leak")
         );
     }
 
@@ -911,7 +940,9 @@ mod tests {
         let (blind, private) = bundle.roots();
         fs::write(private.join("shared-listener-copy.wav"), b"private").unwrap();
         assert!(
-            verify(&blind, &private).unwrap_err().contains("possible blind/private data leak")
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("possible blind/private data leak")
         );
     }
 
@@ -924,14 +955,23 @@ mod tests {
         let audio = fs::read_dir(&blind)
             .unwrap()
             .filter_map(Result::ok)
-            .find(|entry| entry.path().extension().is_some_and(|extension| extension == "wav"))
+            .find(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "wav")
+            })
             .unwrap()
             .path();
         let target = private.join("outside.wav");
         fs::write(&target, b"external").unwrap();
         fs::remove_file(&audio).unwrap();
         symlink(&target, &audio).unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("non-symlink"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("non-symlink")
+        );
     }
 
     #[test]
@@ -945,7 +985,11 @@ mod tests {
             .unwrap()
             .path();
         fs::write(path, b"tampered").unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("audio digest mismatch"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("audio digest mismatch")
+        );
     }
 
     #[test]
@@ -956,7 +1000,11 @@ mod tests {
         let mut clips: Vec<BlindClip> = read_json(&path).unwrap();
         clips[0].audio = "../private/private_backend_key.json".into();
         fs::write(path, serde_json::to_vec(&clips).unwrap()).unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("simple .wav filename"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("simple .wav filename")
+        );
     }
 
     #[test]
@@ -967,7 +1015,11 @@ mod tests {
         let mut key: Value = read_json(&path).unwrap();
         key["entries"][0]["backend"] = Value::String("forged-backend".into());
         fs::write(path, serde_json::to_vec(&key).unwrap()).unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("blind ID does not match"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("blind ID does not match")
+        );
     }
 
     #[test]
@@ -978,7 +1030,11 @@ mod tests {
         let mut run: Value = read_json(&path).unwrap();
         run["cases"][0]["score_blake3"] = Value::String("f".repeat(64));
         fs::write(path, serde_json::to_vec(&run).unwrap()).unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("score digest mismatch"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("score digest mismatch")
+        );
     }
 
     #[test]
@@ -1002,7 +1058,11 @@ mod tests {
         let bundle = build_fixture(false);
         let (blind, private) = bundle.roots();
         fs::write(private.join("objective_report.json"), b"[]").unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("objective report count"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("objective report count")
+        );
     }
 
     #[test]
@@ -1013,7 +1073,11 @@ mod tests {
         let mut key: Value = read_json(&path).unwrap();
         key["entries"][0]["capability_manifest_blake3"] = Value::Null;
         fs::write(path, serde_json::to_vec(&key).unwrap()).unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("no capability digest"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("no capability digest")
+        );
     }
 
     #[test]
@@ -1036,6 +1100,10 @@ mod tests {
         let mut run: Value = read_json(&path).unwrap();
         run["source_revision"] = Value::String("not-a-sha".into());
         fs::write(&path, serde_json::to_vec(&run).unwrap()).unwrap();
-        assert!(verify(&blind, &private).unwrap_err().contains("exact lowercase Git SHA"));
+        assert!(
+            verify(&blind, &private)
+                .unwrap_err()
+                .contains("exact lowercase Git SHA")
+        );
     }
 }
