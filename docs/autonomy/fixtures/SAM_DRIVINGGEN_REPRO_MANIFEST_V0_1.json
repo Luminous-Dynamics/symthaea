@@ -1,0 +1,193 @@
+{
+  "manifest_schema": "luminous.sam.drivinggen-reproduction-manifest",
+  "manifest_version": "0.1.0",
+  "status": "protocol_frozen_not_reproduced",
+  "snapshot_date": "2026-11-08",
+  "benchmark": {
+    "id": "drivinggen-iclr-2026",
+    "name": "DrivingGen: A Comprehensive Benchmark for Generative Video World Models in Autonomous Driving",
+    "venue": "ICLR 2026",
+    "paper": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html",
+    "arxiv": "https://arxiv.org/abs/2601.01528"
+  },
+  "upstream": {
+    "code_repository": "https://github.com/youngzhou1999/DrivingGen",
+    "code_default_branch": "main",
+    "code_readme_blob_sha": "aa194e4926ba04eac073b57a47c90a80d93bbec0",
+    "license_file_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "code_license_declared": "Apache-2.0",
+    "dataset_repository": "https://huggingface.co/datasets/yangzhou99/DrivingGen",
+    "dataset_revision": "unresolved",
+    "dataset_revision_note": "Freeze a commit SHA or immutable revision before any reproduction. The current card was inspected on 2026-11-08, but its commit SHA was not pinned in this manifest.",
+    "dataset_license_declared": "Apache-2.0",
+    "third_party_provenance_review": "required",
+    "third_party_provenance_note": "Open-domain samples are internet-sourced; ego-conditioned samples aggregate multiple source datasets. Review source-video redistribution and commercial-use rights separately from repository/card license metadata."
+  },
+  "protocol": {
+    "tracks": {
+      "open_domain": {
+        "purpose": "open-domain generalization across geography, weather, time of day and diverse driving interactions",
+        "paper_reported_evaluation_clips": 200,
+        "hosted_card_reported_evaluation_examples": 222,
+        "input_fields": [
+          "front_view_rgb",
+          "scene_caption"
+        ]
+      },
+      "ego_conditioned": {
+        "purpose": "controllability of generated video trajectories relative to supplied ego motion",
+        "paper_reported_evaluation_clips": 200,
+        "hosted_card_reported_evaluation_examples": 222,
+        "input_fields": [
+          "front_view_rgb",
+          "scene_caption",
+          "ego_motion"
+        ],
+        "source_datasets": [
+          "ZOD",
+          "DrivingDojo",
+          "COVLA",
+          "nuPlan",
+          "Waymo Open Motion Dataset"
+        ]
+      }
+    },
+    "paper_total_evaluation_clips": 400,
+    "hosted_card_eval_examples_total": 444,
+    "hosted_page_total_rows": 22866,
+    "sample_count_discrepancy": {
+      "status": "unresolved",
+      "description": "Paper describes 200 samples per track (400 total); the current Hugging Face README metadata reports 222 eval examples for each track; the dataset page also shows 22,866 rows. These quantities may refer to different revisions or row/frame/sample units.",
+      "required_resolution": [
+        "pin immutable dataset revision",
+        "enumerate exact video/sample IDs per track",
+        "record row-to-video grouping",
+        "reconcile paper sample IDs vs hosted dataset card IDs",
+        "retain missing/extra IDs as typed outcomes"
+      ]
+    },
+    "generation_example": {
+      "video_frames": 101,
+      "frames_per_second": 10,
+      "resolution": [
+        576,
+        1024
+      ],
+      "source": "upstream repository Wan2.2-14B example; not assumed universal for every model"
+    },
+    "trajectory_extraction": {
+      "ego": [
+        "UniDepthV2",
+        "visual SLAM"
+      ],
+      "agents": [
+        "YOLOv10 detection",
+        "depth estimation"
+      ],
+      "provenance_warning": "Extracted trajectories are estimates from generated video, not perfect physical ground truth. Record estimator version, confidence, failures, tracking switches and invalid segments separately from generative model metrics."
+    },
+    "metrics": {
+      "distribution": [
+        "FVD",
+        "FTD"
+      ],
+      "video_quality": [
+        "CLIP-IQA+",
+        "IEEE P2020 imaging factors",
+        "LPIPS",
+        "SSIM"
+      ],
+      "scene_temporal_consistency": [
+        "DINOv3 scene consistency",
+        "video consistency"
+      ],
+      "agent_consistency": [
+        "agent appearance consistency",
+        "agent disappearance / missing-detection consistency"
+      ],
+      "trajectory_alignment": [
+        "ADE",
+        "FDE",
+        "success rate",
+        "Hausdorff distance",
+        "DTW"
+      ],
+      "trajectory_quality": [
+        "jerk",
+        "acceleration",
+        "yaw rate",
+        "comfort score",
+        "curvature RMS",
+        "speed score"
+      ],
+      "trajectory_temporal_consistency": [
+        "velocity consistency",
+        "acceleration consistency"
+      ]
+    },
+    "authors_evaluated_models": {
+      "general_video_world_models": [
+        "Gen-3",
+        "Kling",
+        "CogVideoX",
+        "Wan",
+        "HunyuanVideo",
+        "LTX-Video",
+        "SkyReels"
+      ],
+      "physical_world_models": [
+        "Cosmos-Predict1",
+        "Cosmos-Predict2"
+      ],
+      "driving_specific_models": [
+        "Vista",
+        "DrivingDojo",
+        "GEM",
+        "VaViM",
+        "UniFuture"
+      ],
+      "reported_total": 14
+    }
+  },
+  "comparability_controls": {
+    "downstream_planner_task_evaluation_in_paper_table": false,
+    "reciprocal_online_actor_replanning": false,
+    "required_before_comparison": [
+      "exact model/checkpoint",
+      "dataset revision and sample IDs",
+      "metric implementation commit",
+      "video generation config and prompt",
+      "inference hardware/latency",
+      "trajectory extraction versions",
+      "split-specific metrics",
+      "failure/missing sample denominator"
+    ],
+    "claim_boundary": "Generative video and trajectory metrics do not by themselves establish downstream planner utility, causal actor response, closed-loop driving safety or operational outcomes."
+  },
+  "prospective_sam_experiment": {
+    "arms": [
+      "direct planner on admitted scene",
+      "planner with generated future-scene hypotheses at matched compute and latency"
+    ],
+    "metrics": [
+      "feasible-action set overlap",
+      "counterfactual decision regret",
+      "actor collision/risky interaction",
+      "metric geometry/identity consistency",
+      "prediction-set coverage",
+      "worst-stratum temporal consistency",
+      "p95/p99 inference latency"
+    ],
+    "compose_with": [
+      "SAM #10237",
+      "SAM #10256",
+      "SAM #10257",
+      "SAM #10320",
+      "SAM #10012",
+      "ReactSim-Bench",
+      "Symtropy #3532"
+    ],
+    "success_condition": "show downstream decision value at matched compute without degrading feasibility, actor identity, uncertainty calibration, tail strata or runtime/fallback constraints",
+    "status": "prospective_not_measured"
+  }
+}
