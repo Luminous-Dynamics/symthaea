@@ -118,7 +118,8 @@ A v0.1 snapshot contains:
 2. **Scenario / ODD:** exact scenario, operational-domain, map, vehicle-configuration and policy-profile identities.
 3. **Clock:** clock domain, event tick, receive tick, processing tick, transform reference and uncertainty.
 4. **Reference frames:** named frames, transform identities and the declared unit/axis convention.
-5. **Sources:** source ID, modality, sensor / software identity, failure-domain lineage, evidence reference, calibration reference and currentness.
+5. **Sources:** source ID, modality, explicit source role (local sensor / synthetic sensor / remote cooperative claim / simulator oracle / map prior / derived estimate / unknown), sensor / software identity, failure-domain lineage, evidence reference, calibration reference and currentness.
+11. **Source-domain side references:** cooperative advisory claims and simulator oracle truth are retained in separate typed reference lists; they cannot be smuggled into local actor tracks.
 6. **Ego state:** pose, velocity, orientation, estimator identity, uncertainty and contributing evidence references.
 7. **Road geometry:** lane / boundary / drivable-area hypotheses, direction, validity interval, provenance and uncertainty.
 8. **Object hypotheses:** track lineage, metric state, class hypotheses, physical extent, motion, uncertainty, visibility, time and source references.
