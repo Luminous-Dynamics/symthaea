@@ -19,7 +19,8 @@
     "mitigation",
     "experiment",
     "measurement",
-    "acceptance"
+    "acceptance",
+    "error_budget"
   ],
   "properties": {
     "manifest_version": {
@@ -888,6 +889,211 @@
           }
         }
       }
+    },
+    "error_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dependence_assumption",
+        "dependence_evidence_sha256",
+        "task_sensitivity_bound",
+        "sensitivity_evidence_sha256",
+        "contributions"
+      ],
+      "properties": {
+        "dependence_assumption": {
+          "enum": [
+            "unknown_or_correlated",
+            "independent_declared"
+          ]
+        },
+        "dependence_evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "task_sensitivity_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sensitivity_evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contribution_id",
+              "kind",
+              "layer",
+              "magnitude",
+              "units",
+              "propagation_gain",
+              "magnitude_kind",
+              "evidence_status",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "contribution_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "weight_perturbation",
+                  "multiplicative_distortion",
+                  "nonlinear_transfer_residual",
+                  "additive_offset",
+                  "input_conversion",
+                  "output_quantization",
+                  "accumulation",
+                  "read_noise",
+                  "timing_jitter",
+                  "spatial_fault",
+                  "other"
+                ]
+              },
+              "layer": {
+                "enum": [
+                  "device",
+                  "array",
+                  "circuit",
+                  "data_conversion",
+                  "readout",
+                  "controller",
+                  "system",
+                  "algorithm",
+                  "other"
+                ]
+              },
+              "magnitude": {
+                "type": "number",
+                "minimum": 0
+              },
+              "units": {
+                "type": "string",
+                "minLength": 1
+              },
+              "propagation_gain": {
+                "type": "number",
+                "minimum": 0
+              },
+              "magnitude_kind": {
+                "enum": [
+                  "deterministic_upper_bound",
+                  "standard_deviation"
+                ]
+              },
+              "evidence_status": {
+                "enum": [
+                  "synthetic",
+                  "measured",
+                  "derived",
+                  "unknown"
+                ]
+              },
+              "evidence_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dependence_assumption": {
+                "const": "independent_declared"
+              }
+            },
+            "required": [
+              "dependence_assumption"
+            ]
+          },
+          "then": {
+            "properties": {
+              "dependence_evidence_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dependence_assumption": {
+                "const": "unknown_or_correlated"
+              }
+            },
+            "required": [
+              "dependence_assumption"
+            ]
+          },
+          "then": {
+            "properties": {
+              "dependence_evidence_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_sensitivity_bound": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "task_sensitivity_bound"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sensitivity_evidence_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_sensitivity_bound": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "task_sensitivity_bound"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sensitivity_evidence_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
