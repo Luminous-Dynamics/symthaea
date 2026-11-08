@@ -33,6 +33,60 @@ use super::HDC_DIMENSION;
 use super::binary_hv::BinaryHV;
 use std::collections::HashSet;
 
+/// Errors returned when constructing a sparse hypervector from a target density.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SparseHVError {
+    /// Density must be finite and lie in the closed interval [0, 1].
+    InvalidDensity,
+}
+
+impl std::fmt::Display for SparseHVError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidDensity => {
+                write!(f, "SparseHV density must be finite and within [0, 1]")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SparseHVError {}
+
+/// Small deterministic generator used only for reproducible sparse sampling.
+///
+/// SplitMix64 has a full-width output permutation. The bounded draw uses
+/// rejection sampling so reducing to a bounded integer does not introduce
+/// modulo bias.
+#[derive(Debug, Clone, Copy)]
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^ (value >> 31)
+    }
+
+    fn below(&mut self, upper_exclusive: u64) -> u64 {
+        debug_assert!(upper_exclusive > 0);
+        let threshold = upper_exclusive.wrapping_neg() % upper_exclusive;
+        loop {
+            let value = self.next_u64();
+            if value >= threshold {
+                return value % upper_exclusive;
+            }
+        }
+    }
+}
+
 /// Sparse representation of a 16,384-bit hypervector
 ///
 /// Stores only the positions of 1-bits, plus a pre-computed LSH signature
@@ -113,37 +167,63 @@ impl SparseHV {
         BinaryHV(data)
     }
 
-    /// Create random sparse vector with target density
+    /// Create a deterministic random sparse vector with an exact target density.
+    ///
+    /// The selected coordinates are sampled uniformly without replacement;
+    /// no coordinate prefix or dense-vector truncation is privileged.
     ///
     /// # Arguments
-    /// - `seed`: Random seed for reproducibility
-    /// - `density`: Target density (0.0 to 1.0)
+    /// - `seed`: Seed for reproducible sampling (not a cryptographic key).
+    /// - `density`: Target density in [0.0, 1.0]. Cardinality is floor(density * DIM).
+    ///
+    /// # Panics
+    /// Panics if density is non-finite or outside [0, 1]. Use
+    /// [Self::try_random] when input validation must be handled explicitly.
     pub fn random(seed: u64, density: f32) -> Self {
-        let hv = BinaryHV::random(seed);
-        let mut sparse = Self::from_hv16(&hv);
+        Self::try_random(seed, density)
+            .expect("SparseHV::random density must be finite and within [0, 1]")
+    }
 
-        // Adjust density if needed
-        let target_count = (density * Self::DIM as f32) as usize;
-
-        if sparse.active_indices.len() > target_count {
-            sparse.active_indices.truncate(target_count);
-        } else if sparse.active_indices.len() < target_count {
-            // Add more positions using additional randomness
-            let mut rng_seed = seed.wrapping_add(1);
-            while sparse.active_indices.len() < target_count {
-                let pos = (rng_seed % Self::DIM as u64) as u16;
-                rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-
-                if !sparse.active_indices.contains(&pos) {
-                    sparse.active_indices.push(pos);
-                }
-            }
-            sparse.active_indices.sort();
+    /// Fallible counterpart to [Self::random].
+    ///
+    /// Uses Floyd's fixed-cardinality sampling algorithm with unbiased bounded
+    /// draws. Runtime is O(DIM) to materialize the sorted coordinate set and
+    /// O(k) random draws, where k = floor(density * DIM).
+    pub fn try_random(seed: u64, density: f32) -> Result<Self, SparseHVError> {
+        if !density.is_finite() || !(0.0..=1.0).contains(&density) {
+            return Err(SparseHVError::InvalidDensity);
         }
 
-        sparse.cached_density = sparse.active_indices.len() as f32 / Self::DIM as f32;
-        sparse.lsh_signature = Self::compute_lsh_signature(&sparse.active_indices);
-        sparse
+        let target_count = (density * Self::DIM as f32).floor() as usize;
+        let mut selected = vec![false; Self::DIM];
+        let mut rng = SplitMix64::new(seed ^ 0x5350_4152_5345_4856);
+
+        // Floyd's algorithm produces a uniform subset of exactly target_count
+        // coordinates without replacement.
+        for upper in (Self::DIM - target_count)..Self::DIM {
+            let candidate = rng.below((upper + 1) as u64) as usize;
+            let selected_index = if selected[candidate] {
+                upper
+            } else {
+                candidate
+            };
+            selected[selected_index] = true;
+        }
+
+        let mut active_indices = Vec::with_capacity(target_count);
+        for (index, is_active) in selected.into_iter().enumerate() {
+            if is_active {
+                active_indices.push(index as u16);
+            }
+        }
+
+        let cached_density = active_indices.len() as f32 / Self::DIM as f32;
+        let lsh_signature = Self::compute_lsh_signature(&active_indices);
+        Ok(Self {
+            active_indices,
+            lsh_signature,
+            cached_density,
+        })
     }
 
     /// Get density (proportion of 1-bits)
@@ -420,6 +500,71 @@ mod tests {
             "Random vector density should be ~0.5, got {}",
             density
         );
+    }
+
+    #[test]
+    fn random_target_density_has_exact_cardinality() {
+        for target in [0.0, 0.001, 0.01, 0.1, 0.3, 0.5, 0.999, 1.0] {
+            let sparse = SparseHV::try_random(42, target).expect("valid target density");
+            let expected = (target * SparseHV::DIM as f32).floor() as usize;
+            assert_eq!(sparse.popcount(), expected, "target density {target}");
+            assert!(
+                (sparse.density() - expected as f32 / SparseHV::DIM as f32).abs() < 1e-7
+            );
+        }
+    }
+
+    #[test]
+    fn random_sparse_sampling_is_deterministic_and_round_trips() {
+        let first = SparseHV::try_random(0x51A7, 0.125).expect("valid density");
+        let second = SparseHV::try_random(0x51A7, 0.125).expect("valid density");
+        assert_eq!(first.active_indices, second.active_indices);
+        assert_eq!(first.to_hv16(), second.to_hv16());
+        assert_eq!(
+            SparseHV::from_hv16(&first.to_hv16()).active_indices,
+            first.active_indices
+        );
+    }
+
+    #[test]
+    fn random_sparse_sampling_does_not_prefer_low_coordinate_ranges() {
+        const TRIALS: usize = 256;
+        const BINS: usize = 16;
+        const DENSITY: f32 = 0.1;
+        let mut counts = [0usize; BINS];
+
+        for seed in 0..TRIALS as u64 {
+            let sparse = SparseHV::try_random(seed, DENSITY).expect("valid density");
+            for &index in &sparse.active_indices {
+                let bin = (index as usize * BINS) / SparseHV::DIM;
+                counts[bin] += 1;
+            }
+        }
+
+        let expected_per_bin =
+            TRIALS * (DENSITY * SparseHV::DIM as f32).floor() as usize / BINS;
+        let min = *counts.iter().min().expect("non-empty bins");
+        let max = *counts.iter().max().expect("non-empty bins");
+        assert!(
+            max - min < expected_per_bin / 8,
+            "coordinate bins should be exchangeable; counts={counts:?}, expected≈{expected_per_bin}"
+        );
+    }
+
+    #[test]
+    fn try_random_rejects_nonfinite_and_out_of_range_density() {
+        for invalid in [
+            -f32::EPSILON,
+            1.0 + f32::EPSILON,
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ] {
+            assert!(matches!(
+                SparseHV::try_random(7, invalid),
+                Err(SparseHVError::InvalidDensity)
+            ));
+        }
     }
 
     #[test]
