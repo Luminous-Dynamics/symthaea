@@ -257,6 +257,62 @@ impl From<LpCertificateError> for OccupationFlowError {
     }
 }
 
+/// Build an LP for the worst-case regret of one action against a comparator.
+///
+/// The objective is U_comparator(omega) - U_selected(omega), optimized over
+/// one shared occupation-flow trajectory. This preserves dependence between
+/// the two action utilities; subtracting independently optimized utility
+/// intervals would generally be invalid.
+pub fn build_pairwise_worst_case_regret_lp(
+    model: &StagewiseIntervalMarkovModel,
+    selected_scores: &[Vec<CheckedRational>],
+    comparator_scores: &[Vec<CheckedRational>],
+    budget: OccupationFlowBudget,
+) -> Result<OccupationFlowLp, OccupationFlowError> {
+    let periods = model.period_count();
+    let states = model.state_count();
+    for (scores, name) in [
+        (selected_scores, "selected"),
+        (comparator_scores, "comparator"),
+    ] {
+        if scores.len() != periods {
+            return Err(OccupationFlowError::ScorePeriodCountMismatch {
+                expected: periods,
+                actual: scores.len(),
+            });
+        }
+        for (time, row) in scores.iter().enumerate() {
+            if row.len() != states {
+                return Err(OccupationFlowError::ScoreStateCountMismatch {
+                    time,
+                    expected: states,
+                    actual: row.len(),
+                });
+            }
+        }
+        let _ = name;
+    }
+
+    let mut regret_scores = Vec::with_capacity(periods);
+    for time in 0..periods {
+        let mut row = Vec::with_capacity(states);
+        for state in 0..states {
+            let comparator = comparator_scores[time][state];
+            let selected = selected_scores[time][state];
+            let negative_selected = CheckedRational::new(
+                selected.numerator().checked_neg()
+                    .ok_or(OccupationFlowError::ArithmeticOverflow)?,
+                selected.denominator(),
+            ).map_err(|_| OccupationFlowError::ArithmeticOverflow)?;
+            row.push(comparator.checked_add(negative_selected)
+                .map_err(|_| OccupationFlowError::ArithmeticOverflow)?);
+        }
+        regret_scores.push(row);
+    }
+
+    build_occupation_flow_lp(model, &regret_scores, UtilityDirection::Maximize, budget)
+}
+
 /// Build the exact occupation-flow LP for cumulative finite-horizon utility.
 ///
 /// Variables:
