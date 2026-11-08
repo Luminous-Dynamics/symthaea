@@ -543,7 +543,7 @@ fn log_sum_exp(values: &[f64]) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::model_discrimination::{
-        GaussianModelPrediction, ModelUniverseCoverage, PredictionDisposition,
+        GaussianModelPrediction, PredictionDisposition,
     };
 
     fn hypothesis(id: &str, byte: u8) -> DiscriminationHypothesis {
@@ -655,6 +655,49 @@ mod tests {
         for row in report.confusion_counts {
             assert_eq!(row[3], 32);
         }
+    }
+
+    #[test]
+    fn identical_likelihoods_expose_prior_dominated_recovery() {
+        let hypotheses = vec![
+            hypothesis("a", b'a'),
+            hypothesis("b", b'b'),
+            hypothesis("c", b'c'),
+        ];
+        let experiment = experiment(vec![
+            prediction("a", 0.0, 0.1),
+            prediction("b", 0.0, 0.1),
+            prediction("c", 0.0, 0.1),
+        ]);
+        let generators = vec![
+            RecoveryGenerator { generator_id: "a".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
+            RecoveryGenerator { generator_id: "b".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
+            RecoveryGenerator { generator_id: "c".into(), predictive_mean: 0.0, predictive_sigma: 0.1 },
+        ];
+        let skewed_prior = ModelPriorScenario {
+            scenario_id: "model-a-dominant".to_string(),
+            scenario_weight: 1.0,
+            probabilities: vec![8.0, 1.0, 1.0],
+        };
+        let report = evaluate_model_recovery(
+            &hypotheses,
+            &experiment,
+            &skewed_prior,
+            &generators,
+            64,
+            77,
+            0.75,
+        )
+        .unwrap();
+
+        // The observation has zero ability to distinguish the models. A
+        // high posterior threshold still accepts the prior winner, so
+        // prior-weighted accuracy is high while equal-generator accuracy is
+        // only one third.
+        assert!((report.named_model_accuracy - 1.0 / 3.0).abs() < 1.0e-12);
+        assert!((report.prior_weighted_named_model_accuracy - 0.8).abs() < 1.0e-12);
+        assert_eq!(report.named_model_coverage, 1.0);
+        assert!(report.confusion_counts.iter().all(|row| row[0] == 64));
     }
 
     #[test]
