@@ -1,0 +1,10 @@
+// IDTMC robust total-reward endpoints.
+R{"action_a"}min=? [ C ]
+R{"action_a"}max=? [ C ]
+R{"action_b"}min=? [ C ]
+R{"action_b"}max=? [ C ]
+
+// Pairwise regret differences are shifted by a path-constant to make all
+// state rewards nonnegative. Subtract 2 from A and 1 from B after solving.
+R{"regret_a_shifted"}max=? [ C ]
+R{"regret_b_shifted"}max=? [ C ]
