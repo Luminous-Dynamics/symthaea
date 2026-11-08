@@ -254,6 +254,21 @@ jobs:
             cat curved-order-inversion.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run finite-cone and product-window link-bias reference
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example link_sampling_bias_reference | tee link-sampling-bias-reference.csv
+          grep -q 'comparison_status=FINITE_CONE_TABLE_I_DISCREPANCY_REQUIRES_CONVENTION_AUDIT' link-sampling-bias-reference.csv
+          {
+            echo "## Finite-cone / product-window link-sampling reference"
+            echo 'The finite-cone Table I discrepancy is retained as an open reproduction audit.'
+            echo '```csv'
+            cat link-sampling-bias-reference.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
