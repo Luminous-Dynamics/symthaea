@@ -17,3 +17,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+
+[[example]]
+name = "adm_derivative_step_sweep"
+path = "examples/adm_derivative_step_sweep.rs"
