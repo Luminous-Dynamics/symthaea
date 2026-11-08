@@ -188,6 +188,18 @@ jobs:
             echo "- Claim boundary: finite-sample kinematics only; no continuum-limit or quantum-gravity claim"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run dimensionless curved-order inversion
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example curved_order_inversion | tee curved-order-inversion.txt
+          grep -q 'estimated_dimensionless_curvature_q=' curved-order-inversion.txt
+          {
+            echo '## Model-conditional curved order-statistic inversion'
+            cat curved-order-inversion.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
