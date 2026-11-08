@@ -957,7 +957,10 @@ mod tests {
     fn early_false_witness_rejects_clause_with_unassigned_literal() {
         let problem = CnfProblem {
             variables: vec!["x".into(), "y".into()],
-            clauses: vec![vec![Literal::positive(0)]],
+            clauses: vec![
+                vec![Literal::positive(0)],
+                vec![Literal::positive(1)],
+            ],
         };
         let prefix = make_prefix(
             2,
@@ -974,7 +977,7 @@ mod tests {
             _ => unreachable!(),
         };
         tampered.nodes[low_child].kind =
-            QbfProofNodeKind::EarlyFalseClause { clause_index: 0 };
+            QbfProofNodeKind::EarlyFalseClause { clause_index: 1 };
         assert!(matches!(
             verify_qbf_game_proof(&problem, &prefix, &tampered, budget()),
             Err(QuantifiedProofError::EarlyFalseClauseNotEstablished { .. })
