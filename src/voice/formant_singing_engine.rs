@@ -167,10 +167,7 @@ fn same_phones(
 }
 
 /// Replace Muse's fixed vibrato with the per-note controls frozen in VocalPerformance.
-fn apply_note_pitch_controls(
-    frames: &mut [FormantFrame],
-    performance: &VocalPerformance,
-) {
+fn apply_note_pitch_controls(frames: &mut [FormantFrame], performance: &VocalPerformance) {
     const EDGE_RAMP_S: f32 = 0.015;
     for syllable in &performance.syllables {
         for note in syllable.notes() {
