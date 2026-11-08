@@ -568,6 +568,12 @@ mod tests {
     }
 
     #[test]
+    fn random_compatibility_wrapper_fails_fast_on_invalid_density() {
+        let result = std::panic::catch_unwind(|| SparseHV::random(7, f32::INFINITY));
+        assert!(result.is_err(), "invalid density must not enter a non-terminating fill loop");
+    }
+
+    #[test]
     fn test_random_with_target_density() {
         for target in [0.01, 0.1, 0.3, 0.5] {
             let sparse = SparseHV::random(42, target);
