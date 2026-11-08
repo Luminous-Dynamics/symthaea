@@ -106,7 +106,9 @@ pub enum GaussianModelInformationGainError {
     NonFiniteOutcomeMean { action_id: String, index: usize },
     #[error("observation standard deviation must be positive and finite, got {0}")]
     InvalidObservationStdDev(f64),
-    #[error("quadrature point count must be odd and in {MIN_QUADRATURE_POINTS}..={MAX_QUADRATURE_POINTS}, got {0}")]
+    #[error(
+        "quadrature point count must be odd and in {MIN_QUADRATURE_POINTS}..={MAX_QUADRATURE_POINTS}, got {0}"
+    )]
     InvalidQuadraturePointCount(usize),
     #[error("integration tail sigma must be positive and finite, got {0}")]
     InvalidTailSigma(f64),
@@ -135,17 +137,13 @@ impl GaussianModelInformationGainError {
             return Err(Self::EmptyActionSet);
         }
         if !config.observation_std_dev.is_finite() || config.observation_std_dev <= 0.0 {
-            return Err(Self::InvalidObservationStdDev(
-                config.observation_std_dev,
-            ));
+            return Err(Self::InvalidObservationStdDev(config.observation_std_dev));
         }
         if config.quadrature_points < MIN_QUADRATURE_POINTS
             || config.quadrature_points > MAX_QUADRATURE_POINTS
             || config.quadrature_points % 2 == 0
         {
-            return Err(Self::InvalidQuadraturePointCount(
-                config.quadrature_points,
-            ));
+            return Err(Self::InvalidQuadraturePointCount(config.quadrature_points));
         }
         if !config.tail_sigma.is_finite() || config.tail_sigma <= 0.0 {
             return Err(Self::InvalidTailSigma(config.tail_sigma));
@@ -178,7 +176,9 @@ impl GaussianModelInformationGainError {
         let mut action_ids = BTreeSet::new();
         for (action_index, action) in actions.iter().enumerate() {
             if action.action_id.trim().is_empty() {
-                return Err(Self::EmptyActionId { index: action_index });
+                return Err(Self::EmptyActionId {
+                    index: action_index,
+                });
             }
             if !action_ids.insert(action.action_id.clone()) {
                 return Err(Self::DuplicateActionId(action.action_id.clone()));
@@ -226,15 +226,11 @@ pub fn evaluate_gaussian_model_information_gains(
     let prior_entropy = hypotheses
         .iter()
         .filter(|hypothesis| hypothesis.prior_probability > 0.0)
-        .map(|hypothesis| {
-            -hypothesis.prior_probability * hypothesis.prior_probability.ln()
-        })
+        .map(|hypothesis| -hypothesis.prior_probability * hypothesis.prior_probability.ln())
         .sum::<f64>();
 
-    let quadrature_weights = standard_normal_simpson_weights(
-        config.quadrature_points,
-        config.tail_sigma,
-    );
+    let quadrature_weights =
+        standard_normal_simpson_weights(config.quadrature_points, config.tail_sigma);
     let std_dev = config.observation_std_dev;
 
     actions
@@ -258,10 +254,8 @@ pub fn evaluate_gaussian_model_information_gains(
                             continue;
                         }
                         let standardized = z + (own_mean - other_mean) / std_dev;
-                        log_mixture_terms.push(
-                            other.prior_probability.ln()
-                                - 0.5 * standardized * standardized,
-                        );
+                        log_mixture_terms
+                            .push(other.prior_probability.ln() - 0.5 * standardized * standardized);
                     }
                     let log_mixture = log_sum_exp(&log_mixture_terms);
                     let log_likelihood_ratio = -0.5 * z * z - log_mixture;
@@ -275,11 +269,9 @@ pub fn evaluate_gaussian_model_information_gains(
                 || information_gain < -tolerance
                 || information_gain > prior_entropy + tolerance
             {
-                return Err(
-                    GaussianModelInformationGainError::InvalidInformationGain(
-                        information_gain,
-                    ),
-                );
+                return Err(GaussianModelInformationGainError::InvalidInformationGain(
+                    information_gain,
+                ));
             }
             let information_gain = information_gain.clamp(0.0, prior_entropy);
             Ok(GaussianModelInformationGain {
@@ -295,10 +287,7 @@ pub fn evaluate_gaussian_model_information_gains(
         .collect()
 }
 
-fn standard_normal_simpson_weights(
-    point_count: usize,
-    tail_sigma: f64,
-) -> Vec<(f64, f64)> {
+fn standard_normal_simpson_weights(point_count: usize, tail_sigma: f64) -> Vec<(f64, f64)> {
     let lower = -tail_sigma;
     let upper = tail_sigma;
     let step = (upper - lower) / (point_count - 1) as f64;
@@ -373,8 +362,7 @@ mod tests {
             .expect("valid Gaussian observation model");
         assert!(gain[0].model_information_gain_nats.abs() < 1e-12);
         assert!(
-            (gain[0].expected_posterior_model_entropy_nats
-                - gain[0].current_model_entropy_nats)
+            (gain[0].expected_posterior_model_entropy_nats - gain[0].current_model_entropy_nats)
                 .abs()
                 < 1e-12
         );
@@ -389,9 +377,7 @@ mod tests {
         }];
         let gain = evaluate_gaussian_model_information_gains(&models, &actions, config(0.1))
             .expect("valid Gaussian observation model");
-        assert!(
-            (gain[0].model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-9
-        );
+        assert!((gain[0].model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-9);
     }
 
     #[test]
@@ -407,8 +393,7 @@ mod tests {
             .expect("clearer model");
         assert!(clearer[0].model_information_gain_nats > noisy[0].model_information_gain_nats);
         assert!(
-            clearer[0].model_information_gain_nats
-                <= clearer[0].current_model_entropy_nats + 1e-12
+            clearer[0].model_information_gain_nats <= clearer[0].current_model_entropy_nats + 1e-12
         );
     }
 
