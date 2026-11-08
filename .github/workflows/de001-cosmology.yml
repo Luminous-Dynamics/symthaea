@@ -1,0 +1,101 @@
+name: DE-001 Cosmology Research Kernel
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-cosmology-research/**"
+      - "docs/research/DE_001_PREREGISTRATION_2026-09-18.md"
+      - ".github/workflows/de001-cosmology.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: de001-cosmology-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kernel-contract:
+    name: DE-001 kernel contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
+
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind execution subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          actual_tree="$(git rev-parse HEAD^{tree})"
+          test "$actual_head" = "$EXPECTED_HEAD"
+          echo "head=$actual_head" >> "$GITHUB_OUTPUT"
+          echo "tree=$actual_tree" >> "$GITHUB_OUTPUT"
+          echo "Subject HEAD: $actual_head"
+          echo "Subject TREE: $actual_tree"
+          if [[ -n "$EXPECTED_BASE" ]]; then
+            echo "PR base: $EXPECTED_BASE"
+          fi
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt -p symthaea-cosmology-research -- --check
+
+      - name: Locked compile
+        run: cargo check -p symthaea-cosmology-research --locked
+
+      - name: Unit invariants
+        run: cargo test -p symthaea-cosmology-research --locked
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Write qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "protocol=DE-001-kernel-v1"
+            echo "head=$(git rev-parse HEAD)"
+            echo "tree=$(git rev-parse HEAD^{tree})"
+            echo "base=${EXPECTED_BASE}"
+            echo "rust=1.96.0"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "job_status=${{ job.status }}"
+            echo "scientific_claim=NONE"
+          } > de001-kernel-receipt.txt
+          cat de001-kernel-receipt.txt
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: de001-kernel-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: de001-kernel-receipt.txt
+          if-no-files-found: error
+          retention-days: 30
