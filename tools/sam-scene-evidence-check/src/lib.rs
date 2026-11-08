@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -624,6 +624,19 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         .map(str::to_owned)
         .collect();
 
+    let source_roles: BTreeMap<String, String> = snapshot
+        .get("sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|source| {
+            Some((
+                source.get("source_id")?.as_str()?.to_owned(),
+                source.get("source_role")?.as_str()?.to_owned(),
+            ))
+        })
+        .collect();
+
     let frame_ids: BTreeSet<String> = snapshot
         .get("reference_frames")
         .and_then(Value::as_array)
@@ -650,6 +663,7 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
             {
                 errors.push(format!("duplicate source_id: {id}"));
             }
+            validate_source_role(&mut errors, source);
             check_ref(
                 &mut errors,
                 "source.reference_frame_id",
@@ -694,6 +708,15 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
             .and_then(|value| value.get("source_refs")),
         &source_ids,
     );
+    check_source_role_refs(
+        &mut errors,
+        "ego_state.source_refs",
+        snapshot
+            .get("ego_state")
+            .and_then(|value| value.get("source_refs")),
+        &source_roles,
+        &["local_sensor_observation", "synthetic_sensor_observation"],
+    );
     check_ref(
         &mut errors,
         "road_geometry.reference_frame_id",
@@ -713,6 +736,17 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
                 &format!("road_geometry.lane_hypotheses[{index}].source_refs"),
                 lane.get("source_refs"),
                 &source_ids,
+            );
+            check_source_role_refs(
+                &mut errors,
+                &format!("road_geometry.lane_hypotheses[{index}].source_refs"),
+                lane.get("source_refs"),
+                &source_roles,
+                &[
+                    "local_sensor_observation",
+                    "synthetic_sensor_observation",
+                    "map_prior",
+                ],
             );
         }
     }
@@ -746,6 +780,13 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
                 object.get("source_refs"),
                 &source_ids,
             );
+            check_source_role_refs(
+                &mut errors,
+                &format!("{prefix}.source_refs"),
+                object.get("source_refs"),
+                &source_roles,
+                &["local_sensor_observation", "synthetic_sensor_observation"],
+            );
             validate_uncertainty(&mut errors, &prefix, object.get("uncertainty"));
             validate_class_distribution(&mut errors, &prefix, object.get("class_hypotheses"));
         }
@@ -763,6 +804,13 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
                 &format!("{prefix}.source_refs"),
                 region.get("source_refs"),
                 &source_ids,
+            );
+            check_source_role_refs(
+                &mut errors,
+                &format!("{prefix}.source_refs"),
+                region.get("source_refs"),
+                &source_roles,
+                &["local_sensor_observation", "synthetic_sensor_observation"],
             );
             if region.get("state").and_then(Value::as_str) == Some("observed_free")
                 && region
@@ -789,6 +837,13 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
                 proposal.get("source_id"),
                 &source_ids,
             );
+            check_source_role_ref(
+                &mut errors,
+                &format!("{prefix}.source_id"),
+                proposal.get("source_id"),
+                &source_roles,
+                &["local_sensor_observation", "synthetic_sensor_observation"],
+            );
             check_ref(
                 &mut errors,
                 &format!("{prefix}.image_frame_id"),
@@ -813,7 +868,91 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         }
     }
 
+    check_source_role_refs(
+        &mut errors,
+        "cooperative_advisory_refs",
+        snapshot.get("cooperative_advisory_refs"),
+        &source_roles,
+        &["remote_cooperative_claim"],
+    );
+    check_source_role_refs(
+        &mut errors,
+        "simulator_truth_refs",
+        snapshot.get("simulator_truth_refs"),
+        &source_roles,
+        &["simulator_oracle"],
+    );
+
     errors
+}
+
+fn validate_source_role(errors: &mut Vec<String>, source: &Value) {
+    let id = source.get("source_id").and_then(Value::as_str).unwrap_or("<missing>");
+    let role = source.get("source_role").and_then(Value::as_str).unwrap_or("unknown");
+    let modality = source.get("modality").and_then(Value::as_str).unwrap_or("unknown");
+    let evidence = source.get("evidence_kind").and_then(Value::as_str).unwrap_or("unknown");
+
+    let sensor_modality = matches!(
+        modality,
+        "rgb_camera"
+            | "stereo_camera"
+            | "lidar"
+            | "radar"
+            | "ultrasonic"
+            | "imu"
+            | "gnss"
+            | "wheel_odometry"
+    );
+    let compatible = match role {
+        "local_sensor_observation" => sensor_modality && evidence == "measurement",
+        "synthetic_sensor_observation" => {
+            (sensor_modality || modality == "synthetic") && evidence == "synthetic_observation"
+        }
+        "remote_cooperative_claim" => modality == "v2x" && evidence == "advisory",
+        "simulator_oracle" => modality == "synthetic" && evidence == "synthetic_observation",
+        "map_prior" => modality == "map" && evidence == "map_prior",
+        "derived_estimate" => evidence == "estimate",
+        "unknown" => true,
+        _ => false,
+    };
+    if !compatible {
+        errors.push(format!(
+            "source {id}: source_role {role} is incompatible with modality {modality} and evidence_kind {evidence}"
+        ));
+    }
+}
+
+fn check_source_role_ref(
+    errors: &mut Vec<String>,
+    label: &str,
+    reference: Option<&Value>,
+    roles: &BTreeMap<String, String>,
+    allowed: &[&str],
+) {
+    let Some(id) = reference.and_then(Value::as_str) else {
+        return;
+    };
+    if let Some(role) = roles.get(id) {
+        if !allowed.contains(&role.as_str()) {
+            errors.push(format!(
+                "{label}: source {id} has role {role}, which is not allowed here"
+            ));
+        }
+    }
+}
+
+fn check_source_role_refs(
+    errors: &mut Vec<String>,
+    label: &str,
+    references: Option<&Value>,
+    roles: &BTreeMap<String, String>,
+    allowed: &[&str],
+) {
+    if let Some(references) = references.and_then(Value::as_array) {
+        for reference in references {
+            check_source_role_ref(errors, label, Some(reference), roles, allowed);
+        }
+    }
 }
 
 fn check_ref(
