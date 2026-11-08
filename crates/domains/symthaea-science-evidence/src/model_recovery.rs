@@ -657,16 +657,9 @@ mod tests {
                 predictive_sigma: 0.1,
             },
         ];
-        let report = evaluate_model_recovery(
-            &hypotheses,
-            &experiment,
-            &prior(),
-            &generators,
-            32,
-            7,
-            0.8,
-        )
-        .unwrap();
+        let report =
+            evaluate_model_recovery(&hypotheses, &experiment, &prior(), &generators, 32, 7, 0.8)
+                .unwrap();
 
         assert_eq!(report.named_model_accuracy, 0.0);
         assert_eq!(report.named_model_coverage, 0.0);
