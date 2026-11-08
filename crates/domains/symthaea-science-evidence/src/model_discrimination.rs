@@ -423,7 +423,7 @@ pub fn rank_model_discriminating_experiments(
     let mut scores = Vec::with_capacity(experiments.len());
     for (index, experiment) in experiments.iter().enumerate() {
         validate_experiment(experiment, hypotheses, index, &mut experiment_ids)?;
-        scores.push(score_experiment(experiment, hypotheses, config)?);
+        scores.push(score_experiment(experiment, config)?);
     }
 
     scores.sort_by(|left, right| {
@@ -465,12 +465,12 @@ fn validate_experiment(
     experiment: &CandidateExperiment,
     hypotheses: &[DiscriminationHypothesis],
     index: usize,
-    experiment_ids: &mut BTreeSet<&str>,
+    experiment_ids: &mut BTreeSet<String>,
 ) -> Result<(), ModelDiscriminationError> {
     if experiment.experiment_id.trim().is_empty() {
         return Err(ModelDiscriminationError::EmptyExperimentId(index));
     }
-    if !experiment_ids.insert(experiment.experiment_id.as_str()) {
+    if !experiment_ids.insert(experiment.experiment_id.clone()) {
         return Err(ModelDiscriminationError::DuplicateExperimentId(
             experiment.experiment_id.clone(),
         ));
@@ -581,7 +581,6 @@ fn validate_experiment(
 
 fn score_experiment(
     experiment: &CandidateExperiment,
-    hypotheses: &[DiscriminationHypothesis],
     config: &ModelDiscriminationConfig,
 ) -> Result<ExperimentDiscriminationScore, ModelDiscriminationError> {
     let mut blockers = Vec::new();
