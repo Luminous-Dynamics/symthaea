@@ -747,6 +747,80 @@ fn main() -> Result<()> {
 mod rating_validation_tests {
     use super::*;
 
+    fn case_receipt() -> CaseReceipt {
+        let melody = vec![symthaea_muse::Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
+        CaseReceipt {
+            case_id: 1,
+            seed: 9002,
+            lyrics: "hello world".to_string(),
+            challenge: "baseline".to_string(),
+            category: "center_legato".to_string(),
+            style: "Classical".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            composition_energy: 0.55,
+            bars: 2,
+            consciousness_level: 0.72,
+            transpose_semitones: 0.0,
+            score_blake3: score_digest(&melody).unwrap(),
+            melody,
+            performance_blake3: "b".repeat(64),
+        }
+    }
+
+    fn human_reference(case: &CaseReceipt) -> ReferenceClip {
+        ReferenceClip {
+            case_id: case.case_id,
+            audio: PathBuf::from("licensed-human-reference.wav"),
+            lyrics: case.lyrics.clone(),
+            category: case.category.clone(),
+            challenge: case.challenge.clone(),
+            score_blake3: case.score_blake3.clone(),
+            singer_pseudonym: "singer-001".to_string(),
+            consent_reference: "consent:study-001".to_string(),
+            license_reference: "license:study-001".to_string(),
+        }
+    }
+
+    #[test]
+    fn human_reference_requires_exact_lyric_score_and_rights_receipts() {
+        let case = case_receipt();
+        let reference = human_reference(&case);
+        validate_reference_case(&reference, &case).unwrap();
+
+        let mut wrong_score = human_reference(&case);
+        wrong_score.score_blake3 = "0".repeat(64);
+        assert!(
+            validate_reference_case(&wrong_score, &case)
+                .unwrap_err()
+                .to_string()
+                .contains("score digest")
+        );
+
+        let mut wrong_lyrics = human_reference(&case);
+        wrong_lyrics.lyrics = "different lyrics".into();
+        assert!(
+            validate_reference_case(&wrong_lyrics, &case)
+                .unwrap_err()
+                .to_string()
+                .contains("lyrics/category/challenge")
+        );
+
+        let mut no_consent = human_reference(&case);
+        no_consent.consent_reference.clear();
+        assert!(
+            validate_reference_case(&no_consent, &case)
+                .unwrap_err()
+                .to_string()
+                .contains("consent reference")
+        );
+    }
+
     fn clip(id: &str, lyrics: &str) -> BlindClip {
         BlindClip {
             clip_id: id.to_string(),
