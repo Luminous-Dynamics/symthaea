@@ -134,6 +134,12 @@ pub struct OccupationFlowBudget {
     pub max_matrix_entries: usize,
     /// Maximum bit width of any rational numerator or denominator.
     pub max_rational_bit_width: usize,
+    /// Maximum number of rational entries in a primal/dual certificate.
+    pub max_certificate_entries: usize,
+    /// Estimated in-memory storage cap for the certificate vectors and header.
+    pub max_certificate_memory_bytes: usize,
+    /// Upper bound on rational multiply/add terms in one primal/dual replay.
+    pub max_verifier_multiply_adds: usize,
 }
 
 /// Canonical variable layout for the occupation-flow LP.
@@ -208,6 +214,7 @@ pub struct OccupationFlowLp {
     lp: RationalLp,
     layout: OccupationFlowLayout,
     direction: UtilityDirection,
+    budget: OccupationFlowBudget,
     source_model_sha256: [u8; 32],
     compiled_lp_sha256: [u8; 32],
 }
@@ -254,6 +261,59 @@ impl OccupationFlowLp {
         self.verify_primal_dual_gap(&certificate.primal_dual, requested_gap)
     }
 
+    fn verify_certificate_budget(
+        &self,
+        certificate: &PrimalDualCertificate,
+    ) -> Result<(), OccupationFlowError> {
+        let entries = certificate.primal.len()
+            .checked_add(certificate.dual.len())
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
+        if entries > self.budget.max_certificate_entries {
+            return Err(OccupationFlowError::BudgetExceeded {
+                resource: "certificate rational entries",
+                required: entries,
+                limit: self.budget.max_certificate_entries,
+            });
+        }
+
+        let capacity_entries = certificate.primal.capacity()
+            .checked_add(certificate.dual.capacity())
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
+        let vector_bytes = capacity_entries
+            .checked_mul(std::mem::size_of::<CheckedRational>())
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
+        let estimated_bytes = vector_bytes
+            .checked_add(std::mem::size_of::<PrimalDualCertificate>())
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
+        if estimated_bytes > self.budget.max_certificate_memory_bytes {
+            return Err(OccupationFlowError::BudgetExceeded {
+                resource: "estimated certificate memory bytes",
+                required: estimated_bytes,
+                limit: self.budget.max_certificate_memory_bytes,
+            });
+        }
+
+        for value in certificate.primal.iter().chain(certificate.dual.iter()) {
+            check_rational_bit_width(*value, self.budget)?;
+        }
+
+        let matrix_products = self.lp.row_count()
+            .checked_mul(self.lp.column_count())
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
+        let work = matrix_products.checked_mul(2)
+            .and_then(|value| value.checked_add(self.lp.row_count())) 
+            .and_then(|value| value.checked_add(self.lp.column_count()))
+            .ok_or(OccupationFlowError::DimensionOverflow)?;
+        if work > self.budget.max_verifier_multiply_adds {
+            return Err(OccupationFlowError::BudgetExceeded {
+                resource: "primal-dual verifier multiply-add work",
+                required: work,
+                limit: self.budget.max_verifier_multiply_adds,
+            });
+        }
+        Ok(())
+    }
+
     fn verify_certificate_identity(
         &self,
         certificate: &OccupationFlowCertificate,
@@ -273,6 +333,7 @@ impl OccupationFlowLp {
         &self,
         certificate: &PrimalDualCertificate,
     ) -> Result<VerifiedOccupationFlowOptimum, OccupationFlowError> {
+        self.verify_certificate_budget(certificate)?;
         let VerifiedLpOptimum { objective } =
             verify_primal_dual_optimality(&self.lp, certificate)?;
         Ok(VerifiedOccupationFlowOptimum {
@@ -291,6 +352,7 @@ impl OccupationFlowLp {
         certificate: &PrimalDualCertificate,
         requested_gap: CheckedRational,
     ) -> Result<VerifiedOccupationFlowGap, OccupationFlowError> {
+        self.verify_certificate_budget(certificate)?;
         let VerifiedLpGap {
             lower_bound,
             upper_bound,
@@ -703,6 +765,7 @@ pub fn build_occupation_flow_lp(
         lp,
         layout,
         direction,
+        budget,
         source_model_sha256,
         compiled_lp_sha256,
     })
@@ -915,6 +978,9 @@ mod tests {
             max_constraints: 36,
             max_matrix_entries: max_entries,
             max_rational_bit_width: 64,
+            max_certificate_entries: 64,
+            max_certificate_memory_bytes: 1_000_000,
+            max_verifier_multiply_adds: 100_000,
         }
     }
 
@@ -1388,6 +1454,9 @@ mod tests {
                 max_constraints: 20,
                 max_matrix_entries: 120,
                 max_rational_bit_width: 64,
+                max_certificate_entries: 64,
+                max_certificate_memory_bytes: 1_000_000,
+                max_verifier_multiply_adds: 100_000,
             },
         ).unwrap();
         assert_eq!(built.problem().row_count(), 20);
