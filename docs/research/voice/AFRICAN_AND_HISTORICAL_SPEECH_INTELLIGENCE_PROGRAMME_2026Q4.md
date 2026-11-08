@@ -510,3 +510,88 @@ A result must not enter the external frontier without its receipt. Keep the foll
 - publish worst-language and worst-domain cells beside aggregate results.
 
 The receipt requirement is tracked in [#11107 — VOICE-RESULT-RECEIPT-001](https://github.com/Luminous-Dynamics/symthaea/issues/11107). The machine-readable benchmark matrix now contains eleven tracks, with experiment-receipt conformance as the final meta-track.
+
+
+## 16. Multimodal in-context learning and closed-set acoustic hypothesis selection
+
+### 16.1 Research basis
+
+Li & Niehues, Findings of ACL 2026, “Multimodal In-context Learning for ASR of Low-resource Languages”:
+- https://aclanthology.org/2026.findings-acl.1239/
+- https://arxiv.org/abs/2601.05707
+
+The paper evaluates Phi-4 and Qwen3-Omni on three diverse endangered languages. It reports that audio/text in-context demonstrations can support unseen-language ASR, cross-lingual transfer can improve MICL efficiency without target-language training, and prompt-only speech-LLM transcription is weak. Its proposed hybrid combines a stronger acoustic recognizer with a speech LLM that selects among acoustic hypotheses.
+
+These are results in the paper's tested languages and configuration. They do not establish transfer to Yoruba, African code-switching, click languages or South African language varieties.
+
+### 16.2 Paradigm shift: select evidence-bearing candidates before rewriting
+
+Treat the problem as:
+```text
+source audio
+  -> immutable acoustic candidate set
+  -> MICL candidate selector
+  -> candidate ID OR ABSTAIN
+  -> exact candidate copy
+```
+
+The first qualified mode must be closed-set. A selector may return only an ID from the immutable candidate pool or an explicit abstention. It cannot return a free-form replacement transcript. Any generated rewrite becomes a separate candidate with its own provenance, timing and acoustic verification; it is not selection.
+
+This prevents a fluent language model from silently substituting a contextually likely word for what was actually spoken.
+
+### 16.3 Distinguish MICL from semantic anchoring
+
+- **MICL candidate selection (#11119):** conditions an external selector on audio/text demonstrations and asks it to rank a fixed candidate pool.
+- **SAMA-ASR semantic anchoring (#11104):** changes decoder conditioning with semantic embeddings plus an acoustic anchor, creating a distinct risk of semantic-prior override.
+
+Do not collapse these into one “LLM-assisted ASR” arm. Compare them separately and use acoustic contradiction controls.
+
+### 16.4 Matched comparison arms
+
+Use identical audio and the same frozen candidate set:
+1. single-best acoustic recognizer;
+2. acoustic N-best score;
+3. acoustic plus conventional language-model fusion;
+4. independent-recognizer consensus / MBR where alignments allow;
+5. text-only MICL selector;
+6. audio-only MICL selector;
+7. audio+text MICL selector;
+8. cross-lingual MICL demonstrations with no target-language supervised training;
+9. risk-controlled candidate selector with abstention;
+10. SAMA-style semantic anchor as a separate baseline;
+11. oracle best-in-pool as an upper bound only, never a deployable system.
+
+Demonstration retrieval arms should include random, same-language/domain, typological, phonetic/orthographic, switch-pattern, diversity and expected-value-of-information selection. Record immutable demonstration IDs and index revisions; no target test label, target transcript or speaker/source overlap may leak into demonstrations.
+
+### 16.5 Evaluation
+
+Candidate-selection metrics:
+- top-1 candidate selection accuracy;
+- candidate-oracle regret and oracle gap;
+- candidate-pool coverage;
+- false acceptance when no candidate is correct;
+- selective risk/coverage and abstention precision/recall.
+
+Speech metrics after selection:
+- strict WER/CER;
+- PIER and embedded-language deletion;
+- SETER, SPER@1/@3, boundary and transition-direction F1 when annotations exist;
+- names, numbers, units, negation and role exactness.
+
+Integrity and system costs:
+- candidate ID integrity and exact transcript-copy rate;
+- free-form rewrite rate;
+- demonstration retrieval/speaker/source leakage;
+- p50/p95/p99 total-system latency, RTFx, memory, energy and cost per correctly selected utterance;
+- matched total-system compute, not only selector-model compute.
+
+Keep per-language, variety, switch-density and worst-group results. Use speaker/source clustered paired intervals. Treat oracle best-in-pool as a theoretical upper bound and disclose candidate-pool coverage: a selector cannot recover a correct word absent from every candidate.
+
+### 16.6 Repository work and claim ceiling
+
+- [#11119 — VOICE-MICL-SELECT-001](https://github.com/Luminous-Dynamics/symthaea/issues/11119) defines the MICL candidate-selection experiment.
+- [#11120 — VOICE-CANDIDATE-INTEGRITY-001](https://github.com/Luminous-Dynamics/symthaea/issues/11120) defines the Rust closed-set decision boundary.
+- [Draft PR #11121](https://github.com/Luminous-Dynamics/symthaea/pull/11121) adds immutable candidate IDs/provenance, common source-audio/frame-span checks, candidate-ID-or-abstain decisions and exact candidate-token copying. Eleven synthetic unit-test functions are authored but not executed.
+- The experiment receipt schema now has an optional `candidate_selection` section for candidate-set manifest, selector model/prompt, demonstration manifest/policy, target-language demonstration/training regime, selected candidate or abstention, rewrite permission/count and exact-copy integrity checks. The design example marks candidate selection NOT_USED.
+
+This is an integrity primitive, not a MICL model or an ASR improvement. No model/provider was invoked and no audio, dataset or training run was used.
