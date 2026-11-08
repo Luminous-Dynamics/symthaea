@@ -21,6 +21,9 @@ This is a workload-to-primitive-and-substrate selection experiment, not a claim 
 `research/physical_compute/equation_solver_contract_v1.rs` is a dependency-free numerical oracle draft providing:
 
 - Dense finite-valued matrix representation with a 16,777,216-element ceiling.
+- A shared `LinearOperator` interface for dense and matrix-free structured systems.
+- Matrix-free 1-D Poisson operator with O(n) storage, O(n) MVM and exact spectral condition number.
+- Stable diagonal-decay ODE with an analytic trajectory oracle and a classical RK4 digital baseline.
 - Reproducible symmetric positive-definite family `A = λI + α11ᵀ`, with a known exact spectrum and condition number.
 - Known-answer RHS generation from a frozen solution vector.
 - Direct Cholesky solve.
@@ -28,7 +31,9 @@ This is a workload-to-primitive-and-substrate selection experiment, not a claim 
 - Matrix-free 1-D Poisson operator (second-difference stencil) with O(n) storage and O(n) MVM; its exact condition number is available from the discrete spectrum.
 - Unpreconditioned conjugate-gradient solve with explicit tolerance and iteration budget; it recomputes the true residual before acceptance and restarts the recurrence if residual replacement is needed.
 - Compensated dot-product accumulation in the digital reference to reduce avoidable summation error.
+- Compensated digital dot-product accumulation.
 - Separate residual norm, relative residual, relative backward error, absolute forward error and relative forward error.
+- ODE maximum/final absolute and relative trajectory error against the analytic path.
 - Negative controls for singular/nonsymmetric input, invalid dimensions/tolerances, non-finite values and ill-conditioned residual/forward-error divergence.
 
 The exact condition number of the generated SPD family is:
@@ -44,7 +49,7 @@ rustc --edition=2021 --test research/physical_compute/equation_solver_contract_v
 /tmp/equation_solver_tests
 ```
 
-The tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
+The 17 Rust unit tests are authored but remain uncompiled/unexecuted in the current authoring environment because `rustc` is unavailable.
 
 ## 3. Workload portfolio
 
@@ -69,6 +74,16 @@ The first executable M4 case is the matrix-free 1-D Poisson operator:
 with zero-boundary convention. Its eigenvalues are `4 sin²(kπ/(2(n+1)))`; therefore the exact 2-norm condition number is `cot²(π/(2(n+1)))`. It requires O(n) storage and O(n) work per MVM, unlike a dense matrix representation. This makes it a better baseline for sparse scientific workloads and a bridge toward discretized PDEs.
 
 Next include banded, Toeplitz, circulant, graph-Laplacian-derived and block-structured systems. Count sparsity, storage, data movement and preconditioner cost. Do not compare a matrix-free operator to a dense solver without counting the difference in representation and memory traffic.
+
+### D1 — stable diagonal linear ODE
+
+The first executable differential-equation oracle is:
+
+`dx_i/dt = -r_i x_i`, with `r_i ≥ 0` and known solution `x_i(t)=x_i(0)e^{-r_i t}`.
+
+The software reference provides the analytic trajectory and a classical RK4 baseline. Compare maximum and final trajectory error over the complete horizon, not only the final state. Sweep multiple decay timescales and step sizes, and use the RK4 step-refinement ratio as a numerical regression. This is a controlled software fixture; it is not a model of a specific analog circuit or a complete stiff/nonlinear ODE benchmark.
+
+Next extensions: coupled linear systems, oscillatory systems, stiff systems and nonlinear ODEs, then PDE spatial discretization. Keep analog-native direct dynamics, digital time integration, and analog MVM inside digital time stepping as distinct architecture tracks.
 
 ### M5 — negative controls
 
@@ -170,4 +185,4 @@ Do not use a composite scalar to hide a reliability/availability trade-off. Repo
 
 ## 10. Claim ceiling
 
-A software solver passing known-answer tests does not prove analog hardware correctness. A small residual does not prove a small forward error. A paper-specific 16×16 experiment does not establish arbitrary-size scaling. A condition-number stress bin is not a universal substrate capability threshold. Algorithmic complexity, analog-core energy and end-to-end joules per correct accepted task are separate evidence classes.
+A software solver passing known-answer tests does not prove analog hardware correctness. A small residual does not prove a small forward error. A paper-specific 16×16 experiment does not establish arbitrary-size scaling. A condition-number stress bin is not a universal substrate capability threshold. Algorithmic complexity, analog-core energy and end-to-end joules per correct accepted task are separate evidence classes. The error sources should also be recorded using the cross-layer mechanism taxonomy in `CROSS_LAYER_ERROR_BUDGET_V1.md`; never collapse device, circuit, conversion and system errors into a single rate.
