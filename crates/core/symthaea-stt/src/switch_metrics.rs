@@ -386,7 +386,7 @@ pub fn switch_boundary_precision_recall_f1<L: PartialEq>(
 
     let true_positives = reference_positions
         .iter()
-        .filter(|position| predicted_positions.binary_search(position).is_ok())
+        .filter(|position| predicted_positions.binary_search(*position).is_ok())
         .count();
     let false_positives = predicted_positions.len() - true_positives;
     let false_negatives = reference_positions.len() - true_positives;
