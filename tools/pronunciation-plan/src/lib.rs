@@ -851,6 +851,418 @@ impl VocalScoreAlignment {
     }
 }
 
+
+/// Typed articulatory/phonological features attached to a language-specific
+/// inventory phone. Multi-character orthographic graphemes are normalized to
+/// one of these IPA tokens before a PronunciationPlan is created.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PhoneFeature {
+    Voiced,
+    Nasal,
+    Syllabic,
+    Aspirated,
+    Ejective,
+    Implosive,
+    Click,
+    ClickDental,
+    ClickAlveolar,
+    ClickPostAlveolar,
+    ClickLateral,
+    LengthLong,
+    LengthShort,
+    VowelHigh,
+    VowelMid,
+    VowelLow,
+    VowelFront,
+    VowelCentral,
+    VowelBack,
+    Rounded,
+    PlaceBilabial,
+    PlaceLabiodental,
+    PlaceDental,
+    PlaceAlveolar,
+    PlacePostAlveolar,
+    PlacePalatal,
+    PlaceVelar,
+    PlaceUvular,
+    PlaceGlottal,
+}
+
+/// One canonical phone in a versioned language/dialect inventory.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageProfilePhone {
+    pub ipa: String,
+    pub kind: PhoneKind,
+    pub features: Vec<PhoneFeature>,
+}
+
+/// Evidence and rights metadata for one external lexical/phonological resource.
+/// The content is referenced by immutable source revision and blob digest; it
+/// is never bundled implicitly by including this receipt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageResourceReceipt {
+    pub resource_id: String,
+    pub source_repository: String,
+    pub source_revision: String,
+    pub resource_path: String,
+    pub source_digest: String,
+    pub license_document_path: String,
+    pub license_document_digest: String,
+    pub license_expression: String,
+    pub attribution: String,
+    pub rights_status: ResourceRightsStatus,
+    pub legal_review_reference: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceRightsStatus {
+    MetadataAudited,
+    LegalReviewedForDistribution,
+    Excluded,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageTask {
+    GraphemeToPhoneme,
+    Syllabification,
+    Morphology,
+    TonePrediction,
+    SpeechSynthesis,
+    SingingSynthesis,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageTaskStatus {
+    NotEvaluated,
+    ResearchOnly,
+    Qualified,
+    Unsupported,
+}
+
+/// Capability status is per task. G2P or ASR support never implies singing
+/// support; Qualified requires an external evidence receipt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageTaskCapability {
+    pub task: LanguageTask,
+    pub status: LanguageTaskStatus,
+    pub evidence_reference: Option<String>,
+    pub evidence_digest: Option<String>,
+}
+
+/// Canonical, versioned dialect/orthography/phone inventory contract.
+///
+/// The digest covers a canonical serialization of every field except
+/// profile_digest itself. It is computed by the profile publisher and checked
+/// again when the manifest is loaded; this crate deliberately does not assume
+/// a particular canonical-JSON or cryptographic implementation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageProfileManifest {
+    pub schema_version: u32,
+    pub profile_id: String,
+    pub profile_digest: String,
+    pub language_tag: String,
+    pub dialect: String,
+    pub orthography_id: String,
+    pub inventory_version: String,
+    pub phone_inventory: Vec<LanguageProfilePhone>,
+    pub resources: Vec<LanguageResourceReceipt>,
+    pub capabilities: Vec<LanguageTaskCapability>,
+}
+
+/// A pronunciation plan bound to one exact language-profile identity. The
+/// complete profile is supplied separately at validation/render time so the
+/// plan can remain compact while carrying an immutable profile reference.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfiledPronunciationPlan {
+    pub schema_version: u32,
+    pub language_profile_id: String,
+    pub language_profile_digest: String,
+    pub pronunciation: PronunciationPlan,
+}
+
+impl LanguageProfileManifest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != 1 {
+            return Err(format!(
+                "unsupported language-profile schema version {}",
+                self.schema_version
+            ));
+        }
+        if self.profile_id.trim().is_empty()
+            || self.language_tag.trim().is_empty()
+            || self.language_tag.bytes().any(|byte| byte.is_ascii_whitespace())
+            || self.dialect.trim().is_empty()
+            || self.orthography_id.trim().is_empty()
+            || self.inventory_version.trim().is_empty()
+        {
+            return Err("language profile requires ID, BCP-47 tag, dialect, orthography and inventory version".into());
+        }
+        if !valid_source_digest(&self.profile_digest) {
+            return Err("language profile requires a valid canonical profile digest".into());
+        }
+        if self.phone_inventory.is_empty() {
+            return Err("language profile requires a non-empty phone inventory".into());
+        }
+        let mut phones = std::collections::BTreeSet::new();
+        let mut has_vowel = false;
+        let mut has_consonant = false;
+        for phone in &self.phone_inventory {
+            if phone.ipa.trim().is_empty()
+                || phone.ipa.chars().any(char::is_whitespace)
+                || !phones.insert(phone.ipa.as_str())
+            {
+                return Err(format!(
+                    "language profile {} has an empty, whitespace-containing or duplicate IPA phone",
+                    self.profile_id
+                ));
+            }
+            if phone.features.is_empty() {
+                return Err(format!("phone {:?} has no articulatory features", phone.ipa));
+            }
+            let features: std::collections::BTreeSet<_> = phone.features.iter().copied().collect();
+            if features.len() != phone.features.len() {
+                return Err(format!("phone {:?} has duplicate features", phone.ipa));
+            }
+            match phone.kind {
+                PhoneKind::Vowel => {
+                    has_vowel = true;
+                    if features.iter().any(|feature| matches!(
+                        feature,
+                        PhoneFeature::Click
+                            | PhoneFeature::ClickDental
+                            | PhoneFeature::ClickAlveolar
+                            | PhoneFeature::ClickPostAlveolar
+                            | PhoneFeature::ClickLateral
+                            | PhoneFeature::Aspirated
+                            | PhoneFeature::Ejective
+                            | PhoneFeature::Implosive
+                    )) {
+                        return Err(format!("vowel {:?} has consonant-only features", phone.ipa));
+                    }
+                }
+                PhoneKind::Consonant => {
+                    has_consonant = true;
+                    if features.contains(&PhoneFeature::Syllabic) {
+                        return Err(format!(
+                            "phone {:?} is marked syllabic but its kind is consonant",
+                            phone.ipa
+                        ));
+                    }
+                }
+                PhoneKind::SyllabicConsonant => {
+                    has_consonant = true;
+                    if !features.contains(&PhoneFeature::Syllabic) {
+                        return Err(format!(
+                            "syllabic consonant {:?} lacks the syllabic feature",
+                            phone.ipa
+                        ));
+                    }
+                }
+            }
+            let click_places = [
+                PhoneFeature::ClickDental,
+                PhoneFeature::ClickAlveolar,
+                PhoneFeature::ClickPostAlveolar,
+                PhoneFeature::ClickLateral,
+            ]
+            .iter()
+            .filter(|feature| features.contains(feature))
+            .count();
+            if features.contains(&PhoneFeature::Click) != (click_places == 1) {
+                return Err(format!(
+                    "click phone {:?} must have exactly one explicit click place",
+                    phone.ipa
+                ));
+            }
+            if click_places > 0 && phone.kind != PhoneKind::Consonant {
+                return Err(format!("click phone {:?} must be a consonant", phone.ipa));
+            }
+        }
+        if !has_vowel || !has_consonant {
+            return Err("language profile inventory must include vowels and consonants".into());
+        }
+
+        if self.resources.is_empty() {
+            return Err("language profile requires explicit resource/license receipts".into());
+        }
+        let mut resource_ids = std::collections::BTreeSet::new();
+        for resource in &self.resources {
+            if resource.resource_id.trim().is_empty()
+                || !resource_ids.insert(resource.resource_id.as_str())
+                || resource.source_repository.trim().is_empty()
+                || !valid_source_digest(&resource.source_digest)
+                || !valid_source_digest(&resource.license_document_digest)
+                || resource.license_expression.trim().is_empty()
+                || resource.license_expression == "NOASSERTION"
+                || resource.attribution.trim().is_empty()
+                || !safe_resource_path(&resource.resource_path)
+                || !safe_resource_path(&resource.license_document_path)
+            {
+                return Err(format!(
+                    "resource {:?} has incomplete provenance/license metadata",
+                    resource.resource_id
+                ));
+            }
+            match resource.rights_status {
+                ResourceRightsStatus::Excluded => {
+                    return Err(format!(
+                        "excluded resource {:?} cannot be present in an active language profile",
+                        resource.resource_id
+                    ));
+                }
+                ResourceRightsStatus::LegalReviewedForDistribution => {
+                    if resource
+                        .legal_review_reference
+                        .as_deref()
+                        .is_none_or(str::is_empty)
+                    {
+                        return Err(format!(
+                            "resource {:?} claims legal review without an evidence reference",
+                            resource.resource_id
+                        ));
+                    }
+                }
+                ResourceRightsStatus::MetadataAudited => {}
+            }
+        }
+
+        let mut tasks = std::collections::BTreeSet::new();
+        for capability in &self.capabilities {
+            if !tasks.insert(capability.task) {
+                return Err(format!(
+                    "language profile has duplicate capability {:?}",
+                    capability.task
+                ));
+            }
+            if let Some(reference) = capability.evidence_reference.as_deref()
+                && reference.trim().is_empty()
+            {
+                return Err(format!(
+                    "capability {:?} has an empty evidence reference",
+                    capability.task
+                ));
+            }
+            if let Some(digest) = capability.evidence_digest.as_deref()
+                && !valid_source_digest(digest)
+            {
+                return Err(format!(
+                    "capability {:?} has an invalid evidence digest",
+                    capability.task
+                ));
+            }
+            if capability.status == LanguageTaskStatus::Qualified
+                && (capability.evidence_reference.as_deref().is_none_or(str::is_empty)
+                    || capability.evidence_digest.is_none())
+            {
+                return Err(format!(
+                    "qualified capability {:?} requires evidence reference and digest",
+                    capability.task
+                ));
+            }
+        }
+        for required in [LanguageTask::GraphemeToPhoneme, LanguageTask::Syllabification] {
+            if !tasks.contains(&required) {
+                return Err(format!("language profile must explicitly state {required:?} capability"));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn capability(&self, task: LanguageTask) -> Option<&LanguageTaskCapability> {
+        self.capabilities.iter().find(|capability| capability.task == task)
+    }
+}
+
+fn safe_resource_path(value: &str) -> bool {
+    !value.trim().is_empty()
+        && !value.starts_with('/')
+        && !value.contains('\\')
+        && value
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
+}
+
+impl ProfiledPronunciationPlan {
+    pub fn validate_against(&self, profile: &LanguageProfileManifest) -> Result<(), String> {
+        if self.schema_version != 1 {
+            return Err(format!(
+                "unsupported profiled-pronunciation schema version {}",
+                self.schema_version
+            ));
+        }
+        profile.validate()?;
+        self.pronunciation.validate()?;
+        if self.language_profile_id != profile.profile_id
+            || self.language_profile_digest != profile.profile_digest
+        {
+            return Err("pronunciation plan language-profile ID/digest mismatch".into());
+        }
+        if self.pronunciation.language != profile.language_tag {
+            return Err(format!(
+                "pronunciation language {:?} does not match profile language {:?}",
+                self.pronunciation.language, profile.language_tag
+            ));
+        }
+
+        for (word_index, word) in self.pronunciation.words.iter().enumerate() {
+            for candidate in &word.candidates {
+                for (syllable_index, syllable) in candidate.syllables.iter().enumerate() {
+                    for (phone_index, phone) in syllable.phones.iter().enumerate() {
+                        let Some(profile_phone) = profile
+                            .phone_inventory
+                            .iter()
+                            .find(|profile_phone| profile_phone.ipa == phone.ipa)
+                        else {
+                            return Err(format!(
+                                "word {word_index} candidate {} syllable {syllable_index} phone {phone_index} {:?} is outside profile {} inventory",
+                                candidate.candidate_id, phone.ipa, profile.profile_id
+                            ));
+                        };
+                        if profile_phone.kind != phone.kind {
+                            return Err(format!(
+                                "word {word_index} candidate {} phone {:?} kind {:?} conflicts with profile kind {:?}",
+                                candidate.candidate_id, phone.ipa, phone.kind, profile_phone.kind
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// A task is production-qualified only when the exact language profile
+    /// carries a Qualified status with an evidence receipt. ResearchOnly and
+    /// NotEvaluated profiles may still be used in explicitly labelled studies.
+    pub fn validate_for_task(
+        &self,
+        profile: &LanguageProfileManifest,
+        task: LanguageTask,
+    ) -> Result<(), String> {
+        self.validate_against(profile)?;
+        self.pronunciation.validate_renderable()?;
+        let capability = profile.capability(task).ok_or_else(|| {
+            format!("language profile {} does not declare capability {task:?}", profile.profile_id)
+        })?;
+        if capability.status != LanguageTaskStatus::Qualified {
+            return Err(format!(
+                "language profile {} task {task:?} is {:?}, not Qualified",
+                profile.profile_id, capability.status
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
