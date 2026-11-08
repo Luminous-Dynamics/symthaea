@@ -203,7 +203,7 @@ The following are pilot-to-confirmatory targets, not achieved results or new met
 - C2 must reduce false-retain/stale-evidence use relative to C0 and C1 on the predeclared adversarial sequence slice; **zero false retain** is the desired outcome on the high-severity synthetic controls.
 - C2 must not increase false invalidation or unresolved/escalation so broadly that it simply discards evidence or defers every decision. Freeze the non-inferiority margin only after a blinded pilot establishes label reliability and baseline rates.
 - C2 must preserve or improve sequence-complete rate and repair survival under the existing CEB-CONTINUITY measurement contract.
-- The full continuity policy should retain the existing aspiration of at least **20% lower revalidation cost** than reset-and-recheck at non-inferior sequence correctness; report the cost of closure construction and updates in the same ledger.
+- The full continuity policy should retain the existing aspiration of at least **20% lower revalidation cost** than reset-and-recheck at non-inferior sequence correctness; report the cost of closure construction and updates in the same ledger. This is the existing at least 20% lower revalidation cost target already owned by #10630, not a new CEB metric.
 - On a sampled subset, incremental support closure must agree with the clean-recomputation oracle or explicitly return unresolved. No unqualified retain is permitted when closure completeness cannot be established.
 - Use repository-/defect-family-clustered paired intervals and multiplicity control. Six public cases are for protocol debugging only and cannot establish any of these targets.
 
