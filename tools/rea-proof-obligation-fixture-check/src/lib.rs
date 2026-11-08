@@ -455,6 +455,88 @@ fn validate_split_values(agent: &Value, grader: &Value) -> Result<(), FixtureErr
     Ok(())
 }
 
+
+fn validate_split_matches_authoring(
+    authoring: &Value,
+    agent: &Value,
+    grader: &Value,
+) -> Result<(), FixtureError> {
+    let authoring_cases = array_at(authoring, &["cases"])?;
+    let agent_cases = array_at(agent, &["cases"])?;
+    let grader_cases = array_at(grader, &["cases"])?;
+
+    let agent_by_id: BTreeMap<&str, &Value> = agent_cases
+        .iter()
+        .map(|case| Ok((string_at(case, &["case_id"])?, case)))
+        .collect::<Result<_, FixtureError>>()?;
+    let grader_by_id: BTreeMap<&str, &Value> = grader_cases
+        .iter()
+        .map(|case| Ok((string_at(case, &["case_id"])?, case)))
+        .collect::<Result<_, FixtureError>>()?;
+
+    for full in authoring_cases {
+        let id = string_at(full, &["case_id"])?;
+        let agent_case = agent_by_id.get(id).ok_or_else(|| {
+            FixtureError(format!("authoring case {id} is missing from agent view"))
+        })?;
+        let grader_case = grader_by_id.get(id).ok_or_else(|| {
+            FixtureError(format!("authoring case {id} is missing from grader view"))
+        })?;
+
+        let candidates = array_at(full, &["candidates"])?;
+        let expected_agent_candidates: Vec<Value> = candidates
+            .iter()
+            .map(|candidate| {
+                serde_json::json!({
+                    "experiment_id": candidate["experiment_id"],
+                    "authorization": candidate["authorization"],
+                    "reversible": candidate["reversible"],
+                    "destructive": candidate["destructive"],
+                    "target_impact": candidate["target_impact"],
+                    "cost_units": candidate["cost_units"],
+                    "description": candidate["description"],
+                    "outcomes": candidate["outcomes"]
+                })
+            })
+            .collect();
+        let expected_agent_case = serde_json::json!({
+            "case_id": full["case_id"],
+            "domain": full["domain"],
+            "fault_family": full["fault_family"],
+            "claim_text": full["claim_text"],
+            "obligations": full["obligations"],
+            "candidates": expected_agent_candidates
+        });
+        if **agent_case != expected_agent_case {
+            return Err(FixtureError(format!(
+                "agent-view projection differs from authoring case {id}"
+            )));
+        }
+
+        let expected_candidate_effects: Vec<Value> = candidates
+            .iter()
+            .map(|candidate| {
+                serde_json::json!({
+                    "experiment_id": candidate["experiment_id"],
+                    "effects": candidate["effects"]
+                })
+            })
+            .collect();
+        let expected_grader_case = serde_json::json!({
+            "case_id": full["case_id"],
+            "world_state_oracle": full["world_state_oracle"],
+            "expected_policy": full["expected_policy"],
+            "candidate_effects": expected_candidate_effects
+        });
+        if **grader_case != expected_grader_case {
+            return Err(FixtureError(format!(
+                "grader-view projection differs from authoring case {id}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Validate the embedded Draft 2020-12 schema, its instance, and semantic
 /// cross-field invariants.
 pub fn validate_embedded_corpus() -> Result<(), FixtureError> {
@@ -480,7 +562,13 @@ pub fn validate_embedded_corpus() -> Result<(), FixtureError> {
     }
 
     validate_fixture(&fixture)?;
-    validate_split_corpus()
+    validate_split_corpus()?;
+
+    let agent: Value = serde_json::from_str(AGENT_VIEW)
+        .map_err(|error| FixtureError(format!("agent-view fixture parse failed: {error}")))?;
+    let grader: Value = serde_json::from_str(GRADER_VIEW)
+        .map_err(|error| FixtureError(format!("grader fixture parse failed: {error}")))?;
+    validate_split_matches_authoring(&fixture, &agent, &grader)
 }
 
 #[cfg(test)]
@@ -631,6 +719,16 @@ mod tests {
         let mut grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
         grader["cases"][0]["case_id"] = Value::String("REA-POA-999".to_owned());
         assert!(validate_split_values(&serde_json::from_str(AGENT_VIEW).unwrap(), &grader).is_err());
+    }
+
+
+    #[test]
+    fn split_views_must_be_exact_projections_of_authoring_fixture() {
+        let authoring: Value = serde_json::from_str(FIXTURE).unwrap();
+        let mut agent: Value = serde_json::from_str(AGENT_VIEW).unwrap();
+        let grader: Value = serde_json::from_str(GRADER_VIEW).unwrap();
+        agent["cases"][0]["claim_text"] = Value::String("silently changed claim".to_owned());
+        assert!(validate_split_matches_authoring(&authoring, &agent, &grader).is_err());
     }
 
 }
