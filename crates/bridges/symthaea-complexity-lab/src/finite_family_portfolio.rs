@@ -232,9 +232,34 @@ pub struct OptimalPolicyPortfolio {
     pub worst_case_model_indices: Vec<usize>,
 }
 
+/// Decoded deterministic time-dependent Markov policy.
+///
+/// Actions are stored in time-major, then state-major order. Index zero is
+/// the first time/state slot; the policy index is the lexicographic rank of
+/// the action vector when each action is a base-|A| digit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeterministicMarkovPolicy {
+    pub index: usize,
+    pub horizon: usize,
+    pub state_count: usize,
+    pub action_count: usize,
+    pub actions: Vec<usize>,
+}
+
+impl DeterministicMarkovPolicy {
+    pub fn action_at(&self, time: usize, state: usize) -> Option<usize> {
+        if time >= self.horizon || state >= self.state_count {
+            return None;
+        }
+        self.actions.get(time.checked_mul(self.state_count)?.checked_add(state)?).copied()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FiniteFamilyPolicyPortfolioResult {
     pub model_family_sha256: [u8; 32],
+    /// Versioned identity of the policy class and canonical policy-index encoding.
+    pub policy_manifest_sha256: [u8; 32],
     pub policy_values_sha256: [u8; 32],
     pub decision_certificate_sha256: [u8; 32],
     pub discount: CheckedRational,
@@ -274,6 +299,7 @@ pub enum PolicyPortfolioError {
     InconsistentInitialDistribution { model: usize },
     DuplicateModelIdentity,
     PolicySpaceOverflow,
+    InvalidPolicyIndex { index: usize, policy_count: usize },
     DimensionOverflow,
     BudgetExceeded { resource: &'static str, required: usize, limit: usize },
     AllocationFailed { resource: &'static str, entries: usize },
@@ -305,6 +331,7 @@ impl fmt::Display for PolicyPortfolioError {
             Self::InconsistentInitialDistribution { model } => write!(f, "model {model} has a different initial distribution"),
             Self::DuplicateModelIdentity => write!(f, "duplicate environment identity in finite family"),
             Self::PolicySpaceOverflow => write!(f, "deterministic Markov policy space overflowed usize"),
+            Self::InvalidPolicyIndex { index, policy_count } => write!(f, "policy index {index} is outside 0..{policy_count}"),
             Self::DimensionOverflow => write!(f, "policy portfolio dimension/count overflowed"),
             Self::BudgetExceeded { resource, required, limit } => write!(f, "policy portfolio {resource} requires {required}; configured limit is {limit}"),
             Self::AllocationFailed { resource, entries } => write!(f, "unable to reserve {resource} for {entries} entries"),
@@ -422,6 +449,43 @@ fn decode_policy(index: usize, horizon: usize, states: usize, actions: usize, ou
         output[slot] = remaining % actions;
         remaining /= actions;
     }
+}
+
+/// Decode the canonical policy index used by the exhaustive solver.
+pub fn decode_deterministic_markov_policy(
+    index: usize,
+    horizon: usize,
+    state_count: usize,
+    action_count: usize,
+) -> Result<DeterministicMarkovPolicy, PolicyPortfolioError> {
+    if horizon == 0 {
+        return Err(PolicyPortfolioError::ZeroHorizon);
+    }
+    if state_count == 0 {
+        return Err(PolicyPortfolioError::EmptyStateSpace);
+    }
+    if action_count == 0 {
+        return Err(PolicyPortfolioError::EmptyActionSpace);
+    }
+    let policy_count = checked_policy_count(state_count, horizon, action_count)?;
+    if index >= policy_count {
+        return Err(PolicyPortfolioError::InvalidPolicyIndex { index, policy_count });
+    }
+    let entries = horizon.checked_mul(state_count)
+        .ok_or(PolicyPortfolioError::PolicySpaceOverflow)?;
+    let mut actions = Vec::new();
+    actions.try_reserve_exact(entries).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed { resource: "decoded policy actions", entries }
+    })?;
+    actions.resize(entries, 0usize);
+    decode_policy(index, horizon, state_count, action_count, &mut actions);
+    Ok(DeterministicMarkovPolicy {
+        index,
+        horizon,
+        state_count,
+        action_count,
+        actions,
+    })
 }
 
 fn evaluate_policy(
@@ -625,7 +689,17 @@ pub fn solve_finite_family_policy_portfolio(
         policy_values.push(row);
     }
 
-    let policy_values_sha256 = hash_policy_values(family.sha256(), discount, states, actions, horizon, &model_optima, &policy_values);
+    let policy_manifest_sha256 = policy_manifest_sha256(states, actions, horizon, policy_count);
+    let policy_values_sha256 = hash_policy_values(
+        family.sha256(),
+        policy_manifest_sha256,
+        discount,
+        states,
+        actions,
+        horizon,
+        &model_optima,
+        &policy_values,
+    );
     let mut incumbent: Option<CheckedRational> = None;
     let mut optimal_portfolios = Vec::new();
     let mut stored_policy_indices = 0usize;
@@ -773,12 +847,21 @@ pub fn solve_finite_family_policy_portfolio(
 
     let minimax_regret = incumbent.ok_or(PolicyPortfolioError::EmptyPortfolio)?;
     let decision_certificate_sha256 = hash_portfolio_decision(
-        family.sha256(), policy_values_sha256, discount, policy_count, k,
-        evaluations, candidates_evaluated, minimax_regret, &optimal_portfolios,
+        family.sha256(),
+        policy_manifest_sha256,
+        policy_values_sha256,
+        discount,
+        policy_count,
+        k,
+        evaluations,
+        candidates_evaluated,
+        minimax_regret,
+        &optimal_portfolios,
     );
 
     Ok(FiniteFamilyPolicyPortfolioResult {
         model_family_sha256: family.sha256(),
+        policy_manifest_sha256,
         policy_values_sha256,
         decision_certificate_sha256,
         discount,
@@ -814,8 +897,24 @@ pub fn verify_finite_family_policy_portfolio_result(
     }
 }
 
+fn policy_manifest_sha256(
+    states: usize,
+    actions: usize,
+    horizon: usize,
+    policy_count: usize,
+) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(b"SYMPGM-FINITE-UMDP-POLICY-MANIFEST\0\x01");
+    h.update(b"deterministic-time-dependent-markov;time-major-state-major;lexicographic-base-actions");
+    for value in [states, actions, horizon, policy_count] {
+        h.update((value as u64).to_le_bytes());
+    }
+    h.finalize().into()
+}
+
 fn hash_policy_values(
     family: [u8; 32],
+    policy_manifest: [u8; 32],
     discount: CheckedRational,
     states: usize,
     actions: usize,
@@ -824,12 +923,14 @@ fn hash_policy_values(
     values: &[Vec<CheckedRational>],
 ) -> [u8; 32] {
     let mut h = Sha256::new();
-    h.update(b"SYMPGM-FINITE-UMDP-POLICY-VALUES\0\x01");
+    h.update(b"SYMPGM-FINITE-UMDP-POLICY-VALUES\0\x02");
     h.update(family);
+    h.update(policy_manifest);
     hash_rational(&mut h, discount);
     for value in [states, actions, horizon] { h.update((value as u64).to_le_bytes()); }
     h.update((optima.len() as u64).to_le_bytes());
     for value in optima { hash_rational(&mut h, *value); }
+    h.update((values.len() as u64).to_le_bytes());
     for row in values {
         h.update((row.len() as u64).to_le_bytes());
         for value in row { hash_rational(&mut h, *value); }
@@ -839,6 +940,7 @@ fn hash_policy_values(
 
 fn hash_portfolio_decision(
     family: [u8; 32],
+    policy_manifest: [u8; 32],
     values_digest: [u8; 32],
     discount: CheckedRational,
     policy_count: usize,
@@ -849,8 +951,9 @@ fn hash_portfolio_decision(
     portfolios: &[OptimalPolicyPortfolio],
 ) -> [u8; 32] {
     let mut h = Sha256::new();
-    h.update(b"SYMPGM-FINITE-UMDP-PORTFOLIO-DECISION\0\x01");
+    h.update(b"SYMPGM-FINITE-UMDP-PORTFOLIO-DECISION\0\x02");
     h.update(family);
+    h.update(policy_manifest);
     h.update(values_digest);
     hash_rational(&mut h, discount);
     for value in [policy_count, k, evaluations, candidates] { h.update((value as u64).to_le_bytes()); }
@@ -859,14 +962,17 @@ fn hash_portfolio_decision(
     for portfolio in portfolios {
         h.update((portfolio.policy_indices.len() as u64).to_le_bytes());
         for index in &portfolio.policy_indices { h.update((*index as u64).to_le_bytes()); }
+        h.update((portfolio.model_witnesses.len() as u64).to_le_bytes());
         for witness in &portfolio.model_witnesses {
             h.update((witness.model_index as u64).to_le_bytes());
             h.update(witness.model_sha256);
             hash_rational(&mut h, witness.model_optimal_value);
             hash_rational(&mut h, witness.portfolio_value);
             hash_rational(&mut h, witness.regret);
+            h.update((witness.best_policy_indices.len() as u64).to_le_bytes());
             for index in &witness.best_policy_indices { h.update((*index as u64).to_le_bytes()); }
         }
+        h.update((portfolio.worst_case_model_indices.len() as u64).to_le_bytes());
         for index in &portfolio.worst_case_model_indices { h.update((*index as u64).to_le_bytes()); }
     }
     h.finalize().into()
