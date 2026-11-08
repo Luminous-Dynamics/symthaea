@@ -251,6 +251,46 @@ Targets, not achieved results:
 
 A numeric percentage gain in cost or coverage must be set only after a pilot establishes human agreement, task difficulty, baseline variance and statistical power. Do not pick an arbitrary improvement threshold and treat it as a scientific result.
 
+## 6.1 External benchmark baselines and denominator discipline
+
+Use external benchmarks as separate reference tracks; never pool their scores.
+
+### AgentRE-Bench v3.1 (November 2026)
+
+The current published Windows PE run reports 20 artifacts, five attempts per artifact, six models and 600 episodes. Muse Wonder reports 87.37/100 (100/100 valid answers); GPT-6 Astra reports 87.04/100 (100/100 valid answers). Their published 95% intervals overlap substantially (Muse 85.18–89.56; Astra 85.80–88.29), so the reported ordering is not evidence of a clear winner. The benchmark reports a 90% Main / 10% Bonus score and says all 600 scores were independently reproduced. https://www.agentre-bench.ai/
+
+REA alignment:
+- retain the official AgentRE score unchanged;
+- add claim-level source-grounded accuracy and obligation completion as separate supplemental measures;
+- distinguish valid structured answer, evidence coverage and conditional answer quality;
+- replay the exact tool/evidence trace and independently reproduce the artifact-to-claim mapping;
+- keep all attempts, failures and budget exits visible.
+
+### SRE-Bench (updated October 2026)
+
+SRE-Bench contains 19 private programs, 262 binary instances, 1,572 deterministically graded tasks, five RE domains and 44 anti-analysis mechanisms. Its published public-facing GPT-6-Astra row has 181 graded instances, of which 149 are fully solved: 82.3% conditional on graded instances. Graded coverage is 181/262 = 69.1%. The derived full-solve yield over all eligible instances is 149/262 = 56.9% if ungraded instances are treated as not yet solved; this is not the benchmark owner's official metric and must be labelled as a coverage-adjusted derived measure. https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+
+REA alignment:
+- publish eligible, attempted, graded, completed and refused/unavailable counts separately;
+- show official conditional scores beside coverage-adjusted yields;
+- never treat a refusal or ungraded task as absent from the denominator;
+- separate pass@1 from pass@k and don't count repeated attempts as independent benchmark cases;
+- use artifact/program/source-family clusters—not individual attempts—as the resampling unit.
+
+### REA's competitive scorecard
+
+Do not claim superiority from one mean score. Report:
+1. Official task score under each external benchmark's original formula.
+2. Eligible coverage and valid structured-answer coverage.
+3. Correct claim detail conditional on attempted/graded tasks.
+4. Source-grounded detail and exact evidence-span traceability.
+5. Unsupported-claim / false-ready rate.
+6. Independent replay and artifact binding.
+7. Abstention correctness and useful coverage.
+8. Cost, time, tool calls, memory and energy under matched budgets.
+
+For pairwise comparisons, freeze the task/artifact cohort and system configurations, then use paired cluster bootstrap intervals over artifacts/programs or independent source families. Model attempts nested inside one artifact are repeated measurements, not independent samples. If a cohort has a high refusal/ungraded rate, report it as a separate capability/coverage outcome rather than silently comparing only its answered subset.
+
 ## 7. Industry boundary
 
 REA composes rather than replaces:
