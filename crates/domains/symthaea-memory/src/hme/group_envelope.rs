@@ -1,0 +1,460 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Verified coordinate-envelope synopses for immutable ContinuousHV groups.
+//!
+//! A group envelope is built by scanning every original payload in a group and
+//! computing exact coordinate minima/maxima. At query time, the core interval
+//! kernel propagates that box through the canonical f32 cosine score. If the
+//! group upper score is strictly below the current exact kth threshold, every
+//! member can be skipped without loading its original payload.
+//!
+//! The builder is deliberately read-only and in-memory in this first slice.
+//! Persistence, checksummed immutable segment headers and reopen-time proof
+//! binding remain owned by HME-001A (#10917). A digest binds the builder input;
+//! it is not a substitute for verifying the extrema against those payloads.
+
+use std::collections::BTreeMap;
+
+use symthaea_core::hdc::continuous_hv_interval::{
+    ContinuousHVIntervalError, ContinuousHVScoreInterval,
+};
+use symthaea_core::hdc::ContinuousHV;
+
+/// Domain separator for deterministic group-envelope content identities.
+const GROUP_ENVELOPE_DOMAIN: &[u8] = b"hme_continuous_hv_group_envelope_v1";
+
+/// Immutable coordinate envelope for one homogeneous ContinuousHV group.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContinuousHVGroupEnvelope {
+    manifest_generation: u64,
+    eligibility_generation: u64,
+    dimension: usize,
+    member_ids: Vec<String>,
+    member_set_digest: [u8; 32],
+    content_digest: [u8; 32],
+    coordinate_minima: Vec<f32>,
+    coordinate_maxima: Vec<f32>,
+}
+
+/// Fail-closed errors for group-envelope construction and query use.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GroupEnvelopeError {
+    /// A synopsis cannot be constructed from an empty group.
+    EmptyGroup,
+    /// A member has an empty stable identifier.
+    EmptyMemberId {
+        /// Position of the invalid member in the supplied slice.
+        member_index: usize,
+    },
+    /// The same stable identifier appears more than once.
+    DuplicateMemberId {
+        /// First member index.
+        first_index: usize,
+        /// Later duplicate member index.
+        duplicate_index: usize,
+    },
+    /// A member has a dimension different from the first member.
+    DimensionMismatch {
+        /// Expected homogeneous dimension.
+        expected: usize,
+        /// Observed member dimension.
+        actual: usize,
+        /// Position of the mismatched member.
+        member_index: usize,
+    },
+    /// A member is outside the finite [-1,1] canonical score profile.
+    InvalidMemberProfile {
+        /// Position of the invalid member.
+        member_index: usize,
+        /// Underlying profile error.
+        error: symthaea_core::hdc::unified_hv::ContinuousHVProfileError,
+    },
+    /// The caller supplied a different manifest generation.
+    ManifestGenerationMismatch {
+        /// Generation bound into the envelope.
+        envelope_generation: u64,
+        /// Generation requested by the query.
+        requested_generation: u64,
+    },
+    /// The caller supplied a different eligibility generation.
+    EligibilityGenerationMismatch {
+        /// Eligibility generation bound into the envelope.
+        envelope_generation: u64,
+        /// Eligibility generation requested by the query.
+        requested_generation: u64,
+    },
+    /// The member set does not match the pinned eligible group.
+    MemberSetMismatch,
+    /// The expected payload/content identity does not match.
+    ContentDigestMismatch,
+    /// A kth threshold is not finite or outside the canonical score range.
+    InvalidKthThreshold,
+    /// The core interval kernel rejected the query or box.
+    ScoreInterval(ContinuousHVIntervalError),
+}
+
+impl std::fmt::Display for GroupEnvelopeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyGroup => write!(f, "cannot build an empty ContinuousHV group envelope"),
+            Self::EmptyMemberId { member_index } => {
+                write!(f, "group member {member_index} has an empty stable ID")
+            }
+            Self::DuplicateMemberId { first_index, duplicate_index } => write!(
+                f,
+                "group member ID duplicated at indices {first_index} and {duplicate_index}"
+            ),
+            Self::DimensionMismatch { expected, actual, member_index } => write!(
+                f,
+                "group member {member_index} dimension {actual} does not match {expected}"
+            ),
+            Self::InvalidMemberProfile { member_index, error } => {
+                write!(f, "group member {member_index} has invalid profile: {error}")
+            }
+            Self::ManifestGenerationMismatch { envelope_generation, requested_generation } => write!(
+                f,
+                "group envelope manifest generation {envelope_generation} does not match requested {requested_generation}"
+            ),
+            Self::EligibilityGenerationMismatch { envelope_generation, requested_generation } => write!(
+                f,
+                "group envelope eligibility generation {envelope_generation} does not match requested {requested_generation}"
+            ),
+            Self::MemberSetMismatch => write!(f, "group envelope member set does not match pinned eligible membership"),
+            Self::ContentDigestMismatch => write!(f, "group envelope content digest does not match pinned manifest"),
+            Self::InvalidKthThreshold => write!(f, "kth threshold must be finite and in [-1, 1]"),
+            Self::ScoreInterval(error) => write!(f, "group score interval failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for GroupEnvelopeError {}
+
+/// Compute the deterministic digest of a stable-ID set.
+///
+/// IDs are sorted and duplicate IDs are rejected. The digest does not prove
+/// eligibility; it lets a query compare the exact requested membership set to
+/// the set used when the envelope was built.
+pub fn member_id_set_digest(
+    member_ids: &[String],
+) -> Result<[u8; 32], GroupEnvelopeError> {
+    let mut sorted = member_ids.to_vec();
+    if sorted.iter().any(|id| id.is_empty()) {
+        return Err(GroupEnvelopeError::EmptyMemberId { member_index: 0 });
+    }
+    sorted.sort();
+    for index in 1..sorted.len() {
+        if sorted[index - 1] == sorted[index] {
+            return Err(GroupEnvelopeError::DuplicateMemberId {
+                first_index: index - 1,
+                duplicate_index: index,
+            });
+        }
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(GROUP_ENVELOPE_DOMAIN);
+    hasher.update(&(sorted.len() as u64).to_le_bytes());
+    for id in sorted {
+        hasher.update(&(id.len() as u64).to_le_bytes());
+        hasher.update(id.as_bytes());
+    }
+    Ok(*hasher.finalize().as_bytes())
+}
+
+impl ContinuousHVGroupEnvelope {
+    /// Build a group envelope by verifying and scanning every original member.
+    ///
+    /// This constructor owns the coordinate extrema: callers cannot provide
+    /// claimed minima/maxima. Members are sorted by stable ID before hashing,
+    /// making the identity independent of input ordering.
+    pub fn from_original_members(
+        manifest_generation: u64,
+        eligibility_generation: u64,
+        members: &[(String, ContinuousHV)],
+    ) -> Result<Self, GroupEnvelopeError> {
+        if members.is_empty() {
+            return Err(GroupEnvelopeError::EmptyGroup);
+        }
+
+        let dimension = members[0].1.values.len();
+        let mut by_id: BTreeMap<&str, (usize, &ContinuousHV)> = BTreeMap::new();
+        for (member_index, (id, vector)) in members.iter().enumerate() {
+            if id.is_empty() {
+                return Err(GroupEnvelopeError::EmptyMemberId { member_index });
+            }
+            if let Some((first_index, _)) = by_id.get(id.as_str()) {
+                return Err(GroupEnvelopeError::DuplicateMemberId {
+                    first_index: *first_index,
+                    duplicate_index: member_index,
+                });
+            }
+            if vector.values.len() != dimension {
+                return Err(GroupEnvelopeError::DimensionMismatch {
+                    expected: dimension,
+                    actual: vector.values.len(),
+                    member_index,
+                });
+            }
+            vector
+                .validate_full_resolution_profile("group_member")
+                .map_err(|error| GroupEnvelopeError::InvalidMemberProfile {
+                    member_index,
+                    error,
+                })?;
+            by_id.insert(id.as_str(), (member_index, vector));
+        }
+
+        let mut coordinate_minima = vec![f32::INFINITY; dimension];
+        let mut coordinate_maxima = vec![f32::NEG_INFINITY; dimension];
+        for (_, vector) in by_id.values() {
+            for index in 0..dimension {
+                coordinate_minima[index] =
+                    coordinate_minima[index].min(vector.values[index]);
+                coordinate_maxima[index] =
+                    coordinate_maxima[index].max(vector.values[index]);
+            }
+        }
+
+        let member_ids: Vec<String> = by_id.keys().map(|id| (*id).to_owned()).collect();
+        let member_set_digest = member_id_set_digest(&member_ids)?;
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(GROUP_ENVELOPE_DOMAIN);
+        hasher.update(b"/content");
+        hasher.update(&manifest_generation.to_le_bytes());
+        hasher.update(&eligibility_generation.to_le_bytes());
+        hasher.update(&(dimension as u64).to_le_bytes());
+        hasher.update(&(member_ids.len() as u64).to_le_bytes());
+        hasher.update(&member_set_digest);
+        for id in &member_ids {
+            let (_, vector) = by_id
+                .get(id.as_str())
+                .expect("member ID was inserted and sorted from the same map");
+            hasher.update(&(id.len() as u64).to_le_bytes());
+            hasher.update(id.as_bytes());
+            for value in &vector.values {
+                hasher.update(&value.to_bits().to_le_bytes());
+            }
+        }
+        for value in coordinate_minima.iter().chain(&coordinate_maxima) {
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
+
+        Ok(Self {
+            manifest_generation,
+            eligibility_generation,
+            dimension,
+            member_ids,
+            member_set_digest,
+            content_digest: *hasher.finalize().as_bytes(),
+            coordinate_minima,
+            coordinate_maxima,
+        })
+    }
+
+    /// Stable IDs covered by the envelope, sorted ascending.
+    pub fn member_ids(&self) -> &[String] {
+        &self.member_ids
+    }
+
+    /// Digest of the exact member-ID set.
+    pub fn member_set_digest(&self) -> [u8; 32] {
+        self.member_set_digest
+    }
+
+    /// Digest binding generations, member IDs, payload f32 bits and extrema.
+    pub fn content_digest(&self) -> [u8; 32] {
+        self.content_digest
+    }
+
+    /// ContinuousHV dimension covered by this envelope.
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    /// Query-specific interval enclosing every member score for a pinned group.
+    ///
+    /// The expected generations, member-set digest and content digest must come
+    /// from the authoritative query/segment snapshot. A mismatch disables
+    /// group pruning. The caller must still ensure the group is uniformly
+    /// eligible under the query's principal, valid_at/known_at and forgetting
+    /// scope; construct separate envelopes for different eligible subsets.
+    pub fn score_interval_for_snapshot(
+        &self,
+        query: &ContinuousHV,
+        expected_manifest_generation: u64,
+        expected_eligibility_generation: u64,
+        expected_member_set_digest: [u8; 32],
+        expected_content_digest: [u8; 32],
+    ) -> Result<ContinuousHVScoreInterval, GroupEnvelopeError> {
+        if self.manifest_generation != expected_manifest_generation {
+            return Err(GroupEnvelopeError::ManifestGenerationMismatch {
+                envelope_generation: self.manifest_generation,
+                requested_generation: expected_manifest_generation,
+            });
+        }
+        if self.eligibility_generation != expected_eligibility_generation {
+            return Err(GroupEnvelopeError::EligibilityGenerationMismatch {
+                envelope_generation: self.eligibility_generation,
+                requested_generation: expected_eligibility_generation,
+            });
+        }
+        if self.member_set_digest != expected_member_set_digest {
+            return Err(GroupEnvelopeError::MemberSetMismatch);
+        }
+        if self.content_digest != expected_content_digest {
+            return Err(GroupEnvelopeError::ContentDigestMismatch);
+        }
+        query
+            .similarity_interval_full_resolution_for_component_bounds(
+                &self.coordinate_minima,
+                &self.coordinate_maxima,
+            )
+            .map_err(GroupEnvelopeError::ScoreInterval)
+    }
+
+    /// Whether this entire group can be excluded from an exact top-k query.
+    ///
+    /// Only a strict upper<threshold result prunes. Equality always remains
+    /// unresolved. The query and snapshot bindings are validated first.
+    pub fn can_prune_for_top_k(
+        &self,
+        query: &ContinuousHV,
+        kth_exact_threshold: f32,
+        expected_manifest_generation: u64,
+        expected_eligibility_generation: u64,
+        expected_member_set_digest: [u8; 32],
+        expected_content_digest: [u8; 32],
+    ) -> Result<bool, GroupEnvelopeError> {
+        if !kth_exact_threshold.is_finite() || !(-1.0..=1.0).contains(&kth_exact_threshold) {
+            return Err(GroupEnvelopeError::InvalidKthThreshold);
+        }
+        let interval = self.score_interval_for_snapshot(
+            query,
+            expected_manifest_generation,
+            expected_eligibility_generation,
+            expected_member_set_digest,
+            expected_content_digest,
+        )?;
+        Ok(interval.upper < kth_exact_threshold)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hv(values: &[f32]) -> ContinuousHV {
+        ContinuousHV::from_vec(values.to_vec())
+    }
+
+    #[test]
+    fn group_bound_contains_every_original_member_score() {
+        let members = vec![
+            ("m-1".to_owned(), hv(&[0.91, -0.79, 0.69, -0.61, 0.51, -0.39, 0.29, -0.21, 0.11])),
+            ("m-2".to_owned(), hv(&[-0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8, 0.9, -1.0])),
+            ("m-3".to_owned(), hv(&[0.0, 0.0, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4])),
+        ];
+        let envelope = ContinuousHVGroupEnvelope::from_original_members(7, 3, &members).unwrap();
+        let query = hv(&[0.9, -0.8, 0.7, -0.6, 0.5, -0.4, 0.3, -0.2, 0.1]);
+        let interval = envelope
+            .score_interval_for_snapshot(
+                &query,
+                7,
+                3,
+                envelope.member_set_digest(),
+                envelope.content_digest(),
+            )
+            .unwrap();
+        for (_, member) in &members {
+            assert!(interval.contains(query.similarity_full_resolution(member)));
+        }
+    }
+
+    #[test]
+    fn group_pruning_is_strict_and_generation_bound() {
+        let members = vec![
+            ("a".to_owned(), hv(&[-1.0; 9])),
+            ("b".to_owned(), hv(&[-0.9; 9])),
+        ];
+        let envelope = ContinuousHVGroupEnvelope::from_original_members(11, 4, &members).unwrap();
+        let query = hv(&[1.0; 9]);
+        let args = (
+            &query,
+            11,
+            4,
+            envelope.member_set_digest(),
+            envelope.content_digest(),
+        );
+        let interval = envelope
+            .score_interval_for_snapshot(args.0, args.1, args.2, args.3, args.4)
+            .unwrap();
+        assert!(envelope
+            .can_prune_for_top_k(&query, interval.upper, 11, 4, args.3, args.4)
+            .unwrap()
+            == false);
+        assert!(envelope
+            .can_prune_for_top_k(&query, (interval.upper + 1.0).min(1.0), 11, 4, args.3, args.4)
+            .unwrap()
+            || interval.upper == 1.0);
+
+        assert!(matches!(
+            envelope.score_interval_for_snapshot(
+                &query,
+                12,
+                4,
+                args.3,
+                args.4
+            ),
+            Err(GroupEnvelopeError::ManifestGenerationMismatch { .. })
+        ));
+        assert!(matches!(
+            envelope.score_interval_for_snapshot(
+                &query,
+                11,
+                5,
+                args.3,
+                args.4
+            ),
+            Err(GroupEnvelopeError::EligibilityGenerationMismatch { .. })
+        ));
+        assert!(matches!(
+            envelope.score_interval_for_snapshot(
+                &query,
+                11,
+                4,
+                [0u8; 32],
+                args.4
+            ),
+            Err(GroupEnvelopeError::MemberSetMismatch)
+        ));
+    }
+
+    #[test]
+    fn group_builder_rejects_duplicate_ids_bad_dimensions_and_non_finite_values() {
+        let duplicate = vec![
+            ("same".to_owned(), hv(&[0.0; 8])),
+            ("same".to_owned(), hv(&[1.0; 8])),
+        ];
+        assert!(matches!(
+            ContinuousHVGroupEnvelope::from_original_members(1, 1, &duplicate),
+            Err(GroupEnvelopeError::DuplicateMemberId { .. })
+        ));
+
+        let mismatch = vec![
+            ("a".to_owned(), hv(&[0.0; 8])),
+            ("b".to_owned(), hv(&[0.0; 9])),
+        ];
+        assert!(matches!(
+            ContinuousHVGroupEnvelope::from_original_members(1, 1, &mismatch),
+            Err(GroupEnvelopeError::DimensionMismatch { .. })
+        ));
+
+        let invalid = vec![("a".to_owned(), hv(&[f32::NAN; 8]))];
+        assert!(matches!(
+            ContinuousHVGroupEnvelope::from_original_members(1, 1, &invalid),
+            Err(GroupEnvelopeError::InvalidMemberProfile { .. })
+        ));
+    }
+}
