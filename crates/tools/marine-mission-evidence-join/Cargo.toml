@@ -1,0 +1,18 @@
+[package]
+name = "marine-mission-evidence-join"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact-subject cross-domain evidence join for marine liveaboard mission cases"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "thirty_day_case"
+path = "examples/thirty_day_case.rs"
+
+# Keep this verifier isolated from the large Symthaea workspace.
+[workspace]
