@@ -703,6 +703,20 @@ pub enum GroupIntervalSelectionError {
         /// Later duplicate index.
         duplicate_index: usize,
     },
+    /// Group member IDs overlap, so the group partition is not disjoint.
+    DuplicateMemberAcrossGroups {
+        /// Stable member identifier appearing in multiple groups.
+        member_id: String,
+        /// First group containing the member.
+        first_group_index: usize,
+        /// Later group containing the member.
+        duplicate_group_index: usize,
+    },
+    /// Group member metadata lengths do not agree.
+    InvalidGroupMembership {
+        /// Group index with inconsistent metadata.
+        group_index: usize,
+    },
     /// Summing group member counts overflowed usize.
     MemberCountOverflow,
 }
@@ -734,6 +748,17 @@ impl std::fmt::Display for GroupIntervalSelectionError {
                 f,
                 "duplicate group ID at indices {first_index} and {duplicate_index}"
             ),
+            Self::DuplicateMemberAcrossGroups {
+                member_id,
+                first_group_index,
+                duplicate_group_index,
+            } => write!(
+                f,
+                "member {member_id} appears in groups {first_group_index} and {duplicate_group_index}"
+            ),
+            Self::InvalidGroupMembership { group_index } => {
+                write!(f, "group {group_index} has inconsistent member metadata")
+            }
             Self::MemberCountOverflow => write!(f, "group member count overflow"),
         }
     }
@@ -928,12 +953,30 @@ pub fn select_group_refinement_set(
 ) -> Result<GroupIntervalSelectionPlan, GroupIntervalSelectionError> {
     let mut covered_records = 0usize;
     let mut first_index_by_id = BTreeMap::new();
+    let mut first_group_by_member_id = BTreeMap::new();
     let mut lower_order: Vec<&GroupScoreIntervalRecord> =
         Vec::with_capacity(groups.len());
 
     for (group_index, group) in groups.iter().enumerate() {
         if group.member_count == 0 {
             return Err(GroupIntervalSelectionError::EmptyGroup { group_index });
+        }
+        if group.member_count != group.member_ids.len()
+            || group.member_ids.len() != group.member_payload_digests.len()
+        {
+            return Err(GroupIntervalSelectionError::InvalidGroupMembership { group_index });
+        }
+        for member_id in &group.member_ids {
+            if let Some(first_group_index) =
+                first_group_by_member_id.get(member_id.as_str()).copied()
+            {
+                return Err(GroupIntervalSelectionError::DuplicateMemberAcrossGroups {
+                    member_id: member_id.clone(),
+                    first_group_index,
+                    duplicate_group_index: group_index,
+                });
+            }
+            first_group_by_member_id.insert(member_id.as_str(), group_index);
         }
         if !group.interval.is_well_formed() {
             return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
