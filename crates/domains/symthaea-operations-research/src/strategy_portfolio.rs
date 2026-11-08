@@ -19,13 +19,12 @@ use super::quantified_strategy::{
     StrategyVerificationReport,
 };
 use super::strategy_aig::{
-    AigLiteral, AigNode, StrategyAig, StrategyAigBudget, StrategyAigError,
-    StrategyAigReport, compile_strategy_function_to_aig_with_order,
-    verify_aig_matches_strategy_function,
+    AigLiteral, AigNode, StrategyAig, StrategyAigBudget, StrategyAigError, StrategyAigReport,
+    compile_strategy_function_to_aig_with_order, verify_aig_matches_strategy_function,
 };
 use super::strategy_bdd::{
-    BddRef, CompiledStrategyFunction, StrategyBddBudget, StrategyBddError,
-    StrategyBddReport, VerifiedStrategyCompilationError, verify_and_compile_qbf_strategy,
+    BddRef, CompiledStrategyFunction, StrategyBddBudget, StrategyBddError, StrategyBddReport,
+    VerifiedStrategyCompilationError, verify_and_compile_qbf_strategy,
     verify_robdd_matches_strategy_function,
 };
 use std::convert::TryFrom;
@@ -254,14 +253,9 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
     aig_budget: StrategyAigBudget,
     encoding_budget: StrategyPortfolioBudget,
 ) -> Result<VerifiedStrategyPortfolio, StrategyPortfolioError> {
-    let verified = verify_and_compile_qbf_strategy(
-        problem,
-        prefix,
-        candidate,
-        qbf_budget,
-        bdd_budget,
-    )
-    .map_err(StrategyPortfolioError::SourceOrBddCompilation)?;
+    let verified =
+        verify_and_compile_qbf_strategy(problem, prefix, candidate, qbf_budget, bdd_budget)
+            .map_err(StrategyPortfolioError::SourceOrBddCompilation)?;
 
     let mut functions = Vec::with_capacity(verified.representation.functions.len());
     let mut total_bdd_bytes = 0usize;
@@ -286,12 +280,9 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
             aig_budget,
         )
         .map_err(StrategyPortfolioError::AigCompilation)?;
-        let aig_verification = verify_aig_matches_strategy_function(
-            &aig,
-            &compiled.reduced_function,
-            aig_budget,
-        )
-        .map_err(StrategyPortfolioError::AigVerification)?;
+        let aig_verification =
+            verify_aig_matches_strategy_function(&aig, &compiled.reduced_function, aig_budget)
+                .map_err(StrategyPortfolioError::AigVerification)?;
         let aig_bytes = encode_strategy_aig(&aig, aig_budget, encoding_budget)?;
 
         let (selected, selected_bytes) = if bdd_bytes.len() <= aig_bytes.len() {
@@ -356,10 +347,10 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::decomposition::Literal;
     use super::super::quantified_scope::{Quantifier, QuantifierBlock, ValidatedQuantifierPrefix};
-    use super::super::quantified_strategy::{evaluate_qbf_with_strategy, StrategyOwner};
+    use super::super::quantified_strategy::{StrategyOwner, evaluate_qbf_with_strategy};
+    use super::*;
 
     fn qbf_budget() -> QuantifiedEvaluationBudget {
         QuantifiedEvaluationBudget {
@@ -473,14 +464,22 @@ mod tests {
 
         assert!(portfolio.value);
         assert_eq!(
-            portfolio.source_strategy_verification.opponent_assignments_checked,
+            portfolio
+                .source_strategy_verification
+                .opponent_assignments_checked,
             2
         );
         assert_eq!(portfolio.functions.len(), 1);
         assert_eq!(portfolio.functions[0].variable, 1);
         assert_eq!(portfolio.functions[0].reduced_dependencies, vec![0]);
-        assert_eq!(portfolio.functions[0].bdd_verification.assignments_checked, 2);
-        assert_eq!(portfolio.functions[0].aig_verification.assignments_checked, 2);
+        assert_eq!(
+            portfolio.functions[0].bdd_verification.assignments_checked,
+            2
+        );
+        assert_eq!(
+            portfolio.functions[0].aig_verification.assignments_checked,
+            2
+        );
         assert_eq!(
             portfolio.functions[0].selected_bytes,
             portfolio.functions[0]
@@ -503,9 +502,7 @@ mod tests {
     fn tampered_strategy_fails_before_any_circuit_is_admitted() {
         let (problem, prefix) = equality_qbf();
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        result.strategy.functions[0]
-            .table
-            .insert(vec![false], true);
+        result.strategy.functions[0].table.insert(vec![false], true);
         assert!(matches!(
             verify_and_compile_qbf_strategy_portfolio(
                 &problem,
@@ -588,8 +585,7 @@ mod tests {
             variables: vec![],
             clauses: vec![],
         };
-        let prefix =
-            ValidatedQuantifierPrefix::new(0, vec![], Default::default()).unwrap();
+        let prefix = ValidatedQuantifierPrefix::new(0, vec![], Default::default()).unwrap();
         let result = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
         let portfolio = verify_and_compile_qbf_strategy_portfolio(
             &problem,
