@@ -586,6 +586,111 @@
         }
       ],
       "note": "A leaderboard result without immutable inputs, model/decode/scorer revisions, data admission, split integrity, denominators, clustered uncertainty and efficiency measures is not reproducible evidence. Schema validity is not proof that the recorded facts are true."
+    },
+    {
+      "id": "acoustic_hypothesis_selection",
+      "name": "Closed-set acoustic transcript hypothesis selection",
+      "task": "ASR_HYPOTHESIS_SELECTION",
+      "issue": 11119,
+      "implementation_issue": 11120,
+      "implementation_pr": 11121,
+      "parent_issues": [
+        10873,
+        10970,
+        10999,
+        11057,
+        9661,
+        11082,
+        11107,
+        5352
+      ],
+      "candidate_sources": [
+        {
+          "id": "micl_low_resource_asr",
+          "status": "PAPER_COMPARATOR_REPRODUCTION_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-acl.1239/",
+          "note": "Findings ACL 2026 evaluates Phi-4 and Qwen3-Omni on three endangered languages; reports multimodal in-context learning, cross-lingual transfer and acoustic-hypothesis selection. No transfer claim to African language cohorts without matched replication."
+        },
+        {
+          "id": "sama_asr_semantic_anchor",
+          "status": "SEPARATE_ARCHITECTURAL_COMPARATOR",
+          "paper_url": "https://aclanthology.org/2026.emnlp-main.1380/",
+          "note": "SAMA-ASR conditions decoding with translation-derived semantic embeddings plus acoustic anchor. This is not candidate selection; compare separately with acoustic-veto controls under #11104."
+        }
+      ],
+      "system_arms": [
+        "acoustic_single_best",
+        "acoustic_nbest_score",
+        "acoustic_lm_fusion",
+        "independent_recognizer_consensus",
+        "text_only_micl_candidate_selector",
+        "audio_only_micl_candidate_selector",
+        "audio_text_micl_candidate_selector",
+        "cross_lingual_micl_candidate_selector",
+        "risk_controlled_selector_with_abstention",
+        "sama_semantic_anchor_separate_arm",
+        "oracle_best_candidate_upper_bound"
+      ],
+      "metrics": [
+        "candidate_selection_top1_accuracy",
+        "candidate_oracle_regret",
+        "oracle_gap",
+        "candidate_coverage",
+        "false_accept_when_no_candidate_correct",
+        "abstention_precision_recall",
+        "selection_calibration",
+        "strict_WER",
+        "strict_CER",
+        "PIER",
+        "SETER",
+        "SPER_at_1",
+        "SPER_at_3",
+        "critical_entity_number_unit_negation_exactness",
+        "candidate_id_integrity",
+        "selected_transcript_exact_copy_rate",
+        "free_form_rewrite_rate",
+        "demonstration_retrieval_leakage_rate",
+        "total_system_latency_p50_p95_p99",
+        "cost_per_correctly_selected_utterance"
+      ],
+      "required_outputs": [
+        "immutable_candidate_set_manifest",
+        "candidate_provenance_and_source_frame_spans",
+        "selector_prompt_and_model_revision",
+        "demonstration_manifest_and_retrieval_policy",
+        "candidate_id_or_typed_abstention",
+        "exact_selected_candidate_copy",
+        "selection_experiment_receipt"
+      ],
+      "selection_modes": [
+        "acoustic_best",
+        "n_best_score",
+        "consensus",
+        "text_only_micl",
+        "audio_only_micl",
+        "audio_text_micl",
+        "cross_lingual_micl",
+        "risk_controlled"
+      ],
+      "controls": [
+        "closed_set_selector_cannot_return_replacement_transcript",
+        "no_correct_candidate_false_accept_control",
+        "context_predicts_wrong_word_audio_clear_control",
+        "candidate_pool_coverage_oracle_gap",
+        "demonstration_source_and_speaker_leakage_audit",
+        "target_language_label_and_demo_leakage_audit",
+        "matched_total_system_compute_and_latency",
+        "abstention_on_empty_or_invalid_candidate_pool"
+      ],
+      "prospective_gates": [
+        "candidate_id_integrity_100_percent",
+        "selected_transcript_exact_copy_100_percent",
+        "closed_set_free_form_rewrite_rate_zero",
+        "source_frame_and_model_lineage_completeness_100_percent",
+        "no_candidate_correct_false_accept_zero_on_frozen_controls",
+        "MICL_gain_reported_against_same_candidate_pool_at_matched_total_compute"
+      ],
+      "note": "Candidate selection is not transcript correction. Oracle best-in-pool is an upper bound only. MICL published results are not assumed to transfer to African speech."
     }
   ],
   "promotion_gates": [
@@ -599,7 +704,9 @@
     "no_capability_promotion_from_skipped_ci_or_synthetic_fixtures",
     "phonetic_supervision_tier_verified",
     "native_acoustic_label_distinguished_from_rule_derived_phones",
-    "depth_adapter_retention_noninferiority_on_prior_languages"
+    "depth_adapter_retention_noninferiority_on_prior_languages",
+    "closed_set_candidate_selection_integrity_verified",
+    "selector_demonstration_manifest_and_leakage_audit_complete"
   ],
   "test_vector_sets": [
     {
