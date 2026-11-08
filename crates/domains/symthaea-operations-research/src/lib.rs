@@ -28,6 +28,7 @@ pub mod graph;
 pub mod inventory;
 pub mod queue;
 pub mod quantified_proof;
+pub mod quantified_game_dag;
 pub mod quantified_scope;
 pub mod quantified_strategy;
 pub mod qdimacs;
