@@ -8,16 +8,19 @@
 
 Move the proof unit from one compressed candidate to an immutable group of candidates. If a conservative interval encloses the canonical score of every eligible member in a group, and its upper endpoint is strictly below the current exact kth threshold, the entire group's original vector payloads can remain unread.
 
-This is established branch-and-bound / VA-file-style bounding-box retrieval, not a claim of a new search primitive. The HME question is whether query-conditioned coordinate envelopes and HDC-specific data layout offer a useful Pareto point at 16K–256K dimensions. High-dimensional boxes can become uninformative; negative results are expected.
+This is established branch-and-bound / VA-file-style retrieval, not a claim of a new search primitive. The HME question is whether query-conditioned group summaries and HDC-specific data layout offer a useful Pareto point at 16K–256K dimensions. Coordinate boxes can become uninformative in high dimensions; a joint centroid/radius bound is the next tightening.
 
 ## 2. Source implementation
 
-Core score interval:
+Core score intervals:
 
 - `symthaea-core/src/hdc/continuous_hv_interval.rs`
 - `ContinuousHV::similarity_interval_full_resolution_for_component_bounds(lower, upper)`
+- `ContinuousHV::similarity_interval_full_resolution_for_l2_ball_center(center, radius)`
 
-Given coordinate ranges `x_j in [L_j,H_j]`, it propagates outward binary32 intervals through the #10918 canonical group-of-eight/tail cosine score, norm product, sqrt, near-zero denominator, divide and clamp. If any interval arithmetic is ambiguous, it returns [-1,1]. Inputs require finite query and candidate bounds in [-1,1] with lower <= upper.
+The component-box path evaluates the coordinate-wise superset through the #10918 canonical group-of-eight/tail f32 cosine score. The centroid-ball path retains the *joint* L2 constraint: Cauchy–Schwarz bounds the dot-product change by `||q||_2 r`, and reverse triangle inequality bounds the candidate norm by `max(0, ||c||_2-r)` and `||c||_2+r`. It adds an operation-count gamma bound and an absolute subnormal allowance for the canonical f32 multiply/add reduction, then propagates through the canonical norm product, square-root, near-zero branch, division and clamp. An ambiguous denominator or unbounded calculation returns [-1,1].
+
+The group query intersects the component-box and centroid-ball score intervals. Since both independently enclose every member score, their intersection is also conservative; disjoint results are treated as a numeric/provenance defect and fail open to [-1,1].
 
 Memory-layer group builder:
 
@@ -26,14 +29,17 @@ Memory-layer group builder:
 - `score_interval_for_snapshot(...)`
 - `can_prune_for_top_k(...)`
 
-The builder scans every original member and computes coordinate minima/maxima itself; callers cannot inject extrema. It rejects empty/duplicate IDs, mixed dimensions and invalid profile values. Members are sorted by stable ID. The BLAKE3 content identity binds:
-- domain and score-contract ID;
+The builder scans every original member and computes coordinate minima/maxima itself; callers cannot inject extrema. It computes a deterministic arithmetic-mean centroid and independently verifies every original member's L2 residual to that centroid using `verify_l2_residual_certificate`. The maximum outward squared residual is converted upward to a binary32 radius, with an additional representable-value expansion. Thus the group builder owns the centroid/radius rather than trusting caller-supplied extrema or a claimed radius.
+
+It rejects empty/duplicate IDs, mixed dimensions and invalid profile values. Members are sorted by stable ID. The BLAKE3 content identity binds:
+- domain and #10918 score-contract ID;
 - manifest and eligibility generations;
 - dimension and sorted member-ID set;
 - each member ID and every original f32 bit pattern;
-- computed coordinate minima and maxima.
+- computed coordinate minima/maxima;
+- computed centroid f32 bits and conservative radius.
 
-A separate member-set digest allows the query to compare the synopsis to the authoritative eligible-member set. The query path requires expected manifest generation, eligibility generation, member-set digest and content digest. A mismatch fails closed.
+A separate member-set digest allows the query to compare the synopsis to the authoritative eligible-member set. The query path requires expected manifest generation, eligibility generation, member-set digest and content digest. A mismatch fails closed. Public diagnostic getters expose the centroid, radius and component extrema, but not mutation.
 
 The prune condition is strictly:
 
@@ -56,12 +62,15 @@ A mixed-eligibility group cannot be pruned under one member-set identity unless 
 The Rust source includes tests for:
 - every member's canonical score being enclosed by the group interval;
 - strict threshold equality (not pruned);
+- a 12-group, 64D synthetic corpus where a full exact top-k threshold is used to assert that every pruned group has no member at or above kth;
 - manifest and eligibility generation mismatch;
 - member-set mismatch;
 - deterministic content digest independent of input ordering;
 - duplicate IDs, dimension mismatch and non-finite member rejection.
 
-Tests are authored but not run in this environment because `cargo` and `rustc` are unavailable. The core numeric kernel still requires compilation, test execution, cross-platform qualification and the floating-point assumptions documented in the canonical interval protocol.
+**Independent JavaScript binary32-model sanity checks** are recorded in [`hme_group_envelope_js_sanity_v0.json`](fixtures/hme_group_envelope_js_sanity_v0.json). The clustered synthetic case checked 4,320 group bounds / 34,560 member scores and observed 4,138 groups pruned (33,104 of 34,560 synthetic member payloads, 95.8%) with zero false-prune disagreements. The workload uses deliberately tight groups (random normalized centroids and per-coordinate perturbation bounded by `0.0008/sqrt(D)`) and random normalized queries; it is not a realistic corpus benchmark. A separate dimension/norm-stratified simulation checked 1,000 groups / 8,000 member scores with zero escapes; 144 intervals deliberately widened to [-1,1]. The coordinate-only random control had zero escapes but pruned zero groups, illustrating why the L2-ball synopsis is being added.
+
+These are independent simulations of the math, not Rust execution. They do not measure I/O, latency, real saved bytes or typical-corpus pruning. Tests are authored but not run in this environment because `cargo` and `rustc` are unavailable. Compilation, test execution, cross-platform qualification and the floating-point assumptions documented in the canonical interval protocol remain outstanding.
 
 ## 5. Required comparisons
 
@@ -71,10 +80,12 @@ A. full original-payload exact scan;
 B. #10945 progressive per-candidate exact pruning;  
 C. #11078 per-candidate certified residual intervals;  
 D. one global coordinate box per group;  
-E. blockwise coordinate boxes and coarse-to-fine interval refinement;  
-F. group boxes plus per-record residual intervals;  
-G. group ordering hints without group pruning (scheduler-only control);  
-H. HdcStoreReader exact mmap scan for BinaryHV as a separate representation baseline.
+E. centroid + jointly verified L2 radius per group;  
+F. intersection of coordinate box and centroid-ball intervals (current reference);  
+G. blockwise coordinate boxes and coarse-to-fine interval refinement;  
+H. group bounds plus per-record residual intervals;  
+I. group ordering hints without group pruning (scheduler-only control);  
+J. HdcStoreReader exact mmap scan for BinaryHV as a separate representation baseline.
 
 Sweep:
 - dimensions 2K, 4K, 8K, 16K, 32K, 64K, 128K and 256K where admitted;
