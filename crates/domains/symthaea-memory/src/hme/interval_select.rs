@@ -1118,6 +1118,213 @@ mod tests {
         ));
     }
 
+    fn unit_vector_with_first_component(score: f32) -> ContinuousHV {
+        let mut values = vec![0.0f32; 8];
+        values[0] = score;
+        values[1] = (1.0 - score * score).sqrt();
+        ContinuousHV::from_vec(values)
+    }
+
+    fn build_group_record(
+        envelope: &ContinuousHVGroupEnvelope,
+        query: &ContinuousHV,
+    ) -> GroupScoreIntervalRecord {
+        GroupScoreIntervalRecord::from_group_envelope(
+            envelope,
+            query,
+            20,
+            3,
+            envelope.member_set_digest(),
+            envelope.content_digest(),
+        )
+        .unwrap()
+    }
+
+    fn build_member_record(
+        group: &GroupScoreIntervalRecord,
+        id: &str,
+        original: &ContinuousHV,
+        query: &ContinuousHV,
+    ) -> GroupMemberScoreIntervalRecord {
+        GroupMemberScoreIntervalRecord::from_verified_l2_residual(
+            group,
+            id.to_owned(),
+            query,
+            original,
+            original,
+            0.0,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn hierarchical_group_then_member_refinement_matches_full_exact_top_k() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let high_members = vec![
+            ("high-a".to_owned(), unit_vector_with_first_component(0.96)),
+            ("high-b".to_owned(), unit_vector_with_first_component(0.959)),
+            ("high-c".to_owned(), unit_vector_with_first_component(0.90)),
+        ];
+        let middle_members = vec![
+            ("middle-a".to_owned(), unit_vector_with_first_component(0.95)),
+            ("middle-b".to_owned(), unit_vector_with_first_component(0.10)),
+        ];
+        let low_members = vec![
+            ("low-a".to_owned(), unit_vector_with_first_component(-0.80)),
+            ("low-b".to_owned(), unit_vector_with_first_component(-0.90)),
+        ];
+        let envelopes = vec![
+            ContinuousHVGroupEnvelope::from_original_members(20, 3, &high_members).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(20, 3, &middle_members).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(20, 3, &low_members).unwrap(),
+        ];
+        let group_records: Vec<GroupScoreIntervalRecord> = envelopes
+            .iter()
+            .map(|envelope| build_group_record(envelope, &query))
+            .collect();
+        let coverage = complete_group_coverage(&group_records);
+        let group_plan = select_group_refinement_set(&group_records, 2, coverage).unwrap();
+
+        assert!(group_plan.refinement_groups.contains(&group_records[0].identity));
+        assert!(group_plan.refinement_groups.contains(&group_records[1].identity));
+        assert!(group_plan.excluded_groups.contains(&group_records[2].identity));
+
+        // Stage two reads compact per-member reconstructions/certificates only
+        // for members of surviving groups. The low group's original payloads
+        // are never presented to the member selector.
+        let mut member_records = Vec::new();
+        for (group_index, members) in [(0usize, &high_members), (1usize, &middle_members)] {
+            for (id, original) in members {
+                member_records.push(build_member_record(
+                    &group_records[group_index],
+                    id,
+                    original,
+                    &query,
+                ));
+            }
+        }
+
+        let plan = select_hierarchical_refinement_set(
+            &group_records,
+            &member_records,
+            2,
+            coverage,
+        )
+        .unwrap();
+        assert_eq!(plan.group_plan, group_plan);
+        assert_eq!(plan.member_plan.threshold, 0.959);
+        assert_eq!(
+            plan.member_plan.refinement_ids,
+            vec!["high-a".to_owned(), "high-b".to_owned()]
+        );
+        assert_eq!(
+            plan.member_plan.excluded_ids,
+            vec![
+                "high-c".to_owned(),
+                "middle-a".to_owned(),
+                "middle-b".to_owned()
+            ]
+        );
+
+        let full_scores: Vec<ExactScoreRecord<String>> = high_members
+            .iter()
+            .chain(&middle_members)
+            .chain(&low_members)
+            .map(|(id, vector)| ExactScoreRecord {
+                id: id.clone(),
+                score: query.similarity_full_resolution(vector),
+            })
+            .collect();
+        let expected = stable_exact_top_k(&full_scores, 2).unwrap();
+        assert_eq!(plan.member_plan.refinement_ids, expected);
+    }
+
+    #[test]
+    fn hierarchical_selection_rejects_missing_member_intervals_and_foreign_groups() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let high_members = vec![
+            ("high-a".to_owned(), unit_vector_with_first_component(0.96)),
+            ("high-b".to_owned(), unit_vector_with_first_component(0.959)),
+            ("high-c".to_owned(), unit_vector_with_first_component(0.90)),
+        ];
+        let middle_members = vec![
+            ("middle-a".to_owned(), unit_vector_with_first_component(0.95)),
+            ("middle-b".to_owned(), unit_vector_with_first_component(0.10)),
+        ];
+        let low_members = vec![
+            ("low-a".to_owned(), unit_vector_with_first_component(-0.80)),
+            ("low-b".to_owned(), unit_vector_with_first_component(-0.90)),
+        ];
+        let envelopes = vec![
+            ContinuousHVGroupEnvelope::from_original_members(20, 3, &high_members).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(20, 3, &middle_members).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(20, 3, &low_members).unwrap(),
+        ];
+        let groups: Vec<GroupScoreIntervalRecord> = envelopes
+            .iter()
+            .map(|envelope| build_group_record(envelope, &query))
+            .collect();
+        let coverage = complete_group_coverage(&groups);
+        let group_plan = select_group_refinement_set(&groups, 2, coverage).unwrap();
+
+        let one_member = vec![build_member_record(
+            &groups[0],
+            "high-a",
+            &high_members[0].1,
+            &query,
+        )];
+        assert!(matches!(
+            select_hierarchical_refinement_set(&groups, &one_member, 2, coverage),
+            Err(HierarchicalIntervalSelectionError::IncompleteMemberCoverage { .. })
+        ));
+
+        let mut all_selected = Vec::new();
+        for (group_index, members) in [(0usize, &high_members), (1usize, &middle_members)] {
+            for (id, original) in members {
+                all_selected.push(build_member_record(
+                    &groups[group_index],
+                    id,
+                    original,
+                    &query,
+                ));
+            }
+        }
+        all_selected.push(build_member_record(
+            &groups[2],
+            "low-a",
+            &low_members[0].1,
+            &query,
+        ));
+        assert!(matches!(
+            select_hierarchical_refinement_set(&groups, &all_selected, 2, coverage),
+            Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup { .. })
+        ));
+
+        assert_eq!(group_plan.excluded_groups, vec![groups[2].identity]);
+    }
+
+    #[test]
+    fn group_member_admission_rejects_payload_that_does_not_match_member_id() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let original = unit_vector_with_first_component(0.95);
+        let other_payload = unit_vector_with_first_component(0.25);
+        let members = vec![("memory-a".to_owned(), original.clone())];
+        let envelope = ContinuousHVGroupEnvelope::from_original_members(20, 3, &members).unwrap();
+        let group = build_group_record(&envelope, &query);
+        let result = GroupMemberScoreIntervalRecord::from_verified_l2_residual(
+            &group,
+            "memory-a".to_owned(),
+            &query,
+            &other_payload,
+            &other_payload,
+            0.0,
+        );
+        assert!(matches!(
+            result,
+            Err(GroupMemberScoreIntervalBuildError::OriginalPayloadDigestMismatch)
+        ));
+    }
+
     #[test]
     fn weighted_group_selection_counts_each_member_in_the_lower_threshold() {
         let groups = vec![
