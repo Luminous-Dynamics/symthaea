@@ -754,3 +754,23 @@ Do not conflate:
 - IncompleteOrUncertified: no completed top-k claim.
 
 The updated system crosswalk is [HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md](HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md). No SOTA win or external benchmark score is claimed by adding these protocols.
+
+
+## 2026-11-08: residual certificate verification and cascade retrieval
+
+A build/admission-time residual verifier now exists in `crates/core/symthaea-core/src/hdc/continuous_hv_interval.rs`:
+
+`verify_l2_residual_certificate(original, reconstruction, epsilon)`
+
+It validates matching dimensions and the canonical finite [-1,1] profile, then accumulates an outward upper bound on the squared residual in binary64 before comparing against the exact square represented by the binary32 epsilon. It rejects malformed/underreported radii; it also reports changed-coordinate count and the verified upper sum. This checks a supplied payload pair at construction/admission time. It is not a cryptographic segment proof, persistence format or trust anchor: the result must be bound to exact original/reconstruction bytes, transform/codebook and generation.
+
+The memory-layer `ScoreIntervalRecord` now has private fields and a public `from_verified_l2_residual` constructor. It verifies the residual against original payload bytes, then builds the canonical score interval. This prevents ordinary external callers from fabricating a prune-authorizing record from arbitrary `[lower, upper]` values through the public API. Synthetic tests remain internal to the module. Persisted segment reopen still requires a future generation-bound proof/attestation format; do not claim a cold-start verifier today.
+
+New direct prior art: AgentIR (arXiv:2605.25092, 2026-05-24) reports workload-adaptive BM25/dense cascade routing and a time-partitioned index for LongMemEval/LoCoMo. HME should test a cheap-first cascade over eligibility, metadata, lexical/BinaryHV and ContinuousHV channels, but learned channel skipping remains empirical. A lexical margin is not a certified upper bound on ContinuousHV dense similarity. Only a mathematically admissible all-eligible bound may authorize ExactCertified channel skipping.
+
+Current leaderboard evidence is mixed:
+- Official AML Cycle 1 reports separate textual/coding and commercial/open-source divisions; Cycle 2 results are expected mid-November 2026.
+- Supermemory self-reports 97% LongMemEval-S Recall@20 and 100% knowledge-update performance in its May 2026 report.
+- A SOTA2 LongMemEval retrieval listing shows 92.9 Recall@5 for an RRF retrieval configuration but 24.8 strict answer accuracy under its configured answerer/judge.
+
+Do not compare these raw scores across different k, reader, judge, split and protocol. HME's downstream goal is to improve retrieval *and* actual answer correctness, with source, temporal and governance quality reported separately.
