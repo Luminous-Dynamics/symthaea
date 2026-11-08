@@ -320,7 +320,7 @@ mod tests {
     fn manifest_is_deterministic_and_paths_are_relative_and_sorted() {
         let tree = TestTree::new();
         tree.write("voices/en/voice.bin", b"voice-bytes");
-        tree.write("model/config.json", b"{\\"version\\":1}");
+        tree.write("model/config.json", br#"{"version":1}"#);
         let first = build_manifest(&tree.0, "kokoro-voice-assets").unwrap();
         let second = build_manifest(&tree.0, "kokoro-voice-assets").unwrap();
         assert_eq!(first, second);
@@ -335,7 +335,7 @@ mod tests {
     fn verify_passes_for_identical_tree_and_fails_for_modified_bytes() {
         let tree = TestTree::new();
         tree.write("acoustic.onnx", b"model-v1");
-        tree.write("phonemes.json", b"{\\"a\\":1}");
+        tree.write("phonemes.json", br#"{"a":1}"#);
         let manifest = build_manifest(&tree.0, "diffsinger-voicebank").unwrap();
         verify_manifest(&tree.0, &manifest).unwrap();
 
