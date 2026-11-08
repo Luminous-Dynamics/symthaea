@@ -104,6 +104,63 @@ Every evidence effect names an evidence class and source family. A candidate can
 A self-report can satisfy an obligation to reproduce what a provider reported. It cannot satisfy an obligation to independently verify artifact bytes. A complete filtered query cannot satisfy whole-artifact completeness. A transparency checkpoint cannot prove issuer participation without a separate issuer-history obligation.
 
 
+## 3.0 From EIG maximization to proof-complete acquisition
+
+The planner objective should be studied as a **constrained sequential evidence-acquisition problem**, not as a renamed entropy score.
+
+For claim c, define a state:
+
+```
+s_t = (belief_state_t, obligation_state_t, evidence_lineage_t, target_scope_t)
+```
+
+where:
+- `belief_state` represents uncertainty over world-state hypotheses;
+- `obligation_state` represents the separately adjudicated state of each required proof obligation;
+- `evidence_lineage` identifies exact observations, source families, derivations, freshness and known shared roots;
+- `target_scope` binds the claim to the exact artifact, operation, environment and time interval.
+
+An experiment proposal is an action. Its predicted outcomes may forecast state transitions but cannot satisfy an obligation. Only after execution does a new observation become Evidence; the independent verifier then determines admissibility and the obligation transition.
+
+Let `G_c` be the set of states in which every mandatory obligation for c is satisfied and no mandatory conflict/defeater remains. A candidate policy pi is evaluated by:
+
+```
+minimize   E[cumulative acquisition cost under pi]
+subject to P(false-ready under pi) <= epsilon
+           every proposed action passes authorization/impact gates
+           useful-claim coverage >= declared minimum
+```
+
+The probability/risk statement is meaningful only under a declared and evaluated data-generating distribution; it is not a universal guarantee. Report the empirical false-ready rate and its confidence interval, plus distribution-shift tests, rather than claiming the constraint is proved by a model's own likelihoods.
+
+### Why this is a paradigm shift
+
+- EIG rewards information about hypotheses; it may not close a mandatory obligation.
+- EVSI rewards expected downstream decision improvement; it may still accept a decision whose source/provenance obligation is unresolved unless that constraint is encoded explicitly.
+- Greedy obligation coverage targets missing obligations, but ignores uncertainty, conflicting outcomes, source dependence and downstream decision utility.
+- A proof-complete acquisition policy makes evidence admissibility and mandatory obligation closure hard constraints, then optimizes decision utility, risk and cost inside that admissible region.
+
+### Minimum useful baseline
+
+Add a deterministic obligation-coverage baseline:
+- consider only authorized, reversible, non-destructive candidates under the same target-impact/resource budget;
+- estimate expected *admissible obligation closure* per unit cost from the planner-visible prediction only;
+- never count predicted closure as actual satisfaction;
+- use stable deterministic tie-breaking;
+- abstain when no eligible action has positive predicted admissible value.
+
+This is a baseline, not a new production planner. It should be compared with random eligible, cheapest-first, EIG, robust-EIG, EVSI and minimax-regret policies.
+
+### Exact oracle for small cases
+
+For small synthetic cases, enumerate every policy/action sequence under a hard cap and compute the true minimum-cost path to G_c using hidden grader outcomes. This gives an exact small-instance oracle against which heuristics can be measured. The exact oracle is a diagnostic optimum for the finite synthetic case only; it is never provided to the evaluated system.
+
+For larger cases, study constrained stochastic shortest-path / POMDP approximations, receding-horizon planning and proof-obligation coverage heuristics. Do not claim set-cover or submodular approximation guarantees unless the required monotonicity/submodularity assumptions are formally proved. Contradictions, expiry, source common-cause and population gaps can make evidence updates non-monotone.
+
+### Evidence can retract readiness
+
+Evidence is not always a monotone accumulation process. A newly verified contradiction, expiry, revocation, artifact mismatch or discovery of shared provenance may move an obligation from satisfied to conflicted/unknown and revoke a previous readiness result. Benchmark sequences must include such invalidation events; the planner/verifier must not keep a stale success certificate.
+
 ## 3.1 Agent-visible and grader-only views
 
 The combined fixture JSON is a development authoring source only. It must never be used directly as the agent prompt or planner input.
