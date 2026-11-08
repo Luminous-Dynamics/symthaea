@@ -130,6 +130,132 @@ fn validate_parent_acyclic(
     }
 }
 
+/// Result of a deterministic domain-outage preflight replay.
+///
+/// This is deliberately not a task-execution result: it never claims that a
+/// computation was correct or accepted. It only evaluates whether the declared
+/// candidate path and verifier remain available under supported domain outages.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreflightReplay {
+    pub failed_domain_ids: Vec<String>,
+    pub failed_component_ids: Vec<String>,
+    pub candidate_available: bool,
+    pub verifier_available: bool,
+    pub classification: String,
+}
+
+/// Replay only deterministic `domain_outage` entries with parameters.state
+/// == `failed`. Unsupported injection mechanisms fail closed rather than being
+/// silently ignored. Parent-domain and declared dependency failures propagate
+/// to descendants/dependent domains.
+pub fn replay_domain_outages(value: &Value) -> Result<PreflightReplay, String> {
+    let domains = array_at(value, "fault_domains")
+        .ok_or_else(|| "fault_domains must be an array".to_owned())?;
+    let dependencies = array_at(value, "domain_dependencies")
+        .ok_or_else(|| "domain_dependencies must be an array".to_owned())?;
+    let injections = array_at(value, "fault_injections")
+        .ok_or_else(|| "fault_injections must be an array".to_owned())?;
+
+    let mut domain_ids = BTreeSet::new();
+    for domain in domains {
+        let id = string_at(domain, "domain_id")
+            .ok_or_else(|| "fault domain is missing domain_id".to_owned())?;
+        if !domain_ids.insert(id.to_owned()) {
+            return Err(format!("duplicate domain id {id}"));
+        }
+    }
+
+    let mut failed_domains = BTreeSet::new();
+    let mut failed_components = BTreeSet::new();
+    for injection in injections {
+        let mechanism = string_at(injection, "mechanism")
+            .ok_or_else(|| "fault injection is missing mechanism".to_owned())?;
+        if mechanism != "domain_outage" {
+            return Err(format!("unsupported replay mechanism {mechanism}"));
+        }
+        let state = injection.get("parameters")
+            .and_then(|p| string_at(p, "state"))
+            .ok_or_else(|| "domain_outage is missing parameters.state".to_owned())?;
+        if state != "failed" {
+            return Err(format!("unsupported domain_outage state {state}"));
+        }
+        let target = string_at(injection, "target_id")
+            .ok_or_else(|| "fault injection is missing target_id".to_owned())?;
+        if domain_ids.contains(target) {
+            failed_domains.insert(target.to_owned());
+        } else {
+            failed_components.insert(target.to_owned());
+        }
+    }
+
+    // Compute the closure of parent failures and explicit shared dependencies.
+    loop {
+        let before = failed_domains.len();
+        for domain in domains {
+            let id = string_at(domain, "domain_id").unwrap_or_default();
+            let parent = domain.get("parent_domain_id").and_then(Value::as_str);
+            if parent.is_some_and(|parent_id| failed_domains.contains(parent_id)) {
+                failed_domains.insert(id.to_owned());
+            }
+        }
+        for dependency in dependencies {
+            let dependent = string_at(dependency, "dependent_domain_id")
+                .ok_or_else(|| "domain dependency is missing dependent_domain_id".to_owned())?;
+            let required = string_at(dependency, "dependency_domain_id")
+                .ok_or_else(|| "domain dependency is missing dependency_domain_id".to_owned())?;
+            if failed_domains.contains(required) {
+                failed_domains.insert(dependent.to_owned());
+            }
+        }
+        if failed_domains.len() == before {
+            break;
+        }
+    }
+
+    for domain in domains {
+        let id = string_at(domain, "domain_id").unwrap_or_default();
+        if failed_domains.contains(id) {
+            if let Some(members) = array_at(domain, "member_component_ids") {
+                for member in members {
+                    if let Some(component_id) = member.as_str() {
+                        failed_components.insert(component_id.to_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    let required_components = array_at(
+        value.get("workload").unwrap_or(&Value::Null),
+        "required_component_ids",
+    ).ok_or_else(|| "workload.required_component_ids must be an array".to_owned())?;
+    let candidate_available = required_components
+        .iter()
+        .filter_map(Value::as_str)
+        .all(|component| !failed_components.contains(component));
+
+    let verifier_id = value.get("mitigation")
+        .and_then(|m| string_at(m, "verifier_component_id"));
+    let verifier_available = verifier_id
+        .is_some_and(|component| !failed_components.contains(component));
+
+    let classification = if !candidate_available {
+        "hardware_unavailable"
+    } else if !verifier_available {
+        "verification_unavailable"
+    } else {
+        "preflight_ready"
+    };
+
+    Ok(PreflightReplay {
+        failed_domain_ids: failed_domains.into_iter().collect(),
+        failed_component_ids: failed_components.into_iter().collect(),
+        candidate_available,
+        verifier_available,
+        classification: classification.to_owned(),
+    })
+}
+
 /// Validate semantic constraints that JSON Schema cannot express conveniently.
 ///
 /// This deliberately does not qualify probability distributions, physical
@@ -220,6 +346,28 @@ pub fn validate_manifest(value: &Value) -> ValidationReport {
         }
     } else {
         errors.push("components: expected an array".to_owned());
+    }
+
+    if let Some(required) = array_at(workload, "required_component_ids") {
+        if required.is_empty() {
+            errors.push("workload.required_component_ids: must not be empty".to_owned());
+        }
+        let mut required_seen = BTreeSet::new();
+        for (index, item) in required.iter().enumerate() {
+            match item.as_str() {
+                Some(id) if !id.is_empty() => {
+                    if !required_seen.insert(id.to_owned()) {
+                        errors.push(format!("workload.required_component_ids[{index}]: duplicate {id}"));
+                    }
+                    if !component_ids.contains(id) {
+                        errors.push(format!("workload.required_component_ids[{index}]: unresolved component {id}"));
+                    }
+                }
+                _ => errors.push(format!("workload.required_component_ids[{index}]: expected a non-empty string")),
+            }
+        }
+    } else {
+        errors.push("workload.required_component_ids: expected an array".to_owned());
     }
 
     let mut domain_ids = BTreeSet::new();
@@ -464,6 +612,34 @@ mod tests {
             value["fault_injections"][0]["target_id"].as_str(),
             Some("shared-power-domain-0")
         );
+    }
+
+    #[test]
+    fn controller_outage_replay_blocks_candidate_but_leaves_verifier_up() {
+        let value = fixture_value();
+        let replay = replay_domain_outages(&value).unwrap();
+        assert!(!replay.candidate_available);
+        assert!(replay.verifier_available);
+        assert_eq!(replay.classification, "hardware_unavailable");
+        assert!(replay.failed_component_ids.iter().any(|id| id == "controller-0"));
+    }
+
+    #[test]
+    fn shared_power_outage_replay_blocks_candidate_and_verifier() {
+        let value: Value = serde_json::from_str(SHARED_POWER_FIXTURE).unwrap();
+        let replay = replay_domain_outages(&value).unwrap();
+        assert!(!replay.candidate_available);
+        assert!(!replay.verifier_available);
+        assert_eq!(replay.classification, "hardware_unavailable");
+        assert!(replay.failed_component_ids.iter().any(|id| id == "array-0"));
+        assert!(replay.failed_component_ids.iter().any(|id| id == "verifier-0"));
+    }
+
+    #[test]
+    fn unsupported_replay_mechanisms_fail_closed() {
+        let mut value = fixture_value();
+        value["fault_injections"][0]["mechanism"] = Value::String("read_noise".into());
+        assert!(replay_domain_outages(&value).is_err());
     }
 
     #[test]
