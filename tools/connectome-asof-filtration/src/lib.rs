@@ -269,7 +269,17 @@ pub fn seal_ledger(ledger: &mut GlobalLedger) -> Result<(), AuditError> {
     if !valid_sha256(&ledger.global_filtration_sha256) {
         return Err(AuditError("malformed global filtration digest".into()));
     }
-    let mut previous_root = genesis_root(ledger)?;
+    // Copy only immutable ledger context so the entries can be mutated below
+    // without aliasing the whole GlobalLedger during entry-root calculation.
+    let context = GlobalLedger {
+        campaign_id: ledger.campaign_id.clone(),
+        global_filtration_id: ledger.global_filtration_id.clone(),
+        ledger_epoch_id: ledger.ledger_epoch_id.clone(),
+        global_filtration_sha256: ledger.global_filtration_sha256.clone(),
+        ledger_chain_root_sha256: String::new(),
+        entries: Vec::new(),
+    };
+    let mut previous_root = genesis_root(&context)?;
     let mut event_roots = BTreeMap::new();
     let mut ordered_event_ids = Vec::new();
     for (index, entry) in ledger.entries.iter_mut().enumerate() {
@@ -289,7 +299,7 @@ pub fn seal_ledger(ledger: &mut GlobalLedger) -> Result<(), AuditError> {
                 &event_roots,
             )?;
         }
-        let root = entry_root(ledger, entry.sequence, &previous_root, &entry.payload)?;
+        let root = entry_root(&context, entry.sequence, &previous_root, &entry.payload)?;
         entry.entry_commitment_sha256.clone_from(&root);
         if let LedgerPayload::Evidence(event) = &entry.payload {
             if event_roots.insert(event.event_id.clone(), root.clone()).is_some() {
@@ -1068,10 +1078,12 @@ mod tests {
     }
 
     fn fixture() -> GlobalLedger {
-        GlobalLedger {
+        let mut ledger = GlobalLedger {
             campaign_id: "campaign-1".into(),
             global_filtration_id: "connectome-global-v1".into(),
+            ledger_epoch_id: "epoch-1".into(),
             global_filtration_sha256: d('8'),
+            ledger_chain_root_sha256: d('0'),
             entries: vec![
                 entry(
                     1,
@@ -1118,7 +1130,9 @@ mod tests {
                     ),
                 ),
             ],
-        }
+        };
+        seal_ledger(&mut ledger).expect("synthetic ledger seals");
+        ledger
     }
 
     fn confirmation_event() -> LedgerPayload {
@@ -1182,6 +1196,7 @@ mod tests {
             ),
         );
         // T7 has not yet been delivered at sequence 2.
+        seal_ledger(&mut ledger).unwrap();
         let audit = audit_ledger(&ledger).unwrap();
         assert_eq!(
             audit.decisions[0].status,
@@ -1202,6 +1217,7 @@ mod tests {
                 EvidenceSplit::Fit,
             ),
         );
+        seal_ledger(&mut ledger).unwrap();
         let audit = audit_ledger(&ledger).unwrap();
         assert_eq!(
             audit.decisions[0].status,
@@ -1253,6 +1269,7 @@ mod tests {
         ledger
             .entries
             .push(entry(6, LedgerPayload::Evidence(revised)));
+        seal_ledger(&mut ledger).unwrap();
         assert!(audit_ledger(&ledger).is_ok());
     }
 
@@ -1284,6 +1301,7 @@ mod tests {
         for (index, item) in ledger.entries.iter_mut().enumerate() {
             item.sequence = index as u64 + 1;
         }
+        seal_ledger(&mut ledger).unwrap();
         let audit = audit_ledger(&ledger).unwrap();
         assert_eq!(
             audit.decisions[0].status,
@@ -1323,6 +1341,7 @@ mod tests {
         for (idx, e) in ledger.entries.iter_mut().enumerate() {
             e.sequence = idx as u64 + 1;
         }
+        seal_ledger(&mut ledger).unwrap();
         let audit = audit_ledger(&ledger).unwrap();
         assert_eq!(audit.decisions[1].status, DecisionAuditStatus::Accepted);
     }
@@ -1347,6 +1366,7 @@ mod tests {
                 }),
             ),
         ];
+        seal_ledger(&mut ledger).unwrap();
         assert!(audit_ledger(&ledger).is_err());
     }
 
@@ -1440,6 +1460,7 @@ mod tests {
                 EvidenceSplit::Exploration,
             ),
         ));
+        seal_ledger(&mut extended).unwrap();
         let after = decision_prefixes(&extended).unwrap();
         assert_eq!(before, after);
     }
@@ -1457,6 +1478,7 @@ mod tests {
                 EvidenceSplit::Exploration,
             ),
         );
+        seal_ledger(&mut ledger).unwrap();
         let report = audit_ledger(&ledger).unwrap();
         assert_eq!(report.evidence_ids.last().unwrap(), "T8-failed");
     }
