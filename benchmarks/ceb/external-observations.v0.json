@@ -470,7 +470,7 @@
       "source_id": "scope-selective-judge-summary",
       "source_url": "https://hypermatrix.cs.dal.ca/selective-prediction/",
       "title": "Uncertainty-Guarded Selective Prediction for Large Language Models — SCOPE research summary",
-      "source_type": "research_summary",
+      "source_type": "benchmark_documentation",
       "accessed_on": "2026-11-08",
       "published_on": "2026-08-20",
       "supports": [
@@ -5901,7 +5901,7 @@
         "value": 2.4,
         "value_status": "reported",
         "operator": "equal",
-        "unit": "x",
+        "unit": "multipliers",
         "direction": "maximize",
         "raw_display": "up to 2.4x",
         "uncertainty": {
