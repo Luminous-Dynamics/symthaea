@@ -182,6 +182,23 @@ Report separately:
 Do not merge these into a new score or replace the existing CEB-CONTINUITY primary metrics registered under #10632.
 
 
+
+### 7.1A Map closure evidence onto the existing CEB-CONTINUITY metrics
+
+The closure work must be evaluated through the seven existing CEB-CONTINUITY primary metrics registered under #10632. The mapping is:
+
+| Existing primary metric | How support closure contributes evidence | What must not happen |
+|---|---|---|
+| **Sequence-complete rate** | A sequence is complete only when each consequential claim has an admissible closure/disposition at every milestone and protected invariants survive | Do not mark a sequence complete because the last patch passed while earlier claims silently became stale |
+| **Evidence-disposition macro-F1** | Score retain/revalidate/invalidate/supersede/unresolved against independent event/claim gold, macro-averaged over the existing disposition classes | Do not replace the five-way disposition with a binary stale/fresh label |
+| **Stale-evidence use rate** | Count consequential decisions that consume evidence whose support closure was invalidated, revoked or unresolved | Do not count only explicit “retain” errors; a system can use stale material without emitting a retain label |
+| **False-invalidation rate** | Count valid claims withdrawn or forced into unnecessary revalidation without a dependency/contract reason | Do not reward invalidate-all or unconditional full recomputation as safe success |
+| **Revalidation cost per accepted sequence** | Include closure construction/update, dependency traversal, evidence ingestion/retrieval, authorized rechecks and human escalation | Do not report marginal graph-update time while excluding initial construction, cache/memory or revalidation work |
+| **Repair survival rate** | Check whether repair claims and their target/preservation witnesses remain valid across later sequence events | Do not infer survival from the first post-fix test alone |
+| **Evidence-lineage completeness** | Check whether each claim's required evidence nodes, typed edges, digests, assumptions, authority and evaluator identities are present and traceable | Do not create a parallel provenance receipt or inflate completeness with duplicated/correlated records |
+
+Closure completeness, impact-witness quality, unaffectedness-witness quality, cycle detection and counter-evidence coverage remain **diagnostic annotations** under these existing metrics. They do not become extra primary metrics or a new lane.
+
 ### 7.2 Correctness oracle and performance accounting
 
 On a repository-/defect-family-disjoint sequence sample, construct the reference closure and expected disposition through independent expert annotation and a **clean full-recomputation** of the relevant support dependencies. The clean recomputation is the correctness oracle for incremental closure maintenance; it is not a candidate-generated expected answer. Record when the reference itself is under-specified and preserve unresolved cases.
