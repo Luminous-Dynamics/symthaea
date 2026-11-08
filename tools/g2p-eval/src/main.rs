@@ -29,6 +29,8 @@ struct ReferenceVariant {
 struct ReferenceCase {
     case_id: String,
     language: String,
+    /// Versioned orthographic/phonological variety (for example en-US-v1 or zu-ZA-standard-v1).
+    profile_id: String,
     text: String,
     context: String,
     expected_oov: bool,
@@ -41,6 +43,8 @@ struct CandidateCase {
     candidate_id: String,
     source_id: String,
     language: String,
+    /// Must match the exact reference profile used to evaluate this hypothesis.
+    profile_id: String,
     phones: Vec<String>,
     syllable_boundaries: Option<Vec<usize>>,
     syllable_stress: Option<Vec<u8>>,
@@ -77,6 +81,7 @@ struct BoundaryCounts {
 struct CaseScore {
     case_id: String,
     language: String,
+    profile_id: String,
     selected_reference_variant: Option<String>,
     reference_phone_count: usize,
     candidate_phone_count: usize,
@@ -144,10 +149,28 @@ struct LanguageMetrics {
 }
 
 #[derive(Debug, Serialize)]
+struct ProfileMetrics {
+    profile_id: String,
+    cases: usize,
+    in_vocabulary_cases: usize,
+    reference_phone_count: usize,
+    phone_edits: usize,
+    phone_error_rate: Option<f64>,
+    exact_pronunciation_cases: usize,
+    exact_pronunciation_rate: Option<f64>,
+    oov_true_positive: usize,
+    oov_false_positive: usize,
+    oov_false_negative: usize,
+    oov_precision: Option<f64>,
+    oov_recall: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
 struct EvaluationReport {
     schema: &'static str,
     metrics: AggregateMetrics,
     by_language: Vec<LanguageMetrics>,
+    by_profile: Vec<ProfileMetrics>,
     cases: Vec<CaseScore>,
 }
 
@@ -457,6 +480,7 @@ fn validate_inputs(
     for reference in references {
         if reference.case_id.trim().is_empty()
             || reference.language.trim().is_empty()
+            || reference.profile_id.trim().is_empty()
             || reference.text.trim().is_empty()
         {
             return Err("reference case ID, language, and text are required".into());
@@ -509,9 +533,10 @@ fn validate_inputs(
             || prediction.candidate_id.trim().is_empty()
             || prediction.source_id.trim().is_empty()
             || prediction.language.trim().is_empty()
+            || prediction.profile_id.trim().is_empty()
         {
             return Err(
-                "candidate case_id, candidate_id, source_id, and language are required".into(),
+                "candidate case_id, candidate_id, source_id, language, and profile_id are required".into(),
             );
         }
         if !prediction_ids.insert(prediction.case_id.as_str()) {
@@ -534,6 +559,12 @@ fn validate_inputs(
             return Err(format!(
                 "prediction {} language {:?} does not match reference language {:?}",
                 prediction.case_id, prediction.language, reference.language
+            ));
+        }
+        if prediction.profile_id != reference.profile_id {
+            return Err(format!(
+                "prediction {} profile {:?} does not match reference profile {:?}",
+                prediction.case_id, prediction.profile_id, reference.profile_id
             ));
         }
         if let Some((candidate_id, source_id)) = identity {
@@ -626,6 +657,7 @@ fn evaluate(
 
     let mut cases = Vec::with_capacity(references.len());
     let mut language_totals: BTreeMap<String, LanguageTotals> = BTreeMap::new();
+    let mut profile_totals: BTreeMap<String, LanguageTotals> = BTreeMap::new();
     let mut total_reference_phones = 0usize;
     let mut total_edits = 0usize;
     let mut in_vocabulary_cases = 0usize;
@@ -648,6 +680,10 @@ fn evaluate(
             .entry(reference.language.clone())
             .or_default();
         language.cases += 1;
+        let profile = profile_totals
+            .entry(reference.profile_id.clone())
+            .or_default();
+        profile.cases += 1;
         let candidate = prediction_by_id[reference.case_id.as_str()];
         let selected = choose_variant(&reference.accepted_variants, candidate);
         let (
@@ -696,13 +732,17 @@ fn evaluate(
             total_edits += edits.total();
             language.reference_phone_count += reference_phones;
             language.phone_edits += edits.total();
+            profile.reference_phone_count += reference_phones;
+            profile.phone_edits += edits.total();
         }
         if let Some(exact) = exact {
             in_vocabulary_cases += 1;
             language.in_vocabulary_cases += 1;
+            profile.in_vocabulary_cases += 1;
             if exact {
                 exact_cases += 1;
                 language.exact_pronunciation_cases += 1;
+                profile.exact_pronunciation_cases += 1;
             }
         }
         if let Some(boundaries) = &boundaries {
@@ -736,6 +776,12 @@ fn evaluate(
             if !reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
         language.oov_false_negative +=
             if reference.expected_oov && !candidate.detected_oov { 1 } else { 0 };
+        profile.oov_true_positive +=
+            if reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
+        profile.oov_false_positive +=
+            if !reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
+        profile.oov_false_negative +=
+            if reference.expected_oov && !candidate.detected_oov { 1 } else { 0 };
         oov_correct += if reference.expected_oov == candidate.detected_oov {
             1
         } else {
@@ -749,6 +795,7 @@ fn evaluate(
         cases.push(CaseScore {
             case_id: reference.case_id.clone(),
             language: reference.language.clone(),
+            profile_id: reference.profile_id.clone(),
             selected_reference_variant: variant_id,
             reference_phone_count: reference_phones,
             candidate_phone_count,
@@ -810,6 +857,37 @@ fn evaluate(
             }
         })
         .collect();
+    let by_profile = profile_totals
+        .into_iter()
+        .map(|(profile_id, totals)| {
+            let oov_precision = ratio(
+                totals.oov_true_positive,
+                totals.oov_true_positive + totals.oov_false_positive,
+            );
+            let oov_recall = ratio(
+                totals.oov_true_positive,
+                totals.oov_true_positive + totals.oov_false_negative,
+            );
+            ProfileMetrics {
+                profile_id,
+                cases: totals.cases,
+                in_vocabulary_cases: totals.in_vocabulary_cases,
+                reference_phone_count: totals.reference_phone_count,
+                phone_edits: totals.phone_edits,
+                phone_error_rate: ratio(totals.phone_edits, totals.reference_phone_count),
+                exact_pronunciation_cases: totals.exact_pronunciation_cases,
+                exact_pronunciation_rate: ratio(
+                    totals.exact_pronunciation_cases,
+                    totals.in_vocabulary_cases,
+                ),
+                oov_true_positive: totals.oov_true_positive,
+                oov_false_positive: totals.oov_false_positive,
+                oov_false_negative: totals.oov_false_negative,
+                oov_precision,
+                oov_recall,
+            }
+        })
+        .collect();
     Ok(EvaluationReport {
         schema: "g2p-reference-evaluation/v1",
         metrics: AggregateMetrics {
@@ -846,6 +924,7 @@ fn evaluate(
                 .then(|| confidence_squared_error / confidence_count as f64),
         },
         by_language,
+        by_profile,
         cases,
     })
 }
@@ -906,6 +985,7 @@ mod tests {
         ReferenceCase {
             case_id: case_id.into(),
             language: "en".into(),
+            profile_id: "en-US-general-v1".into(),
             text: case_id.into(),
             context: "test context".into(),
             expected_oov,
@@ -925,6 +1005,7 @@ mod tests {
             candidate_id: "candidate-a".into(),
             source_id: "test-source".into(),
             language: "en".into(),
+            profile_id: "en-US-general-v1".into(),
             phones: phones.iter().map(|phone| (*phone).into()).collect(),
             syllable_boundaries: (!detected_oov).then(|| boundaries.to_vec()),
             syllable_stress: (!detected_oov).then(|| stress.to_vec()),
