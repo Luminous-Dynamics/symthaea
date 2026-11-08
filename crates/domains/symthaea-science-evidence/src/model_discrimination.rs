@@ -1169,6 +1169,69 @@ mod tests {
     }
 
     #[test]
+    fn insufficient_quadrature_refinement_is_not_ranked() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let experiment = experiment(
+            "underresolved",
+            1.0,
+            Some(0.1),
+            vec![
+                prediction("model-a", Some(-0.2), Some(0.0)),
+                prediction("model-b", Some(0.2), Some(0.0)),
+            ],
+        );
+        let mut config = config(vec![equal_prior()], 64);
+        config.quadrature_tolerance_nats = 1.0e-30;
+        let report =
+            rank_model_discriminating_experiments(&hypotheses, &[experiment], &config).unwrap();
+        let score = &report.experiments[0];
+
+        assert!(matches!(
+            score.status,
+            ExperimentDiscriminationStatus::QuadratureNotConverged { .. }
+        ));
+        assert!(score.worst_case_model_identity_eig_nats.is_none());
+        assert!(score.weighted_mean_eig_per_cost.is_none());
+    }
+
+    #[test]
+    fn numeric_unresolved_hypothesis_is_rejected() {
+        let hypotheses = vec![
+            hypothesis("model-a", b'a'),
+            DiscriminationHypothesis {
+                model_id: OTHER_UNRESOLVED_MODEL_ID.to_string(),
+                source_revision_sha: "d".repeat(40),
+                specification_reference: "synthetic://unresolved".to_string(),
+            },
+        ];
+        let candidate = experiment(
+            "candidate",
+            1.0,
+            Some(0.1),
+            vec![
+                prediction("model-a", Some(0.0), Some(0.0)),
+                prediction(OTHER_UNRESOLVED_MODEL_ID, Some(1.0), Some(0.0)),
+            ],
+        );
+
+        assert_eq!(
+            rank_model_discriminating_experiments(
+                &hypotheses,
+                &[candidate],
+                &config(
+                    vec![ModelPriorScenario {
+                        scenario_id: "equal".to_string(),
+                        scenario_weight: 1.0,
+                        probabilities: vec![0.5, 0.5],
+                    }],
+                    128,
+                ),
+            ),
+            Err(ModelDiscriminationError::UnresolvedHypothesisMustRemainOpen)
+        );
+    }
+
+    #[test]
     fn malformed_prediction_coverage_and_prior_fail_closed() {
         let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
         let incomplete = experiment(
