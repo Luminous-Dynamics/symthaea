@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: rea-numeric-intent-validator-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validator:
@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -48,26 +48,6 @@ jobs:
 
       - name: Validate embedded Draft 2020-12 profile schema
         run: cargo test --manifest-path tools/rea-numeric-intent-validator/Cargo.toml --locked embedded_profile_schema_is_valid_draft_2020_12
-
-      - name: Apply rustfmt
-        run: |
-          cargo fmt --manifest-path tools/rea-numeric-intent-validator/Cargo.toml
-          if ! git diff --quiet -- tools/rea-numeric-intent-validator/src; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tools/rea-numeric-intent-validator/src
-            git commit -m "style(rea): format numeric intent validator"
-            target_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-            git push origin "HEAD:${target_branch}"
-          fi
-
-      - name: Archive rustfmt-normalized source for exact commit repair
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: rea-numeric-intent-rustfmt-source
-          path: tools/rea-numeric-intent-validator/src/lib.rs
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Rust formatting check
         run: cargo fmt --manifest-path tools/rea-numeric-intent-validator/Cargo.toml -- --check
