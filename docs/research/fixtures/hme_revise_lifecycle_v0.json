@@ -4,9 +4,9 @@
   "status": "synthetic_bitemporal_dependency_contract_not_runtime_or_benchmark_result",
   "owner_issues": [
     9075,
-    9075,
     8427,
-    9139
+    9139,
+    9048
   ],
   "semantics": {
     "valid_time": "When an assertion applies in the modeled world",
@@ -38,7 +38,8 @@
           "valid_from": "2026-01-01T00:00:00Z",
           "valid_to": null,
           "recorded_at": "2026-01-02T09:00:00Z",
-          "supersedes": null
+          "supersedes": null,
+          "supersession_effective_valid_from": "2026-01-10T00:00:00Z"
         },
         {
           "id": "office-r1",
@@ -60,7 +61,8 @@
           "valid_from": "2026-01-10T00:00:00Z",
           "valid_to": null,
           "recorded_at": "2026-03-01T12:00:00Z",
-          "supersedes": "home-r1"
+          "supersedes": "home-r1",
+          "supersession_effective_valid_from": "2026-01-10T00:00:00Z"
         }
       ],
       "derived_claims": [
@@ -157,7 +159,8 @@
         "The correction can change the current belief about an earlier valid date.",
         "A dependent conclusion is not valid merely because its vector remains indexed.",
         "Between correction and recomputation, the dependent conclusion is unknown, not the old value and not false.",
-        "The audit retains the old revision without making it eligible for current retrieval."
+        "The audit retains the old revision without making it eligible for current retrieval.",
+        "A supersession recorded later may revise the effective valid-time cutoff without changing what was known at an earlier knowledge-time."
       ]
     },
     {
