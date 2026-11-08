@@ -33,22 +33,22 @@ use thiserror::Error;
 pub const SCIENCE_EVIDENCE_SCHEMA: &str = "symthaea-science-evidence-v2";
 
 /// Theory prediction completeness and cross-model comparability contracts.
-pub mod theory_prediction;
 pub mod model_discrimination;
+pub mod theory_prediction;
 
+pub use model_discrimination::{
+    CandidateExperiment, DiscriminationHypothesis, ExperimentBlocker,
+    ExperimentDiscriminationScore, ExperimentDiscriminationStatus, GaussianModelPrediction,
+    MAX_DISCRIMINATION_EXPERIMENTS, MAX_DISCRIMINATION_HYPOTHESES, MAX_EIG_QUADRATURE_INTERVALS,
+    MAX_MODEL_PRIOR_SCENARIOS, ModelDiscriminationConfig, ModelDiscriminationError,
+    ModelDiscriminationReport, ModelPriorScenario, ModelUniverseCoverage, PriorScenarioEIG,
+    rank_model_discriminating_experiments,
+};
 pub use theory_prediction::{
     ComparisonBlocker, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
     OTHER_UNRESOLVED_MODEL_ID, ObservableContract, PredictionCoverage, PredictionDisposition,
     PredictiveUncertaintyStatus, THEORY_PREDICTION_SCHEMA, TheoryModel, TheoryModelRole,
     TheoryPredictionError, TheoryPredictionLedger, TheoryPredictionRecord,
-};
-pub use model_discrimination::{
-    CandidateExperiment, DiscriminationHypothesis, ExperimentBlocker,
-    ExperimentDiscriminationScore, ExperimentDiscriminationStatus, GaussianModelPrediction,
-    MAX_DISCRIMINATION_EXPERIMENTS, MAX_DISCRIMINATION_HYPOTHESES,
-    MAX_EIG_QUADRATURE_INTERVALS, MAX_MODEL_PRIOR_SCENARIOS, ModelDiscriminationConfig,
-    ModelDiscriminationError, ModelDiscriminationReport, ModelPriorScenario,
-    ModelUniverseCoverage, PriorScenarioEIG, rank_model_discriminating_experiments,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
