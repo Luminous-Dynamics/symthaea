@@ -7,7 +7,10 @@
 //! ordered prefix. Each support-minimized function is then compiled to both a
 //! ROBDD and an AIG. Each representation is independently checked against the
 //! same reduced truth table and encoded using a versioned canonical byte
-//! format. Selection compares byte lengths, not incomparable node counts.
+//! format. The portfolio exposes a Pareto frontier over encoded bytes, circuit
+//! nodes, worst-case evaluation work and independent verification work. Its
+//! default selected representation is the smallest encoded member of that
+//! frontier; callers retain both alternatives for workload-specific choice.
 //!
 //! A compiled circuit is not itself a QBF proof. The source strategy checker
 //! remains the authority for whether the Skolem/Herbrand functions win.
@@ -38,6 +41,94 @@ pub enum SelectedStrategyRepresentation {
     Robdd,
     Aig,
 }
+
+/// Deterministic structural cost vector for one checked representation.
+///
+/// `worst_case_evaluation_steps` counts decision-node visits for an ROBDD
+/// and full stored-node evaluations for the current straight-line AIG
+/// evaluator. `estimated_verification_work_units` is explicitly a structural
+/// estimate: graph-node visits plus exhaustive assignments multiplied by
+/// worst-case evaluation steps. It is not wall-clock timing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StrategyRepresentationCost {
+    pub encoded_bytes: usize,
+    pub internal_nodes: usize,
+    pub logic_depth: usize,
+    pub worst_case_evaluation_steps: usize,
+    pub estimated_verification_work_units: u128,
+}
+
+/// Return the nondominated encodings. Exact cost ties retain ROBDD as the
+/// deterministic representative; incomparable costs preserve both.
+pub fn strategy_representation_pareto_frontier(
+    robdd: StrategyRepresentationCost,
+    aig: StrategyRepresentationCost,
+) -> Vec<SelectedStrategyRepresentation> {
+    fn dominates(left: StrategyRepresentationCost, right: StrategyRepresentationCost) -> bool {
+        let no_worse = left.encoded_bytes <= right.encoded_bytes
+            && left.internal_nodes <= right.internal_nodes
+            && left.logic_depth <= right.logic_depth
+            && left.worst_case_evaluation_steps <= right.worst_case_evaluation_steps
+            && left.estimated_verification_work_units
+                <= right.estimated_verification_work_units;
+        let strictly_better = left.encoded_bytes < right.encoded_bytes
+            || left.internal_nodes < right.internal_nodes
+            || left.logic_depth < right.logic_depth
+            || left.worst_case_evaluation_steps < right.worst_case_evaluation_steps
+            || left.estimated_verification_work_units
+                < right.estimated_verification_work_units;
+        no_worse && strictly_better
+    }
+
+    if dominates(robdd, aig) || robdd == aig {
+        vec![SelectedStrategyRepresentation::Robdd]
+    } else if dominates(aig, robdd) {
+        vec![SelectedStrategyRepresentation::Aig]
+    } else {
+        vec![
+            SelectedStrategyRepresentation::Robdd,
+            SelectedStrategyRepresentation::Aig,
+        ]
+    }
+}
+
+fn select_smallest_pareto_encoding(
+    frontier: &[SelectedStrategyRepresentation],
+    robdd: StrategyRepresentationCost,
+    aig: StrategyRepresentationCost,
+) -> (SelectedStrategyRepresentation, StrategyRepresentationCost) {
+    let mut selected = frontier[0];
+    let mut selected_cost = match selected {
+        SelectedStrategyRepresentation::Robdd => robdd,
+        SelectedStrategyRepresentation::Aig => aig,
+    };
+    for &candidate in frontier.iter().skip(1) {
+        let cost = match candidate {
+            SelectedStrategyRepresentation::Robdd => robdd,
+            SelectedStrategyRepresentation::Aig => aig,
+        };
+        let candidate_key = (
+            cost.encoded_bytes,
+            cost.estimated_verification_work_units,
+            cost.worst_case_evaluation_steps,
+            cost.internal_nodes,
+            matches!(candidate, SelectedStrategyRepresentation::Aig),
+        );
+        let selected_key = (
+            selected_cost.encoded_bytes,
+            selected_cost.estimated_verification_work_units,
+            selected_cost.worst_case_evaluation_steps,
+            selected_cost.internal_nodes,
+            matches!(selected, SelectedStrategyRepresentation::Aig),
+        );
+        if candidate_key < selected_key {
+            selected = candidate;
+            selected_cost = cost;
+        }
+    }
+    (selected, selected_cost)
+}
+
 
 /// Explicit limits on canonical artifact encoding and aggregate output size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +195,9 @@ pub struct StrategyFunctionPortfolio {
     pub aig_verification: StrategyAigReport,
     pub bdd_bytes: Vec<u8>,
     pub aig_bytes: Vec<u8>,
+    pub bdd_cost: StrategyRepresentationCost,
+    pub aig_cost: StrategyRepresentationCost,
+    pub pareto_frontier: Vec<SelectedStrategyRepresentation>,
     pub selected: SelectedStrategyRepresentation,
     pub selected_bytes: usize,
 }
@@ -119,6 +213,9 @@ pub struct VerifiedStrategyPortfolio {
     pub total_selected_bytes: usize,
     pub total_bdd_nodes: usize,
     pub total_aig_and_nodes: usize,
+    pub total_bdd_estimated_verification_work: u128,
+    pub total_aig_estimated_verification_work: u128,
+    pub total_selected_estimated_verification_work: u128,
     pub bdd_search_complete: bool,
 }
 
@@ -184,6 +281,99 @@ fn append_dependencies(
         append_u64(bytes, dependency, budget)?;
     }
     Ok(())
+}
+
+fn checked_cost_add(left: u128, right: u128) -> Result<u128, StrategyPortfolioError> {
+    left.checked_add(right)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)
+}
+
+fn checked_cost_mul(left: u128, right: u128) -> Result<u128, StrategyPortfolioError> {
+    left.checked_mul(right)
+        .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)
+}
+
+fn bdd_representation_cost(
+    bdd: &super::strategy_bdd::ReducedOrderedBdd,
+    encoded_bytes: usize,
+    assignments_checked: u128,
+) -> Result<StrategyRepresentationCost, StrategyPortfolioError> {
+    let mut depth = vec![0usize; bdd.nodes.len()];
+    for (index, node) in bdd.nodes.iter().enumerate() {
+        let child_depth = |child: BddRef| -> usize {
+            match child {
+                BddRef::False | BddRef::True => 0,
+                BddRef::Node(child_index) => depth[child_index],
+            }
+        };
+        depth[index] = child_depth(node.low)
+            .max(child_depth(node.high))
+            .checked_add(1)
+            .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+    }
+
+    let logic_depth = match bdd.root {
+        BddRef::False | BddRef::True => 0,
+        BddRef::Node(root) => depth[root],
+    };
+    let structural_work = u128::try_from(bdd.nodes.len())
+        .map_err(|_| StrategyPortfolioError::ResourceAccountingOverflow)?;
+    let evaluation_work = checked_cost_mul(
+        assignments_checked,
+        u128::try_from(logic_depth)
+            .map_err(|_| StrategyPortfolioError::ResourceAccountingOverflow)?,
+    )?;
+    Ok(StrategyRepresentationCost {
+        encoded_bytes,
+        internal_nodes: bdd.nodes.len(),
+        logic_depth,
+        worst_case_evaluation_steps: logic_depth,
+        estimated_verification_work_units: checked_cost_add(structural_work, evaluation_work)?,
+    })
+}
+
+fn aig_representation_cost(
+    aig: &StrategyAig,
+    encoded_bytes: usize,
+    assignments_checked: u128,
+    and_nodes: usize,
+) -> Result<StrategyRepresentationCost, StrategyPortfolioError> {
+    let mut depth = vec![0usize; aig.nodes.len()];
+    for (index, node) in aig.nodes.iter().enumerate() {
+        if let AigNode::And { left, right } = node {
+            let child_depth = |literal: AigLiteral| -> usize {
+                match literal {
+                    AigLiteral::Constant(_) => 0,
+                    AigLiteral::Node { index, .. } => depth[index],
+                }
+            };
+            depth[index] = child_depth(*left)
+                .max(child_depth(*right))
+                .checked_add(1)
+                .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+        }
+    }
+    let logic_depth = match aig.output {
+        AigLiteral::Constant(_) => 0,
+        AigLiteral::Node { index, .. } => depth[index],
+    };
+    // The present AIG evaluator executes its canonical straight-line node list
+    // for every assignment; unlike an ROBDD it does not short-circuit by path.
+    let worst_case_evaluation_steps = aig.nodes.len();
+    let structural_work = u128::try_from(aig.nodes.len())
+        .map_err(|_| StrategyPortfolioError::ResourceAccountingOverflow)?;
+    let evaluation_work = checked_cost_mul(
+        assignments_checked,
+        u128::try_from(worst_case_evaluation_steps)
+            .map_err(|_| StrategyPortfolioError::ResourceAccountingOverflow)?,
+    )?;
+    Ok(StrategyRepresentationCost {
+        encoded_bytes,
+        internal_nodes: and_nodes,
+        logic_depth,
+        worst_case_evaluation_steps,
+        estimated_verification_work_units: checked_cost_add(structural_work, evaluation_work)?,
+    })
 }
 
 fn append_aig_literal(
@@ -630,6 +820,9 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
     let mut total_selected_bytes = 0usize;
     let mut total_bdd_nodes = 0usize;
     let mut total_aig_and_nodes = 0usize;
+    let mut total_bdd_estimated_verification_work = 0u128;
+    let mut total_aig_estimated_verification_work = 0u128;
+    let mut total_selected_estimated_verification_work = 0u128;
 
     for compiled in &verified.representation.functions {
         let (bdd_bytes, bdd_verification) = (
@@ -653,11 +846,21 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
                 .map_err(StrategyPortfolioError::AigVerification)?;
         let aig_bytes = encode_strategy_aig(&aig, aig_budget, encoding_budget)?;
 
-        let (selected, selected_bytes) = if bdd_bytes.len() <= aig_bytes.len() {
-            (SelectedStrategyRepresentation::Robdd, bdd_bytes.len())
-        } else {
-            (SelectedStrategyRepresentation::Aig, aig_bytes.len())
-        };
+        let bdd_cost = bdd_representation_cost(
+            &compiled.bdd,
+            bdd_bytes.len(),
+            bdd_verification.assignments_checked,
+        )?;
+        let aig_cost = aig_representation_cost(
+            &aig,
+            aig_bytes.len(),
+            aig_verification.assignments_checked,
+            aig_verification.and_nodes,
+        )?;
+        let pareto_frontier = strategy_representation_pareto_frontier(bdd_cost, aig_cost);
+        let (selected, selected_cost) =
+            select_smallest_pareto_encoding(&pareto_frontier, bdd_cost, aig_cost);
+        let selected_bytes = selected_cost.encoded_bytes;
 
         total_bdd_bytes = total_bdd_bytes
             .checked_add(bdd_bytes.len())
@@ -674,6 +877,18 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
         total_aig_and_nodes = total_aig_and_nodes
             .checked_add(aig_verification.and_nodes)
             .ok_or(StrategyPortfolioError::ResourceAccountingOverflow)?;
+        total_bdd_estimated_verification_work = checked_cost_add(
+            total_bdd_estimated_verification_work,
+            bdd_cost.estimated_verification_work_units,
+        )?;
+        total_aig_estimated_verification_work = checked_cost_add(
+            total_aig_estimated_verification_work,
+            aig_cost.estimated_verification_work_units,
+        )?;
+        total_selected_estimated_verification_work = checked_cost_add(
+            total_selected_estimated_verification_work,
+            selected_cost.estimated_verification_work_units,
+        )?;
 
         let total_bytes = total_bdd_bytes
             .checked_add(total_aig_bytes)
@@ -695,6 +910,9 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
             aig_verification,
             bdd_bytes,
             aig_bytes,
+            bdd_cost,
+            aig_cost,
+            pareto_frontier,
             selected,
             selected_bytes,
         });
@@ -709,6 +927,9 @@ pub fn verify_and_compile_qbf_strategy_portfolio(
         total_selected_bytes,
         total_bdd_nodes,
         total_aig_and_nodes,
+        total_bdd_estimated_verification_work,
+        total_aig_estimated_verification_work,
+        total_selected_estimated_verification_work,
         bdd_search_complete: verified.representation.optimization_search_complete,
     })
 }
