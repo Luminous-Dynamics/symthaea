@@ -102,6 +102,7 @@ pub mod phoneme_hdc_ltc;
 pub mod pier;
 pub mod rls;
 pub mod streaming;
+pub mod switch_metrics;
 pub mod temporal_grammar;
 pub mod unified_grammar;
 pub mod whale;
@@ -151,6 +152,10 @@ pub use phoneme::{
 };
 pub use rls::{FastRlsClassifier, RlsClassifier};
 pub use sleep_sentinel::{BandPowers, ConsciousnessSentinel, ConsciousnessState};
+pub use switch_metrics::{
+    LanguageErrorRate, MaskedErrorRate, SwitchAwareResult, SwitchMetricError,
+    SwitchWindowErrorRate, switch_aware_error_rates,
+};
 pub use streaming::{StreamConfig, StreamProcessor, StreamSession};
 
 /// Crate version
