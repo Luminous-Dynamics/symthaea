@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/physical_compute/workload_ir_v1.schema.json",
+  "title": "Symthaea Physical Compute Workload IR v1",
+  "description": "Solver-visible workload contract for selecting mathematical formulations and computational substrates. Evaluator-only ground truth is deliberately outside this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "workload_id", "problem", "task_contract"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "workload_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "problem": { "$ref": "#/$defs/problem" },
+    "task_contract": { "$ref": "#/$defs/task_contract" },
+    "resource_constraints": { "$ref": "#/$defs/resource_constraints" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "evidence_status": {
+      "type": "string",
+      "enum": ["proven", "checked", "derived", "estimated", "assumed", "unknown"]
+    },
+    "property_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/evidence_status" },
+        "value": { "type": ["boolean", "number", "string", "null"] },
+        "method": { "type": "string", "maxLength": 160 },
+        "evidence_ref": { "type": "string", "maxLength": 160 },
+        "notes": { "type": "string", "maxLength": 1000 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["proven", "checked", "derived", "estimated"] } },
+            "required": ["status"]
+          },
+          "then": { "required": ["value", "method"] }
+        }
+      ]
+    },
+    "condition_estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/evidence_status" },
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "method": { "type": "string", "maxLength": 160 },
+        "uncertainty": { "type": "number", "minimum": 0 },
+        "evidence_ref": { "type": "string", "maxLength": 160 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["derived", "estimated", "checked", "proven"] } },
+            "required": ["status"]
+          },
+          "then": { "required": ["value", "method"] }
+        }
+      ]
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape"],
+      "properties": {
+        "shape": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+        },
+        "spacing": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "type": "number", "exclusiveMinimum": 0 }
+        },
+        "boundary_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["homogeneous_dirichlet", "inhomogeneous_dirichlet", "neumann", "periodic", "mixed", "other"]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "formulation", "representation"],
+      "properties": {
+        "family": {
+          "type": "string",
+          "enum": ["linear_algebra", "steady_pde", "time_dependent_pde", "ode", "sde", "neural_score_dynamics", "combinatorial_optimization"]
+        },
+        "formulation": {
+          "type": "string",
+          "enum": ["linear_system", "least_squares", "initial_value_problem", "boundary_value_problem", "state_space_dynamics", "score_field_dynamics", "energy_minimization", "other"]
+        },
+        "representation": {
+          "type": "string",
+          "enum": ["dense_matrix", "sparse_matrix", "matrix_free_operator", "continuous_state_space", "neural_vector_field", "qubo_or_pubo", "other"]
+        },
+        "spatial_dimension": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "state_dimension": { "type": "integer", "minimum": 1 },
+        "grid": { "$ref": "#/$defs/grid" },
+        "discretization": {
+          "type": "string",
+          "enum": ["finite_difference", "finite_volume", "finite_element", "spectral", "continuous_time", "none", "other"]
+        },
+        "coefficient_structure": {
+          "type": "string",
+          "enum": ["constant_isotropic", "constant_anisotropic", "heterogeneous", "discontinuous", "nonlinear", "time_varying", "not_applicable", "unknown"]
+        },
+        "operator_properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "symmetry": { "$ref": "#/$defs/property_claim" },
+            "positive_definite": { "$ref": "#/$defs/property_claim" },
+            "normality": { "$ref": "#/$defs/property_claim" },
+            "condition_number_2": { "$ref": "#/$defs/condition_estimate" }
+          }
+        },
+        "rhs_or_initial_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fixture_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "spectrum": {
+              "type": "string",
+              "enum": ["smooth_low_frequency", "oscillatory_high_frequency", "broadband_random", "mixed", "unknown", "not_applicable"]
+            },
+            "seed": { "type": "integer", "minimum": 0 },
+            "generator": { "type": "string", "maxLength": 160 }
+          }
+        },
+        "time_horizon": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": { "type": "number" },
+            "end": { "type": "number" },
+            "sample_count": { "type": "integer", "minimum": 1 },
+            "sampling_semantics": { "type": "string", "enum": ["continuous_observation", "fixed_grid", "event_driven", "not_applicable"] }
+          }
+        }
+      }
+    },
+    "acceptance_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "comparator", "threshold"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "enum": ["relative_true_residual", "absolute_true_residual", "relative_backward_error", "relative_forward_error", "trajectory_rms_error", "trajectory_max_error", "phase_error", "distribution_kl", "distribution_wasserstein", "distribution_mmd", "fid", "kid", "conditional_accuracy", "constraint_violation_rate", "other"]
+        },
+        "comparator": { "type": "string", "enum": ["<=", "<", ">=", ">", "within"] },
+        "threshold": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 32 },
+        "notes": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "task_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objective", "acceptance_metrics", "verification"],
+      "properties": {
+        "objective": {
+          "type": "string",
+          "enum": ["solve", "simulate_trajectory", "sample_distribution", "minimize_energy", "other"]
+        },
+        "acceptance_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/acceptance_metric" }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "independent", "evaluator_truth_visible_to_solver"],
+          "properties": {
+            "required": { "const": true },
+            "independent": { "type": "boolean" },
+            "evaluator_truth_visible_to_solver": { "const": false },
+            "method": { "type": "string", "maxLength": 160 },
+            "failure_policy": { "type": "string", "enum": ["reject", "fallback", "abstain", "reject_or_fallback"] }
+          }
+        },
+        "deadline_ms": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "minimum_success_probability": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "resource_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "energy_budget_j": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "memory_budget_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "area_budget_mm2": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "max_physical_tiles": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_revision": { "type": "string", "maxLength": 128 },
+        "input_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "configuration_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "uniqueItems": true
+        },
+        "notes": { "type": "string", "maxLength": 1000 }
+      }
+    }
+  }
+}
