@@ -190,52 +190,44 @@ impl ActionRegistry {
                 })
             })
             .register("READ_SENSOR", |ctx| {
-                let sensor_id = ctx.args.first().cloned().unwrap_or_else(|| "ina219".into());
-                let channels = if ctx.args.len() > 1 {
-                    ctx.args[1..].to_vec()
-                } else {
-                    vec!["voltage".into(), "current".into()]
-                };
+                let sensor_id = ctx
+                    .args
+                    .first()
+                    .filter(|value| !value.trim().is_empty())
+                    .cloned()
+                    .ok_or_else(|| {
+                        ActionError::ValidationFailed(
+                            "READ_SENSOR requires an explicit sensor_id".into(),
+                        )
+                    })?;
+                let channels = ctx.args.get(1..).unwrap_or_default().to_vec();
+                if channels.is_empty() || channels.iter().any(|channel| channel.trim().is_empty()) {
+                    return Err(ActionError::ValidationFailed(
+                        "READ_SENSOR requires at least one explicit non-empty channel".into(),
+                    ));
+                }
                 Ok(ActionIR::ReadSensor {
                     sensor_id,
                     channels,
                 })
             })
-            .register("WRITE_SERVO", |ctx| {
-                let id = ctx
-                    .args
-                    .first()
-                    .and_then(|s| s.parse::<u32>().ok())
-                    .unwrap_or(0);
-                let val = ctx
-                    .args
-                    .get(1)
-                    .and_then(|s| s.parse::<f32>().ok())
-                    .unwrap_or(0.0);
-                Ok(ActionIR::WriteServo {
-                    servo_id: id,
-                    value: val,
-                })
+            .register("WRITE_SERVO", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "WRITE_SERVO requires an explicit actuator capability/profile; legacy standard binding disabled"
+                        .into(),
+                ))
             })
-            .register("SWARM_GOSSIP", |ctx| {
-                let topic = ctx
-                    .args
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| "optimization".into());
-                let payload = ctx.content.clone().unwrap_or_default().into_bytes();
-                Ok(ActionIR::SwarmGossip { topic, payload })
+            .register("SWARM_GOSSIP", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "SWARM_GOSSIP requires an explicit swarm/network capability/profile; legacy standard binding disabled"
+                        .into(),
+                ))
             })
-            .register("WASM_VERIFY", |ctx| {
-                let path = ctx.target_path.clone().ok_or_else(|| {
-                    ActionError::ValidationFailed("WASM_VERIFY requires target_path".into())
-                })?;
-                let func = ctx.args.first().cloned().unwrap_or_else(|| "verify".into());
-                Ok(ActionIR::WasmSandbox {
-                    module_path: path,
-                    function_name: func,
-                    input_data: vec![],
-                })
+            .register("WASM_VERIFY", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "WASM_VERIFY requires an explicit Forge capability/profile; legacy standard binding disabled"
+                        .into(),
+                ))
             })
     }
 }
@@ -250,18 +242,171 @@ impl PrimitiveExecutor {
         Self { registry }
     }
 
-    /// Translate a sequence of primitives into a sequence of actions
+    /// Translate a sequence of primitives into a sequence of actions.
+    ///
+    /// Translation is all-or-nothing: an unknown primitive or invalid binding
+    /// returns `Err` rather than silently dropping that requested action and
+    /// returning a shorter sequence.
     pub fn translate(
         &self,
         primitives: &[String],
         context: &ActionContext,
     ) -> Result<Vec<ActionIR>, ActionError> {
-        let mut actions = Vec::new();
+        let mut actions = Vec::with_capacity(primitives.len());
         for prim in primitives {
-            if let Ok(action) = self.registry.resolve(prim, context) {
-                actions.push(action);
-            }
+            actions.push(self.registry.resolve(prim, context)?);
         }
         Ok(actions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_sensor_requires_explicit_identity_and_channel() {
+        let registry = ActionRegistry::standard();
+
+        let missing = registry.resolve("READ_SENSOR", &ActionContext::default());
+        assert!(missing.is_err());
+
+        let no_channel = ActionContext {
+            args: vec!["imu-0".into()],
+            ..Default::default()
+        };
+        assert!(registry.resolve("READ_SENSOR", &no_channel).is_err());
+
+        let valid = ActionContext {
+            args: vec!["imu-0".into(), "accel_x".into()],
+            ..Default::default()
+        };
+        let action = registry.resolve("READ_SENSOR", &valid).unwrap();
+        match action {
+            ActionIR::ReadSensor {
+                sensor_id,
+                channels,
+            } => {
+                assert_eq!(sensor_id, "imu-0");
+                assert_eq!(channels, vec!["accel_x"]);
+            }
+            other => panic!("unexpected action: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn write_servo_requires_explicit_actuator_profile() {
+        let registry = ActionRegistry::standard();
+        let context = ActionContext {
+            args: vec!["3".into(), "0.5".into()],
+            ..Default::default()
+        };
+
+        let err = registry
+            .resolve("WRITE_SERVO", &context)
+            .expect_err("standard WRITE_SERVO must fail closed without actuator authority");
+        assert!(format!("{err}").contains("explicit actuator capability/profile"));
+    }
+
+    #[test]
+    fn swarm_gossip_requires_explicit_network_profile() {
+        let registry = ActionRegistry::standard();
+        let context = ActionContext {
+            args: vec!["research".into()],
+            content: Some("result".into()),
+            ..Default::default()
+        };
+
+        let err = registry
+            .resolve("SWARM_GOSSIP", &context)
+            .expect_err("standard SWARM_GOSSIP must fail closed without network authority");
+        assert!(format!("{err}").contains("explicit swarm/network capability/profile"));
+    }
+
+    #[test]
+    fn wasm_verify_requires_explicit_forge_profile() {
+        let registry = ActionRegistry::standard();
+        let context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/module.wasm")),
+            args: vec!["verify".into()],
+            ..Default::default()
+        };
+
+        let err = registry
+            .resolve("WASM_VERIFY", &context)
+            .expect_err("standard WASM_VERIFY must fail closed without Forge authority");
+        assert!(format!("{err}").contains("explicit Forge capability/profile"));
+    }
+
+    #[test]
+    fn effect_denial_aborts_primitive_sequence() {
+        let executor = PrimitiveExecutor::new(ActionRegistry::standard());
+        let read_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            ..Default::default()
+        };
+        let servo_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            args: vec!["3".into(), "0.5".into()],
+            ..Default::default()
+        };
+        let swarm_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            args: vec!["research".into()],
+            content: Some("result".into()),
+            ..Default::default()
+        };
+        let forge_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/module.wasm")),
+            ..Default::default()
+        };
+
+        for (primitive, context) in [
+            ("WRITE_SERVO", servo_context),
+            ("SWARM_GOSSIP", swarm_context),
+            ("WASM_VERIFY", forge_context),
+        ] {
+            let result = executor.translate(
+                &["READ".to_string(), primitive.to_string()],
+                &context,
+            );
+            assert!(result.is_err(), "{primitive} denial must abort the whole sequence");
+        }
+
+        let read_only = executor
+            .translate(&["READ".to_string()], &read_context)
+            .expect("non-effectful READ remains available");
+        assert_eq!(read_only.len(), 1);
+    }
+
+    #[test]
+    fn primitive_translation_is_all_or_nothing() {
+        let executor = PrimitiveExecutor::new(ActionRegistry::standard());
+        let context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            ..Default::default()
+        };
+
+        let result = executor.translate(
+            &["READ".to_string(), "UNKNOWN_PRIMITIVE".to_string()],
+            &context,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn primitive_translation_preserves_order_when_complete() {
+        let executor = PrimitiveExecutor::new(ActionRegistry::standard());
+        let context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            ..Default::default()
+        };
+
+        let actions = executor
+            .translate(&["READ".to_string(), "LIST".to_string()], &context)
+            .unwrap();
+        assert_eq!(actions.len(), 2);
+        assert!(matches!(actions[0], ActionIR::ReadFile { .. }));
+        assert!(matches!(actions[1], ActionIR::ListDirectory { .. }));
     }
 }
