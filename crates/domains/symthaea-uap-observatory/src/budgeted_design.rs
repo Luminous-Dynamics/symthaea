@@ -240,7 +240,6 @@ impl From<ObservabilityError> for BudgetedDesignError {
 /// include shared/correlated measurement errors, their joint whitening must be
 /// performed before using this additive contribution interface.
 pub fn greedy_budgeted_design(
-    scenarios: &[DesignScenario],
     options: &[ExperimentOption],
     config: &BudgetedDesignConfig,
 ) -> Result<BudgetedDesignReport, BudgetedDesignError> {
@@ -339,7 +338,6 @@ pub fn greedy_budgeted_design(
     }
 
     report_from_selection(
-        scenarios,
         options,
         config,
         &selected,
@@ -607,10 +605,19 @@ fn validate_inputs(
 }
 
 fn normalized_scenario_weights(scenarios: &[DesignScenario]) -> Vec<f64> {
-    let total: f64 = scenarios.iter().map(|scenario| scenario.weight).sum();
+    // Scale before summing so a set of individually finite weights cannot
+    // overflow merely because their unnormalized total is large.
+    let maximum = scenarios
+        .iter()
+        .map(|scenario| scenario.weight)
+        .fold(0.0_f64, f64::max);
+    let scaled_total: f64 = scenarios
+        .iter()
+        .map(|scenario| scenario.weight / maximum)
+        .sum();
     scenarios
         .iter()
-        .map(|scenario| scenario.weight / total)
+        .map(|scenario| (scenario.weight / maximum) / scaled_total)
         .collect()
 }
 
