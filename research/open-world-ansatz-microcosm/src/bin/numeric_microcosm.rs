@@ -2,8 +2,8 @@ use std::env;
 use std::process::ExitCode;
 
 use open_world_ansatz_microcosm::numeric::{
-    discover, oracle_equivalence_classes, DiscoveryReport, Mechanism, ModelHypothesis,
-    NumericWorld, ObservationLog, SensorMap, StructureAccess,
+    DiscoveryReport, Mechanism, ModelHypothesis, NumericWorld, ObservationLog, SensorMap,
+    StructureAccess, discover, oracle_equivalence_classes,
 };
 use serde::Serialize;
 
@@ -19,7 +19,9 @@ fn parse_mechanism(value: &str) -> Result<Mechanism, String> {
     match value {
         "direct" => Ok(Mechanism::DirectResponse),
         "leaky" => Ok(Mechanism::LeakyMemory),
-        _ => Err(format!("unknown mechanism: {value}; expected direct or leaky")),
+        _ => Err(format!(
+            "unknown mechanism: {value}; expected direct or leaky"
+        )),
     }
 }
 
@@ -91,13 +93,10 @@ fn run() -> Result<(), String> {
         .run(&interventions)
         .map_err(|error| error.to_string())?;
 
-    let a0_parameter_control = discover(
-        &observations,
-        StructureAccess::Supplied(mechanism),
-    )
-    .map_err(|error| error.to_string())?;
-    let a2_structure_discovery = discover(&observations, StructureAccess::Withheld)
+    let a0_parameter_control = discover(&observations, StructureAccess::Supplied(mechanism))
         .map_err(|error| error.to_string())?;
+    let a2_structure_discovery =
+        discover(&observations, StructureAccess::Withheld).map_err(|error| error.to_string())?;
     let oracle_equivalence_class_count = oracle_equivalence_classes(interventions.len())
         .map_err(|error| error.to_string())?
         .len();
