@@ -658,14 +658,11 @@ impl VocalPerformance {
                         1.0
                     };
                     let center_frequency = if from_frequency > 0.0 && note.frequency > 0.0 {
-                        from_frequency
-                            * (note.frequency / from_frequency).powf(transition)
+                        from_frequency * (note.frequency / from_frequency).powf(transition)
                     } else {
                         note.frequency
                     };
-                    if syllable.vibrato_depth_cents <= 0.0
-                        || syllable.vibrato_rate_hz <= 0.0
-                    {
+                    if syllable.vibrato_depth_cents <= 0.0 || syllable.vibrato_rate_hz <= 0.0 {
                         return Some(center_frequency);
                     }
                     let vibrato_start =
@@ -1335,8 +1332,7 @@ mod tests {
                 velocity: 0.7,
             },
         ];
-        let mut performance =
-            VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        let mut performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
         performance.syllables[0].vibrato_depth_cents = 0.0;
         performance.syllables[1].portamento = 0.5;
         performance.syllables[1].vibrato_onset = 0.5;
@@ -1379,8 +1375,7 @@ mod tests {
                 velocity: 0.7,
             },
         ];
-        let mut performance =
-            VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        let mut performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
         performance.syllables[1].portamento = 1.0;
         assert!(
             (performance.target_pitch_at(0.81).unwrap() - 440.0).abs() < 0.01,
