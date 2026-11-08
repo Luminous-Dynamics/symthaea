@@ -1233,4 +1233,59 @@ mod tests {
             ))
         ));
     }
+
+    #[test]
+    fn l2_ball_interval_contains_high_dimensional_adversarial_payloads() {
+        // Differential containment against the canonical original-payload
+        // scorer. This is not a performance result or a platform proof.
+        let mut state = 0xC0DE_F00Du32;
+        for dimension in [8usize, 9, 257, 16_384] {
+            for scenario in 0..4 {
+                let query_values: Vec<f32> = (0..dimension)
+                    .map(|index| match scenario {
+                        0 => ((index as f32) * 0.013).sin() * 0.8,
+                        1 => if index % 2 == 0 { 0.999 } else { -0.999 },
+                        2 => if index == dimension / 2 { 1.0 } else { 0.0 },
+                        _ => ((index as f32) * 0.019).cos() * 1.0e-5,
+                    })
+                    .collect();
+                let center_values: Vec<f32> = (0..dimension)
+                    .map(|index| match scenario {
+                        0 => query_values[index] * 0.8,
+                        1 => -query_values[index] * 0.8,
+                        2 => pseudo_random_unit(&mut state) * 0.8,
+                        _ => ((index as f32) * 0.017).sin() * 0.6,
+                    })
+                    .collect();
+                let query = ContinuousHV::from_vec(query_values);
+                let center = ContinuousHV::from_vec(center_values);
+                let actual = ContinuousHV::from_vec(
+                    center
+                        .values
+                        .iter()
+                        .enumerate()
+                        .map(|(index, value)| {
+                            let direction = ((index as f32) * 0.071).sin();
+                            (*value + 0.0005 * direction).clamp(-1.0, 1.0)
+                        })
+                        .collect(),
+                );
+                let epsilon = 0.07f32;
+                verify_l2_residual_certificate(&actual, &center, epsilon)
+                    .unwrap_or_else(|error| panic!("valid generated residual rejected: {error}"));
+                let interval = query
+                    .similarity_interval_full_resolution_for_l2_ball_center(&center, epsilon)
+                    .unwrap();
+                let exact = query.similarity_full_resolution(&actual);
+                assert!(
+                    interval.contains(exact),
+                    "scenario={scenario}, dimension={dimension}: exact={exact}, interval=[{}, {}]",
+                    interval.lower,
+                    interval.upper
+                );
+                assert!(interval.is_well_formed());
+            }
+        }
+    }
+
 }
