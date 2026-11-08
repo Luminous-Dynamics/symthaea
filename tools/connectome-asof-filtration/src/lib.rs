@@ -5,6 +5,7 @@
 //! receipt-binding semantics. It does not authenticate artifacts or prove
 //! conditional supermartingale validity / an adjuster theorem.
 
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
@@ -24,6 +25,328 @@ fn valid_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn decode_sha256(value: &str) -> Result<[u8; 32], AuditError> {
+    if !valid_sha256(value) {
+        return Err(AuditError("malformed SHA-256 digest".into()));
+    }
+    let mut decoded = [0_u8; 32];
+    for (index, slot) in decoded.iter_mut().enumerate() {
+        let offset = index * 2;
+        *slot = u8::from_str_radix(&value[offset..offset + 2], 16)
+            .map_err(|_| AuditError("malformed SHA-256 digest".into()))?;
+    }
+    Ok(decoded)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    output
+}
+
+/// Deterministic binary writer: big-endian fixed-width integers and u64
+/// length-prefixed UTF-8 strings/byte sequences. Never uses JSON or Debug.
+#[derive(Default)]
+struct CanonicalWriter(Vec<u8>);
+
+impl CanonicalWriter {
+    fn u8(&mut self, value: u8) {
+        self.0.push(value);
+    }
+
+    fn u32(&mut self, value: u32) {
+        self.0.extend_from_slice(&value.to_be_bytes());
+    }
+
+    fn u64(&mut self, value: u64) {
+        self.0.extend_from_slice(&value.to_be_bytes());
+    }
+
+    fn i64(&mut self, value: i64) {
+        self.0.extend_from_slice(&value.to_be_bytes());
+    }
+
+    fn bytes(&mut self, value: &[u8]) -> Result<(), AuditError> {
+        let length = u64::try_from(value.len())
+            .map_err(|_| AuditError("canonical byte field exceeds u64 length".into()))?;
+        self.u64(length);
+        self.0.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn string(&mut self, value: &str) -> Result<(), AuditError> {
+        self.bytes(value.as_bytes())
+    }
+
+    fn digest(&mut self, value: &str) -> Result<(), AuditError> {
+        self.0.extend_from_slice(&decode_sha256(value)?);
+        Ok(())
+    }
+
+    fn optional_string(&mut self, value: Option<&str>) -> Result<(), AuditError> {
+        match value {
+            Some(value) => {
+                self.u8(1);
+                self.string(value)
+            }
+            None => {
+                self.u8(0);
+                Ok(())
+            }
+        }
+    }
+
+    fn optional_i64(&mut self, value: Option<i64>) {
+        match value {
+            Some(value) => {
+                self.u8(1);
+                self.i64(value);
+            }
+            None => self.u8(0),
+        }
+    }
+
+    fn strings(&mut self, values: &[String]) -> Result<(), AuditError> {
+        self.u64(
+            u64::try_from(values.len())
+                .map_err(|_| AuditError("canonical list exceeds u64 length".into()))?,
+        );
+        for value in values {
+            self.string(value)?;
+        }
+        Ok(())
+    }
+}
+
+const LEDGER_SCHEMA_VERSION: u32 = 1;
+const LEDGER_HASH_SUITE: &str = "SHA-256";
+const LEDGER_GENESIS_DOMAIN: &[u8] = b"SYTHAEA/CONNECTOME/ASOF-LEDGER-GENESIS/V1\0";
+const LEDGER_ENTRY_DOMAIN: &[u8] = b"SYTHAEA/CONNECTOME/ASOF-LEDGER-ENTRY/V1\0";
+const INPUT_PREFIX_DOMAIN: &[u8] = b"SYTHAEA/CONNECTOME/ASOF-INPUT-PREFIX/V1\0";
+const HISTORY_PREFIX_DOMAIN: &[u8] = b"SYTHAEA/CONNECTOME/ASOF-HISTORY-PREFIX/V1\0";
+const CHECKPOINT_DOMAIN: &[u8] = b"SYTHAEA/CONNECTOME/ASOF-CHECKPOINT/V1\0";
+
+fn canonical_payload(payload: &LedgerPayload) -> Result<(u8, Vec<u8>), AuditError> {
+    let mut writer = CanonicalWriter::default();
+    match payload {
+        LedgerPayload::Evidence(event) => {
+            writer.u8(1);
+            writer.string(&event.event_id)?;
+            writer.string(&event.evidence_family_id)?;
+            writer.string(&event.source_stream)?;
+            writer.digest(&event.source_artifact_sha256)?;
+            writer.u32(event.revision);
+            writer.optional_string(event.supersedes_event_id.as_deref())?;
+            writer.optional_i64(event.event_time_ms);
+            writer.optional_i64(event.acquired_at_ms);
+            writer.optional_i64(event.annotated_at_ms);
+            writer.optional_i64(event.qc_at_ms);
+            writer.u8(match event.availability_state {
+                AvailabilityState::Approved => 0,
+                AvailabilityState::Provisional => 1,
+                AvailabilityState::Disputed => 2,
+                AvailabilityState::Failed => 3,
+                AvailabilityState::Missing => 4,
+                AvailabilityState::OutOfSupport => 5,
+                AvailabilityState::NotAssessed => 6,
+            });
+            writer.u8(match event.split {
+                EvidenceSplit::Exploration => 0,
+                EvidenceSplit::Fit => 1,
+                EvidenceSplit::Calibration => 2,
+                EvidenceSplit::Confirmation => 3,
+            });
+            writer.optional_string(event.confirmatory_family_id.as_deref())?;
+            Ok((1, writer.0))
+        }
+        LedgerPayload::FamilyFreeze(freeze) => {
+            writer.u8(2);
+            writer.string(&freeze.family_id)?;
+            writer.digest(&freeze.family_commitment_sha256)?;
+            writer.u8(u8::from(freeze.confirmation_lockbox_closed));
+            Ok((2, writer.0))
+        }
+        LedgerPayload::Decision(decision) => {
+            writer.u8(3);
+            writer.string(&decision.decision_id)?;
+            writer.string(&decision.campaign_id)?;
+            writer.u8(match decision.kind {
+                DecisionKind::Discovery => 0,
+                DecisionKind::Confirmation => 1,
+            });
+            writer.digest(&decision.policy_version_sha256)?;
+            writer.digest(&decision.input_prefix_sha256)?;
+            writer.digest(&decision.driver_receipt_sha256)?;
+            writer.digest(&decision.history_prefix_sha256)?;
+            writer.digest(&decision.action_sha256)?;
+            writer.digest(&decision.feasibility_receipt_sha256)?;
+            writer.strings(&decision.available_event_ids)?;
+            writer.strings(&decision.consumed_event_ids)?;
+            writer.optional_string(decision.confirmatory_family_id.as_deref())?;
+            Ok((3, writer.0))
+        }
+    }
+}
+
+fn genesis_root(ledger: &GlobalLedger) -> Result<String, AuditError> {
+    let mut writer = CanonicalWriter::default();
+    writer.u32(LEDGER_SCHEMA_VERSION);
+    writer.string(LEDGER_HASH_SUITE)?;
+    writer.string(&ledger.campaign_id)?;
+    writer.string(&ledger.global_filtration_id)?;
+    writer.digest(&ledger.global_filtration_sha256)?;
+    writer.string(&ledger.ledger_epoch_id)?;
+    let mut preimage = LEDGER_GENESIS_DOMAIN.to_vec();
+    preimage.extend_from_slice(&writer.0);
+    Ok(sha256_hex(&preimage))
+}
+
+fn entry_root(
+    ledger: &GlobalLedger,
+    sequence: u64,
+    previous_root: &str,
+    payload: &LedgerPayload,
+) -> Result<String, AuditError> {
+    let (payload_kind, payload_bytes) = canonical_payload(payload)?;
+    let mut writer = CanonicalWriter::default();
+    writer.u32(LEDGER_SCHEMA_VERSION);
+    writer.string(LEDGER_HASH_SUITE)?;
+    writer.string(&ledger.campaign_id)?;
+    writer.string(&ledger.global_filtration_id)?;
+    writer.digest(&ledger.global_filtration_sha256)?;
+    writer.string(&ledger.ledger_epoch_id)?;
+    writer.u64(sequence);
+    writer.digest(previous_root)?;
+    writer.u8(payload_kind);
+    writer.bytes(&payload_bytes)?;
+    let mut preimage = LEDGER_ENTRY_DOMAIN.to_vec();
+    preimage.extend_from_slice(&writer.0);
+    Ok(sha256_hex(&preimage))
+}
+
+fn prefix_digest(
+    domain: &[u8],
+    event_ids: &[String],
+    event_roots: &BTreeMap<String, String>,
+) -> Result<String, AuditError> {
+    let mut writer = CanonicalWriter::default();
+    writer.u32(LEDGER_SCHEMA_VERSION);
+    writer.u64(
+        u64::try_from(event_ids.len())
+            .map_err(|_| AuditError("prefix event list exceeds u64 length".into()))?,
+    );
+    for event_id in event_ids {
+        writer.string(event_id)?;
+        match event_roots.get(event_id) {
+            Some(root) => {
+                writer.u8(1);
+                writer.digest(root)?;
+            }
+            None => writer.u8(0),
+        }
+    }
+    let mut preimage = domain.to_vec();
+    preimage.extend_from_slice(&writer.0);
+    Ok(sha256_hex(&preimage))
+}
+
+/// Producer-side helper. Consumers must independently verify with audit_ledger.
+pub fn seal_ledger(ledger: &mut GlobalLedger) -> Result<(), AuditError> {
+    if ledger.campaign_id.is_empty()
+        || ledger.global_filtration_id.is_empty()
+        || ledger.ledger_epoch_id.is_empty()
+    {
+        return Err(AuditError(
+            "campaign, filtration, and ledger epoch IDs are required".into(),
+        ));
+    }
+    if !valid_sha256(&ledger.global_filtration_sha256) {
+        return Err(AuditError("malformed global filtration digest".into()));
+    }
+    let mut previous_root = genesis_root(ledger)?;
+    let mut event_roots = BTreeMap::new();
+    let mut ordered_event_ids = Vec::new();
+    for (index, entry) in ledger.entries.iter_mut().enumerate() {
+        let sequence = index as u64 + 1;
+        if entry.sequence != sequence {
+            return Err(AuditError(format!(
+                "global ledger sequence gap: expected {sequence}, found {}",
+                entry.sequence
+            )));
+        }
+        if let LedgerPayload::Decision(decision) = &mut entry.payload {
+            decision.input_prefix_sha256 =
+                prefix_digest(INPUT_PREFIX_DOMAIN, &ordered_event_ids, &event_roots)?;
+            decision.history_prefix_sha256 = prefix_digest(
+                HISTORY_PREFIX_DOMAIN,
+                &decision.consumed_event_ids,
+                &event_roots,
+            )?;
+        }
+        let root = entry_root(ledger, entry.sequence, &previous_root, &entry.payload)?;
+        entry.entry_commitment_sha256.clone_from(&root);
+        if let LedgerPayload::Evidence(event) = &entry.payload {
+            if event_roots.insert(event.event_id.clone(), root.clone()).is_some() {
+                return Err(AuditError(format!(
+                    "duplicate evidence event ID {} during ledger sealing",
+                    event.event_id
+                )));
+            }
+            ordered_event_ids.push(event.event_id.clone());
+        }
+        previous_root = root;
+    }
+    ledger.ledger_chain_root_sha256 = previous_root;
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LedgerIntegrityDisposition {
+    InternallyCommittedUnanchored,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExpectedTerminalCheckpoint {
+    pub campaign_id: String,
+    pub global_filtration_id: String,
+    pub ledger_epoch_id: String,
+    pub terminal_sequence: u64,
+    pub ledger_chain_root_sha256: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExternalCheckpointDisposition {
+    MatchesIndependentlyPinnedCheckpoint,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExternalCheckpointAudit {
+    pub disposition: ExternalCheckpointDisposition,
+    pub checkpoint_sha256: String,
+    pub terminal_sequence: u64,
+    pub ledger_chain_root_sha256: String,
+}
+
+pub fn expected_terminal_checkpoint_sha256(
+    checkpoint: &ExpectedTerminalCheckpoint,
+) -> Result<String, AuditError> {
+    let mut writer = CanonicalWriter::default();
+    writer.u32(LEDGER_SCHEMA_VERSION);
+    writer.string(LEDGER_HASH_SUITE)?;
+    writer.string(&checkpoint.campaign_id)?;
+    writer.string(&checkpoint.global_filtration_id)?;
+    writer.string(&checkpoint.ledger_epoch_id)?;
+    writer.u64(checkpoint.terminal_sequence);
+    writer.digest(&checkpoint.ledger_chain_root_sha256)?;
+    let mut preimage = CHECKPOINT_DOMAIN.to_vec();
+    preimage.extend_from_slice(&writer.0);
+    Ok(sha256_hex(&preimage))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -124,7 +447,12 @@ pub struct LedgerEntry {
 pub struct GlobalLedger {
     pub campaign_id: String,
     pub global_filtration_id: String,
+    /// Immutable identity for one append-only availability-ledger epoch.
+    pub ledger_epoch_id: String,
+    /// Filtration-definition identity; distinct from the evolving ledger root.
     pub global_filtration_sha256: String,
+    /// Recomputed terminal append-chain root over all entries in this epoch.
+    pub ledger_chain_root_sha256: String,
     pub entries: Vec<LedgerEntry>,
 }
 
@@ -149,28 +477,41 @@ pub struct DecisionAudit {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LedgerAudit {
     pub campaign_id: String,
+    pub ledger_epoch_id: String,
     pub final_sequence: u64,
     pub global_filtration_sha256: String,
+    pub ledger_chain_root_sha256: String,
+    pub integrity_disposition: LedgerIntegrityDisposition,
     pub decisions: Vec<DecisionAudit>,
     pub evidence_ids: Vec<String>,
 }
 
-/// Replay the immutable ledger in availability order. The event_time fields
-/// are intentionally ignored for ordering and lookahead decisions.
+/// Replay the immutable ledger in availability order and independently
+/// recompute every content-bound entry commitment and decision-time prefix.
+/// Biological event time never determines ordering or lookahead.
 pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
-    if ledger.campaign_id.is_empty() || ledger.global_filtration_id.is_empty() {
+    if ledger.campaign_id.is_empty()
+        || ledger.global_filtration_id.is_empty()
+        || ledger.ledger_epoch_id.is_empty()
+    {
         return Err(AuditError(
-            "campaign and global filtration IDs are required".into(),
+            "campaign, global filtration, and ledger epoch IDs are required".into(),
         ));
     }
-    if !valid_sha256(&ledger.global_filtration_sha256) {
-        return Err(AuditError("malformed global filtration digest".into()));
+    if !valid_sha256(&ledger.global_filtration_sha256)
+        || !valid_sha256(&ledger.ledger_chain_root_sha256)
+    {
+        return Err(AuditError(
+            "malformed filtration-definition or ledger-chain digest".into(),
+        ));
     }
 
     let mut evidence: BTreeMap<String, (u64, EvidenceEvent)> = BTreeMap::new();
+    let mut event_roots: BTreeMap<String, String> = BTreeMap::new();
     let mut families: BTreeMap<String, (u64, FamilyFreeze)> = BTreeMap::new();
     let mut decisions = Vec::new();
     let mut ordered_evidence_ids = Vec::new();
+    let mut previous_root = genesis_root(ledger)?;
 
     for (index, entry) in ledger.entries.iter().enumerate() {
         let expected_sequence = index as u64 + 1;
@@ -187,15 +528,24 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
             )));
         }
 
+        let expected_entry_root =
+            entry_root(ledger, entry.sequence, &previous_root, &entry.payload)?;
+        if entry.entry_commitment_sha256 != expected_entry_root {
+            return Err(AuditError(format!(
+                "entry commitment mismatch at global sequence {}",
+                entry.sequence
+            )));
+        }
+        previous_root.clone_from(&expected_entry_root);
+
         match &entry.payload {
             LedgerPayload::Evidence(event) => {
                 if event.event_id.is_empty()
                     || event.evidence_family_id.is_empty()
                     || event.source_stream.is_empty()
-                    || !valid_sha256(&event.source_artifact_sha256)
                 {
                     return Err(AuditError(format!(
-                        "invalid evidence identity or source digest at sequence {}",
+                        "invalid evidence identity at sequence {}",
                         entry.sequence
                     )));
                 }
@@ -265,11 +615,11 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                     }
                 }
                 evidence.insert(event.event_id.clone(), (entry.sequence, event.clone()));
+                event_roots.insert(event.event_id.clone(), expected_entry_root);
                 ordered_evidence_ids.push(event.event_id.clone());
             }
             LedgerPayload::FamilyFreeze(freeze) => {
                 if freeze.family_id.is_empty()
-                    || !valid_sha256(&freeze.family_commitment_sha256)
                     || !freeze.confirmation_lockbox_closed
                     || families.contains_key(&freeze.family_id)
                 {
@@ -282,21 +632,33 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
             }
             LedgerPayload::Decision(decision) => {
                 let mut status = DecisionAuditStatus::Accepted;
-                if decision.campaign_id != ledger.campaign_id
-                    || decision.decision_id.is_empty()
-                    || !valid_sha256(&decision.policy_version_sha256)
-                    || !valid_sha256(&decision.input_prefix_sha256)
-                    || !valid_sha256(&decision.driver_receipt_sha256)
-                    || !valid_sha256(&decision.history_prefix_sha256)
-                    || !valid_sha256(&decision.action_sha256)
-                    || !valid_sha256(&decision.feasibility_receipt_sha256)
-                {
+                if decision.campaign_id != ledger.campaign_id || decision.decision_id.is_empty() {
                     status = DecisionAuditStatus::InvalidReceipt;
                 }
+                for digest in [
+                    &decision.policy_version_sha256,
+                    &decision.input_prefix_sha256,
+                    &decision.driver_receipt_sha256,
+                    &decision.history_prefix_sha256,
+                    &decision.action_sha256,
+                    &decision.feasibility_receipt_sha256,
+                ] {
+                    if !valid_sha256(digest) {
+                        status = DecisionAuditStatus::InvalidReceipt;
+                    }
+                }
 
-                // The prefix is every evidence event actually delivered before
-                // this decision, in canonical global availability order.
-                if decision.available_event_ids != ordered_evidence_ids {
+                let expected_input_prefix =
+                    prefix_digest(INPUT_PREFIX_DOMAIN, &ordered_evidence_ids, &event_roots)?;
+                let expected_history_prefix = prefix_digest(
+                    HISTORY_PREFIX_DOMAIN,
+                    &decision.consumed_event_ids,
+                    &event_roots,
+                )?;
+                if decision.available_event_ids != ordered_evidence_ids
+                    || decision.input_prefix_sha256 != expected_input_prefix
+                    || decision.history_prefix_sha256 != expected_history_prefix
+                {
                     status = DecisionAuditStatus::PrefixMismatch;
                 }
                 match decision.kind {
@@ -374,12 +736,55 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
         }
     }
 
+    if ledger.ledger_chain_root_sha256 != previous_root {
+        return Err(AuditError(
+            "ledger terminal chain root does not match recomputed final entry".into(),
+        ));
+    }
+
     Ok(LedgerAudit {
         campaign_id: ledger.campaign_id.clone(),
+        ledger_epoch_id: ledger.ledger_epoch_id.clone(),
         final_sequence: ledger.entries.len() as u64,
         global_filtration_sha256: ledger.global_filtration_sha256.clone(),
+        ledger_chain_root_sha256: previous_root,
+        integrity_disposition: LedgerIntegrityDisposition::InternallyCommittedUnanchored,
         decisions,
         evidence_ids: ordered_evidence_ids,
+    })
+}
+
+/// Match a committed ledger to a terminal checkpoint whose commitment was
+/// pinned through an independent channel. This does not verify a signature or
+/// witness quorum; trust in the pinned digest remains external.
+pub fn audit_ledger_against_external_checkpoint(
+    ledger: &GlobalLedger,
+    checkpoint: &ExpectedTerminalCheckpoint,
+    independently_pinned_checkpoint_sha256: &str,
+) -> Result<ExternalCheckpointAudit, AuditError> {
+    let audit = audit_ledger(ledger)?;
+    let computed = expected_terminal_checkpoint_sha256(checkpoint)?;
+    if computed != independently_pinned_checkpoint_sha256 {
+        return Err(AuditError(
+            "terminal checkpoint does not match the independently pinned checkpoint digest"
+                .into(),
+        ));
+    }
+    if checkpoint.campaign_id != ledger.campaign_id
+        || checkpoint.global_filtration_id != ledger.global_filtration_id
+        || checkpoint.ledger_epoch_id != ledger.ledger_epoch_id
+        || checkpoint.terminal_sequence != audit.final_sequence
+        || checkpoint.ledger_chain_root_sha256 != audit.ledger_chain_root_sha256
+    {
+        return Err(AuditError(
+            "ledger does not match the externally pinned terminal checkpoint".into(),
+        ));
+    }
+    Ok(ExternalCheckpointAudit {
+        disposition: ExternalCheckpointDisposition::MatchesIndependentlyPinnedCheckpoint,
+        checkpoint_sha256: computed,
+        terminal_sequence: audit.final_sequence,
+        ledger_chain_root_sha256: audit.ledger_chain_root_sha256,
     })
 }
 
