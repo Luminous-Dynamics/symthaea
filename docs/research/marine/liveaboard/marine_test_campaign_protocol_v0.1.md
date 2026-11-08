@@ -68,7 +68,7 @@ Each campaign binds:
 - exact analysis profile and acceptance-criteria owner;
 - protocol deviations, aborts, missing samples and data-quality status.
 
-A replaced instrument, moved sensor, modified pipe/wiring, changed module revision or changed calibration epoch creates a new measurement context. Historical raw observations remain historical; do not rewrite them to match the new configuration.
+A replaced instrument, moved sensor, modified pipe/wiring, changed module revision or changed calibration epoch creates a new measurement context. Historical raw observations remain historical; do not rewrite them to match the new configuration. Each measurement channel binds its own as-built configuration digest and each campaign declares a maximum synchronization-uncertainty budget for the claimed analysis. The verifier compares these values; it does not assume a channel inherits the article's identity or that clocks are aligned because samples share an index.
 
 ## 5. Channel profile and sampling adequacy
 
@@ -113,6 +113,7 @@ Use event-based phase markers and calibrated dimensions/mass where relevant. Pre
 ## 7. Current standards and method boundaries
 
 - **ISO 16315:2026 Edition 2** was published 6 February 2026. Its scope covers design/installation of AC/DC electric propulsion and the electrical part of hybrid propulsion on small craft up to 24 m LH, with stated voltage scope below 1,500 V DC and up to 1,000 V single-/three-phase AC. The 2026 edition clarifies overcurrent protection and revises fault monitoring for isolated DC systems. Confirm exact applicability and review the licensed standard with a qualified marine electrical engineer; record applicable clause refs without reproducing copyrighted text. Official record: https://www.iso.org/standard/84203.html
+- **ISO 16315:2026 Edition 2**: ISO's public metadata notes that the 2026 edition clarifies overcurrent protection and revises fault monitoring for isolated DC systems. For LOS electric/hybrid propulsion, record the exact applicable edition and reviewer-approved requirements; capture relevant pre-commissioning test evidence and protection/fault-monitoring observations in the qualified electrical test plan. Do not infer compliance from a sensor log or reproduce licensed standard text. https://www.iso.org/standard/84203.html
 - **ITTC Recommended Procedures register, Revision 10** includes resistance-test and uncertainty-analysis procedure families. Use current applicable ITTC procedures for towing-tank/model-test campaigns; do not improvise instrumentation or uncertainty methodology. https://ittc.info/downloads/quality-systems-manual/recommended-procedures-and-guidelines/
 - **ISO 25175:2026** covers specified RO/NF membrane-element tests, not installed watermaker service or potable-water acceptance. https://www.iso.org/standard/89252.html
 - **Bordbar et al. 2026 shipyard production planning review** finds hybrid DES–optimisation more operationally credible than many architecture-rich but longitudinally unvalidated DT/AI systems; it reinforces the need for calibrated data, execution-layer connections and long-run KPIs. https://doi.org/10.3390/jmse14040396
