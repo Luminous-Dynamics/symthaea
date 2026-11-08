@@ -68,6 +68,8 @@ The protocol module covers the boolean hidden-lag world, numeric direct/leaky-me
 
 `policy::FiniteEnumeratorBaseline` consumes only `AgentView` values and emits one probe or a terminal submission. It uses exact consistency filtering over the declared finite model family and the finite partition heuristic. This provides a transparent reproducible reference against which the learned Symthaea research policy can be compared; it is not itself learned and does not demonstrate scientific discovery beyond the finite grammar.
 
+`strategies::ProbeStrategy` makes the experimental-design comparison explicit: maximum partition count, minimax worst-case survivors, maximum entropy, minimum expected remaining candidates under a uniform prior, fixed-grid and seeded-random selection. `policy::StrategyEnumeratorBaseline` pairs these choices with the same inference/submission logic. The exact expected-survivor statistic is the sum of squared outcome-partition sizes divided by the candidate count; entropy and expected survivors are uniform-prior controls, not calibrated Bayesian posteriors or decision-focused EVSI. The random control is deterministic under its seed.
+
 Its current policy tests exercise paired numeric A0/A2 episodes using the same generating model and probe budget, plus a full-factorial interaction discovery episode. The evaluator separately asserts that the hidden generating model belongs to the computed version space. This is a test harness for the protocol and baseline, not a reported benchmark score.
 
 ## Current limitations / next falsifiable milestones
