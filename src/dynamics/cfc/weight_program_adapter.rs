@@ -477,6 +477,194 @@ pub struct CfCGaussianPermutationProbeScore {
     pub expected_posterior_permutation_entropy_nats: f64,
 }
 
+/// Provenance class for a scalar activation-projection noise calibration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CfCProjectionNoiseCalibrationMethod {
+    RepeatedProjectionRuns,
+    DevicePrecisionStudy,
+    StochasticActivationModel,
+    IndependentBootstrap,
+}
+
+impl CfCProjectionNoiseCalibrationMethod {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::RepeatedProjectionRuns => "repeated_projection_runs",
+            Self::DevicePrecisionStudy => "device_precision_study",
+            Self::StochasticActivationModel => "stochastic_activation_model",
+            Self::IndependentBootstrap => "independent_bootstrap",
+        }
+    }
+}
+
+/// Empirical noise estimate bound to the exact CfC pair and scalar projection.
+///
+/// Samples are repeated measurements of the same scalar projection under a
+/// frozen probe corpus. The unbiased sample standard deviation is used as the
+/// Gaussian observation scale. A zero-variance sample is rejected: callers
+/// must use a deterministic margin objective or establish a justified noise
+/// model rather than inject a convenient non-zero value.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCProjectionNoiseCalibration {
+    pub format_version: u32,
+    pub source_model_digest: String,
+    pub candidate_model_digest: String,
+    pub architecture_digest: String,
+    pub manifest_digest: String,
+    pub layer_index: usize,
+    pub projection_digest: String,
+    pub calibration_probe_digest: String,
+    pub method: CfCProjectionNoiseCalibrationMethod,
+    pub sample_count: usize,
+    pub sample_mean: f64,
+    pub observation_std_dev: f64,
+    pub calibration_digest: String,
+}
+
+/// Compute a source/candidate-bound projection-noise receipt from repeated
+/// measurements of the deterministic projection on a frozen calibration set.
+///
+/// The caller is responsible for collecting repeated measurements under the
+/// declared method and producing the calibration probe-corpus digest. The
+/// constructor calculates the statistics and binds the evidence to the exact
+/// model pair, layer, and projection so it cannot be reused after an edit.
+pub fn calibrate_cfc_projection_observation_noise(
+    source: &CfCNetwork,
+    candidate: &CfCNetwork,
+    layer_index: usize,
+    calibration_probe_digest: &str,
+    method: CfCProjectionNoiseCalibrationMethod,
+    repeated_projection_samples: &[f64],
+) -> Result<CfCProjectionNoiseCalibration, CfCPermutationAlignmentError> {
+    if repeated_projection_samples.len() < 2 {
+        return Err(CfCPermutationAlignmentError::InsufficientNoiseCalibrationSamples {
+            actual: repeated_projection_samples.len(),
+            minimum: 2,
+        });
+    }
+    if !is_lowercase_hex_digest(calibration_probe_digest) {
+        return Err(CfCPermutationAlignmentError::InvalidNoiseCalibrationDigest {
+            field: "calibration_probe_digest",
+        });
+    }
+    if let Some(index) = repeated_projection_samples
+        .iter()
+        .position(|sample| !sample.is_finite())
+    {
+        return Err(CfCPermutationAlignmentError::NonFiniteNoiseCalibrationSample { index });
+    }
+
+    let source_fingerprint = source
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    let candidate_fingerprint = candidate
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    if source_fingerprint.architecture_digest != candidate_fingerprint.architecture_digest {
+        return Err(CfCPermutationAlignmentError::ArchitectureMismatch {
+            source: source_fingerprint.architecture_digest,
+            candidate: candidate_fingerprint.architecture_digest,
+        });
+    }
+    if source_fingerprint.manifest_digest != candidate_fingerprint.manifest_digest {
+        return Err(CfCPermutationAlignmentError::ManifestMismatch {
+            source: source_fingerprint.manifest_digest,
+            candidate: candidate_fingerprint.manifest_digest,
+        });
+    }
+    if layer_index >= source.config().num_layers {
+        return Err(CfCPermutationAlignmentError::InvalidLayerIndex {
+            layer_index,
+            layer_count: source.config().num_layers,
+        });
+    }
+
+    let sample_mean = repeated_projection_samples.iter().sum::<f64>()
+        / repeated_projection_samples.len() as f64;
+    let sample_variance = repeated_projection_samples
+        .iter()
+        .map(|sample| (sample - sample_mean).powi(2))
+        .sum::<f64>()
+        / (repeated_projection_samples.len() - 1) as f64;
+    let observation_std_dev = sample_variance.sqrt();
+    if !observation_std_dev.is_finite() || observation_std_dev <= 0.0 {
+        return Err(CfCPermutationAlignmentError::DegenerateNoiseCalibration);
+    }
+
+    let projection = deterministic_permutation_projection(
+        &source_fingerprint.architecture_digest,
+        layer_index,
+        source.config().hidden_dim,
+    );
+    let projection_digest = digest_projection(&projection);
+    let calibration_digest = digest_cfc_projection_noise_calibration(
+        &source_fingerprint.model_digest,
+        &candidate_fingerprint.model_digest,
+        &source_fingerprint.architecture_digest,
+        &source_fingerprint.manifest_digest,
+        layer_index,
+        &projection_digest,
+        calibration_probe_digest,
+        method,
+        repeated_projection_samples,
+        sample_mean,
+        observation_std_dev,
+    );
+
+    Ok(CfCProjectionNoiseCalibration {
+        format_version: 1,
+        source_model_digest: source_fingerprint.model_digest,
+        candidate_model_digest: candidate_fingerprint.model_digest,
+        architecture_digest: source_fingerprint.architecture_digest,
+        manifest_digest: source_fingerprint.manifest_digest,
+        layer_index,
+        projection_digest,
+        calibration_probe_digest: calibration_probe_digest.to_owned(),
+        method,
+        sample_count: repeated_projection_samples.len(),
+        sample_mean,
+        observation_std_dev,
+        calibration_digest,
+    })
+}
+
+fn digest_cfc_projection_noise_calibration(
+    source_model_digest: &str,
+    candidate_model_digest: &str,
+    architecture_digest: &str,
+    manifest_digest: &str,
+    layer_index: usize,
+    projection_digest: &str,
+    calibration_probe_digest: &str,
+    method: CfCProjectionNoiseCalibrationMethod,
+    samples: &[f64],
+    sample_mean: f64,
+    observation_std_dev: f64,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-cfc-projection-noise-calibration-v1\0");
+    for value in [
+        source_model_digest,
+        candidate_model_digest,
+        architecture_digest,
+        manifest_digest,
+        projection_digest,
+        calibration_probe_digest,
+        method.as_str(),
+    ] {
+        hasher.update(&(value.len() as u64).to_le_bytes());
+        hasher.update(value.as_bytes());
+    }
+    hasher.update(&(layer_index as u64).to_le_bytes());
+    hasher.update(&(samples.len() as u64).to_le_bytes());
+    hasher.update(&sample_mean.to_le_bytes());
+    hasher.update(&observation_std_dev.to_le_bytes());
+    for sample in samples {
+        hasher.update(&sample.to_le_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
 /// Source-bound receipt for Gaussian-channel EIG over an exact small permutation space.
 ///
 /// The likelihood is a scalar Gaussian observation: a deterministic projection of
@@ -621,6 +809,21 @@ pub enum CfCPermutationAlignmentError {
     },
     #[error("permutation posterior normalization failed")]
     InvalidPermutationPosterior,
+    #[error("noise calibration has {actual} repeated projection samples; at least {minimum} are required")]
+    InsufficientNoiseCalibrationSamples {
+        actual: usize,
+        minimum: usize,
+    },
+    #[error("noise calibration sample {index} is non-finite")]
+    NonFiniteNoiseCalibrationSample { index: usize },
+    #[error("noise calibration has zero or invalid sample variance")]
+    DegenerateNoiseCalibration,
+    #[error("noise calibration receipt has an invalid {field} digest")]
+    InvalidNoiseCalibrationDigest { field: &'static str },
+    #[error("noise calibration does not match the current {field}")]
+    StaleNoiseCalibration { field: &'static str },
+    #[error("noise calibration receipt is malformed: {field}")]
+    MalformedNoiseCalibration { field: &'static str },
     #[error("canonicalization would not change any parameters")]
     NoOpCanonicalization,
 }
