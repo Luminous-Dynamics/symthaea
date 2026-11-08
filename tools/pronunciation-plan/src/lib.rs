@@ -851,7 +851,6 @@ impl VocalScoreAlignment {
     }
 }
 
-
 /// Typed articulatory/phonological features attached to a language-specific
 /// inventory phone. Multi-character orthographic graphemes are normalized to
 /// one of these IPA tokens before a PronunciationPlan is created.
@@ -1001,7 +1000,10 @@ impl LanguageProfileManifest {
         if self.profile_id.trim().is_empty()
             || !valid_source_digest(&format!("git-sha1:{}", self.source_revision))
             || self.language_tag.trim().is_empty()
-            || self.language_tag.bytes().any(|byte| byte.is_ascii_whitespace())
+            || self
+                .language_tag
+                .bytes()
+                .any(|byte| byte.is_ascii_whitespace())
             || self.dialect.trim().is_empty()
             || self.orthography_id.trim().is_empty()
             || self.inventory_version.trim().is_empty()
@@ -1028,7 +1030,10 @@ impl LanguageProfileManifest {
                 ));
             }
             if phone.features.is_empty() {
-                return Err(format!("phone {:?} has no articulatory features", phone.ipa));
+                return Err(format!(
+                    "phone {:?} has no articulatory features",
+                    phone.ipa
+                ));
             }
             let features: std::collections::BTreeSet<_> = phone.features.iter().copied().collect();
             if features.len() != phone.features.len() {
@@ -1037,17 +1042,19 @@ impl LanguageProfileManifest {
             match phone.kind {
                 PhoneKind::Vowel => {
                     has_vowel = true;
-                    if features.iter().any(|feature| matches!(
-                        feature,
-                        PhoneFeature::Click
-                            | PhoneFeature::ClickDental
-                            | PhoneFeature::ClickAlveolar
-                            | PhoneFeature::ClickPostAlveolar
-                            | PhoneFeature::ClickLateral
-                            | PhoneFeature::Aspirated
-                            | PhoneFeature::Ejective
-                            | PhoneFeature::Implosive
-                    )) {
+                    if features.iter().any(|feature| {
+                        matches!(
+                            feature,
+                            PhoneFeature::Click
+                                | PhoneFeature::ClickDental
+                                | PhoneFeature::ClickAlveolar
+                                | PhoneFeature::ClickPostAlveolar
+                                | PhoneFeature::ClickLateral
+                                | PhoneFeature::Aspirated
+                                | PhoneFeature::Ejective
+                                | PhoneFeature::Implosive
+                        )
+                    }) {
                         return Err(format!("vowel {:?} has consonant-only features", phone.ipa));
                     }
                 }
@@ -1162,7 +1169,10 @@ impl LanguageProfileManifest {
                 ));
             }
             if capability.status == LanguageTaskStatus::Qualified
-                && (capability.evidence_reference.as_deref().is_none_or(str::is_empty)
+                && (capability
+                    .evidence_reference
+                    .as_deref()
+                    .is_none_or(str::is_empty)
                     || capability.evidence_digest.is_none())
             {
                 return Err(format!(
@@ -1171,16 +1181,23 @@ impl LanguageProfileManifest {
                 ));
             }
         }
-        for required in [LanguageTask::GraphemeToPhoneme, LanguageTask::Syllabification] {
+        for required in [
+            LanguageTask::GraphemeToPhoneme,
+            LanguageTask::Syllabification,
+        ] {
             if !tasks.contains(&required) {
-                return Err(format!("language profile must explicitly state {required:?} capability"));
+                return Err(format!(
+                    "language profile must explicitly state {required:?} capability"
+                ));
             }
         }
         Ok(())
     }
 
     pub fn capability(&self, task: LanguageTask) -> Option<&LanguageTaskCapability> {
-        self.capabilities.iter().find(|capability| capability.task == task)
+        self.capabilities
+            .iter()
+            .find(|capability| capability.task == task)
     }
 }
 
@@ -1253,7 +1270,10 @@ impl ProfiledPronunciationPlan {
         self.validate_against(profile)?;
         self.pronunciation.validate_renderable()?;
         let capability = profile.capability(task).ok_or_else(|| {
-            format!("language profile {} does not declare capability {task:?}", profile.profile_id)
+            format!(
+                "language profile {} does not declare capability {task:?}",
+                profile.profile_id
+            )
         })?;
         if capability.status != LanguageTaskStatus::Qualified {
             return Err(format!(
@@ -1344,7 +1364,11 @@ mod tests {
                 LanguageProfilePhone {
                     ipa: "m".into(),
                     kind: PhoneKind::SyllabicConsonant,
-                    features: vec![PhoneFeature::Syllabic, PhoneFeature::Nasal, PhoneFeature::Voiced],
+                    features: vec![
+                        PhoneFeature::Syllabic,
+                        PhoneFeature::Nasal,
+                        PhoneFeature::Voiced,
+                    ],
                 },
             ],
             resources: vec![LanguageResourceReceipt {
@@ -1537,7 +1561,12 @@ mod tests {
     fn language_profile_rejects_excluded_or_unlicensed_resource() {
         let mut profile = xhosa_profile_fixture();
         profile.resources[0].rights_status = ResourceRightsStatus::Excluded;
-        assert!(profile.validate().unwrap_err().contains("excluded resource"));
+        assert!(
+            profile
+                .validate()
+                .unwrap_err()
+                .contains("excluded resource")
+        );
 
         let mut profile = xhosa_profile_fixture();
         profile.resources[0].license_expression = "NOASSERTION".into();
