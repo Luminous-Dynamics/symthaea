@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_metric_golden_v0.1.schema.json",
+  "title": "Switch Metric Golden Vectors",
+  "description": "Synthetic-only shared test vectors for WER, PIER, SETER and SPER@k. Structural validation does not establish test execution or empirical language performance.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "description",
+    "token_indexing",
+    "alignment_policy",
+    "normalization_policy",
+    "metric_definitions",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "description": {
+      "type": "string"
+    },
+    "token_indexing": {
+      "const": "zero_based"
+    },
+    "alignment_policy": {
+      "type": "string"
+    },
+    "normalization_policy": {
+      "type": "string"
+    },
+    "metric_definitions": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference_tokens",
+          "hypothesis_tokens",
+          "language_tags",
+          "poi_tags",
+          "window_radii",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_tokens": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hypothesis_tokens": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "language_tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "poi_tags": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "window_radii": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "wer",
+              "pier"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "reference_tokens": {
+                  "minItems": 1
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "language_tags": {
+                  "minItems": 1
+                },
+                "poi_tags": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "id": {
+                  "const": "empty_reference_rejected"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "reference_tokens": {
+                  "maxItems": 0
+                },
+                "language_tags": {
+                  "maxItems": 0
+                },
+                "poi_tags": {
+                  "maxItems": 0
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
