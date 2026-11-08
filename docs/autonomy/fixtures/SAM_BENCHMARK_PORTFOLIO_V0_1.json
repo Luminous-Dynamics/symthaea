@@ -79,7 +79,8 @@
         "The vendor table lists GPT-5.5 at 0.502 versus Alpamayo 2 Super at 0.433 on the OOD reasoning benchmark; it does not lead every reasoning metric.",
         "AlpaSim Score is a distinct evaluator and is not directly comparable to NAVSIM EPDMS, Bench2Drive DS or real-world crash rates.",
         "Published inference path is BF16 for a 34B model; compare compute, precision, hardware, sensor privilege and latency before treating it as a deployment baseline.",
-        "Not directly comparable to Bench2Drive, Fail2Drive, Waymo Motion or Waymo operational outcome data."
+        "Not directly comparable to Bench2Drive, Fail2Drive, Waymo Motion or Waymo operational outcome data.",
+        "NVIDIA describes Alpamayo models as cloud-side teacher models, not in-vehicle runtimes; use this 34B model as a teacher/reasoning/data-generation comparator and evaluate edge deployment under a separate hardware, memory, power, precision and p95/p99 latency budget."
       ],
       "sources": [
         "https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/",
@@ -1174,7 +1175,7 @@
     "reactsim_bench_2026": "Beat strongest reproduced actor-world-model baselines on matched ego-deviation inputs, preserving AV-agent risk, agent-agent collision, off-road, direction and kinematic feasibility metrics separately; qualify reciprocal online interaction separately.",
     "sam-traffic-convention-mirror-v0.1": "100% of exact paired geometric/control sign invariants; 100% of missing/stale/map-rule-mismatch negatives reject or remain unresolved; 0 silent inference of traffic side from steering-wheel layout, GPS, map appearance or image pixel orientation.",
     "drivinggen_iclr_2026": "Reproduce the exact 400-paper-sample or separately frozen hosted-card release with pinned sample IDs, then improve worst-stratum scene/agent temporal consistency, automotive imaging quality, trajectory feasibility and ego-control alignment without regressions. Add a distinct decision-value experiment: counterfactual planner outcome and reactive-agent response under matched action/call budgets; do not treat visual scores as downstream safety.",
-    "nuplan_r_2026": "Reproduce the exact nuPlan-R Diffusion-Planner Test14-Hard baseline first, then improve CLS, SR and PR separately while preserving or improving TTC JSD, cluster-trajectory FID, entropy and agent collision/off-road plausibility; extend to branch-synchronized reciprocal policies with exact actor observation and replay receipts."
+    "nuplan_r_2026": "Reproduce the exact nuPlan-R Diffusion-Planner Test14-Hard baseline first. Stretch target: +2 CLS points and +2 percentage points Success Rate at matched settings, with no regression in All-Core Pass Rate, worst-family collision/off-road, agent realism/diversity or p99 latency. All thresholds are prospective and require paired family-cluster uncertainty intervals."
   },
   "global_rules": [
     "No composite score across non-comparable benchmark families.",
