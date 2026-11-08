@@ -2157,6 +2157,245 @@
         }
       ],
       "additionalProperties": false
+    },
+    "counterfactual_pairs": {
+      "type": "object",
+      "description": "Optional paired causal evaluation receipt. Distinguishes text nuisance invariance, audio-relevant evidence sensitivity and acoustic nuisance robustness.",
+      "required": [
+        "mode",
+        "pair_manifest_sha256",
+        "intervention_manifest_sha256",
+        "trial_manifest_sha256",
+        "scorer_revision",
+        "condition_manifest_schema_version",
+        "changed_dimension_annotation_revision",
+        "pair_count",
+        "pair_kinds",
+        "pair_split_revision"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "NOT_USED",
+            "SYNTHETIC_ONLY",
+            "ADMITTED_COUNTERFACTUAL_PAIR_EVALUATION"
+          ]
+        },
+        "pair_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "intervention_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "trial_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        },
+        "scorer_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "condition_manifest_schema_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changed_dimension_annotation_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pair_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "TEXT_NUISANCE",
+              "AUDIO_RELEVANT",
+              "AUDIO_NUISANCE"
+            ]
+          }
+        },
+        "pair_split_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_lineage_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/sha256"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "NOT_USED"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "pair_manifest_sha256": {
+                "type": "null"
+              },
+              "intervention_manifest_sha256": {
+                "type": "null"
+              },
+              "trial_manifest_sha256": {
+                "type": "null"
+              },
+              "scorer_revision": {
+                "type": "null"
+              },
+              "condition_manifest_schema_version": {
+                "type": "null"
+              },
+              "changed_dimension_annotation_revision": {
+                "type": "null"
+              },
+              "pair_count": {
+                "const": 0
+              },
+              "pair_kinds": {
+                "maxItems": 0
+              },
+              "pair_split_revision": {
+                "type": "null"
+              },
+              "source_lineage_manifest_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "SYNTHETIC_ONLY",
+                  "ADMITTED_COUNTERFACTUAL_PAIR_EVALUATION"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "pair_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "intervention_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "trial_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "scorer_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "condition_manifest_schema_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "changed_dimension_annotation_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pair_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pair_kinds": {
+                "minItems": 1
+              },
+              "pair_split_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_lineage_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
     }
   },
   "$defs": {
