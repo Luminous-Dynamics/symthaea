@@ -9,6 +9,9 @@
 use piper_plus_g2p::Phonemizer;
 use piper_plus_g2p::english::EnglishPhonemizer;
 
+mod normalize;
+use normalize::normalize_piper_english;
+
 const CASES: &[(&str, &str)] = &[
     ("baseline", "hello world"),
     ("clusters", "quick queen strength sixth"),
@@ -26,7 +29,7 @@ fn main() {
     let phonemizer = EnglishPhonemizer::new_bundled()
         .expect("bundled Piper Plus English dictionary must initialize");
 
-    println!("case_id\ttext\tpiper_ipa_tokens\tmuse_word_ipa_tokens\tprosody_debug");
+    println!("case_id\ttext\tpiper_ipa_tokens\tnormalized_word_hypotheses_json\tmuse_word_ipa_tokens\tprosody_debug");
     for (case_id, text) in CASES {
         let words: Vec<&str> = text.split_whitespace().collect();
         let muse_word_syllable_counts: Vec<usize> = words
@@ -58,10 +61,23 @@ fn main() {
 
         match phonemizer.phonemize_with_prosody(text) {
             Ok((tokens, prosody)) => {
-                println!("{case_id}\t{text}\t{tokens:?}\t{muse_word_tokens:?}\t{prosody:?}");
+                match normalize_piper_english(&tokens, &prosody) {
+                    Ok(hypothesis) => {
+                        let normalized_json =
+                            serde_json::to_string(&hypothesis).expect("hypothesis serialization");
+                        println!(
+                            "{case_id}\t{text}\t{tokens:?}\t{normalized_json}\t{muse_word_tokens:?}\t{prosody:?}"
+                        );
+                    }
+                    Err(error) => {
+                        println!(
+                            "{case_id}\t{text}\t{tokens:?}\tNORMALIZATION_ERROR: {error}\t{muse_word_tokens:?}\t{prosody:?}"
+                        );
+                    }
+                }
             }
             Err(error) => {
-                println!("{case_id}\t{text}\tERROR: {error}\t{muse_word_tokens:?}\t-");
+                println!("{case_id}\t{text}\tERROR: {error}\t-\t{muse_word_tokens:?}\t-");
             }
         }
     }
