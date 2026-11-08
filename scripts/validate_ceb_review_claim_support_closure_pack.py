@@ -209,7 +209,7 @@ def self_test() -> list[str]:
         ("support closure removed", protocol, challenge.replace("Support closure:", "Missing:", 1), key, continuity),
         ("unaffectedness proof removed", protocol.replace("unaffectedness witness", "no retain proof"), challenge, key, continuity),
         ("public key boundary removed", protocol, challenge, key.replace("not secure blinding", "secure"), continuity),
-        ("continuity link removed", protocol, challenge, key, continuity.replace("claim-support closure", "removed")),
+        ("continuity link removed", protocol, challenge, key, continuity.replace("## 14.3 Claim-support closure extension", "## 14.3 Missing extension")),
         ("authority revocation omitted", protocol.replace("Security/authority", "Security event"), challenge, key, continuity),
     )
     for label, mutated_protocol, mutated_challenge, mutated_key, mutated_continuity in mutations:
