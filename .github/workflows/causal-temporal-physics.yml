@@ -150,6 +150,19 @@ jobs:
             echo "- Claim boundary: finite-system signal and numerical convergence only; not thermodynamic DTC phase proof"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run curved 1+1D conformal-FRW causal-set sweep
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example curved_frw_sweep | tee curved-frw-sweep.csv
+          {
+            echo "## Curved 1+1D conformal-FRW causal-set sweep"
+            echo "- Flat kappa=0 control and curved volume-weighted sprinklings"
+            echo "- Empirical order fractions compared with deterministic Halton importance quadrature"
+            echo "- Claim boundary: finite-sample kinematics only; no continuum-limit or quantum-gravity claim"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
