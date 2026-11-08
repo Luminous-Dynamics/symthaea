@@ -152,14 +152,30 @@ pub struct IntervalSelectionPlan<Id> {
 }
 
 
+/// Immutable snapshot identity for a group-level interval.
+///
+/// The member-set and content digests bind the selector plan back to the exact
+/// group envelope; generation fields prevent cross-snapshot routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GroupScoreIntervalIdentity {
+    /// Manifest generation containing the group.
+    pub manifest_generation: u64,
+    /// Eligibility generation used to build the group.
+    pub eligibility_generation: u64,
+    /// Digest of the stable eligible member-ID set.
+    pub member_set_digest: [u8; 32],
+    /// Digest of member payloads, extrema, centroid and radius.
+    pub content_digest: [u8; 32],
+}
+
 /// One group whose interval encloses every eligible member in that group.
 ///
 /// Group records can only be built from a validated in-memory group envelope;
-/// this prevents arbitrary caller-supplied intervals from entering the
-/// weighted exact selector through the public API.
+/// the returned identity is the envelope's pinned snapshot identity, not an
+/// unrelated caller-supplied display label.
 #[derive(Debug, Clone, PartialEq)]
-pub struct GroupScoreIntervalRecord<Id> {
-    id: Id,
+pub struct GroupScoreIntervalRecord {
+    identity: GroupScoreIntervalIdentity,
     member_count: usize,
     interval: ContinuousHVScoreInterval,
 }
@@ -187,11 +203,10 @@ impl std::fmt::Display for GroupScoreIntervalBuildError {
 
 impl std::error::Error for GroupScoreIntervalBuildError {}
 
-impl<Id> GroupScoreIntervalRecord<Id> {
+impl GroupScoreIntervalRecord {
     /// Construct from an in-memory group envelope after its pinned snapshot is
     /// revalidated and its query-specific interval is computed.
     pub fn from_group_envelope(
-        id: Id,
         envelope: &ContinuousHVGroupEnvelope,
         query: &ContinuousHV,
         expected_manifest_generation: u64,
@@ -216,15 +231,20 @@ impl<Id> GroupScoreIntervalRecord<Id> {
             return Err(GroupScoreIntervalBuildError::InvalidInterval);
         }
         Ok(Self {
-            id,
+            identity: GroupScoreIntervalIdentity {
+                manifest_generation: expected_manifest_generation,
+                eligibility_generation: expected_eligibility_generation,
+                member_set_digest: expected_member_set_digest,
+                content_digest: expected_content_digest,
+            },
             member_count,
             interval,
         })
     }
 
-    /// Stable group identifier.
-    pub fn id(&self) -> &Id {
-        &self.id
+    /// Exact group identity carried into the selection plan.
+    pub fn identity(&self) -> GroupScoreIntervalIdentity {
+        self.identity
     }
 
     /// Number of eligible records represented by this interval.
@@ -261,13 +281,13 @@ pub struct GroupIntervalCoverageCounts {
 /// the threshold remains for refinement; only groups with upper < threshold
 /// may be excluded.
 #[derive(Debug, Clone, PartialEq)]
-pub struct GroupIntervalSelectionPlan<Id> {
+pub struct GroupIntervalSelectionPlan {
     /// kth-largest weighted lower endpoint over the complete eligible corpus.
     pub threshold: f32,
-    /// Groups whose members must be visited or refined.
-    pub refinement_group_ids: Vec<Id>,
-    /// Groups proven unable to contain a member in the exact top-k.
-    pub excluded_group_ids: Vec<Id>,
+    /// Snapshot-bound group identities whose members must be visited or refined.
+    pub refinement_groups: Vec<GroupScoreIntervalIdentity>,
+    /// Snapshot-bound groups proven unable to contain a member in the exact top-k.
+    pub excluded_groups: Vec<GroupScoreIntervalIdentity>,
     /// Number of records represented by the refinement groups.
     pub refinement_record_count: usize,
     /// Number of records avoided by excluding whole groups.
@@ -492,7 +512,7 @@ where
         } else {
             right.interval.lower.total_cmp(&left.interval.lower)
         };
-        lower_order.then_with(|| left.id.cmp(&right.id))
+        lower_order.then_with(|| left.identity.cmp(&right.identity))
     });
     let threshold = lower_order[top_k - 1].interval.lower;
 
@@ -532,14 +552,11 @@ where
 /// a pinned membership/eligibility snapshot, and a genuine group enclosure.
 /// The public constructor for GroupScoreIntervalRecord revalidates the
 /// ContinuousHVGroupEnvelope snapshot before it supplies the interval.
-pub fn select_group_refinement_set<Id>(
-    groups: &[GroupScoreIntervalRecord<Id>],
+pub fn select_group_refinement_set(
+    groups: &[GroupScoreIntervalRecord],
     top_k: usize,
     coverage: GroupIntervalCoverageCounts,
-) -> Result<GroupIntervalSelectionPlan<Id>, GroupIntervalSelectionError>
-where
-    Id: Ord + Clone,
-{
+) -> Result<GroupIntervalSelectionPlan, GroupIntervalSelectionError> {
     let mut covered_records = 0usize;
     let mut first_index_by_id = BTreeMap::new();
     let mut lower_order: Vec<&GroupScoreIntervalRecord<Id>> =
@@ -552,13 +569,13 @@ where
         if !group.interval.is_well_formed() {
             return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
         }
-        if let Some(first_index) = first_index_by_id.get(&group.id).copied() {
+        if let Some(first_index) = first_index_by_id.get(&group.identity.member_set_digest).copied() {
             return Err(GroupIntervalSelectionError::DuplicateGroupId {
                 first_index,
                 duplicate_index: group_index,
             });
         }
-        first_index_by_id.insert(group.id.clone(), group_index);
+        first_index_by_id.insert(group.identity.member_set_digest, group_index);
         covered_records = covered_records
             .checked_add(group.member_count)
             .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
@@ -592,7 +609,7 @@ where
         } else {
             right.interval.lower.total_cmp(&left.interval.lower)
         };
-        lower_order.then_with(|| left.id.cmp(&right.id))
+        lower_order.then_with(|| left.identity.cmp(&right.identity))
     });
 
     let mut cumulative_members = 0usize;
@@ -611,30 +628,30 @@ where
         eligible_records: covered_records,
     })?;
 
-    let mut refinement_group_ids = Vec::new();
-    let mut excluded_group_ids = Vec::new();
+    let mut refinement_groups = Vec::new();
+    let mut excluded_groups = Vec::new();
     let mut refinement_record_count = 0usize;
     let mut excluded_record_count = 0usize;
     for group in groups {
         if group.interval.upper >= threshold {
-            refinement_group_ids.push(group.id.clone());
+            refinement_groups.push(group.identity);
             refinement_record_count = refinement_record_count
                 .checked_add(group.member_count)
                 .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
         } else {
-            excluded_group_ids.push(group.id.clone());
+            excluded_groups.push(group.identity);
             excluded_record_count = excluded_record_count
                 .checked_add(group.member_count)
                 .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
         }
     }
-    refinement_group_ids.sort();
-    excluded_group_ids.sort();
+    refinement_groups.sort();
+    excluded_groups.sort();
 
     Ok(GroupIntervalSelectionPlan {
         threshold,
-        refinement_group_ids,
-        excluded_group_ids,
+        refinement_groups,
+        excluded_groups,
         refinement_record_count,
         excluded_record_count,
     })
@@ -683,7 +700,7 @@ where
         } else {
             right.score.total_cmp(&left.score)
         };
-        score_order.then_with(|| left.id.cmp(&right.id))
+        score_order.then_with(|| left.identity.cmp(&right.identity))
     });
 
     Ok(ordered
@@ -727,16 +744,27 @@ mod tests {
         member_count: usize,
         lower: f32,
         upper: f32,
-    ) -> GroupScoreIntervalRecord<String> {
+    ) -> GroupScoreIntervalRecord {
+        let mut member_set_digest = [0u8; 32];
+        for (index, byte) in id.bytes().enumerate() {
+            member_set_digest[index % 32] ^= byte;
+        }
+        let mut content_digest = member_set_digest;
+        content_digest[31] ^= 0xA5;
         GroupScoreIntervalRecord {
-            id: id.to_owned(),
+            identity: GroupScoreIntervalIdentity {
+                manifest_generation: 1,
+                eligibility_generation: 1,
+                member_set_digest,
+                content_digest,
+            },
             member_count,
             interval: ContinuousHVScoreInterval { lower, upper },
         }
     }
 
     fn complete_group_coverage(
-        groups: &[GroupScoreIntervalRecord<String>],
+        groups: &[GroupScoreIntervalRecord],
     ) -> GroupIntervalCoverageCounts {
         let members = groups.iter().map(|group| group.member_count).sum();
         GroupIntervalCoverageCounts {
@@ -761,8 +789,18 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.threshold, 0.40);
-        assert_eq!(plan.refinement_group_ids, vec!["middle".to_owned(), "near".to_owned()]);
-        assert_eq!(plan.excluded_group_ids, vec!["far".to_owned()]);
+        assert_eq!(plan.refinement_groups.len(), 2);
+        assert_eq!(plan.excluded_groups.len(), 1);
+        assert_eq!(
+            plan.refinement_groups.iter().map(|identity| identity.member_set_digest).collect::<BTreeSet<_>>(),
+            vec![groups[0].identity.member_set_digest, groups[1].identity.member_set_digest]
+                .into_iter()
+                .collect()
+        );
+        assert_eq!(
+            plan.excluded_groups[0].member_set_digest,
+            groups[2].identity.member_set_digest
+        );
         assert_eq!(plan.refinement_record_count, 5);
         assert_eq!(plan.excluded_record_count, 5);
     }
@@ -788,8 +826,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(first_plan, second_plan);
-        assert!(first_plan.refinement_group_ids.contains(&"b".to_owned()));
-        assert!(!first_plan.excluded_group_ids.contains(&"b".to_owned()));
+        assert!(first_plan.refinement_groups.iter().any(|identity| {
+            identity.member_set_digest == first[1].identity.member_set_digest
+        }));
+        assert!(!first_plan.excluded_groups.iter().any(|identity| {
+            identity.member_set_digest == first[1].identity.member_set_digest
+        }));
     }
 
     #[test]
@@ -878,13 +920,16 @@ mod tests {
                 complete_group_coverage(&groups),
             )
             .unwrap();
-            let selected: BTreeSet<String> =
-                plan.refinement_group_ids.iter().cloned().collect();
+            let selected: BTreeSet<[u8; 32]> = plan
+                .refinement_groups
+                .iter()
+                .map(|identity| identity.member_set_digest)
+                .collect();
             let mut selected_ids = Vec::new();
             let mut start = 0usize;
-            for (group_index, group) in groups.iter().enumerate() {
+            for group in &groups {
                 let size = group.member_count;
-                if selected.contains(&format!("group-{group_index:04}")) {
+                if selected.contains(&group.identity.member_set_digest) {
                     selected_ids.extend(
                         exact_scores[start..start + size]
                             .iter()
