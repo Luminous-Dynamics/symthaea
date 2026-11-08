@@ -173,12 +173,13 @@ pub fn aggregate_point_of_interest_error_rates<T: PartialEq + Clone>(
         .zip(poi_tags.iter())
         .enumerate()
     {
+        result.totals.reference_tokens += reference.len();
+        result.totals.hypothesis_tokens += hypothesis.len();
+
         match point_of_interest_error_rate(reference, hypothesis, tags) {
             Ok(utterance) => {
                 result.estimable_utterances += 1;
                 macro_total += utterance.pier_percent();
-                result.totals.reference_tokens += utterance.reference_tokens;
-                result.totals.hypothesis_tokens += utterance.hypothesis_tokens;
                 result.totals.poi_reference_tokens += utterance.poi_reference_tokens;
                 result.totals.hits += utterance.hits;
                 result.totals.substitutions += utterance.substitutions;
