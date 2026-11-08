@@ -167,64 +167,27 @@ fn same_phones(
 }
 
 /// Replace Muse's fixed vibrato with the per-note controls frozen in VocalPerformance.
-fn apply_note_pitch_controls(frames: &mut [FormantFrame], performance: &VocalPerformance) {
-    let mut previous_frequency: Option<f32> = None;
-    let mut previous_end = 0.0f32;
+fn apply_note_pitch_controls(
+    frames: &mut [FormantFrame],
+    performance: &VocalPerformance,
+) {
+    const EDGE_RAMP_S: f32 = 0.015;
     for syllable in &performance.syllables {
         for note in syllable.notes() {
             let note_start = note.start_time;
-            let note_end = note.start_time + note.duration;
-            let gap_before = note_start - previous_end;
-            let from_frequency = if gap_before > FRAME_DT_S * 1.5 {
-                note.frequency
-            } else {
-                previous_frequency.unwrap_or(note.frequency)
-            };
-            let transition_s = note.duration * syllable.portamento.clamp(0.0, 1.0);
-            let vibrato_start = note_start + note.duration * syllable.vibrato_onset.clamp(0.0, 1.0);
-            let vibrato_ramp_s = 0.05f32;
-            let edge_ramp_s = 0.015f32;
-
+            let note_end = note_start + note.duration;
             for frame in frames
                 .iter_mut()
                 .filter(|frame| frame.time >= note_start && frame.time < note_end)
             {
+                let Some(target_pitch) = performance.target_pitch_at(frame.time) else {
+                    continue;
+                };
                 let elapsed = (frame.time - note_start).max(0.0);
-                let transition = if transition_s > f32::EPSILON {
-                    (elapsed / transition_s).clamp(0.0, 1.0)
-                } else {
-                    1.0
-                };
-                // Interpolate in log-frequency so the transition is uniform in cents.
-                let pitch = if from_frequency > 0.0 && note.frequency > 0.0 {
-                    from_frequency * (note.frequency / from_frequency).powf(transition)
-                } else {
-                    note.frequency
-                };
-
-                let attack = (elapsed / edge_ramp_s).clamp(0.0, 1.0);
-                let release = ((note_end - frame.time) / edge_ramp_s).clamp(0.0, 1.0);
-                let envelope = attack.min(release);
-                let vibrato_gate = if syllable.vibrato_depth_cents > 0.0
-                    && syllable.vibrato_rate_hz > 0.0
-                    && frame.time >= vibrato_start
-                {
-                    let onset_gate =
-                        ((frame.time - vibrato_start) / vibrato_ramp_s).clamp(0.0, 1.0);
-                    onset_gate * release
-                } else {
-                    0.0
-                };
-                let phase = std::f32::consts::TAU
-                    * syllable.vibrato_rate_hz
-                    * (frame.time - vibrato_start).max(0.0);
-                let vibrato_cents = syllable.vibrato_depth_cents * phase.sin() * vibrato_gate;
-                let vibrato_ratio = 2.0f32.powf(vibrato_cents / 1200.0);
-                frame.f0 = pitch * envelope * vibrato_ratio;
+                let attack = (elapsed / EDGE_RAMP_S).clamp(0.0, 1.0);
+                let release = ((note_end - frame.time) / EDGE_RAMP_S).clamp(0.0, 1.0);
+                frame.f0 = target_pitch * attack.min(release);
             }
-
-            previous_frequency = Some(note.frequency);
-            previous_end = note_end;
         }
     }
 }
