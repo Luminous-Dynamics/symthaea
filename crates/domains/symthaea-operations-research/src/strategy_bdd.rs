@@ -2676,6 +2676,51 @@ mod tests {
     }
 
     #[test]
+    fn weighted_min_fill_reduces_an_observed_four_input_robdd() {
+        let source = function(
+            &[0, 1, 2, 3],
+            &[
+                true, false, false, true, true, false, false, true,
+                true, false, true, false, true, false, false, true,
+            ],
+        );
+        let natural_order = vec![0, 1, 2, 3];
+        let natural = compile_strategy_function_to_robdd_with_order(
+            &source,
+            &natural_order,
+            budget(),
+        )
+        .unwrap();
+
+        let (gf2_graph, _) = strategy_interaction_graph(&source, budget()).unwrap();
+        let unweighted_order = interaction_graph_min_fill_order(&gf2_graph).unwrap();
+        let weighted = strategy_arithmetic_weighted_interaction_graph(&source, budget()).unwrap();
+        let weighted_order = weighted_interaction_min_fill_order(&weighted.weights).unwrap();
+        let weighted_bdd = compile_strategy_function_to_robdd_with_order(
+            &source,
+            &weighted_order,
+            budget(),
+        )
+        .unwrap();
+        let exact = find_exact_minimum_robdd_order(&source, budget()).unwrap();
+
+        assert_eq!(unweighted_order, natural_order);
+        assert_eq!(weighted_order, vec![2, 3, 0, 1]);
+        assert_eq!(natural.nodes.len(), 7);
+        assert_eq!(weighted_bdd.nodes.len(), 6);
+        assert_eq!(exact.minimum_node_count, 5);
+        verify_robdd_matches_strategy_function(&weighted_bdd, &source, budget()).unwrap();
+
+        let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
+        assert!(report.seed_orders.contains(&(
+            StrategyBddOrderSeed::ArithmeticWeightedMinFill,
+            weighted_order,
+        )));
+        assert_eq!(report.optimized_node_count, exact.minimum_node_count);
+        verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
+    }
+
+    #[test]
     fn weighted_order_adds_a_distinct_seed_to_multistart_search() {
         let source = function(
             &[0, 1, 2, 3],
