@@ -114,6 +114,10 @@ path = "examples/cross_domain_query.rs"
 name = "hlb_fep_wsp_factorial_contract"
 path = "examples/hlb_fep_wsp_factorial_contract.rs"
 
+[[example]]
+name = "hlb_structured_mixer_benchmark"
+path = "examples/hlb_structured_mixer_benchmark.rs"
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"
