@@ -606,3 +606,15 @@ The machine-readable matrix now contains **twelve** tracks, with acoustic hypoth
 The experiment receipt schema (`voice_experiment_receipt_v1.schema.json`) now accepts an optional candidate-selection object with immutable candidate-set and generator manifests, selector model/prompt, demonstration manifest and policy, target-language demonstration/training regime, candidate-ID-or-abstain decision, rewrite permission/count, source interval and exact-copy integrity state.
 
 The design example explicitly uses `mode=NOT_USED` and `decision_type=NOT_APPLICABLE`. This is schema design evidence only. No selector or model was run.
+
+
+### 16.8 Prospective candidate-selection targets
+
+These are qualification targets, not achieved results:
+- candidate-ID validity and exact selected-token copy: 100% on frozen fixtures;
+- free-form rewrite rate in closed-set mode: 0;
+- false acceptance when no candidate is correct: 0 on frozen counterfactual controls;
+- at least 20% relative reduction in candidate-oracle regret versus the strongest matched acoustic-only/consensus baseline, at matched total-system compute, on an adequately sampled admitted cohort;
+- report coverage and abstention with error; an always-abstain system does not qualify.
+
+A lower WER that results from contextually replacing acoustically clear words fails the evidence contract. Report paired source/speaker-clustered intervals and leave undersampled cells non-estimable.
