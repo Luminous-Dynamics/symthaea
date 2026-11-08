@@ -275,7 +275,6 @@ fn one_sided_jacobi_svd(
     mut matrix: Vec<Vec<f64>>,
     column_count: usize,
 ) -> Result<(Vec<f64>, Vec<Vec<f64>>), ObservabilityError> {
-    let row_count = matrix.len();
     let mut right_vectors = vec![vec![0.0; column_count]; column_count];
     for (index, row) in right_vectors.iter_mut().enumerate() {
         row[index] = 1.0;
@@ -410,7 +409,6 @@ fn one_sided_jacobi_svd(
         })
         .collect();
 
-    let _ = row_count;
     Ok((singular_values, sorted_right_vectors))
 }
 
