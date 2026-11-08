@@ -19,7 +19,7 @@
       "const": "0.1.0"
     },
     "claim_ceiling": {
-      "const": "synthetic_convention_semantics_only"
+      "const": "profile_metadata_only_no_automatic_legal_authority"
     },
     "profiles": {
       "type": "array",
