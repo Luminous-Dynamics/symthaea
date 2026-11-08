@@ -269,11 +269,29 @@ fn verify_outcome_rows(
             .get("bayes_action")
             .and_then(Value::as_str)
             .ok_or_else(|| format!("missing {prefix}.bayes_action"))?;
-        close(report.outcome_probabilities[index], expected_probability, tolerance, &format!("{prefix}.probability"))?;
-        close(report.posterior_impact_probabilities[index], expected_posterior, tolerance, &format!("{prefix}.posterior"))?;
-        close(report.conditional_bayes_risks[index], expected_risk, tolerance, &format!("{prefix}.risk"))?;
+        close(
+            report.outcome_probabilities[index],
+            expected_probability,
+            tolerance,
+            &format!("{prefix}.probability"),
+        )?;
+        close(
+            report.posterior_impact_probabilities[index],
+            expected_posterior,
+            tolerance,
+            &format!("{prefix}.posterior"),
+        )?;
+        close(
+            report.conditional_bayes_risks[index],
+            expected_risk,
+            tolerance,
+            &format!("{prefix}.risk"),
+        )?;
         if report.bayes_actions[index] != expected_action {
-            return Err(format!("{prefix}.action mismatch: actual={}, expected={expected_action}", report.bayes_actions[index]));
+            return Err(format!(
+                "{prefix}.action mismatch: actual={}, expected={expected_action}",
+                report.bayes_actions[index]
+            ));
         }
     }
     Ok(())
@@ -311,11 +329,19 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
 
     close_fixture(
         report.single_reading.expected_risk,
-        &["correlated_observation_control", "single_reading", "expected_post_observation_bayes_risk"],
+        &[
+            "correlated_observation_control",
+            "single_reading",
+            "expected_post_observation_bayes_risk",
+        ],
     )?;
     close_fixture(
         report.single_reading.evsi,
-        &["correlated_observation_control", "single_reading", "expected_value_of_sample_information"],
+        &[
+            "correlated_observation_control",
+            "single_reading",
+            "expected_value_of_sample_information",
+        ],
     )?;
     close_fixture(
         report.single_reading.information_gain_bits,
@@ -324,28 +350,52 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
 
     close_fixture(
         report.same_source_pair.expected_risk,
-        &["correlated_observation_control", "two_readings_same_source", "expected_post_observation_bayes_risk"],
+        &[
+            "correlated_observation_control",
+            "two_readings_same_source",
+            "expected_post_observation_bayes_risk",
+        ],
     )?;
     close_fixture(
         report.same_source_pair.evsi,
-        &["correlated_observation_control", "two_readings_same_source", "expected_value_of_sample_information"],
+        &[
+            "correlated_observation_control",
+            "two_readings_same_source",
+            "expected_value_of_sample_information",
+        ],
     )?;
     close_fixture(
         report.same_source_pair.information_gain_bits,
-        &["correlated_observation_control", "two_readings_same_source", "expected_information_gain_bits"],
+        &[
+            "correlated_observation_control",
+            "two_readings_same_source",
+            "expected_information_gain_bits",
+        ],
     )?;
 
     close_fixture(
         report.independent_source_pair.expected_risk,
-        &["correlated_observation_control", "two_readings_independent_sources", "expected_post_observation_bayes_risk"],
+        &[
+            "correlated_observation_control",
+            "two_readings_independent_sources",
+            "expected_post_observation_bayes_risk",
+        ],
     )?;
     close_fixture(
         report.independent_source_pair.evsi,
-        &["correlated_observation_control", "two_readings_independent_sources", "expected_value_of_sample_information"],
+        &[
+            "correlated_observation_control",
+            "two_readings_independent_sources",
+            "expected_value_of_sample_information",
+        ],
     )?;
     close_fixture(
         report.independent_source_pair.information_gain_bits,
-        &["correlated_observation_control", "two_readings_independent_sources", "expected_information_gain_bits"],
+        &[
+            "correlated_observation_control",
+            "two_readings_independent_sources",
+            "expected_information_gain_bits",
+        ],
     )?;
 
     close_fixture(
@@ -390,7 +440,11 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
     )?;
     let nuisance_mi = number(
         fixture,
-        &["exact_information_value_controls", "0", "expected_mutual_information_with_decision_state_bits"],
+        &[
+            "exact_information_value_controls",
+            "0",
+            "expected_mutual_information_with_decision_state_bits",
+        ],
     )?;
     close(nuisance_mi, 0.0, tolerance, "nuisance mutual information")?;
     let nuisance_value = number(
@@ -409,7 +463,9 @@ fn verify_against_fixture(report: &VerificationReport, fixture: &Value) -> Resul
         &["correlated_observation_control", "naive_independence_failure", "risk_underestimation"],
     )? <= 0.0
     {
-        return Err("correlation negative control must expose positive risk underestimation".to_owned());
+        return Err(
+            "correlation negative control must expose positive risk underestimation".to_owned(),
+        );
     }
     Ok(())
 }
@@ -453,11 +509,19 @@ pub fn verify_fixture_text(text: &str) -> Result<VerificationReport, String> {
     let nuisance_entropy = entropy(&[0.5, 0.5]);
     let bad_calibration = number(
         &fixture,
-        &["correlated_observation_control", "latent_observation_model", "shared_calibration_bias_probability"],
+        &[
+            "correlated_observation_control",
+            "latent_observation_model",
+            "shared_calibration_bias_probability",
+        ],
     )?;
     let good_error = number(
         &fixture,
-        &["correlated_observation_control", "latent_observation_model", "independent_per_reading_error_probability_given_calibration_state"],
+        &[
+            "correlated_observation_control",
+            "latent_observation_model",
+            "independent_per_reading_error_probability_given_calibration_state",
+        ],
     )?;
     let marginal_error = (1.0 - bad_calibration) * good_error
         + bad_calibration * (1.0 - good_error);
@@ -517,15 +581,29 @@ mod tests {
     fn shared_source_bias_is_not_treated_as_independent_noise() {
         let report = verify_frozen_fixture().expect("fixture should pass");
         close(report.same_source_pair.expected_risk, 0.3869, 1e-12, "same-source risk").unwrap();
-        close(report.independent_source_pair.expected_risk, 0.314, 1e-12, "independent-source risk").unwrap();
-        assert!(report.same_source_pair.expected_risk > report.independent_source_pair.expected_risk);
+        close(
+            report.independent_source_pair.expected_risk,
+            0.314,
+            1e-12,
+            "independent-source risk",
+        )
+        .unwrap();
+        assert!(
+            report.same_source_pair.expected_risk > report.independent_source_pair.expected_risk
+        );
     }
 
     #[test]
     fn same_source_pair_does_not_overstate_evsi() {
         let report = verify_frozen_fixture().expect("fixture should pass");
         close(report.same_source_pair.evsi, 0.6131, 1e-12, "same-source EVSI").unwrap();
-        close(report.independent_source_pair.evsi, 0.686, 1e-12, "independent-source EVSI").unwrap();
+        close(
+            report.independent_source_pair.evsi,
+            0.686,
+            1e-12,
+            "independent-source EVSI",
+        )
+        .unwrap();
         assert!(report.same_source_pair.evsi < report.independent_source_pair.evsi);
     }
 
