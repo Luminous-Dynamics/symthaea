@@ -168,6 +168,51 @@ A GOSPA score is not directly comparable across different cutoffs, orders,
 alpha values, units or truth sets. Freeze those parameters and publish all
 three error components; do not report only the scalar distance.
 
+## Data-only observability diagnostics
+
+The `observability` module exposes `analyze_jacobian` for a whitened
+measurement Jacobian and declared physical parameter scales. It reports
+singular values, numerical rank, nullity, condition number and weak right
+singular directions. It uses a direct one-sided Jacobi SVD rather than forming
+`J^T J`, avoiding condition-number squaring in weakly observable systems.
+
+No prior precision is accepted by this API. That is intentional: prior
+regularization may make a posterior covariance finite even when the data do
+not identify a clock, boresight or trajectory parameter. Keep the data-only
+rank separate from any prior-conditioned uncertainty.
+
+This is a small dense diagnostic capped at 64 parameter columns. It does not
+fix global time/frame gauges, prove global identifiability, or replace a
+rank-revealing sparse QR/SVD implementation for large factor graphs. The
+caller must whiten residuals using the full declared covariance and apply
+documented parameter scales.
+
+## Budgeted multifidelity experimental design
+
+The `budgeted_design` module is an initial linearized design engine:
+
+- Each candidate action provides whitened Jacobian rows under each target or
+  calibration scenario.
+- Candidate options carry resource cost and an optional mutual-exclusion
+  group, allowing alternative fidelity choices for one physical station.
+- `greedy_budgeted_design` greedily maximizes marginal expected
+  log-determinant information gain per unit cost under one scalar budget.
+- `exhaustive_budgeted_design` enumerates up to 20 options and supplies an
+  exact expected-information oracle for measuring the greedy optimality gap.
+- Each scenario reports prior-regularized information gain separately from
+  data-only rank, nullity, singular values and condition number.
+
+Run the synthetic example with:
+
+    cargo run --locked -p symthaea-uap-observatory --example budgeted_experiment_design
+
+The interface assumes candidate contributions are additive after whitening.
+It is not valid to add independently computed Fisher increments when sensors
+share unmodelled calibration or correlated measurement errors. Those errors
+must be whitened jointly or the design scenario marked unsupported. Greedy
+optimality guarantees are not claimed for worst-case, nonlinear or correlated
+objectives. The example uses synthetic Jacobians and is not deployment advice.
+
 ## Run
 
 ```bash
