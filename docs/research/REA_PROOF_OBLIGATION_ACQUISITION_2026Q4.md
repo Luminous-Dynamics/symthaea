@@ -757,3 +757,28 @@ REA should make this a first-class gate:
 5. Independently replay the output claim against the packet; a pre-generation gate is necessary but not sufficient for final verification.
 
 Measure pre-generation false-ready rate and answer-on-insufficient rate separately. Do not reward a gate that suppresses every answer: pair safety with useful coverage on sufficient cases. This is an evidence-before-generation architecture, not a confidence prompt or a second LLM judge.
+
+
+## Current fixture scope and planner-input gap
+
+The current 18-case agent view provides claims, obligation states, admissible evidence classes, candidate experiment descriptions, authorization/reversibility, costs and declared outcomes. It does **not yet** provide a complete planner-ready catalog of competing hypotheses, normalized priors, evidence-root references, per-outcome likelihood matrices, likelihood-scenario weights, or terminal-decision utility/loss matrices.
+
+Therefore the current fixtures can qualify:
+- pre-generation claim readiness semantics;
+- evidence-class admissibility and no-upgrade rules;
+- observation-versus-prediction separation;
+- authorization/reversibility controls;
+- hidden-oracle separation and deterministic expected transitions.
+
+They cannot yet support a fair direct comparison of point-EIG (#10074), robust-EIG (#10105), EVSI (#10109) and minimax-regret (#10174). The planner comparison remains a follow-on deliverable, not a result of the current 18-case workflow.
+
+Before that comparison, add a separately versioned planner-input layer with:
+- independently grounded REA Evidence references and source-family roots;
+- competing hypothesis IDs and priors;
+- point likelihood matrices for every candidate outcome;
+- plausible weighted likelihood scenarios for robust planning;
+- terminal decisions and independently elicited utility/loss matrices for EVSI/regret;
+- hidden data-generating processes that are not included in planner inputs;
+- exact digests and a split policy binding agent-visible model inputs to grader-only realized outcomes.
+
+Do not infer likelihoods or utilities from the expected-policy rationale, and do not make those parameters from the hidden world-state oracle. Keep the same candidates, resource budgets, target-impact gates, and evidence obligations across every matched policy arm. Until that layer exists and is independently validated, report #11110 as an obligation/admissibility fixture qualification only.
