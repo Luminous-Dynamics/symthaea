@@ -756,8 +756,7 @@ mod tests {
             let aig = compile_strategy_function_to_aig(&source, budget()).unwrap();
             let report = verify_aig_matches_strategy_function(&aig, &source, budget()).unwrap();
             assert_eq!(
-                report.assignments_checked,
-                8,
+                report.assignments_checked, 8,
                 "function truth-table mask {function_mask}"
             );
         }
