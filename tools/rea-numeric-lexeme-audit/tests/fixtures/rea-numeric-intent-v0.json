@@ -2,7 +2,7 @@
   "schema": "luminous.rea.numeric-intent-corpus.v0",
   "corpus_id": "rea-numeric-intent-known-answer-v0",
   "status": "design_fixture_only",
-  "semantics_note": "Expected labels are design-time reference outcomes, not outputs from an implemented validator. raw_value_token is a string so the fixture preserves the exact source spelling.",
+  "semantics_note": "Expected labels are design-time reference outcomes, not outputs from an implemented validator. raw_value_token is a string so the fixture preserves the exact source spelling. URN values beginning with urn:example: are synthetic sentinels for mismatch fixtures, not registrations in the canonical quantity/unit authorities.",
   "cases": [
     {
       "id": "binary64-integer-vs-decimal-token",
