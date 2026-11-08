@@ -361,6 +361,15 @@ The protocol's four development policy arms (S0 accept-all, S1 verbal-confidence
 
 This is a design proposal, not a current CEB risk guarantee or a registered confirmatory Phase A/B/C hypothesis. The example sample sizes (59 for a 5% bound and 299 for a 1% bound with zero errors at one-sided 95% confidence) are planning illustrations under independent/exchangeable Bernoulli assumptions; do not apply them to correlated prompt variants or clustered defects without a valid analysis.
 
+
+## 12.9 Claim-support closure extension to CEB-CONTINUITY
+
+Use [CEB Review Claim-Support Closure and Selective Invalidation Protocol V0](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_AND_SELECTIVE_INVALIDATION_PROTOCOL_V0_2026-11-08.md), its [six-case public challenge](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_CHALLENGE_V0_2026-11-08.md) and [separate public key](CEB_REVIEW_CLAIM_SUPPORT_CLOSURE_KEY_V0_2026-11-08.md) as an evaluation extension to existing CEB-CONTINUITY-001 (#10630). Do not create another continuity lane, evidence graph, receipt or task schema.
+
+The extension asks whether every consequential claim has a complete enough support closure to justify selective retain/revalidate/invalidate/supersede/unresolved decisions after a change event. It requires an impact witness for affected claims and an unaffectedness witness for retained claims, with the open-world remainder explicit. The static validator checks only document structure; it does not implement a repository graph or prove real claim invalidation.
+
+The six public cases compose source edits, shared dependencies, feature/build transitions, verifier-only changes, authority-root revocation and incomplete closure under metadata-only change. They remain public development cases, not admitted sequences or sealed holdout tasks. Any C0/C1/C2 comparisons are exploratory and must reuse #10630's evaluation unit and existing CEB-CONTINUITY primary metrics registered under #10632.
+
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
