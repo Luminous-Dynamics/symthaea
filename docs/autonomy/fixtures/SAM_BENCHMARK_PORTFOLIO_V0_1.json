@@ -841,5 +841,48 @@
         "https://docs.autoware.org/main/design/autoware-architecture-v2/"
       ]
     }
+  ],
+  "operational_outcome_references": [
+    {
+      "id": "waymo-safety-impact-through-june-2026",
+      "name": "Waymo Safety Impact",
+      "category": "operational_outcome_comparison_not_benchmark",
+      "measurement_window": "through_2026-06-30",
+      "published_update": "2026-09-24",
+      "source_status": "company_reported_operational_outcome",
+      "exposure": {
+        "autonomous_miles_overall": 270000000,
+        "geographies": [
+          "Atlanta",
+          "Austin",
+          "Los Angeles",
+          "Phoenix",
+          "San Francisco"
+        ]
+      },
+      "metrics": {
+        "all_locations_serious_injury_or_worse_crashes_per_million_miles": {
+          "waymo": 0.01,
+          "human_benchmark": 0.21
+        },
+        "all_locations_any_injury_reported_crashes_per_million_miles": {
+          "waymo": 0.67,
+          "human_benchmark": 3.77
+        },
+        "estimated_injury_causing_crashes_avoided": 841
+      },
+      "rights_status": "publicly_downloadable_data_terms_to_review",
+      "caveats": [
+        "Company-reported operational data; not independently reproduced by SAM.",
+        "Geographic, mileage, outcome-definition, benchmark-adjustment and methodology assumptions are material.",
+        "Do not compare directly with simulation benchmark scores or extrapolate to a different ODD.",
+        "Reproduction requires the downloadable safety data, methodology, outcome definitions, release notes and geography/exposure denominators.",
+        "The 841 avoided-crash figure is an estimate against the stated human benchmark, not a directly observed counterfactual count."
+      ],
+      "sources": [
+        "https://waymo.com/safety/impact/",
+        "https://blog.waymo.com/blog/shorts/safetydata-september26/"
+      ]
+    }
   ]
 }
