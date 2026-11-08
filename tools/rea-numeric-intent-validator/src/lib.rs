@@ -620,8 +620,13 @@ fn validate_integer_value(
         .get("max_value")
         .and_then(Value::as_str)
         .unwrap_or("");
-    let parsed =
-        parse_integer(value, reject_negative_zero).map_err(|_| "invalid_integer_grammar")?;
+    let parsed = parse_integer(value, reject_negative_zero).map_err(|message| {
+        if message == "negative zero is forbidden" {
+            "negative_zero_rejected"
+        } else {
+            "invalid_integer_grammar"
+        }
+    })?;
     let min = parse_integer(minimum, false).map_err(|_| "invalid_numeric_contract")?;
     let max = parse_integer(maximum, false).map_err(|_| "invalid_numeric_contract")?;
     if signedness == "unsigned" && parsed.starts_with('-') {
@@ -671,7 +676,7 @@ fn validate_fixed_decimal_value(
         .and_then(Value::as_str)
         .unwrap_or("");
     let parsed = parse_fixed_decimal(value, scale, max_integer_digits, signedness)
-        .map_err(|_| "invalid_decimal_grammar")?;
+        .map_err(fixed_decimal_error_status)?;
     let min = parse_fixed_decimal(minimum, scale, max_integer_digits, signedness)
         .map_err(|_| "invalid_numeric_contract")?;
     let max = parse_fixed_decimal(maximum, scale, max_integer_digits, signedness)
@@ -709,6 +714,17 @@ fn parse_integer(value: &str, reject_negative_zero: bool) -> std::result::Result
     }
 }
 
+fn fixed_decimal_error_status(message: String) -> &'static str {
+    match message.as_str() {
+        "exponent notation is forbidden" => "exponent_not_allowed",
+        "decimal scale mismatch" => "scale_mismatch",
+        "negative zero is forbidden" => "negative_zero_rejected",
+        "negative decimal is forbidden for unsigned intent" => "signedness_mismatch",
+        "integer part exceeds max_integer_digits" => "digit_limit_exceeded",
+        _ => "invalid_decimal_grammar",
+    }
+}
+
 fn parse_fixed_decimal(
     value: &str,
     scale: usize,
@@ -717,6 +733,9 @@ fn parse_fixed_decimal(
 ) -> std::result::Result<String, String> {
     if value.is_empty() {
         return Err("decimal must not be empty".to_owned());
+    }
+    if value.contains('e') || value.contains('E') {
+        return Err("exponent notation is forbidden".to_owned());
     }
     let (negative, unsigned) = match value.strip_prefix('-') {
         Some(rest) => (true, rest),
@@ -1086,4 +1105,115 @@ mod tests {
         assert_eq!(ids.len(), 23);
         assert!(cases.iter().all(|case| case["expected"].is_string()));
     }
+
+    fn fixture_case_runtime_status(case: &Value) -> String {
+        let intent = case["intent"].as_str().unwrap();
+        let raw = case["raw_value_token"].as_str().unwrap();
+        let value: Value = serde_json::from_str(raw).unwrap();
+
+        match intent {
+            "binary64" => {
+                let number = value.as_number().expect("binary64 fixture must be a JSON number");
+                let canonical = serde_json_canonicalizer::to_string(&value).unwrap();
+                assert_eq!(
+                    canonical,
+                    case["expected_canonical_number"].as_str().unwrap(),
+                    "canonical number mismatch for {}",
+                    case["id"].as_str().unwrap()
+                );
+                let _ = number;
+                "valid_binary64".to_owned()
+            }
+            "safe_integer" => {
+                let audit = audit_json(raw.as_bytes()).unwrap();
+                if audit.numeric_precision_warnings.iter().any(|item| item.json_pointer.is_empty()) {
+                    return "unsafe_integer".to_owned();
+                }
+                let Some(number) = value.as_number() else {
+                    return "type_mismatch".to_owned();
+                };
+                if !number.is_i64() && !number.is_u64() {
+                    return "lexical_form_mismatch".to_owned();
+                }
+                validate_integer_value(&number.to_string(), &case["contract"], false)
+                    .map(|_| "valid_safe_integer".to_owned())
+                    .unwrap_or_else(str::to_owned)
+            }
+            "exact_integer_string" => {
+                let Some(text) = value.as_str() else {
+                    return "type_mismatch".to_owned();
+                };
+                validate_exact_integer_value(text, &case["contract"])
+                    .map(|_| "valid_exact_integer_string".to_owned())
+                    .unwrap_or_else(str::to_owned)
+            }
+            "fixed_decimal_string" => {
+                let Some(text) = value.as_str() else {
+                    return "type_mismatch".to_owned();
+                };
+                validate_fixed_decimal_value(text, &case["contract"])
+                    .map(|_| "valid_fixed_decimal".to_owned())
+                    .unwrap_or_else(str::to_owned)
+            }
+            "opaque_numeric" => {
+                if value.is_number() {
+                    "opaque_preserved_arithmetic_forbidden".to_owned()
+                } else {
+                    "type_mismatch".to_owned()
+                }
+            }
+            "none" => "unsupported_path".to_owned(),
+            other => panic!("unknown fixture intent {other}"),
+        }
+    }
+
+    #[test]
+    fn numeric_intent_fixture_executes_all_supported_known_answer_cases() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/rea-numeric-intent-v0.json"
+        ))
+        .unwrap();
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 23);
+
+        let mut executed = 0usize;
+        let mut protocol_only = HashSet::new();
+        for case in cases {
+            let id = case["id"].as_str().unwrap();
+            match id {
+                // These are intentionally not inferred from URI syntax. The
+                // validator retains the references and emits unresolved status.
+                "same-dimension-different-quantity-kind"
+                | "same-number-different-unit" => {
+                    protocol_only.insert(id.to_owned());
+                }
+                // Covered by dedicated full-profile mutation tests.
+                "duplicate-profile-path" | "profile-digest-mismatch" => {
+                    protocol_only.insert(id.to_owned());
+                }
+                // Value-only callers have no raw byte source to audit. The
+                // public API accepts byte slices only, so this fixture records
+                // the required non-upgrade state but cannot be executed as a
+                // raw-document validation call.
+                "constructed-value-without-source-bytes" => {
+                    assert!(case["raw_value_token"].is_null());
+                    assert_eq!(
+                        case["expected"].as_str(),
+                        Some("lexical_coverage_unavailable_not_audited")
+                    );
+                    protocol_only.insert(id.to_owned());
+                }
+                _ => {
+                    let actual = fixture_case_runtime_status(case);
+                    let expected = case["expected"].as_str().unwrap();
+                    assert_eq!(actual, expected, "fixture mismatch for {id}");
+                    executed += 1;
+                }
+            }
+        }
+
+        assert_eq!(executed, 18, "all executable fixture cases must run");
+        assert_eq!(protocol_only.len(), 5, "all protocol-boundary cases must be accounted for");
+    }
+
 }
