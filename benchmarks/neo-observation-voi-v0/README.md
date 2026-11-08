@@ -106,3 +106,6 @@ cargo run --manifest-path benchmarks/neo-observation-voi-v0/verifier/Cargo.toml 
 ```
 
 The dedicated workflow is `.github/workflows/neo-observation-voi-v0.yml`. It is defined on this research branch and will run for subsequent benchmark changes once merged into the default branch. The existing root CI does not compile this independent nested package, so root-workspace CI success must not be reported as verifier test success.
+
+
+The verifier also includes a deterministic 128-case finite-model sweep. For each generated likelihood pair it compares posterior-based evaluation against an independent joint-probability action-loss identity, then permutes outcome labels to check risk and information invariance. This adds a second path to the finite risk calculation without introducing a property-testing dependency.
