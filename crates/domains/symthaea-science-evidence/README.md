@@ -73,8 +73,17 @@ zero prediction by this schema.
 
 Pairwise comparison is deliberately limited to quantitative predictions for
 the same operational observable and domain, with calibrated Gaussian
-measurement noise. The reported normalized separation is a simple
-measurement-sigma screening diagnostic. It is **not** expected information
+measurement noise. Schema v1 explicitly marks prediction uncertainty as
+`PointValueOnly`, `Unspecified`, or `NotApplicable`. A record whose
+predictive uncertainty is `Unspecified` is not admitted to pairwise
+separation. A `PointValueOnly` record means no model-prediction dispersion
+has been supplied; it does not imply certainty that the model describes
+nature. Distribution-valued model predictions and correlated predictive
+uncertainty require a future schema extension; do not combine variances by
+assuming independence without an explicit covariance model.
+
+The reported normalized separation is a point-value screening diagnostic
+against the calibrated measurement sigma. It is **not** expected information
 gain, a Bayes factor, model posterior probability, or a claim that one theory
 is true. The generic EIG/EVSI/Fisher design utilities remain separate and
 should consume full calibrated likelihoods only after those are available.
