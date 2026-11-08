@@ -233,7 +233,19 @@ The September 3, 2026 survey characterizes model design through state abstractio
 
 The targets are prospective objectives. No current Symthaea or Symtropy measurement is implied.
 
-## 7. Registry status semantics
+## 7. Operational outcome reference — separate from benchmark results
+
+### Waymo Safety Impact (data through June 2026)
+
+- **Evidence class:** company-reported operational outcome comparison, not an open dataset benchmark or SAM reproduction.
+- **Exposure:** Waymo's September 24, 2026 update says its analysis covers more than 270 million fully autonomous miles through the end of June 2026 across five metropolitan service areas.
+- **Serious-injury-or-worse crash rates:** the current Safety Impact page reports 0.01 incidents per million miles for Waymo versus 0.21 for the human comparison benchmark in the all-locations display. Per-city estimates and 95% confidence intervals are shown separately.
+- **Any-injury-reported crash rates:** the same page reports 0.67 versus 3.77 incidents per million miles in the all-locations display.
+- **Additional reported count:** Waymo's September post estimates 841 fewer injury-causing crashes than the human benchmark across its analysis window.
+- **Claim boundary:** these are Waymo-reported, geography-, exposure-, case-definition- and methodology-dependent operational comparisons. They do not establish SAM performance, do not compare directly with simulation leaderboard scores, and do not establish a universal safety rate for other ODDs or jurisdictions. Reproduce from the data hub's downloadable datasets, dynamic benchmark methodology, release notes and outcome definitions before an independent comparison.
+- **Sources:** [Waymo Safety Impact data hub](https://waymo.com/safety/impact/), [September 24, 2026 release](https://blog.waymo.com/blog/shorts/safetydata-september26/).
+
+## 8. Registry status semantics
 
 - `upstream_reported`: published by benchmark/model authors.
 - `secondary_leaderboard_snapshot`: surfaced on a non-owner leaderboard; not independently verified.
