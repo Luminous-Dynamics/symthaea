@@ -8,6 +8,8 @@ on:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs"
+      - "crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs"
+      - "crates/core/symthaea-core/src/hdc/structured_mixer.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "Cargo.lock"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
@@ -37,6 +39,8 @@ on:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs"
+      - "crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs"
+      - "crates/core/symthaea-core/src/hdc/structured_mixer.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "Cargo.lock"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
@@ -114,6 +118,8 @@ jobs:
           set -euo pipefail
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/structured_mixer.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
@@ -170,6 +176,8 @@ jobs:
           cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_vsa_bundle_capacity -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib hdc::structured_mixer::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark -- --nocapture
 
 
       - name: Run packed BinaryHV bundle-capacity pilot
@@ -179,6 +187,13 @@ jobs:
           cargo run --locked --release -p symthaea-core --example hlb_vsa_bundle_capacity > research-results/hlb-vsa-bundle-capacity.csv
           cat research-results/hlb-vsa-bundle-capacity.csv
 
+      - name: Run structured mixer characterization
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark > research-results/hlb-structured-mixer.csv
+          cat research-results/hlb-structured-mixer.csv
+
       - name: Generate source-bound protocol receipt
         env:
           SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -186,7 +201,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv > research-results/SHA256SUMS
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
