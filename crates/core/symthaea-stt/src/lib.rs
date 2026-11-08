@@ -146,7 +146,10 @@ pub use liquid_projection::{
 pub use lm::{BeamConfig, BeamDecoder, CombinedDecoder, Hypothesis, NgramLM, PhonemeToWordDecoder};
 pub use ltc::{LtcCell, LtcConfig, TauSmoother};
 pub use models::{ModelInfo, ModelMetadata, ModelPackage, ModelRegistry};
-pub use pier::{point_of_interest_error_rate, PierError, PierResult};
+pub use pier::{
+    PierCorpusError, PierCorpusResult, PierError, PierResult,
+    aggregate_point_of_interest_error_rates, point_of_interest_error_rate,
+};
 pub use phoneme::{
     PhonemeDecoder, PhonemeInventory, PhonemeResonator, TemporalConfig, TemporalDecoder,
 };
