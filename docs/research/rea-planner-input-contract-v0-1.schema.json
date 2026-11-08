@@ -258,6 +258,7 @@
       "additionalProperties": false,
       "required": [
         "hypothesis_id",
+        "outcome_order",
         "outcome_probabilities"
       ],
       "properties": {
@@ -273,6 +274,15 @@
             "minimum": 0,
             "maximum": 1
           }
+        },
+        "outcome_order": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },
