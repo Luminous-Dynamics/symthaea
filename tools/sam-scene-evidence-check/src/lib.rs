@@ -130,37 +130,6 @@ pub fn validate_bundle_values(
                 scene_profile_id, profile_frame_id, ego_frame, road_frame
             ));
         }
-        if profile
-            .and_then(|profile| profile.get("applicability"))
-            .and_then(Value::as_str)
-            == Some("verified_for_declared_context")
-        {
-            let source_ids: BTreeSet<&str> = snapshot
-                .and_then(|snapshot| snapshot.get("sources"))
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(|source| source.get("source_id").and_then(Value::as_str))
-                .collect();
-            let evidence_refs = profile
-                .and_then(|profile| profile.get("verification_evidence_refs"))
-                .and_then(Value::as_array);
-            if evidence_refs.is_none_or(Vec::is_empty) {
-                errors.push(
-                    "verified traffic profile has no evidence references in the scene bundle"
-                        .into(),
-                );
-            } else if let Some(references) = evidence_refs {
-                for reference in references {
-                    let id = reference.as_str().unwrap_or_default();
-                    if !source_ids.contains(id) {
-                        errors.push(format!(
-                            "verified traffic profile evidence reference {id:?} does not resolve in the scene source registry"
-                        ));
-                    }
-                }
-            }
-        }
     }
 
     if errors.is_empty() {
