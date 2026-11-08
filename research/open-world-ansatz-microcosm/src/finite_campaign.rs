@@ -210,6 +210,20 @@ pub struct PairedPolicyResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PairedEpisodeRecord {
+    /// Opaque deterministic pair identifier; does not encode generating truth.
+    pub pair_id: String,
+    pub world_family: WorldFamily,
+    /// Stable ordinal within this declared finite family, not the true model parameters.
+    pub generating_model_ordinal: usize,
+    pub action_budget: usize,
+    pub policy: String,
+    pub comparison_design: String,
+    pub a0: EvaluatorScore,
+    pub a2: EvaluatorScore,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FinitePolicyCampaignReport {
     pub report_version: String,
     pub campaign_kind: String,
@@ -220,6 +234,8 @@ pub struct FinitePolicyCampaignReport {
     pub pair_count: usize,
     pub episode_count: usize,
     pub results: Vec<PairedPolicyResult>,
+    /// Raw post-submission evaluator scores for paired seed/world comparisons.
+    pub pair_records: Vec<PairedEpisodeRecord>,
     pub limitations: Vec<String>,
 }
 
@@ -368,6 +384,7 @@ pub fn run_exhaustive_finite_policy_campaign(
     let truths = candidate_truths();
     let policy_specs = policies();
     let mut results = Vec::new();
+    let mut pair_records = Vec::with_capacity(truths.len() * policy_specs.len());
 
     for family in [
         WorldFamily::BooleanMechanism,
@@ -404,6 +421,16 @@ pub fn run_exhaustive_finite_policy_campaign(
                 )?;
                 a0.record(&score_a0);
                 a2.record(&score_a2);
+                pair_records.push(PairedEpisodeRecord {
+                    pair_id: pair.clone(),
+                    world_family: family,
+                    generating_model_ordinal: index,
+                    action_budget: budget,
+                    policy: policy.name.to_owned(),
+                    comparison_design: "adaptive_budget".to_owned(),
+                    a0: score_a0,
+                    a2: score_a2,
+                });
             }
 
             results.push(PairedPolicyResult {
@@ -428,6 +455,7 @@ pub fn run_exhaustive_finite_policy_campaign(
         pair_count: truths.len() * policy_specs.len(),
         episode_count: truths.len() * policy_specs.len() * 2,
         results,
+        pair_records,
         limitations: vec![
             "This is a deterministic census over the three declared finite reference grammars, not a sample of natural-science systems.".to_owned(),
             "The evaluated policy is the transparent exact finite inference baseline, not the learned Symthaea research orchestrator.".to_owned(),
