@@ -166,3 +166,40 @@ Two additional Rust tests were added:
 - high_dimensional_group_envelope_contains_every_original_score constructs a four-member 16,384D group, builds both synopsis types, intersects their intervals and checks every original member score remains enclosed.
 
 These tests complement, but do not replace, property-based generation of arbitrary residual directions, near-threshold/small-norm adversaries, compiler-target qualification and persisted-segment corruption/reopen tests. They have been authored but NOT executed. No Rust formatting, compilation, test, benchmark or CI pass is claimed.
+
+
+## 11. Spherical-cap candidate intervals (research-only, 2026-11-08)
+
+The core source now has two deliberately separate types and methods:
+
+- ContinuousHVRealCosineInterval from real_cosine_interval_for_l2_ball_center encloses real-arithmetic cosine using an outward f64 spherical-cap calculation. It does not enclose the canonical f32 score.
+- ContinuousHVSphericalCapF32ScoreInterval from similarity_interval_full_resolution_for_l2_ball_center_spherical_cap starts with the real-cosine interval and adds a separate gamma/eta error envelope for the canonical dot and norm reductions, then accounts for the f32 norm-product multiplication, square root and final division.
+
+The second type is intentionally not accepted by ScoreIntervalRecord or select_refinement_set. This avoids accidentally treating a promising experimental bound as a certified retrieval interval. It must remain outside production selection until its derivation and target/compiler behavior are independently reviewed.
+
+### Numeric derivation implemented
+
+For dimension D, the prototype uses unit roundoff u = 2^-24 and an operation count n = 2D for each canonical dot/norm reduction. It bounds relative accumulation error by gamma = n*u/(1-n*u), and absolute underflow contribution by eta. It then constructs interval factors for the two norm accumulations, the f32 norm-product multiplication and f32 square root. The normalized dot interval is expanded by gamma + eta/(||q||*||x||_lower); the final quotient includes f32 division rounding and an absolute minimum-subnormal allowance.
+
+The interval is uninformative when the lower norm/denominator is unsafe, the canonical near-zero denominator branch may be crossed, any error term is unbounded, or the real-cone interval is uninformative. If the entire possible denominator is below the canonical 1e-10 threshold, the result is exactly [0,0]. A zero-radius input returns a point at the canonical scalar score.
+
+Assumptions requiring compiler/target review remain: IEEE-754 round-to-nearest f32 operations, gradual underflow rather than FTZ/DAZ, no fast-math transformations, and the versioned canonical reduction semantics. The f32 type remains separate from the selector even though the current formula attempts to enclose the canonical f32 output.
+
+### New Rust tests authored
+
+- patterned candidate containment at dimensions 8, 9, 17, 257, 2,048 and 16,384;
+- randomized residual directions at dimensions 1, 7, 8, 9, 17, 257, 2,048 and 16,384, with each residual independently checked before canonical-score containment;
+- zero-radius point behavior and zero-query exact-zero behavior;
+- canonical near-zero denominator branch.
+
+These tests have not been executed because no Rust toolchain is available in the current environment.
+
+### Independent simulation (not Rust execution)
+
+A separate Python f32 arithmetic simulation compared the candidate spherical-cap score interval with the current joint-ball canonical interval on 900 generated member cases across dimensions 8, 9, 17, 257, 2,048 and 16,384. It observed zero canonical-score escapes for both interval models. In that sample:
+
+- spherical-cap mean interval width: 0.0585;
+- joint-ball mean interval width: 0.0732;
+- spherical-cap interval narrower in all 900 cases.
+
+This is exploratory numerical evidence only. It is not proof, Rust test execution, cross-platform qualification, an HME benchmark, or evidence of physical payload I/O savings. No selector integration is authorized by this simulation.
