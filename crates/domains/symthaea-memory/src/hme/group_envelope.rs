@@ -140,7 +140,7 @@ impl std::error::Error for GroupEnvelopeError {}
 pub fn member_id_set_digest(
     member_ids: &[String],
 ) -> Result<[u8; 32], GroupEnvelopeError> {
-    let mut first_index_by_id = BTreeMap::new();
+    let mut first_index_by_id: BTreeMap<String, usize> = BTreeMap::new();
     for (member_index, id) in member_ids.iter().enumerate() {
         if id.is_empty() {
             return Err(GroupEnvelopeError::EmptyMemberId { member_index });
@@ -151,7 +151,7 @@ pub fn member_id_set_digest(
                 duplicate_index: member_index,
             });
         }
-        first_index_by_id.insert(id, member_index);
+        first_index_by_id.insert(id.clone(), member_index);
     }
     let mut sorted = member_ids.to_vec();
     sorted.sort();
