@@ -159,6 +159,25 @@ fn ensure_manifest_outside_root(root: &Path, manifest_path: &Path) -> Result<(),
     if target.starts_with(&root) {
         return Err(fail("manifest file must be outside the artifact root"));
     }
+
+    // Inspect the destination without following it. A pre-existing symlink
+    // could redirect a receipt write somewhere other than the caller's path.
+    match fs::symlink_metadata(&target) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(fail("manifest destination must not be a symlink"));
+        }
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            return Err(fail("manifest destination must be a regular file"));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(fail(format!(
+                "cannot inspect manifest destination {}: {error}",
+                target.display()
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -389,6 +408,23 @@ mod tests {
         assert!(
             ensure_manifest_outside_root(&tree.0, &tree.0.join("manifest.json")).is_err()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn manifest_destination_symlink_is_rejected_without_following_it() {
+        use std::os::unix::fs::symlink;
+        let tree = TestTree::new();
+        tree.write("weights.bin", b"weights");
+        let outside = TestTree::new();
+        let destination = outside.0.join("redirect.json");
+        let target = outside.0.join("actual.json");
+        fs::write(&target, b"do-not-overwrite").unwrap();
+        symlink(&target, &destination).unwrap();
+
+        let error = ensure_manifest_outside_root(&tree.0, &destination).unwrap_err();
+        assert!(error.contains("must not be a symlink"), "{error}");
+        assert_eq!(fs::read(&target).unwrap(), b"do-not-overwrite");
     }
 
     #[test]
