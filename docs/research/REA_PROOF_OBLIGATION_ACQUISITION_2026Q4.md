@@ -691,3 +691,54 @@ No single average should hide a false-ready event or stale claim. Publish false-
 ## Claim ceiling
 
 This work defines a research protocol and synthetic fixtures. It does not implement an acquisition policy, authenticate source lineage, calibrate likelihoods, prove world-state truth, validate utility elicitation, or establish superiority over existing experiment-selection or evidence-retrieval systems.
+
+
+## New research refinement — marginal evidence contribution and minimum sufficient proofs
+
+The 18-case acquisition suite must be evaluated alongside, not instead of, the existing evidence-set synergy/redundancy programme:
+
+- [#9000 — evidence synergy and redundancy under fixed budgets](https://github.com/Luminous-Dynamics/symthaea/issues/9000) owns complementary support, alternative redundant support, same-source duplicates, distractor interactions, and evidence-order controls.
+- [#9049 — alternative sufficient justifications](https://github.com/Luminous-Dynamics/symthaea/issues/9049) owns AND-within-proof / OR-across-proof semantics, alternative proof survival, and retraction propagation.
+- [#9077 — proof-carrying context ABI](https://github.com/Luminous-Dynamics/symthaea/issues/9077) owns the reader-facing packet boundary.
+- [#10314 — benchmark run receipt](https://github.com/Luminous-Dynamics/symthaea/issues/10314) owns the canonical run accounting; no new receipt format is introduced here.
+
+### New external evidence
+
+Zhong et al., *More Evidence Is Not Always More Support* (Findings of EMNLP 2026), introduces a same-prefix diagnostic with 1,180 pairs. The experiment fixes the existing evidence prefix, then adds either an exact/redundant passage or the genuinely missing fact needed for the verdict. The paper reports that equal clean F1 can conceal large differences in sensitivity to repeated evidence: the eight-repeat flip rate ranges from 8.5% to 30.3% across tested supervised verifiers. Its repeated-evidence ladder and missing-fact gain are directly relevant diagnostics, not REA results. https://aclanthology.org/2026.findings-emnlp.747/
+
+Li et al., *Minimal Evidence Group Identification for Claim Verification* (2024), formalizes finding all minimal evidence groups that collectively verify or refute a claim and notes the set-cover structure of the task. This reinforces the need to distinguish an inclusion-minimal evidence set from a globally minimum-cost sufficient set. https://arxiv.org/abs/2404.15588
+
+Afli & Frank, *The Benchmark Is Not the Construct* (Findings of EMNLP 2026), argues for distribution-based evaluation using generated/validated perturbations, repeated runs and uncertainty-aware reports rather than treating one fixed benchmark score as the construct. Apply that measurement principle to the REA claim-readiness results. https://aclanthology.org/2026.findings-emnlp.1992/
+
+### Required set-level interventions
+
+The composed evaluation should add these diagnostics, owned by #9000/#9049 where appropriate:
+
+1. **Duplicate invariance:** repeat the same evidence item 1, 2, 8 and 64 times while keeping source-family identity fixed. The duplicates must not upgrade claim readiness or independence.
+2. **Missing-fact gain:** hold the existing evidence prefix fixed; add either a duplicate of an already-covered fact or the admissible missing premise. Only the missing premise may close its corresponding obligation.
+3. **Synergy:** two evidence items jointly satisfy a required proof path while neither is sufficient alone.
+4. **Alternative redundancy:** either of two independently admissible proof paths suffices; deleting one path preserves readiness while deleting both removes it.
+5. **Counterfactual necessity:** delete each evidence leaf in turn and recompute which obligations/readiness change. Report necessary, redundant, synergistic and irrelevant evidence separately.
+6. **Source-family collapse:** re-encode the same source through different providers and formats. Tool/provider labels alone must not create independent support.
+7. **Order invariance:** permute equivalent evidence sets. Readiness and semantic proof packet identity should remain invariant where the contract declares order irrelevant.
+
+### Metrics added to the scorecard
+
+- minimal-sufficient-proof recovery: whether at least one complete admissible proof set is recovered;
+- alternative-proof recall: proportion of independently adjudicated sufficient alternatives found;
+- duplicate-repeat flip rate: rate at which adding copies changes a decision that should remain unchanged;
+- missing-fact gain: rate at which adding a required admissible premise correctly changes the corresponding obligation;
+- synergy sensitivity: whether removing one required conjunct breaks that proof path;
+- redundancy robustness: whether a remaining independent alternative proof preserves readiness;
+- counterfactual deletion precision/recall for identifying necessary versus redundant leaves;
+- proof acquisition cost and excess cost relative to the oracle minimum, reported separately from inclusion minimality.
+
+A proof set may be inclusion-minimal without being the cheapest proof set. A system can also retain redundant evidence for resilience or audit purposes; therefore do not punish redundancy blindly. Report minimality, robustness and acquisition cost as separate dimensions.
+
+### Complexity and qualification boundary
+
+All-minimal-proof enumeration is potentially exponential in the number of candidate evidence leaves. Start with bounded small proof DAGs and exhaustive oracle enumeration; for larger instances use exact branch-and-bound under a published limit, or deterministic approximations that report a lower bound, upper bound and optimality gap. Never silently label a heuristic result globally minimal.
+
+The public synthetic corpus is not the hidden benchmark. Before capability comparisons, use source-family-disjoint held-out cases, independently adjudicated gold minimal proof sets, fixed context/observation budgets, repeated attempts where stochastic systems are involved, and paired confidence intervals.
+
+No evidence-minimality, duplicate-resistance, or cost-optimality result is claimed by the existing 18-case fixture workflow. This section defines a composed follow-on evaluation, not a new retrieval engine or justification graph.
