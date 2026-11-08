@@ -122,6 +122,18 @@ These descriptors describe the system; the four coordinates describe the evidenc
 - **Claim boundary:** no country-specific legal correctness, vehicle safety or broad LHT/RHT generalization claim.
 - **Source:** [SAM-TRAFFIC-CONVENTION-001 #11123](https://github.com/Luminous-Dynamics/symthaea/issues/11123).
 
+### DrivingGen (ICLR 2026) — generative driving world-model evaluation
+
+- **Role:** evaluates generated driving videos from both visual and robotics perspectives: distribution, visual quality, temporal/agent consistency and trajectory alignment.
+- **Dataset:** two tracks: open-domain internet-sourced driving videos and ego-conditioned clips aggregated from ZOD, DrivingDojo, COVLA, nuPlan and Waymo Open Motion. The paper reports 400 evaluation samples (200 per track), global weather/time/region diversity and 5.4% Sub-Saharan Africa in the open-domain regional mix.
+- **Versioning caution:** the current Hugging Face dataset README reports 222 evaluation examples per track, while the hosted dataset page reports 22,866 rows. Those counts do not match the paper's 200 per track; freeze a dataset revision, split manifest and sample IDs before reproduction.
+- **Metrics:** FVD / FTD, CLIP-IQA+, IEEE P2020 imaging dimensions, DINOv3 scene consistency, agent consistency / missing detections, LPIPS / SSIM, ADE / FDE / success / Hausdorff / DTW, comfort, curvature RMS, speed, velocity and acceleration consistency. Keep families separate; no one-number rank substitutes for failure analysis.
+- **Trajectory provenance:** upstream example pipeline derives ego trajectories via UniDepthV2 + visual SLAM and agent trajectories via YOLOv10 / depth estimation. These are inferred trajectories, not perfect ground-truth labels; carry extraction failure / uncertainty in any reproduction.
+- **Limitation:** Table 1 does not include downstream-task evaluation for DrivingGen; it is not a closed-loop planner or causal interactive-agent benchmark. Compose with NAVSIM v2 for pseudo-simulation planning, ReactSim-Bench for reactive-agent response, Symtropy #3532 for reciprocal policies, and SAM #10237/#10320 for counterfactual decision value.
+- **Rights:** code repository is Apache-2.0 and the dataset card declares Apache-2.0; retain source-video provenance and review third-party footage rights before commercial redistribution.
+- **Status:** upstream-reported; 14 models evaluated by authors, no SAM reproduction.
+- **Sources:** [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html), [project site](https://drivinggen-bench.github.io/), [code](https://github.com/youngzhou1999/DrivingGen), [dataset card](https://huggingface.co/datasets/yangzhou99/DrivingGen).
+
 ### NAVSIM v2 / EPDMS — pseudo-simulation, not fully interactive closed loop
 
 - **Role:** scalable planning evaluation using real driving scenes plus pseudo-simulated follow-up scenes.
@@ -228,6 +240,7 @@ The September 3, 2026 survey characterizes model design through state abstractio
 
 | Track | Baseline | Prospective SAM target | Hard comparability requirement |
 |---|---|---|---|
+| DrivingGen | 14 author-evaluated generative world models; two tracks; paper reports 400 samples | Reproduce exact release then improve worst-stratum video/trajectory consistency and ego controllability; add separate decision-value and interactive response tests | Pinned data revision, resolve 200-vs-222 per-track count, sample IDs, estimator/extraction pipeline, split and metric revisions |
 | SAM Traffic Convention Mirror v0.1 | Internal synthetic contract: one mirrored LHT/RHT pair plus steering-layout control | 100% of transform invariants; 100% conflicting-profile negatives reject/unresolve; 0 silent convention inference | Exact fixture/schema/checker digest; paired road frame, traffic profile, map/profile and vehicle configuration identities |
 | NAVSIM v2 / EPDMS | Official NAVSIM v2.1.2 implementation; SOTA2 secondary snapshot: Human Agent 90.3, LWDrive 89.6 | Reproduce the strongest matched score first; then improve EPDMS and component metrics on sealed slices without worsening the weakest metric | Exact v2.1.2 devkit, split, two-stage manifest, EPDMS evaluator, data privilege and checkpoint |
 | ReactSim-Bench | Author-reported SMART baseline; 2,636 nuPlan deviation scenarios | Beat reproduced response baselines across collision/risk/map/kinematic families; report each metric and worst deviation category separately | Exact scenario/cache version, ego deviation input, actor model, data split and per-metric denominator |
