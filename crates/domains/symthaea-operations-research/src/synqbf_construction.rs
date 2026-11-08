@@ -246,6 +246,7 @@ impl AigComposer {
             }
             AigNode::And { left, right } => {
                 let left = self.clone_local_literal(
+                    layer_position,
                     left,
                     local_aig,
                     dependency_to_paired_input,
@@ -253,6 +254,7 @@ impl AigComposer {
                     budget,
                 )?;
                 let right = self.clone_local_literal(
+                    layer_position,
                     right,
                     local_aig,
                     dependency_to_paired_input,
