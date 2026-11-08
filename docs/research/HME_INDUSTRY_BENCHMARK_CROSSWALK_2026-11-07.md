@@ -705,3 +705,12 @@ For Agent Memory Leaderboard:
 - keep the participant Add/Search API, durability and tenant isolation contract separate from HME kernel performance.
 
 The 98% value is a stretch project target, not a current result or a direct cross-paper comparison. Run the official split/evaluator and reproduce the vendor reader/judge settings before claiming an industry lead.
+
+
+## 11. Group-level exact pruning: current prototype boundary
+
+#11059 now has an in-memory group-envelope source prototype. Its first coordinate-box-only strategy was safe in the independent random control but pruned zero of 7,200 groups. The current candidate intersects that coordinate box with a centroid + L2-radius bound. The latter keeps the joint residual budget and may be materially tighter on clustered groups.
+
+A JavaScript binary32-model sanity experiment reports, for a deliberately clustered synthetic corpus, 4,138/4,320 groups pruned and 33,104/34,560 potential member payloads not requiring refinement, with zero observed false-prune disagreements. The same simulation does not represent disk bytes or latency; its member perturbations are deliberately small. Separate dimension/norm stress covered dimensions up to 16,384 and observed zero interval escapes across 8,000 member scores, with 144 conservative [-1,1] fallbacks. These results are captured in `hme_group_envelope_js_sanity_v0.json` and are not Rust tests or a proof.
+
+The decisive next comparison is against unclustered/random and low-margin groups, then actual HME segment/page data. If group radii saturate, fall back to per-vector certificates (#10978), progressive exact (#10945), or full scan. No group-level speedup or storage-byte savings should be claimed until #10917 persists the synopsis and measures actual reads.
