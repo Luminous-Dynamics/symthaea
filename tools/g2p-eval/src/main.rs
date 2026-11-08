@@ -1100,6 +1100,19 @@ mod tests {
     }
 
     #[test]
+    fn prediction_profile_must_match_reference_profile() {
+        let refs = vec![reference(
+            "word",
+            false,
+            vec![variant("v1", &["w", "ɜ", "d"], &[3], &[1])],
+        )];
+        let mut pred = candidate("word", &["w", "ɜ", "d"], &[3], &[1], false);
+        pred.profile_id = "en-GB-southern-v1".into();
+        let error = validate_inputs(&refs, &[pred]).unwrap_err();
+        assert!(error.contains("does not match reference profile"), "{error}");
+    }
+
+    #[test]
     fn aggregate_report_contains_language_stratified_metrics() {
         let mut refs = vec![reference(
             "hello",
@@ -1107,13 +1120,19 @@ mod tests {
             vec![variant("v1", &["h", "ə", "l", "oʊ"], &[2, 4], &[0, 1])],
         )];
         refs[0].language = "en-US".into();
+        refs[0].profile_id = "en-US-general-v1".into();
         let mut pred = candidate("hello", &["h", "ə", "l", "oʊ"], &[2, 4], &[0, 1], false);
         pred.language = "en-US".into();
+        pred.profile_id = "en-US-general-v1".into();
         let report = evaluate(&refs, &[pred]).unwrap();
         assert_eq!(report.by_language.len(), 1);
         assert_eq!(report.by_language[0].language, "en-US");
         assert_eq!(report.by_language[0].phone_error_rate, Some(0.0));
         assert_eq!(report.by_language[0].exact_pronunciation_rate, Some(1.0));
+        assert_eq!(report.by_profile.len(), 1);
+        assert_eq!(report.by_profile[0].profile_id, "en-US-general-v1");
+        assert_eq!(report.by_profile[0].phone_error_rate, Some(0.0));
+        assert_eq!(report.cases[0].profile_id, "en-US-general-v1");
     }
 
     #[test]
