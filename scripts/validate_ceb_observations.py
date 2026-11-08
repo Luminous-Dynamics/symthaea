@@ -450,6 +450,36 @@ def semantic_errors(payload: dict) -> list[str]:
         if "not a software-agent benchmark" not in caveats or "few shared datasets" not in caveats:
             errors.append("microservice SLR must retain review-scope and literature-gap caveats")
 
+    # SWE-CI is a long-horizon maintenance comparator, not a review claim
+    # disposition benchmark.
+    sweci = comparators.get("swe-ci-long-horizon-maintenance")
+    if sweci is None:
+        errors.append("missing SWE-CI long-horizon maintenance comparator")
+    else:
+        if (
+            sweci["lane_id"] != "CEB-CONTINUITY"
+            or sweci["source_id"] != "swe-ci-maintenance-paper-2026"
+            or sweci["sample_denominator"]["status"] != "reported"
+            or sweci["sample_denominator"]["value"] != 100
+        ):
+            errors.append("SWE-CI lane/source/100-task denominator changed")
+        caveats = " ".join(sweci["caveats"]).lower()
+        if "not code-review claim-support adjudication" not in caveats or "not evidence-disposition macro-f1" not in caveats:
+            errors.append("SWE-CI must retain maintenance-vs-evidence-continuity scope caveat")
+    required_sweci_observations = {
+        "sweci-maintenance-task-count": ("repository_maintenance_task_count", 100),
+        "sweci-average-history-days": ("average_history_duration", 233),
+        "sweci-average-commit-count": ("average_consecutive_commit_count", 71),
+    }
+    for observation_id, expected in required_sweci_observations.items():
+        row = next((item for item in observations if item["observation_id"] == observation_id), None)
+        if row is None:
+            errors.append(f"missing SWE-CI observation {observation_id}")
+            continue
+        metric_id, value = expected
+        if row["comparator_id"] != "swe-ci-long-horizon-maintenance" or row["metric"]["metric_id"] != metric_id or row["metric"]["value"] != value:
+            errors.append(f"{observation_id}: SWE-CI metric/value binding changed")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -725,6 +755,16 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "microservice-evolution-formal-verification-slr")
     comparator["sample_denominator"]["value"] = 1187
     must_reject(mutant, "systematic review search yield conflated with included-study denominator")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "sweci-average-history-days")
+    row["metric"]["value"] = 71
+    must_reject(mutant, "SWE-CI history duration conflated with commit count")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "swe-ci-long-horizon-maintenance")
+    comparator["sample_denominator"]["value"] = 71
+    must_reject(mutant, "SWE-CI commit-history depth conflated with task count")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
