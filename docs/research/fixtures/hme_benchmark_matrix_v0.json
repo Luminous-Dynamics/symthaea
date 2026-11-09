@@ -304,6 +304,32 @@
         "first_milestone": "reproduce_retrospective_memory_faithfulness_with_frozen_perception"
       },
       "target_status": "proposed_HME_milestone"
+    },
+    {
+      "benchmark": "GroupMemBench",
+      "dimensions": [
+        "multi-party group dynamics",
+        "speaker-grounded belief tracking",
+        "audience-adapted language",
+        "multi-hop reasoning",
+        "knowledge update",
+        "temporal reasoning",
+        "abstention"
+      ],
+      "metrics": [
+        "asker-conditioned_accuracy",
+        "speaker_attribution_accuracy",
+        "knowledge_update_accuracy",
+        "term_ambiguity_accuracy",
+        "abstention_accuracy",
+        "role_scope_leakage"
+      ],
+      "target": {
+        "first_milestone": "reproduce_BM25_baseline_and_strongest_published_system_under_official_protocol",
+        "role_scope_leakage": 0
+      },
+      "target_status": "reproduction_milestone_plus_hard_scope_gate",
+      "source": "arXiv:2605.14498"
     }
   ],
   "lifecycle_and_governance_track": {
@@ -365,12 +391,128 @@
     "Separate author-reported/vendor-reported results from independently reproduced results.",
     "Do not treat candidate counts or virtual page calculations as measured I/O.",
     "Report metadata overhead and build-time certificate cost as well as query-time savings.",
-    "Treat unauthorized reads and stale-memory resurrection as hard failures, not score trade-offs."
+    "Treat unauthorized reads and stale-memory resurrection as hard failures, not score trade-offs.",
+    "Compare LongMemEval only under the same official split, answer model, judge prompt, ingestion reset policy, retrieval budget and cost accounting.",
+    "Keep GroupMemBench and COLLABMEM separate from single-user LongMemEval; role/asker identity and authorization are part of correctness.",
+    "Keep TAME/Trust-Memevo separate from answer retrieval score; report safety/trustworthiness drift independently."
   ],
   "nonclaims": [
     "No benchmark in this matrix has been run by this fixture.",
     "All numeric targets are prospective project targets, not achieved results or published standards.",
     "The matrix does not certify the spherical-cap f32 prototype.",
     "The matrix does not certify persisted partition receipts or physical I/O savings."
+  ],
+  "synopsis_storage_track": {
+    "modes": [
+      {
+        "name": "BoxAndBall",
+        "numeric_bytes_per_dimension": 12,
+        "formula": "centroid f32 + coordinate min f32 + coordinate max f32",
+        "status": "implemented_default"
+      },
+      {
+        "name": "QuantizedBoxAndBall",
+        "numeric_bytes_per_dimension": 8,
+        "formula": "centroid f32 + coordinate min u16 + coordinate max u16",
+        "status": "experimental_outward_quantized"
+      },
+      {
+        "name": "BallOnly",
+        "numeric_bytes_per_dimension": 4,
+        "formula": "centroid f32 only"
+      }
+    ],
+    "numeric_bytes_per_group": "dimension * bytes_per_dimension + 4-byte radius",
+    "memory_fixture": "hme_group_synopsis_memory_budget_v0.json",
+    "sweep": {
+      "dimensions": [
+        16384,
+        65536,
+        262144
+      ],
+      "eligible_records": [
+        10000,
+        100000,
+        1000000
+      ],
+      "group_sizes": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "cache_profiles": [
+        "cold synopsis + cold payload",
+        "warm synopsis + cold payload",
+        "warm synopsis + warm payload"
+      ]
+    },
+    "metrics": [
+      "numeric_synopsis_bytes",
+      "member_id_and_digest_bytes",
+      "actual_serialized_directory_bytes",
+      "actual_peak_build_rss",
+      "actual_retained_rss",
+      "synopsis_cache_miss_bytes",
+      "query_time_groups_scanned",
+      "group_survival_fraction",
+      "member_intervals_scanned",
+      "original_payloads_read",
+      "physical_payload_bytes_read",
+      "p50/p95/p99_latency_ms",
+      "build_time_and_compaction_cost"
+    ],
+    "qualification": {
+      "quantized_endpoint_containment": "every decoded lower <= source min and upper >= source max, including all quantizer bin boundaries and adjacent f32 values",
+      "score_interval_containment": "all member canonical f32 scores contained for every query stratum",
+      "exact_top_k_id_agreement": 1,
+      "false_prune_count": 0,
+      "mode_dimension_generation_and_score_contract_binding": "required",
+      "rust_test_execution": "required_before selector use",
+      "physical_io_measurement": "required_for payload savings claims"
+    },
+    "proposed_targets": {
+      "metadata_work_fraction_of_per_record_baseline": 0.1,
+      "cold_payload_byte_reduction_p50": 0.5,
+      "cold_payload_byte_reduction_p95": 0.2
+    },
+    "nonclaims": [
+      "Analytical estimates are not runtime RSS or serialized storage measurements.",
+      "Quantized mode is not Rust-test qualified or production selector enabled.",
+      "No group survival or payload I/O savings are inferred from metadata size alone."
+    ]
+  },
+  "external_comparators": [
+    {
+      "name": "Redis Remis + Instruct",
+      "benchmark": "LongMemEval Small",
+      "reported_task_averaged_accuracy": 0.865,
+      "answer_backbone": "GPT-4o",
+      "evaluator": "official GPT-4o binary judge",
+      "evaluation_size": 500,
+      "provenance": "Redis-published reproduced run; same-backbone comparison as described in vendor report",
+      "comparability": "strong production-memory reference; reproduce in HME harness before ranking claims"
+    },
+    {
+      "name": "GroupMemBench strongest reported system",
+      "benchmark": "GroupMemBench",
+      "reported_average_accuracy": 0.46,
+      "provenance": "author-reported arXiv result",
+      "comparability": "multi-party benchmark; never mix with LongMemEval"
+    },
+    {
+      "name": "COLLABMEM TMS-GRAPH++",
+      "benchmark": "COLLABMEM",
+      "reported_non_oracle_average": 0.696,
+      "provenance": "author-reported EMNLP 2026 result",
+      "comparability": "collaborative memory competencies; never mix with retrieval benchmarks"
+    },
+    {
+      "name": "TAME",
+      "benchmark": "GPT-5.2 AIME plus Trust-Memevo",
+      "reported_accuracy_gain_percentage_points": 14.6,
+      "provenance": "author-reported EMNLP 2026 result",
+      "comparability": "memory evolution/trustworthiness, not retrieval accuracy"
+    }
   ]
 }
