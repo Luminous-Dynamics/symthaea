@@ -158,14 +158,100 @@
         },
         "robocasa_long_average_max_task_progress_pct": {
           "baseline_xiaomi_robotics_1": 20.83,
-          "most": 42.22
+          "most": 42.22,
+          "note": "Terminal success remains low: MOST reports 6.66% average success across the three simulation tasks (XR-1 and MOST-Raw 0%); progress improvement is not task-completion reliability."
         },
         "real_world_success_pct": {
           "baseline_xiaomi_robotics_1": 6.66,
           "most_raw_visual_history": 36.66,
           "most": 43.33
         },
-        "real_world_trials_per_method_per_task": 10
+        "real_world_trials_per_method_per_task": 10,
+        "memory_representation_ablation": {
+          "protocol": "RoboCasa365 Target-100% Composite-Seen; 16 tasks; paper-reported matched setup",
+          "metrics": "success_rate_pct; MC@25/50/75; max_progress_pct; path_weighted_progress_length_pct; ordered_progress_score_pct; unordered_progress_score_pct",
+          "variants": [
+            {
+              "memory": "no_memory_xr1",
+              "success_pct": 57.91,
+              "mc25": 90.83,
+              "mc50": 84.37,
+              "mc75": 70.41,
+              "max_progress": 79.48,
+              "ppl": 63.55,
+              "ops": 74.83,
+              "ups": 84.56
+            },
+            {
+              "memory": "visual_history_most_raw",
+              "success_pct": 63.33,
+              "mc25": 90.62,
+              "mc50": 85,
+              "mc75": 73.95,
+              "max_progress": 81.68,
+              "ppl": 65.06,
+              "ops": 76.67,
+              "ups": 86.82
+            },
+            {
+              "memory": "current_task_state_only",
+              "success_pct": 56.45,
+              "mc25": 89.37,
+              "mc50": 81.66,
+              "mc75": 68.54,
+              "max_progress": 77.5,
+              "ppl": 61.35,
+              "ops": 72.24,
+              "ups": 83
+            },
+            {
+              "memory": "task_state_history",
+              "success_pct": 65.2,
+              "mc25": 91.04,
+              "mc50": 84.79,
+              "mc75": 75.83,
+              "max_progress": 82.18,
+              "ppl": 66.23,
+              "ops": 77.88,
+              "ups": 86.67
+            },
+            {
+              "memory": "subtask_trajectory_only",
+              "success_pct": 67.08,
+              "mc25": 92.91,
+              "mc50": 86.45,
+              "mc75": 76.66,
+              "max_progress": 83.67,
+              "ppl": 67.88,
+              "ops": 79.25,
+              "ups": 88.02
+            },
+            {
+              "memory": "object_state_trajectory_only",
+              "success_pct": 66.04,
+              "mc25": 92.7,
+              "mc50": 87.08,
+              "mc75": 76.66,
+              "max_progress": 83.67,
+              "ppl": 68.09,
+              "ops": 79.31,
+              "ups": 86.87
+            },
+            {
+              "memory": "task_state_trajectory_most",
+              "success_pct": 68.75,
+              "mc25": 94.79,
+              "mc50": 89.16,
+              "mc75": 80.2,
+              "max_progress": 85.88,
+              "ppl": 68.5,
+              "ops": 82.09,
+              "ups": 89.37
+            }
+          ],
+          "interpretation": "The joint task-state trajectory with both subtask and object-state supervision plus future queries leads this ablation; current-state-only is worse than no-memory on terminal success. This is paper evidence, not an independently reproduced result.",
+          "source_line_range": "arXiv HTML lines 160-173"
+        }
       },
       "physical_scope": "Galbot G1, fixed base, waist rotation between pickup and placement tables; not mobile-base navigation qualification.",
       "claim_ceiling": "paper-reported result; small real-world trial count and bounded task; not a general deployment claim"
@@ -246,6 +332,7 @@
   "non_claims": [
     "No Luminous benchmark has been executed by recording this source snapshot.",
     "No SOTA superiority, physical qualification, safety certification or production readiness is implied.",
-    "A credential signature or content digest does not prove the physical event or measurement is true."
+    "A credential signature or content digest does not prove the physical event or measurement is true.",
+    "MOST's paper-reported memory-ablation results are not reproduced or independently verified by Luminous."
   ]
 }
