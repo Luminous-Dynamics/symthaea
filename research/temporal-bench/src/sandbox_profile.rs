@@ -296,7 +296,9 @@ fn build_systemd_run_arguments(
     let mut args = vec![
         "--user".into(),
         "--scope".into(),
-        "--pipe".into(),
+        // Scope mode runs as a child of systemd-run and inherits the launcher
+        // environment/stdio. The trusted launcher must explicitly preserve fd 3
+        // across fork/exec; --pipe is a transient-service mode and is unnecessary.
         format!("--property=MemoryMax={}", spec.memory_max_bytes),
         "--property=MemorySwapMax=0".into(),
         format!("--property=CPUQuota={}%", spec.cpu_quota_percent),
@@ -438,10 +440,10 @@ mod tests {
     }
 
     #[test]
-    fn scope_mode_uses_pipe_without_invalid_wait_or_service_only_properties() {
+    fn scope_mode_uses_inherited_stdio_without_pipe_or_wait_flags() {
         let plan = build_candidate_sandbox_plan(&spec()).unwrap();
         assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--scope"));
-        assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--pipe"));
+        assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == "--pipe"));
         assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == "--wait"));
         for service_only in [
             "--property=NoNewPrivileges=yes",
