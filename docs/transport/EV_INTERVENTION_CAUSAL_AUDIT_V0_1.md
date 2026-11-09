@@ -28,12 +28,13 @@ where d=+1 for higher-is-better metrics and d=-1 for lower-is-better metrics. Be
 
 ## Frozen synthetic corpus
 
-Seven cases exercise:
+Eight cases exercise:
 - a positive difference-in-differences effect (+7 kWh);
 - a regression-to-the-mean negative control with a +4.5 kWh naive treated-only change but zero DiD effect;
 - a harmful intervention (-5 kWh);
 - a censored follow-up that must force ABSTAIN while retaining the censored unit identity;
 - a pre-trend mismatch that must force ABSTAIN before a treatment effect is reported;
+- a lower-is-better resistance outcome, verifying that beneficial reductions have a positive normalized effect;
 - a work-order-only control that must be rejected;
 - protocol drift that must be rejected.
 
