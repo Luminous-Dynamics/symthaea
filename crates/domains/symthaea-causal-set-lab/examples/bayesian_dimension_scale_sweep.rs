@@ -45,10 +45,6 @@ impl Aggregate {
             return;
         }
         self.calibrated += 1;
-        if posterior.credible_set_95.contains(&true_dimension) {
-            self.covered_95 += 1;
-        }
-
         let Some(true_probability) = posterior
             .dimensions
             .iter()
@@ -59,6 +55,9 @@ impl Aggregate {
             self.calibrated -= 1;
             return;
         };
+        if posterior.credible_set_95.contains(&true_dimension) {
+            self.covered_95 += 1;
+        }
         self.true_probability_sum += true_probability;
         self.log_loss_sum -= true_probability.max(1.0e-15).ln();
 
@@ -108,12 +107,15 @@ impl Aggregate {
         let total = self.samples.max(1) as f64;
         let calibrated = self.calibrated.max(1) as f64;
         let brier_denominator = calibrated * DIMENSIONS.len() as f64;
+        let (coverage_low, coverage_high) = wilson_interval(self.covered_95, self.calibrated);
         format!(
-            "{event_count},{true_dimension},{prior_name},{calibration_replicates},{},{:.6},{},{:.9},{:.9},{:.9},{:.9},{:.9},{},{}",
+            "{event_count},{true_dimension},{prior_name},{calibration_replicates},{},{:.6},{},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{},{}",
             self.samples,
             self.calibrated as f64 / total,
             self.outside_support,
             self.covered_95 as f64 / calibrated,
+            coverage_low,
+            coverage_high,
             self.correct_map as f64 / calibrated,
             self.true_probability_sum / calibrated,
             self.log_loss_sum / calibrated,
@@ -122,6 +124,22 @@ impl Aggregate {
             p95_low_dimension_mass,
         )
     }
+}
+
+fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
+    if trials == 0 {
+        return (f64::NAN, f64::NAN);
+    }
+    let z = 1.959_963_984_540_054;
+    let n = trials as f64;
+    let observed = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (observed + z2 / (2.0 * n)) / denominator;
+    let half_width = z
+        * (observed * (1.0 - observed) / n + z2 / (4.0 * n * n)).sqrt()
+        / denominator;
+    ((center - half_width).max(0.0), (center + half_width).min(1.0))
 }
 
 fn prior(probabilities: [f64; 3]) -> [DimensionPrior; 3] {
@@ -151,7 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("likelihood=empirical_KDE_of_ordering_fraction_not_iid_pair_Bernoulli");
     println!("calibration_unit=one_complete_fixed_cardinality_sprinkling");
     println!("calibration_and_qualification=disjoint_deterministic_seed_manifests");
-    println!("event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support");
+    println!("event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,wilson95_coverage_low,wilson95_coverage_high,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support");
     
     for (size_index, event_count) in EVENT_COUNTS.iter().copied().enumerate() {
         let calibration_replicates = CALIBRATION_REPLICATES[size_index];
