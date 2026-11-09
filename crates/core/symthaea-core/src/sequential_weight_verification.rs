@@ -372,7 +372,7 @@ fn campaign_snapshot_digest(
     let encoded = serde_json::to_vec(&claims)
         .map_err(|_| SequentialWeightVerificationError::CampaignSnapshotSerialization)?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-weight-verification-campaign-snapshot-v1\0");
+    hasher.update(b"symthaea-weight-verification-campaign-snapshot-v2\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(hasher.finalize().to_hex().to_string())
@@ -387,6 +387,7 @@ pub struct SequentialWeightVerificationCampaign {
     next_candidate_index: u64,
     used_candidate_digests: BTreeSet<String>,
     used_confirmatory_shards: BTreeSet<String>,
+    used_confirmatory_episode_id_digests: BTreeSet<String>,
 }
 
 impl SequentialWeightVerificationCampaign {
@@ -403,6 +404,7 @@ impl SequentialWeightVerificationCampaign {
             next_candidate_index: 1,
             used_candidate_digests: BTreeSet::new(),
             used_confirmatory_shards: BTreeSet::new(),
+            used_confirmatory_episode_id_digests: BTreeSet::new(),
         })
     }
 
@@ -413,10 +415,20 @@ impl SequentialWeightVerificationCampaign {
         baseline_model_digest: String,
         candidate_model_digest: String,
         confirmatory_shard_digest: String,
+        confirmatory_episode_manifest: ConfirmatoryEpisodeManifest,
         precondition_gate_digest: String,
     ) -> Result<SequentialWeightVerification, SequentialWeightVerificationError> {
         if self.next_candidate_index == u64::MAX {
             return Err(SequentialWeightVerificationError::CandidateIndexExhausted);
+        }
+        validate_confirmatory_episode_manifest(&confirmatory_episode_manifest)?;
+        if confirmatory_episode_manifest.episode_count()
+            < self.config.maximum_observations as usize
+        {
+            return Err(SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
+                expected: self.config.maximum_observations as usize,
+                actual: confirmatory_episode_manifest.episode_count(),
+            });
         }
         if self
             .used_candidate_digests
@@ -430,18 +442,38 @@ impl SequentialWeightVerificationCampaign {
         {
             return Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed);
         }
+        let episode_id_digests = confirmatory_episode_manifest
+            .episode_ids
+            .iter()
+            .map(|episode_id| confirmatory_episode_id_digest(episode_id))
+            .collect::<Vec<_>>();
+        if episode_id_digests
+            .iter()
+            .any(|digest| self.used_confirmatory_episode_id_digests.contains(digest))
+        {
+            return Err(SequentialWeightVerificationError::ConfirmatoryEpisodeOverlap);
+        }
         let binding = WeightVerificationBinding {
             candidate_index: self.next_candidate_index,
             baseline_model_digest,
             candidate_model_digest: candidate_model_digest.clone(),
             evaluation_protocol_digest: self.evaluation_protocol_digest.clone(),
             confirmatory_shard_digest: confirmatory_shard_digest.clone(),
+            confirmatory_episode_manifest_digest: confirmatory_episode_manifest
+                .manifest_digest
+                .clone(),
             precondition_gate_digest,
         };
-        let verifier = SequentialWeightVerification::from_binding(binding, self.config)?;
+        let verifier = SequentialWeightVerification::from_binding(
+            binding,
+            self.config,
+            confirmatory_episode_manifest,
+        )?;
         self.used_candidate_digests.insert(candidate_model_digest);
         self.used_confirmatory_shards
             .insert(confirmatory_shard_digest);
+        self.used_confirmatory_episode_id_digests
+            .extend(episode_id_digests);
         self.next_candidate_index += 1;
         Ok(verifier)
     }
@@ -456,19 +488,29 @@ impl SequentialWeightVerificationCampaign {
         self.used_confirmatory_shards.len()
     }
 
+    /// Return the number of unique confirmatory episode IDs reserved by this campaign.
+    pub fn used_confirmatory_episode_id_count(&self) -> usize {
+        self.used_confirmatory_episode_id_digests.len()
+    }
+
     /// Create a deterministic checkpoint suitable for durable storage.
     pub fn snapshot(
         &self,
     ) -> Result<SequentialWeightVerificationCampaignSnapshot, SequentialWeightVerificationError>
     {
         let mut snapshot = SequentialWeightVerificationCampaignSnapshot {
-            format_version: 1,
+            format_version: 2,
             config: self.config,
             evaluation_protocol_digest: self.evaluation_protocol_digest.clone(),
             next_candidate_index: self.next_candidate_index,
             used_candidate_digests: self.used_candidate_digests.iter().cloned().collect(),
             used_confirmatory_shard_digests: self
                 .used_confirmatory_shards
+                .iter()
+                .cloned()
+                .collect(),
+            used_confirmatory_episode_id_digests: self
+                .used_confirmatory_episode_id_digests
                 .iter()
                 .cloned()
                 .collect(),
@@ -485,7 +527,7 @@ impl SequentialWeightVerificationCampaign {
     pub fn from_snapshot(
         snapshot: SequentialWeightVerificationCampaignSnapshot,
     ) -> Result<Self, SequentialWeightVerificationError> {
-        if snapshot.format_version != 1 {
+        if snapshot.format_version != 2 {
             return Err(
                 SequentialWeightVerificationError::UnsupportedCampaignSnapshotVersion(
                     snapshot.format_version,
@@ -518,6 +560,10 @@ impl SequentialWeightVerificationCampaign {
                 .used_confirmatory_shard_digests
                 .windows(2)
                 .any(|pair| pair[0] >= pair[1])
+            || snapshot
+                .used_confirmatory_episode_id_digests
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
         {
             return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
         }
@@ -537,6 +583,22 @@ impl SequentialWeightVerificationCampaign {
             }
         }
 
+        let expected_episode_id_count = expected_count
+            .checked_mul(snapshot.config.maximum_observations)
+            .ok_or(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
+        let episode_id_count = u64::try_from(snapshot.used_confirmatory_episode_id_digests.len())
+            .map_err(|_| SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
+        if episode_id_count < expected_episode_id_count {
+            return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+        }
+        let mut used_confirmatory_episode_id_digests = BTreeSet::new();
+        for digest in &snapshot.used_confirmatory_episode_id_digests {
+            validate_hex_digest(digest, "confirmatory_episode_id_digest")?;
+            if !used_confirmatory_episode_id_digests.insert(digest.clone()) {
+                return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+            }
+        }
+
         let expected_digest = campaign_snapshot_digest(&snapshot)?;
         if expected_digest != snapshot.snapshot_digest {
             return Err(SequentialWeightVerificationError::CampaignSnapshotDigestMismatch);
@@ -548,6 +610,7 @@ impl SequentialWeightVerificationCampaign {
             next_candidate_index: snapshot.next_candidate_index,
             used_candidate_digests,
             used_confirmatory_shards,
+            used_confirmatory_episode_id_digests,
         })
     }
 }
