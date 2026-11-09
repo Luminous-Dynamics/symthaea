@@ -41,6 +41,9 @@ pub struct DtcProbeConfig {
     pub probe_amplitude: f64,
     /// Finite-difference displacement used to estimate d p(outcome) / d A.
     pub amplitude_derivative_step: f64,
+    /// Centered finite-difference step for the initial probe phase nuisance,
+    /// in radians.
+    pub phase_derivative_step_rad: f64,
     /// Number of early/rolling samples used to measure subharmonic lifetime.
     pub lifetime_window: usize,
     /// Lifetime is the first window whose mean absolute demodulated order is
@@ -72,6 +75,8 @@ impl DtcProbeConfig {
             || !self.probe_amplitude.is_finite()
             || !self.amplitude_derivative_step.is_finite()
             || self.amplitude_derivative_step <= 0.0
+            || !self.phase_derivative_step_rad.is_finite()
+            || self.phase_derivative_step_rad <= 0.0
             || self.lifetime_window < 2
             || lifetime_end >= self.periods
             || !self.lifetime_threshold_fraction.is_finite()
@@ -232,6 +237,23 @@ pub struct DtcProbeSensingReport {
     /// finite-difference state derivative. This is an upper bound for
     /// measurements on the declared ideal pure state, not achieved readout.
     pub quantum_fisher_information_per_shot: f64,
+    /// Joint classical Fisher matrix for [probe amplitude, initial phase].
+    pub classical_fisher_matrix_per_shot: [[f64; 2]; 2],
+    /// Joint pure-state QFIM for [probe amplitude, initial phase].
+    pub quantum_fisher_matrix_per_shot: [[f64; 2]; 2],
+    /// Amplitude information after treating phase as an unknown nuisance.
+    /// None means the phase is itself informative but the joint information
+    /// matrix is singular; a zero-frequency phase-invariant control can still
+    /// return the known-phase amplitude information.
+    pub classical_effective_amplitude_fisher_with_phase_nuisance: Option<f64>,
+    pub quantum_effective_amplitude_fisher_with_phase_nuisance: Option<f64>,
+    /// Conversion from phase uncertainty to equivalent clock offset, in
+    /// drive periods per radian: |dT/dphi| = 1 / (2 pi f). Undefined at f=0.
+    pub phase_time_offset_drive_periods_per_radian: Option<f64>,
+    /// Local joint Cramér-Rao covariance lower bounds per independent shot,
+    /// ordered [amplitude, phase]. Singular matrices are reported as None.
+    pub classical_joint_crlb_covariance_per_shot: Option<[[f64; 2]; 2]>,
+    pub quantum_joint_crlb_covariance_per_shot: Option<[[f64; 2]; 2]>,
     /// Classical total-Z Fisher information divided by the pure-state QFI.
     /// None means that the QFI is numerically zero.
     pub classical_to_quantum_fisher_ratio: Option<f64>,
@@ -313,12 +335,61 @@ pub fn evaluate_dtc_probe_sensing(
         minus_model.amplitudes(),
         delta,
     )?;
-    let fisher = total_z_classical_fisher_information(
+    let phase_delta = config.phase_derivative_step_rad;
+    let mut phase_plus_model = build_model(config)?;
+    phase_plus_model.stroboscopic_magnetization_with_uniform_ac_probe(
+        config.periods,
+        config.probe_amplitude,
+        config.probe_frequency_cycles_per_drive_period,
+        config.probe_initial_phase_rad + phase_delta,
+    )?;
+    let phase_plus_readout = readout_distribution(&phase_plus_model);
+    validate_readout(&phase_plus_readout)?;
+
+    let mut phase_minus_model = build_model(config)?;
+    phase_minus_model.stroboscopic_magnetization_with_uniform_ac_probe(
+        config.periods,
+        config.probe_amplitude,
+        config.probe_frequency_cycles_per_drive_period,
+        config.probe_initial_phase_rad - phase_delta,
+    )?;
+    let phase_minus_readout = readout_distribution(&phase_minus_model);
+    validate_readout(&phase_minus_readout)?;
+
+    let classical_fisher_matrix = total_z_classical_fisher_matrix(
         &probe_readout.probability_by_down_spins,
         &plus_readout.probability_by_down_spins,
         &minus_readout.probability_by_down_spins,
+        &phase_plus_readout.probability_by_down_spins,
+        &phase_minus_readout.probability_by_down_spins,
         delta,
+        phase_delta,
     )?;
+    let quantum_fisher_matrix = pure_state_quantum_fisher_matrix(
+        nominal_model.amplitudes(),
+        plus_model.amplitudes(),
+        minus_model.amplitudes(),
+        phase_plus_model.amplitudes(),
+        phase_minus_model.amplitudes(),
+        delta,
+        phase_delta,
+    )?;
+    let fisher = classical_fisher_matrix[0][0];
+    let quantum_fisher = quantum_fisher_matrix[0][0];
+    let classical_effective_amplitude_fisher =
+        effective_amplitude_information_with_phase_nuisance(classical_fisher_matrix);
+    let quantum_effective_amplitude_fisher =
+        effective_amplitude_information_with_phase_nuisance(quantum_fisher_matrix);
+    let phase_time_offset_conversion = if config.probe_frequency_cycles_per_drive_period > 0.0 {
+        Some(
+            1.0 / (2.0 * std::f64::consts::PI
+                * config.probe_frequency_cycles_per_drive_period),
+        )
+    } else {
+        None
+    };
+    let classical_joint_covariance = invert_fisher_matrix_2x2(classical_fisher_matrix);
+    let quantum_joint_covariance = invert_fisher_matrix_2x2(quantum_fisher_matrix);
     let fisher_per_period = fisher / config.periods as f64;
     let quantum_fisher_per_period = quantum_fisher / config.periods as f64;
     let classical_to_quantum_fisher_ratio = if quantum_fisher > f64::EPSILON {
@@ -351,6 +422,15 @@ pub fn evaluate_dtc_probe_sensing(
         probe_readout,
         classical_fisher_information_per_shot: fisher,
         quantum_fisher_information_per_shot: quantum_fisher,
+        classical_fisher_matrix_per_shot: classical_fisher_matrix,
+        quantum_fisher_matrix_per_shot: quantum_fisher_matrix,
+        classical_effective_amplitude_fisher_with_phase_nuisance:
+            classical_effective_amplitude_fisher,
+        quantum_effective_amplitude_fisher_with_phase_nuisance:
+            quantum_effective_amplitude_fisher,
+        phase_time_offset_drive_periods_per_radian: phase_time_offset_conversion,
+        classical_joint_crlb_covariance_per_shot: classical_joint_covariance,
+        quantum_joint_crlb_covariance_per_shot: quantum_joint_covariance,
         classical_to_quantum_fisher_ratio,
         classical_fisher_within_quantum_bound,
         fisher_information_per_drive_period: fisher_per_period,
@@ -481,6 +561,210 @@ fn total_z_classical_fisher_information(
     Ok(information)
 }
 
+/// Joint pure-state quantum Fisher information matrix for amplitude and phase.
+fn pure_state_quantum_fisher_matrix(
+    nominal: &[Complex<f64>],
+    amplitude_plus: &[Complex<f64>],
+    amplitude_minus: &[Complex<f64>],
+    phase_plus: &[Complex<f64>],
+    phase_minus: &[Complex<f64>],
+    amplitude_step: f64,
+    phase_step: f64,
+) -> Result<[[f64; 2]; 2], DtcProbeError> {
+    let states = [amplitude_plus, amplitude_minus, phase_plus, phase_minus];
+    if nominal.is_empty()
+        || states.iter().any(|state| state.len() != nominal.len())
+        || !amplitude_step.is_finite()
+        || amplitude_step <= 0.0
+        || !phase_step.is_finite()
+        || phase_step <= 0.0
+    {
+        return Err(DtcProbeError::InvalidStateVector);
+    }
+
+    let nominal_norm = nominal.iter().map(|amplitude| amplitude.norm_sqr()).sum::<f64>();
+    if !nominal_norm.is_finite() || (nominal_norm - 1.0).abs() > 1.0e-8 {
+        return Err(DtcProbeError::InvalidStateVector);
+    }
+
+    let mut derivatives = [
+        vec![Complex::new(0.0, 0.0); nominal.len()],
+        vec![Complex::new(0.0, 0.0); nominal.len()],
+    ];
+    for index in 0..nominal.len() {
+        if !nominal[index].re.is_finite() || !nominal[index].im.is_finite() {
+            return Err(DtcProbeError::InvalidStateVector);
+        }
+        for state in states {
+            if !state[index].re.is_finite() || !state[index].im.is_finite() {
+                return Err(DtcProbeError::InvalidStateVector);
+            }
+        }
+        derivatives[0][index] =
+            (amplitude_plus[index] - amplitude_minus[index]) / (2.0 * amplitude_step);
+        derivatives[1][index] = (phase_plus[index] - phase_minus[index]) / (2.0 * phase_step);
+    }
+
+    let mut derivative_norm = [[0.0; 2]; 2];
+    let mut overlaps = [Complex::new(0.0, 0.0); 2];
+    for left in 0..2 {
+        for index in 0..nominal.len() {
+            overlaps[left] += nominal[index].conj() * derivatives[left][index];
+        }
+        for right in 0..2 {
+            for index in 0..nominal.len() {
+                derivative_norm[left][right] +=
+                    (derivatives[left][index].conj() * derivatives[right][index]).re;
+            }
+        }
+    }
+
+    let mut information = [[0.0; 2]; 2];
+    for left in 0..2 {
+        for right in 0..2 {
+            let projected = derivative_norm[left][right]
+                - (overlaps[left].conj() * overlaps[right]).re;
+            information[left][right] = 4.0 * projected;
+            if !information[left][right].is_finite() {
+                return Err(DtcProbeError::NonFiniteFisherInformation);
+            }
+        }
+    }
+
+    // Symmetrize only the roundoff-level asymmetry implied by the analytic
+    // expression. A material asymmetry would indicate an implementation bug.
+    let asymmetry = (information[0][1] - information[1][0]).abs();
+    if asymmetry > 1.0e-8 * information[0][0].abs().max(information[1][1].abs()).max(1.0) {
+        return Err(DtcProbeError::NonFiniteFisherInformation);
+    }
+    let cross = 0.5 * (information[0][1] + information[1][0]);
+    information[0][1] = cross;
+    information[1][0] = cross;
+    for diagonal in [information[0][0], information[1][1]] {
+        if diagonal < -1.0e-8 {
+            return Err(DtcProbeError::NonFiniteFisherInformation);
+        }
+    }
+    information[0][0] = information[0][0].max(0.0);
+    information[1][1] = information[1][1].max(0.0);
+    Ok(information)
+}
+
+/// Joint classical Fisher information matrix for the declared total-Z
+/// probability distribution, with parameters [amplitude, phase].
+fn total_z_classical_fisher_matrix(
+    nominal: &[f64],
+    amplitude_plus: &[f64],
+    amplitude_minus: &[f64],
+    phase_plus: &[f64],
+    phase_minus: &[f64],
+    amplitude_step: f64,
+    phase_step: f64,
+) -> Result<[[f64; 2]; 2], DtcProbeError> {
+    let distributions = [amplitude_plus, amplitude_minus, phase_plus, phase_minus];
+    if nominal.is_empty()
+        || distributions
+            .iter()
+            .any(|distribution| distribution.len() != nominal.len())
+        || !amplitude_step.is_finite()
+        || amplitude_step <= 0.0
+        || !phase_step.is_finite()
+        || phase_step <= 0.0
+    {
+        return Err(DtcProbeError::InvalidConfiguration);
+    }
+
+    let mut information = [[0.0; 2]; 2];
+    for outcome in 0..nominal.len() {
+        let probability = nominal[outcome];
+        if !probability.is_finite() || probability < 0.0 {
+            return Err(DtcProbeError::InvalidProbabilityDistribution);
+        }
+        let derivatives = [
+            (amplitude_plus[outcome] - amplitude_minus[outcome]) / (2.0 * amplitude_step),
+            (phase_plus[outcome] - phase_minus[outcome]) / (2.0 * phase_step),
+        ];
+        if derivatives.iter().any(|value| !value.is_finite()) {
+            return Err(DtcProbeError::NonFiniteFisherInformation);
+        }
+        if probability <= 1.0e-15 {
+            if derivatives.iter().any(|value| value.abs() > 1.0e-10) {
+                return Err(DtcProbeError::SingularReadoutSupport {
+                    outcome_down_spins: outcome,
+                });
+            }
+            continue;
+        }
+        for left in 0..2 {
+            for right in 0..2 {
+                information[left][right] +=
+                    derivatives[left] * derivatives[right] / probability;
+            }
+        }
+    }
+
+    for row in &information {
+        if row.iter().any(|value| !value.is_finite()) {
+            return Err(DtcProbeError::NonFiniteFisherInformation);
+        }
+    }
+    let cross = 0.5 * (information[0][1] + information[1][0]);
+    information[0][1] = cross;
+    information[1][0] = cross;
+    Ok(information)
+}
+
+/// Schur-complement information for amplitude after eliminating the phase
+/// nuisance. If phase has no information and no amplitude/phase coupling,
+/// phase is irrelevant to this amplitude readout and the known-phase value is
+/// retained. Otherwise the singular nuisance case returns None.
+fn effective_amplitude_information_with_phase_nuisance(
+    information: [[f64; 2]; 2],
+) -> Option<f64> {
+    let amplitude = information[0][0];
+    let cross = information[0][1];
+    let phase = information[1][1];
+    if !amplitude.is_finite() || !cross.is_finite() || !phase.is_finite() {
+        return None;
+    }
+    if phase <= f64::EPSILON {
+        return if cross.abs() <= 1.0e-12 {
+            Some(amplitude.max(0.0))
+        } else {
+            None
+        };
+    }
+    let effective = amplitude - cross * cross / phase;
+    if !effective.is_finite() || effective < -1.0e-8 * amplitude.abs().max(1.0) {
+        return None;
+    }
+    Some(effective.max(0.0))
+}
+
+/// Invert a symmetric 2x2 Fisher matrix when both parameters are jointly
+/// identifiable. The returned covariance is a per-shot local CRLB.
+fn invert_fisher_matrix_2x2(information: [[f64; 2]; 2]) -> Option<[[f64; 2]; 2]> {
+    let a = information[0][0];
+    let b = 0.5 * (information[0][1] + information[1][0]);
+    let d = information[1][1];
+    if !a.is_finite() || !b.is_finite() || !d.is_finite() || a <= 0.0 || d <= 0.0 {
+        return None;
+    }
+    let determinant = a * d - b * b;
+    let scale = (a * d).abs().max(b * b).max(f64::MIN_POSITIVE);
+    if !determinant.is_finite() || determinant <= 1.0e-12 * scale {
+        return None;
+    }
+    let covariance = [
+        [d / determinant, -b / determinant],
+        [-b / determinant, a / determinant],
+    ];
+    if covariance.iter().flatten().any(|value| !value.is_finite()) {
+        return None;
+    }
+    Some(covariance)
+}
+
 /// Ideal single-parameter Cramér–Rao lower bound for independent repeated
 /// total-Z measurements under the same model. It excludes nuisance parameters.
 pub fn cramer_rao_standard_error(
@@ -526,6 +810,7 @@ mod tests {
             probe_initial_phase_rad: 0.0,
             probe_amplitude: 0.04,
             amplitude_derivative_step: 1.0e-3,
+            phase_derivative_step_rad: 1.0e-3,
             lifetime_window: 8,
             lifetime_threshold_fraction: 0.5,
         }
@@ -559,6 +844,67 @@ mod tests {
                 .is_finite()
         );
         assert!(report.norm_error < 1.0e-10);
+    }
+
+    #[test]
+    fn joint_fisher_matrices_are_symmetric_and_classical_is_bounded_by_quantum() {
+        let report = evaluate_dtc_probe_sensing(&config()).unwrap();
+        let classical = report.classical_fisher_matrix_per_shot;
+        let quantum = report.quantum_fisher_matrix_per_shot;
+        assert!((classical[0][1] - classical[1][0]).abs() < 1.0e-10);
+        assert!((quantum[0][1] - quantum[1][0]).abs() < 1.0e-10);
+
+        // For a 2x2 symmetric matrix, PSD is equivalent to non-negative
+        // diagonal entries and determinant (within finite-difference tolerance).
+        for matrix in [classical, quantum] {
+            assert!(matrix[0][0] >= -1.0e-10);
+            assert!(matrix[1][1] >= -1.0e-10);
+            assert!(matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0] >= -1.0e-8);
+        }
+
+        let difference = [
+            [
+                quantum[0][0] - classical[0][0],
+                quantum[0][1] - classical[0][1],
+            ],
+            [
+                quantum[1][0] - classical[1][0],
+                quantum[1][1] - classical[1][1],
+            ],
+        ];
+        assert!(difference[0][0] >= -1.0e-6);
+        assert!(difference[1][1] >= -1.0e-6);
+        assert!(
+            difference[0][0] * difference[1][1]
+                - difference[0][1] * difference[1][0]
+                >= -1.0e-5
+        );
+        assert!(
+            (report.classical_fisher_information_per_shot - classical[0][0]).abs() < 1.0e-12
+        );
+        assert!(
+            (report.quantum_fisher_information_per_shot - quantum[0][0]).abs() < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn phase_nuisance_cannot_increase_amplitude_information() {
+        let report = evaluate_dtc_probe_sensing(&config()).unwrap();
+        let known_phase = report.classical_fisher_information_per_shot;
+        let unknown_phase = report
+            .classical_effective_amplitude_fisher_with_phase_nuisance
+            .unwrap();
+        assert!(unknown_phase <= known_phase + 1.0e-10);
+        assert!(report.phase_time_offset_drive_periods_per_radian.is_some());
+    }
+
+    #[test]
+    fn zero_frequency_has_no_phase_to_clock_conversion() {
+        let mut zero_frequency = config();
+        zero_frequency.probe_frequency_cycles_per_drive_period = 0.0;
+        let report = evaluate_dtc_probe_sensing(&zero_frequency).unwrap();
+        assert_eq!(report.phase_time_offset_drive_periods_per_radian, None);
+        assert!(report.classical_effective_amplitude_fisher_with_phase_nuisance.is_some());
     }
 
     #[test]
