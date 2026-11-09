@@ -1455,10 +1455,10 @@
       "source_status": "sam_reproduced",
       "rights_status": "synthetic_no_external_dataset",
       "validation_result": {
-        "exact_head": "2c5bad4bfe702b6eab61a15e3e91c60d17de5c7c",
-        "workflow_run_id": 42518757049,
-        "unit_tests_total": 30,
-        "unit_tests_passed": 30,
+        "exact_head": "3f31696570b273c40ec9649dc6598590931e7bf9",
+        "workflow_run_id": 42656397728,
+        "unit_tests_total": 50,
+        "unit_tests_passed": 50,
         "unit_tests_failed": 0,
         "format": "passed",
         "scene_schema_and_fixture": "passed",
@@ -1466,14 +1466,16 @@
         "cross_contract_profile_resolution": "passed",
         "cross_contract_road_frame_closure": "passed",
         "source_role_domain_separation": "passed",
-        "strict_clippy": "passed"
+        "strict_clippy": "passed",
+        "follow_target_geometry_time_provenance": "passed",
+        "left_right_mirror_equivariance": "passed"
       },
       "caveats": [
         "This is a SAM-authored synthetic conformance suite, not an external leaderboard.",
         "Two paired synthetic scenes and three synthetic traffic profiles do not represent broad road-jurisdiction or scenario coverage.",
+        "The 50 tests include structural and semantic fixtures, not 50 independent driving episodes or a statistical sample of road interactions.",
         "Passing tests do not establish national traffic-law correctness, local sensor accuracy, map fidelity, real-road generalization, roadworthiness or safety.",
-        "The paired-scene count and all control-family denominators must accompany future pass-rate claims.",
-        "The source-role checks validate declared provenance roles and prevent cross-domain relabelling; they do not authenticate sender identity, prove sensor calibration, source independence, spatial applicability or physical truth."
+        "The paired-scene count and all control-family denominators must accompany future pass-rate claims."
       ],
       "sources": [
         "https://github.com/Luminous-Dynamics/symthaea/pull/11111",
