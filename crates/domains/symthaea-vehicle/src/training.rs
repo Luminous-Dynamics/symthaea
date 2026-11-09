@@ -441,11 +441,12 @@ impl VehicleTrainer {
             let road_heading = proj.road_heading;
 
             let sensor_hv = encoder.encode(&state);
-            let mut command = controller.forward(&sensor_hv, dt as f32);
-
-            // Blend with PD teacher during curriculum
-            if pd_weight > 0.01 {
-                let pd_cmd = match task {
+            let student_proposal_command = controller.forward(&sensor_hv, dt as f32);
+            let train_this_step = step % self.config.train_every == 0;
+            let teacher_action_needed =
+                pd_weight > 0.01 || train_this_step || self.config.collect_telemetry;
+            let teacher_command = if teacher_action_needed {
+                Some(match task {
                     VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
                         &state,
                         drive_target,
@@ -454,20 +455,41 @@ impl VehicleTrainer {
                         follow_oracle_target.as_ref(),
                     ),
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
-                };
+                })
+            } else {
+                None
+            };
+
+            // Keep student proposal, privileged teacher, blended proposal and
+            // executed command distinct. The teacher can use simulator truth
+            // while the student receives only the encoded VehicleState.
+            let teacher_action_used_for_blend = pd_weight > 0.01 && teacher_command.is_some();
+            let pd_teacher_blend_weight = if teacher_action_used_for_blend {
+                pd_weight
+            } else {
+                0.0
+            };
+            let mut command = student_proposal_command;
+            if teacher_action_used_for_blend {
+                let pd_cmd = teacher_command.expect("blend requires a computed teacher action");
                 command = VehicleCommand {
-                    steering: pd_weight * pd_cmd.steering + (1.0 - pd_weight) * command.steering,
-                    throttle: pd_weight * pd_cmd.throttle + (1.0 - pd_weight) * command.throttle,
-                    brake: pd_weight * pd_cmd.brake + (1.0 - pd_weight) * command.brake,
+                    steering: pd_teacher_blend_weight * pd_cmd.steering
+                        + (1.0 - pd_teacher_blend_weight) * command.steering,
+                    throttle: pd_teacher_blend_weight * pd_cmd.throttle
+                        + (1.0 - pd_teacher_blend_weight) * command.throttle,
+                    brake: pd_teacher_blend_weight * pd_cmd.brake
+                        + (1.0 - pd_teacher_blend_weight) * command.brake,
                 };
                 command = command.clamped();
             }
+            let blended_action_command = command;
 
-            // Add exploration noise
+            // Add exploration noise after recording the pre-noise blended proposal.
             if let Some(noise) = &fep_result.exploration_noise {
                 command = command.with_noise(*noise);
                 exploration_count += 1;
             }
+            let executed_action_command = command;
 
             physics.step(&command, dt);
 
@@ -530,21 +552,34 @@ impl VehicleTrainer {
                         .map(|target| target.relative_speed_mps()),
                     follow_oracle_snapshot_age_s: follow_oracle_target
                         .map(|target| (state.timestamp - target.snapshot_time_s()).max(0.0)),
+                    student_proposal_steering: student_proposal_command.steering,
+                    student_proposal_throttle: student_proposal_command.throttle,
+                    student_proposal_brake: student_proposal_command.brake,
+                    teacher_target_steering: teacher_command.map(|target| target.steering),
+                    teacher_target_throttle: teacher_command.map(|target| target.throttle),
+                    teacher_target_brake: teacher_command.map(|target| target.brake),
+                    student_teacher_action_delta_l1: teacher_command.map(|target| {
+                        ((student_proposal_command.steering - target.steering).abs()
+                            + (student_proposal_command.throttle - target.throttle).abs()
+                            + (student_proposal_command.brake - target.brake).abs())
+                            / 3.0
+                    }),
+                    teacher_action_used_for_blend,
+                    teacher_action_used_for_supervision: train_this_step && teacher_command.is_some(),
+                    pd_teacher_blend_weight,
+                    blended_action_steering: blended_action_command.steering,
+                    blended_action_throttle: blended_action_command.throttle,
+                    blended_action_brake: blended_action_command.brake,
+                    executed_action_steering: executed_action_command.steering,
+                    executed_action_throttle: executed_action_command.throttle,
+                    executed_action_brake: executed_action_command.brake,
                 });
             }
 
             // -- TRAINING (every train_every steps, 50Hz) --
-            if step % self.config.train_every == 0 {
-                let target = match task {
-                    VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
-                        &state,
-                        drive_target,
-                        road_heading,
-                        target_gap,
-                        follow_oracle_target.as_ref(),
-                    ),
-                    _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
-                };
+            if train_this_step {
+                let target = teacher_command
+                    .expect("training step must have a computed teacher target");
 
                 // Reward-modulated BPTT: scale gradient by safety reward
                 // so the network learns more when stable (clear signal)
