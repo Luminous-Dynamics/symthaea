@@ -1251,12 +1251,13 @@ mod tests {
         let snapshot = campaign.snapshot().expect("snapshot");
         let mut restored =
             SequentialWeightVerificationCampaign::from_snapshot(snapshot).expect("restore");
+        let overlapping_manifest_after_restore = manifest_for_shard(&restored, 'd');
         assert!(matches!(
             restored.start_candidate(
                 digest('a'),
                 digest('c'),
                 digest('e'),
-                manifest_for_shard(&restored, 'd'),
+                overlapping_manifest_after_restore,
                 digest('e'),
             ),
             Err(SequentialWeightVerificationError::ConfirmatoryEpisodeOverlap)
@@ -1333,22 +1334,24 @@ mod tests {
         assert_eq!(campaign.next_candidate_index(), 2);
         assert_eq!(campaign.used_confirmatory_shard_count(), 1);
         assert_eq!(campaign.used_confirmatory_episode_id_count(), 10);
+        let reused_candidate_manifest = manifest_for_shard(&campaign, 'e');
         assert!(matches!(
             campaign.start_candidate(
                 digest('a'),
                 digest('b'),
                 digest('e'),
-                manifest_for_shard(&campaign, 'e'),
+                reused_candidate_manifest,
                 digest('e'),
             ),
             Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
         ));
+        let reused_shard_manifest = manifest_for_shard(&campaign, 'd');
         assert!(matches!(
             campaign.start_candidate(
                 digest('a'),
                 digest('c'),
                 digest('d'),
-                manifest_for_shard(&campaign, 'd'),
+                reused_shard_manifest,
                 digest('e'),
             ),
             Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
@@ -1379,22 +1382,24 @@ mod tests {
                 .snapshot_digest,
             snapshot.snapshot_digest
         );
+        let reused_candidate_manifest = manifest_for_shard(&restored, 'f');
         assert!(matches!(
             restored.start_candidate(
                 digest('a'),
                 digest('b'),
                 digest('f'),
-                manifest_for_shard(&restored, 'f'),
+                reused_candidate_manifest,
                 digest('e'),
             ),
             Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
         ));
+        let reused_shard_manifest = manifest_for_shard(&restored, 'd');
         assert!(matches!(
             restored.start_candidate(
                 digest('a'),
                 digest('f'),
                 digest('d'),
-                manifest_for_shard(&restored, 'd'),
+                reused_shard_manifest,
                 digest('e'),
             ),
             Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
@@ -1451,12 +1456,13 @@ mod tests {
         ));
 
         let mut campaign = campaign(0.1, 10);
+        let invalid_candidate_manifest = manifest_for_shard(&campaign, 'd');
         assert!(matches!(
             campaign.start_candidate(
                 digest('a'),
                 "not-a-digest".into(),
                 digest('d'),
-                manifest_for_shard(&campaign, 'd'),
+                invalid_candidate_manifest,
                 digest('e'),
             ),
             Err(SequentialWeightVerificationError::InvalidDigest(_))
