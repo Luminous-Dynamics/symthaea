@@ -26,7 +26,7 @@ cargo run --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --
 
 A policy run contains exactly one decision per case: a selected candidate ID or abstain, plus the system's readiness assertion against the current pre-action evidence state.
 
-The scorer reports coverage, invalid/unsafe selections, false-ready and false-not-ready claims, initial readiness accuracy, potential mandatory-obligation updates, unnecessary abstention, relative acquisition cost, and agreement with the synthetic design reference.
+The scorer reports coverage, invalid/unsafe selections, false-ready and false-not-ready claims, initial readiness accuracy, potentially changeable mandatory obligations, abstention when a safe obligation update is available, relative acquisition cost, and agreement with the synthetic design reference.
 
 **Synthetic design-reference agreement is not benchmark accuracy.** The grader's preferred action is a design annotation, not a human-adjudicated gold policy. No experiment is executed and predicted candidate outcomes never change current readiness. The report explicitly states that it is not an official benchmark score.
 
