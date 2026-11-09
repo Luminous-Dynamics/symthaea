@@ -60,7 +60,7 @@
     },
     {
       "case_id": "REA-POA-012",
-      "selected_experiment_id": "claim_absence_from_no_event",
+      "selected_experiment_id": "repeat_same_bounded_session",
       "claimed_ready_before_action": false
     },
     {
