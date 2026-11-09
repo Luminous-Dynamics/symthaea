@@ -111,6 +111,22 @@ jobs:
             echo "- Synthetic whitened Jacobians only; no field/deployment claim"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run correlated-observation sensor-design benchmark
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example correlated_experiment_design | tee correlated-experiment-design.csv
+          grep -q 'diagonal_limit_equivalence=true' correlated-experiment-design.csv
+          grep -q 'common_mode_information_saturation=true' correlated-experiment-design.csv
+          grep -q 'correlation_is_selected_set_dependent=true' correlated-experiment-design.csv
+          {
+            echo "## Selected-set correlated observation design"
+            cat correlated-experiment-design.csv
+            echo "- Joint covariance and selected principal submatrix used for whitening"
+            echo "- Synthetic Gaussian control only; no field covariance is asserted"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run theory prediction coverage and comparability report
         if: matrix.package == 'symthaea-science-evidence'
         shell: bash
