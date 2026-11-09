@@ -376,6 +376,13 @@ impl VehicleTrainer {
                 self.perturbation_schedule.apply_to_state(step, &mut state);
             }
 
+            // Separate simulator-truth Follow target from delayed mesh aggregates.
+            // The oracle selector only returns a same-road actor snapshot at or
+            // before this exact ego observation timestamp.
+            let follow_oracle_target = swarm
+                .as_ref()
+                .and_then(|sw| sw.nearest_simulator_truth_follow_target(&state));
+
             if let (Some(context), Some(bridge), Some(navigator)) = (
                 self.subterranean_context.as_ref(),
                 subterranean_bridge.as_ref(),
@@ -420,7 +427,7 @@ impl VehicleTrainer {
             if pd_weight > 0.01 {
                 let pd_cmd = match task {
                     VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
+                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap, follow_oracle_target.as_ref())
                     }
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
                 };
@@ -442,7 +449,13 @@ impl VehicleTrainer {
 
             // Track metrics
             let safe_r = reward::safety_reward(&state);
-            let episode_r = reward::episode_reward(&state, &task, drive_target, road_heading);
+            let episode_r = reward::episode_reward_with_follow_target(
+                &state,
+                &task,
+                drive_target,
+                road_heading,
+                follow_oracle_target.as_ref(),
+            );
             total_safety_reward += safe_r;
             total_episode_reward += episode_r;
             total_speed += state.speed;
@@ -493,7 +506,7 @@ impl VehicleTrainer {
             if step % self.config.train_every == 0 {
                 let target = match task {
                     VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
+                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap, follow_oracle_target.as_ref())
                     }
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
                 };
