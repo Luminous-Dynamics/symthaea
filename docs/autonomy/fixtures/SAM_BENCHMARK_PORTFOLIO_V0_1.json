@@ -1162,6 +1162,62 @@
         "https://github.com/Pemixing/nuPlan-R",
         "https://www.nuscenes.org/nuplan"
       ]
+    },
+    {
+      "id": "wod-e2e-long-tail-2026",
+      "name": "WOD-E2E — Waymo Open Dataset for End-to-End Driving in Challenging Long-tail Scenarios",
+      "category": "open_loop_long_tail_trajectory_preference",
+      "capability_target": [
+        "long_tail_trajectory_prediction",
+        "expert_preference_alignment",
+        "multi_camera_scene_understanding"
+      ],
+      "protocol": {
+        "kind": "open_loop_trajectory_preference_evaluation",
+        "segments_total": 4021,
+        "duration_hours_approx": 12,
+        "reported_occurrence_frequency_below_percent": 0.03,
+        "camera_count": 8,
+        "split": {
+          "train": 2037,
+          "validation": 479,
+          "test": 1505
+        },
+        "test_context_seconds": 12,
+        "test_future_prediction_seconds": 5,
+        "test_future_labels": "withheld",
+        "preference_labels": "expert_rater_feedback"
+      },
+      "metrics": [
+        "RFS_Overall",
+        "RFS_Spotlight",
+        "ADE_3s",
+        "ADE_5s"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "dataset_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_observed_date": "2026-11-09",
+        "page_last_updated_relative": "about five months ago",
+        "top_displayed_method": "DriveMA-4B",
+        "RFS_Overall": 8.079,
+        "RFS_Spotlight": 7.169,
+        "ADE_5s_m": 2.67,
+        "ADE_3s_m": 1.166
+      },
+      "caveats": [
+        "The score snapshot is from a secondary leaderboard page that reports an update about five months ago; it is not a fresh independent reproduction.",
+        "Official WOD-E2E RFS evaluates expert trajectory preference on recorded scenes; it is open-loop and does not establish reciprocal actor response or closed-loop intervention outcomes.",
+        "Use the official split, camera inputs, rater labels, trajectory horizon and evaluator revision; don't infer missing labels or compare data-privileged methods against sensor-limited methods without a separate track.",
+        "Report overall, Spotlight, scenario-cluster and ADE dimensions separately; RFS is not a safety metric.",
+        "Do not infer public-road safety, physical sensor qualification, or counterfactual correctness from benchmark performance."
+      ],
+      "sources": [
+        "https://www.waymo.jp/intl/jp/open/data/e2e/",
+        "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_WOD-E2E_Waymo_Open_Dataset_for_End-to-End_Driving_in_Challenging_Long-tail_CVPR_2026_paper.html",
+        "https://www.sota2.com/research/sota/autonomous-driving-planning-on-wod-e2e"
+      ]
     }
   ],
   "prospective_targets": {
@@ -1190,7 +1246,8 @@
     "SAM-developed synthetic conformance crucibles are stored separately from external benchmark leaderboard records; a passing synthetic suite is not external benchmark reproduction or physical-safety evidence.",
     "nuPlan-R is a reciprocal reactive loop at the planner/actor layer, but interaction-selected top-k agents receive diffusion rollouts while remaining agents follow log replay; distinguish this from all-agent reciprocal re-planning and from physical vehicle validation.",
     "World-model benchmark-landscape counts are cross-domain taxonomy data, not driving-only counts; preserve target-specific denominators and distinguish closed-loop protocol from downstream outcome metrics.",
-    "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result."
+    "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result.",
+    "WOD-E2E is an open-loop expert-preference / long-tail trajectory benchmark; RFS is not a closed-loop safety or counterfactual outcome metric."
   ],
   "system_references": [
     {
