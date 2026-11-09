@@ -30,6 +30,10 @@ ordering, wrong rights profiles, denied rights and malformed revision ancestry. 
 older versions while identifying which admitted version supersedes them at the chosen
 frontier. It counts unique provenance-family identifiers rather than documents; that count is not proof that the underlying sources are actually independent.
 
+## Timestamp precision
+
+Version 0.1 accepts only exact, offset-aware availability instants. Some source APIs expose only calendar dates or vintage dates. Do not convert a date-only vintage to midnight and claim an exact instant. For an intraday decision frontier, that source is Indeterminate unless another retained record proves the exact availability time. A later version should support interval-bounded availability (earliest possible / latest possible) and return Indeterminate whenever the interval straddles the frontier.
+
 ## Trust boundary
 
 The crate does not retrieve or authenticate source material, verify signatures, validate a
