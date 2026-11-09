@@ -28,11 +28,11 @@ use std::fmt;
 pub use bayesian_dimension::{
     BayesianDimensionError, DimensionCalibrationSamples, DimensionInferenceStatus,
     DimensionPosteriorEntry, DimensionPrior, FiniteSizeDimensionCalibration,
-    FiniteSizeDimensionPosterior, MAX_BAYESIAN_DIMENSION,
-    MAX_CALIBRATION_SUPPORT_DISTANCE, MAX_DIMENSION_CALIBRATION_EVENTS,
-    MAX_DIMENSION_CALIBRATION_PAIR_EVALUATIONS, MAX_DIMENSION_CALIBRATION_REPLICATES,
-    MIN_BAYESIAN_DIMENSION, MIN_DIMENSION_CALIBRATION_REPLICATES,
-    calibrate_minkowski_ordering_fraction, estimate_finite_size_dimension_posterior,
+    FiniteSizeDimensionPosterior, MAX_BAYESIAN_DIMENSION, MAX_CALIBRATION_SUPPORT_DISTANCE,
+    MAX_DIMENSION_CALIBRATION_EVENTS, MAX_DIMENSION_CALIBRATION_PAIR_EVALUATIONS,
+    MAX_DIMENSION_CALIBRATION_REPLICATES, MIN_BAYESIAN_DIMENSION,
+    MIN_DIMENSION_CALIBRATION_REPLICATES, calibrate_minkowski_ordering_fraction,
+    estimate_finite_size_dimension_posterior,
 };
 pub use curved_frw_1p1::{ConformalFrw1p1, CurvedFrwError};
 pub use curved_order_statistics::{
