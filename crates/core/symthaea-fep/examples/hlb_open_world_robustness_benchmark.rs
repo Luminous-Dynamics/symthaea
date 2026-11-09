@@ -22,8 +22,8 @@ use symthaea_fep::decision_relevant_information::{
 use symthaea_fep::open_world_robust_decision::{
     ModelAdequacyStatus, ModelAdequacyThresholds, PrequentialAlternativeModel,
     PrequentialCategoricalObservation, calibrate_categorical_tv_radius_from_counts,
-    evaluate_prequential_e_process, evaluate_prequential_model_adequacy,
-    evaluate_tv_robust_decision_diagnostics,
+    evaluate_dirichlet_prequential_e_process, evaluate_prequential_e_process,
+    evaluate_prequential_model_adequacy, evaluate_tv_robust_decision_diagnostics,
 };
 
 const TV_RADIUS: f64 = 0.2;
@@ -257,6 +257,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let shift_e_process =
         evaluate_prequential_e_process(&shifted, &shift_alternatives, E_PROCESS_ALPHA)?;
 
+    // The universal Dirichlet alternative learns a categorical frequency
+    // baseline online from prior observations, without a fixed forecast list.
+    let dirichlet_prior = [1.0, 1.0];
+    let no_shift_dirichlet_e_process = evaluate_dirichlet_prequential_e_process(
+        &no_shift,
+        &dirichlet_prior,
+        E_PROCESS_ALPHA,
+    )?;
+    let shift_dirichlet_e_process = evaluate_dirichlet_prequential_e_process(
+        &shifted,
+        &dirichlet_prior,
+        E_PROCESS_ALPHA,
+    )?;
+
     // A subsequent observation outside the entire registered support must
     // trigger an adequacy violation even when the aggregate score gate is not
     // sufficiently informative.
@@ -280,7 +294,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(IoError::other("alternating null control crossed the e-process threshold").into());
     }
     if shift_e_process.crossed_at_observation.is_none() {
-        return Err(IoError::other("persistent regime shift did not cross the e-process threshold").into());
+        return Err(IoError::other("fixed-specialist regime-shift control did not cross its e-process threshold").into());
+    }
+    if no_shift_dirichlet_e_process.crossed_at_observation.is_some() {
+        return Err(IoError::other("Dirichlet alternative crossed under the balanced null control").into());
+    }
+    if shift_dirichlet_e_process.crossed_at_observation.is_none() {
+        return Err(IoError::other("universal Dirichlet alternative did not detect the persistent frequency shift").into());
     }
     if out_of_support_report.status != ModelAdequacyStatus::Inadequate {
         return Err(IoError::other("out-of-support observation did not fail the adequacy gate").into());
@@ -324,10 +344,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         "anytime_e_process": {
             "alpha": E_PROCESS_ALPHA,
             "null_predictive_model": [0.5, 0.5],
-            "alternative_models": shift_alternatives,
-            "no_shift_report": no_shift_e_process,
-            "regime_shift_report": shift_e_process,
-            "guarantee_scope": "Ville bound conditional on the declared null predictive model and alternatives frozen before each evaluated outcome; this single deterministic fixture is not a type-I error-rate study."
+            "fixed_predictable_alternatives": shift_alternatives,
+            "fixed_alternative_no_shift_report": no_shift_e_process,
+            "fixed_alternative_regime_shift_report": shift_e_process,
+            "dirichlet_mixture_prior_concentration": dirichlet_prior,
+            "dirichlet_no_shift_report": no_shift_dirichlet_e_process,
+            "dirichlet_regime_shift_report": shift_dirichlet_e_process,
+            "guarantee_scope": "Ville bound conditional on the declared predictable null forecast; fixed alternatives must be predictable, and the Dirichlet alternative is updated only from earlier observations. This deterministic fixture is not a type-I error-rate study."
         }
     });
     println!("{}", serde_json::to_string_pretty(&report)?);
