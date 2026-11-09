@@ -33,6 +33,9 @@ pub const MAX_MATERIALIZED_ATTACKS: usize = 20_000;
 /// Hard cap on pairwise attack comparisons during one analysis.
 pub const MAX_PAIRWISE_COMPARISONS: usize = 10_000_000;
 
+/// Hard cap on the number of role layers in one contract.
+pub const MAX_GROOVE_LAYERS: usize = 64;
+
 /// One attack in a repeating rhythmic layer.
 ///
 /// accent is an ordinal, role-local level from 0 (unaccented) to 3
@@ -197,6 +200,17 @@ pub fn validate_ensemble_groove(
             "empty_layers",
             "layers",
             "at least one rhythmic layer is required",
+        ));
+    }
+    if groove.layers.len() > MAX_GROOVE_LAYERS {
+        issues.push(issue(
+            "too_many_layers",
+            "layers",
+            format!(
+                "{} layers exceeds the {}-layer safety limit",
+                groove.layers.len(),
+                MAX_GROOVE_LAYERS
+            ),
         ));
     }
 
@@ -680,5 +694,40 @@ mod tests {
             report.pair_analyses[0].minimum_circular_separation_ticks,
             None
         );
+    }
+
+    #[test]
+    fn common_phase_translation_preserves_pairwise_circular_relationships() {
+        let original = analyze_ensemble_groove(&cross_cycle_fixture()).unwrap();
+        let mut shifted = cross_cycle_fixture();
+        for layer in &mut shifted.layers {
+            for event in &mut layer.events {
+                event.onset_tick =
+                    (event.onset_tick + 5) % layer.cycle_ticks;
+            }
+        }
+        let translated = analyze_ensemble_groove(&shifted).unwrap();
+        assert_eq!(original.supercycle_ticks, translated.supercycle_ticks);
+        assert_eq!(
+            original.pair_analyses[0].coincident_attack_pairs,
+            translated.pair_analyses[0].coincident_attack_pairs
+        );
+        assert_eq!(
+            original.pair_analyses[0].minimum_circular_separation_ticks,
+            translated.pair_analyses[0].minimum_circular_separation_ticks
+        );
+    }
+
+    #[test]
+    fn coincident_attacks_are_measured_not_globally_forbidden() {
+        let mut groove = cross_cycle_fixture();
+        groove.layers[1].events = vec![GrooveEventV1 {
+            onset_tick: 0,
+            accent: 2,
+        }];
+        groove.constraints.clear();
+        let report = analyze_ensemble_groove(&groove).unwrap();
+        assert!(report.all_constraints_passed);
+        assert!(report.pair_analyses[0].coincident_attack_pairs > 0);
     }
 }
