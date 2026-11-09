@@ -616,11 +616,28 @@
         "component_safety_comfort_progress"
       ],
       "protocol": {
-        "kind": "two_stage_pseudo_simulation_non_reactive",
-        "official_devkit": "v2.1.2",
+        "kind": "two_stage_pseudo_simulation_non_interactive_with_reactive_agent_support",
+        "official_devkit": "not_pinned_for_secondary_SOTA2_snapshot",
         "first_stage_horizon_seconds": 4,
         "followup_scene_horizon_seconds": 4,
-        "followup_weighting": "precomputed_followup_scenes_weighted_by_proximity_to_planner_first_stage_endpoint"
+        "followup_weighting": "precomputed_followup_scenes_weighted_by_proximity_to_planner_first_stage_endpoint",
+        "version_matrix": [
+          {
+            "release": "v2.1",
+            "role": "introduced two-stage pseudo-simulation and support for reactive traffic-agent policies"
+          },
+          {
+            "release": "v2.1.2",
+            "role": "updated EPDMS for the Hugging Face Warmup leaderboard; released navhard_two_stage"
+          },
+          {
+            "release": "v2.2",
+            "role": "official devkit version for AGC2025; added private_test_hard"
+          }
+        ],
+        "live_reciprocal_online_loop": false,
+        "sequential_interaction": false,
+        "reactive_traffic_agent_policy_support": true
       },
       "metrics": [
         "NC",
@@ -759,17 +776,19 @@
             "EPDMS": 83.1
           }
         ],
-        "unit": "percentage points unless the upstream table defines otherwise; use upstream evaluator for exact semantics"
+        "unit": "percentage points unless the upstream table defines otherwise; use upstream evaluator for exact semantics",
+        "snapshot_devkit_version": "unknown_not_exposed_by_secondary_board",
+        "snapshot_split": "unknown_not_exposed_by_secondary_board"
       },
       "caveats": [
         "SOTA2 is a secondary leaderboard and these values are not independently verified by SAM.",
-        "The official NAVSIM v2 protocol is pseudo-simulation with precomputed follow-up scenes; it is not a fully reciprocal online traffic simulator.",
+        "NAVSIM v2 includes two-stage pseudo-closed-loop evaluation and reactive traffic-agent policy support, but the official README states pseudo-simulation is neither sequential nor interactive; do not describe it as a reciprocal online ego/actor policy loop.",
+        "The secondary SOTA2 snapshot does not expose a verifiable exact devkit release or split. Pin those before reproducing or comparing scores.",
         "EPDMS aggregates multiple component metrics; report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC separately.",
-        "Exact data split, evaluator revision, filtering, model checkpoint and sensor privilege must be pinned before reproducing or comparing numbers.",
-        "The leaderboard table has displayed version/timestamp labels for methods; model artifact, evaluator and split identity must be pinned before reproduction.",
-        "Do not treat any missing component as zero or collapse the component panel into a single explanation of model quality."
+        "Exact evaluator revision, filtering, checkpoint, data split, observation privilege and rights must be pinned before reproducing or comparing numbers."
       ],
       "sources": [
+        "https://github.com/autonomousvision/navsim/blob/main/README.md",
         "https://github.com/autonomousvision/navsim",
         "https://github.com/autonomousvision/navsim/releases",
         "https://papers.nips.cc/paper_files/paper/2024/file/32768f7faf1995026ef9821c696f3404-Abstract-Datasets_and_Benchmarks_Track.html",
