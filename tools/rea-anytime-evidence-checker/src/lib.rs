@@ -246,6 +246,36 @@ fn is_action_eligible(action: &Value, budget: &Value) -> Result<bool> {
         && cost <= maximum)
 }
 
+fn can_afford_next_action(
+    action: &Value,
+    budget: &Value,
+    events: &[Value],
+    already_observed_events: usize,
+    candidates: &BTreeMap<String, &Value>,
+) -> Result<bool> {
+    if !is_action_eligible(action, budget)? {
+        return Ok(false);
+    }
+    let max_actions = get(budget, &["max_actions"])?.as_u64()
+        .ok_or_else(|| fail("max_actions must be an integer"))?;
+    let max_cost = get(budget, &["max_cost_units"])?.as_f64()
+        .ok_or_else(|| fail("max_cost_units must be numeric"))?;
+    let mut used_actions = 0_u64;
+    let mut used_cost = 0.0_f64;
+    for event in events.iter().take(already_observed_events) {
+        if string_at(event, &["trigger_kind"])? == "observed_action" {
+            let action_id = string_at(event, &["action_id"])?;
+            let prior = candidates.get(action_id)
+                .ok_or_else(|| fail(format!("observed action {action_id} is undeclared")))?;
+            used_actions += 1;
+            used_cost += get(prior, &["cost_units"])?.as_f64()
+                .ok_or_else(|| fail("prior action cost must be numeric"))?;
+        }
+    }
+    let next_cost = get(action, &["cost_units"])?.as_f64()
+        .ok_or_else(|| fail("next action cost must be numeric"))?;
+    Ok(used_actions < max_actions && used_cost + next_cost <= max_cost + 1.0e-12)
+}
 fn validate_claim_ladder(episode: &Value) -> Result<()> {
     let claims = array_at(episode, &["claim_ladder"])?;
     let obligations: BTreeSet<String> = array_at(episode, &["initial_state", "obligations"])?
@@ -454,7 +484,19 @@ pub fn validate_cross_corpus(agent: &Value, grader: &Value) -> Result<()> {
 
         let mut current = (*agent_episode).clone();
         let events = array_at(grader_episode, &["events"])?;
-        for checkpoint in array_at(grader_episode, &["checkpoints"])? {
+        let checkpoints = array_at(grader_episode, &["checkpoints"])?;
+        let final_checkpoint_index = checkpoints
+            .last()
+            .and_then(|checkpoint| checkpoint.get("after_event_index"))
+            .and_then(Value::as_u64)
+            .ok_or_else(|| fail(format!("episode {id} has no valid final checkpoint")))? as usize;
+        if final_checkpoint_index != events.len() {
+            return Err(fail(format!(
+                "final checkpoint must account for every event in {id}: checkpoint={final_checkpoint_index}, events={}",
+                events.len()
+            )));
+        }
+        for checkpoint in checkpoints {
             let event_index = get(checkpoint, &["after_event_index"])?
                 .as_u64()
                 .ok_or_else(|| fail("checkpoint event index must be an integer"))? as usize;
@@ -483,8 +525,16 @@ pub fn validate_cross_corpus(agent: &Value, grader: &Value) -> Result<()> {
                     let action = candidates
                         .get(action_id)
                         .ok_or_else(|| fail(format!("checkpoint continues with unknown action {action_id}")))?;
-                    if !is_action_eligible(action, budget)? {
-                        return Err(fail(format!("checkpoint selects ineligible action {action_id}")));
+                    if !can_afford_next_action(
+                        action,
+                        budget,
+                        events,
+                        event_index,
+                        &candidates,
+                    )? {
+                        return Err(fail(format!(
+                            "checkpoint selects ineligible or unaffordable action {action_id}"
+                        )));
                     }
                     if !get(checkpoint, &["claim_id"])?.is_null() {
                         return Err(fail("continue checkpoint must not declare a terminal claim"));
@@ -503,20 +553,26 @@ pub fn validate_cross_corpus(agent: &Value, grader: &Value) -> Result<()> {
                             "checkpoint selects {claim_id}, but strongest ready claim is {strongest:?} in {id}"
                         )));
                     }
-                    if decision == "stop_bounded" {
-                        let selected_rank = array_at(&current, &["claim_ladder"])?
-                            .iter()
-                            .find(|claim| claim.get("claim_id").and_then(Value::as_str) == Some(claim_id))
-                            .and_then(|claim| claim.get("strength_rank"))
-                            .and_then(Value::as_u64)
-                            .unwrap_or(0);
-                        if !array_at(&current, &["claim_ladder"])?.iter().any(|claim| {
-                            claim.get("strength_rank").and_then(Value::as_u64).unwrap_or(0) > selected_rank
-                        }) {
-                            return Err(fail(format!(
-                                "stop_bounded selected the strongest/only claim in {id}"
-                            )));
-                        }
+                    let selected_rank = array_at(&current, &["claim_ladder"])?
+                        .iter()
+                        .find(|claim| claim.get("claim_id").and_then(Value::as_str) == Some(claim_id))
+                        .and_then(|claim| claim.get("strength_rank"))
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
+                    let maximum_rank = array_at(&current, &["claim_ladder"])?
+                        .iter()
+                        .filter_map(|claim| claim.get("strength_rank").and_then(Value::as_u64))
+                        .max()
+                        .unwrap_or(0);
+                    if decision == "stop_ready" && selected_rank != maximum_rank {
+                        return Err(fail(format!(
+                            "stop_ready selected a bounded claim {claim_id} instead of the strongest declared claim in {id}"
+                        )));
+                    }
+                    if decision == "stop_bounded" && selected_rank >= maximum_rank {
+                        return Err(fail(format!(
+                            "stop_bounded selected the strongest/only claim in {id}"
+                        )));
                     }
                     if !get(checkpoint, &["action_id"])?.is_null() {
                         return Err(fail("terminal stop checkpoint must not select an action"));
@@ -761,5 +817,51 @@ mod tests {
         invalid_class["episodes"][0]["events"][1]["obligation_updates"][0]["evidence_class"] =
             Value::String("provider_self_report".into());
         assert!(validate_cross_corpus(&agent, &invalid_class).is_err());
+
+        let mut missing_final_event = grader.clone();
+        missing_final_event["episodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["episode_id"] == "REA-STOP-006")
+            .unwrap()["checkpoints"][0]["after_event_index"] = Value::from(2);
+        assert!(validate_cross_corpus(&agent, &missing_final_event).is_err());
+
+        let mut wrong_stop_class = grader.clone();
+        wrong_stop_class["episodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["episode_id"] == "REA-STOP-002")
+            .unwrap()["checkpoints"][1]["decision"] = Value::String("stop_ready".into());
+        assert!(validate_cross_corpus(&agent, &wrong_stop_class).is_err());
+
+        let mut over_budget_continue = grader.clone();
+        let over_budget = over_budget_continue["episodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["episode_id"] == "REA-STOP-001")
+            .unwrap();
+        over_budget["events"] = Value::Array(vec![
+            over_budget["events"][0].clone()
+        ]);
+        over_budget["checkpoints"] = serde_json::json!([{
+            "after_event_index": 1,
+            "decision": "continue",
+            "claim_id": null,
+            "action_id": "controlled_reproduction",
+            "reason": "The selected next action exceeds the remaining cost budget."
+        }]);
+        let mut tight_budget = agent.clone();
+        let target = tight_budget["episodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["episode_id"] == "REA-STOP-001")
+            .unwrap();
+        target["budget"]["max_actions"] = Value::from(2);
+        target["budget"]["max_cost_units"] = Value::from(2.5);
+        assert!(validate_cross_corpus(&tight_budget, &over_budget_continue).is_err());
     }
 }
