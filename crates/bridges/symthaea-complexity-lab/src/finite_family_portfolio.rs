@@ -332,6 +332,8 @@ pub enum PolicyPortfolioError {
     PolicyMaskCertificateMismatch,
     PolicyRegretProfileSourceMismatch,
     PolicyRegretProfileCertificateMismatch,
+    ThresholdCoverCertificateMismatch,
+    ThresholdCoverNoFeasibleProfile,
 }
 
 impl fmt::Display for PolicyPortfolioError {
@@ -380,6 +382,8 @@ impl fmt::Display for PolicyPortfolioError {
             Self::PolicyMaskCertificateMismatch => write!(f, "policy action-mask bound replay differs from the claimed result"),
             Self::PolicyRegretProfileSourceMismatch => write!(f, "policy regret-profile source values or identities do not match the finite model family"),
             Self::PolicyRegretProfileCertificateMismatch => write!(f, "policy regret-profile frontier replay differs from the claimed certificate"),
+            Self::ThresholdCoverCertificateMismatch => write!(f, "regret-threshold set-cover replay differs from the claimed optimum"),
+            Self::ThresholdCoverNoFeasibleProfile => write!(f, "no profile cover exists at the maximum exact regret threshold"),
         }
     }
 }
@@ -2853,6 +2857,755 @@ pub fn verify_policy_regret_profile_frontier(
         Ok(())
     } else {
         Err(PolicyPortfolioError::PolicyRegretProfileCertificateMismatch)
+    }
+}
+
+
+/// Resource limits for the exact threshold-feasibility / set-cover solver.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PolicyThresholdCoverBudget {
+    pub profile_budget: PolicyRegretProfileBudget,
+    pub max_threshold_candidates: usize,
+    /// Coverage-matrix construction plus MRV/branch profile checks.
+    pub max_profile_coverage_checks: usize,
+    pub max_search_nodes_per_threshold: usize,
+    pub max_total_search_nodes: usize,
+    pub max_recursion_depth: usize,
+    pub max_output_memory_bytes: usize,
+}
+
+/// Exact minimum-threshold policy cover over the Pareto regret-profile frontier.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedPolicyRegretThresholdCover {
+    pub model_family_sha256: [u8; 32],
+    pub policy_manifest_sha256: [u8; 32],
+    pub policy_values_sha256: [u8; 32],
+    pub profile_frontier_sha256: [u8; 32],
+    pub discount: CheckedRational,
+    pub max_portfolio_size: usize,
+    pub optimal_threshold: CheckedRational,
+    pub selected_profile_group_indices: Vec<usize>,
+    pub selected_policy_indices: Vec<usize>,
+    /// One selected profile group that covers each model at the exact threshold.
+    pub model_covering_profile_group_indices: Vec<usize>,
+    pub model_minimum_regrets: Vec<CheckedRational>,
+    pub worst_case_model_indices: Vec<usize>,
+    pub threshold_candidate_count: usize,
+    pub thresholds_tested: usize,
+    pub feasibility_search_nodes: usize,
+    pub feasibility_dead_ends: usize,
+    pub profile_coverage_checks: usize,
+    pub optimality_proven: bool,
+    pub certificate_sha256: [u8; 32],
+}
+
+/// Exact DFS feasibility for one regret threshold. Branches are disjoint:
+/// for the chosen uncovered model, branch i selects candidate i and forbids
+/// all earlier candidates. Thus every feasible cover appears in exactly one
+/// branch and no policy-set permutation is enumerated twice.
+fn threshold_cover_dfs(
+    coverage: &[Vec<bool>],
+    frontier_group_indices: &[usize],
+    max_portfolio_size: usize,
+    selected_rows: &mut Vec<usize>,
+    forbidden: &mut [bool],
+    covered: &mut [bool],
+    covered_count: &mut usize,
+    covered_trail: &mut Vec<usize>,
+    forbidden_trail: &mut Vec<usize>,
+    nodes_this_threshold: &mut usize,
+    total_search_nodes: &mut usize,
+    profile_coverage_checks: &mut usize,
+    dead_ends: &mut usize,
+    budget: PolicyThresholdCoverBudget,
+    solution: &mut Option<Vec<usize>>,
+) -> Result<bool, PolicyPortfolioError> {
+    *nodes_this_threshold = nodes_this_threshold.checked_add(1)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if *nodes_this_threshold > budget.max_search_nodes_per_threshold {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover nodes per feasibility check",
+            required: *nodes_this_threshold,
+            limit: budget.max_search_nodes_per_threshold,
+        });
+    }
+    *total_search_nodes = total_search_nodes.checked_add(1)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if *total_search_nodes > budget.max_total_search_nodes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover total search nodes",
+            required: *total_search_nodes,
+            limit: budget.max_total_search_nodes,
+        });
+    }
+
+    if *covered_count == covered.len() {
+        let mut selected_groups = Vec::new();
+        selected_groups.try_reserve_exact(selected_rows.len()).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover selected profile groups",
+                entries: selected_rows.len(),
+            }
+        })?;
+        for &row in selected_rows.iter() {
+            selected_groups.push(frontier_group_indices[row]);
+        }
+        selected_groups.sort_unstable();
+        *solution = Some(selected_groups);
+        return Ok(true);
+    }
+    if selected_rows.len() >= max_portfolio_size {
+        *dead_ends = dead_ends.checked_add(1)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        return Ok(false);
+    }
+    if selected_rows.len() >= budget.max_recursion_depth {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover recursion depth",
+            required: selected_rows.len() + 1,
+            limit: budget.max_recursion_depth,
+        });
+    }
+
+    // Minimum-remaining-values: branch on the uncovered model with the
+    // fewest currently available profile classes.
+    let mut chosen_model = None;
+    let mut minimum_candidates = usize::MAX;
+    for model in 0..covered.len() {
+        if covered[model] {
+            continue;
+        }
+        let mut available = 0usize;
+        for row in 0..coverage.len() {
+            *profile_coverage_checks = profile_coverage_checks.checked_add(1)
+                .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+            if *profile_coverage_checks > budget.max_profile_coverage_checks {
+                return Err(PolicyPortfolioError::BudgetExceeded {
+                    resource: "threshold-cover profile coverage checks",
+                    required: *profile_coverage_checks,
+                    limit: budget.max_profile_coverage_checks,
+                });
+            }
+            if coverage[row][model] && !forbidden[row] {
+                available += 1;
+            }
+        }
+        if available < minimum_candidates {
+            minimum_candidates = available;
+            chosen_model = Some(model);
+        }
+        if minimum_candidates == 0 {
+            break;
+        }
+    }
+    let chosen_model = chosen_model.ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+    if minimum_candidates == 0 {
+        *dead_ends = dead_ends.checked_add(1)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        return Ok(false);
+    }
+
+    let covered_mark = covered_trail.len();
+    let forbidden_mark = forbidden_trail.len();
+
+    // Ascending row order is canonical. After each branch, forbid the policy
+    // just explored so all later branches require it to be absent.
+    for row in 0..coverage.len() {
+        *profile_coverage_checks = profile_coverage_checks.checked_add(1)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if *profile_coverage_checks > budget.max_profile_coverage_checks {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover profile coverage checks",
+                required: *profile_coverage_checks,
+                limit: budget.max_profile_coverage_checks,
+            });
+        }
+        if !coverage[row][chosen_model] || forbidden[row] {
+            continue;
+        }
+
+        selected_rows.push(row);
+        for model in 0..covered.len() {
+            if coverage[row][model] && !covered[model] {
+                covered[model] = true;
+                *covered_count += 1;
+                covered_trail.push(model);
+            }
+        }
+
+        let found = threshold_cover_dfs(
+            coverage,
+            frontier_group_indices,
+            max_portfolio_size,
+            selected_rows,
+            forbidden,
+            covered,
+            covered_count,
+            covered_trail,
+            forbidden_trail,
+            nodes_this_threshold,
+            total_search_nodes,
+            profile_coverage_checks,
+            dead_ends,
+            budget,
+            solution,
+        )?;
+
+        while covered_trail.len() > covered_mark {
+            let model = covered_trail.pop().ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+            covered[model] = false;
+            *covered_count -= 1;
+        }
+        selected_rows.pop();
+
+        forbidden[row] = true;
+        forbidden_trail.push(row);
+
+        if found {
+            while forbidden_trail.len() > forbidden_mark {
+                let restore = forbidden_trail.pop().ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+                forbidden[restore] = false;
+            }
+            return Ok(true);
+        }
+    }
+
+    while forbidden_trail.len() > forbidden_mark {
+        let restore = forbidden_trail.pop().ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+        forbidden[restore] = false;
+    }
+    Ok(false)
+}
+
+fn policy_regret_threshold_cover_sha256(
+    family_sha256: [u8; 32],
+    policy_manifest_sha256: [u8; 32],
+    policy_values_sha256: [u8; 32],
+    profile_frontier_sha256: [u8; 32],
+    discount: CheckedRational,
+    max_portfolio_size: usize,
+    optimal_threshold: CheckedRational,
+    selected_profile_group_indices: &[usize],
+    selected_policy_indices: &[usize],
+    model_covering_profile_group_indices: &[usize],
+    model_minimum_regrets: &[CheckedRational],
+    worst_case_model_indices: &[usize],
+    threshold_candidate_count: usize,
+    thresholds_tested: usize,
+    feasibility_search_nodes: usize,
+    feasibility_dead_ends: usize,
+    profile_coverage_checks: usize,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-FINITE-UMDP-PROFILE-THRESHOLD-COVER\0\x01");
+    hasher.update(family_sha256);
+    hasher.update(policy_manifest_sha256);
+    hasher.update(policy_values_sha256);
+    hasher.update(profile_frontier_sha256);
+    hash_rational(&mut hasher, discount);
+    hasher.update((max_portfolio_size as u64).to_le_bytes());
+    hash_rational(&mut hasher, optimal_threshold);
+    for indices in [
+        selected_profile_group_indices,
+        selected_policy_indices,
+        model_covering_profile_group_indices,
+        worst_case_model_indices,
+    ] {
+        hasher.update((indices.len() as u64).to_le_bytes());
+        for index in indices {
+            hasher.update((*index as u64).to_le_bytes());
+        }
+    }
+    hasher.update((model_minimum_regrets.len() as u64).to_le_bytes());
+    for value in model_minimum_regrets {
+        hash_rational(&mut hasher, *value);
+    }
+    for value in [
+        threshold_candidate_count,
+        thresholds_tested,
+        feasibility_search_nodes,
+        feasibility_dead_ends,
+        profile_coverage_checks,
+    ] {
+        hasher.update((value as u64).to_le_bytes());
+    }
+    hasher.update([1u8]);
+    hasher.finalize().into()
+}
+
+/// Solve the exact finite-family portfolio problem as minimum-threshold
+/// set cover over a verified rational regret-profile frontier.
+///
+/// The objective of any selected profile set is a maximum of per-model
+/// minima, so its value is one of the finite profile components. Feasibility
+/// is monotone in the threshold. Binary search over sorted unique rational
+/// components therefore finds the exact optimum without floating point.
+///
+/// The profile frontier and source table must be produced by and verified
+/// against the finite-family exact reference. The solver replays the profile
+/// quotient before searching; callers should also run
+/// verify_finite_family_policy_portfolio_result for externally persisted
+/// source results.
+pub fn solve_exact_policy_regret_threshold_cover(
+    family: &FiniteUmdpModelFamily,
+    source: &FiniteFamilyPolicyPortfolioResult,
+    profile_frontier: &VerifiedPolicyRegretProfileFrontier,
+    max_portfolio_size: usize,
+    budget: PolicyThresholdCoverBudget,
+) -> Result<VerifiedPolicyRegretThresholdCover, PolicyPortfolioError> {
+    verify_policy_regret_profile_frontier(
+        family,
+        source,
+        budget.profile_budget,
+        profile_frontier,
+    )?;
+
+    if max_portfolio_size == 0 || max_portfolio_size > profile_frontier.policy_count {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover portfolio size (must be in 1..=policy_count)",
+            required: max_portfolio_size,
+            limit: profile_frontier.policy_count,
+        });
+    }
+    let models = profile_frontier.model_count;
+    let frontier_count = profile_frontier.frontier_profile_group_indices.len();
+    if frontier_count == 0 {
+        return Err(PolicyPortfolioError::ThresholdCoverNoFeasibleProfile);
+    }
+    if budget.max_search_nodes_per_threshold == 0
+        || budget.max_total_search_nodes == 0
+        || budget.max_recursion_depth == 0
+    {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover search limits",
+            required: 1,
+            limit: budget.max_search_nodes_per_threshold
+                .min(budget.max_total_search_nodes)
+                .min(budget.max_recursion_depth),
+        });
+    }
+
+    let threshold_entries = frontier_count.checked_mul(models)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if threshold_entries > budget.max_threshold_candidates {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover candidate profile components",
+            required: threshold_entries,
+            limit: budget.max_threshold_candidates,
+        });
+    }
+
+    let coverage_bytes = threshold_entries.checked_mul(std::mem::size_of::<bool>())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let threshold_bytes = threshold_entries.checked_mul(std::mem::size_of::<CheckedRational>())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let row_header_bytes = frontier_count.checked_mul(std::mem::size_of::<Vec<bool>>())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let scratch_bytes = models.checked_mul(std::mem::size_of::<bool>() + std::mem::size_of::<usize>())
+        .and_then(|value| value.checked_add(frontier_count.checked_mul(
+            std::mem::size_of::<bool>() + std::mem::size_of::<usize>()
+        )?))
+        .and_then(|value| value.checked_add(max_portfolio_size.checked_mul(std::mem::size_of::<usize>())?))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let result_bytes = models.checked_mul(
+        std::mem::size_of::<usize>() + std::mem::size_of::<CheckedRational>(),
+    ).and_then(|value| value.checked_add(max_portfolio_size.checked_mul(2 * std::mem::size_of::<usize>())?))
+        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<usize>>()))
+        .and_then(|value| value.checked_add(std::mem::size_of::<VerifiedPolicyRegretThresholdCover>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let output_bytes = coverage_bytes
+        .checked_add(threshold_bytes)
+        .and_then(|value| value.checked_add(row_header_bytes))
+        .and_then(|value| value.checked_add(scratch_bytes))
+        .and_then(|value| value.checked_add(result_bytes))
+        .and_then(|value| value.checked_add(4 * std::mem::size_of::<Vec<CheckedRational>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if output_bytes > budget.max_output_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover output and scratch memory bytes",
+            required: output_bytes,
+            limit: budget.max_output_memory_bytes,
+        });
+    }
+
+    let mut thresholds = Vec::new();
+    thresholds.try_reserve_exact(threshold_entries).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "threshold-cover exact candidate values",
+            entries: threshold_entries,
+        }
+    })?;
+    for &group_index in &profile_frontier.frontier_profile_group_indices {
+        let group = profile_frontier.profile_groups.get(group_index)
+            .ok_or(PolicyPortfolioError::PolicyRegretProfileSourceMismatch)?;
+        thresholds.extend_from_slice(&group.regret_profile);
+    }
+    thresholds.sort_by(|left, right| compare_signed(*left, *right));
+    thresholds.dedup();
+
+    let mut low = 0usize;
+    let mut high = thresholds.len().checked_sub(1)
+        .ok_or(PolicyPortfolioError::ThresholdCoverNoFeasibleProfile)?;
+    let mut thresholds_tested = 0usize;
+    let mut total_search_nodes = 0usize;
+    let mut total_dead_ends = 0usize;
+    let mut total_profile_checks = 0usize;
+
+    // The largest candidate threshold is always feasible: every frontier
+    // profile component is at most this value, and k >= 1.
+    while low < high {
+        let middle = low + (high - low) / 2;
+        let threshold = thresholds[middle];
+        let coverage_entries = frontier_count.checked_mul(models)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        total_profile_checks = total_profile_checks.checked_add(coverage_entries)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if total_profile_checks > budget.max_profile_coverage_checks {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover profile coverage checks",
+                required: total_profile_checks,
+                limit: budget.max_profile_coverage_checks,
+            });
+        }
+
+        let mut coverage = Vec::new();
+        coverage.try_reserve_exact(frontier_count).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover coverage rows",
+                entries: frontier_count,
+            }
+        })?;
+        for &group_index in &profile_frontier.frontier_profile_group_indices {
+            let group = &profile_frontier.profile_groups[group_index];
+            let mut row = Vec::new();
+            row.try_reserve_exact(models).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed {
+                    resource: "threshold-cover model coverage row",
+                    entries: models,
+                }
+            })?;
+            for &regret in &group.regret_profile {
+                row.push(compare_signed(regret, threshold) != Ordering::Greater);
+            }
+            coverage.push(row);
+        }
+
+        let mut selected_rows = Vec::new();
+        selected_rows.try_reserve_exact(max_portfolio_size.min(frontier_count)).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover selected profile rows",
+                entries: max_portfolio_size.min(frontier_count),
+            }
+        })?;
+        let mut forbidden = Vec::new();
+        forbidden.try_reserve_exact(frontier_count).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover forbidden profile flags",
+                entries: frontier_count,
+            }
+        })?;
+        forbidden.resize(frontier_count, false);
+        let mut covered = Vec::new();
+        covered.try_reserve_exact(models).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover model flags",
+                entries: models,
+            }
+        })?;
+        covered.resize(models, false);
+        let mut covered_count = 0usize;
+        let mut covered_trail = Vec::new();
+        covered_trail.try_reserve_exact(models).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover covered trail",
+                entries: models,
+            }
+        })?;
+        let mut forbidden_trail = Vec::new();
+        forbidden_trail.try_reserve_exact(frontier_count).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "threshold-cover forbidden trail",
+                entries: frontier_count,
+            }
+        })?;
+        let mut nodes_this_threshold = 0usize;
+        let mut solution = None;
+        let feasible = threshold_cover_dfs(
+            &coverage,
+            &profile_frontier.frontier_profile_group_indices,
+            max_portfolio_size.min(frontier_count),
+            &mut selected_rows,
+            &mut forbidden,
+            &mut covered,
+            &mut covered_count,
+            &mut covered_trail,
+            &mut forbidden_trail,
+            &mut nodes_this_threshold,
+            &mut total_search_nodes,
+            &mut total_profile_checks,
+            &mut total_dead_ends,
+            budget,
+            &mut solution,
+        )?;
+        thresholds_tested = thresholds_tested.checked_add(1)
+            .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+        if feasible {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+
+    // Re-run feasibility at the first feasible threshold to produce a fresh
+    // final witness after all larger-threshold probes have been discarded.
+    let optimal_threshold = thresholds[low];
+    let coverage_entries = frontier_count.checked_mul(models)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    total_profile_checks = total_profile_checks.checked_add(coverage_entries)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if total_profile_checks > budget.max_profile_coverage_checks {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "threshold-cover profile coverage checks",
+            required: total_profile_checks,
+            limit: budget.max_profile_coverage_checks,
+        });
+    }
+    let mut coverage = Vec::new();
+    coverage.try_reserve_exact(frontier_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "final threshold-cover coverage rows",
+            entries: frontier_count,
+        }
+    })?;
+    for &group_index in &profile_frontier.frontier_profile_group_indices {
+        let group = &profile_frontier.profile_groups[group_index];
+        let mut row = Vec::new();
+        row.try_reserve_exact(models).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "final threshold-cover model coverage row",
+                entries: models,
+            }
+        })?;
+        for &regret in &group.regret_profile {
+            row.push(compare_signed(regret, optimal_threshold) != Ordering::Greater);
+        }
+        coverage.push(row);
+    }
+
+    let mut selected_rows = Vec::new();
+    selected_rows.try_reserve_exact(max_portfolio_size.min(frontier_count)).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "final threshold-cover selected profile rows",
+            entries: max_portfolio_size.min(frontier_count),
+        }
+    })?;
+    let mut forbidden = Vec::new();
+    forbidden.try_reserve_exact(frontier_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "final threshold-cover forbidden profile flags",
+            entries: frontier_count,
+        }
+    })?;
+    forbidden.resize(frontier_count, false);
+    let mut covered = Vec::new();
+    covered.try_reserve_exact(models).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "final threshold-cover model flags",
+            entries: models,
+        }
+    })?;
+    covered.resize(models, false);
+    let mut covered_count = 0usize;
+    let mut covered_trail = Vec::new();
+    covered_trail.try_reserve_exact(models).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "final threshold-cover covered trail",
+            entries: models,
+        }
+    })?;
+    let mut forbidden_trail = Vec::new();
+    forbidden_trail.try_reserve_exact(frontier_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "final threshold-cover forbidden trail",
+            entries: frontier_count,
+        }
+    })?;
+    let mut final_nodes_this_threshold = 0usize;
+    let mut selected_profile_group_indices = None;
+    if !threshold_cover_dfs(
+        &coverage,
+        &profile_frontier.frontier_profile_group_indices,
+        max_portfolio_size.min(frontier_count),
+        &mut selected_rows,
+        &mut forbidden,
+        &mut covered,
+        &mut covered_count,
+        &mut covered_trail,
+        &mut forbidden_trail,
+        &mut final_nodes_this_threshold,
+        &mut total_search_nodes,
+        &mut total_profile_checks,
+        &mut total_dead_ends,
+        budget,
+        &mut selected_profile_group_indices,
+    )? {
+        return Err(PolicyPortfolioError::ThresholdCoverNoFeasibleProfile);
+    }
+    thresholds_tested = thresholds_tested.checked_add(1)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+
+    let selected_profile_group_indices = selected_profile_group_indices
+        .ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+    let mut selected_policy_indices = Vec::new();
+    selected_policy_indices.try_reserve_exact(selected_profile_group_indices.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "threshold-cover representative policy indices",
+            entries: selected_profile_group_indices.len(),
+        }
+    })?;
+    for &group_index in &selected_profile_group_indices {
+        selected_policy_indices.push(profile_frontier.profile_groups[group_index].representative_policy_index);
+    }
+
+    let mut model_covering_profile_group_indices = Vec::new();
+    model_covering_profile_group_indices.try_reserve_exact(models).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "threshold-cover model coverage witnesses",
+            entries: models,
+        }
+    })?;
+    let mut model_minimum_regrets = Vec::new();
+    model_minimum_regrets.try_reserve_exact(models).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "threshold-cover model minimum regrets",
+            entries: models,
+        }
+    })?;
+    let mut worst_case_model_indices = Vec::new();
+    worst_case_model_indices.try_reserve_exact(models).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "threshold-cover worst-case model indices",
+            entries: models,
+        }
+    })?;
+    let mut minimax_regret = CheckedRational::zero();
+    for model in 0..models {
+        let mut best_value: Option<CheckedRational> = None;
+        let mut covering_group: Option<usize> = None;
+        for &group_index in &selected_profile_group_indices {
+            let value = profile_frontier.profile_groups[group_index].regret_profile[model];
+            if best_value.map_or(true, |best| compare_signed(value, best) == Ordering::Less) {
+                best_value = Some(value);
+                covering_group = Some(group_index);
+            }
+        }
+        let best_value = best_value.ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+        let covering_group = covering_group.ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+        if compare_signed(best_value, optimal_threshold) == Ordering::Greater {
+            return Err(PolicyPortfolioError::ThresholdCoverCertificateMismatch);
+        }
+        if compare_signed(best_value, minimax_regret) == Ordering::Greater {
+            minimax_regret = best_value;
+            worst_case_model_indices.clear();
+            worst_case_model_indices.push(model);
+        } else if best_value == minimax_regret {
+            worst_case_model_indices.push(model);
+        }
+        model_minimum_regrets.push(best_value);
+        model_covering_profile_group_indices.push(covering_group);
+    }
+    if minimax_regret != optimal_threshold {
+        return Err(PolicyPortfolioError::ThresholdCoverCertificateMismatch);
+    }
+    if source.max_portfolio_size == max_portfolio_size
+        && source.minimax_regret != minimax_regret
+    {
+        return Err(PolicyPortfolioError::ThresholdCoverCertificateMismatch);
+    }
+
+    let certificate_sha256 = policy_regret_threshold_cover_sha256(
+        family.sha256(),
+        profile_frontier.policy_manifest_sha256,
+        profile_frontier.policy_values_sha256,
+        profile_frontier_certificate_sha256_placeholder,
+        source.discount,
+        max_portfolio_size,
+        optimal_threshold,
+        &selected_profile_group_indices,
+        &selected_policy_indices,
+        &model_covering_profile_group_indices,
+        &model_minimum_regrets,
+        &worst_case_model_indices,
+        thresholds.len(),
+        thresholds_tested,
+        total_search_nodes,
+        total_dead_ends,
+        total_profile_checks,
+    );
+
+    let mut result = VerifiedPolicyRegretThresholdCover {
+        model_family_sha256: family.sha256(),
+        policy_manifest_sha256: profile_frontier.policy_manifest_sha256,
+        policy_values_sha256: profile_frontier.policy_values_sha256,
+        profile_frontier_sha256: profile_frontier_certificate_sha256_placeholder,
+        discount: source.discount,
+        max_portfolio_size,
+        optimal_threshold,
+        selected_profile_group_indices,
+        selected_policy_indices,
+        model_covering_profile_group_indices,
+        model_minimum_regrets,
+        worst_case_model_indices,
+        threshold_candidate_count: thresholds.len(),
+        thresholds_tested,
+        feasibility_search_nodes: total_search_nodes,
+        feasibility_dead_ends: total_dead_ends,
+        profile_coverage_checks: total_profile_checks,
+        optimality_proven: true,
+        certificate_sha256,
+    };
+    // The profile certificate is already included in the outer result hash.
+    result.certificate_sha256 = policy_regret_threshold_cover_sha256(
+        family.sha256(),
+        result.policy_manifest_sha256,
+        result.policy_values_sha256,
+        result.profile_frontier_sha256,
+        result.discount,
+        result.max_portfolio_size,
+        result.optimal_threshold,
+        &result.selected_profile_group_indices,
+        &result.selected_policy_indices,
+        &result.model_covering_profile_group_indices,
+        &result.model_minimum_regrets,
+        &result.worst_case_model_indices,
+        result.threshold_candidate_count,
+        result.thresholds_tested,
+        result.feasibility_search_nodes,
+        result.feasibility_dead_ends,
+        result.profile_coverage_checks,
+    );
+    Ok(result)
+}
+
+/// Replay threshold search and the minimum-threshold feasibility proof.
+pub fn verify_policy_regret_threshold_cover(
+    family: &FiniteUmdpModelFamily,
+    source: &FiniteFamilyPolicyPortfolioResult,
+    profile_frontier: &VerifiedPolicyRegretProfileFrontier,
+    budget: PolicyThresholdCoverBudget,
+    claimed: &VerifiedPolicyRegretThresholdCover,
+) -> Result<(), PolicyPortfolioError> {
+    let replay = solve_exact_policy_regret_threshold_cover(
+        family,
+        source,
+        profile_frontier,
+        claimed.max_portfolio_size,
+        budget,
+    )?;
+    if replay == *claimed {
+        Ok(())
+    } else {
+        Err(PolicyPortfolioError::ThresholdCoverCertificateMismatch)
     }
 }
 
