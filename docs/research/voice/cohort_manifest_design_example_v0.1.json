@@ -155,7 +155,8 @@
       "variant_record_id": "pilot-b",
       "split": "PILOT",
       "purpose": "PILOT_EVALUATION",
-      "counterfactual_pair_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      "counterfactual_pair_manifest_sha256": "7d7be3c9bf5dcad123e2e7199d2705d590752284aabd58b50d10aaaf4ad2a01f",
+      "counterfactual_pair_manifest_path": "cohort_manifest_design_example/pair-manifests/pilot-pair.json"
     },
     {
       "pair_id": "pref-pair",
@@ -163,7 +164,8 @@
       "variant_record_id": "pref-b",
       "split": "PREFERENCE_TRAINING",
       "purpose": "PREFERENCE_TRAINING",
-      "counterfactual_pair_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      "counterfactual_pair_manifest_sha256": "95245f9c0e8df1569baac2d63dd9f215e4b127385eeea0af315114d0e376276b",
+      "counterfactual_pair_manifest_path": "cohort_manifest_design_example/pair-manifests/pref-pair.json"
     }
   ]
 }
