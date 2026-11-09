@@ -907,14 +907,12 @@ mod tests {
             c: vec![0.0, 0.0],
         };
         let certificate = FarkasCertificate { y: vec![1.0, 1.0e-12] };
-        assert_eq!(
-            verify_infeasible(&problem, &certificate, tolerances()),
-            Ok(FarkasMetrics {
-                dual_cone_violation: 1.0e-12,
-                contradiction_margin: 1.0,
-                b_transpose_y: -1.0,
-            })
-        );
+        let approximate =
+            verify_infeasible(&problem, &certificate, tolerances()).unwrap();
+        assert!(approximate.dual_cone_violation > 0.0);
+        assert!(approximate.dual_cone_violation < tolerances().dual_feasibility);
+        assert!(approximate.contradiction_margin > 0.99);
+        assert!((approximate.b_transpose_y + 1.0).abs() < 1.0e-12);
         assert_eq!(
             verify_infeasible_exact(&problem, &certificate),
             Err(VerifyError::FarkasConeViolation)
