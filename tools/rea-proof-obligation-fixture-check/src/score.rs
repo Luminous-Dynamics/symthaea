@@ -225,7 +225,7 @@ pub fn score_policy_submission(
     let mut readiness_claim_correct_count = 0usize;
     let mut design_reference_agreement_count = 0usize;
     let mut potential_obligation_update_count = 0usize;
-    let mut unnecessary_abstention_count = 0usize;
+    let mut abstention_when_safe_obligation_update_available_count = 0usize;
     let mut selected_cost_total = 0.0f64;
     let mut selected_cost_count = 0usize;
     let mut per_case = Vec::with_capacity(agent_cases.len());
@@ -269,7 +269,7 @@ pub fn score_policy_submission(
         if selected_id == "abstain" {
             abstained_count += 1;
             if grader_case_has_progress_option(agent_case, grader_case)? {
-                unnecessary_abstention_count += 1;
+                abstention_when_safe_obligation_update_available_count += 1;
             }
         } else {
             selected_count += 1;
@@ -320,7 +320,7 @@ pub fn score_policy_submission(
             "readiness_claim_correct": readiness_correct,
             "synthetic_design_reference_match": matches_reference,
             "selected_cost_units": selected_cost,
-            "potentially_updatable_mandatory_obligations": potential_updates
+            "potentially_changeable_mandatory_obligations": potential_updates
         }));
     }
 
@@ -358,7 +358,7 @@ pub fn score_policy_submission(
         "synthetic_design_reference_agreement_count": design_reference_agreement_count,
         "synthetic_design_reference_agreement_rate": rate(design_reference_agreement_count, case_count),
         "selected_actions_with_potential_mandatory_obligation_update": potential_obligation_update_count,
-        "unnecessary_abstention_count": unnecessary_abstention_count,
+        "abstention_when_safe_obligation_update_available_count": abstention_when_safe_obligation_update_available_count,
         "selected_cost_units_total": selected_cost_total,
         "selected_cost_units_mean": if selected_cost_count == 0 {
             Value::Null
@@ -559,7 +559,7 @@ mod tests {
         let mut submission = cheapest_eligible_submission(&agent);
         submission["cases"][0]["selected_experiment_id"] = json!("abstain");
         let report = score_policy_submission(&agent, &grader, &submission).unwrap();
-        assert_eq!(report["unnecessary_abstention_count"], 1);
+        assert_eq!(report["abstention_when_safe_obligation_update_available_count"], 1);
     }
 
     #[test]
