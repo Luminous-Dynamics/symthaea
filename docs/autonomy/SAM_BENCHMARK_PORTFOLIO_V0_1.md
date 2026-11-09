@@ -283,6 +283,16 @@ This is a separate leaderboard task display from the NAVSIM v2 planning table al
 - **Rights:** code repository declares CC BY-NC 4.0; do not vendor/relicense its implementation. Dataset/environment rights are separate.
 - **Sources:** [ICML 2026 paper](https://proceedings.mlr.press/v306/chang26a.html), [upstream code](https://github.com/facebookresearch/MRSQ).
 
+### SURE-Plan — uncertainty-aware reachable-set planning method (September 2026)
+
+- **Role:** method comparator for uncertainty-aware spatio-temporal reachable-set constraints, not an external benchmark or a SAM result.
+- **Method reported by the paper:** deep evidential learning estimates aleatoric and epistemic uncertainty in one pass; a spatio-temporal driving corridor derived through reachability analysis is used as a hard planning constraint; an uncertainty-driven cost balances robustness and efficiency.
+- **Evaluation domains reported:** CommonRoad, SIND and nuPlan. The abstract reports superior performance in complex interactive scenarios and generalization, but does not provide enough numerical detail here to reproduce or independently compare the headline claim.
+- **SAM comparison hypothesis:** SURE-Plan addresses how uncertainty can constrain the trajectory set. SAM Option Preservation #11291 asks a different question: after taking a candidate action, does one common next action remain feasible across all hidden-state/reference cells that the next controller observation cannot distinguish? These methods may compose; they should not be presented as competing implementations of the same metric.
+- **Required matched ablation:** same scene/history, candidate first-action set, successor cells, action-domain receipt and qualified reference portfolio; compare (a) no reachability constraint, (b) uncertainty-aware reachable corridor, (c) observation-constrained lower/upper continuation sets, and (d) their composition. Measure constraint violations, robust/possible option width, clairvoyance gap, unresolved/incomplete rate, progress, comfort and p95/p99 runtime separately.
+- **Claim boundary:** research-paper method reference only. No numerical SOTA score is copied into the registry; paper dataset splits, checkpoints, evaluation code, sensor privilege and license must be pinned before reproduction.
+- **Source:** [SURE-Plan, Transportation Research Part C, volume 190, article 105800, September 2026](https://doi.org/10.1016/j.trc.2026.105800).
+
 ## 5. Measurement framework — not a performance leaderboard
 
 ### NIST Measurement Science for Automated Vehicles
