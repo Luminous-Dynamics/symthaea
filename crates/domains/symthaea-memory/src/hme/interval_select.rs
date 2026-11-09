@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use super::group_envelope::{
     ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
-    continuous_hv_query_digest,
+    continuous_hv_query_digest, member_id_set_digest,
 };
 
 use symthaea_core::hdc::continuous_hv_interval::{
@@ -295,6 +295,273 @@ pub struct GroupIntervalCoverageCounts {
     /// Number of unopened groups without an admissible aggregate interval.
     pub unbounded_unopened_groups: usize,
 }
+
+
+/// Opaque build-time proof that a set of group envelopes is a disjoint,
+/// complete partition of one manifest/eligibility snapshot.
+///
+/// The member-ID disjointness check is paid once when this receipt is created.
+/// Query-time verification hashes the small group identity list and checks
+/// counts/generations; it does not scan every member ID. Persistent use still
+/// requires the segment/manifest owner (#10917) to authenticate this receipt
+/// on reopen. This in-memory type is not a signature or authorization token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GroupPartitionCoverageReceipt {
+    manifest_generation: u64,
+    eligibility_generation: u64,
+    eligible_records: usize,
+    group_count: usize,
+    partition_digest: [u8; 32],
+}
+
+/// Failure while proving a disjoint group partition at build time or matching
+/// a query's group directory to an existing receipt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupPartitionReceiptError {
+    /// A partition cannot be empty.
+    EmptyPartition,
+    /// A group has no members or has misaligned member/payload metadata.
+    InvalidGroupMembership {
+        /// Group index with malformed member metadata.
+        group_index: usize,
+    },
+    /// A group's roster does not match its stored member-set digest.
+    MemberSetDigestMismatch {
+        /// Group index whose roster digest disagreed.
+        group_index: usize,
+    },
+    /// Two groups have the same group member-set digest.
+    DuplicateGroup {
+        /// First group occurrence.
+        first_group_index: usize,
+        /// Later duplicate occurrence.
+        duplicate_group_index: usize,
+    },
+    /// One stable member ID appears in multiple groups.
+    DuplicateMember {
+        /// Duplicated stable member ID.
+        member_id: String,
+        /// First group containing the member.
+        first_group_index: usize,
+        /// Later group containing the member.
+        duplicate_group_index: usize,
+    },
+    /// A group belongs to a different manifest or eligibility snapshot.
+    MixedSnapshot {
+        /// Index of the mismatched group.
+        group_index: usize,
+    },
+    /// Adding group member counts overflowed usize.
+    MemberCountOverflow,
+    /// Query group directory does not match this receipt.
+    ReceiptMismatch,
+}
+
+impl std::fmt::Display for GroupPartitionReceiptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyPartition => write!(f, "group partition is empty"),
+            Self::InvalidGroupMembership { group_index } => {
+                write!(f, "group {group_index} has invalid member metadata")
+            }
+            Self::MemberSetDigestMismatch { group_index } => {
+                write!(f, "group {group_index} member roster digest does not match")
+            }
+            Self::DuplicateGroup { first_group_index, duplicate_group_index } => write!(
+                f,
+                "duplicate group at indices {first_group_index} and {duplicate_group_index}"
+            ),
+            Self::DuplicateMember {
+                member_id,
+                first_group_index,
+                duplicate_group_index,
+            } => write!(
+                f,
+                "member {member_id} appears in groups {first_group_index} and {duplicate_group_index}"
+            ),
+            Self::MixedSnapshot { group_index } => {
+                write!(f, "group {group_index} belongs to another snapshot")
+            }
+            Self::MemberCountOverflow => write!(f, "group partition member count overflow"),
+            Self::ReceiptMismatch => write!(f, "group directory does not match its partition receipt"),
+        }
+    }
+}
+
+impl std::error::Error for GroupPartitionReceiptError {}
+
+impl GroupPartitionCoverageReceipt {
+    /// Verify a complete, disjoint group partition at segment-build time.
+    ///
+    /// This method scans stable IDs once, verifies each per-group roster digest,
+    /// and computes a deterministic receipt over sorted group identities.
+    pub fn from_group_envelopes(
+        envelopes: &[ContinuousHVGroupEnvelope],
+    ) -> Result<Self, GroupPartitionReceiptError> {
+        let first = envelopes.first().ok_or(GroupPartitionReceiptError::EmptyPartition)?;
+        let manifest_generation = first.manifest_generation();
+        let eligibility_generation = first.eligibility_generation();
+        let mut member_count = 0usize;
+        let mut first_group_by_member: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut first_group_by_digest: BTreeMap<[u8; 32], usize> = BTreeMap::new();
+        let mut group_identities = Vec::with_capacity(envelopes.len());
+
+        for (group_index, envelope) in envelopes.iter().enumerate() {
+            if envelope.manifest_generation() != manifest_generation
+                || envelope.eligibility_generation() != eligibility_generation
+            {
+                return Err(GroupPartitionReceiptError::MixedSnapshot { group_index });
+            }
+            let member_ids = envelope.member_ids();
+            let payload_digests = envelope.member_payload_digests();
+            if member_ids.is_empty() || member_ids.len() != payload_digests.len() {
+                return Err(GroupPartitionReceiptError::InvalidGroupMembership { group_index });
+            }
+            let observed_digest = member_id_set_digest(member_ids)
+                .map_err(|_| GroupPartitionReceiptError::InvalidGroupMembership { group_index })?;
+            if observed_digest != envelope.member_set_digest() {
+                return Err(GroupPartitionReceiptError::MemberSetDigestMismatch { group_index });
+            }
+            if let Some(first_group_index) =
+                first_group_by_digest.get(&envelope.member_set_digest()).copied()
+            {
+                return Err(GroupPartitionReceiptError::DuplicateGroup {
+                    first_group_index,
+                    duplicate_group_index: group_index,
+                });
+            }
+            first_group_by_digest.insert(envelope.member_set_digest(), group_index);
+            for member_id in member_ids {
+                if let Some(first_group_index) =
+                    first_group_by_member.get(member_id.as_str()).copied()
+                {
+                    return Err(GroupPartitionReceiptError::DuplicateMember {
+                        member_id: member_id.clone(),
+                        first_group_index,
+                        duplicate_group_index: group_index,
+                    });
+                }
+                first_group_by_member.insert(member_id.as_str(), group_index);
+            }
+            member_count = member_count
+                .checked_add(member_ids.len())
+                .ok_or(GroupPartitionReceiptError::MemberCountOverflow)?;
+            group_identities.push((
+                envelope.member_set_digest(),
+                envelope.content_digest(),
+                member_ids.len(),
+            ));
+        }
+
+        group_identities.sort_by_key(|entry| (entry.0, entry.1));
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"hme_group_partition_coverage_receipt_v1");
+        hasher.update(&manifest_generation.to_le_bytes());
+        hasher.update(&eligibility_generation.to_le_bytes());
+        hasher.update(&(member_count as u64).to_le_bytes());
+        hasher.update(&(group_identities.len() as u64).to_le_bytes());
+        for (member_set_digest, content_digest, members) in group_identities {
+            hasher.update(&member_set_digest);
+            hasher.update(&content_digest);
+            hasher.update(&(members as u64).to_le_bytes());
+        }
+
+        Ok(Self {
+            manifest_generation,
+            eligibility_generation,
+            eligible_records: member_count,
+            group_count: envelopes.len(),
+            partition_digest: *hasher.finalize().as_bytes(),
+        })
+    }
+
+    /// Verify a query's compact group records against this build-time receipt.
+    ///
+    /// Cost is O(number of groups), not O(number of members): member roster
+    /// disjointness was established by from_group_envelopes().
+    fn verify_group_records(
+        &self,
+        groups: &[GroupScoreIntervalRecord],
+    ) -> Result<(), GroupPartitionReceiptError> {
+        if groups.is_empty() || groups.len() != self.group_count {
+            return Err(GroupPartitionReceiptError::ReceiptMismatch);
+        }
+        let mut member_count = 0usize;
+        let mut identities = Vec::with_capacity(groups.len());
+        for (group_index, group) in groups.iter().enumerate() {
+            if group.identity.manifest_generation != self.manifest_generation
+                || group.identity.eligibility_generation != self.eligibility_generation
+                || group.member_count == 0
+            {
+                return Err(GroupPartitionReceiptError::MixedSnapshot { group_index });
+            }
+            if group.member_count != group.member_ids.len()
+                || group.member_ids.len() != group.member_payload_digests.len()
+            {
+                return Err(GroupPartitionReceiptError::InvalidGroupMembership { group_index });
+            }
+            if member_id_set_digest(&group.member_ids)
+                .map_err(|_| GroupPartitionReceiptError::InvalidGroupMembership { group_index })?
+                != group.identity.member_set_digest
+            {
+                return Err(GroupPartitionReceiptError::MemberSetDigestMismatch { group_index });
+            }
+            member_count = member_count
+                .checked_add(group.member_count)
+                .ok_or(GroupPartitionReceiptError::MemberCountOverflow)?;
+            identities.push((
+                group.identity.member_set_digest,
+                group.identity.content_digest,
+                group.member_count,
+            ));
+        }
+        if member_count != self.eligible_records {
+            return Err(GroupPartitionReceiptError::ReceiptMismatch);
+        }
+        identities.sort_by_key(|entry| (entry.0, entry.1));
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"hme_group_partition_coverage_receipt_v1");
+        hasher.update(&self.manifest_generation.to_le_bytes());
+        hasher.update(&self.eligibility_generation.to_le_bytes());
+        hasher.update(&(member_count as u64).to_le_bytes());
+        hasher.update(&(identities.len() as u64).to_le_bytes());
+        for (member_set_digest, content_digest, members) in identities {
+            hasher.update(&member_set_digest);
+            hasher.update(&content_digest);
+            hasher.update(&(members as u64).to_le_bytes());
+        }
+        if *hasher.finalize().as_bytes() != self.partition_digest {
+            return Err(GroupPartitionReceiptError::ReceiptMismatch);
+        }
+        Ok(())
+    }
+
+    /// Snapshot generation bound into this partition receipt.
+    pub fn manifest_generation(&self) -> u64 {
+        self.manifest_generation
+    }
+
+    /// Eligibility generation bound into this partition receipt.
+    pub fn eligibility_generation(&self) -> u64 {
+        self.eligibility_generation
+    }
+
+    /// Total eligible member count covered by the partition.
+    pub fn eligible_records(&self) -> usize {
+        self.eligible_records
+    }
+
+    /// Number of groups covered by this partition.
+    pub fn group_count(&self) -> usize {
+        self.group_count
+    }
+
+    /// Deterministic digest of the disjoint group directory.
+    pub fn partition_digest(&self) -> [u8; 32] {
+        self.partition_digest
+    }
+}
+
 
 /// Exact group-level refinement plan obtained from weighted lower endpoints.
 ///
