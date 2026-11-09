@@ -3,8 +3,9 @@
 //! Budgeted multi-scenario experimental design for small linearized systems.
 //!
 //! Each candidate contributes whitened Jacobian rows for each declared
-//! scenario. The greedy selector maximizes expected D-optimal information gain
-//! per unit cost under a scalar budget and optional mutual-exclusion groups.
+//! scenario. The greedy selector maximizes target-state marginal D-optimal
+//! information gain per unit cost. Nuisance parameters are eliminated through
+//! a Schur complement; full joint-state gain is reported separately.
 //! An exhaustive subset oracle is provided for small candidate sets.
 //!
 //! Important limits:
@@ -15,7 +16,7 @@
 //! - The greedy expected-logdet objective is useful for screening, but no
 //!   guarantee is claimed for worst-case, nonlinear or correlated objectives.
 //! - Data-only observability is reported separately from prior-regularized
-//!   Bayesian D-optimal utility.
+//!   target-marginal and full joint-state Bayesian D-optimal utilities.
 
 use crate::observability::{MAX_OBSERVABILITY_PARAMETERS, ObservabilityError, analyze_jacobian};
 use std::collections::BTreeSet;
@@ -26,9 +27,12 @@ use std::fmt;
 #[derive(Clone, Debug, PartialEq)]
 pub struct DesignScenario {
     pub scenario_id: String,
+    /// Number of leading parameters whose marginal uncertainty is the design
+    /// objective. Remaining parameters are nuisance variables.
+    pub target_parameter_count: usize,
     /// Non-normalized positive scenario weight.
     pub weight: f64,
-    /// Positive-definite prior precision for this scenario.
+    /// Positive-definite prior precision for the full target+nuisance state.
     pub prior_precision: Vec<Vec<f64>>,
 }
 
@@ -60,7 +64,11 @@ pub struct BudgetedDesignConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScenarioDesignScore {
     pub scenario_id: String,
+    /// Marginal target-state information gain after eliminating nuisance
+    /// parameters with the Schur complement.
     pub information_gain_nats: f64,
+    /// Full joint-state information gain, including nuisance parameters.
+    pub joint_information_gain_nats: f64,
     pub data_only_rank: usize,
     pub data_only_nullity: usize,
     pub data_only_singular_values: Vec<f64>,
@@ -84,8 +92,14 @@ pub struct BudgetedDesignReport {
     pub total_cost: f64,
     pub budget: f64,
     pub remaining_budget: f64,
+    /// Scenario-weighted target-state marginal information gain.
     pub expected_information_gain_nats: f64,
+    /// Minimum target-state marginal information gain across scenarios.
     pub worst_case_information_gain_nats: f64,
+    /// Scenario-weighted full joint-state information gain.
+    pub expected_joint_information_gain_nats: f64,
+    /// Minimum full joint-state information gain across scenarios.
+    pub worst_case_joint_information_gain_nats: f64,
     pub scenario_scores: Vec<ScenarioDesignScore>,
     pub steps: Vec<DesignSelectionStep>,
 }
@@ -102,6 +116,11 @@ pub enum BudgetedDesignError {
     DuplicateScenarioId(String),
     InvalidScenarioWeight {
         scenario_id: String,
+    },
+    InvalidTargetParameterCount {
+        scenario_id: String,
+        count: usize,
+        maximum: usize,
     },
     InvalidPriorShape {
         scenario_id: String,
@@ -176,6 +195,14 @@ impl fmt::Display for BudgetedDesignError {
                     "scenario {scenario_id} must have a finite positive weight"
                 )
             }
+            Self::InvalidTargetParameterCount {
+                scenario_id,
+                count,
+                maximum,
+            } => write!(
+                f,
+                "scenario {scenario_id} has {count} target parameters; valid range is 1..={maximum}"
+            ),
             Self::InvalidPriorShape { scenario_id } => {
                 write!(
                     f,
@@ -535,6 +562,13 @@ fn validate_inputs(
                 scenario_id: scenario.scenario_id.clone(),
             });
         }
+        if scenario.target_parameter_count == 0 || scenario.target_parameter_count > dimension {
+            return Err(BudgetedDesignError::InvalidTargetParameterCount {
+                scenario_id: scenario.scenario_id.clone(),
+                count: scenario.target_parameter_count,
+                maximum: dimension,
+            });
+        }
         if scenario.prior_precision.len() != dimension
             || scenario
                 .prior_precision
@@ -679,12 +713,22 @@ fn evaluate_selection(
             }
         }
 
-        let posterior_logdet = cholesky_log_determinant(&information)
+        let posterior_joint_logdet = cholesky_log_determinant(&information)
             .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
-        let prior_logdet = cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
+        let prior_joint_logdet = cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
             BudgetedDesignError::PriorNotPositiveDefinite {
                 scenario_id: scenario.scenario_id.clone(),
             }
+        })?;
+        let posterior_target_logdet =
+            marginal_target_log_determinant(&information, scenario.target_parameter_count)
+                .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
+        let prior_target_logdet = marginal_target_log_determinant(
+            &scenario.prior_precision,
+            scenario.target_parameter_count,
+        )
+        .map_err(|_| BudgetedDesignError::PriorNotPositiveDefinite {
+            scenario_id: scenario.scenario_id.clone(),
         })?;
 
         let (
@@ -706,7 +750,8 @@ fn evaluate_selection(
 
         scores.push(ScenarioDesignScore {
             scenario_id: scenario.scenario_id.clone(),
-            information_gain_nats: posterior_logdet - prior_logdet,
+            information_gain_nats: posterior_target_logdet - prior_target_logdet,
+            joint_information_gain_nats: posterior_joint_logdet - prior_joint_logdet,
             data_only_rank,
             data_only_nullity,
             data_only_singular_values,
@@ -725,6 +770,14 @@ fn weighted_gain(scores: &[ScenarioDesignScore], weights: &[f64]) -> f64 {
         .sum()
 }
 
+fn weighted_joint_gain(scores: &[ScenarioDesignScore], weights: &[f64]) -> f64 {
+    scores
+        .iter()
+        .zip(weights)
+        .map(|(score, weight)| score.joint_information_gain_nats * weight)
+        .sum()
+}
+
 fn report_from_selection(
     options: &[ExperimentOption],
     config: &BudgetedDesignConfig,
@@ -739,6 +792,11 @@ fn report_from_selection(
         .iter()
         .map(|score| score.information_gain_nats)
         .fold(f64::INFINITY, f64::min);
+    let expected_joint_information_gain_nats = weighted_joint_gain(&scenario_scores, weights);
+    let worst_case_joint_information_gain_nats = scenario_scores
+        .iter()
+        .map(|score| score.joint_information_gain_nats)
+        .fold(f64::INFINITY, f64::min);
     let selected_option_ids = selected
         .iter()
         .map(|index| options[*index].option_id.clone())
@@ -751,9 +809,135 @@ fn report_from_selection(
         remaining_budget: (config.budget - total_cost).max(0.0),
         expected_information_gain_nats,
         worst_case_information_gain_nats,
+        expected_joint_information_gain_nats,
+        worst_case_joint_information_gain_nats,
         scenario_scores,
         steps,
     })
+}
+
+/// Log-determinant of the precision marginal for the leading target block.
+///
+/// The target precision after nuisance elimination is the Schur complement
+/// A - B C^-1 B^T of the full precision [[A, B], [B^T, C]]. Cholesky solves
+/// are used for C^-1 B^T; no explicit inverse or pseudo-inverse is formed.
+fn marginal_target_log_determinant(
+    precision: &[Vec<f64>],
+    target_parameter_count: usize,
+) -> Result<f64, ()> {
+    let dimension = precision.len();
+    if target_parameter_count == 0
+        || target_parameter_count > dimension
+        || precision.iter().any(|row| row.len() != dimension)
+    {
+        return Err(());
+    }
+    if target_parameter_count == dimension {
+        return cholesky_log_determinant(precision);
+    }
+
+    let nuisance_count = dimension - target_parameter_count;
+    let nuisance_precision: Vec<Vec<f64>> = precision[target_parameter_count..]
+        .iter()
+        .map(|row| row[target_parameter_count..].to_vec())
+        .collect();
+    let nuisance_lower = cholesky_factor(&nuisance_precision)?;
+    let mut schur: Vec<Vec<f64>> = precision[..target_parameter_count]
+        .iter()
+        .map(|row| row[..target_parameter_count].to_vec())
+        .collect();
+
+    for target_column in 0..target_parameter_count {
+        let rhs: Vec<f64> = (0..nuisance_count)
+            .map(|index| precision[target_parameter_count + index][target_column])
+            .collect();
+        let solved = cholesky_solve(&nuisance_lower, &rhs)?;
+        for target_row in 0..target_parameter_count {
+            let correction = (0..nuisance_count)
+                .map(|index| precision[target_row][target_parameter_count + index] * solved[index])
+                .sum::<f64>();
+            schur[target_row][target_column] -= correction;
+        }
+    }
+
+    for row in 0..target_parameter_count {
+        for column in (row + 1)..target_parameter_count {
+            let symmetric = 0.5 * (schur[row][column] + schur[column][row]);
+            schur[row][column] = symmetric;
+            schur[column][row] = symmetric;
+        }
+    }
+    cholesky_log_determinant(&schur)
+}
+
+fn cholesky_solve(lower: &[Vec<f64>], rhs: &[f64]) -> Result<Vec<f64>, ()> {
+    let dimension = lower.len();
+    if rhs.len() != dimension || lower.iter().any(|row| row.len() != dimension) {
+        return Err(());
+    }
+
+    let mut forward = vec![0.0; dimension];
+    for row in 0..dimension {
+        let previous = (0..row)
+            .map(|column| lower[row][column] * forward[column])
+            .sum::<f64>();
+        let diagonal = lower[row][row];
+        if !diagonal.is_finite() || diagonal <= 0.0 {
+            return Err(());
+        }
+        forward[row] = (rhs[row] - previous) / diagonal;
+        if !forward[row].is_finite() {
+            return Err(());
+        }
+    }
+
+    let mut solution = vec![0.0; dimension];
+    for row in (0..dimension).rev() {
+        let following = ((row + 1)..dimension)
+            .map(|column| lower[column][row] * solution[column])
+            .sum::<f64>();
+        let diagonal = lower[row][row];
+        solution[row] = (forward[row] - following) / diagonal;
+        if !solution[row].is_finite() {
+            return Err(());
+        }
+    }
+    Ok(solution)
+}
+
+fn cholesky_factor(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, ()> {
+    let dimension = matrix.len();
+    if dimension == 0 || matrix.iter().any(|row| row.len() != dimension) {
+        return Err(());
+    }
+    let mut lower = vec![vec![0.0; dimension]; dimension];
+    let scale = matrix
+        .iter()
+        .flatten()
+        .fold(1.0_f64, |maximum, value| maximum.max(value.abs()));
+    for row in 0..dimension {
+        for column in 0..=row {
+            if (matrix[row][column] - matrix[column][row]).abs() > 1.0e-12 * scale {
+                return Err(());
+            }
+            let correction = (0..column)
+                .map(|index| lower[row][index] * lower[column][index])
+                .sum::<f64>();
+            let residual = matrix[row][column] - correction;
+            if row == column {
+                if !residual.is_finite() || residual <= f64::MIN_POSITIVE {
+                    return Err(());
+                }
+                lower[row][column] = residual.sqrt();
+            } else {
+                lower[row][column] = residual / lower[column][column];
+                if !lower[row][column].is_finite() {
+                    return Err(());
+                }
+            }
+        }
+    }
+    Ok(lower)
 }
 
 /// Cholesky log-determinant for a symmetric positive-definite matrix.
@@ -795,6 +979,7 @@ mod tests {
     fn scenario(scenario_id: &str, weight: f64) -> DesignScenario {
         DesignScenario {
             scenario_id: scenario_id.to_string(),
+            target_parameter_count: 2,
             weight,
             prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         }
