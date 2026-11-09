@@ -229,6 +229,85 @@ pub fn evaluate_prequential_model_adequacy(
     })
 }
 
+/// What the open-world control plane permits after model-adequacy evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OpenWorldGateDisposition {
+    /// Collect more prequential evidence before generating parameter edits.
+    EvidenceCollectionOnly,
+    /// Stop automatic repair proposals and revise/expand the predictive family.
+    ModelRevisionRequired,
+    /// Detached candidate generation/evaluation is permitted, but not acceptance.
+    DetachedCandidateEvaluationPermitted,
+}
+
+/// Explicit authority boundary derived from model adequacy and sequential evidence.
+///
+/// This gate never authorizes candidate acceptance or live-model mutation.
+/// A status of NoDetectedInadequacy is not proof that the model family is correct;
+/// it only permits detached candidate evaluation subject to the normal SWI and
+/// independent-verifier contracts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OpenWorldDecisionGateReport {
+    pub declared_adequacy_status: ModelAdequacyStatus,
+    pub effective_adequacy_status: ModelAdequacyStatus,
+    /// First one-based observation at which a valid prequential e-process crossed.
+    pub prequential_evidence_crossed_at: Option<usize>,
+    pub disposition: OpenWorldGateDisposition,
+    /// Selection/evaluation of explicitly safe diagnostic probes remains possible.
+    /// This is not permission to execute a probe; external safety checks still apply.
+    pub diagnostic_probe_selection_permitted: bool,
+    pub weight_program_generation_permitted: bool,
+    pub detached_candidate_evaluation_permitted: bool,
+    pub independent_verifier_required: bool,
+    /// Always false: only the independent verifier can accept a candidate.
+    pub candidate_acceptance_authorized: bool,
+    /// Always false: this research gate cannot mutate a live model.
+    pub live_model_mutation_authorized: bool,
+}
+
+/// Combine proper-score/support adequacy with optional anytime-valid evidence.
+///
+/// A prequential e-process crossing overrides an aggregate-score state of
+/// NoDetectedInadequacy. Insufficient evidence and detected inadequacy both
+/// prevent WeightProgram generation; diagnostics may still be considered by
+/// a separate cost/safety-constrained probe policy.
+pub fn evaluate_open_world_decision_gate(
+    adequacy: &ModelAdequacyReport,
+    prequential_evidence_crossed_at: Option<usize>,
+) -> OpenWorldDecisionGateReport {
+    let effective_adequacy_status = if adequacy.status == ModelAdequacyStatus::Inadequate
+        || prequential_evidence_crossed_at.is_some()
+    {
+        ModelAdequacyStatus::Inadequate
+    } else {
+        adequacy.status
+    };
+    let disposition = match effective_adequacy_status {
+        ModelAdequacyStatus::InsufficientEvidence => {
+            OpenWorldGateDisposition::EvidenceCollectionOnly
+        }
+        ModelAdequacyStatus::NoDetectedInadequacy => {
+            OpenWorldGateDisposition::DetachedCandidateEvaluationPermitted
+        }
+        ModelAdequacyStatus::Inadequate => OpenWorldGateDisposition::ModelRevisionRequired,
+    };
+    let candidate_work_permitted = disposition
+        == OpenWorldGateDisposition::DetachedCandidateEvaluationPermitted;
+
+    OpenWorldDecisionGateReport {
+        declared_adequacy_status: adequacy.status,
+        effective_adequacy_status,
+        prequential_evidence_crossed_at,
+        disposition,
+        diagnostic_probe_selection_permitted: true,
+        weight_program_generation_permitted: candidate_work_permitted,
+        detached_candidate_evaluation_permitted: candidate_work_permitted,
+        independent_verifier_required: true,
+        candidate_acceptance_authorized: false,
+        live_model_mutation_authorized: false,
+    }
+}
+
 fn validate_adequacy_thresholds(
     thresholds: ModelAdequacyThresholds,
 ) -> Result<(), ModelAdequacyError> {
@@ -1225,6 +1304,92 @@ mod tests {
             evaluate_dirichlet_prequential_e_process(&[], &[1.0, 1.0], 1.0),
             Err(PrequentialEProcessError::InvalidAlpha)
         ));
+    }
+
+    fn adequacy_report_with_status(status: ModelAdequacyStatus) -> ModelAdequacyReport {
+        ModelAdequacyReport {
+            status,
+            observation_count: 40,
+            zero_support_count: usize::from(status == ModelAdequacyStatus::Inadequate),
+            low_probability_count: 0,
+            low_probability_rate: 0.0,
+            mean_log_loss: Some(0.5),
+            mean_multiclass_brier_score: Some(0.2),
+            minimum_observed_probability: Some(0.2),
+            thresholds: thresholds(),
+        }
+    }
+
+    #[test]
+    fn open_world_gate_requires_more_evidence_before_weight_programming() {
+        let adequacy = adequacy_report_with_status(ModelAdequacyStatus::InsufficientEvidence);
+        let gate = evaluate_open_world_decision_gate(&adequacy, None);
+
+        assert_eq!(
+            gate.disposition,
+            OpenWorldGateDisposition::EvidenceCollectionOnly
+        );
+        assert!(gate.diagnostic_probe_selection_permitted);
+        assert!(!gate.weight_program_generation_permitted);
+        assert!(!gate.detached_candidate_evaluation_permitted);
+        assert!(gate.independent_verifier_required);
+        assert!(!gate.candidate_acceptance_authorized);
+        assert!(!gate.live_model_mutation_authorized);
+    }
+
+    #[test]
+    fn open_world_gate_requires_model_revision_after_detected_inadequacy() {
+        let adequacy = adequacy_report_with_status(ModelAdequacyStatus::Inadequate);
+        let gate = evaluate_open_world_decision_gate(&adequacy, None);
+
+        assert_eq!(
+            gate.disposition,
+            OpenWorldGateDisposition::ModelRevisionRequired
+        );
+        assert!(gate.diagnostic_probe_selection_permitted);
+        assert!(!gate.weight_program_generation_permitted);
+        assert!(!gate.detached_candidate_evaluation_permitted);
+        assert!(!gate.candidate_acceptance_authorized);
+        assert!(!gate.live_model_mutation_authorized);
+    }
+
+    #[test]
+    fn anytime_evidence_overrides_aggregate_no_detected_inadequacy() {
+        let adequacy =
+            adequacy_report_with_status(ModelAdequacyStatus::NoDetectedInadequacy);
+        let gate = evaluate_open_world_decision_gate(&adequacy, Some(66));
+
+        assert_eq!(
+            gate.declared_adequacy_status,
+            ModelAdequacyStatus::NoDetectedInadequacy
+        );
+        assert_eq!(
+            gate.effective_adequacy_status,
+            ModelAdequacyStatus::Inadequate
+        );
+        assert_eq!(gate.prequential_evidence_crossed_at, Some(66));
+        assert_eq!(
+            gate.disposition,
+            OpenWorldGateDisposition::ModelRevisionRequired
+        );
+        assert!(!gate.weight_program_generation_permitted);
+    }
+
+    #[test]
+    fn open_world_gate_only_permits_detached_candidates_and_never_live_mutation() {
+        let adequacy =
+            adequacy_report_with_status(ModelAdequacyStatus::NoDetectedInadequacy);
+        let gate = evaluate_open_world_decision_gate(&adequacy, None);
+
+        assert_eq!(
+            gate.disposition,
+            OpenWorldGateDisposition::DetachedCandidateEvaluationPermitted
+        );
+        assert!(gate.weight_program_generation_permitted);
+        assert!(gate.detached_candidate_evaluation_permitted);
+        assert!(gate.independent_verifier_required);
+        assert!(!gate.candidate_acceptance_authorized);
+        assert!(!gate.live_model_mutation_authorized);
     }
 
     #[test]
