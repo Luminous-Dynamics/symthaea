@@ -44,7 +44,7 @@ The new `ensemble_groove` module provides:
 - fail-closed validation, including unknown layer references, invalid event positions, invalid accent levels, excessive supercycles, attack count limits and aggregate pairwise-work limits;
 - deterministic synthetic tests for unequal cycles, exact collisions, accent distributions, invalid records, bounded expansion and intentional rests.
 
-The two supported relationship constraints are deliberately small:
+The supported relationship constraints are deliberately small:
 1. `NoCoincidentAttacks` — an exact non-overlap requirement where the arrangement contract calls for it.
 2. `MinimumCircularSeparation` — a lower bound on the circular distance between attacks in two layers.
 3. `CallResponseWithinWindow` — a directed requirement that each caller-layer attack receive a responder-layer attack within a declared circular delay window, with a minimum coverage threshold in integer basis points.
