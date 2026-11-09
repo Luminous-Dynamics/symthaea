@@ -2053,11 +2053,21 @@ mod tests {
         let report = rank_detection_aware_model_discriminating_experiments(
             &hypotheses,
             &[first, second],
-            &config(vec![equal_prior(), ModelPriorScenario {
-                scenario_id: "skewed".to_string(),
-                scenario_weight: 1.0,
-                probabilities: vec![4.0, 1.0, 1.0],
-            }], 256),
+            &config(
+                vec![
+                    ModelPriorScenario {
+                        scenario_id: "balanced".to_string(),
+                        scenario_weight: 1.0,
+                        probabilities: vec![1.0, 1.0, 1.0],
+                    },
+                    ModelPriorScenario {
+                        scenario_id: "skewed".to_string(),
+                        scenario_weight: 1.0,
+                        probabilities: vec![4.0, 1.0, 1.0],
+                    },
+                ],
+                256,
+            ),
         )
         .unwrap();
         let first = report.experiments.iter().find(|score| score.experiment_id == "first-order").unwrap();
