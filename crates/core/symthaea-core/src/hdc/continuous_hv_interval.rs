@@ -1167,6 +1167,19 @@ impl ContinuousHV {
             return Ok(ContinuousHVScoreInterval::uninformative());
         }
         if query_norm_sq == 0.0 {
+            for index in 0..self.values.len() {
+                let (lower, upper) = component_bounds(index);
+                if !lower.is_finite()
+                    || !upper.is_finite()
+                    || !(-1.0..=1.0).contains(&lower)
+                    || !(-1.0..=1.0).contains(&upper)
+                    || lower > upper
+                {
+                    return Err(
+                        ContinuousHVIntervalError::InvalidCandidateComponentBounds { index },
+                    );
+                }
+            }
             return Ok(ContinuousHVScoreInterval { lower: 0.0, upper: 0.0 });
         }
 
@@ -1265,9 +1278,11 @@ impl ContinuousHV {
     /// Enclose canonical full-resolution cosine over component bounds
     /// supplied by a deterministic, allocation-free indexed callback.
     ///
-    /// This supports compact outward-quantized synopsis formats. The callback
-    /// is invoked exactly once per component in ascending index order. Returned
-    /// lower and upper values must enclose the true component range.
+    /// This supports compact outward-quantized synopsis formats. For a valid
+    /// input, the callback is invoked exactly once per component in ascending
+    /// index order. Invalid bounds fail closed and may stop callback traversal
+    /// early. Returned lower and upper values must enclose the true component
+    /// range.
     ///
     /// The implementation uses the same group-of-eight and ordered-tail
     /// reduction contract as the slice-based component-bound kernel. It does
@@ -1678,6 +1693,32 @@ mod tests {
             })
             .unwrap();
         assert_eq!(slice_interval, callback_interval);
+    }
+
+    #[test]
+    fn component_bounds_callback_visits_each_valid_component_once() {
+        let query = ContinuousHV::from_vec(vec![0.3; 17]);
+        let bounds: Vec<(f32, f32)> = (0..17).map(|_| (-0.1, 0.2)).collect();
+        let visits = std::cell::Cell::new(0usize);
+        let result = query
+            .similarity_interval_full_resolution_for_component_bounds_with(|index| {
+                visits.set(visits.get() + 1);
+                bounds[index]
+            })
+            .unwrap();
+        assert!(result.is_well_formed());
+        assert_eq!(visits.get(), 17);
+
+        let zero_query = ContinuousHV::zero(9);
+        let zero_visits = std::cell::Cell::new(0usize);
+        let zero = zero_query
+            .similarity_interval_full_resolution_for_component_bounds_with(|_| {
+                zero_visits.set(zero_visits.get() + 1);
+                (-1.0, 1.0)
+            })
+            .unwrap();
+        assert_eq!(zero, ContinuousHVScoreInterval { lower: 0.0, upper: 0.0 });
+        assert_eq!(zero_visits.get(), 9);
     }
 
     #[test]
