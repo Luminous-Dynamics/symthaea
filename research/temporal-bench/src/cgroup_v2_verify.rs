@@ -353,6 +353,61 @@ fn parse_systemd_u64(
         .map_err(|_| CgroupV2Error::InvalidSystemdProperty(name))
 }
 
+/// Parse systemd's normalized integer-component timespan representation into
+/// microseconds. Examples include "190ms", "1s", and "1min 30s".
+///
+/// Fractional, unknown, unbounded ("infinity"), empty and overflowing values
+/// fail closed. Sub-microsecond precision is rejected rather than rounded.
+fn parse_systemd_timespan_usec(
+    value: &str,
+    name: &'static str,
+) -> Result<u64, CgroupV2Error> {
+    let value = value.trim();
+    if value.is_empty() || value == "infinity" {
+        return Err(CgroupV2Error::InvalidSystemdProperty(name));
+    }
+
+    const NS_PER_US: u128 = 1_000;
+    let mut total_ns = 0_u128;
+
+    for component in value.split_whitespace() {
+        let digit_end = component
+            .find(|character: char| !character.is_ascii_digit())
+            .unwrap_or(component.len());
+        if digit_end == 0 || digit_end == component.len() {
+            return Err(CgroupV2Error::InvalidSystemdProperty(name));
+        }
+
+        let amount = component[..digit_end]
+            .parse::<u128>()
+            .map_err(|_| CgroupV2Error::InvalidSystemdProperty(name))?;
+        let unit = &component[digit_end..];
+        let ns_per_unit = match unit {
+            "ns" => 1_u128,
+            "us" | "µs" => 1_000_u128,
+            "ms" => 1_000_000_u128,
+            "s" => 1_000_000_000_u128,
+            "min" => 60_000_000_000_u128,
+            "h" => 3_600_000_000_000_u128,
+            "d" => 86_400_000_000_000_u128,
+            "w" => 604_800_000_000_000_u128,
+            _ => return Err(CgroupV2Error::InvalidSystemdProperty(name)),
+        };
+        let component_ns = amount
+            .checked_mul(ns_per_unit)
+            .ok_or(CgroupV2Error::InvalidSystemdProperty(name))?;
+        total_ns = total_ns
+            .checked_add(component_ns)
+            .ok_or(CgroupV2Error::InvalidSystemdProperty(name))?;
+    }
+
+    if total_ns % NS_PER_US != 0 {
+        return Err(CgroupV2Error::InvalidSystemdProperty(name));
+    }
+    u64::try_from(total_ns / NS_PER_US)
+        .map_err(|_| CgroupV2Error::InvalidSystemdProperty(name))
+}
+
 /// Parse the exact `KEY=VALUE` response selected by the trusted caller.
 ///
 /// Query only the listed properties with `systemctl show --property=...`.
@@ -399,9 +454,9 @@ pub fn parse_systemd_scope_properties(
         control_group: required_systemd_property(&fields, "ControlGroup")?.to_string(),
         memory_max_bytes: parse_systemd_u64(&fields, "MemoryMax")?,
         memory_swap_max_bytes: parse_systemd_u64(&fields, "MemorySwapMax")?,
-        cpu_quota_per_sec_usec: parse_systemd_u64(&fields, "CPUQuotaPerSecUSec")?,
+        cpu_quota_per_sec_usec: parse_systemd_timespan_usec(required_systemd_property(&fields, "CPUQuotaPerSecUSec")?, "CPUQuotaPerSecUSec")?,
         tasks_max: parse_systemd_u64(&fields, "TasksMax")?,
-        runtime_max_usec: parse_systemd_u64(&fields, "RuntimeMaxUSec")?,
+        runtime_max_usec: parse_systemd_timespan_usec(required_systemd_property(&fields, "RuntimeMaxUSec")?, "RuntimeMaxUSec")?,
         oom_policy: required_systemd_property(&fields, "OOMPolicy")?.to_string(),
     })
 }
@@ -708,6 +763,26 @@ mod tests {
             cpu_quota_percent: 100,
             tasks_max: 16,
             runtime_max_usec: 30_000_000,
+        }
+    }
+
+    #[test]
+    fn systemd_timespan_parser_handles_documented_integer_units_exactly() {
+        assert_eq!(parse_systemd_timespan_usec("190ms", "test"), Ok(190_000));
+        assert_eq!(parse_systemd_timespan_usec("1s", "test"), Ok(1_000_000));
+        assert_eq!(parse_systemd_timespan_usec("1min 30s", "test"), Ok(90_000_000));
+        assert_eq!(parse_systemd_timespan_usec("1s 500ms", "test"), Ok(1_500_000));
+        assert_eq!(parse_systemd_timespan_usec("1000us", "test"), Ok(1_000));
+    }
+
+    #[test]
+    fn systemd_timespan_parser_rejects_unbounded_malformed_and_inexact_values() {
+        for invalid in ["", "infinity", "1.5s", "1fortnight", "1ns", "1s garbage"] {
+            assert_eq!(
+                parse_systemd_timespan_usec(invalid, "RuntimeMaxUSec"),
+                Err(CgroupV2Error::InvalidSystemdProperty("RuntimeMaxUSec")),
+                "unexpectedly accepted {invalid:?}"
+            );
         }
     }
 
