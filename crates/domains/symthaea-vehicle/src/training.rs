@@ -1202,6 +1202,13 @@ mod tests {
         assert!(step_header.contains("follow_oracle_available"));
         assert!(step_header.contains("follow_oracle_actor_id"));
         assert!(step_header.contains("follow_oracle_snapshot_age_s"));
+        assert!(step_header.contains("student_proposal_steering"));
+        assert!(step_header.contains("teacher_target_steering"));
+        assert!(step_header.contains("student_teacher_action_delta_l1"));
+        assert!(step_header.contains("teacher_action_used_for_supervision"));
+        assert!(step_header.contains("pd_teacher_blend_weight"));
+        assert!(step_header.contains("blended_action_steering"));
+        assert!(step_header.contains("executed_action_steering"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1666,6 +1673,48 @@ mod tests {
                 && row.follow_oracle_gap_m.is_some()
                 && row.follow_oracle_snapshot_age_s.is_some()
         }));
+    }
+
+    #[test]
+    fn test_follow_telemetry_separates_student_teacher_and_executed_actions() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let metrics = trainer.train();
+        let telemetry = &metrics[0].telemetry;
+
+        assert_eq!(telemetry.len(), 5);
+        assert!(telemetry.iter().all(|row| {
+            row.teacher_target_steering.is_some()
+                && row.teacher_target_throttle.is_some()
+                && row.teacher_target_brake.is_some()
+                && row.student_teacher_action_delta_l1.is_some()
+                && row.teacher_action_used_for_blend
+                && row.pd_teacher_blend_weight > 0.0
+                && row.executed_action_steering.is_finite()
+                && row.executed_action_throttle.is_finite()
+                && row.executed_action_brake.is_finite()
+        }));
+        assert!(
+            telemetry
+                .iter()
+                .any(|row| row.teacher_action_used_for_supervision),
+            "At least one step must record use of the teacher as a BPTT target"
+        );
+        assert!(
+            telemetry
+                .iter()
+                .any(|row| !row.teacher_action_used_for_supervision),
+            "Teacher blending and BPTT supervision must remain distinct events"
+        );
     }
 
     #[test]
