@@ -679,6 +679,11 @@ pub struct GroupIntervalSelectionPlan {
     pub refinement_record_count: usize,
     /// Number of records avoided by excluding whole groups.
     pub excluded_record_count: usize,
+    /// Group-directory entries visited by validation and selection.
+    pub group_directory_records_scanned: usize,
+    /// Stable member IDs walked for defensive disjointness validation.
+    /// Zero when a build-time partition receipt is used.
+    pub member_roster_ids_scanned: usize,
 }
 
 
@@ -997,6 +1002,8 @@ pub struct HierarchicalIntervalSelectionPlan {
     pub group_plan: GroupIntervalSelectionPlan,
     /// Second-stage per-record selection within the surviving groups.
     pub member_plan: IntervalSelectionPlan<String>,
+    /// Member interval records consumed across surviving groups.
+    pub member_interval_records_scanned: usize,
 }
 
 /// Errors that prevent hierarchical exact interval selection.
@@ -1426,7 +1433,12 @@ pub fn select_group_refinement_set_with_partition_receipt(
             unbounded_unopened_groups: coverage.unbounded_unopened_groups,
         });
     }
-    select_group_refinement_set_impl(groups, top_k, coverage, false)
+    let mut plan = select_group_refinement_set_impl(groups, top_k, coverage, false)?;
+    plan.group_directory_records_scanned = plan
+        .group_directory_records_scanned
+        .checked_add(groups.len())
+        .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
+    Ok(plan)
 }
 
 fn select_group_refinement_set_impl(
@@ -1438,6 +1450,7 @@ fn select_group_refinement_set_impl(
     let mut covered_records = 0usize;
     let mut first_index_by_id = BTreeMap::new();
     let mut first_group_by_member_id = BTreeMap::new();
+    let mut member_roster_ids_scanned = 0usize;
     let mut lower_order: Vec<&GroupScoreIntervalRecord> =
         Vec::with_capacity(groups.len());
     for (group_index, group) in groups.iter().enumerate() {
@@ -1472,6 +1485,9 @@ fn select_group_refinement_set_impl(
         first_index_by_id.insert(group.identity.member_set_digest, group_index);
         if verify_member_disjointness {
             for member_id in group.member_ids.iter() {
+                member_roster_ids_scanned = member_roster_ids_scanned
+                    .checked_add(1)
+                    .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
                 if let Some(first_group_index) =
                     first_group_by_member_id.get(member_id.as_str()).copied()
                 {
@@ -1566,6 +1582,11 @@ fn select_group_refinement_set_impl(
         excluded_groups,
         refinement_record_count,
         excluded_record_count,
+        group_directory_records_scanned: groups
+            .len()
+            .checked_mul(2)
+            .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?,
+        member_roster_ids_scanned,
     })
 }
 
@@ -1742,6 +1763,7 @@ fn select_hierarchical_refinement_set_impl(
 
     Ok(HierarchicalIntervalSelectionPlan {
         group_plan,
+        member_interval_records_scanned: effective_records.len(),
         member_plan,
     })
 }
@@ -2699,7 +2721,15 @@ mod tests {
             ))
         ));
         let defensive = select_group_refinement_set(&groups, 1, coverage).unwrap();
-        assert_eq!(fast, defensive);
+        assert_eq!(fast.threshold, defensive.threshold);
+        assert_eq!(fast.refinement_groups, defensive.refinement_groups);
+        assert_eq!(fast.excluded_groups, defensive.excluded_groups);
+        assert_eq!(fast.refinement_record_count, defensive.refinement_record_count);
+        assert_eq!(fast.excluded_record_count, defensive.excluded_record_count);
+        assert_eq!(defensive.member_roster_ids_scanned, 3);
+        assert_eq!(fast.member_roster_ids_scanned, 0);
+        assert_eq!(defensive.group_directory_records_scanned, 4);
+        assert_eq!(fast.group_directory_records_scanned, 6);
         assert_eq!(receipt.group_count(), 2);
         assert_eq!(receipt.eligible_records(), 3);
 
@@ -2716,6 +2746,42 @@ mod tests {
                 GroupPartitionReceiptError::ReceiptMismatch
             ))
         ));
+    }
+
+    #[test]
+    fn receipt_backed_selection_reports_zero_member_roster_walk_before_stage_one() {
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let members_a = vec![
+            ("a1".to_owned(), ContinuousHV::from_vec(vec![0.7; 8])),
+            ("a2".to_owned(), ContinuousHV::from_vec(vec![0.6; 8])),
+        ];
+        let members_b = vec![
+            ("b1".to_owned(), ContinuousHV::from_vec(vec![-0.7; 8])),
+            ("b2".to_owned(), ContinuousHV::from_vec(vec![-0.6; 8])),
+        ];
+        let envelopes = vec![
+            ContinuousHVGroupEnvelope::from_original_members(91, 17, &members_a).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(91, 17, &members_b).unwrap(),
+        ];
+        let receipt = receipt_for_fixture_envelopes(&envelopes);
+        let groups: Vec<GroupScoreIntervalRecord> = envelopes
+            .iter()
+            .map(|envelope| build_group_record(envelope, &query))
+            .collect();
+        let coverage = complete_group_coverage(&groups);
+        let fast = select_group_refinement_set_with_partition_receipt(
+            &groups,
+            1,
+            coverage,
+            &receipt,
+        )
+        .unwrap();
+        let defensive = select_group_refinement_set(&groups, 1, coverage).unwrap();
+
+        assert_eq!(fast.member_roster_ids_scanned, 0);
+        assert_eq!(defensive.member_roster_ids_scanned, 4);
+        assert_eq!(fast.refinement_groups, defensive.refinement_groups);
+        assert_eq!(fast.threshold, defensive.threshold);
     }
 
     #[test]
