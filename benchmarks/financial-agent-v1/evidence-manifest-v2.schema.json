@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/financial-agent-v1/evidence-manifest-v2.schema.json",
+  "title": "Luminous Financial Research Evidence Manifest v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "principal_id",
+    "rights_profile_id",
+    "evaluation_mode",
+    "decision_frontier",
+    "artifacts",
+    "qualification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.financial-research-evidence-manifest.v2"
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rights_profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_mode": {
+      "enum": [
+        "historical_reconstruction",
+        "prospective_streaming",
+        "development_only"
+      ]
+    },
+    "decision_frontier": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "evidence-v2.schema.json"
+      }
+    },
+    "qualification": {
+      "enum": [
+        "synthetic_development_only",
+        "historical_confirmation",
+        "prospective_shadow"
+      ]
+    },
+    "manifest_artifact_ref": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  }
+}
