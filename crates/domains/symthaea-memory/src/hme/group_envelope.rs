@@ -865,6 +865,105 @@ mod tests {
     }
 
     #[test]
+    fn ball_only_synopsis_reduces_numeric_metadata_and_preserves_exact_enclosure() {
+        const DIM: usize = 257;
+        let query = ContinuousHV::from_vec(
+            (0..DIM)
+                .map(|index| ((index as f32) * 0.037).sin() * 0.8)
+                .collect(),
+        );
+        let members: Vec<(String, ContinuousHV)> = (0..12)
+            .map(|member_index| {
+                let center = member_index as f32 * 0.0007;
+                let vector = ContinuousHV::from_vec(
+                    (0..DIM)
+                        .map(|index| {
+                            ((index as f32) * 0.019).cos() * 0.6
+                                + center * ((index as f32) * 0.071).sin()
+                        })
+                        .map(|value| value.clamp(-1.0, 1.0))
+                        .collect(),
+                );
+                (format!("member-{member_index:02}"), vector)
+            })
+            .collect();
+
+        let full = ContinuousHVGroupEnvelope::from_original_members(31, 12, &members).unwrap();
+        let ball = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            31,
+            12,
+            &members,
+            GroupEnvelopeMode::BallOnly,
+        )
+        .unwrap();
+
+        assert_eq!(full.mode(), GroupEnvelopeMode::BoxAndBall);
+        assert_eq!(ball.mode(), GroupEnvelopeMode::BallOnly);
+        assert_eq!(full.numeric_synopsis_bytes(), 12 * DIM * 4 + 4);
+        assert_eq!(ball.numeric_synopsis_bytes(), DIM * 4 + 4);
+        assert_eq!(
+            full.numeric_synopsis_bytes() - ball.numeric_synopsis_bytes(),
+            8 * DIM * 4
+        );
+        assert_ne!(full.content_digest(), ball.content_digest());
+
+        let full_interval = full
+            .score_interval_for_snapshot(
+                &query,
+                31,
+                12,
+                full.member_set_digest(),
+                full.content_digest(),
+            )
+            .unwrap();
+        let ball_interval = ball
+            .score_interval_for_snapshot(
+                &query,
+                31,
+                12,
+                ball.member_set_digest(),
+                ball.content_digest(),
+            )
+            .unwrap();
+
+        for (id, member) in &members {
+            let exact = query.similarity_full_resolution(member);
+            assert!(full_interval.contains(exact), "full box missed {id}");
+            assert!(ball_interval.contains(exact), "ball-only missed {id}");
+        }
+        assert!(ball_interval.lower <= full_interval.lower);
+        assert!(ball_interval.upper >= full_interval.upper);
+    }
+
+    #[test]
+    fn ball_only_and_box_ball_have_distinct_snapshot_identities() {
+        let members = vec![
+            ("a".to_owned(), hv(&[0.7, 0.1, -0.2, 0.9, 0.3, -0.1, 0.4, 0.8])),
+            ("b".to_owned(), hv(&[0.6, 0.2, -0.1, 0.8, 0.4, -0.2, 0.3, 0.7])),
+        ];
+        let full = ContinuousHVGroupEnvelope::from_original_members(4, 5, &members).unwrap();
+        let ball = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            4,
+            5,
+            &members,
+            GroupEnvelopeMode::BallOnly,
+        )
+        .unwrap();
+        assert_eq!(full.member_set_digest(), ball.member_set_digest());
+        assert_ne!(full.content_digest(), ball.content_digest());
+        assert!(matches!(
+            ball.score_interval_for_snapshot(
+                &hv(&[1.0; 8]),
+                4,
+                5,
+                full.member_set_digest(),
+                full.content_digest(),
+            ),
+            Err(GroupEnvelopeError::ContentDigestMismatch)
+        ));
+    }
+
+    #[test]
     fn high_dimensional_group_envelope_contains_every_original_score() {
         let dimension = 16_384usize;
         let base: Vec<f32> = (0..dimension)
