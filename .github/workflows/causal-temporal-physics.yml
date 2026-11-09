@@ -270,6 +270,19 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run finite-size Bayesian causal-set dimension inference
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example bayesian_dimension_reference | tee bayesian-dimension-reference.csv
+          {
+            echo "## Finite-size Bayesian causal-set dimension reference"
+            echo '```csv'
+            cat bayesian-dimension-reference.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
