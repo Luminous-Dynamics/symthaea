@@ -1,0 +1,376 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "HME-2026-MULTITRACK-MATRIX",
+  "status": "evaluation_contract_and_proposed_targets_not_results",
+  "score_contracts": {
+    "exact_continuous_hv": "continuous_hv_cosine_full_f32_group8_v1",
+    "approximate_profiles": "must_be_versioned_and_reported_separately",
+    "tie_policy": "score_descending_then_stable_id_ascending",
+    "exact_completion": "all eligible records either exact-scored or excluded by a qualified admissible interval"
+  },
+  "core_workload_matrix": {
+    "representations": [
+      {
+        "name": "ContinuousHV",
+        "dimensions": [
+          16384,
+          65536,
+          262144
+        ],
+        "scalar": "f32"
+      }
+    ],
+    "corpus_sizes": [
+      1000,
+      10000,
+      100000,
+      1000000
+    ],
+    "top_k": [
+      1,
+      10,
+      100
+    ],
+    "query_sets": [
+      "IID random",
+      "clustered in-distribution",
+      "near-tie decision boundaries",
+      "adversarial orthogonal and antipodal",
+      "OOD query distribution",
+      "zero and near-zero norms",
+      "dimension tails at 7/8/9 and 15/16/17 for reduced-size controls"
+    ],
+    "workload_profiles": [
+      "cold start with payloads absent from page cache",
+      "warm metadata with cold payload",
+      "warm metadata and warm payload",
+      "concurrent mixed top-k and query-size requests",
+      "insert/delete/revoke/compact/reopen between query batches"
+    ]
+  },
+  "exact_retrieval_track": {
+    "goal": "100 percent exact top-k ID equality with the canonical full scan oracle",
+    "baselines": [
+      "canonical full-payload scan",
+      "per-record certified interval selector",
+      "weighted group interval selector with defensive disjointness scan",
+      "receipt-backed O(G) group selector",
+      "receipt-backed group-then-member hierarchical selector"
+    ],
+    "metrics": [
+      "exact_top_k_id_agreement",
+      "false_prune_count",
+      "eligible_population_reconciliation",
+      "group_synopses_scanned",
+      "member_interval_records_scanned",
+      "member_roster_ids_walked_before_group_selection",
+      "original_payloads_read",
+      "physical_payload_bytes_read",
+      "metadata_bytes_read",
+      "p50/p95/p99_latency_ms",
+      "peak_resident_bytes",
+      "allocations_per_query"
+    ],
+    "hard_gates": {
+      "exact_top_k_id_agreement": 1,
+      "false_prune_count": 0,
+      "unauthorized_payload_reads": 0,
+      "excluded_payload_reads": 0,
+      "stale_or_mixed_generation_completion": 0,
+      "fast_path_member_roster_walk_before_stage1": 0
+    },
+    "prospective_targets": {
+      "fast_receipt_validation_complexity": "O(G)",
+      "cold_payload_byte_reduction_p50": 0.5,
+      "cold_payload_byte_reduction_p95": 0.2,
+      "metadata_work_fraction_of_per_record_baseline": 0.1
+    }
+  },
+  "approximate_retrieval_track": {
+    "goal": "measure the per-query quality/cost distribution without confusing probabilistic recall with deterministic exactness",
+    "baselines": [
+      "PQR-Search",
+      "HNSW/FAISS/ScaNN under matched workload",
+      "existing HdcStore LSH only for compatible BinaryHV comparison"
+    ],
+    "metrics": [
+      "per_query_recall_at_k_distribution",
+      "fraction_of_queries_below_tau",
+      "empirical_failure_rate_against_delta",
+      "recall_by_query_stratum",
+      "update/delete_quality_drift",
+      "cold_payload_bytes",
+      "p50/p95/p99_latency_ms"
+    ],
+    "guarantee_classes": [
+      "deterministic_exact",
+      "per_query_probabilistic",
+      "empirical_approximate"
+    ],
+    "rules": [
+      "never label probabilistic or empirical retrieval ExactComplete",
+      "publish tau and delta and the assumptions of the guarantee",
+      "report OOD and dynamic-update strata separately"
+    ]
+  },
+  "systems_track": {
+    "baselines": [
+      "full-scan Rust in-memory",
+      "existing HdcStore mmap for BinaryHV",
+      "VectorDBBench VIBE-compatible system profile where dimensions/metric match",
+      "PostgreSQL/pgvector only for a separately matched ContinuousHV workload"
+    ],
+    "metrics": [
+      "physical_device_bytes_read",
+      "major/minor_faults",
+      "page_cache_residency",
+      "metadata_bytes",
+      "payload_bytes",
+      "CPU_cycles",
+      "instructions",
+      "branch_misses",
+      "allocations",
+      "p50/p95/p99",
+      "ingest_throughput",
+      "update_delete_compaction_cost"
+    ],
+    "comparability_rule": "Do not compare HME 16K-256K ContinuousHV results directly to 768/1536-dimension public workloads or BinaryHV bit-vector workloads without a separate matched protocol."
+  },
+  "memory_quality_tracks": [
+    {
+      "benchmark": "MEME",
+      "dimensions": [
+        "Exact Recall",
+        "Aggregation",
+        "Tracking",
+        "Deletion",
+        "Cascade",
+        "Absence"
+      ],
+      "metrics": [
+        "task_accuracy_by_competency",
+        "deletion_correctness",
+        "cascade_precision_recall",
+        "false_absence_rate",
+        "resurrection_rate"
+      ],
+      "target": {
+        "exact_recall": 0.95,
+        "aggregation": 0.95,
+        "tracking": 0.95,
+        "deletion": 0.99,
+        "cascade": 0.9,
+        "absence": 0.9
+      },
+      "target_status": "proposed_HME_stretch_target"
+    },
+    {
+      "benchmark": "DyadMem",
+      "dimensions": [
+        "Capture",
+        "Update",
+        "Recall",
+        "user memory",
+        "relational agent memory"
+      ],
+      "metrics": [
+        "gold_memory_accuracy",
+        "full_pipeline_accuracy",
+        "capture_update_support_recall",
+        "pipeline_gap_percentage_points"
+      ],
+      "target": {
+        "capture_update_support_recall": 0.95,
+        "full_pipeline_gold_gap_pp": 5
+      },
+      "target_status": "proposed_HME_target"
+    },
+    {
+      "benchmark": "Agent Memory Leaderboard",
+      "dimensions": [
+        "textual",
+        "coding",
+        "multimodal"
+      ],
+      "metrics": [
+        "official_per_task_scores",
+        "Add_Search_API_compliance",
+        "latency",
+        "resource_use",
+        "governance"
+      ],
+      "target": {
+        "first_milestone": "protocol_compliance_and_reproducible_local_run"
+      },
+      "target_status": "proposed_HME_milestone"
+    },
+    {
+      "benchmark": "COLLABMEM",
+      "dimensions": [
+        "sharing",
+        "routing",
+        "provenance",
+        "authority",
+        "conflict_resolution",
+        "retention"
+      ],
+      "metrics": [
+        "role_routing_accuracy",
+        "unauthorized_read_count",
+        "unauthorized_emission_count",
+        "provenance_accuracy",
+        "retention_accuracy"
+      ],
+      "target": {
+        "unauthorized_read_count": 0,
+        "unauthorized_emission_count": 0
+      },
+      "target_status": "hard_safety_gate_plus_per_competency_quality"
+    },
+    {
+      "benchmark": "TAME / Trust-Memevo",
+      "dimensions": [
+        "memory evolution",
+        "trustworthiness under benign updates"
+      ],
+      "metrics": [
+        "safety_regression_rate",
+        "privacy_regression_rate",
+        "harmful_memory_propagation",
+        "utility_gain",
+        "trustworthiness_delta"
+      ],
+      "target": {
+        "safety_regression_rate": 0,
+        "privacy_regression_rate": 0
+      },
+      "target_status": "hard_safety_gate"
+    },
+    {
+      "benchmark": "TimlMemBench",
+      "dimensions": [
+        "raw-native ingestion",
+        "governed activation",
+        "scope",
+        "provenance",
+        "restraint"
+      ],
+      "metrics": [
+        "activation_precision_recall",
+        "source_provenance_recovery",
+        "scope_leakage_rate",
+        "false_activation_rate",
+        "restraint_accuracy"
+      ],
+      "target": {
+        "scope_leakage_rate": 0
+      },
+      "target_status": "hard_safety_gate_plus_quality"
+    },
+    {
+      "benchmark": "MEMOBench",
+      "dimensions": [
+        "Storage",
+        "Update",
+        "Compression",
+        "process-level robotics memory"
+      ],
+      "metrics": [
+        "checkpoint_fidelity",
+        "update_correctness",
+        "compression_retention",
+        "memory_only_ablation_gain",
+        "long_horizon_task_success"
+      ],
+      "target": {
+        "first_milestone": "reproduce_memory_only_baselines_with_frozen_policy"
+      },
+      "target_status": "proposed_HME_milestone"
+    },
+    {
+      "benchmark": "MEMORA-Bench",
+      "dimensions": [
+        "retrospective faithfulness",
+        "prospective memory-grounded planning"
+      ],
+      "metrics": [
+        "memory_faithfulness",
+        "temporal_grounding",
+        "object_state_accuracy",
+        "prospective_plan_success",
+        "OOD_goal_composition"
+      ],
+      "target": {
+        "first_milestone": "reproduce_retrospective_memory_faithfulness_with_frozen_perception"
+      },
+      "target_status": "proposed_HME_milestone"
+    }
+  ],
+  "lifecycle_and_governance_track": {
+    "project_fixture": "hme_revise_lifecycle_v0.json",
+    "metrics": [
+      "bitemporal_leakage_rate",
+      "dependency_cascade_precision",
+      "dependency_cascade_recall",
+      "stale_conclusion_emission_rate",
+      "deleted_descendant_read_count",
+      "deletion_resurrection_rate_after_compaction_reopen_replay",
+      "invalidation_to_unavailability_latency_ms",
+      "authorization_pre_read_violation_count",
+      "false_unknown_rate",
+      "false_absence_rate"
+    ],
+    "hard_gates": {
+      "bitemporal_leakage_rate": 0,
+      "stale_conclusion_emission_rate": 0,
+      "deletion_resurrection_rate_after_compaction_reopen_replay": 0,
+      "authorization_pre_read_violation_count": 0
+    }
+  },
+  "eligibility_scope_binding": {
+    "owner_issue": 11003,
+    "fields": [
+      "principal_scope_digest",
+      "policy_digest",
+      "policy_generation",
+      "source_ledger_generation",
+      "bitemporal_query_digest_for_valid_at_known_at",
+      "eligible_member_set_digest",
+      "eligible_record_count"
+    ],
+    "query_order": "eligibility_before_group_lookup_or_payload_access",
+    "nonclaim": "HME scope binding is not an authorization engine; values must come from the authoritative #11003 owner."
+  },
+  "persistence_and_receipt_qualification": {
+    "owner_issue": 11221,
+    "in_memory_receipt_is_production_authority": false,
+    "require_manifest_authentication_on_reopen": true,
+    "require_per_member_receipt_binding": true,
+    "require_tombstone_and_revocation_replay": true
+  },
+  "reproducibility": {
+    "exact_head_commit_required": true,
+    "rust_toolchain_and_target_fingerprint_required": true,
+    "raw_query_traces_and_seeds_required": true,
+    "reader_and_judge_frozen_for_memory_benchmarks": true,
+    "hardware_and_storage_provenance_required": true,
+    "warm_cold_profiles_separate": true,
+    "confidence_intervals_required_for_stochastic_results": true,
+    "raw_latency_samples_required": true,
+    "physical_io_claim_requires_device_telemetry": true
+  },
+  "publication_rules": [
+    "Report exact, probabilistic and empirical guarantee classes separately.",
+    "Do not merge public benchmark scores into one aggregate.",
+    "Separate author-reported/vendor-reported results from independently reproduced results.",
+    "Do not treat candidate counts or virtual page calculations as measured I/O.",
+    "Report metadata overhead and build-time certificate cost as well as query-time savings.",
+    "Treat unauthorized reads and stale-memory resurrection as hard failures, not score trade-offs."
+  ],
+  "nonclaims": [
+    "No benchmark in this matrix has been run by this fixture.",
+    "All numeric targets are prospective project targets, not achieved results or published standards.",
+    "The matrix does not certify the spherical-cap f32 prototype.",
+    "The matrix does not certify persisted partition receipts or physical I/O savings."
+  ]
+}
