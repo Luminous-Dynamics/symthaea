@@ -24,9 +24,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
-      - name: Check formatting
+      - name: Produce rustfmt-normalized source snapshot
         working-directory: benchmarks/financial-time-frontier
-        run: cargo fmt -- --check
+        run: |
+          cargo fmt
+          mkdir -p /tmp/financial-time-frontier-format
+          cp src/lib.rs /tmp/financial-time-frontier-format/lib.rs
+      - name: Upload formatter snapshot for maintainer review
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-time-frontier-rustfmt-snapshot
+          path: /tmp/financial-time-frontier-format/lib.rs
+          retention-days: 1
+      - name: Require committed source to match rustfmt
+        run: git diff --exit-code -- benchmarks/financial-time-frontier/src/lib.rs
       - name: Run unit and adversarial tests
         working-directory: benchmarks/financial-time-frontier
         run: cargo test
