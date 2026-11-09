@@ -21,3 +21,7 @@ serde_json = { workspace = true }
 [[example]]
 name = "adm_derivative_step_sweep"
 path = "examples/adm_derivative_step_sweep.rs"
+
+[[example]]
+name = "adm_constraint_sweep"
+path = "examples/adm_constraint_sweep.rs"
