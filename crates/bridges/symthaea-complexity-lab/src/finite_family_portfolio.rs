@@ -1469,6 +1469,8 @@ pub struct ExactClusterPolicySearchBudget {
 pub struct ExactPolicyPortfolioSearchBudget {
     pub per_cluster: ExactClusterPolicySearchBudget,
     pub max_outer_search_nodes: usize,
+    /// Aggregate cap across every exact inner-cluster branch-and-bound solve.
+    pub max_total_cluster_search_nodes: usize,
     pub max_total_inner_dp_multiply_adds: usize,
     pub max_frontier_nodes: usize,
     pub max_frontier_memory_bytes: usize,
@@ -2824,14 +2826,37 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
     let mut seed_inner_budget = budget.per_cluster;
     seed_inner_budget.max_total_dp_multiply_adds = seed_inner_budget.max_total_dp_multiply_adds
         .min(budget.max_total_inner_dp_multiply_adds);
-    let seed_solution = solve_exact_cluster_policy_bnb(
+    seed_inner_budget.max_search_nodes = seed_inner_budget.max_search_nodes
+        .min(budget.max_total_cluster_search_nodes);
+    let seed_solution = match solve_exact_cluster_policy_bnb(
         family,
         &all_models,
         discount,
         seed_inner_budget,
-    )?;
+    ) {
+        Ok(solution) => solution,
+        Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "cluster B&B search nodes",
+            required,
+            ..
+        }) if budget.max_total_cluster_search_nodes < budget.per_cluster.max_search_nodes => {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer total cluster B&B search nodes",
+                required,
+                limit: budget.max_total_cluster_search_nodes,
+            });
+        }
+        Err(error) => return Err(error),
+    };
     let seed_dp_work = seed_solution.dp_multiply_adds;
     let seed_search_nodes = seed_solution.search_nodes;
+    if seed_search_nodes > budget.max_total_cluster_search_nodes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "outer total cluster B&B search nodes",
+            required: seed_search_nodes,
+            limit: budget.max_total_cluster_search_nodes,
+        });
+    }
     let seed_entry = ClusterPolicyCacheEntry {
         model_indices: try_clone_usize_vec(&all_models)?,
         solution: seed_solution,
@@ -2940,9 +2965,14 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
                     let remaining_work = budget.max_total_inner_dp_multiply_adds
                         .checked_sub(total_dp_multiply_adds)
                         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+                    let remaining_search_nodes = budget.max_total_cluster_search_nodes
+                        .checked_sub(total_cluster_search_nodes)
+                        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
                     let mut inner_budget = budget.per_cluster;
                     inner_budget.max_total_dp_multiply_adds = inner_budget.max_total_dp_multiply_adds
                         .min(remaining_work);
+                    inner_budget.max_search_nodes = inner_budget.max_search_nodes
+                        .min(remaining_search_nodes);
                     let frontier_bytes = outer_frontier_bytes(&frontier)?;
                     let active_node_bytes = outer_partition_node_bytes(&node)?;
                     let projected_cache = cached_bytes
@@ -2958,12 +2988,27 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
                         });
                     }
 
-                    let solution = solve_exact_cluster_policy_bnb(
+                    let solution = match solve_exact_cluster_policy_bnb(
                         family,
                         cluster,
                         discount,
                         inner_budget,
-                    )?;
+                    ) {
+                        Ok(solution) => solution,
+                        Err(PolicyPortfolioError::BudgetExceeded {
+                            resource: "cluster B&B search nodes",
+                            required,
+                            ..
+                        }) if remaining_search_nodes < budget.per_cluster.max_search_nodes => {
+                            return Err(PolicyPortfolioError::BudgetExceeded {
+                                resource: "outer total cluster B&B search nodes",
+                                required: total_cluster_search_nodes.checked_add(required)
+                                    .ok_or(PolicyPortfolioError::DimensionOverflow)?,
+                                limit: budget.max_total_cluster_search_nodes,
+                            });
+                        }
+                        Err(error) => return Err(error),
+                    };
                     total_dp_multiply_adds = total_dp_multiply_adds
                         .checked_add(solution.dp_multiply_adds)
                         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
@@ -2977,6 +3022,13 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
                     total_cluster_search_nodes = total_cluster_search_nodes
                         .checked_add(solution.search_nodes)
                         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+                    if total_cluster_search_nodes > budget.max_total_cluster_search_nodes {
+                        return Err(PolicyPortfolioError::BudgetExceeded {
+                            resource: "outer total cluster B&B search nodes",
+                            required: total_cluster_search_nodes,
+                            limit: budget.max_total_cluster_search_nodes,
+                        });
+                    }
                     let entry = ClusterPolicyCacheEntry {
                         model_indices: try_clone_usize_vec(cluster)?,
                         solution,
@@ -3155,6 +3207,22 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
             .ok_or(PolicyPortfolioError::PolicyMaskCertificateMismatch)
     }).collect::<Result<_, _>>()?;
 
+    // Preflight the final all-model-by-selected-policy replay before allocating
+    // the copied output certificates or performing any further DP work.
+    let portfolio_evaluation_count = model_count.checked_mul(best_partition.len())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let portfolio_eval_ops = fixed_policy_dp_multiply_adds(family, portfolio_evaluation_count)?;
+    let total_work_with_portfolio_replay = total_dp_multiply_adds
+        .checked_add(portfolio_eval_ops)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if total_work_with_portfolio_replay > budget.max_total_inner_dp_multiply_adds {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "outer total DP work including cross-model portfolio replay",
+            required: total_work_with_portfolio_replay,
+            limit: budget.max_total_inner_dp_multiply_adds,
+        });
+    }
+
     // Estimate the complete returned structure from cache references before
     // allocating duplicate selected-cluster certificates.
     let output_bytes = portfolio_output_bytes(
@@ -3192,20 +3260,6 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         &cache[all_model_cache_index].solution.model_optimal_values,
         "outer model-optimal values",
     )?;
-
-    let portfolio_evaluation_count = model_count.checked_mul(best_partition.len())
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    let portfolio_eval_ops = fixed_policy_dp_multiply_adds(family, portfolio_evaluation_count)?;
-    let total_work_with_portfolio_replay = total_dp_multiply_adds
-        .checked_add(portfolio_eval_ops)
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    if total_work_with_portfolio_replay > budget.max_total_inner_dp_multiply_adds {
-        return Err(PolicyPortfolioError::BudgetExceeded {
-            resource: "outer total DP work including cross-model portfolio replay",
-            required: total_work_with_portfolio_replay,
-            limit: budget.max_total_inner_dp_multiply_adds,
-        });
-    }
 
     let mut model_policy_values = Vec::new();
     model_policy_values.try_reserve_exact(model_count).map_err(|_| {
@@ -3413,6 +3467,7 @@ mod tests {
         ExactPolicyPortfolioSearchBudget {
             per_cluster: cluster_search_budget(),
             max_outer_search_nodes: 10_000,
+            max_total_cluster_search_nodes: 1_000_000,
             max_total_inner_dp_multiply_adds: 10_000_000,
             max_frontier_nodes: 10_000,
             max_frontier_memory_bytes: 10_000_000,
