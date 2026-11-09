@@ -138,6 +138,63 @@ Targets, not results:
 
 Do not choose an arbitrary percentage improvement before a human-adjudicated pilot establishes difficulty, agreement and baseline variance.
 
+## 6.1 Statistical protocol: avoid false precision in sequential comparisons
+
+### Sampling units and dependence
+
+The primary independent unit is the target/artifact/source-family episode, not an event, claim, prompt variant or repeated attempt. Repeated model runs are nested within episodes; observations derived from one acquisition root are not independent samples. When episodes share source roots, build families, test fixtures or upstream corpora, uncertainty must be clustered at that dependency family.
+
+For matched policies, compare the same episode, eligible candidate set, budget and event schedule. Report paired differences in:
+- false-ready and premature-strong-claim outcomes;
+- useful-claim coverage;
+- cost/actions/time to the first strongest justified claim;
+- false-stop and false-continue outcomes;
+- revocation recall and latency;
+- regret versus the finite-horizon oracle.
+
+Use a cluster bootstrap over independent episode/source-family units for paired differences where sample size supports it. Retain per-case values and the complete denominator. Do not bootstrap events as if each event were an independent episode.
+
+For binary false-ready rates, report an exact one-sided binomial upper confidence bound only when the unit-level independence assumption is defensible. With zero failures in n independent cases, the 95% upper bound is (1-0.05^{1/n}); approximately 299 independent cases with zero observed failures are needed to put that bound below 1%. Shared-source or repeated-variant clustering reduces the effective sample size. Zero observed failures in a small synthetic fixture is a control result, not a production error-rate estimate.
+
+### Time-to-readiness and competing terminal outcomes
+
+Do not report only mean cost among successful cases. Preserve:
+- reached a ready claim within budget;
+- reached only a bounded claim;
+- claim refuted or contradicted;
+- no eligible action / authorization unavailable;
+- evidence unavailable or censored;
+- budget exhausted while unresolved.
+
+Report the probability of reaching each terminal outcome within the declared budget and the cost distribution conditional on outcome. For time-to-readiness, treat budget exhaustion as an explicitly observed terminal outcome, not as an invisible dropped row. If survival-style curves or restricted mean time/cost-to-readiness are used, document the censoring assumptions and handle refutation, authorization failure and unavailable evidence as competing outcomes rather than assuming they are ordinary independent censoring.
+
+### Repeated runs and policy uncertainty
+
+Freeze model, system prompt, tools, decoding, planner settings, utility definitions, likelihood profiles and budgets. Use repeated seeds/runs per episode to estimate run-to-run variation, but aggregate uncertainty at episode/source-family level. Report median, p90 and tail cost; do not use a mean alone where a small number of long episodes dominate.
+
+Calibration is evaluated only for explicit probability forecasts (world-state priors, action likelihoods or event predictions) against held-out outcomes using proper scoring rules such as log score and Brier score, with reliability analysis. A confidence value attached to a claim is not a substitute for its proof obligations or the evidence-admissibility checks.
+
+### Hidden evaluation and contamination
+
+The public synthetic grader is development-only. A credible held-out evaluation needs:
+- private or access-controlled oracle labels and future event schedules;
+- source-family, artifact-family, build and domain separation between development and test;
+- no future-event text, labels, expected checkpoints or grader effects in the agent workspace;
+- preregistered inclusion/exclusion rules and scoring code;
+- independent audit of the agent-visible/grader boundary;
+- an auditable task-set digest and exact evaluator version in the existing #10314 run receipt.
+
+A filename, branch name or `access_policy` string is not access control. Hidden test labels must be inaccessible to the evaluated model and to any retrieval/indexing pipeline available to it.
+
+### Qualification progression
+
+1. Finite deterministic control suite: exact state transition, stop decision and revocation tests.
+2. Human-adjudicated pilot: dual independent labels for claim burden, admissible classes and defeater duties; report disagreements.
+3. Frozen public development set plus private held-out source-family set.
+4. Matched policy tournament under equal budgets, with cluster-aware paired intervals.
+5. Out-of-ensemble event shifts and adversarial delays/retractions.
+6. External reverse-engineering evaluation (SRE-Bench, AgentRE-Bench, Behavior2Code) reported in separate tables; never combine their official scores with REA's claim-assurance metrics.
+
 ## 7. Claim ceiling and integration
 
 This work defines a sequential evaluation protocol and synthetic development fixtures. It does not prove every conceivable defeater was imagined, likelihoods are calibrated, stopping is optimal outside the finite oracle, or observations are authentic/true. Compose with #11108/#11125/#11162 and the existing EIG/EVSI/minimax planners. Reuse #10314 receipts; do not create another planner, generic evidence graph, trust score or receipt format.
