@@ -7,6 +7,7 @@ use crate::protocol::{
     AgentIntervention, AgentMeasurement, AgentView, EpisodeStatus, StructureAccess,
 };
 use crate::{interaction, numeric};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
