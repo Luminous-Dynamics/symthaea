@@ -44,6 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         measurement_sigma: Some(0.05),
         noise_calibration: NoiseCalibrationStatus::SyntheticKnownAnswer,
         calibration_reference: Some("synthetic://calibration/v1".to_string()),
+        availability_probability: 1.0,
         cost: 1.0,
         exclusive_group: None,
         predictions: vec![
