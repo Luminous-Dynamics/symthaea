@@ -58,7 +58,7 @@ Use deterministic reference oracles for cash, positions, returns, costs, fills a
 
 ### Source timestamp precision
 
-Do not coerce date-only vintage metadata (including macro-series vintage dates or filingDate) to midnight for intraday backtests. The shared v0.1 kernel (#11241 / PR #11253) requires exact offset-aware availability instants; coarse or ambiguous timestamps remain indeterminate until the interval-censored extension in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256) proves the entire possible-availability interval is before the frontier.
+Do not coerce date-only vintage metadata (including macro-series vintage dates or filingDate) to midnight for intraday backtests. The shared v0.1 kernel (#11241 / PR #11253) requires exact offset-aware availability instants; coarse or ambiguous timestamps remain indeterminate until the interval-censored extension in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256) proves the entire possible-availability interval is before the frontier. Competing admissible revisions that branch from one predecessor must remain conflicted until an explicit resolution under [SYM-FIN-TIME-004 #11300](https://github.com/Luminous-Dynamics/symthaea/issues/11300); never select a branch by input order or recency alone.
 
 ## 4. Cohorts and split design
 
