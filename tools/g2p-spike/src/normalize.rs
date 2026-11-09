@@ -146,6 +146,9 @@ pub fn normalize_piper_english(
     prosody: &[Option<ProsodyInfo>],
 ) -> Result<RawPronunciationHypothesis, String> {
     validate_prosody_alignment(tokens, prosody)?;
+    if tokens.is_empty() {
+        return Err("Piper returned an empty token stream".into());
+    }
 
     let mut words = Vec::new();
     let mut current_tokens: Vec<String> = Vec::new();
@@ -168,7 +171,11 @@ pub fn normalize_piper_english(
             character_prosody: std::mem::take(current_prosody),
             syllable_boundaries: None,
             oov_status: "not_assessed",
-            resolution_status: "needs_review",
+            resolution_status: if has_ipa_hypothesis {
+                "needs_review"
+            } else {
+                "empty_hypothesis"
+            },
         });
     };
 
@@ -402,6 +409,53 @@ mod tests {
             normalized.words[0].ipa_character_tokens.len()
         );
         assert_eq!(normalized.words[0].character_prosody[0], raw_prosody_info(prosody[1]));
+    }
+
+    #[test]
+    fn punctuation_inside_a_word_does_not_split_its_word_slot() {
+        let tokens = vec![
+            "d".into(),
+            "o".into(),
+            "ʊ".into(),
+            "n".into(),
+            "'".into(),
+            "t".into(),
+            " ".into(),
+            "w".into(),
+            "i".into(),
+            "ː".into(),
+            "l".into(),
+            " ".into(),
+            " ".into(),
+            "g".into(),
+            "oʊ".into(),
+        ];
+        let prosody = vec![
+            info(0, 3),
+            info(0, 3),
+            info(0, 3),
+            info(0, 3),
+            None,
+            info(0, 3),
+            None,
+            info(1, 2),
+            info(1, 2),
+            info(1, 2),
+            info(1, 2),
+            None,
+            None,
+            info(0, 1),
+            info(0, 1),
+        ];
+        let normalized = normalize_piper_english(&tokens, &prosody).unwrap();
+        assert_eq!(normalized.words.len(), 3);
+        assert_eq!(normalized.words[0].raw_ipa, "doʊnt");
+        assert_eq!(normalized.words[1].raw_ipa, "");
+        assert_eq!(normalized.words[1].resolution_status, "empty_hypothesis");
+        assert_eq!(normalized.words[2].raw_ipa, "g oʊ".replace(' ', "").as_str());
+        assert_eq!(normalized.punctuation.len(), 1);
+        assert_eq!(normalized.punctuation[0].word_index, 0);
+        assert_eq!(normalized.punctuation[0].after_ipa_character_index, 4);
     }
 
     #[test]
