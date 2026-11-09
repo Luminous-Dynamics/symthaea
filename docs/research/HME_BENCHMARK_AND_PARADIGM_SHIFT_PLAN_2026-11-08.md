@@ -458,13 +458,13 @@ If the intersection is empty, fail closed. Then run the existing per-record glob
 A performance contradiction was caught in review: checking that group member IDs do not overlap inside every query would itself scan O(N) IDs, defeating the metadata-first optimization. The source now distinguishes two paths:
 
 - select_group_refinement_set: defensive path; it scans the member rosters and validates disjointness on every call.
-- select_group_refinement_set_with_partition_receipt: fast path; it verifies a build-time receipt against O(G) group identities/counts/generations/query digests and does not walk every member ID.
+- select_group_refinement_set_with_partition_receipt: fast path; it verifies a build-time receipt against O(G log G) group identities/counts/generations/query digests and does not walk every member ID.
 
 GroupPartitionCoverageReceipt::from_group_envelopes pays the full membership scan once at segment-build time. It requires both:
 - the authoritative eligible-record count from the pinned manifest/eligibility snapshot;
 - the authoritative digest of that exact eligible member-ID set.
 
-It verifies each group's roster digest, cross-group disjointness, a single manifest/eligibility generation, the aggregate eligible population and a deterministic digest over the group directory. The query path then checks the group records against this receipt in O(G). GroupScoreIntervalRecord also shares immutable member rosters and payload-digest rosters through Arc, avoiding a full member-ID vector clone when query plans are built.
+It verifies each group's roster digest, cross-group disjointness, a single manifest/eligibility generation, the aggregate eligible population and a deterministic digest over the group directory. The query path then checks the group records against this receipt in O(G log G). GroupScoreIntervalRecord also shares immutable member rosters and payload-digest rosters through Arc, avoiding a full member-ID vector clone when query plans are built.
 
 The receipt is still an in-memory prototype. It is not signed, serialized or authenticated on reopen. #10917 remains the owner of immutable segment serialization, checksums, manifest binding and reopen qualification. Do not use the fast path after process restart until the segment owner authenticates the stored receipt and the exact manifest generations.
 
@@ -493,7 +493,7 @@ The fixture now needs the authoritative eligible-member-set digest supplied by t
 
 This design changes where the exhaustive work happens:
 - once per immutable segment/eligibility snapshot: verify disjoint membership, authoritative eligible population and per-group payload rosters;
-- per query: scan group synopses (O(G));
+- per query: scan group synopses (O(G log G));
 - only for surviving groups: scan member interval metadata and compact reconstructions;
 - only for the final member refinement set: read original ContinuousHV payloads and run the canonical full-resolution scorer.
 
@@ -579,7 +579,7 @@ The newest useful comparisons are not all vector-search benchmarks:
 
 - PQR-Search challenges average-recall ANN with a per-query probability guarantee under insertions/deletions. HME's deterministic exact mode is a different guarantee class; HME's approximate mode should report a per-query recall distribution, not average Recall@K alone.
 - VectorDBBench added hosted VIBE datasets and 1M/10M/100M dataset profiles in its September 2026 release. This provides a useful system workload source, while HME must separately publish native high-dimensional profiles.
-- Agent Memory Leaderboard offers textual, coding and multimodal tracks with participant-hosted Add/Search APIs. Its official page still places Cycle 2 official publication in mid-November 2026. As of 9 November, do not describe Cycle 2 as an official published ranking; prepare an API-compatible system only after local correctness/governance qualification.
+- Agent Memory Leaderboard offers textual, coding and multimodal tracks with participant-hosted Add/Search APIs. As of 9 November, its Cycle 2 page displays provisional participant entries (e.g., MemoraX v0.5 at 62.00 overall, Claude-mem v12.1.1 at 52.00 and MemOS v2.0.1 at 52.00), while explicitly stating that official Cycle 2 results are due mid-November. Treat these as live provisional/status-labelled entries, not a finalized ranking or independent replication. Materials submission is closed; the future milestone is API compatibility for the next cycle, after local correctness/governance qualification.
 - COLLABMEM, TAME, TimlMemBench and MEMOBench expose routing, memory evolution, governed activation and process-level update/compression failures that answer-only benchmarks hide.
 
 The winning HME story should not be "another database with high QPS." It should be a reproducible point on a Pareto frontier: exactness/guarantee class, p99 latency, cold bytes, metadata bytes, update/compaction cost, memory quality, governance and lifecycle integrity. Publish the complete trade-off surface.
@@ -772,3 +772,106 @@ This keeps the quantized codec available for numerical research and future bench
 An independent JavaScript IEEE-754 model tested 296,608 coordinates: every quantizer boundary and its adjacent f32 values, plus 100,000 deterministic random values. It observed zero endpoint escapes; maximum decoded interval width in that sample was about 3.06e-5. This is useful arithmetic cross-checking only. It is not Rust execution, formal proof, target/compiler qualification, or permission to prune.
 
 The next measurements must count actual metadata bytes, allocations, group survival, member intervals scanned and physical original-payload bytes. The theoretical 4/8/12-byte-per-dimension profiles are only the first line in a cost model, not performance outcomes.
+
+
+## 17. Executable hierarchical-selector benchmark harness (2026-11-09)
+
+A dependency-free benchmark executable is now authored at:
+
+crates/domains/symthaea-memory/benches/hme_hierarchical_select.rs
+
+It is registered in crates/domains/symthaea-memory/Cargo.toml as a harness-free Cargo bench.
+
+Run:
+
+\`\`\`sh
+cargo bench -p symthaea-memory --bench hme_hierarchical_select
+\`\`\`
+
+Configurable inputs:
+
+\`\`\`sh
+HME_BENCH_RECORDS=4096 \\
+HME_BENCH_DIM=16384 \\
+HME_BENCH_GROUP_SIZE=64 \\
+HME_BENCH_TOP_K=10 \\
+HME_BENCH_REPEATS=21 \\
+cargo bench -p symthaea-memory --bench hme_hierarchical_select
+\`\`\`
+
+The harness:
+- generates deterministic, correlated high-dimensional ContinuousHV groups;
+- builds BoxAndBall group envelopes;
+- derives an authoritative eligible-member-set digest and a group partition receipt;
+- builds 1/1024-grid scalar reconstructions and verifies per-member residual receipts at admission;
+- compares defensive per-query disjointness validation with receipt-backed group selection;
+- materializes member intervals only for surviving groups;
+- performs hierarchical selection and exact-reranks the final payload set;
+- checks every run against the full canonical score/top-k oracle;
+- reports p50/p95/p99 timing, build cost, selector cost, logical exact-payload reads and metadata estimates.
+
+The reconstruction remains an unpacked f32 grid simulation. This is not a production compression format, not a physical disk-I/O benchmark, and not a substitute for #10917 segment/page telemetry. It emits physical_io_measured=false by design. The benchmark has been authored and registered but was not executed in this environment because cargo/rustc are unavailable.
+
+### Interpreting its output
+
+The benchmark separates:
+- one-time dataset and group-envelope build cost;
+- one-time partition receipt generation;
+- one-time member residual certificate admission;
+- defensive selector latency;
+- receipt-backed selector latency;
+- member interval materialization;
+- full hierarchical selection;
+- final exact rerank.
+
+It does not infer cold bytes from candidate counts as a measured result. Logical payload-byte estimates use the exact f32 dimension and final exact refinement count; physical savings require device/page counters from the immutable segment implementation.
+
+### Source review corrections
+
+Two trust-boundary corrections were made while authoring the harness:
+- Coordinate-extrema accessors now return Option<&[f32]> so BallOnly and QuantizedBoxAndBall modes cannot be mistaken for storing raw f32 extrema.
+- VerifiedMemberResidualCertificate and GroupMemberScoreIntervalRecord now carry the HME eligibility scope binding. A residual receipt or member interval built under another principal/policy/source-ledger/bitemporal context is rejected, even if group identity, payload digest and query vector happen to match.
+
+The new negative test constructs two otherwise identical group records under different policy scopes and checks that the member receipt cannot cross between them. This is authored source evidence, not executed Rust evidence.
+
+## 18. Current comparative scorecard — November 9, 2026
+
+### Vector retrieval and system baseline
+
+VectorDBBench's September 2026 update makes all 24 VIBE HDF5 datasets available through its existing Performance case and adds VDBBench multimodal Parquet workloads at 1M, 10M and 100M vectors. HME should adopt these workload datasets where the representation and metric match, but it must also publish a separate ContinuousHV native track at 16K, 64K, 128K and 256K dimensions. Results at standard 768/1536 embedding dimensions must not be presented as a direct native-HDC comparison.
+
+The HME comparison set should include:
+- exact scalar full-resolution ContinuousHV scan as the semantic oracle;
+- the existing HdcStore mmap scan and SQLite ConversationMemory path where the metric/profile matches;
+- FAISS Flat for exact vector-search ground truth;
+- HNSW, DiskANN/Vamana, IVF-PQ and ScaNN as conventional ANN baselines;
+- PQR-Search for per-query probabilistic guarantees;
+- Recast for storage-aware refinement and cold-payload behavior;
+- QBAT for query-specific work allocation;
+- VectorDBBench/VIBE for reproducible system-level workloads.
+
+Report exact top-k agreement, per-query Recall@K distribution, fraction below each \u03c4, p50/p95/p99, batch throughput, memory, metadata bytes, build/update/delete/compaction time, cold payload bytes, and energy if direct telemetry exists. Maintain separate result tables for exact, probabilistic-guarantee and empirical-ANN modes.
+
+### Agent-memory benchmark baseline
+
+As of November 9, the Agent Memory Leaderboard Cycle 2 page displays provisional participant statuses and scores but says official results will be released mid-November. Example visible entries include MemoraX v0.5 at 62.00 overall, Claude-mem v12.1.1 at 52.00 and MemOS v2.0.1 at 52.00. The page distinguishes Submitted (API) from Evaluated. HME must not claim a rank against these provisional entries, and Cycle 2 materials submission is already closed.
+
+The relevant public diagnostic suites now cover distinct functions:
+- MEME: aggregation, tracking, deletion, cascades and typed absence;
+- DyadMem: user-conditioned/relational capture and full-pipeline gaps;
+- COLLABMEM: role routing, sharing, visibility and provenance;
+- TAME / Trust-Memevo: safety and trustworthiness during benign memory evolution;
+- TimlMemBench: activation, restraint, scope, provenance and raw-session ingestion;
+- MEMOBench: process-level storage, update and compression for robotics;
+- MEMORA-Bench: retrospective multimodal faithfulness and prospective planning.
+
+Scores across these suites are not commensurate. Use a common frozen answerer/reader, controlled context tokens, fixed source trace and independent evaluators where each benchmark permits. Always report pipeline and memory-only controls separately.
+
+### Competitive hypotheses, not achieved results
+
+1. HME can outperform general-purpose agent memory on source-linked revision, typed absence, scope boundaries, eligibility-before-read and exact auditable retrieval.
+2. HME can outperform conventional ANN on guarantee strength for workloads where exact completeness is required, but it will not necessarily beat ANN latency or throughput.
+3. HME can outperform full scans on cold-payload bytes only if group/member bounds are tight enough to offset synopsis bytes and CPU cost.
+4. HME can outperform existing memory systems on lifecycle correctness only if raw ingestion, update/revocation, retention, activation and restraint are measured—not just final question answering.
+
+These hypotheses need independent benchmark runs. Current HME benchmark status remains authored-but-not-executed.
