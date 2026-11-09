@@ -138,10 +138,11 @@ struct StrategyFunctionLayout {
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, QbfStrategyCountError> {
-    let shift = u32::try_from(exponent)
-        .map_err(|_| QbfStrategyCountError::CandidateProfileSpaceOverflow {
+    let shift = u32::try_from(exponent).map_err(|_| {
+        QbfStrategyCountError::CandidateProfileSpaceOverflow {
             table_bits: exponent,
-        })?;
+        }
+    })?;
     1u128
         .checked_shl(shift)
         .ok_or(QbfStrategyCountError::CandidateProfileSpaceOverflow {
@@ -155,12 +156,10 @@ fn validate_source(
     budget: QbfStrategyCountBudget,
 ) -> Result<(), QbfStrategyCountError> {
     if problem.variables.len() != prefix.variable_count() {
-        return Err(
-            QbfStrategyCountError::MatrixPrefixVariableCountMismatch {
-                matrix: problem.variables.len(),
-                prefix: prefix.variable_count(),
-            },
-        );
+        return Err(QbfStrategyCountError::MatrixPrefixVariableCountMismatch {
+            matrix: problem.variables.len(),
+            prefix: prefix.variable_count(),
+        });
     }
     if problem.variables.len() > budget.max_variables {
         return Err(QbfStrategyCountError::VariableBudgetExceeded {
@@ -308,8 +307,8 @@ fn function_value_for_profile(
         .bit_offset
         .checked_add(row)
         .ok_or(QbfStrategyCountError::ResourceAccountingOverflow)?;
-    let shift = u32::try_from(bit_index)
-        .map_err(|_| QbfStrategyCountError::ResourceAccountingOverflow)?;
+    let shift =
+        u32::try_from(bit_index).map_err(|_| QbfStrategyCountError::ResourceAccountingOverflow)?;
     Ok(((profile_mask >> shift) & 1) != 0)
 }
 
@@ -468,20 +467,16 @@ mod tests {
         }
     }
 
-    fn independent_profile_count(
-        problem: &CnfProblem,
-        prefix: &ValidatedQuantifierPrefix,
-    ) -> u128 {
+    fn independent_profile_count(problem: &CnfProblem, prefix: &ValidatedQuantifierPrefix) -> u128 {
         let mut layouts = Vec::new();
         let mut universal_variables = Vec::new();
         for block in prefix.blocks() {
             for &variable in &block.variables {
                 match block.quantifier {
                     Quantifier::ForAll => universal_variables.push(variable),
-                    Quantifier::Exists => layouts.push((
-                        variable,
-                        prefix.existential_dependencies(variable).unwrap(),
-                    )),
+                    Quantifier::Exists => {
+                        layouts.push((variable, prefix.existential_dependencies(variable).unwrap()))
+                    }
                 }
             }
         }
@@ -526,12 +521,7 @@ mod tests {
             tables: &mut Vec<Vec<bool>>,
         ) -> u128 {
             if function_index == layouts.len() {
-                return u128::from(check_profile(
-                    problem,
-                    layouts,
-                    tables,
-                    universal_variables,
-                ));
+                return u128::from(check_profile(problem, layouts, tables, universal_variables));
             }
             let entries = 1usize << layouts[function_index].1.len();
             let mut winning = 0u128;
@@ -552,24 +542,15 @@ mod tests {
             winning
         }
 
-        enumerate(
-            0,
-            problem,
-            &layouts,
-            &universal_variables,
-            &mut Vec::new(),
-        )
+        enumerate(0, problem, &layouts, &universal_variables, &mut Vec::new())
     }
 
     fn assert_count(problem: &CnfProblem, prefix: &ValidatedQuantifierPrefix, expected: u128) {
         let report = count_qbf_winning_strategy_profiles(problem, prefix, budget()).unwrap();
         assert_eq!(report.winning_strategy_profiles, expected);
-        let decision = evaluate_qbf_with_strategy(
-            problem,
-            prefix,
-            QuantifiedEvaluationBudget::default(),
-        )
-        .unwrap();
+        let decision =
+            evaluate_qbf_with_strategy(problem, prefix, QuantifiedEvaluationBudget::default())
+                .unwrap();
         assert_eq!(report.winning_strategy_profiles > 0, decision.value);
         assert_eq!(
             report.candidate_profiles_checked,
@@ -637,10 +618,7 @@ mod tests {
     fn exists_forall_and_has_no_winning_constant_strategy() {
         let problem = CnfProblem {
             variables: vec!["x".into(), "y".into()],
-            clauses: vec![
-                vec![Literal::positive(0)],
-                vec![Literal::positive(1)],
-            ],
+            clauses: vec![vec![Literal::positive(0)], vec![Literal::positive(1)]],
         };
         let prefix = prefix(
             2,
@@ -690,10 +668,7 @@ mod tests {
             variables: vec!["x".into(), "y".into()],
             clauses: vec![vec![Literal::positive(0), Literal::positive(1)]],
         };
-        let prefix = prefix(
-            2,
-            vec![block(Quantifier::Exists, &[0, 1])],
-        );
+        let prefix = prefix(2, vec![block(Quantifier::Exists, &[0, 1])]);
         let report = count_qbf_winning_strategy_profiles(&problem, &prefix, budget()).unwrap();
         assert_eq!(report.winning_strategy_profiles, 3);
     }
@@ -714,10 +689,26 @@ mod tests {
         let problem = CnfProblem {
             variables: vec!["x".into(), "y".into(), "z".into()],
             clauses: vec![
-                vec![Literal::positive(0), Literal::positive(1), Literal::negative(2)],
-                vec![Literal::negative(0), Literal::negative(1), Literal::negative(2)],
-                vec![Literal::positive(0), Literal::negative(1), Literal::positive(2)],
-                vec![Literal::negative(0), Literal::positive(1), Literal::positive(2)],
+                vec![
+                    Literal::positive(0),
+                    Literal::positive(1),
+                    Literal::negative(2),
+                ],
+                vec![
+                    Literal::negative(0),
+                    Literal::negative(1),
+                    Literal::negative(2),
+                ],
+                vec![
+                    Literal::positive(0),
+                    Literal::negative(1),
+                    Literal::positive(2),
+                ],
+                vec![
+                    Literal::negative(0),
+                    Literal::positive(1),
+                    Literal::positive(2),
+                ],
             ],
         };
         let prefix = prefix(
@@ -764,8 +755,7 @@ mod tests {
             ..budget()
         };
         assert_eq!(
-            count_qbf_winning_strategy_profiles(&equality_problem(), &prefix, tight)
-                .unwrap_err(),
+            count_qbf_winning_strategy_profiles(&equality_problem(), &prefix, tight).unwrap_err(),
             QbfStrategyCountError::MatrixEvaluationBudgetExceeded {
                 required: 8,
                 limit: 4
@@ -829,8 +819,7 @@ mod tests {
                         count_qbf_winning_strategy_profiles(problem, &prefix, budget()).unwrap();
                     let expected = independent_profile_count(problem, &prefix);
                     assert_eq!(
-                        actual.winning_strategy_profiles,
-                        expected,
+                        actual.winning_strategy_profiles, expected,
                         "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
                     );
                 }
