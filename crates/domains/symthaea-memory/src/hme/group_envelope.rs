@@ -234,6 +234,8 @@ pub enum GroupEnvelopeError {
     MemberSetMismatch,
     /// The expected payload/content identity does not match.
     ContentDigestMismatch,
+    /// The experimental quantized synopsis profile has not been promoted for selector use.
+    UnqualifiedSynopsisMode,
     /// A kth threshold is not finite or outside the canonical score range.
     InvalidKthThreshold,
     /// A centroid radius could not be represented as a finite binary32 value.
@@ -273,6 +275,7 @@ impl std::fmt::Display for GroupEnvelopeError {
             ),
             Self::MemberSetMismatch => write!(f, "group envelope member set does not match pinned eligible membership"),
             Self::ContentDigestMismatch => write!(f, "group envelope content digest does not match pinned manifest"),
+            Self::UnqualifiedSynopsisMode => write!(f, "quantized group synopsis is research-only and cannot authorize selector pruning"),
             Self::InvalidKthThreshold => write!(f, "kth threshold must be finite and in [-1, 1]"),
             Self::InvalidRadius => write!(f, "group centroid radius is not finite"),
             Self::ScoreInterval(error) => write!(f, "group score interval failed: {error}"),
@@ -785,6 +788,49 @@ impl ContinuousHVGroupEnvelope {
         expected_member_set_digest: [u8; 32],
         expected_content_digest: [u8; 32],
     ) -> Result<ContinuousHVScoreInterval, GroupEnvelopeError> {
+        self.score_interval_for_snapshot_impl(
+            query,
+            expected_manifest_generation,
+            expected_eligibility_generation,
+            expected_member_set_digest,
+            expected_content_digest,
+            false,
+        )
+    }
+
+    #[cfg(test)]
+    fn score_interval_for_snapshot_allow_experimental_for_test(
+        &self,
+        query: &ContinuousHV,
+        expected_manifest_generation: u64,
+        expected_eligibility_generation: u64,
+        expected_member_set_digest: [u8; 32],
+        expected_content_digest: [u8; 32],
+    ) -> Result<ContinuousHVScoreInterval, GroupEnvelopeError> {
+        self.score_interval_for_snapshot_impl(
+            query,
+            expected_manifest_generation,
+            expected_eligibility_generation,
+            expected_member_set_digest,
+            expected_content_digest,
+            true,
+        )
+    }
+
+    fn score_interval_for_snapshot_impl(
+        &self,
+        query: &ContinuousHV,
+        expected_manifest_generation: u64,
+        expected_eligibility_generation: u64,
+        expected_member_set_digest: [u8; 32],
+        expected_content_digest: [u8; 32],
+        allow_experimental_quantized: bool,
+    ) -> Result<ContinuousHVScoreInterval, GroupEnvelopeError> {
+        if self.mode == GroupEnvelopeMode::QuantizedBoxAndBall
+            && !allow_experimental_quantized
+        {
+            return Err(GroupEnvelopeError::UnqualifiedSynopsisMode);
+        }
         if self.manifest_generation != expected_manifest_generation {
             return Err(GroupEnvelopeError::ManifestGenerationMismatch {
                 envelope_generation: self.manifest_generation,
@@ -1297,7 +1343,7 @@ mod tests {
         );
 
         let quantized_interval = quantized
-            .score_interval_for_snapshot(
+            .score_interval_for_snapshot_allow_experimental_for_test(
                 &query,
                 51,
                 8,
@@ -1339,6 +1385,16 @@ mod tests {
         }
         assert_ne!(full.content_digest(), quantized.content_digest());
         assert_ne!(quantized.content_digest(), ball.content_digest());
+        assert!(matches!(
+            quantized.score_interval_for_snapshot(
+                &query,
+                51,
+                8,
+                quantized.member_set_digest(),
+                quantized.content_digest(),
+            ),
+            Err(GroupEnvelopeError::UnqualifiedSynopsisMode)
+        ));
     }
 
     #[test]
