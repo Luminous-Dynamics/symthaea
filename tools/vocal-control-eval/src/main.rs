@@ -5,7 +5,8 @@
 use std::process::ExitCode;
 
 use symthaea_vocal_control_eval::{
-    ControlCase, ControlSuite, Qualification, evaluate, evaluate_suite,
+    ControlCase, ControlSuite, NoOpCalibration, Qualification, calibrate_noop, evaluate,
+    evaluate_suite,
 };
 
 fn main() -> ExitCode {
@@ -28,7 +29,12 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     })?;
     let bytes = std::fs::read(path)?;
     let value: serde_json::Value = serde_json::from_slice(&bytes)?;
-    if value.get("replicates").is_some() {
+    if value.get("runs").is_some() {
+        let calibration: NoOpCalibration = serde_json::from_value(value)?;
+        let report = calibrate_noop(&calibration).map_err(std::io::Error::other)?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        Ok(true)
+    } else if value.get("replicates").is_some() {
         let suite: ControlSuite = serde_json::from_value(value)?;
         let report = evaluate_suite(&suite).map_err(std::io::Error::other)?;
         println!("{}", serde_json::to_string_pretty(&report)?);
