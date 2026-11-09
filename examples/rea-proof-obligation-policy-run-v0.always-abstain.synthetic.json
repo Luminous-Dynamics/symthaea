@@ -1,0 +1,97 @@
+{
+  "schema_version": "0.1.0",
+  "dataset_id": "rea-proof-obligation-acquisition",
+  "policy_id": "always-abstain-control-v0",
+  "cases": [
+    {
+      "case_id": "REA-POA-001",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-002",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-003",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-004",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-005",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-006",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-007",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-008",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-009",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-010",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-011",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-012",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-013",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-014",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-015",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-016",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-017",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-018",
+      "selected_experiment_id": "abstain",
+      "claimed_ready_before_action": false
+    }
+  ]
+}
