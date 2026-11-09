@@ -37,6 +37,7 @@ struct Scenario {
     outcome_metric: String,
     outcome_unit: String,
     outcome_direction: String,
+    parallel_trends_tolerance: f64,
     matched_sets: Vec<MatchedSet>,
 }
 
@@ -60,6 +61,7 @@ struct UnitRecord {
     post_configuration_digest: String,
     follow_up_status: String,
     censoring_reason: Option<String>,
+    pretrend: Measurement,
     pre: Measurement,
     post: Option<Measurement>,
     intervention: InterventionRecord,
@@ -171,6 +173,15 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
     {
         return Err(format!("unit {} has invalid configuration or matching digest", unit.unit_id));
     }
+    if !unit.pretrend.value.is_finite()
+        || !is_digest(&unit.pretrend.observation_digest)
+        || !is_digest(&unit.pretrend.protocol_digest)
+        || !is_digest(&unit.pretrend.condition_digest)
+        || unit.pretrend.protocol_digest != unit.pre.protocol_digest
+        || unit.pretrend.condition_digest != unit.pre.condition_digest
+    {
+        return Err(format!("unit {} has invalid pre-trend reference measurement", unit.unit_id));
+    }
     if !unit.pre.value.is_finite()
         || !is_digest(&unit.pre.observation_digest)
         || !is_digest(&unit.pre.protocol_digest)
@@ -259,6 +270,9 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
     if !nonempty(&scenario.outcome_metric) || !nonempty(&scenario.outcome_unit) {
         return Err("outcome metric and unit are required".to_owned());
     }
+    if !scenario.parallel_trends_tolerance.is_finite() || scenario.parallel_trends_tolerance < 0.0 {
+        return Err("parallel-trends tolerance must be finite and non-negative".to_owned());
+    }
     let direction = match scenario.outcome_direction.as_str() {
         "higher_is_better" => 1.0,
         "lower_is_better" => -1.0,
@@ -320,6 +334,33 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
             did_effect: None,
             disposition: "abstain".to_owned(),
             reason: Some("censored follow-up prevents the v0.1 fixed-horizon DiD estimate".to_owned()),
+        });
+    }
+
+    let mut pretrend_violation = false;
+    for set in &sets {
+        let treated_pretrend =
+            direction * (set.treated.pre.value - set.treated.pretrend.value);
+        let comparator_pretrend =
+            direction * (set.comparator.pre.value - set.comparator.pretrend.value);
+        let gap = (treated_pretrend - comparator_pretrend).abs();
+        if !gap.is_finite() {
+            return Err("non-finite pre-trend diagnostic".to_owned());
+        }
+        if gap > scenario.parallel_trends_tolerance {
+            pretrend_violation = true;
+        }
+    }
+    if pretrend_violation {
+        return Ok(Evaluation {
+            scenario_id: scenario.scenario_id,
+            matched_pair_count: sets.len(),
+            censored_unit_ids: Vec::new(),
+            treated_mean_change: None,
+            comparator_mean_change: None,
+            did_effect: None,
+            disposition: "abstain".to_owned(),
+            reason: Some("pre-intervention trends differ beyond the declared tolerance".to_owned()),
         });
     }
 
@@ -508,9 +549,9 @@ mod tests {
     #[test]
     fn frozen_corpus_checks_positive_null_harm_censoring_and_rejection() {
         let report = report();
-        assert_eq!(report.scenario_count, 6);
+        assert_eq!(report.scenario_count, 7);
         assert_eq!(report.estimated_count, 3);
-        assert_eq!(report.abstain_count, 1);
+        assert_eq!(report.abstain_count, 2);
         assert_eq!(report.rejected_count, 2);
     }
 
@@ -535,6 +576,17 @@ mod tests {
         assert_eq!(case.disposition, "abstain");
         assert_eq!(case.censored_unit_count, 1);
         assert_eq!(case.censored_unit_ids, vec!["treated-2"]);
+        assert!(case.did_effect.is_none());
+    }
+
+    #[test]
+    fn divergent_preintervention_trends_force_abstention() {
+        let report = report();
+        let case = report.cases.iter()
+            .find(|case| case.case_id == "pretrend-violation-abstains")
+            .expect("pre-trend negative control");
+        assert_eq!(case.disposition, "abstain");
+        assert!(case.reason.as_deref().unwrap().contains("pre-intervention trends"));
         assert!(case.did_effect.is_none());
     }
 
