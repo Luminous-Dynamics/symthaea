@@ -86,7 +86,7 @@ jobs:
             (.out_of_catalogue.action_records | length) == (.out_of_catalogue.observation_count + 1) and
             .out_of_catalogue.action_records[-1].resulting_status == "submitted" and
             (.out_of_catalogue.action_records[-1].action.action == "submit") and
-            (.out_of_catalogue.action_records | length) == (.out_of_catalogue.observation_count + 1) and
+            (.a0.action_records | length) == (.a0.observation_count + 1) and
             (.a2.action_records | length) == (.a2.observation_count + 1) and
             .a0.initial_evidence_prefix == .a0.action_records[0].evidence_prefix_before and
             .a2.initial_evidence_prefix == .a2.action_records[0].evidence_prefix_before and
