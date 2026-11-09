@@ -21,21 +21,23 @@ fn signature_for(
     match dimension {
         2 => {
             let causet = CausalSet2D::sprinkle_fixed_cardinality(seed, EVENT_COUNT, 1.0)?;
-            let ordering_fraction = causet.ordering_fraction().ok_or("missing ordering fraction")?;
+            let ordering_fraction = causet
+                .ordering_fraction()
+                .ok_or("missing ordering fraction")?;
             let scalar = estimate_dimension_from_ordering_fraction(ordering_fraction, 8.0)
                 .unwrap_or(f64::NAN);
-            let signature =
-                JointCausalSetSignature::from_causal_set_1p1(&causet, PROFILE_BINS)?;
+            let signature = JointCausalSetSignature::from_causal_set_1p1(&causet, PROFILE_BINS)?;
             Ok((signature, scalar))
         }
         3 | 4 => {
             let causet =
                 CausalSetNd::sprinkle_fixed_cardinality(seed, EVENT_COUNT, dimension, 1.0)?;
-            let ordering_fraction = causet.ordering_fraction().ok_or("missing ordering fraction")?;
+            let ordering_fraction = causet
+                .ordering_fraction()
+                .ok_or("missing ordering fraction")?;
             let scalar = estimate_dimension_from_ordering_fraction(ordering_fraction, 8.0)
                 .unwrap_or(f64::NAN);
-            let signature =
-                JointCausalSetSignature::from_causal_set_nd(&causet, PROFILE_BINS)?;
+            let signature = JointCausalSetSignature::from_causal_set_nd(&causet, PROFILE_BINS)?;
             Ok((signature, scalar))
         }
         _ => Err("pilot supports D=2,3,4 only".into()),
@@ -47,11 +49,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("epistemic_status=GAUSSIAN_SYNTHETIC_LIKELIHOOD_PILOT_NOT_COVERAGE_QUALIFIED");
     println!("calibration_unit=one_complete_independent_fixed_cardinality_sprinkling");
     println!("features=ILR(normalized_interval_profile)+dimension_conditioned_longest_chain");
-    println!("anti_double_counting=ordering_fraction_and_BDG_bracket_not_added_as_independent_features");
+    println!(
+        "anti_double_counting=ordering_fraction_and_BDG_bracket_not_added_as_independent_features"
+    );
     println!("event_count={EVENT_COUNT},profile_bins={PROFILE_BINS}");
-    println!("calibration_replicates={CALIBRATION_REPLICATES},qualification_replicates={QUALIFICATION_REPLICATES}");
+    println!(
+        "calibration_replicates={CALIBRATION_REPLICATES},qualification_replicates={QUALIFICATION_REPLICATES}"
+    );
     println!("diagonal_shrinkage={DIAGONAL_SHRINKAGE},relative_ridge={RELATIVE_RIDGE}");
-    println!("true_dimension,replicate,seed,joint_map,joint_p_d2,joint_p_d3,joint_p_d4,joint_entropy,MM_dimension,MM_abs_error");
+    println!(
+        "true_dimension,replicate,seed,joint_map,joint_p_d2,joint_p_d3,joint_p_d4,joint_entropy,MM_dimension,MM_abs_error"
+    );
 
     let mut models = Vec::new();
     for dimension in 2..=4 {
@@ -121,10 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             println!(
                 "{true_dimension},{replicate},{seed},{prediction},{:.9},{:.9},{:.9},{:.9},{scalar_dimension:.9},{scalar_error}",
-                probabilities[0],
-                probabilities[1],
-                probabilities[2],
-                posterior.entropy_nats,
+                probabilities[0], probabilities[1], probabilities[2], posterior.entropy_nats,
             );
         }
     }
@@ -148,6 +153,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("MM_mean_absolute_error_on_supported_cases={mean_scalar_error:.9}");
     println!("calibration_seed_range=0xC411BA7E_by_dimension_and_replicate");
     println!("qualification_seed_range=0x9A11DA7A_by_dimension_and_replicate");
-    println!("claim_boundary=finite_simulation_pilot; posterior_coverage_and_out_of_family_abstention_not_yet_qualified");
+    println!(
+        "claim_boundary=finite_simulation_pilot; posterior_coverage_and_out_of_family_abstention_not_yet_qualified"
+    );
     Ok(())
 }
