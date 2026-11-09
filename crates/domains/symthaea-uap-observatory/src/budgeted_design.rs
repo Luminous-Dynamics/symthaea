@@ -1533,7 +1533,9 @@ mod tests {
         assert!(
             (independent_clocks[0].information_gain_nats - independent_expected).abs() < 1.0e-12
         );
-        assert!(independent_clocks[0].information_gain_nats > shared_clock[0].information_gain_nats);
+        assert!(
+            independent_clocks[0].information_gain_nats > shared_clock[0].information_gain_nats
+        );
     }
 
     #[test]
