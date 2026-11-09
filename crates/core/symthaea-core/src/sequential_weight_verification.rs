@@ -108,6 +108,50 @@ pub struct SequentialWeightVerificationReport {
     pub status: SequentialWeightVerificationStatus,
 }
 
+/// Restartable checkpoint of one in-progress candidate's ordered paired-loss stream.
+///
+/// It contains the episode observations needed to rebuild the running mean,
+/// duplicate-ID set, and BLAKE3 stream digest. Protect the serialized content
+/// as evaluation evidence; the checkpoint digest is integrity detection, not
+/// authentication.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialWeightVerificationCheckpoint {
+    pub format_version: u32,
+    pub binding: WeightVerificationBinding,
+    pub config: SequentialWeightVerificationConfig,
+    pub observations: Vec<PairedLossObservation>,
+    pub report_digest: String,
+    pub checkpoint_digest: String,
+}
+
+#[derive(Serialize)]
+struct VerifierCheckpointDigestClaims<'a> {
+    format_version: u32,
+    binding: &'a WeightVerificationBinding,
+    config: SequentialWeightVerificationConfig,
+    observations: &'a [PairedLossObservation],
+    report_digest: &'a str,
+}
+
+fn verifier_checkpoint_digest(
+    checkpoint: &SequentialWeightVerificationCheckpoint,
+) -> Result<String, SequentialWeightVerificationError> {
+    let claims = VerifierCheckpointDigestClaims {
+        format_version: checkpoint.format_version,
+        binding: &checkpoint.binding,
+        config: checkpoint.config,
+        observations: &checkpoint.observations,
+        report_digest: &checkpoint.report_digest,
+    };
+    let encoded = serde_json::to_vec(&claims)
+        .map_err(|_| SequentialWeightVerificationError::VerifierCheckpointSerialization)?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-weight-verification-checkpoint-v1\\0");
+    hasher.update(&(encoded.len() as u64).to_le_bytes());
+    hasher.update(&encoded);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 /// Failure from sequential repair verification.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum SequentialWeightVerificationError {
@@ -151,6 +195,14 @@ pub enum SequentialWeightVerificationError {
     CampaignSnapshotDigestMismatch,
     #[error("failed to serialize campaign snapshot")]
     CampaignSnapshotSerialization,
+    #[error("unsupported verifier checkpoint version {0}")]
+    UnsupportedVerifierCheckpointVersion(u32),
+    #[error("verifier checkpoint digest does not match its contents")]
+    VerifierCheckpointDigestMismatch,
+    #[error("verifier checkpoint does not reproduce its claimed statistical report")]
+    VerifierCheckpointReportMismatch,
+    #[error("failed to serialize verifier checkpoint")]
+    VerifierCheckpointSerialization,
 }
 
 /// Deterministic, integrity-digested checkpoint of a sequential repair campaign.
@@ -359,6 +411,7 @@ pub struct SequentialWeightVerification {
     observation_count: u64,
     mean_improvement: f64,
     observation_hasher: blake3::Hasher,
+    observations: Vec<PairedLossObservation>,
     terminal: bool,
 }
 
@@ -381,6 +434,7 @@ impl SequentialWeightVerification {
             observation_count: 0,
             mean_improvement: 0.0,
             observation_hasher,
+            observations: Vec::new(),
             terminal: false,
         })
     }
@@ -430,6 +484,7 @@ impl SequentialWeightVerification {
             .update(&observation.baseline_loss.to_bits().to_le_bytes());
         self.observation_hasher
             .update(&observation.candidate_loss.to_bits().to_le_bytes());
+        self.observations.push(observation);
 
         let report = self.current_report()?;
         self.terminal = matches!(
@@ -446,6 +501,63 @@ impl SequentialWeightVerification {
         &self,
     ) -> Result<SequentialWeightVerificationReport, SequentialWeightVerificationError> {
         self.current_report()
+    }
+
+    /// Create a restartable checkpoint of this candidate's full ordered evidence stream.
+    pub fn checkpoint(
+        &self,
+    ) -> Result<SequentialWeightVerificationCheckpoint, SequentialWeightVerificationError> {
+        let report = self.current_report()?;
+        let mut checkpoint = SequentialWeightVerificationCheckpoint {
+            format_version: 1,
+            binding: self.binding.clone(),
+            config: self.config,
+            observations: self.observations.clone(),
+            report_digest: report.report_digest,
+            checkpoint_digest: String::new(),
+        };
+        checkpoint.checkpoint_digest = verifier_checkpoint_digest(&checkpoint)?;
+        Ok(checkpoint)
+    }
+
+    /// Restore a verifier by replaying every paired observation into fresh state.
+    ///
+    /// Duplicate IDs, terminal-state overflow, malformed losses, changed report
+    /// claims, and a checkpoint digest mismatch all fail closed.
+    pub fn from_checkpoint(
+        checkpoint: SequentialWeightVerificationCheckpoint,
+    ) -> Result<Self, SequentialWeightVerificationError> {
+        if checkpoint.format_version != 1 {
+            return Err(
+                SequentialWeightVerificationError::UnsupportedVerifierCheckpointVersion(
+                    checkpoint.format_version,
+                ),
+            );
+        }
+        validate_binding(&checkpoint.binding)?;
+        validate_config(checkpoint.config)?;
+        validate_hex_digest(&checkpoint.report_digest, "report_digest")?;
+        validate_hex_digest(&checkpoint.checkpoint_digest, "checkpoint_digest")?;
+        if checkpoint.observations.len() > checkpoint.config.maximum_observations as usize {
+            return Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch);
+        }
+        let expected_digest = verifier_checkpoint_digest(&checkpoint)?;
+        if expected_digest != checkpoint.checkpoint_digest {
+            return Err(SequentialWeightVerificationError::VerifierCheckpointDigestMismatch);
+        }
+
+        let mut verifier = Self::from_binding(checkpoint.binding, checkpoint.config)?;
+        for observation in checkpoint.observations {
+            if verifier.terminal {
+                return Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch);
+            }
+            verifier.observe(observation)?;
+        }
+        let restored_report = verifier.current_report()?;
+        if restored_report.report_digest != checkpoint.report_digest {
+            return Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch);
+        }
+        Ok(verifier)
     }
 
     fn current_report(
@@ -980,6 +1092,61 @@ mod tests {
         }
         assert_eq!(report.status, SequentialWeightVerificationStatus::BenefitEstablished);
         report
+    }
+
+    #[test]
+    fn verifier_checkpoint_round_trip_preserves_ordered_stream_and_continuation() {
+        let mut campaign = campaign(0.05, 1_000);
+        let mut original = candidate(&mut campaign, 'b', 'd');
+        for index in 0..12 {
+            original
+                .observe(observation(index, 0.8, 0.6))
+                .expect("initial paired observations");
+        }
+        let checkpoint = original.checkpoint().expect("candidate checkpoint");
+        let encoded = serde_json::to_vec(&checkpoint).expect("serialize checkpoint");
+        let decoded: SequentialWeightVerificationCheckpoint =
+            serde_json::from_slice(&encoded).expect("deserialize checkpoint");
+        let mut restored =
+            SequentialWeightVerification::from_checkpoint(decoded).expect("restore checkpoint");
+        assert_eq!(
+            original.report().expect("original report").report_digest,
+            restored.report().expect("restored report").report_digest
+        );
+        for index in 12..30 {
+            let next = observation(index, 0.9, 0.5);
+            let original_report = original.observe(next.clone()).expect("original continuation");
+            let restored_report = restored.observe(next).expect("restored continuation");
+            assert_eq!(original_report.report_digest, restored_report.report_digest);
+        }
+    }
+
+    #[test]
+    fn verifier_checkpoint_rejects_tampering_and_inconsistent_replay() {
+        let mut campaign = campaign(0.05, 1_000);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
+        for index in 0..10 {
+            verifier
+                .observe(observation(index, 0.8, 0.6))
+                .expect("paired observation");
+        }
+        let checkpoint = verifier.checkpoint().expect("checkpoint");
+
+        let mut altered_observation = checkpoint.clone();
+        altered_observation.observations[0].candidate_loss = 0.9;
+        assert!(matches!(
+            SequentialWeightVerification::from_checkpoint(altered_observation),
+            Err(SequentialWeightVerificationError::VerifierCheckpointDigestMismatch)
+        ));
+
+        let mut altered_claim = checkpoint;
+        altered_claim.report_digest = digest('f');
+        altered_claim.checkpoint_digest = verifier_checkpoint_digest(&altered_claim)
+            .expect("recompute digest after modifying the claim");
+        assert!(matches!(
+            SequentialWeightVerification::from_checkpoint(altered_claim),
+            Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch)
+        ));
     }
 
     #[test]
