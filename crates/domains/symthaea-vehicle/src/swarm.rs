@@ -12,7 +12,10 @@ use std::collections::VecDeque;
 
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
-use crate::types::{MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road};
+use crate::types::{
+    MeshSignal, SimulatorOracleFollowTarget, VehicleCommand, VehicleState,
+    pd_cruise_baseline_with_road,
+};
 
 /// Configuration for a swarm simulation.
 #[derive(Debug, Clone)]
@@ -31,6 +34,13 @@ pub struct SwarmConfig {
     pub mesh_latency: f64,
     /// Confidence decay rate per meter of distance.
     pub confidence_decay_per_meter: f64,
+    /// Maximum lateral difference from ego's road projection for a simulator lead (m).
+    /// This is a synthetic single-lane curriculum parameter, not a perception threshold.
+    pub follow_lateral_tolerance_m: f64,
+    /// Maximum along-road range for the Follow teacher (m).
+    pub follow_max_range_m: f64,
+    /// Maximum age of an oracle actor snapshot relative to the ego observation (s).
+    pub follow_target_max_age_s: f64,
 }
 
 impl SwarmConfig {
@@ -43,6 +53,9 @@ impl SwarmConfig {
             target_speed: 13.4,
             mesh_latency: 0.01,
             confidence_decay_per_meter: 0.005,
+            follow_lateral_tolerance_m: 1.8,
+            follow_max_range_m: 200.0,
+            follow_target_max_age_s: 0.02,
         }
     }
 
@@ -55,6 +68,9 @@ impl SwarmConfig {
             target_speed: 13.4,
             mesh_latency: 0.01,
             confidence_decay_per_meter: 0.005,
+            follow_lateral_tolerance_m: 1.8,
+            follow_max_range_m: 200.0,
+            follow_target_max_age_s: 0.02,
         }
     }
 }
@@ -99,7 +115,21 @@ pub struct SwarmSimulator {
 
 impl SwarmSimulator {
     /// Create a new swarm with peers staggered along the road ahead of the origin.
+    /// The default absolute simulation time origin is zero.
     pub fn new(config: SwarmConfig) -> Self {
+        Self::new_at_time(config, 0.0)
+    }
+
+    /// Create a new swarm aligned to an existing ego simulation clock.
+    ///
+    /// Use this when the ego simulator has already been primed before the swarm
+    /// is constructed. Peer state timestamps, broadcast-history keys and the
+    /// swarm clock all begin at the same absolute time.
+    pub fn new_at_time(config: SwarmConfig, start_time_s: f64) -> Self {
+        assert!(
+            start_time_s.is_finite() && start_time_s >= 0.0,
+            "swarm time origin must be finite and non-negative"
+        );
         let mut peers = Vec::with_capacity(config.num_peers);
 
         for i in 0..config.num_peers {
@@ -108,11 +138,12 @@ impl SwarmSimulator {
             let s = (i as f64 + 1.0) * config.initial_spacing;
             let (x, y, heading) = config.road.position_at(s);
             sim.set_position(x, y, heading);
-            // Seed the broadcast history with the initial state so the
-            // mesh is never empty at t=0.
+            sim.set_simulation_time(start_time_s);
+
+            // Seed history using the same absolute time as the peer and swarm clocks.
             let initial = sim.state().clone();
             let mut history = VecDeque::new();
-            history.push_back((0.0, initial));
+            history.push_back((start_time_s, initial));
             peers.push(PeerVehicle {
                 sim,
                 id: i as u64 + 1,
@@ -124,7 +155,7 @@ impl SwarmSimulator {
         Self {
             config,
             peers,
-            sim_time: 0.0,
+            sim_time: start_time_s,
         }
     }
 
@@ -159,7 +190,11 @@ impl SwarmSimulator {
         // Record this step's broadcasts and drop frames nobody can still
         // receive (older than the latency window, plus one frame of slack).
         self.sim_time += dt;
-        let prune_before = self.sim_time - self.config.mesh_latency - 2.0 * dt;
+        let history_horizon = self
+            .config
+            .mesh_latency
+            .max(self.config.follow_target_max_age_s);
+        let prune_before = self.sim_time - history_horizon - 2.0 * dt;
         for peer in &mut self.peers {
             peer.history
                 .push_back((self.sim_time, peer.sim.state().clone()));
@@ -185,6 +220,91 @@ impl SwarmSimulator {
         for peer in &mut self.peers {
             peer.is_braking = false;
         }
+    }
+
+    /// Select the nearest same-road lead actor from simulator truth at or before the
+    /// ego observation time. This bypasses the delayed mesh channel and is available
+    /// only to the simulation training/benchmark teacher; it is not a deployable
+    /// perception or V2X interface.
+    pub fn nearest_simulator_truth_follow_target(
+        &self,
+        ego_state: &VehicleState,
+    ) -> Option<SimulatorOracleFollowTarget> {
+        if !ego_state.timestamp.is_finite() {
+            return None;
+        }
+
+        let ego_projection = self
+            .config
+            .road
+            .project(ego_state.position_x, ego_state.position_y);
+        let road = &self.config.road;
+        let mut best: Option<SimulatorOracleFollowTarget> = None;
+
+        for peer in &self.peers {
+            let Some((snapshot_time_s, peer_state)) = peer
+                .history
+                .iter()
+                .rev()
+                .find(|(time_s, _)| *time_s <= ego_state.timestamp + 1e-9)
+            else {
+                continue;
+            };
+
+            let age_s = ego_state.timestamp - *snapshot_time_s;
+            if !age_s.is_finite()
+                || age_s < -1e-9
+                || age_s > self.config.follow_target_max_age_s + 1e-9
+            {
+                continue;
+            }
+
+            let peer_projection = road.project(peer_state.position_x, peer_state.position_y);
+            let lateral_delta =
+                (peer_projection.lateral_offset - ego_projection.lateral_offset).abs();
+            if lateral_delta > self.config.follow_lateral_tolerance_m {
+                continue;
+            }
+
+            let dx = peer_state.position_x - ego_state.position_x;
+            let dy = peer_state.position_y - ego_state.position_y;
+            let local_forward =
+                dx * ego_projection.road_heading.cos() + dy * ego_projection.road_heading.sin();
+            if !local_forward.is_finite() || local_forward <= 0.0 {
+                continue;
+            }
+
+            let raw_gap = peer_projection.s - ego_projection.s;
+            let gap_m = if road.closed && road.total_length > 0.0 {
+                raw_gap.rem_euclid(road.total_length)
+            } else {
+                raw_gap
+            };
+            if !gap_m.is_finite() || gap_m <= 0.0 || gap_m > self.config.follow_max_range_m {
+                continue;
+            }
+
+            let ego_speed_along_road =
+                ego_state.speed * (ego_state.heading - ego_projection.road_heading).cos();
+            let peer_speed_along_road =
+                peer_state.speed * (peer_state.heading - peer_projection.road_heading).cos();
+            let candidate = SimulatorOracleFollowTarget::from_simulator_snapshot(
+                peer.id,
+                gap_m,
+                peer_speed_along_road - ego_speed_along_road,
+                *snapshot_time_s,
+                self.config.follow_target_max_age_s,
+            );
+            if !candidate.is_current_at(ego_state.timestamp) {
+                continue;
+            }
+
+            if best.is_none_or(|current| candidate.gap_m() < current.gap_m()) {
+                best = Some(candidate);
+            }
+        }
+
+        best
     }
 
     /// Compute mesh signals from all peers relative to the ego vehicle.
@@ -313,6 +433,98 @@ mod tests {
             "Nearest should not be too close: {}",
             ego.nearest_peer_distance
         );
+    }
+
+    #[test]
+    fn test_follow_oracle_selects_nearest_same_road_actor() {
+        let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(2));
+        let ego = VehicleState::cruising(13.4);
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("same-road lead should be available from simulator truth");
+
+        assert_eq!(target.actor_id(), 1);
+        assert!((target.gap_m() - 30.0).abs() < 1e-6);
+        assert!((target.relative_speed_mps()).abs() < 1e-6);
+        assert_eq!(target.snapshot_time_s(), ego.timestamp);
+        assert!(target.is_current_at(ego.timestamp));
+    }
+
+    #[test]
+    fn test_follow_oracle_never_uses_future_peer_snapshot() {
+        let mut swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        swarm.step(0.005);
+        let ego = VehicleState::cruising(13.4); // observation remains at t=0
+
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("initial simulator snapshot should remain available");
+        assert_eq!(target.snapshot_time_s(), 0.0);
+        assert!(target.snapshot_time_s() <= ego.timestamp);
+    }
+
+    #[test]
+    fn test_follow_oracle_rejects_off_lane_peer() {
+        let mut swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        swarm.peers[0].history[0].1.position_y = 3.0;
+        let ego = VehicleState::cruising(13.4);
+        assert!(swarm.nearest_simulator_truth_follow_target(&ego).is_none());
+    }
+
+    #[test]
+    fn test_follow_oracle_rejects_stale_peer_snapshot() {
+        let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        let mut ego = VehicleState::cruising(13.4);
+        ego.timestamp = 1.0;
+        assert!(swarm.nearest_simulator_truth_follow_target(&ego).is_none());
+    }
+
+    #[test]
+    fn test_follow_oracle_projects_relative_speed() {
+        let mut swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        swarm.peers[0].history[0].1.speed = 10.0;
+        let ego = VehicleState::cruising(13.4);
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("lead actor should be available");
+        assert!((target.relative_speed_mps() - (10.0 - 13.4)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_follow_oracle_aligns_to_nonzero_simulation_time_origin() {
+        let start_time_s = 0.75;
+        let swarm = SwarmSimulator::new_at_time(SwarmConfig::convoy_straight(1), start_time_s);
+        let mut ego = VehicleState::cruising(13.4);
+        ego.timestamp = start_time_s;
+
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("aligned non-zero clock origin should yield a current target");
+        assert_eq!(target.snapshot_time_s(), start_time_s);
+        assert_eq!(swarm.peers[0].sim.state().timestamp, start_time_s);
+        assert!(target.is_current_at(ego.timestamp));
+    }
+
+    #[test]
+    fn test_follow_oracle_keeps_nonzero_clock_origin_after_step() {
+        let start_time_s = 2.25;
+        let mut swarm = SwarmSimulator::new_at_time(SwarmConfig::convoy_straight(1), start_time_s);
+        swarm.step(0.005);
+        let mut ego = VehicleState::cruising(13.4);
+        ego.timestamp = start_time_s;
+
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("the exact pre-step snapshot should remain available");
+        assert_eq!(target.snapshot_time_s(), start_time_s);
+        assert!(target.snapshot_time_s() <= ego.timestamp);
+    }
+
+    #[test]
+    fn test_follow_oracle_returns_none_without_peers() {
+        let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(0));
+        let ego = VehicleState::cruising(13.4);
+        assert!(swarm.nearest_simulator_truth_follow_target(&ego).is_none());
     }
 
     #[test]

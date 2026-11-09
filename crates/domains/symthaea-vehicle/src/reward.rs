@@ -8,7 +8,7 @@
 //! safe, forward momentum. Deviations from that prior generate prediction error
 //! (free energy), which the LTC controller learns to minimize.
 
-use crate::types::{VehicleState, VehicleTask};
+use crate::types::{SimulatorOracleFollowTarget, VehicleState, VehicleTask};
 
 /// Core safety reward: penalizes dangerous states.
 ///
@@ -75,23 +75,49 @@ pub fn smoothness_reward(state: &VehicleState) -> f64 {
     lon_penalty * lat_penalty
 }
 
-/// Follow-distance reward: how well the vehicle maintains target gap to lead vehicle.
-///
-/// Returns 1.0 when at exact target gap, decays with gap error (Gaussian, σ=10m).
-pub fn follow_distance_reward(state: &VehicleState, target_gap: f64) -> f64 {
-    let gap_error = (state.nearest_peer_distance - target_gap).abs();
+/// Legacy Follow-distance reward API. It has no evidence-bearing target argument,
+/// so it intentionally returns zero rather than treating a mesh aggregate as local
+/// perception or simulator ground truth.
+#[deprecated(note = "use follow_distance_reward_with_oracle with an explicit typed target")]
+pub fn follow_distance_reward(_state: &VehicleState, _target_gap: f64) -> f64 {
+    0.0
+}
+
+/// Follow-distance reward from an explicit, current simulator-oracle target.
+/// Returns zero for absent, stale, future-dated or malformed target evidence.
+pub fn follow_distance_reward_with_oracle(
+    state: &VehicleState,
+    target_gap: f64,
+    target: Option<&SimulatorOracleFollowTarget>,
+) -> f64 {
+    let Some(target) = target.filter(|target| target.is_current_at(state.timestamp)) else {
+        return 0.0;
+    };
+    let gap_error = (target.gap_m() - target_gap).abs();
     (-gap_error / 10.0).exp()
 }
 
-/// Combined episode reward for a given task.
-///
-/// Weighted combination of component rewards, tuned per task.
-/// `target_heading` is the road heading at the vehicle's projected position (0.0 for straight roads).
+/// Backwards-compatible episode reward entry point. Follow receives no gap reward
+/// unless the caller opts into the evidence-bearing variant below.
 pub fn episode_reward(
     state: &VehicleState,
     task: &VehicleTask,
     target_speed: f64,
     target_heading: f64,
+) -> f64 {
+    episode_reward_with_follow_target(state, task, target_speed, target_heading, None)
+}
+
+/// Combined episode reward using an explicit simulator-oracle Follow target.
+///
+/// Weighted components are unchanged; only the provenance of the Follow gap
+/// signal changes. Missing or stale targets contribute zero gap reward.
+pub fn episode_reward_with_follow_target(
+    state: &VehicleState,
+    task: &VehicleTask,
+    target_speed: f64,
+    target_heading: f64,
+    follow_target: Option<&SimulatorOracleFollowTarget>,
 ) -> f64 {
     let safe = safety_reward(state);
     let speed = speed_reward(state, target_speed);
@@ -105,8 +131,8 @@ pub fn episode_reward(
             0.30 * safe + 0.25 * lane + 0.20 * speed + 0.15 * heading + 0.10 * smooth
         }
         VehicleTask::Follow { target_gap } => {
-            // Safety + gap-keeping + speed matching for adaptive cruise
-            let gap = follow_distance_reward(state, *target_gap);
+            // Safety + evidence-qualified gap-keeping + speed matching for adaptive cruise
+            let gap = follow_distance_reward_with_oracle(state, *target_gap, follow_target);
             0.25 * safe + 0.30 * speed + 0.25 * gap + 0.10 * lane + 0.10 * smooth
         }
         VehicleTask::LaneChange => {
@@ -219,18 +245,61 @@ mod tests {
     }
 
     #[test]
-    fn test_follow_reward_on_target() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 30.0;
-        let r = follow_distance_reward(&state, 30.0);
-        assert!((r - 1.0).abs() < 1e-6, "At target gap should be 1.0: {r}");
+    fn test_follow_reward_on_oracle_target() {
+        let state = VehicleState::cruising(13.4);
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            30.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
+        let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
+        assert!(
+            (reward - 1.0).abs() < 1e-6,
+            "At target gap should be 1.0: {reward}"
+        );
     }
 
     #[test]
-    fn test_follow_reward_off_target() {
+    fn test_follow_reward_off_target_uses_oracle_gap() {
+        let state = VehicleState::cruising(13.4);
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            60.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
+        let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
+        assert!(reward < 0.1, "Far from target gap should be low: {reward}");
+    }
+
+    #[test]
+    fn test_follow_reward_missing_or_stale_target_is_zero() {
+        let state = VehicleState::cruising(13.4);
+        assert_eq!(follow_distance_reward_with_oracle(&state, 30.0, None), 0.0);
+        let stale = SimulatorOracleFollowTarget::from_simulator_snapshot(1, 30.0, 0.0, -1.0, 0.05);
+        assert_eq!(
+            follow_distance_reward_with_oracle(&state, 30.0, Some(&stale)),
+            0.0
+        );
+    }
+
+    #[test]
+    fn test_follow_reward_does_not_use_legacy_mesh_distance() {
         let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 60.0;
-        let r = follow_distance_reward(&state, 30.0);
-        assert!(r < 0.1, "Far from target gap should be low: {r}");
+        state.nearest_peer_distance = 30.0;
+        let reward = episode_reward_with_follow_target(
+            &state,
+            &VehicleTask::Follow { target_gap: 30.0 },
+            13.4,
+            0.0,
+            None,
+        );
+        assert!(
+            (reward - 0.75).abs() < 1e-6,
+            "Missing oracle evidence must not award a mesh-derived gap reward: {reward}"
+        );
     }
 }

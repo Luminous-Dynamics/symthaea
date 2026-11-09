@@ -1,0 +1,493 @@
+{
+  "schema": "za-lex-resource-audit/v1",
+  "source": {
+    "repository": "https://github.com/NWU-MuST/za_lex",
+    "branch": "master",
+    "commit": "59a93768d72b5804f8b87bc3dd409320c8f0c328",
+    "snapshot_pushed_at": "2017-12-14T07:45:13Z",
+    "inspected_at": "2026-11-08",
+    "source_commit_is_stale": true,
+    "note": "The upstream tree is pinned for reproducibility. Do not track floating master. This manifest records source evidence and file-level Git blob IDs; it does not copy or integrate third-party dictionary data."
+  },
+  "status": {
+    "integration": "not_integrated",
+    "rights_review": "metadata_audited_per_file_not_legal_opinion",
+    "synthesis_training": "not_authorized_by_this_manifest",
+    "use_policy": "candidate_lexical_and_rule_resources_only; require separate provenance, licensing, pronunciation adjudication, and language-profile validation before production use"
+  },
+  "language_profiles": [
+    {
+      "id": "af-ZA",
+      "upstream_directory": "data/afr",
+      "description": "Afrikaans",
+      "resource_files": [
+        "data/afr/COPYRIGHT",
+        "data/afr/graphemeset.txt",
+        "data/afr/phonememap.ipa-hts.tsv",
+        "data/afr/phonemeset.json",
+        "data/afr/pronundict.txt",
+        "data/afr/ref/rcrl_apd_20110311/LICENCE",
+        "data/afr/ref/rcrl_apd_20110311/rcrl_apd.1.4.1.txt"
+      ],
+      "license": "CC-BY-SA-2.5-ZA",
+      "rights_notes": [
+        "The current derived dictionary is described as a derivative of the RCRL Afrikaans Pronunciation Dictionary v1.4.1.",
+        "The source dictionary itself carries CC BY-SA 2.5 South Africa; attribution and ShareAlike obligations must be retained for redistributed adaptations.",
+        "Stress markings in the derived resource are explicitly marked work-in-progress in its README.",
+        "Upstream documents 24,174 entries for the source RCRL dictionary; this is not a count of independently validated modern speech/singing entries."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": false,
+        "syllabification_scripts": false,
+        "morphology": false
+      },
+      "qualification": "lexicon candidate only; dialect and stress adjudication required"
+    },
+    {
+      "id": "en-ZA",
+      "upstream_directory": "data/eng",
+      "description": "South African English",
+      "resource_files": [
+        "data/eng/COPYRIGHT",
+        "data/eng/graphemeset.txt",
+        "data/eng/phonememap.ipa-hts.tsv",
+        "data/eng/phonemeset.json",
+        "data/eng/pronundict.txt"
+      ],
+      "license": "CC-BY-4.0-with-derived-NCHLT-CC-BY-3.0-attribution",
+      "rights_notes": [
+        "Directory notice identifies CC BY 4.0 for the South African English resource and states it includes work derived from NCHLT pronunciation dictionaries attributed to DAC, CSIR and NWU under CC BY 3.0.",
+        "The README describes the dictionary as a minimal manually created subset for a particular speech corpus.",
+        "The README explicitly notes one pronunciation per entry and unresolved homonym disambiguation."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": false,
+        "syllabification_scripts": false,
+        "morphology": false
+      },
+      "qualification": "narrow lexical seed, not a general English G2P model"
+    },
+    {
+      "id": "st-ZA",
+      "upstream_directory": "data/sot",
+      "description": "Sesotho / Southern Sotho",
+      "resource_files": [
+        "data/sot/COPYRIGHT",
+        "data/sot/g2p.translit.txt",
+        "data/sot/graphemeset.txt",
+        "data/sot/phonememap.ipa-nchlt.tsv",
+        "data/sot/phonemeset.json",
+        "data/sot/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.dict",
+        "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.rules"
+      ],
+      "license": "CC-BY-3.0",
+      "rights_notes": [
+        "Directory notice and NCHLT release license both identify CC BY 3.0; retain attribution to DAC, CSIR and NWU and include license notice with redistributions.",
+        "Rule README comments claim 14,941/15,000 matches to the NCHLT-inlang dictionary; the same-source comparison is not independent accuracy evidence.",
+        "Rules document orthographic/dialect conventions and known unresolved exceptions."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_scripts": true,
+        "morphology": false
+      },
+      "qualification": "candidate profile; independently adjudicated speaker set required"
+    },
+    {
+      "id": "tn-ZA",
+      "upstream_directory": "data/tsn",
+      "description": "Setswana",
+      "resource_files": [
+        "data/tsn/COPYRIGHT",
+        "data/tsn/g2p.translit.txt",
+        "data/tsn/graphemeset.txt",
+        "data/tsn/phonememap.ipa-nchlt.tsv",
+        "data/tsn/phonemeset.json",
+        "data/tsn/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.dict",
+        "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.rules"
+      ],
+      "license": "CC-BY-3.0",
+      "rights_notes": [
+        "Directory notice and NCHLT release license identify CC BY 3.0; preserve attribution to DAC, CSIR and NWU.",
+        "Rule comments claim 14,811/15,000 matches when simplifying vowel diacritics; this is a historical same-source dictionary match, not independent speaker accuracy.",
+        "Rule comments note unresolved phonological/orthographic distinctions for e/o."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_scripts": true,
+        "morphology": false
+      },
+      "qualification": "candidate profile; independent references and tone/stress requirements need review"
+    },
+    {
+      "id": "xh-ZA",
+      "upstream_directory": "data/xho",
+      "description": "isiXhosa",
+      "resource_files": [
+        "data/xho/COPYRIGHT",
+        "data/xho/g2p.translit.txt",
+        "data/xho/graphemeset.txt",
+        "data/xho/phonememap.ipa-nchlt.tsv",
+        "data/xho/phonemeset.json",
+        "data/xho/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.dict",
+        "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.rules"
+      ],
+      "license": "CC-BY-3.0",
+      "rights_notes": [
+        "Directory notice and NCHLT release license identify CC BY 3.0; preserve attribution to DAC, CSIR and NWU.",
+        "Rule comments claim 14,999/15,000 matches to the NCHLT-inlang dictionary; same-source matching does not establish independent accuracy.",
+        "Phone inventory includes dental, lateral and post-alveolar click series, aspiration/ejective contrasts, and syllabic nasals.",
+        "Rule comments explicitly state the NCHLT phone set does not encode tone or vowel length and represents nasal click sequences as nasal plus click; a singing profile needs separate tone/phonation research."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_scripts": true,
+        "morphology": false
+      },
+      "qualification": "candidate profile; click/tone and dialect review required"
+    },
+    {
+      "id": "zu-ZA",
+      "upstream_directory": "data/zul",
+      "description": "isiZulu",
+      "resource_files": [
+        "data/zul/COPYRIGHT",
+        "data/zul/g2p.translit.txt",
+        "data/zul/graphemeset.txt",
+        "data/zul/morphrules.dcg.txt",
+        "data/zul/morphrules.descr.json",
+        "data/zul/phonememap.ipa-nchlt.tsv",
+        "data/zul/phonemeset.json",
+        "data/zul/ref/nchlt_release_20130328/LICENSE.txt",
+        "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.dict",
+        "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.rules"
+      ],
+      "license": "CC-BY-3.0",
+      "rights_notes": [
+        "Directory notice and NCHLT release license identify CC BY 3.0; preserve attribution to DAC, CSIR and NWU.",
+        "Rule comments claim 14,942/15,000 matches to the NCHLT-inlang dictionary; the rules also explain one optional change that changes the historical match count. These are not independent accuracy results.",
+        "Phone inventory includes click series and complex click articulations; a generic English IPA inventory is insufficient.",
+        "The G2P rule header contains a likely copy/paste error saying it transcribes isiXhosa even though the directory and subsequent text identify isiZulu; upstream provenance and profile must be corrected before use.",
+        "Rule comments explicitly state NCHLT 2013 does not encode lexical tone; a singing profile needs separate tone/context evaluation.",
+        "Directory also contains morphology rules, a distinct capability to validate rather than assume."
+      ],
+      "capabilities": {
+        "dictionary": true,
+        "g2p_rules": true,
+        "syllabification_scripts": true,
+        "morphology": true
+      },
+      "qualification": "candidate profile; morphology, tone and dialect review required"
+    }
+  ],
+  "files": [
+    {
+      "path": "COPYRIGHT",
+      "git_blob_sha1": "c8beee0a4e723ff9226f890dbbab80f5ac823a7e",
+      "size_bytes": 902,
+      "purpose": "upstream repository code notice"
+    },
+    {
+      "path": "LICENCE-APACHE",
+      "git_blob_sha1": "16fe87b06e802f094b3fbb0894b137bca2b16ef1",
+      "size_bytes": 10847,
+      "purpose": "upstream scripts license"
+    },
+    {
+      "path": "LICENCE-MIT",
+      "git_blob_sha1": "4cc2d95cc131e266d5e57b532c976fc9421e7e43",
+      "size_bytes": 1218,
+      "purpose": "upstream scripts license"
+    },
+    {
+      "path": "README.md",
+      "git_blob_sha1": "5129c42decde469f1cef0c3f5795321d8a7be241",
+      "size_bytes": 3164,
+      "purpose": "upstream scope and dependency metadata"
+    },
+    {
+      "path": "data/afr/COPYRIGHT",
+      "git_blob_sha1": "99de10954edbd118e5d2055698b5d6aeadc4b10d",
+      "size_bytes": 555,
+      "purpose": "Afrikaans data license and attribution"
+    },
+    {
+      "path": "data/afr/graphemeset.txt",
+      "git_blob_sha1": "deb2eed00e4464e005eaba5ddedd9385b7978a73",
+      "size_bytes": 90,
+      "purpose": "Afrikaans grapheme inventory"
+    },
+    {
+      "path": "data/afr/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "f18a5ccd023dc1f3878bbbdd6751691f5cf4ae32",
+      "size_bytes": 259,
+      "purpose": "Afrikaans IPA-to-HTS phone map"
+    },
+    {
+      "path": "data/afr/phonemeset.json",
+      "git_blob_sha1": "8d3eceeab40e06c2ecccc1fa4b6f8416c454bfa1",
+      "size_bytes": 3553,
+      "purpose": "Afrikaans phone inventory"
+    },
+    {
+      "path": "data/afr/pronundict.txt",
+      "git_blob_sha1": "44b828de8c2e66bbecc4ec75d72cba6710bad919",
+      "size_bytes": 1126187,
+      "purpose": "derived Afrikaans pronunciation dictionary"
+    },
+    {
+      "path": "data/afr/ref/rcrl_apd_20110311/LICENCE",
+      "git_blob_sha1": "71ce8dd12f043629c1135fef138ecd7b50f24c56",
+      "size_bytes": 711,
+      "purpose": "original Afrikaans dictionary license"
+    },
+    {
+      "path": "data/afr/ref/rcrl_apd_20110311/rcrl_apd.1.4.1.txt",
+      "git_blob_sha1": "51ef3861059381a21326db9ba0976bb97cf014fe",
+      "size_bytes": 655176,
+      "purpose": "original RCRL Afrikaans dictionary"
+    },
+    {
+      "path": "data/eng/COPYRIGHT",
+      "git_blob_sha1": "112b03a59d0eae0fd3a17adad7c4bdac00d484cb",
+      "size_bytes": 717,
+      "purpose": "South African English content notice and inherited source attribution"
+    },
+    {
+      "path": "data/eng/graphemeset.txt",
+      "git_blob_sha1": "4f3f4c6e2511705daee0a04dfbf6bbf8b816e709",
+      "size_bytes": 54,
+      "purpose": "South African English grapheme inventory"
+    },
+    {
+      "path": "data/eng/phonememap.ipa-hts.tsv",
+      "git_blob_sha1": "edfce2107d55952f76c47e6350e8abd4e063359a",
+      "size_bytes": 237,
+      "purpose": "South African English IPA-to-HTS phone map"
+    },
+    {
+      "path": "data/eng/phonemeset.json",
+      "git_blob_sha1": "02b1da7dcaf6d0d3411a54bc2f7fbcba35d4614b",
+      "size_bytes": 3854,
+      "purpose": "South African English phone inventory"
+    },
+    {
+      "path": "data/eng/pronundict.txt",
+      "git_blob_sha1": "d8aefd53d498d4cfcca2051f0ed4943cf8a36f8b",
+      "size_bytes": 66890,
+      "purpose": "manual South African English pronunciation dictionary"
+    },
+    {
+      "path": "data/sot/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "Sesotho data license and attribution"
+    },
+    {
+      "path": "data/sot/g2p.translit.txt",
+      "git_blob_sha1": "5a8c50e46c6857a437cf7ef2a89bb8f390e3c8b4",
+      "size_bytes": 3338,
+      "purpose": "Sesotho context-sensitive grapheme-to-phone rules"
+    },
+    {
+      "path": "data/sot/graphemeset.txt",
+      "git_blob_sha1": "eb8d979ea4b9b83562d0213b81938f61f23daadc",
+      "size_bytes": 63,
+      "purpose": "Sesotho grapheme inventory"
+    },
+    {
+      "path": "data/sot/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "b6b68b84efb47f4586be3b4d8272ec3da2eb6bf8",
+      "size_bytes": 317,
+      "purpose": "Sesotho IPA-to-NCHLT phone map"
+    },
+    {
+      "path": "data/sot/phonemeset.json",
+      "git_blob_sha1": "c7e7901e5675656a6a04fb701745ad3604a6220c",
+      "size_bytes": 4338,
+      "purpose": "Sesotho phone and phonotactic inventory"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "NCHLT Sesotho/related dictionary data license"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.dict",
+      "git_blob_sha1": "f431a9f5d047bb8e378421566d8f6fca95b6545b",
+      "size_bytes": 403990,
+      "purpose": "NCHLT Sesotho pronunciation dictionary"
+    },
+    {
+      "path": "data/sot/ref/nchlt_release_20130328/nchlt_sesotho.rules",
+      "git_blob_sha1": "2762bcfa8292b05b80537b0a1e671fe684672320",
+      "size_bytes": 910,
+      "purpose": "NCHLT Sesotho pronunciation rule data"
+    },
+    {
+      "path": "data/tsn/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "Setswana data license and attribution"
+    },
+    {
+      "path": "data/tsn/g2p.translit.txt",
+      "git_blob_sha1": "563fa242590ead292ff3c2da82ed975145517598",
+      "size_bytes": 1974,
+      "purpose": "Setswana context-sensitive grapheme-to-phone rules"
+    },
+    {
+      "path": "data/tsn/graphemeset.txt",
+      "git_blob_sha1": "c2180cf407a1593a1e5c6ecade6c47ff8cd9aa8d",
+      "size_bytes": 63,
+      "purpose": "Setswana grapheme inventory"
+    },
+    {
+      "path": "data/tsn/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "c92722c923c2a582704858855b551010c6d7b74c",
+      "size_bytes": 236,
+      "purpose": "Setswana IPA-to-NCHLT phone map"
+    },
+    {
+      "path": "data/tsn/phonemeset.json",
+      "git_blob_sha1": "5d32f9a198c0f5dfbd27fa09fc618423d9dce87c",
+      "size_bytes": 3612,
+      "purpose": "Setswana phone and phonotactic inventory"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "NCHLT Setswana dictionary data license"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.dict",
+      "git_blob_sha1": "32264296797fc6a7b7421338ccce34f4ea00f61b",
+      "size_bytes": 417998,
+      "purpose": "NCHLT Setswana pronunciation dictionary"
+    },
+    {
+      "path": "data/tsn/ref/nchlt_release_20130328/nchlt_setswana.rules",
+      "git_blob_sha1": "62d92d81c971161ba692c382c63716ddcf756740",
+      "size_bytes": 936,
+      "purpose": "NCHLT Setswana pronunciation rule data"
+    },
+    {
+      "path": "data/xho/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "isiXhosa data license and attribution"
+    },
+    {
+      "path": "data/xho/g2p.translit.txt",
+      "git_blob_sha1": "f466a59f29a5c0841d3ad29593cb7cd9f3b5c88c",
+      "size_bytes": 3735,
+      "purpose": "isiXhosa context-sensitive grapheme-to-phone rules"
+    },
+    {
+      "path": "data/xho/graphemeset.txt",
+      "git_blob_sha1": "4f3f4c6e2511705daee0a04dfbf6bbf8b816e709",
+      "size_bytes": 54,
+      "purpose": "isiXhosa grapheme inventory"
+    },
+    {
+      "path": "data/xho/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "ce25f36b1551244e56e11a23219a386469929b41",
+      "size_bytes": 384,
+      "purpose": "isiXhosa IPA-to-NCHLT phone map"
+    },
+    {
+      "path": "data/xho/phonemeset.json",
+      "git_blob_sha1": "2216556d0513d9be912f2858180eae3715b50978",
+      "size_bytes": 5307,
+      "purpose": "isiXhosa phone inventory including click series"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "NCHLT isiXhosa dictionary data license"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.dict",
+      "git_blob_sha1": "e4d66b010112ccb8fd2c5bf1e90a8e0e3e574fd1",
+      "size_bytes": 481451,
+      "purpose": "NCHLT isiXhosa pronunciation dictionary"
+    },
+    {
+      "path": "data/xho/ref/nchlt_release_20130328/nchlt_isixhosa.rules",
+      "git_blob_sha1": "ce67432dd392cfd6dcf39e89e7150aada5bf9509",
+      "size_bytes": 1099,
+      "purpose": "NCHLT isiXhosa pronunciation rule data"
+    },
+    {
+      "path": "data/zul/COPYRIGHT",
+      "git_blob_sha1": "c006f9aba4e294c5fca245596a8994099b7eb372",
+      "size_bytes": 631,
+      "purpose": "isiZulu data license and attribution"
+    },
+    {
+      "path": "data/zul/g2p.translit.txt",
+      "git_blob_sha1": "84446ac7e1f00b0dc242fdc9c25d9b0096195de7",
+      "size_bytes": 2252,
+      "purpose": "isiZulu context-sensitive grapheme-to-phone rules"
+    },
+    {
+      "path": "data/zul/graphemeset.txt",
+      "git_blob_sha1": "4f3f4c6e2511705daee0a04dfbf6bbf8b816e709",
+      "size_bytes": 54,
+      "purpose": "isiZulu grapheme inventory"
+    },
+    {
+      "path": "data/zul/morphrules.dcg.txt",
+      "git_blob_sha1": "c89dad46a392b34cac1a483491b5c1fb524865d6",
+      "size_bytes": 8477,
+      "purpose": "isiZulu morphological grammar rules"
+    },
+    {
+      "path": "data/zul/morphrules.descr.json",
+      "git_blob_sha1": "f6b678d6bb96305d1afaccde19f1f5b4c8fa2f76",
+      "size_bytes": 14205,
+      "purpose": "isiZulu morphological grammar description"
+    },
+    {
+      "path": "data/zul/phonememap.ipa-nchlt.tsv",
+      "git_blob_sha1": "a853c7461f1d60b33c8c11cc1e3953c94335b937",
+      "size_bytes": 309,
+      "purpose": "isiZulu IPA-to-NCHLT phone map"
+    },
+    {
+      "path": "data/zul/phonemeset.json",
+      "git_blob_sha1": "cecdc5535315009f8d4efd00ccfbac82f8612d97",
+      "size_bytes": 5154,
+      "purpose": "isiZulu phone inventory including click series"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/LICENSE.txt",
+      "git_blob_sha1": "5fdf08a1d9c7b01830c4c26ceb3ff0f57543d765",
+      "size_bytes": 2051,
+      "purpose": "NCHLT isiZulu dictionary data license"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.dict",
+      "git_blob_sha1": "bc4af3e3e1648bc43b7464de7450910b9484e967",
+      "size_bytes": 468519,
+      "purpose": "NCHLT isiZulu pronunciation dictionary"
+    },
+    {
+      "path": "data/zul/ref/nchlt_release_20130328/nchlt_isizulu.rules",
+      "git_blob_sha1": "bbcc29fb32ba916736bebfd98f66fc995928d214",
+      "size_bytes": 887,
+      "purpose": "NCHLT isiZulu pronunciation rule data"
+    }
+  ]
+}

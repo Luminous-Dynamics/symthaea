@@ -8,6 +8,82 @@ use serde::{Deserialize, Serialize};
 /// Number of actuators: steering, throttle, brake.
 pub const NUM_ACTUATORS: usize = 3;
 
+/// Explicit simulation-oracle target used by the Follow curriculum.
+///
+/// This capability-bearing value is intentionally not serializable or
+/// deserializable, and its fields are private. Its only constructor is
+/// crate-private; the current constructor call site is the simulator selector.
+/// Other crate-internal code remains trusted. It is not a local perception
+/// observation or a V2X claim and must never come from legacy mesh aggregates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SimulatorOracleFollowTarget {
+    actor_id: u64,
+    gap_m: f64,
+    relative_speed_mps: f64,
+    snapshot_time_s: f64,
+    max_age_s: f64,
+}
+
+impl SimulatorOracleFollowTarget {
+    /// Construct an oracle capability inside the vehicle simulation crate.
+    ///
+    /// This is crate-private so external callers cannot mint simulator-truth
+    /// evidence by struct construction or serde deserialization.
+    pub(crate) const fn from_simulator_snapshot(
+        actor_id: u64,
+        gap_m: f64,
+        relative_speed_mps: f64,
+        snapshot_time_s: f64,
+        max_age_s: f64,
+    ) -> Self {
+        Self {
+            actor_id,
+            gap_m,
+            relative_speed_mps,
+            snapshot_time_s,
+            max_age_s,
+        }
+    }
+
+    /// Stable actor identifier within the synthetic swarm scenario.
+    pub fn actor_id(&self) -> u64 {
+        self.actor_id
+    }
+
+    /// Positive along-road distance from ego to the lead actor (m).
+    pub fn gap_m(&self) -> f64 {
+        self.gap_m
+    }
+
+    /// Lead actor longitudinal speed minus ego longitudinal speed (m/s).
+    pub fn relative_speed_mps(&self) -> f64 {
+        self.relative_speed_mps
+    }
+
+    /// Simulation time of the actor snapshot used to produce this target (s).
+    pub fn snapshot_time_s(&self) -> f64 {
+        self.snapshot_time_s
+    }
+
+    /// Maximum allowed age of the source snapshot for this training step (s).
+    pub fn max_age_s(&self) -> f64 {
+        self.max_age_s
+    }
+
+    /// Whether this oracle snapshot is finite, forward-facing and current at now_s.
+    pub fn is_current_at(&self, now_s: f64) -> bool {
+        self.gap_m.is_finite()
+            && self.gap_m > 0.0
+            && self.relative_speed_mps.is_finite()
+            && self.snapshot_time_s.is_finite()
+            && now_s.is_finite()
+            && self.max_age_s.is_finite()
+            && self.max_age_s >= 0.0
+            && self.snapshot_time_s <= now_s + 1e-9
+            && now_s - self.snapshot_time_s <= self.max_age_s + 1e-9
+    }
+}
+
 /// Number of state channels for HDC encoding (20D: 14 proprioceptive + 2 road + 4 mesh).
 pub const NUM_STATE_CHANNELS: usize = 20;
 
@@ -494,6 +570,71 @@ pub struct VehicleTelemetry {
     pub tau_factor: f32,
     pub control_effort: f32,
     pub mesh_peers_visible: usize,
+    /// Whether an admissible simulator-oracle target was available for Follow at this step.
+    #[serde(default)]
+    pub follow_oracle_available: bool,
+    /// Simulator actor selected by the Follow oracle, if available.
+    pub follow_oracle_actor_id: Option<u64>,
+    /// Along-road gap to the selected simulator actor (m).
+    pub follow_oracle_gap_m: Option<f64>,
+    /// Lead actor speed minus ego speed along the road (m/s).
+    pub follow_oracle_relative_speed_mps: Option<f64>,
+    /// Age of the exact simulator snapshot relative to the ego observation (s).
+    pub follow_oracle_snapshot_age_s: Option<f64>,
+    /// Whether this step may update controller weights.
+    #[serde(default)]
+    pub training_enabled: bool,
+    /// Whether simulator-oracle data influenced either the blended action or BPTT target.
+    #[serde(default)]
+    pub follow_oracle_used_for_policy: bool,
+    /// Raw learned-controller proposal before teacher blending or exploration.
+    #[serde(default)]
+    pub student_proposal_steering: f32,
+    #[serde(default)]
+    pub student_proposal_throttle: f32,
+    #[serde(default)]
+    pub student_proposal_brake: f32,
+    /// Privileged PD teacher action before blending. None means it was not computed.
+    #[serde(default)]
+    pub teacher_target_steering: Option<f32>,
+    #[serde(default)]
+    pub teacher_target_throttle: Option<f32>,
+    #[serde(default)]
+    pub teacher_target_brake: Option<f32>,
+    /// Mean absolute difference across steering/throttle/brake between student and teacher.
+    #[serde(default)]
+    pub student_teacher_action_delta_l1: Option<f32>,
+    /// Whether the teacher action was blended into the executed proposal this step.
+    #[serde(default)]
+    pub teacher_action_used_for_blend: bool,
+    /// Whether the teacher action was supplied as the BPTT target on this step.
+    #[serde(default)]
+    pub teacher_action_used_for_supervision: bool,
+    /// Whether the teacher action was computed only as an evaluator-side shadow
+    /// reference and was not used for blending, supervision or controller updates.
+    #[serde(default)]
+    pub teacher_action_evaluation_only: bool,
+    /// Whether a teacher action was recorded only as a reference on this step,
+    /// without action blending or BPTT supervision.
+    #[serde(default)]
+    pub teacher_action_reference_only: bool,
+    /// Actual teacher blend coefficient; zero when no teacher blend occurred.
+    #[serde(default)]
+    pub pd_teacher_blend_weight: f32,
+    /// Proposal after teacher blending but before exploration noise.
+    #[serde(default)]
+    pub blended_action_steering: f32,
+    #[serde(default)]
+    pub blended_action_throttle: f32,
+    #[serde(default)]
+    pub blended_action_brake: f32,
+    /// Command sent to the physics simulator after exploration and clamping.
+    #[serde(default)]
+    pub executed_action_steering: f32,
+    #[serde(default)]
+    pub executed_action_throttle: f32,
+    #[serde(default)]
+    pub executed_action_brake: f32,
 }
 
 /// Configuration for the vehicle training system.
@@ -696,20 +837,27 @@ pub fn pd_cruise_baseline_with_road(
     }
 }
 
-/// PD cruise-control for Follow task: modulates speed based on gap to nearest peer.
+/// PD cruise-control teacher for Follow, using an explicit simulator-oracle target.
 ///
-/// Same lateral/heading control as `pd_cruise_baseline_with_road`, but the speed
-/// command is adjusted by the gap error: if the peer is too close, slow down;
-/// if too far, speed up (up to 120% of target).
+/// An absent, stale, future-dated or malformed target produces the baseline
+/// command. The legacy nearest_peer_distance mesh aggregate is never used as
+/// an implicit Follow fallback.
 pub fn pd_cruise_with_follow(
     state: &VehicleState,
     target_speed: f64,
     road_heading: f64,
     target_gap: f64,
+    target: Option<&SimulatorOracleFollowTarget>,
 ) -> VehicleCommand {
-    // Gap-modulated speed: speed_cmd = target_speed + gap_error * 0.3
-    let gap_error = state.nearest_peer_distance - target_gap;
-    let speed_cmd = (target_speed + gap_error * 0.3).clamp(0.0, target_speed * 1.2);
+    let Some(target) = target.filter(|target| target.is_current_at(state.timestamp)) else {
+        return pd_cruise_baseline_with_road(state, target_speed, road_heading);
+    };
+
+    // Gap term responds to headway error; relative-speed term anticipates closing
+    // or opening motion instead of reacting only to a distance snapshot.
+    let gap_error = target.gap_m() - target_gap;
+    let speed_cmd = (target_speed + gap_error * 0.3 + target.relative_speed_mps() * 0.5)
+        .clamp(0.0, target_speed * 1.2);
 
     pd_cruise_baseline_with_road(state, speed_cmd, road_heading)
 }
@@ -1049,34 +1197,97 @@ mod tests {
     }
 
     #[test]
-    fn test_pd_follow_slows_for_close_peer() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 15.0; // closer than target gap
-        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
-        // Gap error = 15 - 30 = -15 → speed_cmd = 13.4 + (-15)*0.3 = 8.9
-        // At 13.4 m/s with target 8.9 → speed_error negative → should brake or reduce throttle
+    fn test_pd_follow_slows_for_close_oracle_target() {
+        let state = VehicleState::cruising(13.4);
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            15.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
+        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&target));
         let baseline = pd_cruise_baseline(&state, 13.4);
         assert!(
             cmd.throttle < baseline.throttle || cmd.brake > baseline.brake,
-            "Close peer → reduced throttle or increased brake: follow={:?}, baseline={:?}",
+            "Close oracle target → reduced throttle or increased brake: follow={:?}, baseline={:?}",
             cmd,
             baseline
         );
     }
 
     #[test]
-    fn test_pd_follow_speeds_for_far_peer() {
-        let mut state = VehicleState::cruising(10.0);
-        state.nearest_peer_distance = 60.0; // farther than target gap
-        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
-        // Gap error = 60 - 30 = 30 → speed_cmd = 13.4 + 30*0.3 = 22.4, clamped to 16.08
-        // At 10.0 m/s with target 16.08 → should throttle harder than baseline at 13.4
+    fn test_pd_follow_speeds_for_far_oracle_target() {
+        let state = VehicleState::cruising(10.0);
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            60.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
+        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&target));
         let baseline = pd_cruise_baseline_with_road(&state, 13.4, 0.0);
         assert!(
             cmd.throttle >= baseline.throttle,
-            "Far peer → increased throttle: follow={:?}, baseline={:?}",
+            "Far oracle target → increased throttle: follow={:?}, baseline={:?}",
             cmd,
             baseline
+        );
+    }
+
+    #[test]
+    fn test_pd_follow_uses_relative_speed_to_anticipate_closing() {
+        let state = VehicleState::cruising(13.4);
+        let closing = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            30.0,
+            -3.0,
+            state.timestamp,
+            0.05,
+        );
+        let opening = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            30.0,
+            3.0,
+            state.timestamp,
+            0.05,
+        );
+        let close_cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&closing));
+        let open_cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&opening));
+        assert!(
+            close_cmd.throttle < open_cmd.throttle || close_cmd.brake > open_cmd.brake,
+            "Closing lead motion must reduce the commanded speed"
+        );
+    }
+
+    #[test]
+    fn test_pd_follow_never_falls_back_to_legacy_mesh_distance() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 2.0;
+        let without_target = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, None);
+        let baseline = pd_cruise_baseline(&state, 13.4);
+        assert_eq!(without_target, baseline);
+    }
+
+    #[test]
+    fn test_pd_follow_rejects_stale_or_future_oracle_target() {
+        let state = VehicleState::cruising(13.4);
+        let stale = SimulatorOracleFollowTarget::from_simulator_snapshot(1, 10.0, -2.0, -1.0, 0.05);
+        let future = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            10.0,
+            -2.0,
+            state.timestamp + 1.0,
+            0.05,
+        );
+        assert_eq!(
+            pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&stale)),
+            pd_cruise_baseline(&state, 13.4)
+        );
+        assert_eq!(
+            pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&future)),
+            pd_cruise_baseline(&state, 13.4)
         );
     }
 }

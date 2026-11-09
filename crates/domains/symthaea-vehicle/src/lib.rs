@@ -95,7 +95,10 @@ pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
-pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
+pub use reward::{
+    episode_reward, episode_reward_with_follow_target, follow_distance_reward,
+    follow_distance_reward_with_oracle, safety_reward, speed_reward,
+};
 pub use road::{Road, RoadSegment};
 pub use scenarios::{
     ScenarioConfig, ScenarioResult, default_scenarios, results_to_csv, run_all_scenarios,

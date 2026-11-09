@@ -50,6 +50,10 @@ pub struct EpisodeMetrics {
     pub avg_control_effort: f64,
     /// Number of exploration bursts triggered.
     pub exploration_count: usize,
+    /// Follow steps with a current simulator-oracle lead target.
+    pub follow_oracle_available_steps: usize,
+    /// Follow steps with no admissible simulator-oracle target.
+    pub follow_oracle_unavailable_steps: usize,
     /// Final subterranean navigation sigma when subterranean context is active.
     pub subterranean_navigation_sigma_m: Option<f64>,
     /// Number of subterranean navigation updates applied.
@@ -223,9 +227,61 @@ impl VehicleTrainer {
         physics: &mut dyn VehiclePhysicsSimulator,
         episode: usize,
     ) -> EpisodeMetrics {
+        self.run_episode_with_sim_mode(encoder, controller, fep_agent, physics, episode, true)
+    }
+
+    /// Run a no-teacher, no-weight-update evaluation episode with any physics simulator.
+    ///
+    /// This path disables PD action blending, BPTT supervision, replay updates
+    /// and exploration noise. Trainable controller weights remain fixed, while
+    /// recurrent hidden-state evolution, state normalization and state-dependent
+    /// FEP time-constant modulation remain active as inference-time dynamics.
+    /// Simulator-oracle targets may still be retained for outcome/reward measurement
+    /// or an evaluator-only shadow action, but are not passed to the policy.
+    /// The student still consumes the existing simulated VehicleState vector;
+    /// this is not a local-sensor-only deployment test.
+    pub fn run_evaluation_episode_with_sim(
+        &self,
+        encoder: &mut VehicleHdcEncoder,
+        controller: &mut VehicleController,
+        fep_agent: &mut ActiveInferenceVehicleAgent,
+        physics: &mut dyn VehiclePhysicsSimulator,
+        episode: usize,
+    ) -> EpisodeMetrics {
+        self.run_episode_with_sim_mode(encoder, controller, fep_agent, physics, episode, false)
+    }
+
+    /// Run a frozen-policy evaluation episode using the bicycle-model simulator.
+    pub fn run_evaluation_episode(
+        &self,
+        encoder: &mut VehicleHdcEncoder,
+        controller: &mut VehicleController,
+        fep_agent: &mut ActiveInferenceVehicleAgent,
+        episode: usize,
+    ) -> EpisodeMetrics {
+        let mut physics = BicycleModelSimulator::at_speed(self.config.init_speed());
+        self.run_evaluation_episode_with_sim(encoder, controller, fep_agent, &mut physics, episode)
+    }
+
+    fn run_episode_with_sim_mode(
+        &self,
+        encoder: &mut VehicleHdcEncoder,
+        controller: &mut VehicleController,
+        fep_agent: &mut ActiveInferenceVehicleAgent,
+        physics: &mut dyn VehiclePhysicsSimulator,
+        episode: usize,
+        train_controller: bool,
+    ) -> EpisodeMetrics {
         let dt = self.config.physics_dt();
         let cognitive_interval = self.config.cognitive_interval();
-        let (task, pd_weight, target_speed, use_perturbations) = self.curriculum(episode);
+        let (task, curriculum_pd_weight, target_speed, use_perturbations) =
+            self.curriculum(episode);
+        // Evaluation never inherits the curriculum's teacher blend or train updates.
+        let pd_weight = if train_controller {
+            curriculum_pd_weight
+        } else {
+            0.0
+        };
 
         // For EmergencyStop: PD teacher, reward, and FEP all target zero speed,
         // even though the sim starts at cruising speed (init_speed).
@@ -277,6 +333,8 @@ impl VehicleTrainer {
         let mut total_heading_error = 0.0;
         let mut total_control_effort = 0.0;
         let mut exploration_count = 0usize;
+        let mut follow_oracle_available_steps = 0usize;
+        let mut follow_oracle_unavailable_steps = 0usize;
         let mut fe_samples = 0usize;
         let mut steps_completed = 0usize;
         let mut current_tau_factor = fep_result.tau_factor;
@@ -326,7 +384,10 @@ impl VehicleTrainer {
             }
             let mut scaled_cfg = cfg.clone();
             scaled_cfg.num_peers = num_peers;
-            Some(SwarmSimulator::new(scaled_cfg))
+            Some(SwarmSimulator::new_at_time(
+                scaled_cfg,
+                physics.state().timestamp,
+            ))
         });
 
         let subterranean_bridge = self
@@ -376,6 +437,24 @@ impl VehicleTrainer {
                 self.perturbation_schedule.apply_to_state(step, &mut state);
             }
 
+            // Separate simulator-truth Follow target from delayed mesh aggregates.
+            // The oracle selector only returns a same-road actor snapshot at or
+            // before this exact ego observation timestamp.
+            let follow_oracle_target = if matches!(task, VehicleTask::Follow { .. }) {
+                swarm
+                    .as_ref()
+                    .and_then(|sw| sw.nearest_simulator_truth_follow_target(&state))
+            } else {
+                None
+            };
+            if matches!(task, VehicleTask::Follow { .. }) {
+                if follow_oracle_target.is_some() {
+                    follow_oracle_available_steps += 1;
+                } else {
+                    follow_oracle_unavailable_steps += 1;
+                }
+            }
+
             if let (Some(context), Some(bridge), Some(navigator)) = (
                 self.subterranean_context.as_ref(),
                 subterranean_bridge.as_ref(),
@@ -414,35 +493,75 @@ impl VehicleTrainer {
             let road_heading = proj.road_heading;
 
             let sensor_hv = encoder.encode(&state);
-            let mut command = controller.forward(&sensor_hv, dt as f32);
-
-            // Blend with PD teacher during curriculum
-            if pd_weight > 0.01 {
-                let pd_cmd = match task {
-                    VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
-                    }
+            let student_proposal_command = controller.forward(&sensor_hv, dt as f32);
+            let train_this_step = step % self.config.train_every == 0;
+            let teacher_action_needed = if train_controller {
+                pd_weight > 0.01 || train_this_step || self.config.collect_telemetry
+            } else {
+                // In frozen evaluation, compute a shadow teacher only for
+                // telemetry comparison. It is never blended or supervised.
+                self.config.collect_telemetry
+            };
+            let teacher_command = if teacher_action_needed {
+                Some(match task {
+                    VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
+                        &state,
+                        drive_target,
+                        road_heading,
+                        target_gap,
+                        follow_oracle_target.as_ref(),
+                    ),
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
-                };
+                })
+            } else {
+                None
+            };
+
+            // Keep student proposal, privileged teacher, blended proposal and
+            // executed command distinct. The teacher can use simulator truth
+            // while the student receives only the encoded VehicleState.
+            let teacher_action_used_for_blend = pd_weight > 0.01 && teacher_command.is_some();
+            let pd_teacher_blend_weight = if teacher_action_used_for_blend {
+                pd_weight
+            } else {
+                0.0
+            };
+            let mut command = student_proposal_command;
+            if teacher_action_used_for_blend {
+                let pd_cmd = teacher_command.expect("blend requires a computed teacher action");
                 command = VehicleCommand {
-                    steering: pd_weight * pd_cmd.steering + (1.0 - pd_weight) * command.steering,
-                    throttle: pd_weight * pd_cmd.throttle + (1.0 - pd_weight) * command.throttle,
-                    brake: pd_weight * pd_cmd.brake + (1.0 - pd_weight) * command.brake,
+                    steering: pd_teacher_blend_weight * pd_cmd.steering
+                        + (1.0 - pd_teacher_blend_weight) * command.steering,
+                    throttle: pd_teacher_blend_weight * pd_cmd.throttle
+                        + (1.0 - pd_teacher_blend_weight) * command.throttle,
+                    brake: pd_teacher_blend_weight * pd_cmd.brake
+                        + (1.0 - pd_teacher_blend_weight) * command.brake,
                 };
                 command = command.clamped();
             }
+            let blended_action_command = command;
 
-            // Add exploration noise
-            if let Some(noise) = &fep_result.exploration_noise {
-                command = command.with_noise(*noise);
-                exploration_count += 1;
+            // Training may explore; no-weight-update evaluation has no exploration
+            // noise, while recurrent/FEP inference-time state dynamics remain active.
+            if train_controller {
+                if let Some(noise) = &fep_result.exploration_noise {
+                    command = command.with_noise(*noise);
+                    exploration_count += 1;
+                }
             }
+            let executed_action_command = command;
 
             physics.step(&command, dt);
 
             // Track metrics
             let safe_r = reward::safety_reward(&state);
-            let episode_r = reward::episode_reward(&state, &task, drive_target, road_heading);
+            let episode_r = reward::episode_reward_with_follow_target(
+                &state,
+                &task,
+                drive_target,
+                road_heading,
+                follow_oracle_target.as_ref(),
+            );
             total_safety_reward += safe_r;
             total_episode_reward += episode_r;
             total_speed += state.speed;
@@ -486,17 +605,51 @@ impl VehicleTrainer {
                     } else {
                         0
                     },
+                    follow_oracle_available: follow_oracle_target.is_some(),
+                    follow_oracle_actor_id: follow_oracle_target.map(|target| target.actor_id()),
+                    follow_oracle_gap_m: follow_oracle_target.map(|target| target.gap_m()),
+                    follow_oracle_relative_speed_mps: follow_oracle_target
+                        .map(|target| target.relative_speed_mps()),
+                    follow_oracle_snapshot_age_s: follow_oracle_target
+                        .map(|target| (state.timestamp - target.snapshot_time_s()).max(0.0)),
+                    training_enabled: train_controller,
+                    follow_oracle_used_for_policy: follow_oracle_target.is_some()
+                        && (teacher_action_used_for_blend
+                            || (train_controller && train_this_step && teacher_command.is_some())),
+                    student_proposal_steering: student_proposal_command.steering,
+                    student_proposal_throttle: student_proposal_command.throttle,
+                    student_proposal_brake: student_proposal_command.brake,
+                    teacher_target_steering: teacher_command.map(|target| target.steering),
+                    teacher_target_throttle: teacher_command.map(|target| target.throttle),
+                    teacher_target_brake: teacher_command.map(|target| target.brake),
+                    student_teacher_action_delta_l1: teacher_command.map(|target| {
+                        ((student_proposal_command.steering - target.steering).abs()
+                            + (student_proposal_command.throttle - target.throttle).abs()
+                            + (student_proposal_command.brake - target.brake).abs())
+                            / 3.0
+                    }),
+                    teacher_action_used_for_blend,
+                    teacher_action_used_for_supervision: train_controller
+                        && train_this_step
+                        && teacher_command.is_some(),
+                    teacher_action_evaluation_only: !train_controller && teacher_command.is_some(),
+                    teacher_action_reference_only: teacher_command.is_some()
+                        && !teacher_action_used_for_blend
+                        && !(train_controller && train_this_step && teacher_command.is_some()),
+                    pd_teacher_blend_weight,
+                    blended_action_steering: blended_action_command.steering,
+                    blended_action_throttle: blended_action_command.throttle,
+                    blended_action_brake: blended_action_command.brake,
+                    executed_action_steering: executed_action_command.steering,
+                    executed_action_throttle: executed_action_command.throttle,
+                    executed_action_brake: executed_action_command.brake,
                 });
             }
 
             // -- TRAINING (every train_every steps, 50Hz) --
-            if step % self.config.train_every == 0 {
-                let target = match task {
-                    VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap)
-                    }
-                    _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
-                };
+            if train_controller && train_this_step {
+                let target =
+                    teacher_command.expect("training step must have a computed teacher target");
 
                 // Reward-modulated BPTT: scale gradient by safety reward
                 // so the network learns more when stable (clear signal)
@@ -578,6 +731,8 @@ impl VehicleTrainer {
             avg_heading_error: total_heading_error / n,
             avg_control_effort: total_control_effort / n,
             exploration_count,
+            follow_oracle_available_steps,
+            follow_oracle_unavailable_steps,
             subterranean_navigation_sigma_m,
             subterranean_navigation_updates,
             subterranean_buffered_relays,
@@ -660,7 +815,7 @@ impl VehicleTrainer {
 
         let mut summary = if telemetry_dir.is_some() {
             Some(String::from(
-                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps\n",
+                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps,follow_oracle_available_steps,follow_oracle_unavailable_steps\n",
             ))
         } else {
             None
@@ -732,11 +887,43 @@ impl VehicleTrainer {
                 if !metrics.telemetry.is_empty() {
                     let step_path = format!("{}/episode_{:04}.csv", dir, ep);
                     let mut csv = String::from(
-                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers\n",
+                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,teacher_action_evaluation_only,teacher_action_reference_only,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake,training_enabled,follow_oracle_used_for_policy\n",
                     );
                     for t in &metrics.telemetry {
+                        let actor_id = t
+                            .follow_oracle_actor_id
+                            .map(|value| value.to_string())
+                            .unwrap_or_default();
+                        let gap_m = t
+                            .follow_oracle_gap_m
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let relative_speed_mps = t
+                            .follow_oracle_relative_speed_mps
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let snapshot_age_s = t
+                            .follow_oracle_snapshot_age_s
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let teacher_steering = t
+                            .teacher_target_steering
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let teacher_throttle = t
+                            .teacher_target_throttle
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let teacher_brake = t
+                            .teacher_target_brake
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let student_teacher_delta = t
+                            .student_teacher_action_delta_l1
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
                         csv.push_str(&format!(
-                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{}\n",
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
                             t.step,
                             t.time,
                             t.speed,
@@ -749,6 +936,31 @@ impl VehicleTrainer {
                             t.tau_factor,
                             t.control_effort,
                             t.mesh_peers_visible,
+                            t.follow_oracle_available,
+                            actor_id,
+                            gap_m,
+                            relative_speed_mps,
+                            snapshot_age_s,
+                            t.student_proposal_steering,
+                            t.student_proposal_throttle,
+                            t.student_proposal_brake,
+                            teacher_steering,
+                            teacher_throttle,
+                            teacher_brake,
+                            student_teacher_delta,
+                            t.teacher_action_used_for_blend,
+                            t.teacher_action_used_for_supervision,
+                            t.teacher_action_evaluation_only,
+                            t.teacher_action_reference_only,
+                            t.pd_teacher_blend_weight,
+                            t.blended_action_steering,
+                            t.blended_action_throttle,
+                            t.blended_action_brake,
+                            t.executed_action_steering,
+                            t.executed_action_throttle,
+                            t.executed_action_brake,
+                            t.training_enabled,
+                            t.follow_oracle_used_for_policy,
                         ));
                     }
                     let _ = std::fs::write(&step_path, csv);
@@ -756,7 +968,7 @@ impl VehicleTrainer {
 
                 if let Some(ref mut s) = summary {
                     s.push_str(&format!(
-                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{}\n",
                         ep,
                         metrics.task,
                         metrics.avg_safety_reward,
@@ -768,6 +980,8 @@ impl VehicleTrainer {
                         metrics.avg_control_effort,
                         metrics.exploration_count,
                         metrics.total_steps,
+                        metrics.follow_oracle_available_steps,
+                        metrics.follow_oracle_unavailable_steps,
                     ));
                 }
             }
@@ -1053,6 +1267,31 @@ mod tests {
 
         let summary = std::fs::read_to_string(format!("{}/summary.csv", dir)).unwrap();
         assert!(summary.starts_with("episode,task,"));
+        let summary_header = summary.lines().next().unwrap();
+        assert!(summary_header.contains("follow_oracle_available_steps"));
+        assert!(summary_header.contains("follow_oracle_unavailable_steps"));
+
+        let step_csv = std::fs::read_to_string(format!("{}/episode_0000.csv", dir)).unwrap();
+        let mut step_lines = step_csv.lines();
+        let step_header = step_lines.next().unwrap();
+        let header_columns = step_header.split(',').count();
+        assert_eq!(header_columns, 37, "telemetry CSV header schema changed");
+        assert!(
+            step_lines.all(|line| line.split(',').count() == header_columns),
+            "Every episode telemetry row must match the CSV header column count"
+        );
+        assert!(step_header.contains("follow_oracle_available"));
+        assert!(step_header.contains("follow_oracle_actor_id"));
+        assert!(step_header.contains("follow_oracle_snapshot_age_s"));
+        assert!(step_header.contains("student_proposal_steering"));
+        assert!(step_header.contains("teacher_target_steering"));
+        assert!(step_header.contains("student_teacher_action_delta_l1"));
+        assert!(step_header.contains("teacher_action_used_for_supervision"));
+        assert!(step_header.contains("teacher_action_evaluation_only"));
+        assert!(step_header.contains("teacher_action_reference_only"));
+        assert!(step_header.contains("pd_teacher_blend_weight"));
+        assert!(step_header.contains("blended_action_steering"));
+        assert!(step_header.contains("executed_action_steering"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1461,6 +1700,221 @@ mod tests {
             matches!(config.task, VehicleTask::Follow { target_gap } if (target_gap - 25.0).abs() < 1e-10)
         );
         assert!((config.effective_target_speed() - 13.4).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_follow_without_swarm_reports_unavailable_oracle_steps() {
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config);
+        let metrics = trainer.train();
+        let episode = &metrics[0];
+
+        assert_eq!(episode.follow_oracle_available_steps, 0);
+        assert_eq!(episode.follow_oracle_unavailable_steps, episode.total_steps);
+        assert!(episode.telemetry.iter().all(|row| {
+            !row.follow_oracle_available
+                && row.follow_oracle_actor_id.is_none()
+                && row.follow_oracle_gap_m.is_none()
+                && row.follow_oracle_snapshot_age_s.is_none()
+        }));
+    }
+
+    #[test]
+    fn test_follow_with_swarm_reports_aligned_oracle_availability() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let metrics = trainer.train();
+        let episode = &metrics[0];
+
+        assert_eq!(
+            episode.follow_oracle_available_steps + episode.follow_oracle_unavailable_steps,
+            episode.total_steps
+        );
+        assert!(
+            episode.follow_oracle_available_steps > 0,
+            "The swarm clock must align with the primed ego timestamp"
+        );
+        assert!(episode.telemetry.iter().any(|row| {
+            row.follow_oracle_available
+                && row.follow_oracle_actor_id.is_some()
+                && row.follow_oracle_gap_m.is_some()
+                && row.follow_oracle_snapshot_age_s.is_some()
+        }));
+    }
+
+    #[test]
+    fn test_follow_telemetry_separates_student_teacher_and_executed_actions() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let metrics = trainer.train();
+        let telemetry = &metrics[0].telemetry;
+
+        assert_eq!(telemetry.len(), 5);
+        assert!(telemetry.iter().all(|row| {
+            row.teacher_target_steering.is_some()
+                && row.teacher_target_throttle.is_some()
+                && row.teacher_target_brake.is_some()
+                && row.student_teacher_action_delta_l1.is_some()
+                && row.training_enabled
+                && row.teacher_action_used_for_blend
+                && (row.pd_teacher_blend_weight - 0.8).abs() < 1e-6
+                && row.follow_oracle_used_for_policy == row.follow_oracle_available
+                && row.student_proposal_steering.is_finite()
+                && row.student_proposal_throttle.is_finite()
+                && row.student_proposal_brake.is_finite()
+                && row.blended_action_steering.is_finite()
+                && row.blended_action_throttle.is_finite()
+                && row.blended_action_brake.is_finite()
+                && row.executed_action_steering.is_finite()
+                && row.executed_action_throttle.is_finite()
+                && row.executed_action_brake.is_finite()
+        }));
+        let supervised = telemetry
+            .iter()
+            .find(|row| row.teacher_action_used_for_supervision)
+            .expect("at least one BPTT teacher-target step");
+        let teacher_delta = ((supervised.student_proposal_steering
+            - supervised.teacher_target_steering.unwrap())
+        .abs()
+            + (supervised.student_proposal_throttle - supervised.teacher_target_throttle.unwrap())
+                .abs()
+            + (supervised.student_proposal_brake - supervised.teacher_target_brake.unwrap()).abs())
+            / 3.0;
+        assert!(
+            (supervised.student_teacher_action_delta_l1.unwrap() - teacher_delta).abs() < 1e-6,
+            "Recorded action delta must be recomputable from the retained teacher/student actions"
+        );
+        assert!(
+            telemetry
+                .iter()
+                .any(|row| !row.teacher_action_used_for_supervision),
+            "Teacher blending and BPTT supervision must remain distinct events"
+        );
+    }
+
+    #[test]
+    fn test_follow_phase_four_can_have_zero_blend_but_teacher_supervision() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 100,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let metrics = trainer.train();
+        let telemetry = &metrics[99].telemetry;
+
+        assert!(
+            telemetry
+                .iter()
+                .all(|row| !row.teacher_action_used_for_blend && !row.teacher_action_evaluation_only)
+        );
+        assert!(
+            telemetry
+                .iter()
+                .all(|row| row.pd_teacher_blend_weight == 0.0)
+        );
+        assert!(
+            telemetry.iter().any(|row| row.teacher_action_reference_only),
+            "Training telemetry should distinguish teacher reference-only steps"
+        );
+        assert!(
+            telemetry.iter().any(|row| {
+                row.teacher_action_used_for_supervision
+                    && row.teacher_target_steering.is_some()
+                    && row.follow_oracle_available
+                    && row.follow_oracle_used_for_policy
+            }),
+            "Zero action blending must not be misreported as zero teacher supervision"
+        );
+    }
+
+    #[test]
+    fn test_follow_frozen_evaluation_disables_teacher_and_keeps_weights_fixed() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let mut trainer =
+            VehicleTrainer::new(config.clone()).with_swarm(SwarmConfig::convoy_straight(1));
+        let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = VehicleController::new(&genesis, &config);
+        let mut fep_agent = ActiveInferenceVehicleAgent::new(
+            VehicleFepConfig::default(),
+            VehicleTask::Follow { target_gap: 30.0 },
+        );
+        let original_projection = controller.output_projection();
+
+        let metrics =
+            trainer.run_evaluation_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        let telemetry = &metrics.telemetry;
+
+        assert_eq!(telemetry.len(), 5);
+        assert_eq!(controller.output_projection(), original_projection);
+        assert!(telemetry.iter().all(|row| {
+            let expected_delta = ((row.student_proposal_steering
+                - row.teacher_target_steering.unwrap())
+            .abs()
+                + (row.student_proposal_throttle - row.teacher_target_throttle.unwrap()).abs()
+                + (row.student_proposal_brake - row.teacher_target_brake.unwrap()).abs())
+                / 3.0;
+            !row.training_enabled
+                && !row.teacher_action_used_for_blend
+                && !row.teacher_action_used_for_supervision
+                && !row.follow_oracle_used_for_policy
+                && row.teacher_action_evaluation_only
+                && row.teacher_action_reference_only
+                && row.pd_teacher_blend_weight == 0.0
+                && row.student_teacher_action_delta_l1.is_some_and(|value| {
+                    (value - expected_delta).abs() < 1e-6
+                })
+                && (row.student_proposal_steering - row.blended_action_steering).abs() < 1e-6
+                && (row.student_proposal_throttle - row.blended_action_throttle).abs() < 1e-6
+                && (row.student_proposal_brake - row.blended_action_brake).abs() < 1e-6
+                && (row.executed_action_steering - row.blended_action_steering).abs() < 1e-6
+                && (row.executed_action_throttle - row.blended_action_throttle).abs() < 1e-6
+                && (row.executed_action_brake - row.blended_action_brake).abs() < 1e-6
+        }));
+        assert!(
+            telemetry.iter().any(|row| row.follow_oracle_available),
+            "Simulator truth may remain available to score the evaluation episode"
+        );
     }
 
     #[test]
