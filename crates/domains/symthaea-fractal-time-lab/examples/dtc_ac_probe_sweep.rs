@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cost_metric=Fisher_information_per_simulated_Floquet_period_not_full_experiment_cost"
     );
     println!(
-        "coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,norm_error"
+        "coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_AA,CFI_Aphi,CFI_phiphi,QFI_AA,QFI_Aphi,QFI_phiphi,CFI_A_given_phase,QFI_A_given_phase,phase_time_offset_drive_periods_per_radian,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,norm_error"
     );
 
     for coupling in couplings {
@@ -57,13 +57,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 probe_initial_phase_rad: 0.0,
                 probe_amplitude: PROBE_AMPLITUDE,
                 amplitude_derivative_step: DERIVATIVE_STEP,
+                phase_derivative_step_rad: 0.002,
                 lifetime_window: 12,
                 lifetime_threshold_fraction: 0.5,
             };
 
             match evaluate_dtc_probe_sensing(&config) {
                 Ok(report) => println!(
-                    "{coupling:.6},{frequency:.6},{:.9},{:.9},{:.9},{:.9},{},{},{:.12e},{:.12e},{:.12e},{:.12e},{},{},{:.3e}",
+                    "{coupling:.6},{frequency:.6},{:.9},{:.9},{:.9},{:.9},{},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{},{},{},{:.12e},{:.12e},{},{},{:.3e}",
                     report.baseline_subharmonic_response.mean_demodulated_order,
                     report.probed_subharmonic_response.mean_demodulated_order,
                     report.baseline_subharmonic_response.sign_coherence,
@@ -72,6 +73,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                     lifetime_label(report.probed_lifetime),
                     report.classical_fisher_information_per_shot,
                     report.quantum_fisher_information_per_shot,
+                    report.classical_fisher_matrix_per_shot[0][0],
+                    report.classical_fisher_matrix_per_shot[0][1],
+                    report.classical_fisher_matrix_per_shot[1][1],
+                    report.quantum_fisher_matrix_per_shot[0][0],
+                    report.quantum_fisher_matrix_per_shot[0][1],
+                    report.quantum_fisher_matrix_per_shot[1][1],
+                    report
+                        .classical_effective_amplitude_fisher_with_phase_nuisance
+                        .map(|value| format!("{value:.12e}"))
+                        .unwrap_or_else(|| "undefined".to_string()),
+                    report
+                        .quantum_effective_amplitude_fisher_with_phase_nuisance
+                        .map(|value| format!("{value:.12e}"))
+                        .unwrap_or_else(|| "undefined".to_string()),
+                    report
+                        .phase_time_offset_drive_periods_per_radian
+                        .map(|value| format!("{value:.12e}"))
+                        .unwrap_or_else(|| "undefined".to_string()),
                     report.fisher_information_per_drive_period,
                     report.quantum_fisher_information_per_drive_period,
                     report
