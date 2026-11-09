@@ -40,3 +40,14 @@ cargo clippy --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml
 ```
 
 This tool qualifies a finite synthetic protocol and scores policy submissions against that development fixture. It does not execute experiments, authenticate observations, prove world-state truth, adjudicate human evidence labels, calibrate EIG/EVSI likelihoods, or establish generalized capability or SOTA performance.
+
+## Baseline controls
+
+Two public synthetic policy submissions are included:
+
+- `examples/rea-proof-obligation-policy-run-v0.cost-only.synthetic.json`: choose the cheapest eligible candidate in each case.
+- `examples/rea-proof-obligation-policy-run-v0.always-abstain.synthetic.json`: abstain on all cases.
+
+The always-abstain control is intentional: on the development fixture it can make perfectly correct pre-action readiness assertions while achieving zero action coverage. The scorer separately reports coverage and abstention when a safe obligation update is available, so a zero-false-ready result cannot win on its own.
+
+Neither baseline is a model result, human gold label, nor hidden-set measurement.
