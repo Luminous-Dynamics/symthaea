@@ -122,7 +122,11 @@ The scorer reports:
 
 Missing measurements, non-finite values, malformed digests, mismatched model artifacts or hidden task changes are errors. There is no composite naturalness/quality score.
 
-The included synthetic fixture demonstrates a vibrato-depth-only change in phrase 2 while phrases 1 and 3 remain unchanged. It is a contract fixture, not a measured audio result.
+The crate also contains a no-op calibration contract. It requires at least five unique seeds while holding the exact performance, source revision, backend/model artifact, voice, invariant task and sample rate fixed. It computes per-feature pairwise absolute drift across repeats, takes the 95th-percentile drift per region, retains the worst region, then applies an explicit measurement-resolution floor. The recommended tolerances must be frozen before any intervention results are examined.
+
+A suite evaluator then requires at least three matched intervention pairs with unique seeds and a fixed experiment contract. It reports the mean response ratio, sample standard deviation and two-sided 95% Student-t confidence interval. It qualifies only if each replicate qualifies and the entire confidence interval lies inside the predeclared response band. Confirmatory sample sizes must still be chosen through a separate power analysis.
+
+The included synthetic fixture demonstrates a vibrato-depth-only change in phrase 2 while phrases 1 and 3 remain unchanged. A second synthetic fixture demonstrates no-op tolerance calibration. Both are contract fixtures, not measured audio results.
 
 ## Proposed qualification targets
 
