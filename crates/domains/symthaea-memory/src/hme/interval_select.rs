@@ -2349,6 +2349,91 @@ mod tests {
     }
 
     #[test]
+    fn member_residual_receipts_cannot_cross_eligibility_scopes() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let original = unit_vector_with_first_component(0.95);
+        let members = vec![("scope-bound".to_owned(), original.clone())];
+        let envelope =
+            ContinuousHVGroupEnvelope::from_original_members(81, 14, &members).unwrap();
+
+        let scope_a = test_scope_binding();
+        let mut scope_b = scope_a;
+        scope_b.policy_generation += 1;
+        scope_b.policy_digest[0] ^= 0x40;
+
+        let build = |scope| {
+            GroupScoreIntervalRecord::from_group_envelope(
+                &envelope,
+                &query,
+                81,
+                14,
+                envelope.member_set_digest(),
+                envelope.content_digest(),
+                scope,
+            )
+            .unwrap()
+        };
+        let group_a = build(scope_a);
+        let group_b = build(scope_b);
+        assert_eq!(group_a.identity, group_b.identity);
+
+        let transform_digest = [0xB4u8; 32];
+        let certificate_b = VerifiedMemberResidualCertificate::verify_at_ingest(
+            &group_b,
+            "scope-bound".to_owned(),
+            &original,
+            &original,
+            0.0,
+            transform_digest,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            GroupMemberScoreIntervalRecord::from_verified_certificate(
+                &group_a,
+                &query,
+                &original,
+                &certificate_b,
+                transform_digest,
+            ),
+            Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::EligibilityScopeMismatch
+            ))
+        ));
+
+        let member_from_b = GroupMemberScoreIntervalRecord::from_verified_l2_residual(
+            &group_b,
+            "scope-bound".to_owned(),
+            &query,
+            &original,
+            &original,
+            0.0,
+        )
+        .unwrap();
+        let coverage = GroupIntervalCoverageCounts {
+            eligible_records: 1,
+            covered_records: 1,
+            interval_groups: 1,
+            expected_manifest_generation: 81,
+            expected_eligibility_generation: 14,
+            query_digest: continuous_hv_query_digest(&query),
+            scope_binding: scope_a,
+            unbounded_unopened_groups: 0,
+        };
+        assert!(matches!(
+            select_hierarchical_refinement_set(
+                &[group_a],
+                &[member_from_b],
+                1,
+                coverage,
+            ),
+            Err(HierarchicalIntervalSelectionError::EligibilityScopeMismatch {
+                member_id
+            }) if member_id == "scope-bound"
+        ));
+    }
+
+    #[test]
     fn query_time_member_interval_uses_receipt_without_original_payload() {
         let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         let id = "receipt-member";
