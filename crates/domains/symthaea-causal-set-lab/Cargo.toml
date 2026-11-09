@@ -41,3 +41,7 @@ path = "examples/link_sampling_bias_reference.rs"
 [[example]]
 name = "bayesian_dimension_reference"
 path = "examples/bayesian_dimension_reference.rs"
+
+[[example]]
+name = "joint_signature_reference"
+path = "examples/joint_signature_reference.rs"
