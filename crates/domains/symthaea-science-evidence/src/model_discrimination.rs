@@ -61,6 +61,12 @@ pub struct ModelPriorScenario {
 /// Quantitative predictive distribution for one model under one candidate
 /// experiment. Predictive sigma represents model/parameter uncertainty only;
 /// calibrated measurement sigma is supplied by CandidateExperiment.
+///
+/// When embedded in a `DetectionAwareCandidateExperiment`, the predictive
+/// mean and sigma describe the value distribution **conditional on D=1**.
+/// They must not be treated as an unconditional distribution when detection
+/// itself truncates or selection-biases the value. Such non-Gaussian/censored
+/// channels are outside this reference model and must block scoring.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GaussianModelPrediction {
     pub model_id: String,
@@ -233,9 +239,12 @@ pub struct DetectionAwarePriorScenarioEIG {
     /// Expected information after the model-independent execution probability.
     pub availability_adjusted_total_eig_nats: f64,
     pub expected_posterior_entropy_nats: f64,
-    /// Coarse/refined quadrature difference after weighting by P(D=1) and
-    /// execution probability. Detection-channel information is analytic.
+    /// Coarse/refined quadrature difference for I(M;Y | D=1), before
+    /// multiplying by the detection or execution probabilities.
     pub quadrature_error_nats: f64,
+    /// The conditional quadrature error scaled by P(D=1) and execution
+    /// probability, bounding its contribution to operational EIG.
+    pub operational_quadrature_error_bound_nats: f64,
     pub converged: bool,
 }
 
@@ -815,9 +824,13 @@ pub fn rank_detection_aware_model_discriminating_experiments(
                 detection_indicator_eig + expected_detection_probability * refined_detected_eig;
             let execution_adjusted =
                 experiment.availability_probability * total_given_execution;
-            let quadrature_error = experiment.availability_probability
+            // Gate on the conditional detected-value integral itself. A
+            // small detection/execution probability must not hide an
+            // under-resolved conditional likelihood calculation.
+            let quadrature_error = (refined_detected_eig - coarse_detected_eig).abs();
+            let operational_quadrature_error_bound_nats = experiment.availability_probability
                 * expected_detection_probability
-                * (refined_detected_eig - coarse_detected_eig).abs();
+                * quadrature_error;
             let converged = quadrature_error <= config.quadrature_tolerance_nats;
             if total_given_execution > prior_entropy + 1.0e-8
                 || execution_adjusted > prior_entropy + 1.0e-8
@@ -846,6 +859,7 @@ pub fn rank_detection_aware_model_discriminating_experiments(
                 availability_adjusted_total_eig_nats: execution_adjusted,
                 expected_posterior_entropy_nats: expected_posterior_entropy,
                 quadrature_error_nats: quadrature_error,
+                operational_quadrature_error_bound_nats,
                 converged,
             });
         }
