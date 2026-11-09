@@ -21,8 +21,9 @@ use symthaea_fep::decision_relevant_information::{
 };
 use symthaea_fep::open_world_robust_decision::{
     ModelAdequacyStatus, ModelAdequacyThresholds, PrequentialAlternativeModel,
-    PrequentialCategoricalObservation, evaluate_prequential_e_process,
-    evaluate_prequential_model_adequacy, evaluate_tv_robust_decision_diagnostics,
+    PrequentialCategoricalObservation, calibrate_categorical_tv_radius_from_counts,
+    evaluate_prequential_e_process, evaluate_prequential_model_adequacy,
+    evaluate_tv_robust_decision_diagnostics,
 };
 
 const TV_RADIUS: f64 = 0.2;
@@ -199,6 +200,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         decision_config,
         TV_RADIUS,
     )?;
+    // These counts stand for a separate independent IID calibration sample;
+    // they are not drawn from the held-out decision episodes below.
+    let tv_calibration = calibrate_categorical_tv_radius_from_counts(&[25, 25], 0.05)?;
+    let calibrated_robust = evaluate_tv_robust_decision_diagnostics(
+        &hypotheses,
+        &actions,
+        decision_config,
+        tv_calibration.total_variation_radius,
+    )?;
     let actual_scores = actual_expected_scores(&hypotheses, &actions, &truth, &nominal);
     let no_probe_score = nominal.prior_bayes_risk;
     let oracle_score = actual_scores
@@ -207,6 +217,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .fold(no_probe_score, f64::min);
     let nominal_index = nominal.selected_action_index;
     let robust_index = robust.robust_selected_action_index;
+    let calibrated_robust_index = calibrated_robust.robust_selected_action_index;
     let selected_score = |index: Option<usize>| match index {
         Some(index) => actual_scores[index],
         None => no_probe_score,
@@ -217,7 +228,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max(robust_actual_score - oracle_score)
         .max(0.0);
 
-    if nominal_index != Some(0) || robust_index != Some(1) {
+    if nominal_index != Some(0)
+        || robust_index != Some(1)
+        || calibrated_robust_index != Some(1)
+    {
         return Err(IoError::other(
             "known-truth fixture no longer produces the preregistered nominal-to-robust switch",
         )
@@ -288,6 +302,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             "no_probe_bayes_risk": no_probe_score,
             "nominal_actual_expected_score": nominal_actual_score,
             "robust_actual_expected_score": robust_actual_score,
+            "calibrated_tv_radius": tv_calibration,
+            "calibrated_robust_selected_action_index": calibrated_robust_index,
+            "calibrated_robust_policy_evaluation": calibrated_robust,
             "oracle_actual_expected_score": oracle_score,
             "nominal_actual_regret": (nominal_actual_score - oracle_score).max(0.0),
             "robust_actual_regret": (robust_actual_score - oracle_score).max(0.0),
