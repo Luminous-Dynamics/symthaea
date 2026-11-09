@@ -18,8 +18,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use symthaea_core::sequential_weight_verification::{
-    SequentialWeightVerification, SequentialWeightVerificationCampaign,
-    SequentialWeightVerificationError,
+    ConfirmatoryEpisodeManifest, SequentialWeightVerification,
+    SequentialWeightVerificationCampaign, SequentialWeightVerificationError,
 };
 
 use super::open_world_robust_decision::{
@@ -64,6 +64,7 @@ pub fn begin_open_world_candidate_evaluation(
     baseline_model_digest: String,
     candidate_model_digest: String,
     confirmatory_shard_digest: String,
+    confirmatory_episode_manifest: ConfirmatoryEpisodeManifest,
 ) -> Result<OpenWorldBoundCandidateEvaluation, OpenWorldWeightProgramGateError> {
     let gate_report =
         evaluate_open_world_decision_gate(adequacy, prequential_evidence_crossed_at);
@@ -101,6 +102,7 @@ pub fn begin_open_world_candidate_evaluation(
         baseline_model_digest,
         candidate_model_digest,
         confirmatory_shard_digest,
+        confirmatory_episode_manifest,
         precondition_gate_digest.clone(),
     )?;
 
@@ -138,6 +140,15 @@ mod tests {
         }
     }
 
+    fn episode_manifest(marker: char) -> ConfirmatoryEpisodeManifest {
+        ConfirmatoryEpisodeManifest::new(
+            (0..1_000)
+                .map(|index| format!("open-world-{marker}-{index}"))
+                .collect(),
+        )
+        .expect("valid confirmatory manifest")
+    }
+
     fn campaign() -> SequentialWeightVerificationCampaign {
         SequentialWeightVerificationCampaign::new(
             symthaea_core::sequential_weight_verification::SequentialWeightVerificationConfig {
@@ -161,6 +172,7 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "d".repeat(64),
+            episode_manifest('d'),
         )
         .expect("detached candidate evaluation permitted");
 
@@ -204,6 +216,7 @@ mod tests {
                     "a".repeat(64),
                     "b".repeat(64),
                     "d".repeat(64),
+                    episode_manifest('d'),
                 ),
                 Err(OpenWorldWeightProgramGateError::CandidateEvaluationNotPermitted(
                     disposition
@@ -224,6 +237,7 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "d".repeat(64),
+            episode_manifest('d'),
         )
         .expect("first precondition");
 
@@ -238,6 +252,7 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "e".repeat(64),
+            episode_manifest('e'),
         )
         .expect("second precondition");
         assert_ne!(
