@@ -1908,7 +1908,7 @@
       "supporting_source_ids": [],
       "comparison_class": "methodological_reference",
       "caveats": [
-        "Self-published vendor/security-audit project by Nebula Security; not an independent academic replication or a controlled live candidate-execution benchmark.",
+        "Self-published vendor/security-audit project by Nebula Security; not an independent academic replication and not a controlled live candidate-execution benchmark.",
         "The nine projects are a selected open-source sample, not a random sample of all sandbox products; no population-wide failure-rate inference is supported.",
         "The 32 high-impact isolation failures are findings, not 32 independent attack trials or 32 independently vulnerable products.",
         "The 2 full escapes are included in the 32 findings; do not add them as separate findings.",
