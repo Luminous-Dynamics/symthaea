@@ -1,0 +1,12 @@
+[package]
+name = "vocal-control-eval"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+description = "Dependency-free evaluator for controlled vocal parameter interventions"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
