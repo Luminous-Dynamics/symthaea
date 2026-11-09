@@ -97,7 +97,8 @@
               "downtime_cost_units": 0.5,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -151,7 +152,10 @@
                   }
                 ]
               }
-            ]
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
           },
           {
             "test_id": "eis_unqualified",
@@ -166,7 +170,8 @@
               "downtime_cost_units": 0.1,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -220,10 +225,29 @@
                   }
                 ]
               }
-            ]
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
           }
         ],
-        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
       }
     },
     {
@@ -306,7 +330,8 @@
               "downtime_cost_units": 0.1,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -351,10 +376,29 @@
                   }
                 ]
               }
-            ]
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
           }
         ],
-        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
       }
     },
     {
@@ -453,7 +497,8 @@
               "downtime_cost_units": 0.5,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -506,10 +551,29 @@
                   }
                 ]
               }
-            ]
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
           }
         ],
-        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
       }
     },
     {
@@ -608,7 +672,8 @@
               "downtime_cost_units": 0.5,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -662,10 +727,29 @@
                   }
                 ]
               }
-            ]
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
           }
         ],
-        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
       }
     },
     {
@@ -764,7 +848,8 @@
               "downtime_cost_units": 0.5,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -818,10 +903,29 @@
                   }
                 ]
               }
-            ]
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
           }
         ],
-        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
       }
     },
     {
@@ -920,7 +1024,8 @@
               "downtime_cost_units": 0.5,
               "cost_unit_ref": "decision-loss-unit/0.1",
               "evidence_class": "declared_synthetic_cost",
-              "evidence_digest": "not-a-digest"
+              "evidence_digest": "not-a-digest",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
             },
             "applicability": {
               "supported_chemistries": [
@@ -974,10 +1079,205 @@
                   }
                 ]
               }
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_ref": "synthetic-calibration-v0.1"
+          }
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "case_id": "positive-test-bound-to-wrong-pack-revision-excluded",
+      "expected_status": "no_test",
+      "expected_test_id": null,
+      "scenario": {
+        "scenario_id": "synthetic-wrong-pack-configuration-test-excluded",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "nmc",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "balanced",
+            "prior_probability": 0.7
+          },
+          {
+            "state_id": "weak_cell",
+            "prior_probability": 0.2
+          },
+          {
+            "state_id": "thermal_risk",
+            "prior_probability": 0.1
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "continue_monitoring",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 0
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 100
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 200
+              }
+            ]
+          },
+          {
+            "action_id": "inspect",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 12
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 15
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 30
+              }
+            ]
+          },
+          {
+            "action_id": "service",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 35
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 5
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 0
+              }
             ]
           }
         ],
-        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
+        "tests": [
+          {
+            "test_id": "capacity_reference_test",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 1.5,
+              "downtime_cost_units": 0.5,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_ref": "synthetic-test-cost-schedule-v0.1"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc",
+                "lfp"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "normal",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.1
+                  }
+                ]
+              },
+              {
+                "outcome_id": "low_capacity",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.1
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.8
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.9
+                  }
+                ]
+              }
+            ],
+            "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pack_configuration_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "calibration_ref": "synthetic-calibration-v0.1"
+          }
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-ev-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-ev-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": {
+          "observation_batch_ref": "synthetic-observation-batch-v0.1",
+          "observation_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "pack_capability_profile_ref": "synthetic-pack-capability-profile-v0.1",
+          "pack_capability_profile_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "prior_model_ref": "synthetic-prior-model-v0.1",
+          "prior_model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_loss_model_ref": "synthetic-decision-loss-model-v0.1",
+          "decision_loss_model_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
       }
     }
   ]
