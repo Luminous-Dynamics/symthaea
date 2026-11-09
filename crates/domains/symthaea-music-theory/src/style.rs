@@ -2345,7 +2345,7 @@ impl Style {
                 // a departure-section transformation.
                 development: DevelopmentDna::Classic,
                 texture: {
-                    let mut t = texture(DrumPolicy::None);
+                    let mut t = texture(DrumPolicy::AfroCuban);
                     // The hidden-bass-quote easter egg (`hook_cell`)
                     // overwrites a whole window of bass content with a
                     // generically-timed hook quote, ignoring whatever
@@ -2491,7 +2491,7 @@ impl Style {
                 // feeling.
                 development: DevelopmentDna::Intensifying,
                 texture: {
-                    let mut t = texture(DrumPolicy::None);
+                    let mut t = texture(DrumPolicy::FlamencoPalmas);
                     // Same reasoning as AfroCuban: the hidden-bass-quote
                     // easter egg is oblivious to the compás and would
                     // silently overwrite the anchor's grounding role.
@@ -2571,7 +2571,7 @@ impl Style {
                 // "understated" identity extends to how it develops too.
                 development: DevelopmentDna::Figural,
                 texture: {
-                    let mut t = texture(DrumPolicy::None);
+                    let mut t = texture(DrumPolicy::BossaNova);
                     // 7ths on every chord, not just the cadential one — the
                     // extended jazz vocabulary that makes the harmony feel
                     // like it's floating rather than resolving.
