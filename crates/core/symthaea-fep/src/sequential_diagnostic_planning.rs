@@ -218,7 +218,10 @@ fn solve_node(
     remaining_actions: u64,
     expansions: &mut usize,
 ) -> Result<
-    (SequentialDiagnosticPlanNode, Vec<SequentialDiagnosticActionValue>),
+    (
+        SequentialDiagnosticPlanNode,
+        Vec<SequentialDiagnosticActionValue>,
+    ),
     SequentialDiagnosticError,
 > {
     if *expansions >= planning_config.max_policy_expansions {
@@ -305,8 +308,7 @@ fn plan_after_action(
         + decision_config.safety_risk_weight * action.safety_risk;
     let mut expected_terminal_bayes_risk = 0.0;
     let mut expected_observation_cost = action.observation_cost;
-    let mut expected_safety_penalty =
-        decision_config.safety_risk_weight * action.safety_risk;
+    let mut expected_safety_penalty = decision_config.safety_risk_weight * action.safety_risk;
     let mut predictive_mass = 0.0;
 
     for outcome_index in 0..outcome_count {
@@ -320,9 +322,7 @@ fn plan_after_action(
             .sum::<f64>();
 
         if !outcome_probability.is_finite() || outcome_probability < 0.0 {
-            return Err(SequentialDiagnosticError::InvalidPredictiveOutcomeMass {
-                action_index,
-            });
+            return Err(SequentialDiagnosticError::InvalidPredictiveOutcomeMass { action_index });
         }
         if outcome_probability == 0.0 {
             continue;
@@ -353,10 +353,8 @@ fn plan_after_action(
         expected_total_cost += outcome_probability * continuation.expected_total_cost;
         expected_terminal_bayes_risk +=
             outcome_probability * continuation.expected_terminal_bayes_risk;
-        expected_observation_cost +=
-            outcome_probability * continuation.expected_observation_cost;
-        expected_safety_penalty +=
-            outcome_probability * continuation.expected_safety_penalty;
+        expected_observation_cost += outcome_probability * continuation.expected_observation_cost;
+        expected_safety_penalty += outcome_probability * continuation.expected_safety_penalty;
 
         branches.push(SequentialDiagnosticBranch {
             outcome_index,
@@ -367,9 +365,7 @@ fn plan_after_action(
     }
 
     if !predictive_mass.is_finite() || (predictive_mass - 1.0).abs() > 1e-8 {
-        return Err(SequentialDiagnosticError::InvalidPredictiveOutcomeMass {
-            action_index,
-        });
+        return Err(SequentialDiagnosticError::InvalidPredictiveOutcomeMass { action_index });
     }
     if !expected_total_cost.is_finite()
         || !expected_terminal_bayes_risk.is_finite()
@@ -486,17 +482,16 @@ mod tests {
     #[test]
     fn two_complementary_probes_have_zero_myopic_evsi_but_positive_sequential_value() {
         let (hypotheses, actions) = xor_complementary_probes();
-        let myopic = evaluate_decision_focused_diagnostics(
-            &hypotheses,
-            &actions,
-            decision_config(),
-        )
-        .expect("one-step diagnostic evaluation");
+        let myopic =
+            evaluate_decision_focused_diagnostics(&hypotheses, &actions, decision_config())
+                .expect("one-step diagnostic evaluation");
         assert_eq!(myopic.selected_action_index, None);
-        assert!(myopic
-            .actions
-            .iter()
-            .all(|action| action.expected_value_of_sample_information.abs() < 1e-12));
+        assert!(
+            myopic
+                .actions
+                .iter()
+                .all(|action| action.expected_value_of_sample_information.abs() < 1e-12)
+        );
 
         let sequential = evaluate_sequential_decision_diagnostics(
             &hypotheses,
@@ -531,12 +526,9 @@ mod tests {
         let (hypotheses, mut actions) = xor_complementary_probes();
         actions[0].observation_cost = 0.0;
         actions[1].observation_cost = 0.25;
-        let myopic = evaluate_decision_focused_diagnostics(
-            &hypotheses,
-            &actions,
-            decision_config(),
-        )
-        .expect("one-step evaluation");
+        let myopic =
+            evaluate_decision_focused_diagnostics(&hypotheses, &actions, decision_config())
+                .expect("one-step evaluation");
         let sequential = evaluate_sequential_decision_diagnostics(
             &hypotheses,
             &actions,
@@ -547,7 +539,10 @@ mod tests {
             },
         )
         .expect("horizon-one evaluation");
-        assert_eq!(sequential.selected_action_index, myopic.selected_action_index);
+        assert_eq!(
+            sequential.selected_action_index,
+            myopic.selected_action_index
+        );
         assert_eq!(sequential.selected_action_index, None);
         assert!((sequential.expected_total_cost - myopic.no_probe_score).abs() < 1e-12);
     }
