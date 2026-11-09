@@ -145,7 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     for score in &report.experiments {
-        let status = match score.status {
+        let status = match &score.status {
             symthaea_science_evidence::ExperimentDiscriminationStatus::Scored => "SCORED",
             symthaea_science_evidence::ExperimentDiscriminationStatus::NotComparable { .. } => {
                 "NOT_COMPARABLE"
