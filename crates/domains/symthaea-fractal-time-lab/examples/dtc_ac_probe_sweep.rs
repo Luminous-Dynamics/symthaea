@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("pulse_angle_rad={:.9},probe_amplitude={PROBE_AMPLITUDE:.9}", PI + 0.10);
     println!("information_metric=classical_Fisher_information_from_exact_total_Z_distribution");
     println!("cost_metric=Fisher_information_per_simulated_Floquet_period_not_full_experiment_cost");
-    println!("coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,Fisher_per_shot,Fisher_per_period,norm_error");
+    println!("coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,norm_error");
 
     for coupling in couplings {
         for frequency in frequencies {
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match evaluate_dtc_probe_sensing(&config) {
                 Ok(report) => println!(
-                    "{coupling:.6},{frequency:.6},{:.9},{:.9},{:.9},{:.9},{},{},{:.12e},{:.12e},{:.3e}",
+                    "{coupling:.6},{frequency:.6},{:.9},{:.9},{:.9},{:.9},{},{},{:.12e},{:.12e},{:.12e},{:.12e},{},{},{:.3e}",
                     report.baseline_subharmonic_response.mean_demodulated_order,
                     report.probed_subharmonic_response.mean_demodulated_order,
                     report.baseline_subharmonic_response.sign_coherence,
@@ -66,7 +66,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     lifetime_label(report.baseline_lifetime),
                     lifetime_label(report.probed_lifetime),
                     report.classical_fisher_information_per_shot,
+                    report.quantum_fisher_information_per_shot,
                     report.fisher_information_per_drive_period,
+                    report.quantum_fisher_information_per_drive_period,
+                    report
+                        .classical_to_quantum_fisher_ratio
+                        .map(|value| format!("{value:.9}"))
+                        .unwrap_or_else(|| "undefined".to_string()),
+                    report.classical_fisher_within_quantum_bound,
                     report.norm_error,
                 ),
                 Err(error) => println!(
