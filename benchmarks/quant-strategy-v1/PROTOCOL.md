@@ -5,6 +5,7 @@
 **Companion:** [SYM-FIN-EVAL-002 / PR #11233](https://github.com/Luminous-Dynamics/symthaea/pull/11233)
 **Shared temporal contract:** [SYM-FIN-TIME-001 #11241](https://github.com/Luminous-Dynamics/symthaea/issues/11241) — use the same bitemporal availability and revision semantics as financial research; do not reimplement a separate timestamp policy.
 **Evaluator/reference metrology:** [FIN-EVAL-METROLOGY-001 #11254](https://github.com/Luminous-Dynamics/symthaea/issues/11254) — use only for analyst/judge-scored workflow comparisons; deterministic portfolio accounting oracles remain independently specified.
+**Portfolio transition oracle:** [SYM-QUANT-ORACLE-001 #11298](https://github.com/Luminous-Dynamics/symthaea/issues/11298) — deterministic benchmark-only order/fill/position/cash/fee/corporate-action reference calculations; reuse Mycelix exact-money/accounting contracts, do not add a second production ledger or broker authority.
 
 ## 1. Research question
 
@@ -150,6 +151,16 @@ No candidate can compensate for a hard-gate failure with high returns or Sharpe.
 - A forecast, backtest or simulation cannot create a financial action or authority.
 - Read-only/proposal-only Symthaea profiles expose no provider write capability.
 - No live account, broker, custody or trading integration is permitted by this benchmark.
+
+## 9a. Portfolio transition reference oracle
+
+Use [SYM-QUANT-ORACLE-001 #11298](https://github.com/Luminous-Dynamics/symthaea/issues/11298) for the deterministic reference path from declared orders and fills to cash, positions, realized/unrealized P&L, costs and portfolio value. This is a benchmark-only reference calculation, not a second production ledger or order-management system.
+
+Compose with Mycelix [FIN-ACC-IMPL-001 #5789](https://github.com/Luminous-Dynamics/mycelix/issues/5789) and [FIN-ACC-BENCH-001 #5782](https://github.com/Luminous-Dynamics/mycelix/issues/5782) for exact money and accounting reference semantics. The quant oracle must not invent another Money type, canonical position ontology, journal, broker adapter or settlement authority.
+
+A qualified net-return result requires explicit fees, spread, slippage, market impact, funding/borrow and other applicable costs. Null/unknown costs are not zero. The oracle must separately identify submitted orders, accepted orders, fills, marks and corporate-action transformations; a price mark cannot create a fill, and a submitted order cannot create a position.
+
+Until #11298 is implemented and independently checked, the current synthetic zero-friction example remains a schema/integrity fixture only—not a historical strategy-performance result.
 
 ## 10. Initial vertical slice
 
