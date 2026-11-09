@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hlb-static-model-robust-seq-\${{ github.event.pull_request.head.sha || github.sha }}
+  group: hlb-static-model-robust-seq-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
       - name: Checkout exact revision
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -64,7 +64,7 @@ jobs:
 
       - name: Emit exact-head known-answer receipt
         env:
-          SYMTHAEA_SOURCE_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           mkdir -p research-results
@@ -80,7 +80,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hlb-static-model-robust-seq-\${{ github.event.pull_request.head.sha || github.sha }}
+          name: hlb-static-model-robust-seq-${{ github.event.pull_request.head.sha || github.sha }}
           path: research-results/
           if-no-files-found: warn
           retention-days: 30
