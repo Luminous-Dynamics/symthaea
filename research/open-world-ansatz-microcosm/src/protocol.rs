@@ -170,9 +170,13 @@ pub struct StructureScore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluatorScore {
     pub evidence_prefix_sha256: String,
-    /// Evaluator-only check that the generating model survived the independent
-    /// trace filter. This catches a candidate-family omission or verifier bug.
+    /// Exact parameter-struct membership in the legal candidate version space.
+    /// False may still be behaviorally represented by an equivalent parameterization.
     pub generating_model_in_version_space: bool,
+    /// Whether some legal candidate has identical predictions over every length-4
+    /// intervention sequence in the finite numeric input language. For Boolean and
+    /// interaction episodes the generating truth is inside the declared grammar.
+    pub generating_truth_behaviorally_represented: bool,
     pub set_score: SetScore,
     /// Scores structural-family recovery independently of coefficients and sensor parameters.
     pub structure_score: StructureScore,
@@ -757,6 +761,20 @@ impl BlindEpisode {
                 _ => return Err(ProtocolError::ClaimFamilyMismatch),
             };
 
+        let generating_truth_behaviorally_represented = match &self.generating_truth {
+            GeneratingTruth::Boolean(_) | GeneratingTruth::Interaction(_) => true,
+            GeneratingTruth::Numeric(truth) => {
+                let access = match self.manifest.structure_access {
+                    StructureAccess::NumericWithheld => numeric::StructureAccess::Withheld,
+                    StructureAccess::NumericSupplied(mechanism) => {
+                        numeric::StructureAccess::Supplied(mechanism)
+                    }
+                    _ => return Err(ProtocolError::ClaimFamilyMismatch),
+                };
+                numeric_truth_behaviorally_represented(truth, access)?
+            }
+        };
+
         let expected = match set_score.oracle_model_count {
             0 => ClaimDisposition::NoCompatibleModel,
             1 => ClaimDisposition::Identified,
@@ -775,6 +793,7 @@ impl BlindEpisode {
         Ok(EvaluatorScore {
             evidence_prefix_sha256: submission.evidence_prefix_sha256.clone(),
             generating_model_in_version_space,
+            generating_truth_behaviorally_represented,
             safe_abstention,
             unnecessary_abstention,
             decision_correct,
@@ -993,6 +1012,121 @@ fn reference_boolean_version_space(
     }
     compatible.sort();
     Ok(compatible)
+}
+
+const NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON: usize = 4;
+
+/// Construct the evaluator-side truth signature independently from the
+/// candidate ModelHypothesis::predict implementation. All possible length-4
+/// intervention sequences are included, so a parameter/sensor reparameterization
+/// is recognized when it is observationally identical over the declared domain.
+fn numeric_truth_signature(
+    truth: &numeric::ModelHypothesis,
+) -> Result<Vec<i64>, ProtocolError> {
+    let horizon = NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON;
+    let sequence_count = numeric::INPUT_LEVELS.len().pow(horizon as u32);
+    let mut signature = Vec::with_capacity(sequence_count * horizon);
+
+    for code in 0..sequence_count {
+        let mut remaining = code;
+        let mut inputs = Vec::with_capacity(horizon);
+        for _ in 0..horizon {
+            inputs.push(numeric::INPUT_LEVELS[remaining % numeric::INPUT_LEVELS.len()]);
+            remaining /= numeric::INPUT_LEVELS.len();
+        }
+
+        let mut state = truth.initial_state;
+        for input in inputs {
+            let latent = match truth.mechanism {
+                numeric::Mechanism::DirectResponse => truth.gain.checked_mul(input),
+                numeric::Mechanism::LeakyMemory => state,
+            }
+            .ok_or_else(|| {
+                ProtocolError::WorldFailure(
+                    "numeric truth signature encountered invalid state or overflow".to_owned(),
+                )
+            })?;
+
+            let measurement = match truth.sensor {
+                numeric::SensorMap::Identity => Some(latent),
+                numeric::SensorMap::Negate => latent.checked_neg(),
+                numeric::SensorMap::Double => latent.checked_mul(2),
+                numeric::SensorMap::ConstantZero => Some(0),
+            }
+            .ok_or_else(|| {
+                ProtocolError::WorldFailure(
+                    "numeric truth signature measurement overflow".to_owned(),
+                )
+            })?;
+            signature.push(measurement);
+
+            if truth.mechanism == numeric::Mechanism::LeakyMemory {
+                let decay = truth.decay.ok_or_else(|| {
+                    ProtocolError::WorldFailure(
+                        "numeric leaky-memory truth has no decay".to_owned(),
+                    )
+                })?;
+                let current = state.ok_or_else(|| {
+                    ProtocolError::WorldFailure(
+                        "numeric leaky-memory truth has no state".to_owned(),
+                    )
+                })?;
+                state = Some(
+                    decay
+                        .checked_mul(current)
+                        .and_then(|value| {
+                            truth
+                                .gain
+                                .checked_mul(input)
+                                .and_then(|drive| value.checked_add(drive))
+                        })
+                        .ok_or_else(|| {
+                            ProtocolError::WorldFailure(
+                                "numeric truth signature state overflow".to_owned(),
+                            )
+                        })?,
+                );
+            }
+        }
+    }
+
+    Ok(signature)
+}
+
+fn numeric_candidate_signature(
+    candidate: &numeric::ModelHypothesis,
+) -> Result<Vec<i64>, ProtocolError> {
+    let horizon = NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON;
+    let sequence_count = numeric::INPUT_LEVELS.len().pow(horizon as u32);
+    let mut signature = Vec::with_capacity(sequence_count * horizon);
+
+    for code in 0..sequence_count {
+        let mut remaining = code;
+        let mut inputs = Vec::with_capacity(horizon);
+        for _ in 0..horizon {
+            inputs.push(numeric::INPUT_LEVELS[remaining % numeric::INPUT_LEVELS.len()]);
+            remaining /= numeric::INPUT_LEVELS.len();
+        }
+        let outputs = candidate
+            .predict(&inputs)
+            .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
+        signature.extend(outputs);
+    }
+
+    Ok(signature)
+}
+
+fn numeric_truth_behaviorally_represented(
+    truth: &numeric::ModelHypothesis,
+    access: numeric::StructureAccess,
+) -> Result<bool, ProtocolError> {
+    let truth_signature = numeric_truth_signature(truth)?;
+    for candidate in reference_numeric_candidates(access) {
+        if numeric_candidate_signature(&candidate)? == truth_signature {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn reference_numeric_version_space(
