@@ -746,7 +746,12 @@
         "calibrated_tv_radius",
         "ambiguity_radius_confidence",
         "fixed_vs_calibrated_radius_selection_disagreement",
-        "log_domain_alpha_threshold"
+        "log_domain_alpha_threshold",
+        "dirichlet_mixture_e_value",
+        "dirichlet_alternative_posterior_predictive",
+        "effective_adequacy_gate_disposition",
+        "weight_program_generation_authority",
+        "live_model_mutation_never_authorized_by_adequacy_gate"
       ],
       "negative_controls": [
         "well_specified_family",
@@ -763,7 +768,15 @@
         "nominal-probe misspecification causing robust policy switch",
         "aggregate log-loss/Brier gate misses symmetric-predictive regime shift",
         "prequential e-process catches persistent regime shift",
-        "out-of-support observation forces adequacy failure"
+        "out-of-support observation forces adequacy failure",
+        "balanced_no_shift_control_for_dirichlet_alternative",
+        "history_dependent_predictable_null_martingale_enumeration",
+        "persistent_frequency_shift_detected_by_universal_dirichlet_alternative",
+        "dirichlet_e_process_crossing_overrides_aggregate_no_detected_inadequacy",
+        "insufficient_evidence_blocks_weight_program_generation",
+        "inadequate_model_blocks_weight_program_generation",
+        "no_detected_inadequacy_allows_detached_candidate_only",
+        "adequacy_gate_never_authorizes_live_mutation_or_candidate_acceptance"
       ]
     }
   ],
@@ -1218,6 +1231,10 @@
     {
       "id": "categorical_hoeffding_union_bound_tv_calibration",
       "scope": "Finite-sample distribution-free TV-radius reference from independent IID categorical calibration counts; per-category Hoeffding intervals plus Bonferroni/union bound, explicitly conservative and not valid under dependent or shifted calibration."
+    },
+    {
+      "id": "dirichlet_mixture_prequential_e_process",
+      "scope": "Online Dirichlet-multinomial categorical alternative q_t(k)=(alpha_k+N_{t-1,k})/(sum alpha+t-1) against frozen predictable null forecasts; anytime-valid likelihood-ratio e-process under any correctly specified conditional null, strongest for persistent frequency shifts."
     }
   ],
   "seeds": {
