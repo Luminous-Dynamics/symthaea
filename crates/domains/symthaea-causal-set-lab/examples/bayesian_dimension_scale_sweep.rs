@@ -110,10 +110,18 @@ impl Aggregate {
         };
         let total = self.samples.max(1) as f64;
         let calibrated = self.calibrated.max(1) as f64;
-        let brier_denominator = calibrated * DIMENSIONS.len() as f64;
+        let brier_denominator = calibrated;
         let (coverage_low, coverage_high) = wilson_interval(self.covered_95, self.calibrated);
+        let d4_supported_cases = self.p_dim_le_3_values.len();
+        let (false_reduction_low, false_reduction_high) =
+            wilson_interval(self.false_dimension_reduction, d4_supported_cases);
+        let false_reduction_rate = if d4_supported_cases > 0 {
+            self.false_dimension_reduction as f64 / d4_supported_cases as f64
+        } else {
+            f64::NAN
+        };
         format!(
-            "{event_count},{true_dimension},{prior_name},{calibration_replicates},{},{:.6},{},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{},{}",
+            "{event_count},{true_dimension},{prior_name},{calibration_replicates},{},{:.6},{},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{},{},{:.9},{:.9},{:.9},{}",
             self.samples,
             self.calibrated as f64 / total,
             self.outside_support,
@@ -125,6 +133,10 @@ impl Aggregate {
             self.log_loss_sum / calibrated,
             self.brier_sum / brier_denominator,
             self.false_dimension_reduction,
+            d4_supported_cases,
+            false_reduction_rate,
+            false_reduction_low,
+            false_reduction_high,
             p95_low_dimension_mass,
         )
     }
@@ -177,8 +189,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("likelihood=empirical_KDE_of_ordering_fraction_not_iid_pair_Bernoulli");
     println!("calibration_unit=one_complete_fixed_cardinality_sprinkling");
     println!("calibration_and_qualification=disjoint_deterministic_seed_manifests");
+    println!("calibration_base_seed=0xCA1B2026");
+    println!("qualification_base_seed=0x51A72026");
+    println!("seed_scheme=splitmix64-v1:event_count_dimension_replicate_strides");
     println!(
-        "event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,wilson95_coverage_low,wilson95_coverage_high,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support"
+        "event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,wilson95_coverage_low,wilson95_coverage_high,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_multiclass_brier_score_given_support,false_p_dim_le_3_count_d4,supported_d4_cases,false_p_dim_le_3_rate_given_support,wilson95_false_reduction_low,wilson95_false_reduction_high,p95_p_dim_le_3_given_support"
     );
 
     for (size_index, event_count) in EVENT_COUNTS.iter().copied().enumerate() {
