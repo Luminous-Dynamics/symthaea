@@ -19,32 +19,17 @@ use std::fmt;
 /// Errors fitting or evaluating a joint synthetic-likelihood model.
 #[derive(Clone, Debug, PartialEq)]
 pub enum JointLikelihoodError {
-    InvalidDimension {
-        dimension: usize,
-    },
-    TooFewSprinklings {
-        samples: usize,
-        features: usize,
-    },
+    InvalidDimension { dimension: usize },
+    TooFewSprinklings { samples: usize, features: usize },
     EmptyCalibration,
-    FeatureCount {
-        expected: usize,
-        actual: usize,
-    },
-    NonFiniteFeature {
-        sample: usize,
-        feature: usize,
-    },
+    FeatureCount { expected: usize, actual: usize },
+    NonFiniteFeature { sample: usize, feature: usize },
     InvalidShrinkage,
     InvalidRidge,
     DegenerateCalibration,
     CovarianceNotPositiveDefinite,
-    InvalidPrior {
-        index: usize,
-    },
-    DuplicateDimension {
-        dimension: usize,
-    },
+    InvalidPrior { index: usize },
+    DuplicateDimension { dimension: usize },
     EmptyModelSet,
     Signature(JointSignatureError),
 }
@@ -61,7 +46,10 @@ impl fmt::Display for JointLikelihoodError {
             ),
             Self::EmptyCalibration => write!(f, "synthetic-likelihood calibration is empty"),
             Self::FeatureCount { expected, actual } => {
-                write!(f, "feature vector has {actual} entries; expected {expected}")
+                write!(
+                    f,
+                    "feature vector has {actual} entries; expected {expected}"
+                )
             }
             Self::NonFiniteFeature { sample, feature } => {
                 write!(f, "calibration feature [{sample}][{feature}] is not finite")
@@ -73,13 +61,22 @@ impl fmt::Display for JointLikelihoodError {
                 write!(f, "relative covariance ridge must be finite and positive")
             }
             Self::DegenerateCalibration => {
-                write!(f, "calibration has zero or non-finite average feature variance")
+                write!(
+                    f,
+                    "calibration has zero or non-finite average feature variance"
+                )
             }
             Self::CovarianceNotPositiveDefinite => {
-                write!(f, "regularized calibration covariance is not positive definite")
+                write!(
+                    f,
+                    "regularized calibration covariance is not positive definite"
+                )
             }
             Self::InvalidPrior { index } => {
-                write!(f, "model prior at index {index} must be finite and positive")
+                write!(
+                    f,
+                    "model prior at index {index} must be finite and positive"
+                )
             }
             Self::DuplicateDimension { dimension } => {
                 write!(f, "spacetime dimension {dimension} appears more than once")
@@ -389,9 +386,7 @@ pub fn infer_joint_dimension(
     })
 }
 
-fn cholesky_decompose(
-    matrix: &[Vec<f64>],
-) -> Result<Vec<Vec<f64>>, JointLikelihoodError> {
+fn cholesky_decompose(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, JointLikelihoodError> {
     let dimension = matrix.len();
     let mut lower = vec![vec![0.0; dimension]; dimension];
     for row in 0..dimension {
@@ -437,14 +432,23 @@ mod tests {
 
     #[test]
     fn fit_uses_full_correlated_covariance_and_cholesky() {
-        let calibration =
-            JointGaussianCalibration::fit_whole_sprinkling_features(2, &correlated_samples(), 0.1, 1.0e-6)
-                .unwrap();
+        let calibration = JointGaussianCalibration::fit_whole_sprinkling_features(
+            2,
+            &correlated_samples(),
+            0.1,
+            1.0e-6,
+        )
+        .unwrap();
         assert_eq!(calibration.whole_sprinkling_count, 64);
         assert_eq!(calibration.feature_count, 3);
         assert!(calibration.cholesky_lower[1][0].abs() > 1.0e-4);
         assert!(calibration.log_determinant_covariance.is_finite());
-        assert!(calibration.log_likelihood(&[0.0, 0.0, 0.0]).unwrap().is_finite());
+        assert!(
+            calibration
+                .log_likelihood(&[0.0, 0.0, 0.0])
+                .unwrap()
+                .is_finite()
+        );
     }
 
     #[test]
@@ -458,7 +462,7 @@ mod tests {
         let calibration =
             JointGaussianCalibration::fit_whole_sprinkling_features(3, &samples, 0.25, 1.0e-5)
                 .unwrap();
-        assert!(calibration.log_likelihood(&[0.0, 0.0, 0.0]).is_finite());
+        assert!(calibration.log_likelihood(&[0.0, 0.0, 0.0]).unwrap().is_finite());
     }
 
     #[test]
