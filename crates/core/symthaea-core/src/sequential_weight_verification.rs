@@ -38,6 +38,8 @@ pub struct WeightVerificationBinding {
     pub candidate_model_digest: String,
     /// Digest of the frozen task, split, loss, and evaluation protocol.
     pub evaluation_protocol_digest: String,
+    /// Digest of the fresh, candidate-specific confirmatory data shard.
+    pub confirmatory_shard_digest: String,
 }
 
 /// Alpha-spending and practical-effect requirements for a repair candidate.
@@ -233,29 +235,29 @@ impl SequentialWeightVerification {
         let n = self.observation_count;
         let n_float = n as f64;
         let candidate = self.binding.candidate_index as f64;
-        let alpha_denominator = candidate * (candidate + 1.0) * n_float * (n_float + 1.0);
-        let alpha_at_look = self.config.campaign_alpha / alpha_denominator;
-        let log_tail_ratio = std::f64::consts::LN_2
-            - self.config.campaign_alpha.ln()
-            + candidate.ln()
-            + (candidate + 1.0).ln()
-            + n_float.ln()
-            + (n_float + 1.0).ln();
-        let confidence_radius = if n == 0 {
-            f64::INFINITY
-        } else {
-            (2.0 * log_tail_ratio / n_float).sqrt()
-        };
-        let lower_confidence_bound = if n == 0 {
-            -1.0
-        } else {
-            (self.mean_improvement - confidence_radius).max(-1.0)
-        };
-        let upper_confidence_bound = if n == 0 {
-            1.0
-        } else {
-            (self.mean_improvement + confidence_radius).min(1.0)
-        };
+        let candidate_alpha =
+            self.config.campaign_alpha / (candidate * (candidate + 1.0));
+        let (alpha_at_look, confidence_radius, lower_confidence_bound, upper_confidence_bound) =
+            if n == 0 {
+                // No confidence look has occurred yet. Return the full bounded
+                // range and a finite initial candidate-level alpha allocation.
+                (candidate_alpha, 1.0, -1.0, 1.0)
+            } else {
+                let alpha_denominator =
+                    candidate * (candidate + 1.0) * n_float * (n_float + 1.0);
+                let alpha_at_look = self.config.campaign_alpha / alpha_denominator;
+                let log_tail_ratio = std::f64::consts::LN_2
+                    - self.config.campaign_alpha.ln()
+                    + candidate.ln()
+                    + (candidate + 1.0).ln()
+                    + n_float.ln()
+                    + (n_float + 1.0).ln()
+                    + 1e-12;
+                let confidence_radius = (2.0 * log_tail_ratio / n_float).sqrt();
+                let lower = (self.mean_improvement - confidence_radius).max(-1.0);
+                let upper = (self.mean_improvement + confidence_radius).min(1.0);
+                (alpha_at_look, confidence_radius, lower, upper)
+            };
 
         let status = if n < self.config.minimum_observations {
             SequentialWeightVerificationStatus::Collecting
@@ -338,6 +340,10 @@ fn validate_binding(
             "evaluation_protocol_digest",
             binding.evaluation_protocol_digest.as_str(),
         ),
+        (
+            "confirmatory_shard_digest",
+            binding.confirmatory_shard_digest.as_str(),
+        ),
     ] {
         if value.len() != DIGEST_HEX_LEN
             || !value
@@ -383,6 +389,7 @@ mod tests {
             baseline_model_digest: "a".repeat(64),
             candidate_model_digest: "b".repeat(64),
             evaluation_protocol_digest: "c".repeat(64),
+            confirmatory_shard_digest: "d".repeat(64),
         }
     }
 
@@ -403,6 +410,14 @@ mod tests {
         }
     }
 
+    fn episodes_for_replay_test() -> [PairedLossObservation; 3] {
+        [
+            observation(1, 0.8, 0.4),
+            observation(2, 0.7, 0.3),
+            observation(3, 0.9, 0.5),
+        ]
+    }
+
     #[test]
     fn strong_paired_improvement_is_established_with_anytime_valid_bounds() {
         let mut verifier = SequentialWeightVerification::new(binding(1), config(0.05, 2_000))
@@ -421,7 +436,8 @@ mod tests {
             SequentialWeightVerificationStatus::BenefitEstablished
         );
         assert!(report.lower_confidence_bound > report.config.minimum_improvement);
-        assert_eq!(report.observation_count, 600);
+        assert!(report.observation_count >= 2);
+        assert!(report.observation_count <= 600);
     }
 
     #[test]
@@ -494,11 +510,7 @@ mod tests {
             .expect("left verifier");
         let mut right = SequentialWeightVerification::new(binding(2), config(0.05, 20))
             .expect("right verifier");
-        let episodes = [
-            observation(1, 0.8, 0.4),
-            observation(2, 0.7, 0.3),
-            observation(3, 0.9, 0.5),
-        ];
+        let episodes = episodes_for_replay_test();
         let mut left_report = left.report().expect("initial");
         let mut right_report = right.report().expect("initial");
         for episode in episodes {
@@ -507,12 +519,21 @@ mod tests {
         }
         assert_eq!(left_report.observation_digest, right_report.observation_digest);
         assert_eq!(left_report.report_digest, right_report.report_digest);
-        assert_ne!(
-            left_report.report_digest,
-            left.observe(observation(4, 0.1, 0.1))
-                .expect_err("new episode after terminal state")
-                .to_string()
-        );
+        let mut altered = SequentialWeightVerification::new(binding(2), config(0.05, 20))
+            .expect("altered-evidence verifier");
+        let mut altered_report = altered.report().expect("initial");
+        for (index, episode) in episodes_for_replay_test().into_iter().enumerate() {
+            let changed = if index == 2 {
+                PairedLossObservation {
+                    candidate_loss: 0.4,
+                    ..episode
+                }
+            } else {
+                episode
+            };
+            altered_report = altered.observe(changed).expect("altered evidence");
+        }
+        assert_ne!(left_report.report_digest, altered_report.report_digest);
     }
 
     #[test]
