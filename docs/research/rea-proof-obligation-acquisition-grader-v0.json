@@ -544,10 +544,10 @@
           ]
         },
         {
-          "experiment_id": "claim_absence_from_no_event",
+          "experiment_id": "repeat_same_bounded_session",
           "effects": [
             {
-              "outcome": "none_seen",
+              "outcome": "no_network_event",
               "obligation_id": "complete_network_observation",
               "resulting_status": "unknown",
               "evidence_class": "bounded_session_observation",
