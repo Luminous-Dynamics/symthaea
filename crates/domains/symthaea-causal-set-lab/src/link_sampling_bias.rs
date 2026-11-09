@@ -222,12 +222,13 @@ impl FiniteConeLinkProfile {
         let upper = dimensionless_time_extent.min(MAX_DIMENSIONLESS_TIME_FOR_QUADRATURE);
         let log_unnormalized =
             |x: f64| finite_cone_log_weight(spatial_dimension, dimensionless_time_extent, x);
-        let log_normalization = log_simpson_integral(upper, SIMPSON_PANELS, &log_unnormalized)?;
-        let log_first_moment = log_simpson_integral(upper, SIMPSON_PANELS, &|x| {
+        let log_normalization =
+            log_simpson_integral_fallible(upper, SIMPSON_PANELS, &log_unnormalized)?;
+        let log_first_moment = log_simpson_integral_fallible(upper, SIMPSON_PANELS, &|x| {
             if x <= 0.0 {
-                f64::NEG_INFINITY
+                Ok(f64::NEG_INFINITY)
             } else {
-                log_unnormalized(x) + x.ln()
+                Ok(log_unnormalized(x)? + x.ln())
             }
         })?;
         let mean = (log_first_moment - log_normalization).exp();
@@ -502,6 +503,53 @@ where
         let log_value = log_function(x);
         let coefficient = if index % 2 == 0 { 2.0 } else { 4.0 };
         weighted_sum += coefficient * (log_value - maximum_log).exp();
+    }
+
+    let scaled_integral = (step / 3.0) * weighted_sum;
+    let log_integral = maximum_log + scaled_integral.ln();
+    if log_integral.is_finite() {
+        Ok(log_integral)
+    } else {
+        Err(LinkSamplingBiasError::NumericalOverflow)
+    }
+}
+
+fn log_simpson_integral_fallible<F>(
+    upper: f64,
+    panels: usize,
+    log_function: &F,
+) -> Result<f64, LinkSamplingBiasError>
+where
+    F: Fn(f64) -> Result<f64, LinkSamplingBiasError>,
+{
+    if !upper.is_finite() || upper <= 0.0 || panels < 2 || panels % 2 != 0 {
+        return Err(LinkSamplingBiasError::InvalidDimensionlessTime);
+    }
+
+    let step = upper / panels as f64;
+    let first = log_function(0.0)?;
+    let last = log_function(upper)?;
+    if first.is_nan() || first == f64::INFINITY || last.is_nan() || last == f64::INFINITY {
+        return Err(LinkSamplingBiasError::NumericalOverflow);
+    }
+    let mut maximum_log = first.max(last);
+
+    for index in 1..panels {
+        let value = log_function(index as f64 * step)?;
+        if value.is_nan() || value == f64::INFINITY {
+            return Err(LinkSamplingBiasError::NumericalOverflow);
+        }
+        maximum_log = maximum_log.max(value);
+    }
+    if !maximum_log.is_finite() {
+        return Err(LinkSamplingBiasError::NumericalOverflow);
+    }
+
+    let mut weighted_sum = (first - maximum_log).exp() + (last - maximum_log).exp();
+    for index in 1..panels {
+        let value = log_function(index as f64 * step)?;
+        let coefficient = if index % 2 == 0 { 2.0 } else { 4.0 };
+        weighted_sum += coefficient * (value - maximum_log).exp();
     }
 
     let scaled_integral = (step / 3.0) * weighted_sum;
