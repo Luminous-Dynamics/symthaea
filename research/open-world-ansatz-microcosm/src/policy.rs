@@ -264,9 +264,8 @@ impl StrategyEnumeratorBaseline {
             }
         }
         let action_strategy = strategy_for_decision_step(strategy, view.observations.len());
-        let (intervention, work) =
-            crate::strategies::choose_probe_with_work(view, action_strategy)
-                .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
+        let (intervention, work) = crate::strategies::choose_probe_with_work(view, action_strategy)
+            .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
         Ok((probe(intervention), work))
     }
 }
