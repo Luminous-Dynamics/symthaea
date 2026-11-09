@@ -27,6 +27,12 @@ pub const MAX_SIGNATURE_SPACETIME_DIMENSION: usize = 4;
 #[derive(Clone, Debug, PartialEq)]
 pub enum JointSignatureError {
     InvalidProfileBinCount,
+    InvalidProfileLength {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidProfileValues,
+    InsufficientEvents,
     InvalidSpacetimeDimension {
         dimension: usize,
     },
@@ -41,6 +47,15 @@ impl fmt::Display for JointSignatureError {
         match self {
             Self::InvalidProfileBinCount => {
                 write!(f, "joint signature requires a positive interval-profile bin count")
+            }
+            Self::InvalidProfileLength { expected, actual } => {
+                write!(f, "interval profile has {actual} values; expected {expected}")
+            }
+            Self::InvalidProfileValues => {
+                write!(f, "interval profile must be a finite normalized composition")
+            }
+            Self::InsufficientEvents => {
+                write!(f, "joint signature requires at least two events")
             }
             Self::InvalidSpacetimeDimension { dimension } => write!(
                 f,
@@ -188,6 +203,84 @@ impl JointCausalSetSignature {
         features.push(scaled_chain);
         Ok(features)
     }
+
+    /// Return a non-redundant, simplex-aware feature vector for joint
+    /// synthetic-likelihood calibration.
+    ///
+    /// The normalized interval profile has K+1 components but only K degrees
+    /// of freedom because its entries sum to one. This method applies an
+    /// isometric log-ratio (ILR) transform after a declared Jeffreys-style
+    /// half-count pseudocount (0.5 / choose(N,2)) is added to each component.
+    /// It then appends the candidate-dimension-normalized longest chain:
+    ///
+    /// [ILR(profile)[0..K], L / N^(1/D)].
+    ///
+    /// The smoothing rule is fixed by event count and does not depend on the
+    /// observed profile. ILR coordinates preserve Aitchison geometry and
+    /// remove the singular simplex direction. Calibration must still use
+    /// whole-sprinkling replicates because interval observations are dependent.
+    pub fn ilr_features_for_dimension(
+        &self,
+        spacetime_dimension: usize,
+    ) -> Result<Vec<f64>, JointSignatureError> {
+        if !(MIN_SIGNATURE_SPACETIME_DIMENSION..=MAX_SIGNATURE_SPACETIME_DIMENSION)
+            .contains(&spacetime_dimension)
+        {
+            return Err(JointSignatureError::InvalidSpacetimeDimension {
+                dimension: spacetime_dimension,
+            });
+        }
+        if self.event_count < 2 {
+            return Err(JointSignatureError::InsufficientEvents);
+        }
+        let expected = self.profile_bin_count + 1;
+        if self.normalized_interval_profile.len() != expected {
+            return Err(JointSignatureError::InvalidProfileLength {
+                expected,
+                actual: self.normalized_interval_profile.len(),
+            });
+        }
+        if self
+            .normalized_interval_profile
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return Err(JointSignatureError::InvalidProfileValues);
+        }
+        let profile_sum = self.normalized_interval_profile.iter().sum::<f64>();
+        if !profile_sum.is_finite() || (profile_sum - 1.0).abs() > 1.0e-8 {
+            return Err(JointSignatureError::InvalidProfileValues);
+        }
+
+        let total_pairs = self.event_count as f64 * (self.event_count - 1) as f64 / 2.0;
+        let pseudocount = 0.5 / total_pairs;
+        let log_composition: Vec<f64> = self
+            .normalized_interval_profile
+            .iter()
+            .map(|value| (value + pseudocount).ln())
+            .collect();
+        let categories = log_composition.len();
+        let mut ilr = Vec::with_capacity(categories);
+        let mut prefix_log_sum = 0.0;
+        for prefix_count in 1..categories {
+            prefix_log_sum += log_composition[prefix_count - 1];
+            let count = prefix_count as f64;
+            let coordinate = (count / (count + 1.0)).sqrt()
+                * (prefix_log_sum / count - log_composition[prefix_count]);
+            if !coordinate.is_finite() {
+                return Err(JointSignatureError::InvalidProfileValues);
+            }
+            ilr.push(coordinate);
+        }
+
+        let scale = (self.event_count as f64).powf(1.0 / spacetime_dimension as f64);
+        let scaled_chain = self.longest_chain_length as f64 / scale;
+        if !scaled_chain.is_finite() || scaled_chain < 0.0 {
+            return Err(JointSignatureError::NonFiniteScaledChain);
+        }
+        ilr.push(scaled_chain);
+        Ok(ilr)
+    }
 }
 
 #[cfg(test)]
@@ -227,6 +320,45 @@ mod tests {
         assert_eq!(d4.len(), 8);
         assert_eq!(&d3[..7], &d4[..7]);
         assert!(d3[7] < d4[7]);
+    }
+
+    #[test]
+    fn ilr_features_remove_simplex_redundancy_and_smooth_zero_bins() {
+        let signature = JointCausalSetSignature {
+            event_count: 64,
+            profile_bin_count: 4,
+            normalized_interval_profile: vec![0.0, 0.0, 0.2, 0.3, 0.5],
+            longest_chain_length: 12,
+        };
+        let features = signature.ilr_features_for_dimension(2).unwrap();
+        assert_eq!(features.len(), 5);
+        assert!(features.iter().all(|value| value.is_finite()));
+        assert!((features[4] - 12.0 / 64.0_f64.sqrt()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn ilr_features_reject_non_normalized_or_malformed_profiles() {
+        let non_normalized = JointCausalSetSignature {
+            event_count: 64,
+            profile_bin_count: 2,
+            normalized_interval_profile: vec![0.2, 0.2, 0.2],
+            longest_chain_length: 8,
+        };
+        assert_eq!(
+            non_normalized.ilr_features_for_dimension(2),
+            Err(JointSignatureError::InvalidProfileValues)
+        );
+
+        let wrong_length = JointCausalSetSignature {
+            event_count: 64,
+            profile_bin_count: 3,
+            normalized_interval_profile: vec![0.5, 0.5],
+            longest_chain_length: 8,
+        };
+        assert!(matches!(
+            wrong_length.ilr_features_for_dimension(2),
+            Err(JointSignatureError::InvalidProfileLength { .. })
+        ));
     }
 
     #[test]
