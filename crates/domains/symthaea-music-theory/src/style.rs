@@ -324,8 +324,8 @@ impl Style {
             | Style::Folk
             | Style::Cinematic
             | Style::Playful
-            | Style::Nocturne
             | Style::March
+            | Style::Nocturne
             | Style::Lullaby
             | Style::ModalFolk
             | Style::Impressionism
@@ -350,10 +350,40 @@ impl Style {
     }
 
     /// This style's full [`crate::grammar::GrammarProfile`] (family, phrase
-    /// grammar, harmonic syntax, performance dialect, supported intent
-    /// axes) — `self.grammar_family().profile()`.
+    /// grammar, harmonic syntax, performance dialect, supported intent axes).
+    ///
+    /// Grammar family still owns the compositional architecture, but the
+    /// performance dialect is specialized per style: a tango and a bossa may
+    /// both be cycle/song forms without sharing the same clock, and a fugue
+    /// must preserve contrapuntal blend while an opera needs dramatic timing.
+    /// This explicit profile is authoritative for preset-driven render paths;
+    /// only free-form user specs should infer a fallback from texture flags.
     pub fn grammar_profile(self) -> crate::grammar::GrammarProfile {
-        self.grammar_family().profile()
+        use crate::grammar::PerformanceDialect as P;
+
+        let mut profile = self.grammar_family().profile();
+        profile.performance = match self {
+            Style::Folk | Style::ModalFolk | Style::Celtic | Style::IrishTraditional => {
+                P::FolkLift
+            }
+            Style::Cinematic | Style::Sonata | Style::Opera | Style::ProgFolk => {
+                P::DramaticTiming
+            }
+            Style::Playful | Style::March | Style::Tango | Style::AfroCuban | Style::Flamenco => {
+                P::DanceLocked
+            }
+            Style::Blues | Style::JazzBallad | Style::BossaNova => P::JazzLaidBack,
+            Style::Fugue | Style::RenaissancePolyphony | Style::SacredChoral => P::ChoralBlend,
+            Style::Passacaglia | Style::Minimalism => P::ProcessExact,
+            Style::Ambient | Style::HindustaniInspired => P::DroneElastic,
+            Style::Classical
+            | Style::Waltz
+            | Style::Nocturne
+            | Style::Lullaby
+            | Style::Impressionism
+            | Style::BaroqueSuite => P::ClassicalRubato,
+        };
+        profile
     }
 
     /// Which [`crate::composer::MusicalIntent`] expressive axes (valence/
@@ -3554,4 +3584,64 @@ mod tests {
             seen
         );
     }
+
+    #[test]
+    fn style_profiles_declare_performance_dialects_explicitly() {
+        use crate::grammar::PerformanceDialect as P;
+
+        let cases = [
+            (Style::Classical, P::ClassicalRubato),
+            (Style::Waltz, P::ClassicalRubato),
+            (Style::Folk, P::FolkLift),
+            (Style::Cinematic, P::DramaticTiming),
+            (Style::Playful, P::DanceLocked),
+            (Style::Nocturne, P::ClassicalRubato),
+            (Style::March, P::DanceLocked),
+            (Style::Lullaby, P::ClassicalRubato),
+            (Style::ModalFolk, P::FolkLift),
+            (Style::Fugue, P::ChoralBlend),
+            (Style::Passacaglia, P::ProcessExact),
+            (Style::Tango, P::DanceLocked),
+            (Style::Celtic, P::FolkLift),
+            (Style::Blues, P::JazzLaidBack),
+            (Style::Impressionism, P::ClassicalRubato),
+            (Style::SacredChoral, P::ChoralBlend),
+            (Style::Minimalism, P::ProcessExact),
+            (Style::JazzBallad, P::JazzLaidBack),
+            (Style::BaroqueSuite, P::ClassicalRubato),
+            (Style::ProgFolk, P::DramaticTiming),
+            (Style::Ambient, P::DroneElastic),
+            (Style::Sonata, P::DramaticTiming),
+            (Style::RenaissancePolyphony, P::ChoralBlend),
+            (Style::AfroCuban, P::DanceLocked),
+            (Style::Flamenco, P::DanceLocked),
+            (Style::BossaNova, P::JazzLaidBack),
+            (Style::Opera, P::DramaticTiming),
+            (Style::IrishTraditional, P::FolkLift),
+            (Style::HindustaniInspired, P::DroneElastic),
+        ];
+        for (style, expected) in cases {
+            assert_eq!(
+                style.grammar_profile().performance,
+                expected,
+                "{style:?}"
+            );
+        }
+
+        // Style-specific timing must not silently reassign the composition
+        // grammar family; this is an orthogonal renderer/performance contract.
+        assert_eq!(
+            Style::Tango.grammar_profile().family,
+            Style::Tango.grammar_family()
+        );
+        assert_eq!(
+            Style::Fugue.grammar_profile().family,
+            Style::Fugue.grammar_family()
+        );
+        assert_eq!(
+            Style::Ambient.grammar_profile().family,
+            Style::Ambient.grammar_family()
+        );
+    }
+
 }
