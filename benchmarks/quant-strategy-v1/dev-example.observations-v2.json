@@ -83,7 +83,8 @@
           "price": "100.00",
           "currency": "USD",
           "venue": "SYNTHETIC"
-        }
+        },
+        "source_version_id": "SYN-PRICE-A-20260105-v1"
       }
     }
   ],
