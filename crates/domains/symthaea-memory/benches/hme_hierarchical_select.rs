@@ -473,6 +473,7 @@ fn run() -> Result<(), String> {
                 "exact top-k mismatch: expected {expected_top_k:?}, received {actual_top_k:?}"
             ));
         }
+        let two_stage_end_to_end_ns = end_to_end_start.elapsed().as_nanos();
 
         let full_scan_start = Instant::now();
         let full_scan_scores: Vec<ExactScoreRecord<String>> = originals_by_id
@@ -489,7 +490,7 @@ fn run() -> Result<(), String> {
         }
         if measure {
             full_scan_samples.push(full_scan_start.elapsed().as_nanos());
-            end_to_end_samples.push(end_to_end_start.elapsed().as_nanos());
+            end_to_end_samples.push(two_stage_end_to_end_ns);
         }
 
         last_group_plan = Some(group_plan);
