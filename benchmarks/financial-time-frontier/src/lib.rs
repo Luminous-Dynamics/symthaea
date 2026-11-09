@@ -168,6 +168,8 @@ pub enum AvailabilityProofKind {
 
 /// Attested result from the caller's independent proof verifier, not a self-asserted boolean.
 /// The proof artifact must already have passed byte and provenance checks before construction.
+/// available_at must be an exact instant. Date-only or otherwise interval-censored source vintages
+/// must use Unverifiable in v0.1; never coerce them to midnight or invent a release time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AvailabilityProof {
     Verified {
