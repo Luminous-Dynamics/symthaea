@@ -114,7 +114,7 @@ Inspected source blobs:
 - `policy/Q0_Preview/runtime/task_context.py`: `7776e51197f824cc754b06a359f4505572c3372d`
 - `policy/Q0_Preview/assets/tasks/task_reference.json`: `9e82814b209cb662aef8ca06099127bce2cce2e2`
 
-A separate upstream commit on 2026-11-03 (`6baccd57ff958570d0db1588370289ee36c8bb70`) removed the `source_sha256` comparison in `task_reference(name)` that previously checked the reference-card source hashes against task-card hashes. The current helper still checks that a task reference exists, but that specific cross-file source-consistency guard is absent.
+A separate upstream commit on 2026-11-03 (`6baccd57ff958570d0db1588370289ee36c8bb70`) removed the `source_sha256` comparison in `task_reference(name)` that previously checked the reference-card source hashes against task-card hashes. The current helper still checks that a task reference exists, but that specific cross-file source-consistency guard is absent. The public `task_context(name, benchmark_root=None, verify=False)` signature also exposes `benchmark_root` and `verify`, but neither parameter is used by the inspected implementation. Therefore callers must not rely on `verify=True` as an integrity check; Luminous should independently bind the exact task-card, task-reference and evaluator-source blobs.
 
 This may be a deliberate maintenance change; this audit does not infer intent or allege benchmark compromise. It is a **qualification and assistance-disclosure issue**:
 - pin the exact task card, task reference and evaluator/source revision used;
