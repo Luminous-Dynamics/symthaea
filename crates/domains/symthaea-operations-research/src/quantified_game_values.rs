@@ -92,55 +92,129 @@ impl Default for GameValueProfileBudget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GameValueProfileError {
     DagVerification(QbfGameDagError),
-    MatrixPrefixVariableCountMismatch { matrix: usize, prefix: usize },
-    VariableBudgetExceeded { required: usize, limit: usize },
-    VariableNameBudgetExceeded { required: usize, limit: usize },
-    EmptyVariableName { index: usize },
+    MatrixPrefixVariableCountMismatch {
+        matrix: usize,
+        prefix: usize,
+    },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    VariableNameBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    EmptyVariableName {
+        index: usize,
+    },
     DuplicateVariableName(String),
-    ClauseBudgetExceeded { required: usize, limit: usize },
-    LiteralBudgetExceeded { required: usize, limit: usize },
+    ClauseBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    LiteralBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     LiteralVariableOutOfRange {
         clause: usize,
         literal: usize,
         variable: usize,
         variable_count: usize,
     },
-    TruthTableEntryBudgetExceeded { required: u128, limit: u128 },
-    DagPathStepBudgetExceeded { required: u128, limit: u128 },
-    MatrixLiteralCheckBudgetExceeded { required: u128, limit: u128 },
+    TruthTableEntryBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    DagPathStepBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    MatrixLiteralCheckBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
     PrefixBindingMismatch,
-    MissingDagNode { node: usize },
-    NodePrefixPositionMismatch { node: usize, expected: usize, actual: usize },
-    LayerCountMismatch { expected: usize, actual: usize },
-    LayerPrefixPositionMismatch { layer: usize, expected: usize, actual: usize },
-    LayerVariableScopeMismatch { layer: usize },
-    LayerEntryCountMismatch { layer: usize, expected: u128, actual: usize },
-    LayerKeyWidthMismatch { layer: usize, expected: usize, actual: usize },
-    MissingLayerAssignment { layer: usize, assignment: Vec<bool> },
-    MatrixValueMismatch { assignment: Vec<bool>, expected: bool, actual: bool },
+    MissingDagNode {
+        node: usize,
+    },
+    NodePrefixPositionMismatch {
+        node: usize,
+        expected: usize,
+        actual: usize,
+    },
+    LayerCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    LayerPrefixPositionMismatch {
+        layer: usize,
+        expected: usize,
+        actual: usize,
+    },
+    LayerVariableScopeMismatch {
+        layer: usize,
+    },
+    LayerEntryCountMismatch {
+        layer: usize,
+        expected: u128,
+        actual: usize,
+    },
+    LayerKeyWidthMismatch {
+        layer: usize,
+        expected: usize,
+        actual: usize,
+    },
+    MissingLayerAssignment {
+        layer: usize,
+        assignment: Vec<bool>,
+    },
+    MatrixValueMismatch {
+        assignment: Vec<bool>,
+        expected: bool,
+        actual: bool,
+    },
     GameValueRecurrenceMismatch {
         prefix_position: usize,
         assignment: Vec<bool>,
         expected: bool,
         actual: bool,
     },
-    StrategyFunctionCountMismatch { owner: Quantifier, expected: usize, actual: usize },
+    StrategyFunctionCountMismatch {
+        owner: Quantifier,
+        expected: usize,
+        actual: usize,
+    },
     StrategyFunctionVariableMismatch {
         owner: Quantifier,
         index: usize,
         expected: usize,
         actual: usize,
     },
-    StrategyFunctionScopeMismatch { variable: usize, expected: Vec<usize>, actual: Vec<usize> },
-    StrategyFunctionEntryCountMismatch { variable: usize, expected: u128, actual: usize },
-    MissingStrategyFunctionRow { variable: usize, assignment: Vec<bool> },
+    StrategyFunctionScopeMismatch {
+        variable: usize,
+        expected: Vec<usize>,
+        actual: Vec<usize>,
+    },
+    StrategyFunctionEntryCountMismatch {
+        variable: usize,
+        expected: u128,
+        actual: usize,
+    },
+    MissingStrategyFunctionRow {
+        variable: usize,
+        assignment: Vec<bool>,
+    },
     StrategyFunctionValueMismatch {
         variable: usize,
         assignment: Vec<bool>,
         expected: bool,
         actual: bool,
     },
-    TruthValueMismatch { expected: bool, actual: bool },
+    TruthValueMismatch {
+        expected: bool,
+        actual: bool,
+    },
     ResourceAccountingOverflow,
 }
 
@@ -318,9 +392,7 @@ fn validate_profile_source(
 }
 
 fn prefix_assignment(mask: u128, width: usize) -> Vec<bool> {
-    (0..width)
-        .map(|index| ((mask >> index) & 1) != 0)
-        .collect()
+    (0..width).map(|index| ((mask >> index) & 1) != 0).collect()
 }
 
 fn dag_value_after_prefix(
@@ -371,13 +443,13 @@ fn dag_value_after_prefix(
                 high_child,
                 ..
             } => {
-                let branch = *assignment
-                    .get(node.prefix_position)
-                    .ok_or(GameValueProfileError::NodePrefixPositionMismatch {
+                let branch = *assignment.get(node.prefix_position).ok_or(
+                    GameValueProfileError::NodePrefixPositionMismatch {
                         node: node_id,
                         expected: node.prefix_position + 1,
                         actual: assignment.len(),
-                    })?;
+                    },
+                )?;
                 node_id = if branch { *high_child } else { *low_child };
             }
         }
@@ -510,8 +582,7 @@ pub fn verify_game_value_profile(
     budget: GameValueProfileBudget,
 ) -> Result<GameValueProfileVerificationReport, GameValueProfileError> {
     let expected_order = validate_profile_source(problem, prefix, budget)?;
-    if profile.variable_count != problem.variables.len() || profile.prefix_order != expected_order
-    {
+    if profile.variable_count != problem.variables.len() || profile.prefix_order != expected_order {
         return Err(GameValueProfileError::PrefixBindingMismatch);
     }
 
@@ -737,13 +808,12 @@ pub fn verify_game_value_profile(
         }
     }
 
-    let root_value = *profile.layers[0]
-        .values
-        .get(&vec![])
-        .ok_or(GameValueProfileError::MissingLayerAssignment {
+    let root_value = *profile.layers[0].values.get(&vec![]).ok_or(
+        GameValueProfileError::MissingLayerAssignment {
             layer: 0,
             assignment: vec![],
-        })?;
+        },
+    )?;
     if profile.truth_value != root_value {
         return Err(GameValueProfileError::TruthValueMismatch {
             expected: root_value,
@@ -1069,9 +1139,7 @@ mod tests {
             profile_budget(),
         )
         .unwrap();
-        profile.skolem_functions[0]
-            .table
-            .insert(vec![true], false);
+        profile.skolem_functions[0].table.insert(vec![true], false);
         assert!(matches!(
             verify_game_value_profile(&problem, &prefix, &profile, profile_budget()),
             Err(GameValueProfileError::StrategyFunctionValueMismatch { .. })
@@ -1094,13 +1162,7 @@ mod tests {
             ..profile_budget()
         };
         assert!(matches!(
-            extract_game_value_profile_from_dag(
-                &problem,
-                &prefix,
-                &dag,
-                dag_budget(),
-                tight
-            ),
+            extract_game_value_profile_from_dag(&problem, &prefix, &dag, dag_budget(), tight),
             Err(GameValueProfileError::TruthTableEntryBudgetExceeded { .. })
         ));
     }
@@ -1110,7 +1172,10 @@ mod tests {
         let problem = equality_problem();
         let existential_prefix = prefix(
             2,
-            vec![block(Quantifier::Exists, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::Exists, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
         );
         let (existential_dag, _) =
             build_qbf_game_proof_dag(&problem, &existential_prefix, dag_budget()).unwrap();
@@ -1129,7 +1194,10 @@ mod tests {
             profile_budget(),
         )
         .unwrap();
-        assert_eq!(existential_profile.skolem_functions[1].dependencies, vec![0]);
+        assert_eq!(
+            existential_profile.skolem_functions[1].dependencies,
+            vec![0]
+        );
         assert_eq!(
             existential_profile.skolem_functions[1].table,
             BTreeMap::from([(vec![false], false), (vec![true], true)])
@@ -1137,7 +1205,10 @@ mod tests {
 
         let universal_prefix = prefix(
             2,
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::ForAll, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::ForAll, &[1]),
+            ],
         );
         let (universal_dag, _) =
             build_qbf_game_proof_dag(&problem, &universal_prefix, dag_budget()).unwrap();
@@ -1156,7 +1227,10 @@ mod tests {
             profile_budget(),
         )
         .unwrap();
-        assert_eq!(universal_profile.herbrand_functions[1].dependencies, vec![0]);
+        assert_eq!(
+            universal_profile.herbrand_functions[1].dependencies,
+            vec![0]
+        );
         assert_eq!(
             universal_profile.herbrand_functions[1].table,
             BTreeMap::from([(vec![false], true), (vec![true], false)])
@@ -1188,8 +1262,7 @@ mod tests {
                         .collect();
                     let prefix = prefix(2, blocks);
                     let dag_budget = dag_budget();
-                    let (dag, _) =
-                        build_qbf_game_proof_dag(problem, &prefix, dag_budget).unwrap();
+                    let (dag, _) = build_qbf_game_proof_dag(problem, &prefix, dag_budget).unwrap();
                     let profile = extract_game_value_profile_from_dag(
                         problem,
                         &prefix,
