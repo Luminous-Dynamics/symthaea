@@ -240,7 +240,6 @@ struct CandidatePolicy {
     static_robust_risk: f64,
     rectangular_per_root_model_risks: Vec<f64>,
     rectangular_robust_risk: f64,
-    bayesian_average_risk: f64,
     worst_branch_cost: f64,
 }
 
@@ -327,7 +326,6 @@ pub fn evaluate_static_model_diagnostic_problem(
                 static_robust_risk,
                 rectangular_per_root_model_risks,
                 rectangular_robust_risk,
-                bayesian_average_risk,
                 worst_branch_cost,
             };
             if best_static.as_ref().is_none_or(|best| candidate_precedes(&candidate, best, true)) {
@@ -1357,7 +1355,7 @@ mod tests {
         let mut problem = symmetric_calibration_fixture();
         let source = problem.model_vertices[0].clone();
         problem.model_vertices[1].stage_one_outcome_probabilities_by_world =
-            source.stage_one_outcome_probabilities_by_world;
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]];
         problem.model_vertices[1].stage_two_outcome_probabilities = source.stage_two_outcome_probabilities;
         problem.model_vertices[1].one_shot_outcome_probabilities_by_action =
             source.one_shot_outcome_probabilities_by_action;
