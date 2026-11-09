@@ -117,11 +117,7 @@ fn sequential_scenario() -> DiagnosticScenario {
                         vec![1.0, 0.0]
                     },
                 });
-                truth.push(vec![
-                    nuisance_outcomes,
-                    first_outcomes,
-                    second_outcomes,
-                ]);
+                truth.push(vec![nuisance_outcomes, first_outcomes, second_outcomes]);
             }
         }
     }
