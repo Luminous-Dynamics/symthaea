@@ -124,7 +124,10 @@ pub fn evaluate_service_continuity(
     case: &ServiceContinuityCase,
 ) -> Result<ServiceContinuityEvaluation, EvaluationError> {
     validate_case(case)?;
-    let safety_failed = case.events.iter().any(|e| e.kind == EventKind::SafetyGateFailed);
+    let safety_gate_events: Vec<&EvidenceEvent> = case.events.iter()
+        .filter(|event| event.kind == EventKind::SafetyGateFailed)
+        .collect();
+    let safety_failed = !safety_gate_events.is_empty();
     let mut services = Vec::with_capacity(case.services.len());
     for contract in &case.services {
         let mut events: Vec<&EvidenceEvent> = case.events.iter()
@@ -133,7 +136,13 @@ pub fn evaluate_service_continuity(
             .then_with(|| a.kind.cmp(&b.kind)).then_with(|| a.event_id.cmp(&b.event_id)));
         let tasks: Vec<&MaintenanceTask> = case.maintenance_tasks.iter()
             .filter(|t| t.service_id == contract.service_id).collect();
-        services.push(evaluate_service(contract, &events, &tasks, case.timeline_seconds));
+        services.push(evaluate_service(
+            contract,
+            &events,
+            &tasks,
+            &safety_gate_events,
+            case.timeline_seconds,
+        ));
     }
     let breaches: u32 = services.iter().map(|s| s.floor_breach_episodes).sum();
     let first_breach = services.iter().filter_map(|s| s.first_floor_breach_seconds).min();
@@ -342,7 +351,10 @@ fn integrate(
     *deficit_hours += (c.minimum_rate - rate) * (dt as f64 / 3600.0);
 }
 fn evaluate_service(
-    c: &ServiceContract, events: &[&EvidenceEvent], tasks: &[&MaintenanceTask],
+    c: &ServiceContract,
+    events: &[&EvidenceEvent],
+    tasks: &[&MaintenanceTask],
+    safety_gate_events: &[&EvidenceEvent],
     timeline: u64,
 ) -> ServiceEvaluation {
     let first_fault = events.iter().filter(|e| matches!(e.kind, EventKind::ComponentFailure
@@ -371,7 +383,7 @@ fn evaluate_service(
                 EventKind::SafetyGateFailed => {}, // global gate, not a flow observation
                 EventKind::AuthorizedRelease => {
                     if e.delivered_rate_after >= c.minimum_rate
-                        && release_accepted(e, events, tasks) {
+                        && release_accepted(e, events, tasks, safety_gate_events) {
                         rate = e.delivered_rate_after; restoration.get_or_insert(t);
                     } else { rejected = rejected.saturating_add(1); }
                 }
@@ -420,17 +432,24 @@ fn evaluate_service(
             .map(|e| e.at_seconds).max(),
         accepted_restoration_seconds: restoration, tasr_seconds: tasr,
         rejected_release_attempts: rejected,
-        restoration_episodes: evaluate_restoration_episodes(events, tasks, c.minimum_rate),
+        restoration_episodes: evaluate_restoration_episodes(
+            events,
+            tasks,
+            safety_gate_events,
+            c.minimum_rate,
+        ),
     }
 }
 fn release_accepted(
-    release: &EvidenceEvent, events: &[&EvidenceEvent], tasks: &[&MaintenanceTask],
+    release: &EvidenceEvent,
+    events: &[&EvidenceEvent],
+    tasks: &[&MaintenanceTask],
+    safety_gate_events: &[&EvidenceEvent],
 ) -> bool {
-    // Authorization is evaluated against the evidence prefix available at this release.
-    // A later safety-gate failure changes the final/current disposition, but must not
-    // retroactively rewrite whether this earlier release was accepted.
-    if events.iter().any(|event| event.kind == EventKind::SafetyGateFailed
-        && event.at_seconds <= release.at_seconds) {
+    // Authorization is evaluated against the case-wide gate prefix available at this
+    // release, even when the gate record is attached to a different service's event log.
+    // A later safety-gate failure does not retroactively veto this earlier release.
+    if safety_gate_events.iter().any(|event| event.at_seconds <= release.at_seconds) {
         return false;
     }
     let Some(task_id) = release.maintenance_task_id.as_deref() else { return false; };
@@ -521,6 +540,7 @@ fn release_accepted(
 fn evaluate_restoration_episodes(
     events: &[&EvidenceEvent],
     tasks: &[&MaintenanceTask],
+    safety_gate_events: &[&EvidenceEvent],
     minimum_rate: f64,
 ) -> Vec<RestorationEpisodeEvaluation> {
     let mut fault_events: BTreeMap<&str, Vec<&EvidenceEvent>> = BTreeMap::new();
@@ -573,7 +593,7 @@ fn evaluate_restoration_episodes(
                 && event.component_id == first_fault.component_id
         }) {
             if release.delivered_rate_after >= minimum_rate
-                && release_accepted(release, events, tasks)
+                && release_accepted(release, events, tasks, safety_gate_events)
             {
                 accepted_release = Some(
                     accepted_release.map_or(release.at_seconds, |time| time.min(release.at_seconds))
@@ -816,6 +836,40 @@ mod tests {
     }
 
     #[test]
+    fn case_wide_safety_gate_applies_across_services_at_each_release_time() {
+        let mut input = case(vec![
+            event("water_failure", 10, EventKind::ComponentFailure, 0.0),
+            task_event_for(TASK_ID, "water_failure", "water_start", 20,
+                EventKind::RepairStarted, 0.0, REV_A),
+            task_event_for(TASK_ID, "water_failure", "water_repair", 30,
+                EventKind::RepairCompleted, 0.0, REV_A),
+            task_event_for(TASK_ID, "water_failure", "water_test", 40,
+                EventKind::PostTestPassed, 0.0, REV_A),
+            task_event_for(TASK_ID, "water_failure", "water_config", 45,
+                EventKind::ConfigurationUpdated, 0.0, REV_A),
+            task_event_for(TASK_ID, "water_failure", "water_release", 50,
+                EventKind::AuthorizedRelease, 80.0, REV_A),
+            event("global_safety_gate", 80, EventKind::SafetyGateFailed, 0.0),
+        ], vec![task_for(TASK_ID, "water_failure")], 100);
+        input.services.push(ServiceContract {
+            service_id: "electrical_distribution".into(),
+            unit: "kW".into(),
+            minimum_rate: 2.0,
+            nominal_rate: 5.0,
+            initial_rate: 5.0,
+        });
+        let mut gate = input.events.pop().unwrap();
+        gate.service_id = "water".into();
+        input.events.push(gate);
+
+        let out = evaluate_service_continuity(&input).unwrap();
+        assert_eq!(out.disposition, ContinuityDisposition::UnsafeNotAuthorized);
+        assert_eq!(out.services[0].accepted_restoration_seconds, Some(50));
+        assert_eq!(out.services[0].restoration_episodes[0].accepted_restoration_seconds, Some(50));
+        assert_eq!(out.services[1].accepted_restoration_seconds, None);
+    }
+
+    #[test]
     fn repair_and_post_test_events_do_not_restore_delivery_before_release() {
         let events = vec![
             event("failure", 10, EventKind::ComponentFailure, 0.0),
@@ -1003,14 +1057,15 @@ mod tests {
     fn all_declared_service_floors_require_every_service_to_recover() {
         let mut input=case(vec![
             event("water_failure",10,EventKind::ComponentFailure,0.0),
-            task_event("water_repair",30,EventKind::RepairCompleted,0.0),
+            task_event_for(TASK_ID, "water_failure", "water_repair", 30,
+                EventKind::RepairCompleted, 0.0, REV_A),
             task_event_for(TASK_ID, "water_failure", "water_test", 40,
                 EventKind::PostTestPassed, 0.0, REV_A),
             task_event_for(TASK_ID, "water_failure", "water_config", 50,
                 EventKind::ConfigurationUpdated, 0.0, REV_A),
             task_event_for(TASK_ID, "water_failure", "water_release", 60,
                 EventKind::AuthorizedRelease, 80.0, REV_A),
-        ],vec![task()],100);
+        ],vec![task_for(TASK_ID, "water_failure")],100);
         input.services.push(ServiceContract {
             service_id:"electrical_distribution".into(), unit:"kW".into(),
             minimum_rate:2.0, nominal_rate:5.0, initial_rate:5.0,
