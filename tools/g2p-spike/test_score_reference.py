@@ -129,6 +129,37 @@ class G2PReferenceScorerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "contiguous"):
             split_normalized_piper_words(json.dumps(value))
 
+    def test_structured_word_hypothesis_rejects_raw_token_stream_mismatch(self):
+        hypothesis = json.loads(normalized_hypothesis(["hello"]))
+        hypothesis["raw_tokens"][0] = "j"
+        with self.assertRaisesRegex(ValueError, "differs from the TSV source"):
+            split_normalized_piper_words(
+                json.dumps(hypothesis),
+                raw_tokens=["h", "e", "l", "l", "o"],
+            )
+
+    def test_structured_word_hypothesis_rejects_punctuation_offset_drift(self):
+        raw_tokens = ["“", "h", "ə", "l", "oʊ", ",", " "]
+        hypothesis = json.loads(
+            normalized_hypothesis(
+                ["həloʊ"],
+                [
+                    {
+                        "raw_token_index": 5,
+                        "word_index": 0,
+                        "after_ipa_character_index": 4,
+                        "token": ",",
+                    }
+                ],
+                raw_tokens,
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "punctuation offsets"):
+            split_normalized_piper_words(
+                json.dumps(hypothesis),
+                raw_tokens=raw_tokens,
+            )
+
     def test_structured_word_hypothesis_rejects_character_prosody_mismatch(self):
         value = json.loads(normalized_hypothesis(["hello"]))
         value["words"][0]["character_prosody"].pop()
