@@ -1,0 +1,978 @@
+{
+  "corpus_version": "ev-diagnostic-voi-corpus/0.1",
+  "scenarios": [
+    {
+      "case_id": "positive-selects-net-positive-test",
+      "expected_status": "test_selected",
+      "expected_test_id": "capacity_reference_test",
+      "scenario": {
+        "scenario_id": "synthetic-diagnostic-positive-evsi",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "nmc",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "balanced",
+            "prior_probability": 0.7
+          },
+          {
+            "state_id": "weak_cell",
+            "prior_probability": 0.2
+          },
+          {
+            "state_id": "thermal_risk",
+            "prior_probability": 0.1
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "continue_monitoring",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 0
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 100
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 200
+              }
+            ]
+          },
+          {
+            "action_id": "inspect",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 12
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 15
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 30
+              }
+            ]
+          },
+          {
+            "action_id": "service",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 35
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 5
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 0
+              }
+            ]
+          }
+        ],
+        "tests": [
+          {
+            "test_id": "capacity_reference_test",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 1.5,
+              "downtime_cost_units": 0.5,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc",
+                "lfp"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "normal",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.1
+                  }
+                ]
+              },
+              {
+                "outcome_id": "low_capacity",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.1
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.8
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.9
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "test_id": "eis_unqualified",
+            "protocol_ref": "eis-protocol",
+            "equipment_ref": "eis-lab",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "unqualified",
+            "cost": {
+              "test_cost_units": 0.1,
+              "downtime_cost_units": 0.1,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc",
+                "lfp"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "pattern_a",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.8
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.3
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.2
+                  }
+                ]
+              },
+              {
+                "outcome_id": "pattern_b",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.7
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.8
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "positive-information-without-decision-value",
+      "expected_status": "no_test",
+      "expected_test_id": null,
+      "scenario": {
+        "scenario_id": "synthetic-high-information-no-decision-value",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "nmc",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "normal",
+            "prior_probability": 0.5
+          },
+          {
+            "state_id": "degraded",
+            "prior_probability": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "inspect_only",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "normal",
+                "loss_units": 10
+              },
+              {
+                "state_id": "degraded",
+                "loss_units": 10
+              }
+            ]
+          },
+          {
+            "action_id": "monitor_blocked",
+            "gate_status": "blocked",
+            "losses": [
+              {
+                "state_id": "normal",
+                "loss_units": 0
+              },
+              {
+                "state_id": "degraded",
+                "loss_units": 100
+              }
+            ]
+          },
+          {
+            "action_id": "service_blocked",
+            "gate_status": "blocked",
+            "losses": [
+              {
+                "state_id": "normal",
+                "loss_units": 100
+              },
+              {
+                "state_id": "degraded",
+                "loss_units": 0
+              }
+            ]
+          }
+        ],
+        "tests": [
+          {
+            "test_id": "perfect_but_non_actionable_test",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 0.1,
+              "downtime_cost_units": 0.1,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "normal",
+                "likelihoods": [
+                  {
+                    "state_id": "normal",
+                    "probability": 1
+                  },
+                  {
+                    "state_id": "degraded",
+                    "probability": 0
+                  }
+                ]
+              },
+              {
+                "outcome_id": "degraded",
+                "likelihoods": [
+                  {
+                    "state_id": "normal",
+                    "probability": 0
+                  },
+                  {
+                    "state_id": "degraded",
+                    "probability": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "positive-out-of-domain-test-excluded",
+      "expected_status": "no_test",
+      "expected_test_id": null,
+      "scenario": {
+        "scenario_id": "synthetic-out-of-domain-no-test",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "sodium_ion",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "balanced",
+            "prior_probability": 0.7
+          },
+          {
+            "state_id": "weak_cell",
+            "prior_probability": 0.2
+          },
+          {
+            "state_id": "thermal_risk",
+            "prior_probability": 0.1
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "continue_monitoring",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 0
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 100
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 200
+              }
+            ]
+          },
+          {
+            "action_id": "inspect",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 12
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 15
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 30
+              }
+            ]
+          },
+          {
+            "action_id": "service",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 35
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 5
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 0
+              }
+            ]
+          }
+        ],
+        "tests": [
+          {
+            "test_id": "nmc-only-test",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 1.5,
+              "downtime_cost_units": 0.5,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "normal",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.1
+                  }
+                ]
+              },
+              {
+                "outcome_id": "low_capacity",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.1
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.8
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.9
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "positive-no-admissible-action-abstains",
+      "expected_status": "abstain",
+      "expected_test_id": null,
+      "scenario": {
+        "scenario_id": "synthetic-no-admissible-action-abstain",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "nmc",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "balanced",
+            "prior_probability": 0.7
+          },
+          {
+            "state_id": "weak_cell",
+            "prior_probability": 0.2
+          },
+          {
+            "state_id": "thermal_risk",
+            "prior_probability": 0.1
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "continue_monitoring",
+            "gate_status": "unknown",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 0
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 100
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 200
+              }
+            ]
+          },
+          {
+            "action_id": "inspect",
+            "gate_status": "unknown",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 12
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 15
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 30
+              }
+            ]
+          },
+          {
+            "action_id": "service",
+            "gate_status": "unknown",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 35
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 5
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 0
+              }
+            ]
+          }
+        ],
+        "tests": [
+          {
+            "test_id": "test-with-missing-safety-prerequisite",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 1.5,
+              "downtime_cost_units": 0.5,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc",
+                "lfp"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "missing",
+              "qualified_facility": "missing",
+              "protocol_approved": "missing",
+              "calibration_valid": "missing",
+              "authority_approved": "missing"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "normal",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.1
+                  }
+                ]
+              },
+              {
+                "outcome_id": "low_capacity",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.1
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.8
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.9
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-likelihoods-not-normalized",
+      "expected_status": "reject",
+      "expected_test_id": null,
+      "scenario": {
+        "scenario_id": "negative-likelihood-mass-does-not-normalize",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "nmc",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "balanced",
+            "prior_probability": 0.7
+          },
+          {
+            "state_id": "weak_cell",
+            "prior_probability": 0.2
+          },
+          {
+            "state_id": "thermal_risk",
+            "prior_probability": 0.1
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "continue_monitoring",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 0
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 100
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 200
+              }
+            ]
+          },
+          {
+            "action_id": "inspect",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 12
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 15
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 30
+              }
+            ]
+          },
+          {
+            "action_id": "service",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 35
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 5
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 0
+              }
+            ]
+          }
+        ],
+        "tests": [
+          {
+            "test_id": "bad-likelihood-test",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 1.5,
+              "downtime_cost_units": 0.5,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc",
+                "lfp"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "a",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.1
+                  }
+                ]
+              },
+              {
+                "outcome_id": "b",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.9
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-cost-provenance-invalid",
+      "expected_status": "reject",
+      "expected_test_id": null,
+      "scenario": {
+        "scenario_id": "negative-invalid-cost-evidence",
+        "oracle_evidence_class": "synthetic_fixture",
+        "context": {
+          "chemistry": "nmc",
+          "temperature_c": 25,
+          "soc_fraction": 0.5
+        },
+        "states": [
+          {
+            "state_id": "balanced",
+            "prior_probability": 0.7
+          },
+          {
+            "state_id": "weak_cell",
+            "prior_probability": 0.2
+          },
+          {
+            "state_id": "thermal_risk",
+            "prior_probability": 0.1
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "continue_monitoring",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 0
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 100
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 200
+              }
+            ]
+          },
+          {
+            "action_id": "inspect",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 12
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 15
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 30
+              }
+            ]
+          },
+          {
+            "action_id": "service",
+            "gate_status": "satisfied",
+            "losses": [
+              {
+                "state_id": "balanced",
+                "loss_units": 35
+              },
+              {
+                "state_id": "weak_cell",
+                "loss_units": 5
+              },
+              {
+                "state_id": "thermal_risk",
+                "loss_units": 0
+              }
+            ]
+          }
+        ],
+        "tests": [
+          {
+            "test_id": "missing-cost-reference",
+            "protocol_ref": "capacity-reference-v1",
+            "equipment_ref": "lab-capacity-rig-01",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "equipment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "interpretation_status": "qualified_for_domain",
+            "cost": {
+              "test_cost_units": 1.5,
+              "downtime_cost_units": 0.5,
+              "cost_unit_ref": "decision-loss-unit/0.1",
+              "evidence_class": "declared_synthetic_cost",
+              "evidence_digest": "not-a-digest"
+            },
+            "applicability": {
+              "supported_chemistries": [
+                "nmc",
+                "lfp"
+              ],
+              "minimum_temperature_c": 0,
+              "maximum_temperature_c": 45,
+              "minimum_soc_fraction": 0.1,
+              "maximum_soc_fraction": 0.95
+            },
+            "preconditions": {
+              "safety_review": "satisfied",
+              "qualified_facility": "satisfied",
+              "protocol_approved": "satisfied",
+              "calibration_valid": "satisfied",
+              "authority_approved": "satisfied"
+            },
+            "outcomes": [
+              {
+                "outcome_id": "normal",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.9
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.2
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.1
+                  }
+                ]
+              },
+              {
+                "outcome_id": "low_capacity",
+                "likelihoods": [
+                  {
+                    "state_id": "balanced",
+                    "probability": 0.1
+                  },
+                  {
+                    "state_id": "weak_cell",
+                    "probability": 0.8
+                  },
+                  {
+                    "state_id": "thermal_risk",
+                    "probability": 0.9
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
