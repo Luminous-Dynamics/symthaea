@@ -23,6 +23,7 @@ const PRIORS: [(&str, [f64; 3]); 3] = [
 struct Aggregate {
     samples: usize,
     calibrated: usize,
+    outside_support: usize,
     covered_95: usize,
     correct_map: usize,
     false_dimension_reduction: usize,
@@ -39,19 +40,25 @@ impl Aggregate {
         posterior: &symthaea_causal_set_lab::FiniteSizeDimensionPosterior,
     ) {
         self.samples += 1;
-        if posterior.status == DimensionInferenceStatus::CalibratedPosterior {
-            self.calibrated += 1;
+        if posterior.status != DimensionInferenceStatus::CalibratedPosterior {
+            self.outside_support += 1;
+            return;
         }
+        self.calibrated += 1;
         if posterior.credible_set_95.contains(&true_dimension) {
             self.covered_95 += 1;
         }
 
-        let true_probability = posterior
+        let Some(true_probability) = posterior
             .dimensions
             .iter()
             .find(|entry| entry.spacetime_dimension == true_dimension)
             .and_then(|entry| entry.posterior_probability)
-            .unwrap_or(0.0);
+        else {
+            self.outside_support += 1;
+            self.calibrated -= 1;
+            return;
+        };
         self.true_probability_sum += true_probability;
         self.log_loss_sum -= true_probability.max(1.0e-15).ln();
 
@@ -75,12 +82,11 @@ impl Aggregate {
             self.brier_sum += (probability - target).powi(2);
         }
         if true_dimension == 4 {
-            let p_low = posterior
-                .posterior_probability_dimension_at_most_three
-                .unwrap_or(1.0);
-            self.p_dim_le_3_values.push(p_low);
-            if p_low >= 0.95 {
-                self.false_dimension_reduction += 1;
+            if let Some(p_low) = posterior.posterior_probability_dimension_at_most_three {
+                self.p_dim_le_3_values.push(p_low);
+                if p_low >= 0.95 {
+                    self.false_dimension_reduction += 1;
+                }
             }
         }
     }
@@ -99,16 +105,18 @@ impl Aggregate {
             let index = ((self.p_dim_le_3_values.len() - 1) as f64 * 0.95).ceil() as usize;
             format!("{:.9}", self.p_dim_le_3_values[index])
         };
-        let n = self.samples.max(1) as f64;
-        let brier_denominator = n * DIMENSIONS.len() as f64;
+        let total = self.samples.max(1) as f64;
+        let calibrated = self.calibrated.max(1) as f64;
+        let brier_denominator = calibrated * DIMENSIONS.len() as f64;
         format!(
-            "{event_count},{true_dimension},{prior_name},{calibration_replicates},{},{:.6},{:.9},{:.9},{:.9},{:.9},{:.9},{},{}",
+            "{event_count},{true_dimension},{prior_name},{calibration_replicates},{},{:.6},{},{:.9},{:.9},{:.9},{:.9},{:.9},{},{}",
             self.samples,
-            self.calibrated as f64 / n,
-            self.covered_95 as f64 / n,
-            self.correct_map as f64 / n,
-            self.true_probability_sum / n,
-            self.log_loss_sum / n,
+            self.calibrated as f64 / total,
+            self.outside_support,
+            self.covered_95 as f64 / calibrated,
+            self.correct_map as f64 / calibrated,
+            self.true_probability_sum / calibrated,
+            self.log_loss_sum / calibrated,
             self.brier_sum / brier_denominator,
             self.false_dimension_reduction,
             p95_low_dimension_mass,
@@ -143,7 +151,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("likelihood=empirical_KDE_of_ordering_fraction_not_iid_pair_Bernoulli");
     println!("calibration_unit=one_complete_fixed_cardinality_sprinkling");
     println!("calibration_and_qualification=disjoint_deterministic_seed_manifests");
-    println!("event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,credible_set_95_coverage,map_accuracy,mean_true_posterior,mean_log_loss,mean_brier,false_p_dim_le_3_count,p95_p_dim_le_3");
+    println!("event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support");
     
     for (size_index, event_count) in EVENT_COUNTS.iter().copied().enumerate() {
         let calibration_replicates = CALIBRATION_REPLICATES[size_index];
