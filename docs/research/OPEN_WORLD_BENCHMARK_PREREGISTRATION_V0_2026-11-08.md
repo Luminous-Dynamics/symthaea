@@ -116,13 +116,14 @@ Separate closed-catalogue recovery from support-misspecification recognition:
 | Stratum | Hidden truth relative to candidate catalogue | Required behavior |
 |---|---|---|
 | F0 | Truth is inside the declared catalogue | Exact compatible version space; identify or report the correct equivalence class |
-| F1 | Parameter is valid for the world generator but outside the catalogue | Reject all incompatible candidates; report no-compatible-model rather than nearest singleton |
+| F1a | Parameter is valid for the world generator but outside the catalogue and not behaviorally represented by any legal candidate | Reject all incompatible candidates; report no-compatible-model rather than nearest singleton |
+| F1b | Exact parameters are outside the catalogue but a legal candidate is observationally equivalent over the complete declared intervention language | Report the compatible candidate/equivalence class; do not claim exact generating-parameter identity or reject it as unknown |
 | F2 | Structural family or term is outside the catalogue | Detect misspecification, request discriminating evidence, then propose a typed grammar extension in a later policy track |
 | F3 | Measurement process differs from declared sensors | Diagnose instrument/model discrepancy rather than attribute every residual to the physical law |
 | F4 | Dynamics change regime or become history/intervention dependent beyond declared model | Detect regime/transport failure and avoid unsupported transfer |
 | F5 | Noise/discrepancy violates the declared observation model | Calibrate, model uncertainty or abstain; do not fit away structured error |
 
-The initial executable F1 control is the gain-7 numeric world: the world generator accepts gains 1–16, while the finite candidate catalogue contains {1,2,3}. It is paired with F0 negative controls. The ordinary closed-grammar evaluator remains fail-closed if truth is accidentally omitted from its oracle. Do not report F1 as structural out-of-grammar discovery.
+The initial F1a control is the gain-7 numeric world: the world generator accepts gains 1–16, while the finite candidate catalogue contains {1,2,3}; gain 7 + identity sensor has no behaviorally equivalent candidate. The F1b control is gain 4 + identity sensor, which is exactly parameter-OOD but behaviorally equivalent to candidate gain 2 + double sensor. Both are paired with F0 controls. The ordinary closed-grammar evaluator remains fail-closed if truth is accidentally omitted from its oracle. Neither F1a nor F1b is structural out-of-grammar discovery.
 
 Required controls: an in-grammar case that must not be rejected; an out-of-catalogue case that must not be forced into a nearest singleton; an evaluator bug/omitted-truth closed-support case that must fail; and a shifted observation that could also arise from sensor or stochastic discrepancies. Detection and subsequent repair are separate outcomes.
 
@@ -163,8 +164,9 @@ Do not implement another general scheduler or probe selector in this lane. Use #
 
 A finite grammar can have many syntactic parameterizations of one functional mechanism. Scoring and experiment selection must operate on the correct target level:
 
-- **Syntax / parameterized model:** exact candidate model or parameter set.
-- **Functional equivalence class:** models indistinguishable over the declared intervention language.
+- **Exact generating-parameter membership:** whether the actual parameterized model literally appears in the catalogue.
+- **Behavioral representation:** whether at least one legal candidate has the same outputs over the complete declared intervention language, even when its parameters/sensor factorization differ.
+- **Functional equivalence class:** the full set of models indistinguishable over the declared intervention language.
 - **Structural family:** mechanism, relevant variables, latent-state and interaction structure.
 - **Measurement process:** sensor transform, delay, censoring, missingness and calibration state.
 
