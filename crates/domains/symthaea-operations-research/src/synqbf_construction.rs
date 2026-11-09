@@ -477,12 +477,12 @@ pub fn construct_synqbf_from_game_value_profile(
 #[cfg(test)]
 mod tests {
     use super::super::decomposition::Literal;
+    use super::super::qdimacs::{QdimacsParseBudget, parse_qdimacs};
     use super::super::quantified_game_dag::{QbfGameDagBudget, build_qbf_game_proof_dag};
     use super::super::quantified_game_values::{
         GameValueProfileBudget, extract_game_value_profile_from_dag,
     };
     use super::super::quantified_scope::QuantifierBlock;
-    use super::super::qdimacs::{QdimacsParseBudget, parse_qdimacs};
     use super::*;
 
     fn block(quantifier: Quantifier, variables: &[usize]) -> QuantifierBlock {
