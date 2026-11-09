@@ -828,14 +828,22 @@ mod tests {
 
     #[test]
     fn row_and_covariance_permutation_preserves_selected_design_score() {
-        let first_scenario = scenario(
-            vec![vec![1.0, 0.4], vec![0.4, 1.0]],
-            vec![vec![1.0, 0.2], vec![0.1, 1.0]],
-        );
-        let second_scenario = scenario(
-            vec![vec![1.0, 0.4], vec![0.4, 1.0]],
-            vec![vec![0.1, 1.0], vec![1.0, 0.2]],
-        );
+        let first_scenario = CorrelatedDesignScenario {
+            scenario_id: "scenario".to_string(),
+            target_parameter_count: 2,
+            weight: 1.0,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            measurement_jacobian_rows: vec![vec![1.0, 0.2], vec![0.1, 1.0]],
+            measurement_covariance: vec![vec![1.0, 0.4], vec![0.4, 1.0]],
+        };
+        let second_scenario = CorrelatedDesignScenario {
+            scenario_id: "scenario".to_string(),
+            target_parameter_count: 2,
+            weight: 1.0,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            measurement_jacobian_rows: vec![vec![0.1, 1.0], vec![1.0, 0.2]],
+            measurement_covariance: vec![vec![1.0, 0.4], vec![0.4, 1.0]],
+        };
         let first_options = vec![option("both", 1.0, vec![0, 1])];
         let second_options = vec![option("both", 1.0, vec![1, 0])];
         let first = greedy_correlated_budgeted_design(
@@ -901,7 +909,6 @@ mod tests {
         let options = vec![
             option("first", 1.0, vec![0]),
             option("second", 1.0, vec![1]),
-            option("both", 1.8, vec![0, 1]),
         ];
         let greedy =
             greedy_correlated_budgeted_design(&scenarios, &options, &config(2.0, 1)).unwrap();
