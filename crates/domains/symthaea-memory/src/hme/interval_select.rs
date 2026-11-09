@@ -669,6 +669,8 @@ pub struct GroupIntervalSelectionPlan {
     pub eligibility_generation: u64,
     /// Exact query vector identity used for all interval calculations.
     pub query_digest: [u8; 32],
+    /// Principal/policy/source-ledger/bitemporal eligibility scope binding.
+    pub scope_binding: HmeEligibilityScopeBinding,
     /// Snapshot-bound group identities whose members must be visited or refined.
     pub refinement_groups: Vec<GroupScoreIntervalIdentity>,
     /// Snapshot-bound groups proven unable to contain a member in the exact top-k.
@@ -1533,6 +1535,7 @@ fn select_group_refinement_set_impl(
         manifest_generation: coverage.expected_manifest_generation,
         eligibility_generation: coverage.expected_eligibility_generation,
         query_digest: coverage.query_digest,
+        scope_binding: coverage.scope_binding,
         refinement_groups,
         excluded_groups,
         refinement_record_count,
