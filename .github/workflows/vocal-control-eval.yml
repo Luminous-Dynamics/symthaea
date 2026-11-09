@@ -44,5 +44,11 @@ jobs:
       - name: Test causal intervention and provenance contract
         run: cargo +1.96.0 test --locked --manifest-path tools/vocal-control-eval/Cargo.toml
 
+      - name: Execute synthetic one-factor control fixture
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/vocal-control-eval/Cargo.toml -- tools/vocal-control-eval/fixtures/synthetic-vibrato-depth-local.json > vocal-control-synthetic-report.json
+          grep -q '"qualification": "qualified"' vocal-control-synthetic-report.json
+
       - name: Confirm exact source revision
         run: test "$(git rev-parse HEAD)" = "$VOCAL_CONTROL_EVAL_REVISION"
