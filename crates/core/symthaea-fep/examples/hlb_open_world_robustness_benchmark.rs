@@ -22,8 +22,9 @@ use symthaea_fep::decision_relevant_information::{
 use symthaea_fep::open_world_robust_decision::{
     ModelAdequacyStatus, ModelAdequacyThresholds, PrequentialAlternativeModel,
     PrequentialCategoricalObservation, calibrate_categorical_tv_radius_from_counts,
-    evaluate_dirichlet_prequential_e_process, evaluate_prequential_e_process,
-    evaluate_prequential_model_adequacy, evaluate_tv_robust_decision_diagnostics,
+    evaluate_dirichlet_prequential_e_process, evaluate_open_world_decision_gate,
+    evaluate_prequential_e_process, evaluate_prequential_model_adequacy,
+    evaluate_tv_robust_decision_diagnostics,
 };
 
 const TV_RADIUS: f64 = 0.2;
@@ -270,6 +271,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         &dirichlet_prior,
         E_PROCESS_ALPHA,
     )?;
+    // The aggregate log-loss/Brier thresholds alone do not detect this shift;
+    // the anytime-valid Dirichlet e-process must still close the repair gate.
+    let no_shift_gate = evaluate_open_world_decision_gate(&no_shift_adequacy, None);
+    let shifted_gate = evaluate_open_world_decision_gate(
+        &shifted_adequacy,
+        shift_dirichlet_e_process.crossed_at_observation,
+    )?;
 
     // A subsequent observation outside the entire registered support must
     // trigger an adequacy violation even when the aggregate score gate is not
@@ -301,6 +309,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     if shift_dirichlet_e_process.crossed_at_observation.is_none() {
         return Err(IoError::other("universal Dirichlet alternative did not detect the persistent frequency shift").into());
+    }
+    if !no_shift_gate.weight_program_generation_permitted
+        || shifted_gate.weight_program_generation_permitted
+        || shifted_gate.candidate_acceptance_authorized
+        || shifted_gate.live_model_mutation_authorized
+    {
+        return Err(IoError::other("open-world adequacy gate failed to preserve its candidate-only authority boundary").into());
     }
     if out_of_support_report.status != ModelAdequacyStatus::Inadequate {
         return Err(IoError::other("out-of-support observation did not fail the adequacy gate").into());
@@ -350,6 +365,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             "dirichlet_mixture_prior_concentration": dirichlet_prior,
             "dirichlet_no_shift_report": no_shift_dirichlet_e_process,
             "dirichlet_regime_shift_report": shift_dirichlet_e_process,
+            "no_shift_authority_gate": no_shift_gate,
+            "shifted_authority_gate": shifted_gate,
             "guarantee_scope": "Ville bound conditional on the declared predictable null forecast; fixed alternatives must be predictable, and the Dirichlet alternative is updated only from earlier observations. This deterministic fixture is not a type-I error-rate study."
         }
     });
