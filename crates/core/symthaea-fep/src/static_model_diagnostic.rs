@@ -1354,9 +1354,12 @@ mod tests {
     fn identical_model_vertices_have_zero_rectangularity_gap() {
         let mut problem = symmetric_calibration_fixture();
         let source = problem.model_vertices[0].clone();
-        problem.model_vertices[1].stage_one_outcome_probabilities_by_world =
-            vec![vec![0.5, 0.5], vec![0.5, 0.5]];
-        problem.model_vertices[1].stage_two_outcome_probabilities = source.stage_two_outcome_probabilities;
+        let shared_stage_one = vec![vec![0.5, 0.5], vec![0.5, 0.5]];
+        problem.model_vertices[0].stage_one_outcome_probabilities_by_world =
+            shared_stage_one.clone();
+        problem.model_vertices[1].stage_one_outcome_probabilities_by_world = shared_stage_one;
+        problem.model_vertices[1].stage_two_outcome_probabilities =
+            source.stage_two_outcome_probabilities;
         problem.model_vertices[1].one_shot_outcome_probabilities_by_action =
             source.one_shot_outcome_probabilities_by_action;
         let result = evaluate_static_model_diagnostic_problem(
