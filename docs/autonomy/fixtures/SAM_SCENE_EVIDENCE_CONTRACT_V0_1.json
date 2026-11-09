@@ -335,7 +335,8 @@
         },
         "source_refs": [
           "front-camera-01",
-          "front-lidar-01"
+          "front-lidar-01",
+          "local-lidar-track-fixture-01"
         ],
         "estimator_id": "synthetic-multi-sensor-track-estimator-v1"
       },
@@ -664,7 +665,28 @@
       "max_age_ns": 500000000,
       "gap_m": 12,
       "relative_speed_mps": -4,
-      "distance_uncertainty_m": 0
-    }
+      "distance_uncertainty_m": 0,
+      "target_reference_kind": "simulator_truth_actor",
+      "target_reference_id": "oracle-actor-42"
+    },
+    "simulator_truth_actor_states": [
+      {
+        "actor_id": "oracle-actor-42",
+        "scenario_id": "sam-synth-crossing-0001",
+        "reference_frame_id": "road-local-01",
+        "acquisition_tick_ns": 12000000000,
+        "position_m": [
+          12,
+          1.4,
+          0
+        ],
+        "velocity_mps": [
+          0,
+          -1.2,
+          0
+        ],
+        "source_ref": "simulator-oracle-truth-01"
+      }
+    ]
   }
 }
