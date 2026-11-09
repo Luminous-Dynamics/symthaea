@@ -2,9 +2,53 @@
   "schema_version": "1.0.0",
   "cohort_id": "synthetic-cohort-design-example-v0.2",
   "records": [
-    {"record_id":"pilot-a","evaluation_audio_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","annotation_revision":"synthetic-annotation-v1","transcript_sha256":"31df11bf1cadf71e7425c02752ef06b1ff45d4a1dcf9f82866b6258d2b2480d2","reviewer_ids":["reviewer-a","reviewer-b"],"adjudication_manifest_sha256":null,"phonological_profile_id":null,"phonological_profile_revision":null,"phonological_profile_qualified":false,"native_review_manifest_sha256":null},
-    {"record_id":"pilot-b","evaluation_audio_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","annotation_revision":"synthetic-annotation-v1","transcript_sha256":"785aa2bf5d29839673f9cc100b1ea8013f76ade13fd6a11e402bd6d8cd5b0986","reviewer_ids":["reviewer-a","reviewer-b"],"adjudication_manifest_sha256":null,"phonological_profile_id":null,"phonological_profile_revision":null,"phonological_profile_qualified":false,"native_review_manifest_sha256":null},
-    {"record_id":"pref-a","evaluation_audio_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","annotation_revision":"synthetic-annotation-v1","transcript_sha256":"815c2a0a630a5c1442439a7fed52ad1ce59c577dcedd06ffc5f11b0392ade168","reviewer_ids":["reviewer-a","reviewer-b"],"adjudication_manifest_sha256":null,"phonological_profile_id":null,"phonological_profile_revision":null,"phonological_profile_qualified":false,"native_review_manifest_sha256":null},
-    {"record_id":"pref-b","evaluation_audio_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","annotation_revision":"synthetic-annotation-v1","transcript_sha256":"e493ce9ceaf6eb00557d5ad938c51627c6c5e3b8e66282281f88accc889e6541","reviewer_ids":["reviewer-a","reviewer-b"],"adjudication_manifest_sha256":null,"phonological_profile_id":null,"phonological_profile_revision":null,"phonological_profile_qualified":false,"native_review_manifest_sha256":null}
+    {
+      "record_id": "pilot-a",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "annotation_revision": "synthetic-annotation-v1",
+      "transcript_sha256": "31df11bf1cadf71e7425c02752ef06b1ff45d4a1dcf9f82866b6258d2b2480d2",
+      "reviewer_ids": ["reviewer-a", "reviewer-b"],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null
+    },
+    {
+      "record_id": "pilot-b",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "annotation_revision": "synthetic-annotation-v1",
+      "transcript_sha256": "785aa2bf5d29839673f9cc100b1ea8013f76ade13fd6a11e402bd6d8cd5b0986",
+      "reviewer_ids": ["reviewer-a", "reviewer-b"],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null
+    },
+    {
+      "record_id": "pref-a",
+      "evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "annotation_revision": "synthetic-annotation-v1",
+      "transcript_sha256": "815c2a0a630a5c1442439a7fed52ad1ce59c577dcedd06ffc5f11b0392ade168",
+      "reviewer_ids": ["reviewer-a", "reviewer-b"],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null
+    },
+    {
+      "record_id": "pref-b",
+      "evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "annotation_revision": "synthetic-annotation-v1",
+      "transcript_sha256": "e493ce9ceaf6eb00557d5ad938c51627c6c5e3b8e66282281f88accc889e6541",
+      "reviewer_ids": ["reviewer-a", "reviewer-b"],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null
+    }
   ]
 }
