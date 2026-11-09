@@ -638,9 +638,16 @@ mod tests {
                 predictive_sigma: 0.0,
             },
         ];
-        let report =
-            evaluate_model_recovery(&hypotheses, &candidate, &prior_two(), &generators, 64, 123, 0.8)
-                .unwrap();
+        let report = evaluate_model_recovery(
+            &hypotheses,
+            &candidate,
+            &prior_two(),
+            &generators,
+            64,
+            123,
+            0.8,
+        )
+        .unwrap();
 
         assert_eq!(report.availability_probability, 0.0);
         assert_eq!(
@@ -671,9 +678,16 @@ mod tests {
                 predictive_sigma: 0.0,
             },
         ];
-        let report =
-            evaluate_model_recovery(&hypotheses, &candidate, &prior_two(), &generators, 32, 456, 0.8)
-                .unwrap();
+        let report = evaluate_model_recovery(
+            &hypotheses,
+            &candidate,
+            &prior_two(),
+            &generators,
+            32,
+            456,
+            0.8,
+        )
+        .unwrap();
 
         assert_eq!(report.availability_probability, 1.0);
         assert_eq!(report.unavailable_observations_by_generator, vec![0, 0]);
