@@ -37,12 +37,15 @@ pub mod model_recovery;
 pub mod theory_prediction;
 
 pub use model_discrimination::{
-    CandidateExperiment, DiscriminationHypothesis, ExperimentBlocker,
-    ExperimentDiscriminationScore, ExperimentDiscriminationStatus, GaussianModelPrediction,
+    CandidateExperiment, DetectionAwareCandidateExperiment, DetectionAwareExperimentScore,
+    DetectionAwareModelDiscriminationReport, DetectionAwarePriorScenarioEIG,
+    DiscriminationHypothesis, ExperimentBlocker, ExperimentDiscriminationScore,
+    ExperimentDiscriminationStatus, GaussianModelPrediction, ModelDetectionProbability,
     MAX_DISCRIMINATION_EXPERIMENTS, MAX_DISCRIMINATION_HYPOTHESES, MAX_EIG_QUADRATURE_INTERVALS,
     MAX_MODEL_PRIOR_SCENARIOS, ModelDiscriminationConfig, ModelDiscriminationError,
     ModelDiscriminationReport, ModelPriorScenario, ModelUniverseCoverage, PriorScenarioEIG,
-    gaussian_predictive_kl_nats, rank_model_discriminating_experiments,
+    gaussian_predictive_kl_nats, rank_detection_aware_model_discriminating_experiments,
+    rank_model_discriminating_experiments,
 };
 pub use model_recovery::{
     MAX_MODEL_RECOVERY_GENERATORS, MAX_MODEL_RECOVERY_TRIALS, ModelRecoveryError,
