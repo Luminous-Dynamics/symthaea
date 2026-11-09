@@ -300,7 +300,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
         || !nonempty(&scenario.evidence.decision_loss_model_ref)
         || !is_digest(&scenario.evidence.decision_loss_model_digest)
     {
-        errors.push("observation, capability, prior or decision-loss evidence binding is invalid".to_owned());
+        errors.push(
+            "observation, capability, prior or decision-loss evidence binding is invalid"
+                .to_owned(),
+        );
     }
     if !nonempty(&scenario.context.chemistry)
         || !scenario.context.temperature_c.is_finite()
@@ -1028,9 +1031,10 @@ mod tests {
         assert_eq!(case.recommendation_status, "no_test");
         let test = case.tests.first().expect("candidate test");
         assert!(!test.eligible);
-        assert!(test
-            .ineligibility_reasons
-            .contains(&"vehicle_or_pack_configuration_mismatch".to_owned()));
+        assert!(
+            test.ineligibility_reasons
+                .contains(&"vehicle_or_pack_configuration_mismatch".to_owned())
+        );
     }
 
     #[test]
