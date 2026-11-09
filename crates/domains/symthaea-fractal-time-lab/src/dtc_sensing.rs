@@ -261,6 +261,9 @@ pub struct DtcProbeSensingReport {
     pub classical_to_quantum_fisher_ratio: Option<f64>,
     /// Allowance includes finite-difference truncation and roundoff.
     pub classical_fisher_within_quantum_bound: bool,
+    /// Whether the full classical FI matrix is bounded by the QFIM in the
+    /// positive-semidefinite ordering, within the declared numerical tolerance.
+    pub joint_classical_fisher_within_quantum_bound: bool,
     /// Fisher information divided by simulated Floquet periods. This omits
     /// state preparation, measurement and dead-time costs.
     pub fisher_information_per_drive_period: f64,
@@ -397,6 +400,8 @@ pub fn evaluate_dtc_probe_sensing(
     };
     let classical_fisher_within_quantum_bound =
         fisher <= quantum_fisher + quantum_fisher.max(1.0) * 1.0e-3;
+    let joint_classical_fisher_within_quantum_bound =
+        classical_fisher_matrix_within_quantum_bound(classical_fisher_matrix, quantum_fisher_matrix);
     let norm_error = (nominal_model.norm_squared() - 1.0).abs();
 
     if !fisher_per_period.is_finite()
@@ -431,6 +436,7 @@ pub fn evaluate_dtc_probe_sensing(
         quantum_joint_crlb_covariance_per_shot: quantum_joint_covariance,
         classical_to_quantum_fisher_ratio,
         classical_fisher_within_quantum_bound,
+        joint_classical_fisher_within_quantum_bound,
         fisher_information_per_drive_period: fisher_per_period,
         quantum_fisher_information_per_drive_period: quantum_fisher_per_period,
         norm_error,
@@ -739,6 +745,32 @@ fn effective_amplitude_information_with_phase_nuisance(
     Some(effective.max(0.0))
 }
 
+/// Check the matrix quantum Cramér-Rao bound by testing whether
+/// QFIM - CFI is positive semidefinite within a relative eigenvalue tolerance.
+fn classical_fisher_matrix_within_quantum_bound(
+    classical: [[f64; 2]; 2],
+    quantum: [[f64; 2]; 2],
+) -> bool {
+    let difference = [
+        [
+            quantum[0][0] - classical[0][0],
+            0.5 * (quantum[0][1] + quantum[1][0] - classical[0][1] - classical[1][0]),
+        ],
+        [
+            0.5 * (quantum[1][0] + quantum[0][1] - classical[1][0] - classical[0][1]),
+            quantum[1][1] - classical[1][1],
+        ],
+    ];
+    let scale = difference
+        .iter()
+        .flatten()
+        .fold(1.0_f64, |maximum, value| maximum.max(value.abs()));
+    let minimum_eigenvalue = 0.5
+        * (difference[0][0] + difference[1][1]
+            - (difference[0][0] - difference[1][1]).hypot(2.0 * difference[0][1]));
+    minimum_eigenvalue >= -1.0e-5 * scale
+}
+
 /// Invert a symmetric 2x2 Fisher matrix when both parameters are jointly
 /// identifiable. The returned covariance is a per-shot local CRLB.
 fn invert_fisher_matrix_2x2(information: [[f64; 2]; 2]) -> Option<[[f64; 2]; 2]> {
@@ -877,6 +909,7 @@ mod tests {
                 - difference[0][1] * difference[1][0]
                 >= -1.0e-5
         );
+        assert!(report.joint_classical_fisher_within_quantum_bound);
         assert!(
             (report.classical_fisher_information_per_shot - classical[0][0]).abs() < 1.0e-12
         );
