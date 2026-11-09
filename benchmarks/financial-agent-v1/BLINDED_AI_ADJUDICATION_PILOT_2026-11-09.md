@@ -20,6 +20,17 @@ Candidate IDs were assigned without system/provider labels. The adjudicator saw 
 
 ## 2. Frozen task facts
 
+### Evidence alias crosswalk
+
+The short labels used in this pilot are evaluator aliases, not canonical evidence IDs. The mapping is:
+
+| Pilot alias | Canonical evidence ID | Evidence manifest location |
+|---|---|---|
+| E-SUP-01 | `ev.synthetic.supplier-status.0001` | `dev-example.evidence.json#/artifacts/0` |
+| E-ENERGY-01 | `ev.synthetic.energy-index.0001` | `dev-example.evidence.json#/artifacts/1` |
+
+The aliases must never be emitted by a production evaluator as if they were canonical IDs. Claim traces and receipts must bind the canonical IDs and exact payload/artifact digests. This crosswalk corrects an omission in the first pilot draft; the aliases were previously used without an explicit machine-resolvable mapping.
+
 Decision frontier: 2026-10-01T12:00:00Z
 
 ### Evidence E-SUP-01
