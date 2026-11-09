@@ -1,0 +1,40 @@
+name: SAM Option Preservation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-vehicle/src/option_preservation.rs"
+      - "crates/domains/symthaea-vehicle/src/lib.rs"
+      - ".github/workflows/sam-option-preservation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-vehicle/src/option_preservation.rs"
+      - "crates/domains/symthaea-vehicle/src/lib.rs"
+      - ".github/workflows/sam-option-preservation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  option-preservation:
+    name: SAM finite-envelope option-preservation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+          # no extra components required
+      - name: Format vehicle crate
+        run: cargo fmt --package symthaea-vehicle -- --check
+      - name: Run option-preservation tests
+        run: cargo test --locked -p symthaea-vehicle --lib option_preservation
+      - name: Clippy vehicle library
+        run: cargo clippy --locked -p symthaea-vehicle --lib -- -D warnings
