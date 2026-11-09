@@ -154,9 +154,8 @@ impl StrategyEnumeratorBaseline {
         Self::next_action_with_work(view, strategy).map(|(action, _)| action)
     }
 
-    /// Select an action and return deterministic probe-scoring work counts.
-    /// The counters cover model predictions used by the one-step probe scorer;
-    /// they do not claim to measure discovery filtering, wall time or CPU cost.
+    /// Returns deterministic model-prediction work for the one-step probe
+    /// scorer. Discovery filtering and hardware/runtime costs are not included.
     pub fn next_action_with_work(
         view: &AgentView,
         strategy: crate::strategies::ProbeStrategy,
@@ -265,8 +264,9 @@ impl StrategyEnumeratorBaseline {
             }
         }
         let action_strategy = strategy_for_decision_step(strategy, view.observations.len());
-        let (intervention, work) = crate::strategies::choose_probe_with_work(view, action_strategy)
-            .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
+        let (intervention, work) =
+            crate::strategies::choose_probe_with_work(view, action_strategy)
+                .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
         Ok((probe(intervention), work))
     }
 }
