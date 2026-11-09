@@ -204,8 +204,8 @@ fn is_nonempty(value: &str) -> bool {
 }
 
 fn schema_validator(schema_bytes: &[u8]) -> Result<Validator, String> {
-    let schema: Value = serde_json::from_slice(schema_bytes)
-        .map_err(|error| format!("schema JSON: {error}"))?;
+    let schema: Value =
+        serde_json::from_slice(schema_bytes).map_err(|error| format!("schema JSON: {error}"))?;
     if schema.get("$schema").and_then(Value::as_str)
         != Some("https://json-schema.org/draft/2020-12/schema")
     {
@@ -255,7 +255,8 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || profile.population.observed_unit_count > profile.population.declared_unit_count
         || profile.population.observed_unit_count != profile.units.len()
     {
-        errors.push("declared/observed unit counts are inconsistent with the units array".to_owned());
+        errors
+            .push("declared/observed unit counts are inconsistent with the units array".to_owned());
     }
     if profile.units.len() < 2 {
         errors.push("at least two comparable units are required".to_owned());
@@ -272,8 +273,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || !capacity_condition.lower_cutoff_voltage_v.is_finite()
         || !capacity_condition.upper_cutoff_voltage_v.is_finite()
         || capacity_condition.lower_cutoff_voltage_v <= 0.0
-        || capacity_condition.upper_cutoff_voltage_v
-            <= capacity_condition.lower_cutoff_voltage_v
+        || capacity_condition.upper_cutoff_voltage_v <= capacity_condition.lower_cutoff_voltage_v
     {
         errors.push("capacity reference condition is invalid".to_owned());
     }
@@ -293,10 +293,16 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     let mut unit_ids = BTreeSet::new();
     for unit in &profile.units {
         if !is_nonempty(&unit.unit_ref) || !unit_ids.insert(unit.unit_ref.clone()) {
-            errors.push(format!("unit identity is empty or duplicated: {}", unit.unit_ref));
+            errors.push(format!(
+                "unit identity is empty or duplicated: {}",
+                unit.unit_ref
+            ));
         }
         if !unit.nominal_capacity_ah.is_finite() || unit.nominal_capacity_ah <= 0.0 {
-            errors.push(format!("unit {} has invalid nominal capacity", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has invalid nominal capacity",
+                unit.unit_ref
+            ));
         }
         if !unit.capacity.value_ah.is_finite()
             || unit.capacity.value_ah <= 0.0
@@ -307,19 +313,28 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             || !unit.resistance.uncertainty_mohm.is_finite()
             || unit.resistance.uncertainty_mohm < 0.0
         {
-            errors.push(format!("unit {} has invalid capacity or resistance", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has invalid capacity or resistance",
+                unit.unit_ref
+            ));
         }
         if unit.capacity.condition_ref != capacity_condition.condition_ref
             || unit.resistance.condition_ref != resistance_condition.condition_ref
         {
-            errors.push(format!("unit {} uses a mismatched reference condition", unit.unit_ref));
+            errors.push(format!(
+                "unit {} uses a mismatched reference condition",
+                unit.unit_ref
+            ));
         }
         if !is_sha256(&unit.capacity.evidence_digest)
             || !is_sha256(&unit.resistance.evidence_digest)
             || !is_nonempty(&unit.capacity.method)
             || !is_nonempty(&unit.resistance.method)
         {
-            errors.push(format!("unit {} has invalid measurement provenance", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has invalid measurement provenance",
+                unit.unit_ref
+            ));
         }
         for class in [
             unit.capacity.evidence_class.as_str(),
@@ -416,10 +431,16 @@ fn summarize(profile: &Profile) -> ProfileSummary {
         resistance_mohm: distribution(&resistance_values),
         weakest_observed_soh_unit_ref: weakest,
         capacity_evidence_class_counts: evidence_counts(
-            profile.units.iter().map(|unit| unit.capacity.evidence_class.as_str()),
+            profile
+                .units
+                .iter()
+                .map(|unit| unit.capacity.evidence_class.as_str()),
         ),
         resistance_evidence_class_counts: evidence_counts(
-            profile.units.iter().map(|unit| unit.resistance.evidence_class.as_str()),
+            profile
+                .units
+                .iter()
+                .map(|unit| unit.resistance.evidence_class.as_str()),
         ),
         uncertainty_status: "per_unit_uncertainty_preserved_not_propagated_in_v0_1".to_owned(),
         pack_energy_power_status: "NOT_COMPUTABLE_TOPOLOGY_MODEL_NOT_QUALIFIED".to_owned(),
@@ -431,7 +452,9 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
     let corpus: Corpus =
         serde_json::from_slice(corpus_bytes).map_err(|error| format!("corpus JSON: {error}"))?;
     if corpus.corpus_version != CORPUS_VERSION || corpus.schema_id != SCHEMA_ID {
-        return Err("corpus version or schema identity does not match the frozen contract".to_owned());
+        return Err(
+            "corpus version or schema identity does not match the frozen contract".to_owned(),
+        );
     }
 
     let mut seen_case_ids = BTreeSet::new();
@@ -574,8 +597,7 @@ mod tests {
             .as_array_mut()
             .expect("units array")
             .reverse();
-        let reversed: Profile =
-            serde_json::from_value(reversed_value).expect("reversed profile");
+        let reversed: Profile = serde_json::from_value(reversed_value).expect("reversed profile");
         assert_eq!(summarize(&original), summarize(&reversed));
     }
 
