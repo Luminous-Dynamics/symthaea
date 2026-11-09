@@ -171,6 +171,12 @@ A deliberately synthetic calibration artifact is recorded in [BLINDED_AI_ADJUDIC
 
 **Interpretation ceiling:** the candidate responses were authored as synthetic rubric probes, not collected from independent model executions. This is a test that the scoring rubric can distinguish known-good and known-bad examples. It is not a model tournament, human-subject evaluation, inter-rater reliability result, generalized accuracy estimate or SOTA claim. The adjudicator is an AI system, not a human. Genuine blind human adjudication remains required for human-comparison results.
 
+## 8e. Sequential and adversarial AI adjudication pilot
+
+The second calibration artifact [BLINDED_AI_ADJUDICATION_PILOT_V2_2026-11-09.md](BLINDED_AI_ADJUDICATION_PILOT_V2_2026-11-09.md) adds synthetic cases for filing restatement without hindsight rewrite, same-name legal-entity collision, source-family duplication with a material contradiction, and annual-versus-half-year financial comparison. One GPT-6 AI adjudicator scored masked, authored probe responses. It is not a human vote, model-output comparison or benchmark result.
+
+The next benchmark construct is [SYM-FIN-SEQ-001 #11290](https://github.com/Luminous-Dynamics/symthaea/issues/11290): prequential financial evidence revision and forecast calibration. It tests immutable snapshots at every frontier, justified updates as evidence arrives, conflict preservation, irrelevant-update stability and properly timed probabilistic forecasts. Keep this sequential construct separate from the static task/report score vector and from the quantitative portfolio tournament.
+
 ## 9. Non-compensable hard gates
 
 Any of the following blocks a qualified label, whatever the average score:
