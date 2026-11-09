@@ -581,6 +581,12 @@ pub struct VehicleTelemetry {
     pub follow_oracle_relative_speed_mps: Option<f64>,
     /// Age of the exact simulator snapshot relative to the ego observation (s).
     pub follow_oracle_snapshot_age_s: Option<f64>,
+    /// Whether this step may update controller weights.
+    #[serde(default)]
+    pub training_enabled: bool,
+    /// Whether simulator-oracle data influenced either the blended action or BPTT target.
+    #[serde(default)]
+    pub follow_oracle_used_for_policy: bool,
     /// Raw learned-controller proposal before teacher blending or exploration.
     #[serde(default)]
     pub student_proposal_steering: f32,
