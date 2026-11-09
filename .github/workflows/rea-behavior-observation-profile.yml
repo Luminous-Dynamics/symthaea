@@ -48,8 +48,20 @@ jobs:
           cargo --version
           sha256sum tools/rea-behavior-observation-check/Cargo.lock
 
-      - name: Rust formatting
-        run: cargo fmt --manifest-path tools/rea-behavior-observation-check/Cargo.toml -- --check
+      - name: Apply rustfmt and verify formatting
+        run: |
+          cargo fmt --manifest-path tools/rea-behavior-observation-check/Cargo.toml
+          cargo fmt --manifest-path tools/rea-behavior-observation-check/Cargo.toml -- --check
+
+      - name: Archive rustfmt-normalized source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-behavior-observation-rustfmt-source
+          path: |
+            tools/rea-behavior-observation-check/src/lib.rs
+            tools/rea-behavior-observation-check/src/main.rs
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Draft 2020-12 schema and raw capture integrity tests
         run: cargo test --manifest-path tools/rea-behavior-observation-check/Cargo.toml --locked
