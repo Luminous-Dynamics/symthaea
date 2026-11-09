@@ -43,8 +43,13 @@ A matching `rights_profile_id` and `RightsDisposition::Authorized` value are not
 for qualification. Each evidence version also needs a separately verified `RightsProof`
 binding the exact evidence ID, evaluated principal, rights profile, authorization disposition,
 validity interval, verifier identity and verifier-build SHA-256. The rights proof must be valid
-at the decision frontier. Missing or unverifiable rights proof is Indeterminate; identity,
-profile, disposition, verifier or validity mismatches fail closed.
+at the decision frontier.
+
+The availability proof is a separate attestation and independently binds the exact evidence
+ID, principal, availability instant, verifier identity and verifier-build SHA-256. A valid
+rights proof cannot stand in for an availability proof, or vice versa. Missing or unverifiable
+proofs are Indeterminate; identity, profile, disposition, verifier or validity mismatches
+fail closed.
 
 The crate consumes the typed result from an independent Mycelix/provenance rights verifier.
 It does not authenticate signatures or licences itself. Do not construct `RightsProof::Verified`
