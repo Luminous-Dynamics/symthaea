@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/financial-agent-v1/sequential-v0/sequence-oracle.schema.json",
+  "title": "Luminous Sequential Financial Evidence Oracle v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "stream_id",
+    "visibility",
+    "expected_frontiers",
+    "stream_level_hard_gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.financial-sequence-oracle.v0-dev"
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visibility": {
+      "const": "public_development_only_not_sealed"
+    },
+    "expected_frontiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "frontier_id",
+          "admitted_evidence_ids",
+          "required_claims",
+          "required_unknowns",
+          "snapshot_invariants"
+        ],
+        "properties": {
+          "frontier_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "admitted_evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "required_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "disposition"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "disposition": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "required_unknowns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "snapshot_invariants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "stream_level_hard_gates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    }
+  }
+}
