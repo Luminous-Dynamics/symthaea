@@ -3859,6 +3859,15 @@ mod tests {
         }
     }
 
+    fn regret_profile_budget() -> PolicyRegretProfileBudget {
+        PolicyRegretProfileBudget {
+            max_profile_entries: 100_000,
+            max_profile_component_comparisons: 10_000_000,
+            max_rational_bit_width: 64,
+            max_output_memory_bytes: 10_000_000,
+        }
+    }
+
     #[test]
     fn exact_action_mask_bound_is_zero_for_full_mask_and_exact_at_leaf() {
         let family = FiniteUmdpModelFamily::new(vec![
@@ -4792,6 +4801,147 @@ mod tests {
         let result = solve_finite_family_policy_portfolio(&family, q(1, 2), 1, budget(1, 1)).unwrap();
         assert_eq!(result.model_optimal_values, vec![q(1, 4)]);
         assert_eq!(result.model_policy_values, vec![vec![q(1, 4)]]);
+    }
+
+    #[test]
+    fn regret_profile_frontier_preserves_exact_specialist_portfolio_value() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 2, budget(2,3),
+        ).unwrap();
+        let frontier = compute_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(),
+        ).unwrap();
+
+        assert_eq!(frontier.profile_groups.len(), 2);
+        assert_eq!(frontier.frontier_profile_group_indices, vec![0,1]);
+        assert!(frontier.dominance_witnesses.is_empty());
+        assert_eq!(
+            frontier.profile_groups.iter().map(|group| group.regret_profile.clone()).collect::<Vec<_>>(),
+            vec![vec![q(0,1), q(1,1)], vec![q(1,1), q(0,1)]]
+        );
+        assert_eq!(
+            frontier.profile_groups.iter().map(|group| group.equivalent_policy_indices.clone()).collect::<Vec<_>>(),
+            vec![vec![0], vec![1]]
+        );
+
+        // The exact profile frontier retains the known k=1 regret 1 and
+        // k=2 regret 0 outcomes of the exhaustive all-policy portfolio oracle.
+        let one_member_regret = frontier.frontier_profile_group_indices.iter()
+            .map(|&index| frontier.profile_groups[index].regret_profile.iter().copied()
+                .fold(q(0,1), |worst, value| if compare_signed(value,worst)==Ordering::Greater { value } else { worst }))
+            .min_by(|left,right| compare_signed(*left,*right))
+            .unwrap();
+        assert_eq!(one_member_regret, q(1,1));
+        assert_eq!(source.minimax_regret, q(0,1));
+
+        verify_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(), &frontier,
+        ).unwrap();
+    }
+
+    #[test]
+    fn regret_profile_frontier_quotients_equal_profiles_and_removes_dominated_profiles() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[3, 3, 1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 1, budget(3,3),
+        ).unwrap();
+        let frontier = compute_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(),
+        ).unwrap();
+        assert_eq!(frontier.profile_groups.len(), 2);
+        assert_eq!(frontier.profile_groups[0].representative_policy_index, 0);
+        assert_eq!(frontier.profile_groups[0].equivalent_policy_indices, vec![0,1]);
+        assert_eq!(frontier.profile_groups[0].regret_profile, vec![q(0,1)]);
+        assert_eq!(frontier.profile_groups[1].representative_policy_index, 2);
+        assert_eq!(frontier.profile_groups[1].regret_profile, vec![q(2,1)]);
+        assert_eq!(frontier.frontier_profile_group_indices, vec![0]);
+        assert_eq!(
+            frontier.dominance_witnesses,
+            vec![PolicyRegretProfileDominanceWitness {
+                dominated_profile_group_index: 1,
+                dominator_profile_group_index: 0,
+            }]
+        );
+        // The exact optimum is unchanged after eliminating the dominated
+        // profile; original equivalent policy indices are not discarded.
+        assert_eq!(source.minimax_regret, q(0,1));
+        verify_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(), &frontier,
+        ).unwrap();
+
+        let mut mutated = frontier.clone();
+        mutated.profile_groups[0].regret_profile[0] = q(1,1);
+        assert_eq!(
+            verify_policy_regret_profile_frontier(
+                &family, &source, regret_profile_budget(), &mutated,
+            ),
+            Err(PolicyPortfolioError::PolicyRegretProfileCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn regret_profile_frontier_rejects_source_mutation_and_exhausted_budgets() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[3, 3, 1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 1, budget(3,3),
+        ).unwrap();
+
+        let mut mutated_source = source.clone();
+        mutated_source.model_policy_values[0][2] = q(0,1);
+        assert_eq!(
+            compute_policy_regret_profile_frontier(
+                &family, &mutated_source, regret_profile_budget(),
+            ),
+            Err(PolicyPortfolioError::PolicyRegretProfileSourceMismatch)
+        );
+
+        let mut entries_tight = regret_profile_budget();
+        entries_tight.max_profile_entries = 2;
+        assert_eq!(
+            compute_policy_regret_profile_frontier(&family, &source, entries_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "regret profile entries",
+                required: 3,
+                limit: 2,
+            })
+        );
+        let mut comparisons_tight = regret_profile_budget();
+        comparisons_tight.max_profile_component_comparisons = 8;
+        assert_eq!(
+            compute_policy_regret_profile_frontier(&family, &source, comparisons_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "regret profile component comparisons",
+                required: 9,
+                limit: 8,
+            })
+        );
+        let mut width_tight = regret_profile_budget();
+        width_tight.max_rational_bit_width = 1;
+        assert_eq!(
+            compute_policy_regret_profile_frontier(&family, &source, width_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "rational bit width",
+                required: 2,
+                limit: 1,
+            })
+        );
+        let mut memory_tight = regret_profile_budget();
+        memory_tight.max_output_memory_bytes = 1;
+        assert!(matches!(
+            compute_policy_regret_profile_frontier(&family, &source, memory_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "regret profile frontier output bytes",
+                ..
+            })
+        ));
     }
 
     #[test]
