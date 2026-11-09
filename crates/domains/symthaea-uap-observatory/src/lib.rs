@@ -820,6 +820,14 @@ pub use budgeted_design::{
     greedy_budgeted_design,
 };
 
+/// Selected-set experimental design with arbitrary declared residual covariance.
+pub mod correlated_design;
+
+pub use correlated_design::{
+    MAX_CORRELATED_DESIGN_OBSERVATIONS, CorrelatedDesignScenario, CorrelatedExperimentOption,
+    exhaustive_correlated_budgeted_design, greedy_correlated_budgeted_design,
+};
+
 /// Data-only Jacobian rank and singular-spectrum diagnostics.
 pub mod observability;
 
