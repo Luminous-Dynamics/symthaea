@@ -219,7 +219,7 @@
           ]
         },
         "proof": {
-          "$ref": "#/$defs/attestation"
+          "$ref": "#/$defs/availabilityAttestation"
         }
       },
       "allOf": [
@@ -351,7 +351,7 @@
           "format": "date-time"
         },
         "proof": {
-          "$ref": "#/$defs/attestation"
+          "$ref": "#/$defs/rightsAttestation"
         }
       }
     },
@@ -422,9 +422,8 @@
     }
   },
   "$defs": {
-    "attestation": {
+    "attestationBase": {
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "state",
         "artifact_ref",
@@ -499,7 +498,10 @@
           "if": {
             "properties": {
               "state": {
-                "const": "verified"
+                "enum": [
+                  "verified",
+                  "synthetic_fixture_only"
+                ]
               }
             },
             "required": [
@@ -534,8 +536,86 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "missing",
+                  "unverifiable"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifact_ref": {
+                "type": "null"
+              },
+              "artifact_sha256": {
+                "type": "null"
+              },
+              "verification_receipt_ref": {
+                "type": "null"
+              },
+              "verification_receipt_sha256": {
+                "type": "null"
+              },
+              "verifier_id": {
+                "type": "null"
+              },
+              "verifier_build_sha256": {
+                "type": "null"
+              },
+              "binding_sha256": {
+                "type": "null"
+              }
+            }
+          }
         }
       ]
+    },
+    "availabilityAttestation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/attestationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "binding"
+          ],
+          "properties": {
+            "binding": {
+              "$ref": "evidence-proof-binding-v1.schema.json#/$defs/availability"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "rightsAttestation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/attestationBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "binding"
+          ],
+          "properties": {
+            "binding": {
+              "$ref": "evidence-proof-binding-v1.schema.json#/$defs/rights"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     }
   }
 }
