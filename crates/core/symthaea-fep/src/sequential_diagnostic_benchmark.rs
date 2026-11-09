@@ -101,31 +101,41 @@ pub enum SequentialDiagnosticBenchmarkError {
     EmptyEpisodeSet,
     #[error("ground-truth hypothesis count {actual} does not match {expected}")]
     TruthHypothesisCount { expected: usize, actual: usize },
-    #[error("ground-truth action count for hypothesis {hypothesis_index}: {actual}, expected {expected}")]
+    #[error(
+        "ground-truth action count for hypothesis {hypothesis_index}: {actual}, expected {expected}"
+    )]
     TruthActionCount {
         hypothesis_index: usize,
         expected: usize,
         actual: usize,
     },
-    #[error("ground-truth outcome count for hypothesis {hypothesis_index}, action {action_index}: {actual}, expected {expected}")]
+    #[error(
+        "ground-truth outcome count for hypothesis {hypothesis_index}, action {action_index}: {actual}, expected {expected}"
+    )]
     TruthOutcomeCount {
         hypothesis_index: usize,
         action_index: usize,
         expected: usize,
         actual: usize,
     },
-    #[error("ground-truth outcome distribution is invalid for hypothesis {hypothesis_index}, action {action_index}")]
+    #[error(
+        "ground-truth outcome distribution is invalid for hypothesis {hypothesis_index}, action {action_index}"
+    )]
     InvalidTruthDistribution {
         hypothesis_index: usize,
         action_index: usize,
     },
-    #[error("ground-truth probability has no support in the agent model for hypothesis {hypothesis_index}, action {action_index}, outcome {outcome_index}")]
+    #[error(
+        "ground-truth probability has no support in the agent model for hypothesis {hypothesis_index}, action {action_index}, outcome {outcome_index}"
+    )]
     TruthOutsideModelSupport {
         hypothesis_index: usize,
         action_index: usize,
         outcome_index: usize,
     },
-    #[error("selected plan has no continuation branch for observed outcome {outcome_index} on action {action_index}")]
+    #[error(
+        "selected plan has no continuation branch for observed outcome {outcome_index} on action {action_index}"
+    )]
     MissingPlanBranch {
         action_index: usize,
         outcome_index: usize,
@@ -217,12 +227,16 @@ fn validate_scenario(
         decision_config,
     )?;
 
-    if scenario.true_outcome_probabilities_by_hypothesis_action.len()
+    if scenario
+        .true_outcome_probabilities_by_hypothesis_action
+        .len()
         != scenario.hypotheses.len()
     {
         return Err(SequentialDiagnosticBenchmarkError::TruthHypothesisCount {
             expected: scenario.hypotheses.len(),
-            actual: scenario.true_outcome_probabilities_by_hypothesis_action.len(),
+            actual: scenario
+                .true_outcome_probabilities_by_hypothesis_action
+                .len(),
         });
     }
 
@@ -250,24 +264,29 @@ fn validate_scenario(
                 });
             }
             let sum = truth_outcomes.iter().sum::<f64>();
-            if truth_outcomes.iter().any(|probability| {
-                !probability.is_finite() || !(0.0..=1.0).contains(probability)
-            }) || (sum - 1.0).abs() > PROBABILITY_TOLERANCE
+            if truth_outcomes
+                .iter()
+                .any(|probability| !probability.is_finite() || !(0.0..=1.0).contains(probability))
+                || (sum - 1.0).abs() > PROBABILITY_TOLERANCE
             {
-                return Err(SequentialDiagnosticBenchmarkError::InvalidTruthDistribution {
-                    hypothesis_index,
-                    action_index,
-                });
+                return Err(
+                    SequentialDiagnosticBenchmarkError::InvalidTruthDistribution {
+                        hypothesis_index,
+                        action_index,
+                    },
+                );
             }
             for (outcome_index, (truth, model)) in
                 truth_outcomes.iter().zip(model_outcomes).enumerate()
             {
                 if *truth > 0.0 && *model == 0.0 {
-                    return Err(SequentialDiagnosticBenchmarkError::TruthOutsideModelSupport {
-                        hypothesis_index,
-                        action_index,
-                        outcome_index,
-                    });
+                    return Err(
+                        SequentialDiagnosticBenchmarkError::TruthOutsideModelSupport {
+                            hypothesis_index,
+                            action_index,
+                            outcome_index,
+                        },
+                    );
                 }
             }
         }
@@ -282,7 +301,10 @@ fn run_policy(
     seed: u64,
     decision_config: DecisionDiagnosticConfig,
     planning_config: SequentialDiagnosticConfig,
-) -> Result<(SequentialDiagnosticPolicyMetrics, Vec<EpisodeMetrics>), SequentialDiagnosticBenchmarkError> {
+) -> Result<
+    (SequentialDiagnosticPolicyMetrics, Vec<EpisodeMetrics>),
+    SequentialDiagnosticBenchmarkError,
+> {
     let decision_count = scenario.hypotheses[0].loss_by_final_decision.len();
     let prior = scenario
         .hypotheses
@@ -313,8 +335,7 @@ fn run_policy(
     let mut episode_metrics = Vec::with_capacity(episodes);
 
     for episode_index in 0..episodes {
-        let episode_seed =
-            seed.wrapping_add((episode_index as u64).wrapping_mul(SEED_MIX));
+        let episode_seed = seed.wrapping_add((episode_index as u64).wrapping_mul(SEED_MIX));
         let mut hidden_rng = DeterministicRng::new(episode_seed ^ 0xA5A5_A5A5_A5A5_A5A5);
         let true_hypothesis = sample_categorical(&prior, &mut hidden_rng);
         let mut posterior = prior.clone();
@@ -325,16 +346,15 @@ fn run_policy(
         match policy {
             SequentialDiagnosticPolicy::NoProbe => {}
             SequentialDiagnosticPolicy::SequentialEvsi => {
-                let plan = sequential_plan.as_ref().expect("sequential policy has a plan");
+                let plan = sequential_plan
+                    .as_ref()
+                    .expect("sequential policy has a plan");
                 let mut node = &plan.plan;
                 while let Some(action_index) = node.selected_action_index {
-                    let current_hypotheses = hypotheses_with_priors(&scenario.hypotheses, &posterior);
-                    let outcome_index = sample_outcome(
-                        scenario,
-                        true_hypothesis,
-                        action_index,
-                        episode_seed,
-                    );
+                    let current_hypotheses =
+                        hypotheses_with_priors(&scenario.hypotheses, &posterior);
+                    let outcome_index =
+                        sample_outcome(scenario, true_hypothesis, action_index, episode_seed);
                     posterior = posterior_model_probabilities(
                         &current_hypotheses,
                         action_index,
@@ -380,12 +400,8 @@ fn run_policy(
                         break;
                     };
                     let action_index = remaining.remove(local_index);
-                    let outcome_index = sample_outcome(
-                        scenario,
-                        true_hypothesis,
-                        action_index,
-                        episode_seed,
-                    );
+                    let outcome_index =
+                        sample_outcome(scenario, true_hypothesis, action_index, episode_seed);
                     posterior = posterior_model_probabilities(
                         &current_hypotheses,
                         local_index,
@@ -404,20 +420,15 @@ fn run_policy(
                 let mut remaining = (0..scenario.actions.len()).collect::<Vec<_>>();
                 for _ in 0..planning_config.horizon {
                     let Some(position) = remaining.iter().position(|index| {
-                        scenario.actions[*index].safety_risk
-                            <= decision_config.maximum_safety_risk
+                        scenario.actions[*index].safety_risk <= decision_config.maximum_safety_risk
                     }) else {
                         break;
                     };
                     let action_index = remaining.remove(position);
                     let current_hypotheses =
                         hypotheses_with_priors(&scenario.hypotheses, &posterior);
-                    let outcome_index = sample_outcome(
-                        scenario,
-                        true_hypothesis,
-                        action_index,
-                        episode_seed,
-                    );
+                    let outcome_index =
+                        sample_outcome(scenario, true_hypothesis, action_index, episode_seed);
                     posterior = posterior_model_probabilities(
                         &current_hypotheses,
                         action_index,
@@ -434,11 +445,7 @@ fn run_policy(
             }
         }
 
-        let selected_decision = best_decision(
-            &posterior,
-            &scenario.hypotheses,
-            decision_count,
-        );
+        let selected_decision = best_decision(&posterior, &scenario.hypotheses, decision_count);
         let task_loss =
             scenario.hypotheses[true_hypothesis].loss_by_final_decision[selected_decision];
         let oracle_task_loss = scenario.hypotheses[true_hypothesis]
@@ -536,8 +543,7 @@ fn sample_outcome(
         episode_seed ^ (action_index as u64).wrapping_mul(SEED_MIX) ^ 0x5A5A_5A5A_5A5A_5A5A;
     let mut rng = DeterministicRng::new(action_seed);
     sample_categorical(
-        &scenario.true_outcome_probabilities_by_hypothesis_action[true_hypothesis]
-            [action_index],
+        &scenario.true_outcome_probabilities_by_hypothesis_action[true_hypothesis][action_index],
         &mut rng,
     )
 }
@@ -606,10 +612,12 @@ fn paired_contrast(
     candidate: &[EpisodeMetrics],
 ) -> Result<SequentialDiagnosticPolicyContrast, SequentialDiagnosticBenchmarkError> {
     if reference.len() != candidate.len() {
-        return Err(SequentialDiagnosticBenchmarkError::PairedEpisodeCountMismatch {
-            reference: reference.len(),
-            candidate: candidate.len(),
-        });
+        return Err(
+            SequentialDiagnosticBenchmarkError::PairedEpisodeCountMismatch {
+                reference: reference.len(),
+                candidate: candidate.len(),
+            },
+        );
     }
     let task_differences = reference
         .iter()
@@ -726,11 +734,7 @@ mod tests {
                             vec![1.0, 0.0]
                         },
                     });
-                    truth.push(vec![
-                        nuisance_outcomes,
-                        first_outcomes,
-                        second_outcomes,
-                    ]);
+                    truth.push(vec![nuisance_outcomes, first_outcomes, second_outcomes]);
                 }
             }
         }
