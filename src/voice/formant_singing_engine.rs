@@ -15,6 +15,9 @@ use symthaea_pronunciation_plan::{
 use symthaea_vocal_tract::speech::formants::formant_target_pub;
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
+use super::resolved_singing_engine::{
+    ResolvedScoreInput, ResolvedSingingVoiceEngine,
+};
 use super::singing_engine::{
     CapabilitySupport, ControlCapability, ExpressionPoint, SingingBackendCapabilities,
     SingingControl, SingingRenderPolicy, SingingVoiceEngine, VocalPerformance, VocalStem,
@@ -24,6 +27,7 @@ use super::vocoder::{FormantVocoder, VocoderConfig};
 const FRAME_RATE_HZ: f32 = 200.0;
 const FRAME_DT_S: f32 = 1.0 / FRAME_RATE_HZ;
 const BACKEND_ID: &str = "formant-vocoder-singing";
+const RESOLVED_BACKEND_ID: &str = "formant-vocoder-singing-resolved-plan-v1";
 
 /// An honest, executable baseline over the already-integrated Muse
 /// sing -> render_sung_frames -> FormantVocoder path.
@@ -71,7 +75,7 @@ impl FormantSingingEngine {
     /// portamento, phrase-expression or voice-identity controls.
     pub fn resolved_plan_capabilities() -> Result<SingingBackendCapabilities> {
         SingingBackendCapabilities::new(
-            format!("{BACKEND_ID}-resolved-plan-v1"),
+            RESOLVED_BACKEND_ID.to_string(),
             vec![
                 capability(
                     SingingControl::LyricText,
@@ -241,7 +245,7 @@ impl FormantSingingEngine {
         let stem = VocalStem {
             samples,
             sample_rate: self.sample_rate,
-            backend: format!("{BACKEND_ID}-resolved-plan-v1"),
+            backend: RESOLVED_BACKEND_ID.to_string(),
         };
         stem.validate()?;
         Ok(stem)
@@ -934,6 +938,38 @@ fn capability(
         control,
         support,
         rationale: rationale.to_string(),
+    }
+}
+
+impl ResolvedSingingVoiceEngine for FormantSingingEngine {
+    fn resolved_backend_id(&self) -> &str {
+        RESOLVED_BACKEND_ID
+    }
+
+    fn resolved_capabilities(&self) -> Result<SingingBackendCapabilities> {
+        Self::resolved_plan_capabilities()
+    }
+
+    fn render_resolved_unchecked(
+        &mut self,
+        pronunciation: &PronunciationPlan,
+        score: ResolvedScoreInput<'_>,
+    ) -> Result<VocalStem> {
+        match score {
+            ResolvedScoreInput::SecondsAlignment(alignment) => {
+                self.render_resolved_plan(pronunciation, alignment)
+            }
+            ResolvedScoreInput::BeatDomain {
+                score,
+                syllable_bindings,
+                phrases,
+            } => self.render_beat_domain_plan(
+                pronunciation,
+                score,
+                syllable_bindings,
+                phrases,
+            ),
+        }
     }
 }
 
