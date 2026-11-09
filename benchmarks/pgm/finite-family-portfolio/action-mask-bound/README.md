@@ -159,3 +159,163 @@ This is an exact **inner cluster solver**, not yet the outer partition
 search. It is not evidence of a runtime win over KAPS. The outer search must
 still assign all environments to at most k clusters, maintain a complete
 frontier lower bound, and prove global portfolio optimality.
+
+## Exact outer policy-portfolio partition branch-and-bound
+
+`solve_exact_finite_family_policy_portfolio_bnb` now composes the exact
+single-cluster solver into a global finite-family solver for at most k policies.
+
+### Partition equivalence
+
+Let (r(C)=min_{\pi}\max_{M\in C}(V^*_M-V_M^\pi)) be the exact minimax
+regret of one shared policy for a nonempty cluster C. Then:
+
+```
+min_{|Pi| <= k} max_M (V*_M - max_{pi in Pi} V_M(pi))
+=
+min_{partition C_1,...,C_j; j <= k} max_i r(C_i)
+```
+
+Proof sketch:
+- Given a partition, choose a minimax-regret policy for each cluster.
+  Every model is covered by its assigned policy, so portfolio regret is no
+  greater than the maximum cluster regret.
+- Given any portfolio, assign each model to a portfolio member that gives
+  it the highest value (ties resolved deterministically). Each induced
+  cluster's shared-policy optimum is no worse than that assigned member,
+  so the best partition has objective no greater than the portfolio regret.
+
+The two optima are equal. At a globally optimal partition, the returned
+cluster-optimal policies must therefore have portfolio coverage regret equal
+to the partition objective. The implementation checks that equality by
+re-evaluating every selected policy on every model.
+
+### Outer admissible bound
+
+A partial partition assigns a prefix of the ordered model family into at most
+k nonempty clusters. For each current cluster C, the inner B&B proves r(C).
+Adding models cannot lower r(C), because the maximum in the cluster regret
+objective is taken over a superset. Thus
+
+```
+LB(partial partition) = max over current clusters C of r(C)
+```
+
+is a valid lower bound for every completion. Unassigned models contribute
+nonnegative regret and do not invalidate the bound.
+
+The search uses canonical restricted-growth partitions: at each model, assign
+it to one existing cluster in ascending order, or create exactly one new
+cluster. Cluster labels are not permuted, so each unlabeled set partition is
+visited once. DFS visits them lexicographically. The initial feasible upper
+bound is the exact one-cluster solution.
+
+A node is pruned only when its exact lower bound is greater than or equal to
+the incumbent. Completed partitions are evaluated exactly. The function
+returns only after the full outer frontier has been exhausted. It exposes
+equal global lower/upper bounds, node/complete/prune counts, cached inner
+cluster certificates, total inner-search nodes and complete DP work. Budget
+exhaustion returns an error, not a partial result labelled optimal.
+
+The transcript hashes every popped partial partition, ordered cluster
+certificate digests, exact lower bound and event (expanded/pruned/complete).
+The final portfolio certificate binds the family, policy manifest, selected
+partition, inner certificates, every model-by-policy value, selected
+portfolio values, regrets, worst-case models, global bounds, counters and
+transcript digest. The verifier re-runs the complete deterministic search.
+
+### Outer exact known answer
+
+Two one-state specialist models, M0 rewards [1,0] and M1 rewards [0,1],
+discount 1/2, maximum portfolio size k=2:
+- Optimal partition: [[0],[1]].
+- Selected cluster policies: action 0 for M0's cluster, action 1 for M1's.
+- Model-by-policy values: [[1,0],[0,1]].
+- Model portfolio values: [1,1]; model regrets: [0,0].
+- Minimax portfolio regret and global lower/upper bounds: 0.
+- Outer nodes: 4; complete partitions: 2; pruned outer nodes: 0.
+- Cached unique cluster solutions: 3 (the full family, [0], [1]).
+- Total inner cluster nodes: 7; total exact DP work including cross-model
+  portfolio replay: 104 multiply/add terms.
+
+Known identities:
+- Family SHA-256: `31c37db3d062ca761438ef3d506049aaebc667984a442605f3c52aa41ea2447f`.
+- One-model M0 cluster certificate: `bdfca086755479f1cff8fe09303fabdbeabb12182e50789c12f2628d365cb5c7`.
+- One-model M1 cluster certificate: `551f6f315468270f5a5b3a74f04665ba3e5a9894cc8ae41312cd1bbb5cdaa222`.
+- Outer partition transcript: `c69c11ded97c6634b743ba30e1f5bfcaadd5cd0de6c3db65cca867c8a3d38eaa`.
+- Outer optimum certificate: `f75dc2c13a38445ffb22df19526d0d4628d533b864dcec8265c2c65d03eb6d17`.
+
+Hashes are independently reconstructed from the documented canonical
+little-endian rational/integer encodings. They are regression targets;
+they are not evidence of a Rust test having executed.
+
+## Comparative benchmark programme
+
+Keep three test regimes distinct:
+
+1. **Exact finite UMDP comparison against KAPS** (SUMI-lab/KAPS, commit
+   `4d35eef6c442521139d1786e31c6d6fbf322788f`). Use the same finite model
+   tensors, discount, initial state, reward timing, k, and deterministic
+   memoryless policy class. For H-step finite-horizon inputs, clock-augment
+   each state to (t,s) with an absorbing zero-reward terminal state. Compare
+   the exact Rust reference and KAPS's float64 values with a preregistered
+   tolerance. Report regret, proof status/gap, nodes, per-cluster solve/cache
+   statistics, wall time, memory, and proof replay separately.
+2. **Continuous/parametric RMDP coverage and selection** against
+   *Adaptive Policy Portfolios for Robust MDPs* (arXiv:2608.17929). This is a
+   different model class: the paper discretizes two-parameter uncertainty
+   domains into cells, clusters regret profiles, and uses UCB for online
+   member selection. It reports Datacenter Climate Control (330 states) and
+   UAV-small/medium/large (98/358/1813 states), with k in {1,2,3,5,7,10}.
+   Its finite-sample 1000-point regret estimate is an under-approximation,
+   not an exact robust guarantee. Port these as approximate/continuous
+   tracks, and do not compare them as if they were finite enumerated KAPS
+   instances.
+3. **Robust best-effort tie breaking** against AAAI-26's ORBE work. When a
+   robust value or regret objective has many tied solutions, measure nominal
+   or non-adversarial performance, Pareto dominance, safety margins and
+   stability of the selected policy. Do not collapse this into worst-case
+   regret alone.
+
+The 2026 adaptive-portfolio paper reports a sharp early gain from K=1 to K=2,
+then diminishing but continued improvements; on its sampled UAV/Datacenter
+cases it also reports online UCB identifying the best arm more slowly as K
+grows. Those are useful targets to reproduce, not results this finite-family
+deterministic reference has already beaten.
+
+## Paradigm shifts to pursue next
+
+- **Beyond offline coverage to evidence-conditioned action:** use observations
+  to update a posterior/confidence set over models and select among
+  pre-certified policies, with a regret decomposition into offline coverage
+  gap plus online identification regret.
+- **Proof-aware active sensing:** choose observations/actions by expected
+  information gain per unit cost, while maintaining a safety envelope and
+  never deploying a policy whose certificate does not cover the current
+  credible model set.
+- **Regret-profile geometry:** cache exact per-model policy profiles, remove
+  dominated policies, quotient identical profiles, and use profile-space
+  bounds to prune portfolios without repeatedly replaying all policies.
+- **One-run policy-budget frontier:** reuse cluster and partition certificates
+  across k instead of rerunning from scratch for every budget; report the
+  full (policy count, regret) Pareto frontier.
+- **Risk-sensitive and service-constrained objectives:** augment minimax
+  regret with tail loss, chance constraints, safety invariants, switching
+  costs and resource limits. Keep these as separately defined objectives.
+- **Randomized and continuous uncertainty:** first support a finite grid of
+  rational randomized policies, then parameterized policies with interval or
+  algebraic bounds. Do not silently generalize the deterministic finite
+  family verifier to arbitrary polytopes.
+
+## Current scope and limitations
+
+The current exact implementation handles a finite, explicitly enumerated
+family of finite-horizon, fully observable UMDPs with common state/action
+spaces and initial distribution, checked-rational data, deterministic
+time-dependent Markov policies, and up to k policies. The inner and outer
+searches are currently deterministic and all-or-error under configured caps;
+they are not yet resumable, distributed or anytime gap-reporting. The policy
+space cardinality must still fit in usize for the current canonical policy
+index manifest. Continuous rational polytopes, randomized policies, online
+model inference, partially observable models, risk constraints and
+incremental Pareto-frontier reuse remain separate work.
