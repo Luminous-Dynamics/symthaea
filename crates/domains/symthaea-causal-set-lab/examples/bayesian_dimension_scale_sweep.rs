@@ -180,7 +180,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,wilson95_coverage_low,wilson95_coverage_high,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support"
     );
-    
+
     for (size_index, event_count) in EVENT_COUNTS.iter().copied().enumerate() {
         let calibration_replicates = CALIBRATION_REPLICATES[size_index];
         let calibration_seed = CALIBRATION_BASE_SEED.wrapping_add((event_count as u64) << 20);
