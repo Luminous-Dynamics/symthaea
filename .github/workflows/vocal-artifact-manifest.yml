@@ -18,7 +18,7 @@ jobs:
       - name: Check out exact pull request revision
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact checked-out revision
@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "VOCAL_ARTIFACT_REVISION=$actual" >> "$GITHUB_ENV"
 
@@ -71,6 +71,6 @@ jobs:
       - name: Upload deterministic test receipt
         uses: actions/upload-artifact@v4
         with:
-          name: vocal-artifact-manifest-\${{ github.event.pull_request.head.sha || github.sha }}
+          name: vocal-artifact-manifest-${{ github.event.pull_request.head.sha || github.sha }}
           path: vocal-artifact-manifest.revision
           if-no-files-found: error
