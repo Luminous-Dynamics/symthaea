@@ -27,6 +27,12 @@ The adapter supplies the Luminous correlation envelope around the native policy 
 - per-environment next chunk index;
 - exact action channel/dimension manifest;
 - maximum allowed number of actions in one chunk.
+- digest of the exact policy-visible observation bundle;
+- digest of the policy source/checkpoint/weight manifest;
+- digest of deployment configuration, prompt/inference settings and resolved runtime lock;
+- digest of the declared tool, skill, oracle and human-assistance profile.
+
+The four digest fields are attached by the Luminous adapter as a wrapper envelope; they are **not** native XPolicyLab model-response fields. They preserve which immutable inputs a result is associated with. This crate does not compute or authenticate those artifact hashes, verify digital signatures, or prove that the policy server actually loaded the artifact named by the manifest. The all-zero digest is reserved as an invalid/unset sentinel.
 
 These envelope fields are not assumed to be native XPolicyLab response fields. In particular, the environment client must bind batch output slot *i* to the exact `env_idx_list[i]` sent to `get_action_batch`.
 
