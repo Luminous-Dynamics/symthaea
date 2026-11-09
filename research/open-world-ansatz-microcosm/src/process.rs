@@ -14,9 +14,9 @@ use sha2::{Digest, Sha256};
 use std::ffi::OsString;
 use std::fmt;
 use std::fs;
-use std::io::{self, BufRead, BufReader, ChildStdin, ChildStdout, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 pub const DEFAULT_MAX_FRAME_BYTES: usize = 1_048_576;
 pub const MAX_PROCESS_FRAME_BYTES: usize = 16 * 1_048_576;
@@ -338,6 +338,7 @@ fn sha256_frame(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
 
+#[derive(Debug)]
 enum BoundedLine {
     Eof,
     Line,
