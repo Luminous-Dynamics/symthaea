@@ -232,15 +232,6 @@ pub fn validate_ensemble_groove(
             ));
             continue;
         }
-        if groove.ticks_per_beat > 0
-            && layer.cycle_ticks % groove.ticks_per_beat != 0
-        {
-            issues.push(issue(
-                "fractional_cycle_beats",
-                format!("{path}.cycle_ticks"),
-                "each layer cycle must contain an integer number of declared beats",
-            ));
-        }
         for (event_index, event) in layer.events.iter().enumerate() {
             if event.onset_tick >= layer.cycle_ticks {
                 issues.push(issue(
@@ -394,18 +385,20 @@ pub fn analyze_ensemble_groove(
 
     let pair_count = groove.layers.len().saturating_mul(groove.layers.len().saturating_sub(1)) / 2;
     let mut pair_analyses = Vec::with_capacity(pair_count);
+    let mut total_pairwise_comparisons = 0usize;
     for left_index in 0..groove.layers.len() {
         for right_index in (left_index + 1)..groove.layers.len() {
             let left = &materialized[left_index];
             let right = &materialized[right_index];
             let comparisons = left.len().saturating_mul(right.len());
-            if comparisons > MAX_PAIRWISE_COMPARISONS {
+            total_pairwise_comparisons =
+                total_pairwise_comparisons.saturating_add(comparisons);
+            if total_pairwise_comparisons > MAX_PAIRWISE_COMPARISONS {
                 return Err(vec![issue(
                     "pairwise_work_limit",
                     "layers",
                     format!(
-                        "pair {} × {} requires {comparisons} attack comparisons; limit is {MAX_PAIRWISE_COMPARISONS}",
-                        groove.layers[left_index].id, groove.layers[right_index].id
+                        "ensemble requires {total_pairwise_comparisons} total attack comparisons; limit is {MAX_PAIRWISE_COMPARISONS}"
                     ),
                 )]);
             }
