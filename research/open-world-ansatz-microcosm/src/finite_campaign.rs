@@ -106,6 +106,8 @@ pub struct ArmAggregate {
     pub unnecessary_abstentions: usize,
     pub total_probe_actions: usize,
     pub total_probe_cost_units: u64,
+    pub total_legal_probe_actions_scored: u64,
+    pub total_model_prediction_evaluations: u64,
     pub maximum_probe_actions_in_episode: usize,
 }
 
@@ -135,11 +137,17 @@ impl ArmAggregate {
             unnecessary_abstentions: 0,
             total_probe_actions: 0,
             total_probe_cost_units: 0,
+            total_legal_probe_actions_scored: 0,
+            total_model_prediction_evaluations: 0,
             maximum_probe_actions_in_episode: 0,
         }
     }
 
-    fn record(&mut self, score: &EvaluatorScore) {
+    fn record(
+        &mut self,
+        score: &EvaluatorScore,
+        work: crate::strategies::ProbeScoringWork,
+    ) {
         self.episodes += 1;
         self.exact_version_space_matches += bool_count(score.set_score.exact_version_space_match);
         self.exact_structure_set_matches +=
@@ -173,6 +181,8 @@ impl ArmAggregate {
         self.unnecessary_abstentions += bool_count(score.unnecessary_abstention);
         self.total_probe_actions += score.probe_count;
         self.total_probe_cost_units += score.probe_count as u64;
+        self.total_legal_probe_actions_scored += work.legal_actions_scored;
+        self.total_model_prediction_evaluations += work.model_prediction_evaluations;
         self.maximum_probe_actions_in_episode =
             self.maximum_probe_actions_in_episode.max(score.probe_count);
     }
@@ -225,6 +235,8 @@ pub struct PairedEpisodeRecord {
     pub comparison_design: String,
     pub a0: EvaluatorScore,
     pub a2: EvaluatorScore,
+    pub a0_probe_work: crate::strategies::ProbeScoringWork,
+    pub a2_probe_work: crate::strategies::ProbeScoringWork,
 }
 
 /// Paired binary outcome counts. "A0 only" and "A2 only" are discordant
@@ -281,6 +293,13 @@ pub struct PairedArmContrast {
     pub a2_probe_actions: usize,
     /// Signed difference in total probe actions (A2 minus A0).
     pub a2_minus_a0_probe_actions: i64,
+    pub a0_legal_probe_actions_scored: u64,
+    pub a2_legal_probe_actions_scored: u64,
+    pub a2_minus_a0_legal_probe_actions_scored: i64,
+    pub a0_model_prediction_evaluations: u64,
+    pub a2_model_prediction_evaluations: u64,
+    /// Signed difference in probe model-prediction evaluations (A2 minus A0).
+    pub a2_minus_a0_model_prediction_evaluations: i64,
 }
 
 impl PairedArmContrast {
@@ -305,6 +324,12 @@ impl PairedArmContrast {
             a0_probe_actions: 0,
             a2_probe_actions: 0,
             a2_minus_a0_probe_actions: 0,
+            a0_legal_probe_actions_scored: 0,
+            a2_legal_probe_actions_scored: 0,
+            a2_minus_a0_legal_probe_actions_scored: 0,
+            a0_model_prediction_evaluations: 0,
+            a2_model_prediction_evaluations: 0,
+            a2_minus_a0_model_prediction_evaluations: 0,
         }
     }
 
@@ -363,6 +388,17 @@ impl PairedArmContrast {
         self.a0_probe_actions += a0.probe_count;
         self.a2_probe_actions += a2.probe_count;
         self.a2_minus_a0_probe_actions += a2.probe_count as i64 - a0.probe_count as i64;
+        self.a0_legal_probe_actions_scored += pair.a0_probe_work.legal_actions_scored;
+        self.a2_legal_probe_actions_scored += pair.a2_probe_work.legal_actions_scored;
+        self.a2_minus_a0_legal_probe_actions_scored += pair.a2_probe_work.legal_actions_scored as i64
+            - pair.a0_probe_work.legal_actions_scored as i64;
+        self.a0_model_prediction_evaluations +=
+            pair.a0_probe_work.model_prediction_evaluations;
+        self.a2_model_prediction_evaluations +=
+            pair.a2_probe_work.model_prediction_evaluations;
+        self.a2_minus_a0_model_prediction_evaluations +=
+            pair.a2_probe_work.model_prediction_evaluations as i64
+                - pair.a0_probe_work.model_prediction_evaluations as i64;
     }
 }
 
@@ -476,7 +512,7 @@ fn run_arm(
     policy: PolicySpec,
     budget: usize,
     episode_id: &str,
-) -> Result<EvaluatorScore, FiniteCampaignError> {
+) -> Result<(EvaluatorScore, crate::strategies::ProbeScoringWork), FiniteCampaignError> {
     if budget == 0 {
         return Err(FiniteCampaignError::InvalidBudget);
     }
@@ -515,6 +551,7 @@ fn run_arm(
     .map_err(|error| FiniteCampaignError::Protocol(error.to_string()))?;
 
     // Policy receives only AgentView. Generating truth remains in the episode.
+    let mut probe_work = crate::strategies::ProbeScoringWork::default();
     for _ in 0..=budget {
         if episode.status() == crate::protocol::EpisodeStatus::Submitted {
             break;
@@ -522,8 +559,11 @@ fn run_arm(
         let view = episode
             .view()
             .map_err(|error| FiniteCampaignError::Protocol(error.to_string()))?;
-        let action = StrategyEnumeratorBaseline::next_action(&view, policy.strategy)
-            .map_err(|error: PolicyError| FiniteCampaignError::Policy(error.to_string()))?;
+        let (action, step_work) =
+            StrategyEnumeratorBaseline::next_action_with_work(&view, policy.strategy)
+                .map_err(|error: PolicyError| FiniteCampaignError::Policy(error.to_string()))?;
+        probe_work.legal_actions_scored += step_work.legal_actions_scored;
+        probe_work.model_prediction_evaluations += step_work.model_prediction_evaluations;
         let response = episode
             .apply(action)
             .map_err(|error| FiniteCampaignError::Protocol(error.to_string()))?;
@@ -535,9 +575,10 @@ fn run_arm(
     if episode.status() != crate::protocol::EpisodeStatus::Submitted {
         return Err(FiniteCampaignError::NotSubmitted);
     }
-    episode
+    let score = episode
         .evaluate_after_submission()
-        .map_err(|error| FiniteCampaignError::Protocol(error.to_string()))
+        .map_err(|error| FiniteCampaignError::Protocol(error.to_string()))?;
+    Ok((score, probe_work))
 }
 
 /// Exhaustive generating-model census. A0/A2 share each exact hidden model,
@@ -574,22 +615,22 @@ pub fn run_exhaustive_finite_policy_campaign(
             for (index, truth) in family_truths.iter().copied().enumerate() {
                 let pair = format!("{}-{}-{:04}", truth.family_alias(), policy.name, index);
                 let paired_policy = strategy_for_pair(policy, family, index);
-                let score_a0 = run_arm(
+                let (score_a0, work_a0) = run_arm(
                     truth,
                     CampaignArm::A0,
                     paired_policy,
                     budget,
                     &format!("{pair}-a0"),
                 )?;
-                let score_a2 = run_arm(
+                let (score_a2, work_a2) = run_arm(
                     truth,
                     CampaignArm::A2,
                     paired_policy,
                     budget,
                     &format!("{pair}-a2"),
                 )?;
-                a0.record(&score_a0);
-                a2.record(&score_a2);
+                a0.record(&score_a0, work_a0);
+                a2.record(&score_a2, work_a2);
                 pair_records.push(PairedEpisodeRecord {
                     pair_id: pair.clone(),
                     world_family: family,
@@ -599,6 +640,8 @@ pub fn run_exhaustive_finite_policy_campaign(
                     comparison_design: "adaptive_budget".to_owned(),
                     a0: score_a0,
                     a2: score_a2,
+                    a0_probe_work: work_a0,
+                    a2_probe_work: work_a2,
                 });
             }
 
@@ -633,7 +676,7 @@ pub fn run_exhaustive_finite_policy_campaign(
             "The evaluated policy is the transparent exact finite inference baseline, not the learned Symthaea research orchestrator.".to_owned(),
             "A0 and A2 share world truth, empty starting evidence and maximum action budgets; post-start adaptive traces may differ.".to_owned(),
             "Random arm uses base seed 23, deterministically salted by world family and pair index; each next action uses a step-specific seed. The same derived seed schedule is paired across A0 and A2.".to_owned(),
-            "Probe cost units use the reference worlds' declared unit cost; inference runtime, hardware and human-review costs are not included.".to_owned(),
+            "Probe cost units use the reference worlds' declared unit cost. Model-prediction evaluation counts are an algorithmic search-work proxy for the one-step probe scorer; they exclude discovery filtering, serialization, hardware timing, CPU/GPU, tokens, energy and human-review costs.".to_owned(),
             "No external benchmark, physical law or SOTA performance claim follows from this report.".to_owned(),
         ],
     })
