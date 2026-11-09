@@ -2138,6 +2138,50 @@ mod tests {
             ),
             Err(ModelDiscriminationError::InvalidDetectionProbability { .. })
         ));
+
+        let unexpected = detection_candidate(
+            "unexpected",
+            1.0,
+            vec![
+                prediction("model-a", Some(-1.0), Some(0.1)),
+                prediction("model-b", Some(1.0), Some(0.1)),
+            ],
+            vec![
+                detection_prediction("model-a", 0.5),
+                detection_prediction("model-c", 0.5),
+            ],
+        );
+        assert!(matches!(
+            rank_detection_aware_model_discriminating_experiments(
+                &hypotheses,
+                &[unexpected],
+                &config(vec![equal_prior()], 128)
+            ),
+            Err(ModelDiscriminationError::UnexpectedDetectionProbability { .. })
+        ));
+
+        let mut missing_reference = vec![
+            detection_prediction("model-a", 0.5),
+            detection_prediction("model-b", 0.5),
+        ];
+        missing_reference[1].derivation_reference = " ".to_string();
+        let ungrounded = detection_candidate(
+            "missing-derivation",
+            1.0,
+            vec![
+                prediction("model-a", Some(-1.0), Some(0.1)),
+                prediction("model-b", Some(1.0), Some(0.1)),
+            ],
+            missing_reference,
+        );
+        assert!(matches!(
+            rank_detection_aware_model_discriminating_experiments(
+                &hypotheses,
+                &[ungrounded],
+                &config(vec![equal_prior()], 128)
+            ),
+            Err(ModelDiscriminationError::MissingDetectionDerivation { .. })
+        ));
     }
 
     #[test]
