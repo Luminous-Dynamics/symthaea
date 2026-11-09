@@ -1777,6 +1777,22 @@ mod tests {
         }
     }
 
+    fn receipt_for_fixture_envelopes(
+        envelopes: &[ContinuousHVGroupEnvelope],
+    ) -> GroupPartitionCoverageReceipt {
+        let all_ids: Vec<String> = envelopes
+            .iter()
+            .flat_map(|envelope| envelope.member_ids().iter().cloned())
+            .collect();
+        let authoritative_digest = member_id_set_digest(&all_ids).unwrap();
+        GroupPartitionCoverageReceipt::from_group_envelopes(
+            envelopes,
+            all_ids.len(),
+            authoritative_digest,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn group_selection_record_is_bound_to_the_verified_envelope_identity() {
         let members = vec![
@@ -1879,7 +1895,7 @@ mod tests {
             ContinuousHVGroupEnvelope::from_original_members(20, 3, &low_members).unwrap(),
         ];
         let partition_receipt =
-            GroupPartitionCoverageReceipt::from_group_envelopes(&envelopes).unwrap();
+            receipt_for_fixture_envelopes(&envelopes);
         let group_records: Vec<GroupScoreIntervalRecord> = envelopes
             .iter()
             .map(|envelope| build_group_record(envelope, &query))
@@ -2037,7 +2053,7 @@ mod tests {
                 })
                 .collect();
             let partition_receipt =
-                GroupPartitionCoverageReceipt::from_group_envelopes(&envelopes).unwrap();
+                receipt_for_fixture_envelopes(&envelopes);
             let groups: Vec<GroupScoreIntervalRecord> = envelopes
                 .iter()
                 .map(|envelope| build_group_record(envelope, &query))
@@ -2369,7 +2385,7 @@ mod tests {
             ContinuousHVGroupEnvelope::from_original_members(88, 12, &second_members).unwrap(),
         ];
         assert!(matches!(
-            GroupPartitionCoverageReceipt::from_group_envelopes(&overlapping),
+            GroupPartitionCoverageReceipt::from_group_envelopes(&overlapping, 4, [0u8; 32]),
             Err(GroupPartitionReceiptError::DuplicateMember {
                 member_id,
                 ..
@@ -2388,7 +2404,7 @@ mod tests {
             )
             .unwrap(),
         ];
-        let receipt = GroupPartitionCoverageReceipt::from_group_envelopes(&disjoint).unwrap();
+        let receipt = receipt_for_fixture_envelopes(&disjoint);
         let groups: Vec<GroupScoreIntervalRecord> = disjoint
             .iter()
             .map(|envelope| build_group_record(envelope, &query))
