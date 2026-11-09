@@ -77,20 +77,30 @@ pub struct DiagnosticPolicyMetrics {
 /// Paired outcome contrast for a candidate policy against a reference policy.
 ///
 /// Differences are candidate minus reference; negative values favor the candidate.
-/// Confidence intervals use a paired normal approximation over the identical
-/// episode seeds and should not be used as a substitute for larger preregistered
-/// replications or a cluster-aware analysis across multiple scenarios.
+/// The normal interval is descriptive. The Hoeffding interval is a conservative,
+/// finite-sample bound for independent paired episodes with the declared range.
+/// Neither interval replaces independent scenario-level replication or a
+/// cluster-aware analysis when multiple scenarios are aggregated.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiagnosticPolicyContrast {
     pub reference_policy: DiagnosticPolicy,
     pub candidate_policy: DiagnosticPolicy,
     pub episodes: usize,
     pub mean_task_loss_difference: f64,
+    /// Descriptive paired normal-approximation interval for task loss.
     pub task_loss_difference_ci95: Option<[f64; 2]>,
+    /// Distribution-free paired Hoeffding interval; paired task loss lies in [-1, 1].
+    pub task_loss_difference_hoeffding_ci95: Option<[f64; 2]>,
     pub mean_decision_regret_difference: f64,
+    /// Descriptive paired normal-approximation interval for decision regret.
     pub decision_regret_difference_ci95: Option<[f64; 2]>,
+    /// Distribution-free paired Hoeffding interval; paired regret lies in [-1, 1].
+    pub decision_regret_difference_hoeffding_ci95: Option<[f64; 2]>,
     pub mean_total_cost_difference: f64,
+    /// Descriptive paired normal-approximation interval for total cost.
     pub total_cost_difference_ci95: Option<[f64; 2]>,
+    /// Distribution-free paired Hoeffding interval using the scenario's known cost bound.
+    pub total_cost_difference_hoeffding_ci95: Option<[f64; 2]>,
     pub confidence_interval_method: String,
 }
 
@@ -191,6 +201,21 @@ pub fn run_diagnostic_policy_benchmark(
         .iter()
         .find(|(metrics, _)| metrics.policy == DiagnosticPolicy::CostAwareEvsi)
         .expect("the fixed policy suite includes cost-aware EVSI");
+    // Each episode's total cost is bounded by task loss (<= 1), the maximum
+    // weighted observation cost, and the maximum weighted safety penalty.
+    let total_cost_absolute_bound = 1.0
+        + config.observation_cost_weight
+            * scenario
+                .actions
+                .iter()
+                .map(|action| action.observation_cost)
+                .fold(0.0, f64::max)
+        + config.safety_risk_weight
+            * scenario
+                .actions
+                .iter()
+                .map(|action| action.safety_risk)
+                .fold(0.0, f64::max);
     let reference_policies = [
         DiagnosticPolicy::NoProbe,
         DiagnosticPolicy::PureModelInformationGain,
@@ -209,6 +234,7 @@ pub fn run_diagnostic_policy_benchmark(
                 &reference.1,
                 DiagnosticPolicy::CostAwareEvsi,
                 &candidate.1,
+                total_cost_absolute_bound,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -413,6 +439,7 @@ fn paired_policy_contrast(
     reference: &[DiagnosticEpisodeMetrics],
     candidate_policy: DiagnosticPolicy,
     candidate: &[DiagnosticEpisodeMetrics],
+    total_cost_absolute_bound: f64,
 ) -> Result<DiagnosticPolicyContrast, DiagnosticBenchmarkError> {
     if reference.len() != candidate.len() {
         return Err(DiagnosticBenchmarkError::PairedEpisodeCountMismatch {
@@ -442,6 +469,12 @@ fn paired_policy_contrast(
         paired_mean_ci95(&regret_differences);
     let (mean_total_cost_difference, total_cost_difference_ci95) =
         paired_mean_ci95(&cost_differences);
+    let task_loss_difference_hoeffding_ci95 =
+        paired_hoeffding_ci95(&task_loss_differences, 1.0);
+    let decision_regret_difference_hoeffding_ci95 =
+        paired_hoeffding_ci95(&regret_differences, 1.0);
+    let total_cost_difference_hoeffding_ci95 =
+        paired_hoeffding_ci95(&cost_differences, total_cost_absolute_bound);
 
     Ok(DiagnosticPolicyContrast {
         reference_policy,
@@ -449,16 +482,20 @@ fn paired_policy_contrast(
         episodes,
         mean_task_loss_difference,
         task_loss_difference_ci95,
+        task_loss_difference_hoeffding_ci95,
         mean_decision_regret_difference,
         decision_regret_difference_ci95,
+        decision_regret_difference_hoeffding_ci95,
         mean_total_cost_difference,
         total_cost_difference_ci95,
-        confidence_interval_method: "paired_normal_approximation_95".to_owned(),
+        total_cost_difference_hoeffding_ci95,
+        confidence_interval_method:
+            "paired_normal_descriptive_plus_95pct_hoeffding_distribution_free".to_owned(),
     })
 }
 
-/// Mean and normal-approximation 95% interval for paired episode differences.
-/// For one episode the interval is absent rather than falsely reporting zero width.
+/// Mean and descriptive normal-approximation 95% interval for paired episode differences.
+/// For one episode the normal interval is absent rather than falsely reporting zero width.
 fn paired_mean_ci95(values: &[f64]) -> (f64, Option<[f64; 2]>) {
     if values.is_empty() {
         return (0.0, None);
@@ -476,6 +513,31 @@ fn paired_mean_ci95(values: &[f64]) -> (f64, Option<[f64; 2]>) {
     let standard_error = (sample_variance / count).sqrt();
     let half_width = 1.959_963_984_540_054 * standard_error;
     (mean, Some([mean - half_width, mean + half_width]))
+}
+
+/// Distribution-free, two-sided Hoeffding interval for independent paired
+/// observations known to lie in [-absolute_bound, absolute_bound].
+///
+/// For X in an interval of width 2B, Hoeffding gives
+/// P(|mean(X)-E[X]| >= r) <= 2 exp(-n r^2 / (2 B^2)).
+/// The confidence interval is clipped to the known support of the mean.
+fn paired_hoeffding_ci95(
+    values: &[f64],
+    absolute_bound: f64,
+) -> Option<[f64; 2]> {
+    if values.is_empty() || !absolute_bound.is_finite() || absolute_bound <= 0.0 {
+        return None;
+    }
+    if values.iter().any(|value| !value.is_finite() || value.abs() > absolute_bound) {
+        return None;
+    }
+    let count = values.len() as f64;
+    let mean = values.iter().sum::<f64>() / count;
+    let radius = absolute_bound * (2.0 * (2.0_f64 / 0.05).ln() / count).sqrt();
+    Some([
+        (mean - radius).max(-absolute_bound),
+        (mean + radius).min(absolute_bound),
+    ])
 }
 
 fn select_action(
@@ -717,6 +779,28 @@ mod tests {
             .decision_regret_difference_ci95
             .expect("paired interval with 10,000 episodes");
         assert!(regret_interval[1] < 0.0);
+        let distribution_free_interval = evsi_vs_pure_eig
+            .decision_regret_difference_hoeffding_ci95
+            .expect("finite-sample paired interval with 10,000 episodes");
+        assert!(distribution_free_interval[0] <= evsi_vs_pure_eig.mean_decision_regret_difference);
+        assert!(distribution_free_interval[1] >= evsi_vs_pure_eig.mean_decision_regret_difference);
+        assert!(distribution_free_interval[1] < 0.0);
+    }
+
+    #[test]
+    fn paired_hoeffding_interval_is_finite_sample_and_shrinks_with_more_episodes() {
+        let small = vec![-0.2, -0.1, 0.0, 0.1];
+        let large = small.repeat(100);
+        let small_interval = paired_hoeffding_ci95(&small, 1.0).expect("small interval");
+        let large_interval = paired_hoeffding_ci95(&large, 1.0).expect("large interval");
+        assert!(small_interval[0] <= 0.0 && small_interval[1] >= 0.0);
+        assert!(large_interval[0] <= 0.0 && large_interval[1] >= 0.0);
+        let small_width = small_interval[1] - small_interval[0];
+        let large_width = large_interval[1] - large_interval[0];
+        assert!(large_width < small_width);
+        assert!(paired_hoeffding_ci95(&[], 1.0).is_none());
+        assert!(paired_hoeffding_ci95(&[1.1], 1.0).is_none());
+        assert!(paired_hoeffding_ci95(&[0.0], f64::NAN).is_none());
     }
 
     #[test]
