@@ -494,6 +494,40 @@ mod tests {
     }
 
     #[test]
+    fn test_follow_oracle_aligns_to_nonzero_simulation_time_origin() {
+        let start_time_s = 0.75;
+        let swarm = SwarmSimulator::new_at_time(
+            SwarmConfig::convoy_straight(1),
+            start_time_s,
+        );
+        let mut ego = VehicleState::cruising(13.4);
+        ego.timestamp = start_time_s;
+
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("aligned non-zero clock origin should yield a current target");
+        assert_eq!(target.snapshot_time_s, start_time_s);
+        assert_eq!(swarm.peers[0].sim.state().timestamp, start_time_s);
+        assert!(target.is_current_at(ego.timestamp));
+    }
+
+    #[test]
+    fn test_follow_oracle_keeps_nonzero_clock_origin_after_step() {
+        let start_time_s = 2.25;
+        let mut swarm =
+            SwarmSimulator::new_at_time(SwarmConfig::convoy_straight(1), start_time_s);
+        swarm.step(0.005);
+        let mut ego = VehicleState::cruising(13.4);
+        ego.timestamp = start_time_s;
+
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("the exact pre-step snapshot should remain available");
+        assert_eq!(target.snapshot_time_s, start_time_s);
+        assert!(target.snapshot_time_s <= ego.timestamp);
+    }
+
+    #[test]
     fn test_follow_oracle_returns_none_without_peers() {
         let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(0));
         let ego = VehicleState::cruising(13.4);
