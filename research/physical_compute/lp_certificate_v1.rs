@@ -884,7 +884,7 @@ mod tests {
             cols: 2,
             a: vec![1.0, 1.0],
             b: vec![1.0],
-            c: vec![-1.0, 0.0],
+            c: vec![-1.0, -1.0],
         };
         let certificate = OptimalCertificate {
             primal: vec![0.5, 0.5000000000001],
