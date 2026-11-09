@@ -428,6 +428,10 @@
         "scenario_id",
         "actor_policy_id",
         "arm_id",
+        "controller_digest",
+        "paired_case_id",
+        "paired_role",
+        "intervention_kind",
         "action_observation_tick",
         "action_commit_tick",
         "observation",
@@ -513,6 +517,30 @@
         },
         "follow_target": {
           "$ref": "#/$defs/follow_target"
+        },
+        "controller_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "paired_case_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paired_role": {
+          "enum": [
+            "standalone",
+            "baseline",
+            "intervention"
+          ]
+        },
+        "intervention_kind": {
+          "enum": [
+            "none",
+            "oracle_sidecar_mutation",
+            "raw_v2x_mutation",
+            "post_commit_shadow_teacher"
+          ]
         }
       }
     }
