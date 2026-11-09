@@ -150,6 +150,13 @@ Source: [A Survey of World Model Benchmarks — 8 November 2026 snapshot](https:
 
 ### NAVSIM v2 / EPDMS — two-stage pseudo-simulation, not reciprocal online closed loop
 
+#### NAVSIM v2 SOTA2 task-display separation — 9 November 2026
+
+SOTA2 exposes a second NAVSIM v2 page titled **Closed-loop Planning on NAVSIM v2**. Its current displayed leaders include CLEAR (ViT/L): NC 99, DAC 98.7, DDC 99.6, TLC 96.9, EP 91.0, TTC 98.4, LK 92.9, HC 96.4, EC 79.5, EPDMS 88.6; and Drive-JEPA (ResNet34): EPDMS 85.4. These values are recorded separately in `navsim-v2-closed-loop-planning-display-2026`.
+
+This is a separate leaderboard task display from the NAVSIM v2 planning table already recorded above; do not merge its submissions with the Human Agent / LWDrive / ExploreVLA snapshot. The NAVSIM v2 protocol remains two-stage pseudo-simulation with precomputed follow-up scenes. The page title does not mean full reciprocal online ego/actor policy simulation. It is secondary-board data, with exact evaluator/devkit/split not exposed; pin those before reproduction or comparisons. Sources: [SOTA2 closed-loop planning NAVSIM v2](https://www.sota2.com/research/sota/closed-loop-planning-on-navsim-v2), [official NAVSIM repository](https://github.com/autonomousvision/navsim/blob/main/README.md).
+
+
 - **Role:** scalable planning evaluation using real driving scenes plus pseudo-simulated follow-up scenes.
 - **Release/version distinction:** the official NAVSIM README identifies v2.2 as the official devkit for AGC2025 and says v2.1.2 updated EPDMS for the Hugging Face Warmup leaderboard. v2.1 added two-stage pseudo-simulation and support for reactive traffic-agent policies. The SOTA2 snapshot recorded here does not expose a verifiable exact devkit release/split, so its version is deliberately marked unpinned. Do not call v2.1.2 the universal NAVSIM v2 devkit.
 - **Protocol nuance:** NAVSIM v2 adds two-stage pseudo-closed-loop evaluation and supports reactive traffic-agent policies, but the official README explicitly says pseudo-simulation is neither sequential nor interactive. It synthesizes/weights follow-up observations around the planned trajectory; it is not a reciprocal live loop in which ego and every surrounding actor repeatedly re-plan from newly realized observations and commands.
