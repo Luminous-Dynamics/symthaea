@@ -274,14 +274,16 @@ pub fn evaluate_decision_focused_diagnostics(
         if decision_information_gain_nats
             > action_information.model_information_gain_nats + RISK_TOLERANCE
         {
-            return Err(DecisionDiagnosticError::DecisionInformationExceedsModelInformation {
-                action_index,
-                decision_information_gain_nats,
-                model_information_gain_nats: action_information.model_information_gain_nats,
-            });
+            return Err(
+                DecisionDiagnosticError::DecisionInformationExceedsModelInformation {
+                    action_index,
+                    decision_information_gain_nats,
+                    model_information_gain_nats: action_information.model_information_gain_nats,
+                },
+            );
         }
-        let decision_information_gain_nats = decision_information_gain_nats
-            .min(action_information.model_information_gain_nats);
+        let decision_information_gain_nats =
+            decision_information_gain_nats.min(action_information.model_information_gain_nats);
         let eligible = action.safety_risk <= config.maximum_safety_risk;
         let total_score = if eligible {
             let score = expected_posterior_bayes_risk
