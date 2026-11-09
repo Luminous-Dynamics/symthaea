@@ -1826,6 +1826,78 @@ mod tests {
     }
 
     #[test]
+    fn group_selector_rejects_mixed_snapshot_generations_and_queries() {
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let members_a = vec![
+            ("snapshot-a".to_owned(), ContinuousHV::from_vec(vec![0.8; 8])),
+        ];
+        let members_b = vec![
+            ("snapshot-b".to_owned(), ContinuousHV::from_vec(vec![-0.8; 8])),
+        ];
+        let envelope_a =
+            ContinuousHVGroupEnvelope::from_original_members(50, 7, &members_a).unwrap();
+        let envelope_b =
+            ContinuousHVGroupEnvelope::from_original_members(51, 7, &members_b).unwrap();
+        let group_a = build_group_record(&envelope_a, &query);
+        let group_b = build_group_record(&envelope_b, &query);
+        let groups = vec![group_a.clone(), group_b];
+        let coverage = complete_group_coverage(&[group_a.clone()]);
+        assert!(matches!(
+            select_group_refinement_set(&groups, 1, coverage),
+            Err(GroupIntervalSelectionError::SnapshotGenerationMismatch { group_index: 1 })
+        ));
+
+        let other_query = ContinuousHV::from_vec(vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let other_group = build_group_record(&envelope_b, &other_query);
+        let same_generation = ContinuousHVGroupEnvelope::from_original_members(
+            50,
+            7,
+            &[("snapshot-b".to_owned(), members_b[0].1.clone())],
+        )
+        .unwrap();
+        let group_same_generation = build_group_record(&same_generation, &other_query);
+        let mixed_queries = vec![group_a.clone(), group_same_generation];
+        let coverage = complete_group_coverage(&[group_a]);
+        assert!(matches!(
+            select_group_refinement_set(&mixed_queries, 1, coverage),
+            Err(GroupIntervalSelectionError::QueryDigestMismatch { group_index: 1 })
+        ));
+        assert_ne!(
+            continuous_hv_query_digest(&query),
+            continuous_hv_query_digest(&other_query)
+        );
+        assert_eq!(other_group.query_digest, continuous_hv_query_digest(&other_query));
+    }
+
+    #[test]
+    fn hierarchical_selection_rejects_member_interval_from_another_query() {
+        let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let other_query =
+            ContinuousHV::from_vec(vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let members = vec![
+            ("item-a".to_owned(), unit_vector_with_first_component(0.9)),
+            ("item-b".to_owned(), unit_vector_with_first_component(0.8)),
+        ];
+        let envelope =
+            ContinuousHVGroupEnvelope::from_original_members(70, 8, &members).unwrap();
+        let group = build_group_record(&envelope, &query);
+        let coverage = complete_group_coverage(&[group.clone()]);
+        let other_query_member = GroupMemberScoreIntervalRecord::from_verified_l2_residual(
+            &group,
+            "item-a".to_owned(),
+            &other_query,
+            &members[0].1,
+            &members[0].1,
+            0.0,
+        )
+        .unwrap();
+        assert!(matches!(
+            select_hierarchical_refinement_set(&[group], &[other_query_member], 1, coverage),
+            Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup { .. })
+        ));
+    }
+
+    #[test]
     fn group_selector_rejects_inconsistent_member_payload_digest_count() {
         let mut group = synthetic_group("malformed", 2, 0.0, 1.0);
         group.member_payload_digests.pop();
