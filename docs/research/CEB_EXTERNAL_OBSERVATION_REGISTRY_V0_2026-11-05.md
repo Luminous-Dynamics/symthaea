@@ -162,3 +162,29 @@ Sources:
 - VerifierBench project page: https://verifierbench.github.io/
 - Unearned-pass maintenance study: https://arxiv.org/abs/2609.34262
 
+## Sandbox-isolation and protected-evaluation comparators — November 9, 2026
+
+### SandboxGym — isolation-boundary failure audit
+
+SandboxGym's public page reports an audit of **nine selected open-source sandbox/VM projects** at fixed source snapshots. It reports **32 high-impact isolation findings**, including **two full escapes**, and at least one retained finding in every scored project. Its scan retains findings judged exploitable from inside a sandbox and capable of collapsing the intended boundary.
+
+The concrete failure taxonomy is directly relevant to #9865/#10064: a user-facing path that never invoked the advertised sandbox; guest-controlled offset arithmetic reaching host memory; filesystem policy applied inconsistently across execution backends; a declared copy-on-write mount that became a writable host bind; path/symlink TOCTOU; path traversal in snapshot operations; cache/volume/control-plane access to host paths; and exposed host-side administration surfaces.
+
+**Limits:** this is a self-published Nebula Security audit, last updated August 15, 2026, using its own agentic code scanner against fixed commits. It is not a randomized sample, a live attack trial on CEB's implementation, an independent reproduction, or a normalized risk score. The 32 findings are not 32 independent attacks; the two full escapes are included within the 32. The site's totals include specific high-impact categories (host memory corruption, host file overwrite, network-policy bypass and impact on other sandboxes) and exclude some unauthorized out-of-sandbox reads and GPU-dependent findings.
+
+**CEB interpretation:** use the findings as threat-model coverage and red-team case templates. The most important lesson is to verify every actual execution entry point and helper path, not simply the existence of a sandbox component or an advertised policy. Retain separate counts for full escapes, policy bypasses and cross-tenant/data exposure. Do not compare the 32 finding count with a CEB pass rate or interpret 100% of this nine-product sample as a universal industry failure rate.
+
+### SRE-Bench — isolated binary tasks with separate grading
+
+SRE-Bench's October 2026 project page reports **19 private programs**, **262 binary instances**, **1,572 deterministic graded tasks**, and **44 anti-analysis mechanisms** across five reverse-engineering domains and four source languages. Candidate work happens in an isolated container; source code, grader code and reference solutions are withheld from the agent; solutions are submitted to a separate grading server.
+
+**Limits:** SRE-Bench measures agentic reverse-engineering capability on compiled binaries, not sandbox escape resistance, PR-review accuracy, causal diagnosis or CEB evidence-continuity outcomes. Its model scores are not added to the CEB metric crosswalk.
+
+**CEB interpretation:** use its environment/grader split as an architecture reference: candidate-visible binary/task/tool artifacts are distinct from private grader/reference materials, and deterministic grading happens outside the candidate workspace. This is relevant to #10314 receipts and #10064/#10369 isolation/trust qualification, but it does not prove CEB's own runner or grader is secure.
+
+The current structured external-observation registry now contains **56 sources, 61 comparator records and 190 atomic observations**. The 56-row CEB metric-correspondence crosswalk remains unchanged; these two comparators are methodological/contextual references only.
+
+Sources:
+- SandboxGym: https://sandboxgym.io/
+- SRE-Bench: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+
