@@ -70,6 +70,105 @@ pub struct ContinuousHVGroupEnvelope {
     radius_l2_upper: f32,
 }
 
+
+/// Memory estimate for a group-envelope directory under one storage profile.
+///
+/// Counts only stable-ID UTF-8 bytes, per-member 32-byte payload digests, and
+/// numeric group synopses. It intentionally excludes allocator/Arc/string
+/// headers, directory indexes, segment checksums, alignment and page padding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GroupEnvelopeMemoryEstimate {
+    /// Number of groups implied by eligible_records and group_size.
+    pub group_count: usize,
+    /// Numeric synopsis bytes per group (centroid, radius, optional extrema).
+    pub numeric_bytes_per_group: usize,
+    /// Numeric synopsis bytes over all groups.
+    pub numeric_synopsis_bytes: usize,
+    /// Per-member payload digest bytes.
+    pub member_payload_digest_bytes: usize,
+    /// Stable-ID UTF-8 bytes using the caller's average ID size.
+    pub stable_member_id_bytes: usize,
+    /// Sum of the explicitly counted fields above.
+    pub known_metadata_bytes: usize,
+}
+
+/// Errors returned by the deterministic group metadata budget estimator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupEnvelopeMemoryEstimateError {
+    /// Vector dimension must be nonzero.
+    ZeroDimension,
+    /// Group size must be nonzero.
+    ZeroGroupSize,
+    /// One or more checked byte/count calculations overflowed usize.
+    ArithmeticOverflow,
+}
+
+impl std::fmt::Display for GroupEnvelopeMemoryEstimateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroDimension => write!(f, "group synopsis dimension must be nonzero"),
+            Self::ZeroGroupSize => write!(f, "group size must be nonzero"),
+            Self::ArithmeticOverflow => write!(f, "group synopsis estimate overflowed usize"),
+        }
+    }
+}
+
+impl std::error::Error for GroupEnvelopeMemoryEstimateError {}
+
+/// Estimate the explicitly countable metadata cost of a grouped HME synopsis.
+///
+/// BoxAndBall stores 3 f32 values per dimension (min, max, centroid), while
+/// BallOnly stores one f32 per dimension (centroid). Both store one f32 radius.
+/// Member IDs and payload digests are per record and do not vary with group size.
+pub fn estimate_group_envelope_memory(
+    dimension: usize,
+    eligible_records: usize,
+    group_size: usize,
+    average_stable_id_bytes: usize,
+    mode: GroupEnvelopeMode,
+) -> Result<GroupEnvelopeMemoryEstimate, GroupEnvelopeMemoryEstimateError> {
+    if dimension == 0 {
+        return Err(GroupEnvelopeMemoryEstimateError::ZeroDimension);
+    }
+    if group_size == 0 {
+        return Err(GroupEnvelopeMemoryEstimateError::ZeroGroupSize);
+    }
+    let group_count = eligible_records / group_size
+        + usize::from(eligible_records % group_size != 0);
+    let coordinate_vectors = match mode {
+        GroupEnvelopeMode::BoxAndBall => 3usize,
+        GroupEnvelopeMode::BallOnly => 1usize,
+    };
+    let numeric_bytes_per_group = dimension
+        .checked_mul(coordinate_vectors)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
+        .and_then(|values| values.checked_add(std::mem::size_of::<f32>()))
+        .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
+    let numeric_synopsis_bytes = group_count
+        .checked_mul(numeric_bytes_per_group)
+        .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
+    let member_payload_digest_bytes = eligible_records
+        .checked_mul(32)
+        .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
+    let stable_member_id_bytes = eligible_records
+        .checked_mul(average_stable_id_bytes)
+        .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
+    let known_metadata_bytes = numeric_synopsis_bytes
+        .checked_add(member_payload_digest_bytes)
+        .and_then(|value| value.checked_add(stable_member_id_bytes))
+        .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
+
+    Ok(GroupEnvelopeMemoryEstimate {
+        group_count,
+        numeric_bytes_per_group,
+        numeric_synopsis_bytes,
+        member_payload_digest_bytes,
+        stable_member_id_bytes,
+        known_metadata_bytes,
+    })
+}
+
+
 /// Fail-closed errors for group-envelope construction and query use.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GroupEnvelopeError {
@@ -861,6 +960,56 @@ mod tests {
         assert!(matches!(
             ContinuousHVGroupEnvelope::from_original_members(1, 1, &invalid),
             Err(GroupEnvelopeError::InvalidMemberProfile { .. })
+        ));
+    }
+
+    #[test]
+    fn group_envelope_memory_estimator_matches_storage_profiles() {
+        let full = estimate_group_envelope_memory(
+            262_144,
+            1_000_000,
+            64,
+            24,
+            GroupEnvelopeMode::BoxAndBall,
+        )
+        .unwrap();
+        let ball = estimate_group_envelope_memory(
+            262_144,
+            1_000_000,
+            64,
+            24,
+            GroupEnvelopeMode::BallOnly,
+        )
+        .unwrap();
+        assert_eq!(full.group_count, 15_625);
+        assert_eq!(full.numeric_bytes_per_group, 12 * 262_144 + 4);
+        assert_eq!(ball.numeric_bytes_per_group, 4 * 262_144 + 4);
+        assert_eq!(full.member_payload_digest_bytes, 32_000_000);
+        assert_eq!(ball.member_payload_digest_bytes, 32_000_000);
+        assert_eq!(
+            full.numeric_synopsis_bytes - ball.numeric_synopsis_bytes,
+            8 * 262_144 * 15_625
+        );
+        assert!(full.known_metadata_bytes > ball.known_metadata_bytes);
+        assert!(matches!(
+            estimate_group_envelope_memory(
+                0,
+                1,
+                1,
+                8,
+                GroupEnvelopeMode::BallOnly,
+            ),
+            Err(GroupEnvelopeMemoryEstimateError::ZeroDimension)
+        ));
+        assert!(matches!(
+            estimate_group_envelope_memory(
+                usize::MAX,
+                1,
+                1,
+                8,
+                GroupEnvelopeMode::BoxAndBall,
+            ),
+            Err(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)
         ));
     }
 
