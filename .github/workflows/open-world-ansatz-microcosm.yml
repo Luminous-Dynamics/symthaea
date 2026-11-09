@@ -95,6 +95,8 @@ jobs:
             .equivalent_out_of_catalogue.evaluator_score.evidence_references_valid == true and
             .equivalent_out_of_catalogue.evaluator_score.probe_count <= 6 and
             .equivalent_out_of_catalogue.agent.environment_inherited == false and
+            .equivalent_out_of_catalogue.agent.max_input_frame_bytes <= 16777216 and
+            .equivalent_out_of_catalogue.agent.max_output_frame_bytes <= 16777216 and
             .equivalent_out_of_catalogue.process_exit_code == 0 and
             (.equivalent_out_of_catalogue.action_records | length) == (.equivalent_out_of_catalogue.observation_count + 1) and
             .equivalent_out_of_catalogue.action_records[-1].resulting_status == "submitted" and
@@ -108,10 +110,16 @@ jobs:
             .a2.initial_evidence_prefix == .a2.action_records[0].evidence_prefix_before and
             .a0.final_evidence_prefix == .a0.action_records[-1].evidence_prefix_after and
             .a2.final_evidence_prefix == .a2.action_records[-1].evidence_prefix_after and
+            .out_of_catalogue.initial_evidence_prefix == .out_of_catalogue.action_records[0].evidence_prefix_before and
+            .out_of_catalogue.final_evidence_prefix == .out_of_catalogue.action_records[-1].evidence_prefix_after and
+            .equivalent_out_of_catalogue.initial_evidence_prefix == .equivalent_out_of_catalogue.action_records[0].evidence_prefix_before and
+            .equivalent_out_of_catalogue.final_evidence_prefix == .equivalent_out_of_catalogue.action_records[-1].evidence_prefix_after and
             .a0.action_records[-1].resulting_status == "submitted" and
             .a2.action_records[-1].resulting_status == "submitted" and
             all(.a0.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
-            all(.a2.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$")))
+            all(.a2.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
+            all(.out_of_catalogue.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
+            all(.equivalent_out_of_catalogue.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$")))
           ' "$report"
           printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-process-pair-smoke.source-sha"
           sha256sum "$report" | tee "$report.sha256"
