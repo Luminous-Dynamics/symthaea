@@ -361,7 +361,9 @@ pub fn estimate_finite_size_dimension_posterior(
             .map(|sample| (observed_ordering_fraction - sample).abs() / bandwidth)
             .fold(f64::INFINITY, f64::min);
         let within_support = nearest <= MAX_CALIBRATION_SUPPORT_DISTANCE;
-        all_outside_support &= !within_support;
+        if normalized_prior > 0.0 {
+            all_outside_support &= !within_support;
+        }
         let log_likelihood = gaussian_kde_log_density(
             observed_ordering_fraction,
             &samples.ordering_fractions,
