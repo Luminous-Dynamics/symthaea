@@ -187,6 +187,19 @@ jobs:
             cat gravcraft-adm-step-sweep.csv
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run independent ADM Hamiltonian and momentum constraints
+        if: matrix.package == 'symthaea-gravcraft'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-gravcraft --example adm_constraint_sweep | tee gravcraft-adm-constraint-sweep.csv
+          grep -q 'independent ADM constraint sweep' gravcraft-adm-constraint-sweep.csv
+          grep -q 'No result here establishes a realizable stress-energy source' gravcraft-adm-constraint-sweep.csv
+          {
+            echo '## Independent ADM Hamiltonian and momentum constraint residuals'
+            cat gravcraft-adm-constraint-sweep.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Diff independent Chain Theory reproduction against pinned author CSV
         if: matrix.package == 'symthaea-chain-theory-audit'
         shell: bash
