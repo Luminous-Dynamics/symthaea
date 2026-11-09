@@ -914,6 +914,28 @@ mod tests {
     }
 
     #[test]
+    fn rejects_timeline_segments_for_parts_absent_from_the_score() {
+        let mut plan = base_plan();
+        plan.segments.push(OrchestrationSegmentV1 {
+            id: "orphan-part".into(),
+            part_id: 2,
+            instrument_id: "piano-1".into(),
+            start: RationalBeatV1 { numerator: 0, denominator: 1 },
+            end: RationalBeatV1 { numerator: 4, denominator: 1 },
+            musical_function: "unreferenced-line".into(),
+            handoff: None,
+        });
+        let report = validate_orchestration_timeline(
+            &base_score(),
+            &plan,
+            &base_instruments(),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == OrchestrationTimelineIssueCodeV1::UnknownScorePart
+        }));
+    }
+
+    #[test]
     fn rejects_non_canonical_or_malformed_score_digest() {
         let mut plan = base_plan();
         plan.score_sha256 = "not-a-digest".into();
