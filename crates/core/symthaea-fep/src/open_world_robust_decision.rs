@@ -486,6 +486,262 @@ pub fn worst_case_distribution_within_tv(
     Ok(worst_case)
 }
 
+
+/// A preregistered alternative predictive model for sequential adequacy testing.
+///
+/// Its forecast at time t must be measurable with respect to information
+/// available before observing outcome t. Alternatives must not be fitted to
+/// the evaluation outcomes they are used to test.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrequentialAlternativeModel {
+    pub id: String,
+    pub prior_weight: f64,
+    pub predicted_outcome_probabilities: Vec<Vec<f64>>,
+}
+
+/// A likelihood-ratio component in the fixed alternative mixture.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AlternativeEProcessComponent {
+    pub id: String,
+    pub prior_weight: f64,
+    /// None means this alternative assigned zero probability to an observed outcome.
+    pub log_likelihood_ratio: Option<f64>,
+}
+
+/// Anytime-valid evidence report against a declared prequential null model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrequentialEProcessReport {
+    pub alpha: f64,
+    pub log_e_threshold: f64,
+    pub log_e_value: Option<f64>,
+    pub log_e_value_by_observation: Vec<Option<f64>>,
+    /// First one-based observation index at which the e-value crossed 1 / alpha.
+    pub crossed_at_observation: Option<usize>,
+    pub alternatives: Vec<AlternativeEProcessComponent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum PrequentialEProcessError {
+    #[error("alpha must be finite and in (0, 1)")]
+    InvalidAlpha,
+    #[error("at least one alternative predictive model is required")]
+    EmptyAlternativeSet,
+    #[error("alternative {alternative_index} has an empty identifier")]
+    EmptyAlternativeId { alternative_index: usize },
+    #[error("alternative {alternative_index} has an invalid prior weight")]
+    InvalidAlternativeWeight { alternative_index: usize },
+    #[error("alternative prior weights sum to {sum}, expected 1")]
+    AlternativeWeightsNotNormalized { sum: f64 },
+    #[error("alternative {alternative_index} has {actual} forecasts; expected {expected}")]
+    AlternativeObservationCountMismatch {
+        alternative_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("alternative {alternative_index}, observation {observation_index} has {actual} categories; expected {expected}")]
+    AlternativeCategoryCountMismatch {
+        alternative_index: usize,
+        observation_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("alternative {alternative_index}, observation {observation_index}, category {category_index} has invalid probability")]
+    InvalidAlternativeProbability {
+        alternative_index: usize,
+        observation_index: usize,
+        category_index: usize,
+    },
+    #[error("alternative {alternative_index}, observation {observation_index} probability mass sums to {sum}, expected 1")]
+    AlternativeProbabilityMassNotNormalized {
+        alternative_index: usize,
+        observation_index: usize,
+        sum: f64,
+    },
+    #[error("null observation {observation_index} has zero probability under the declared null")]
+    NullSupportViolation { observation_index: usize },
+    #[error("sequential log-likelihood ratio became non-finite")]
+    NonFiniteLogLikelihoodRatio,
+}
+
+/// Compute a fixed mixture of likelihood-ratio e-processes.
+///
+/// Under the null, each null predictive distribution must be correctly
+/// specified conditional on the past. Each alternative forecast must also be
+/// predictable (fixed before the corresponding observation). For alternative
+/// j, E_t^j = product_s q_s^j(y_s) / p_s(y_s) is a non-negative martingale
+/// under the null; a fixed convex mixture remains an e-process. Therefore
+/// P(sup_t E_t >= 1 / alpha) <= alpha by Ville's inequality.
+///
+/// This guarantee is conditional on the declared null predictive model. The
+/// finite alternative set affects power, not validity under that null. A
+/// zero-probability null observation is returned as a support violation and
+/// must be handled by the model-adequacy gate rather than epsilon-smoothed.
+pub fn evaluate_prequential_e_process(
+    null_observations: &[PrequentialCategoricalObservation],
+    alternatives: &[PrequentialAlternativeModel],
+    alpha: f64,
+) -> Result<PrequentialEProcessReport, PrequentialEProcessError> {
+    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return Err(PrequentialEProcessError::InvalidAlpha);
+    }
+    if alternatives.is_empty() {
+        return Err(PrequentialEProcessError::EmptyAlternativeSet);
+    }
+
+    let mut ids = std::collections::BTreeSet::new();
+    let mut weight_sum = 0.0;
+    for (alternative_index, alternative) in alternatives.iter().enumerate() {
+        if alternative.id.trim().is_empty() || !ids.insert(alternative.id.clone()) {
+            return Err(PrequentialEProcessError::EmptyAlternativeId { alternative_index });
+        }
+        if !alternative.prior_weight.is_finite() || alternative.prior_weight <= 0.0 {
+            return Err(PrequentialEProcessError::InvalidAlternativeWeight { alternative_index });
+        }
+        weight_sum += alternative.prior_weight;
+        if alternative.predicted_outcome_probabilities.len() != null_observations.len() {
+            return Err(PrequentialEProcessError::AlternativeObservationCountMismatch {
+                alternative_index,
+                expected: null_observations.len(),
+                actual: alternative.predicted_outcome_probabilities.len(),
+            });
+        }
+    }
+    if (weight_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
+        return Err(PrequentialEProcessError::AlternativeWeightsNotNormalized {
+            sum: weight_sum,
+        });
+    }
+
+    let mut log_likelihood_ratios = vec![Some(0.0_f64); alternatives.len()];
+    let mut log_e_value_by_observation = Vec::with_capacity(null_observations.len());
+    let mut crossed_at_observation = None;
+    let log_e_threshold = (1.0 / alpha).ln();
+
+    for (observation_index, null_observation) in null_observations.iter().enumerate() {
+        let null_probabilities = &null_observation.predicted_outcome_probabilities;
+        validate_categorical_distribution(null_probabilities).map_err(|(category_index, sum)| {
+            if let Some(category_index) = category_index {
+                PrequentialEProcessError::NullSupportViolation { observation_index }
+            } else {
+                PrequentialEProcessError::NullSupportViolation { observation_index }
+            }
+        })?;
+        if null_observation.observed_outcome_index >= null_probabilities.len() {
+            return Err(PrequentialEProcessError::NullSupportViolation { observation_index });
+        }
+        let null_probability = null_probabilities[null_observation.observed_outcome_index];
+        if null_probability == 0.0 {
+            return Err(PrequentialEProcessError::NullSupportViolation { observation_index });
+        }
+
+        for (alternative_index, alternative) in alternatives.iter().enumerate() {
+            let probabilities = &alternative.predicted_outcome_probabilities[observation_index];
+            if probabilities.len() != null_probabilities.len() {
+                return Err(PrequentialEProcessError::AlternativeCategoryCountMismatch {
+                    alternative_index,
+                    observation_index,
+                    expected: null_probabilities.len(),
+                    actual: probabilities.len(),
+                });
+            }
+            let sum = probabilities.iter().sum::<f64>();
+            for (category_index, probability) in probabilities.iter().copied().enumerate() {
+                if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                    return Err(PrequentialEProcessError::InvalidAlternativeProbability {
+                        alternative_index,
+                        observation_index,
+                        category_index,
+                    });
+                }
+            }
+            if (sum - 1.0).abs() > PROBABILITY_TOLERANCE {
+                return Err(PrequentialEProcessError::AlternativeProbabilityMassNotNormalized {
+                    alternative_index,
+                    observation_index,
+                    sum,
+                });
+            }
+
+            if let Some(current_log_ratio) = log_likelihood_ratios[alternative_index] {
+                let alternative_probability =
+                    probabilities[null_observation.observed_outcome_index];
+                if alternative_probability == 0.0 {
+                    log_likelihood_ratios[alternative_index] = None;
+                } else {
+                    let updated =
+                        current_log_ratio + alternative_probability.ln() - null_probability.ln();
+                    if !updated.is_finite() {
+                        return Err(PrequentialEProcessError::NonFiniteLogLikelihoodRatio);
+                    }
+                    log_likelihood_ratios[alternative_index] = Some(updated);
+                }
+            }
+        }
+
+        let log_e_value = mixture_log_e_value(alternatives, &log_likelihood_ratios);
+        if crossed_at_observation.is_none()
+            && log_e_value.is_some_and(|value| value >= log_e_threshold)
+        {
+            crossed_at_observation = Some(observation_index + 1);
+        }
+        log_e_value_by_observation.push(log_e_value);
+    }
+
+    let components = alternatives
+        .iter()
+        .zip(log_likelihood_ratios)
+        .map(|(alternative, log_likelihood_ratio)| AlternativeEProcessComponent {
+            id: alternative.id.clone(),
+            prior_weight: alternative.prior_weight,
+            log_likelihood_ratio,
+        })
+        .collect();
+    Ok(PrequentialEProcessReport {
+        alpha,
+        log_e_threshold,
+        log_e_value: log_e_value_by_observation.last().copied().flatten(),
+        log_e_value_by_observation,
+        crossed_at_observation,
+        alternatives: components,
+    })
+}
+
+fn mixture_log_e_value(
+    alternatives: &[PrequentialAlternativeModel],
+    log_likelihood_ratios: &[Option<f64>],
+) -> Option<f64> {
+    let terms = alternatives
+        .iter()
+        .zip(log_likelihood_ratios)
+        .filter_map(|(alternative, log_ratio)| {
+            log_ratio.map(|value| alternative.prior_weight.ln() + value)
+        })
+        .collect::<Vec<_>>();
+    let maximum = terms.iter().copied().reduce(f64::max)?;
+    let log_sum = terms
+        .iter()
+        .map(|term| (term - maximum).exp())
+        .sum::<f64>();
+    Some(maximum + log_sum.ln())
+}
+
+fn validate_categorical_distribution(probabilities: &[f64]) -> Result<(), (Option<usize>, f64)> {
+    if probabilities.is_empty() {
+        return Err((None, 0.0));
+    }
+    let mut sum = 0.0;
+    for (index, probability) in probabilities.iter().copied().enumerate() {
+        if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+            return Err((Some(index), sum));
+        }
+        sum += probability;
+    }
+    if (sum - 1.0).abs() > PROBABILITY_TOLERANCE {
+        return Err((None, sum));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -651,6 +907,78 @@ mod tests {
         assert!(matches!(
             evaluate_prequential_model_adequacy(&observations, thresholds()),
             Err(ModelAdequacyError::ProbabilityMassNotNormalized { .. })
+        ));
+    }
+
+    #[test]
+    fn mixture_e_value_has_unit_expectation_under_the_declared_null() {
+        let null = vec![PrequentialCategoricalObservation {
+            predicted_outcome_probabilities: vec![0.75, 0.25],
+            observed_outcome_index: 0,
+        }];
+        let alternatives = vec![
+            PrequentialAlternativeModel {
+                id: "alternative-a".into(),
+                prior_weight: 0.4,
+                predicted_outcome_probabilities: vec![vec![0.2, 0.8]],
+            },
+            PrequentialAlternativeModel {
+                id: "alternative-b".into(),
+                prior_weight: 0.6,
+                predicted_outcome_probabilities: vec![vec![0.9, 0.1]],
+            },
+        ];
+        let e_for_zero = evaluate_prequential_e_process(&null, &alternatives, 0.05)
+            .expect("first outcome e-process");
+        let null_for_one = vec![PrequentialCategoricalObservation {
+            predicted_outcome_probabilities: vec![0.75, 0.25],
+            observed_outcome_index: 1,
+        }];
+        let e_for_one = evaluate_prequential_e_process(&null_for_one, &alternatives, 0.05)
+            .expect("second outcome e-process");
+        let expectation = 0.75 * e_for_zero.log_e_value.unwrap().exp()
+            + 0.25 * e_for_one.log_e_value.unwrap().exp();
+        assert!((expectation - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn prequential_e_process_crosses_a_declared_sequential_threshold() {
+        let observations = (0..8)
+            .map(|_| PrequentialCategoricalObservation {
+                predicted_outcome_probabilities: vec![0.5, 0.5],
+                observed_outcome_index: 0,
+            })
+            .collect::<Vec<_>>();
+        let alternative = PrequentialAlternativeModel {
+            id: "persistent-regime-shift".into(),
+            prior_weight: 1.0,
+            predicted_outcome_probabilities: (0..8).map(|_| vec![0.9, 0.1]).collect(),
+        };
+        let report =
+            evaluate_prequential_e_process(&observations, &[alternative], 0.05)
+                .expect("valid sequential e-process");
+        assert_eq!(report.crossed_at_observation, Some(6));
+        assert!(
+            report.log_e_value.unwrap() >= report.log_e_threshold
+        );
+    }
+
+    #[test]
+    fn prequential_e_process_rejects_zero_support_under_the_null() {
+        let observations = vec![PrequentialCategoricalObservation {
+            predicted_outcome_probabilities: vec![1.0, 0.0],
+            observed_outcome_index: 1,
+        }];
+        let alternative = PrequentialAlternativeModel {
+            id: "other".into(),
+            prior_weight: 1.0,
+            predicted_outcome_probabilities: vec![vec![0.5, 0.5]],
+        };
+        assert!(matches!(
+            evaluate_prequential_e_process(&observations, &[alternative], 0.05),
+            Err(PrequentialEProcessError::NullSupportViolation {
+                observation_index: 0
+            })
         ));
     }
 
