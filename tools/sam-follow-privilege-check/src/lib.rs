@@ -273,7 +273,7 @@ mod tests {
     use super::*;
 
     fn schema() -> Value {
-        serde_json::from_str(include_str!("../../../../docs/autonomy/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json"))
+        serde_json::from_str(include_str!("../../../docs/autonomy/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json"))
             .expect("schema JSON")
     }
 
