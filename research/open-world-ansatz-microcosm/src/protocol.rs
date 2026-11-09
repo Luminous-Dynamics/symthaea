@@ -1554,6 +1554,57 @@ mod tests {
     }
 
     #[test]
+    fn f2_structural_support_shift_requires_an_empty_version_space_claim() {
+        let truth = numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::Identity,
+        };
+        let mut episode = BlindEpisode::new_numeric_structural_shift(
+            "f2-quadratic-term-001",
+            truth,
+            1,
+            6,
+        )
+        .unwrap();
+
+        for input in [-1, 0, 1] {
+            episode
+                .apply(AgentAction::Probe {
+                    intervention: AgentIntervention::Numeric(input),
+                })
+                .unwrap();
+        }
+
+        let view = episode.view().unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                disposition: ClaimDisposition::NoCompatibleModel,
+                compatible_models: Vec::new(),
+            },
+            evidence_prefix_sha256: view.evidence_prefix_sha256,
+            cited_evidence_ids: view
+                .observations
+                .iter()
+                .map(|observation| observation.evidence_id.clone())
+                .collect(),
+            rationale: "The even response term is outside the declared linear/direct and leaky-memory candidate grammar.".to_owned(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        let score = episode.evaluate_after_submission().unwrap();
+
+        assert!(!score.generating_model_in_version_space);
+        assert!(!score.generating_truth_behaviorally_represented);
+        assert_eq!(score.set_score.oracle_model_count, 0);
+        assert_eq!(score.set_score.claimed_model_count, 0);
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.decision_correct);
+        assert!(score.evidence_references_valid);
+    }
+
+    #[test]
     fn independent_numeric_evaluator_agrees_with_inference_for_every_candidate() {
         let inputs = [1, -1, 1, 0];
         for truth in numeric::candidate_models(numeric::StructureAccess::Withheld) {
