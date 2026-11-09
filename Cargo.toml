@@ -187,6 +187,8 @@ mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
 symthaea-core = { path = "crates/core/symthaea-core" }
 # Shared evidence contract (Phase 1/2 of SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md)
 symthaea-evidence-plane = { path = "crates/core/symthaea-evidence-plane" }
+# REA Evidence-grounded causal hypothesis and experiment selection planner
+symthaea-rea-investigator = { path = "crates/domains/symthaea-rea-investigator", optional = true }
 # Shared epistemic types (E/N/M, Prismatic context, provenance)
 symthaea-communication = { workspace = true }
 symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
@@ -609,6 +611,8 @@ wait-timeout = "0.2"
 
 [features]
 default = ["default-mind"]
+# Deterministic REA Evidence-grounded, fail-closed investigation planning.
+rea-investigator = ["dep:symthaea-rea-investigator"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness

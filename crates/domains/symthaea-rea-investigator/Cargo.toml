@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-rea-investigator"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic, fail-closed hypothesis and next-experiment planner for REA Evidence"
+
+[lib]
+path = "src/lib.rs"
