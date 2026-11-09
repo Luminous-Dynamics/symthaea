@@ -236,7 +236,7 @@ impl SwarmSimulator {
                 continue;
             };
 
-            let age_s = ego_state.timestamp - snapshot_time_s;
+            let age_s = ego_state.timestamp - *snapshot_time_s;
             if !age_s.is_finite()
                 || age_s < -1e-9
                 || age_s > self.config.follow_target_max_age_s + 1e-9
