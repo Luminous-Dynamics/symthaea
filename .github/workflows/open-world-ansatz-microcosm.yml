@@ -56,8 +56,10 @@ jobs:
             .comparison_design == "adaptive_budget" and
             .a0.agent.executable_sha256 == .a2.agent.executable_sha256 and
             .a0.agent.executable_sha256 == .out_of_catalogue.agent.executable_sha256 and
+            .a0.agent.executable_sha256 == .equivalent_out_of_catalogue.agent.executable_sha256 and
             .a0.agent.arguments == .a2.agent.arguments and
             .a0.agent.arguments == .out_of_catalogue.agent.arguments and
+            .a0.agent.arguments == .equivalent_out_of_catalogue.agent.arguments and
             .a0.agent.environment_inherited == false and
             .a2.agent.environment_inherited == false and
             .a0.agent.max_input_frame_bytes <= 16777216 and
@@ -75,6 +77,7 @@ jobs:
             .a0.evaluator_score.probe_count <= 6 and
             .a2.evaluator_score.probe_count <= 6 and
             .out_of_catalogue.evaluator_score.generating_model_in_version_space == false and
+            .out_of_catalogue.evaluator_score.generating_truth_behaviorally_represented == false and
             .out_of_catalogue.evaluator_score.set_score.oracle_model_count == 0 and
             .out_of_catalogue.evaluator_score.set_score.claimed_model_count == 0 and
             .out_of_catalogue.evaluator_score.set_score.exact_version_space_match == true and
@@ -83,6 +86,19 @@ jobs:
             .out_of_catalogue.evaluator_score.probe_count <= 6 and
             .out_of_catalogue.agent.environment_inherited == false and
             .out_of_catalogue.process_exit_code == 0 and
+            .equivalent_out_of_catalogue.evaluator_score.generating_model_in_version_space == false and
+            .equivalent_out_of_catalogue.evaluator_score.generating_truth_behaviorally_represented == true and
+            .equivalent_out_of_catalogue.evaluator_score.set_score.oracle_model_count == 1 and
+            .equivalent_out_of_catalogue.evaluator_score.set_score.claimed_model_count == 1 and
+            .equivalent_out_of_catalogue.evaluator_score.set_score.exact_version_space_match == true and
+            .equivalent_out_of_catalogue.evaluator_score.decision_correct == true and
+            .equivalent_out_of_catalogue.evaluator_score.evidence_references_valid == true and
+            .equivalent_out_of_catalogue.evaluator_score.probe_count <= 6 and
+            .equivalent_out_of_catalogue.agent.environment_inherited == false and
+            .equivalent_out_of_catalogue.process_exit_code == 0 and
+            (.equivalent_out_of_catalogue.action_records | length) == (.equivalent_out_of_catalogue.observation_count + 1) and
+            .equivalent_out_of_catalogue.action_records[-1].resulting_status == "submitted" and
+            (.equivalent_out_of_catalogue.action_records[-1].action.action == "submit") and
             (.out_of_catalogue.action_records | length) == (.out_of_catalogue.observation_count + 1) and
             .out_of_catalogue.action_records[-1].resulting_status == "submitted" and
             (.out_of_catalogue.action_records[-1].action.action == "submit") and
@@ -120,6 +136,7 @@ jobs:
               (.exact_model_set_match.a0_only + .exact_model_set_match.a2_only + .exact_model_set_match.both_true + .exact_model_set_match.neither) == .pair_count and
               (.exact_structure_set_match.a0_only + .exact_structure_set_match.a2_only + .exact_structure_set_match.both_true + .exact_structure_set_match.neither) == .pair_count and
               (.generating_truth_retained.a0_only + .generating_truth_retained.a2_only + .generating_truth_retained.both_true + .generating_truth_retained.neither) == .pair_count and
+              (.generating_truth_behaviorally_represented.a0_only + .generating_truth_behaviorally_represented.a2_only + .generating_truth_behaviorally_represented.both_true + .generating_truth_behaviorally_represented.neither) == .pair_count and
               (.decision_correct.a0_only + .decision_correct.a2_only + .decision_correct.both_true + .decision_correct.neither) == .pair_count and
               (.evidence_references_valid.a0_only + .evidence_references_valid.a2_only + .evidence_references_valid.both_true + .evidence_references_valid.neither) == .pair_count and
               (.false_unique_structure_claim.a0_only + .false_unique_structure_claim.a2_only + .false_unique_structure_claim.both_true + .false_unique_structure_claim.neither) == .pair_count and
