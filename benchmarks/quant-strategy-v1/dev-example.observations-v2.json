@@ -1,0 +1,92 @@
+{
+  "schema_version": "luminous.quant-observation-manifest.v2",
+  "manifest_id": "synthetic-quant-source-manifest.0001",
+  "principal_id": "principal:synthetic-public-research",
+  "rights_profile_id": "rights:synthetic-dev",
+  "evaluation_mode": "development_only",
+  "decision_frontier": "2026-01-05T16:00:00Z",
+  "observations": [
+    {
+      "observation_id": "synthetic-price-observation.asset-a.2026-01-05",
+      "instrument_ref": "SYN-ASSET-A",
+      "event_time": "2026-01-05T15:59:00Z",
+      "value": "100.00",
+      "unit": "USD_per_share",
+      "period_start": null,
+      "period_end": null,
+      "evidence": {
+        "schema_version": "luminous.financial-research-evidence.v2",
+        "evidence_id": "ev.synthetic.price.asset-a.2026-01-05",
+        "source_id": "synthetic-source.market-price.v1",
+        "source_record_id": "SYN-PRICE-A-20260105",
+        "revision_group_id": "revision:SYN-PRICE-A-20260105",
+        "subject_refs": [
+          "SYN-ASSET-A"
+        ],
+        "evidence_kind": "price_observation",
+        "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "media_type": "application/json",
+        "published_at": "2026-01-05T15:59:05Z",
+        "valid_from": "2026-01-05T15:59:00Z",
+        "valid_until": null,
+        "temporal": {
+          "event_time_basis": "period",
+          "observation_period_start": "2026-01-05T15:59:00Z",
+          "observation_period_end": null,
+          "validity_interval_convention": "half_open"
+        },
+        "availability": {
+          "precision": "exact_instant",
+          "principal_id": "principal:synthetic-public-research",
+          "known_at": "2026-01-05T15:59:10Z",
+          "interval": null,
+          "proof": {
+            "state": "synthetic_fixture_only",
+            "artifact_ref": "fixture-only://proof/ev.synthetic.price.asset-a.2026-01-05",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "verification_receipt_ref": "fixture-only://receipt/ev.synthetic.price.asset-a.2026-01-05",
+            "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "verifier_id": "fixture-only-not-a-verifier",
+            "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        },
+        "retrieved_at": "2026-01-05T15:59:10Z",
+        "rights_authorization": {
+          "principal_id": "principal:synthetic-public-research",
+          "rights_profile_id": "rights:synthetic-dev",
+          "disposition": "authorized",
+          "valid_from": "2026-01-01T00:00:00Z",
+          "valid_until": null,
+          "proof": {
+            "state": "synthetic_fixture_only",
+            "artifact_ref": "fixture-only://proof/ev.synthetic.price.asset-a.2026-01-05",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "verification_receipt_ref": "fixture-only://receipt/ev.synthetic.price.asset-a.2026-01-05",
+            "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "verifier_id": "fixture-only-not-a-verifier",
+            "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        },
+        "provenance": {
+          "family_id": "synthetic-source.market-price.v1",
+          "lineage_ref": "fixture-only://provenance/synthetic-source.market-price.v1"
+        },
+        "revision": {
+          "supersedes_evidence_ids": []
+        },
+        "access_class": "public",
+        "payload_ref": "inline:/artifacts/ev.synthetic.price.asset-a.2026-01-05/metadata/synthetic_record",
+        "qualification": "synthetic_development_only",
+        "metadata": {
+          "price": "100.00",
+          "currency": "USD",
+          "venue": "SYNTHETIC"
+        }
+      }
+    }
+  ],
+  "qualification": "synthetic_development_only",
+  "run_id": "synthetic.cash.equal-weight.reference.0001"
+}
