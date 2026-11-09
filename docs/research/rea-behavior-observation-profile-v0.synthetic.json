@@ -1,0 +1,261 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "rea.behavior-observation-profile.v0",
+  "status": "design_fixture_only",
+  "source_policy": "original_synthetic_capture_data_only",
+  "claim_scope": "exact_invocation_and_environment_only",
+  "observations": [
+    {
+      "observation_id": "REA-OBS-001",
+      "claim_scope": "exact_invocation_and_environment_only",
+      "target": {
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executable_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform": "linux-x86_64",
+        "architecture": "x86_64"
+      },
+      "evidence_binding": {
+        "evidence_id": "ev_1111111111111111111111111111111111111111111111111111111111111111",
+        "evidence_raw_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "admission_state": "unverified_reference"
+      },
+      "runner": {
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "os_release": "Ubuntu 24.04 synthetic fixture",
+        "architecture": "x86_64",
+        "locale": "C.UTF-8",
+        "timezone": "UTC",
+        "isolation": "container",
+        "network": "disabled"
+      },
+      "invocation": {
+        "argv": [
+          {
+            "bytes_base64": "L3Vzci9iaW4vcHJpbnRm",
+            "sha256": "11876b7927efb46ce1638a9a33bb14f95c957c6773e185d419f6083b1000dfd4",
+            "byte_length": 15
+          },
+          {
+            "bytes_base64": "JXM=",
+            "sha256": "f684c73cba75b2ba0b6833f62a8fa8af6b8a2d3711b775d52596105f4917e38d",
+            "byte_length": 2
+          },
+          {
+            "bytes_base64": "aGVsbG8=",
+            "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            "byte_length": 5
+          }
+        ],
+        "stdin": {
+          "state": "not_applicable",
+          "reason": "No stdin stream supplied in this synthetic invocation"
+        },
+        "working_directory": ".",
+        "environment": [],
+        "timeout_ms": 1000
+      },
+      "result": {
+        "started_at": "2026-11-09T07:00:00Z",
+        "ended_at": "2026-11-09T07:00:00.010Z",
+        "termination": {
+          "kind": "exit",
+          "exit_code": 0
+        },
+        "stdout": {
+          "state": "complete",
+          "bytes_base64": "aGVsbG8=",
+          "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "byte_length": 5
+        },
+        "stderr": {
+          "state": "complete",
+          "bytes_base64": "",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "byte_length": 0
+        },
+        "filesystem": {
+          "state": "complete",
+          "entries": []
+        }
+      },
+      "assertions": [
+        {
+          "assertion_id": "stdout_matches",
+          "predicate": "stdout_sha256",
+          "capture_ref": "stdout",
+          "observed_value": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        },
+        {
+          "assertion_id": "exit_zero",
+          "predicate": "exit_code",
+          "capture_ref": "termination",
+          "observed_value": 0
+        },
+        {
+          "assertion_id": "no_filesystem_changes",
+          "predicate": "filesystem_diff_empty",
+          "capture_ref": "filesystem",
+          "observed_value": true
+        }
+      ]
+    },
+    {
+      "observation_id": "REA-OBS-002",
+      "claim_scope": "exact_invocation_and_environment_only",
+      "target": {
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executable_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform": "linux-x86_64",
+        "architecture": "x86_64"
+      },
+      "evidence_binding": {
+        "evidence_id": "ev_2222222222222222222222222222222222222222222222222222222222222222",
+        "evidence_raw_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "admission_state": "unverified_reference"
+      },
+      "runner": {
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "os_release": "Ubuntu 24.04 synthetic fixture",
+        "architecture": "x86_64",
+        "locale": "C.UTF-8",
+        "timezone": "UTC",
+        "isolation": "container",
+        "network": "disabled"
+      },
+      "invocation": {
+        "argv": [
+          {
+            "bytes_base64": "L3Vzci9iaW4vZGVtbw==",
+            "sha256": "ef4e47df7c7be2d781f01fa0f1c89508496f4dc855268fab4d1b45ec1370e174",
+            "byte_length": 13
+          },
+          {
+            "bytes_base64": "LS1wYXJzZQ==",
+            "sha256": "74add9486190f200ec9609ffd8dbf52f586f3e09fcba185f843935ed40da40a8",
+            "byte_length": 7
+          }
+        ],
+        "stdin": {
+          "state": "complete",
+          "bytes_base64": "eyJ4Ijp9",
+          "sha256": "dde93f1100e4f08c4ded6dfc33ab6ce1ac1c0c3a353f8195ae02b683f4746586",
+          "byte_length": 6
+        },
+        "working_directory": "workspace",
+        "environment": [],
+        "timeout_ms": 1000
+      },
+      "result": {
+        "started_at": "2026-11-09T07:01:00Z",
+        "ended_at": "2026-11-09T07:01:00.003Z",
+        "termination": {
+          "kind": "exit",
+          "exit_code": 2
+        },
+        "stdout": {
+          "state": "complete",
+          "bytes_base64": "",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "byte_length": 0
+        },
+        "stderr": {
+          "state": "complete",
+          "bytes_base64": "aW52YWxpZCBpbnB1dAo=",
+          "sha256": "12233423dee2d01404ed38640f12f07b233794691f3edceb09aa1f1c7d84a467",
+          "byte_length": 14
+        },
+        "filesystem": {
+          "state": "complete",
+          "entries": []
+        }
+      },
+      "assertions": [
+        {
+          "assertion_id": "syntax_error_reported",
+          "predicate": "stderr_sha256",
+          "capture_ref": "stderr",
+          "observed_value": "12233423dee2d01404ed38640f12f07b233794691f3edceb09aa1f1c7d84a467"
+        },
+        {
+          "assertion_id": "error_exit_two",
+          "predicate": "exit_code",
+          "capture_ref": "termination",
+          "observed_value": 2
+        }
+      ]
+    },
+    {
+      "observation_id": "REA-OBS-003",
+      "claim_scope": "exact_invocation_and_environment_only",
+      "target": {
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executable_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform": "linux-x86_64",
+        "architecture": "x86_64"
+      },
+      "evidence_binding": {
+        "evidence_id": "ev_3333333333333333333333333333333333333333333333333333333333333333",
+        "evidence_raw_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "admission_state": "unverified_reference"
+      },
+      "runner": {
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "os_release": "Ubuntu 24.04 synthetic fixture",
+        "architecture": "x86_64",
+        "locale": "C.UTF-8",
+        "timezone": "UTC",
+        "isolation": "container",
+        "network": "disabled"
+      },
+      "invocation": {
+        "argv": [
+          {
+            "bytes_base64": "L3Vzci9iaW4vZGVtbw==",
+            "sha256": "ef4e47df7c7be2d781f01fa0f1c89508496f4dc855268fab4d1b45ec1370e174",
+            "byte_length": 13
+          },
+          {
+            "bytes_base64": "LS1zdHJlYW0=",
+            "sha256": "ec93e67607507db7d56c010941f3060eeb1b9ee818dbc997473fac5c5fd4d2c2",
+            "byte_length": 8
+          }
+        ],
+        "stdin": {
+          "state": "not_applicable",
+          "reason": "No stdin stream supplied"
+        },
+        "working_directory": "workspace",
+        "environment": [],
+        "timeout_ms": 100
+      },
+      "result": {
+        "started_at": "2026-11-09T07:02:00Z",
+        "ended_at": "2026-11-09T07:02:00.100Z",
+        "termination": {
+          "kind": "timeout",
+          "reason": "Synthetic timeout after partial output"
+        },
+        "stdout": {
+          "state": "partial",
+          "bytes_base64": "Y2h1bmstMQ==",
+          "sha256": "2725aea2d2dea736fbe38e41ecb518f6098cb68ac77362c5e34faafb356567c5",
+          "byte_length": 7,
+          "reason": "Capture stopped at timeout"
+        },
+        "stderr": {
+          "state": "unavailable",
+          "reason": "Stderr collector was unavailable for this synthetic case"
+        },
+        "filesystem": {
+          "state": "unavailable",
+          "entries": [],
+          "reason": "Filesystem tracer unavailable"
+        }
+      },
+      "assertions": []
+    }
+  ]
+}
