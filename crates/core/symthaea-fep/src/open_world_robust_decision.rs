@@ -1310,7 +1310,7 @@ mod tests {
         ModelAdequacyReport {
             status,
             observation_count: 40,
-            zero_support_count: usize::from(status == ModelAdequacyStatus::Inadequate),
+            zero_support_count: if status == ModelAdequacyStatus::Inadequate { 1 } else { 0 },
             low_probability_count: 0,
             low_probability_rate: 0.0,
             mean_log_loss: Some(0.5),
