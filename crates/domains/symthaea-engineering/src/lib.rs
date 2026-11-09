@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Deterministic provenance graph types used by Sol Atlas evidence projections.
+pub mod provenance_graph;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
