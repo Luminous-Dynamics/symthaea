@@ -381,10 +381,15 @@ fn subject_before(line: &str, marker: &str) -> Option<String> {
 }
 
 fn extract_backticked_subject(line: &str) -> Option<String> {
-    let delimiter = char::from(96);
-    let start = line.find(delimiter)? + delimiter.len_utf8();
+    // Nix diagnostics traditionally delimit option names as `option':
+    // (opening backtick, closing apostrophe). Accept a symmetric backtick as
+    // well for fixtures and other tooling that emits `option`.
+    let opening = char::from(96);
+    let start = line.find(opening)? + opening.len_utf8();
     let remainder = &line[start..];
-    let end = remainder.find(delimiter)?;
+    let end = remainder
+        .find('\'')
+        .or_else(|| remainder.find(opening))?;
     let subject = remainder[..end].trim();
     (!subject.is_empty()).then(|| subject.to_string())
 }
@@ -514,12 +519,10 @@ error:
     }
 
     #[test]
-    fn unknown_option_is_classified_without_guessing_a_replacement() {
-        let delimiter = char::from(96);
-        let message = format!(
-            "error: The option {delimiter}services.example.enable{delimiter} does not exist. Definition values:"
+    fn unknown_option_parses_nix_backtick_apostrophe_quoting() {
+        let report = NixEvaluationReport::analyze(
+            "error: The option `services.example.enable' does not exist. Definition values:",
         );
-        let report = NixEvaluationReport::analyze(&message);
         let primary = report.primary().unwrap();
         assert_eq!(primary.kind, EvaluationIssueKind::UnknownOption);
         assert_eq!(
@@ -527,6 +530,19 @@ error:
             Some("services.example.enable")
         );
         assert!(primary.recommendations.iter().all(|item| !item.contains("replace")));
+    }
+
+    #[test]
+    fn unknown_option_also_accepts_symmetric_backticks() {
+        let delimiter = char::from(96);
+        let message = format!(
+            "error: The option {delimiter}services.example.enable{delimiter} does not exist."
+        );
+        let report = NixEvaluationReport::analyze(&message);
+        assert_eq!(
+            report.primary().and_then(|diagnostic| diagnostic.subject.as_deref()),
+            Some("services.example.enable")
+        );
     }
 
     #[test]
