@@ -73,6 +73,12 @@ use crate::spec::CompositionSpec;
 
 const BARS_PER_CHORUS: usize = 12;
 
+// Call and every transformed response are successive statements by the same
+// continuing lead part. Bass and harmony are separate supporting lines.
+const BLUES_MELODY_PART: PartId = PartId(0);
+const BLUES_BASS_PART: PartId = PartId(1);
+const BLUES_HARMONY_PART: PartId = PartId(2);
+
 /// How many whole 12-bar choruses realize `requested_bars` -- rounds UP
 /// (`div_ceil`) so a short request (e.g. the default `bars: 4`) still
 /// gets one complete, harmonically coherent chorus rather than 0 or a
@@ -301,6 +307,7 @@ fn trimmed_for_articulation(nominal: Duration, tempo_bpm: f64) -> Duration {
 fn push_phrase(
     score: &mut Score,
     motif: &Motif,
+    part_id: PartId,
     key: Key,
     start: Duration,
     octave: i32,
@@ -312,7 +319,7 @@ fn push_phrase(
     for n in &motif.notes {
         if let Some(d) = n.degree {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: scale.degree_pitch(d, octave),
                 onset: start + t,
                 duration: trimmed_for_articulation(n.duration, tempo_bpm),
@@ -399,8 +406,9 @@ pub fn realize_call_response(
     // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
     // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
     // and never read each other's state, so the emitted NOTES are unchanged.
-    crate::composer::realize_bass(
+    crate::composer::realize_bass_for_part(
         &mut score,
+        BLUES_BASS_PART,
         &form,
         meter,
         intent,
@@ -409,8 +417,9 @@ pub fn realize_call_response(
         false,
         false,
     );
-    crate::composer::realize_harmony(
+    crate::composer::realize_harmony_for_part(
         &mut score,
+        BLUES_HARMONY_PART,
         &form,
         meter,
         intent,
@@ -436,6 +445,7 @@ pub fn realize_call_response(
             push_phrase(
                 &mut score,
                 &call,
+                BLUES_MELODY_PART,
                 key,
                 chorus_start + bar.scale(call_bar as i64, 1),
                 octave,
@@ -445,6 +455,7 @@ pub fn realize_call_response(
             push_phrase(
                 &mut score,
                 &response,
+                BLUES_MELODY_PART,
                 key,
                 chorus_start + bar.scale(response_bar as i64, 1),
                 octave,
@@ -490,6 +501,41 @@ mod tests {
 
     fn blues_spec() -> CompositionSpec {
         crate::style::Style::Blues.spec()
+    }
+
+    #[test]
+    fn complete_call_response_score_retains_one_melody_and_two_support_parts() {
+        let realized = realize_call_response(&intent(), &blues_spec());
+        let score = &realized.score;
+
+        assert!(
+            score.has_part_identity(),
+            "call/response melody, bass and harmony must all carry explicit PartIds"
+        );
+        let actual: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        let expected: std::collections::BTreeSet<u16> =
+            [BLUES_MELODY_PART.0, BLUES_BASS_PART.0, BLUES_HARMONY_PART.0]
+                .into_iter()
+                .collect();
+        assert_eq!(actual, expected);
+
+        assert!(score.notes.iter().all(|note| match note.part {
+            BLUES_MELODY_PART => note.role == VoiceRole::Melody,
+            BLUES_BASS_PART => note.role == VoiceRole::Bass,
+            BLUES_HARMONY_PART => note.role == VoiceRole::Harmony,
+            _ => false,
+        }));
+
+        // The transformed response is another statement by the same lead
+        // identity, not a newly invented performer/PartId.
+        let first_response_beat = 2.0 * f64::from(score.meter);
+        assert!(
+            score.notes.iter().any(|note| {
+                note.part == BLUES_MELODY_PART
+                    && note.onset.beats() >= first_response_beat
+            })
+        );
     }
 
     #[test]
