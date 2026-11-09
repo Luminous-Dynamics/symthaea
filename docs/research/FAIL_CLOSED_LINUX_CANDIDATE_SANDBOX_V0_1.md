@@ -40,13 +40,13 @@ Load a versioned seccomp BPF filter through Bubblewrap's documented FD interface
 
 ## Cgroup/resource plan
 
-Use a transient **scope** and cgroup v2 for external enforcement. A scope runs the command in the caller's execution environment while the system manager controls its cgroup; this is useful because the trusted launcher must pre-open and pass the seccomp descriptor to Bubblewrap. Use `systemd-run --user --scope --pipe` (not `--scope --wait`: systemd documents those switches as incompatible; `--pipe` already waits synchronously). Scope-level controls are:
+Use a transient **scope** and cgroup v2 for external enforcement. A scope runs the command as a child of `systemd-run` with the caller's execution environment, while the system manager controls its cgroup. Use `systemd-run --user --scope`; do not add `--pipe`, which is documented for the transient-service execution path and is not needed for scope mode. The trusted launcher must pre-open the seccomp descriptor and explicitly preserve it across its own fork/exec so Bubblewrap receives fd 3. This handoff remains an integration-test obligation, not an assumption. Scope-level controls are:
 - `MemoryMax` and `MemorySwapMax=0`;
 - `CPUQuota` (plus external wall-clock timeout);
 - `TasksMax`;
 - read back the effective systemd properties and actual cgroup control files before starting/accepting the candidate result.
 
-Official systemd resource-control documentation maps these properties to cgroup v2 controllers and describes CPU quotas. Scope units are externally created processes and expose resource controls; service execution properties such as `ProtectSystem`, `ProtectHome` and `PrivateNetwork` are not included in this scope argv. Bubblewrap provides the namespace and filesystem isolation. Availability, delegation and controller activation are host-dependent; a requested property string is not evidence that the effective resource limit was enforced. Verify actual values and fail closed. The launcher must prove by integration test that fd 3 (the seccomp program) survives the scope/pipe handoff and reaches Bubblewrap unchanged. [systemd.resource-control](https://freedesktop.org/software/systemd/man/latest/systemd.resource-control.html).
+Official systemd resource-control documentation maps these properties to cgroup v2 controllers and describes CPU quotas. Scope units are externally created processes and expose resource controls; service execution properties such as `ProtectSystem`, `ProtectHome` and `PrivateNetwork` are not included in this scope argv. Bubblewrap provides the namespace and filesystem isolation. Availability, delegation and controller activation are host-dependent; a requested property string is not evidence that the effective resource limit was enforced. Verify actual values and fail closed. The launcher must prove by integration test that fd 3 (the seccomp program) survives the trusted launcher's fork/exec and systemd scope launch and reaches Bubblewrap unchanged. [systemd-run](https://www.freedesktop.org/software/systemd/man/latest/systemd-run.html) and [systemd.resource-control](https://freedesktop.org/software/systemd/man/latest/systemd.resource-control.html).
 
 The supervisor should cap stdout/stderr and frame I/O independently, kill on wall-clock deadline, malformed frame, unexpected extra bytes, resource termination or supervisor error, and record the exact reason.
 
@@ -70,6 +70,14 @@ Before any confirmatory run:
 - verify resource limits by reading the actual candidate cgroup;
 - run process-spawn, fork-bomb, memory-exhaustion, CPU-spin, file-read, descriptor, protocol-malformation, timeout and supervisor-kill negative controls;
 - independently replay all receipts.
+
+## Cgroup v2 read-back verifier tranche
+
+The next implementation slice adds `research/temporal-bench/src/cgroup_v2_verify.rs`, exported as `cgroup_v2_verify`. It consumes the exact systemd `ControlGroup` property from the trusted launcher, checks the trusted host's mountinfo for one unified cgroup2 mount, canonicalizes the scope path beneath that mount, reads the parent controller availability/delegation and the candidate scope's effective `memory.max`, `memory.swap.max`, `cpu.max`, `pids.max`, `memory.oom.group`, `cgroup.procs` and `cgroup.events`, and rejects any mismatch. The candidate PID must belong to the expected scope and the cgroup must report `populated 1`. A digest commits the exact observed limits; it is not a signature or hardware attestation.
+
+Twelve unit tests are authored for exact read-back, wrong scope, permissive/mismatched resource settings, disabled controllers, missing candidate PID, empty scope, unsafe paths, cgroup2 mount parsing and malformed event files. They are not yet compiled or executed. The verifier does not query systemd over D-Bus, create the scope, install seccomp, preserve fd 3, enforce wall time, or run a candidate. Those remain supervisor/integration work and no security qualification is claimed.
+
+The scope planner no longer includes `--pipe`. FD 3 preservation is an explicit responsibility of the trusted launcher and must be verified end-to-end before a candidate run can qualify.
 
 ## Status
 
