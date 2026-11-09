@@ -139,13 +139,37 @@ impl Accompaniment {
         velocity: f32,
         section_intensity: f32,
     ) {
+        self.realize_measure_for_part(
+            score,
+            PartId::UNASSIGNED,
+            voiced,
+            bar_onset,
+            meter_beats,
+            velocity,
+            section_intensity,
+        );
+    }
+
+    /// Part-aware variant used by composers that author a persistent harmony
+    /// line. Existing callers retain the legacy unassigned behavior above.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn realize_measure_for_part(
+        self,
+        score: &mut Score,
+        part_id: PartId,
+        voiced: &[Pitch],
+        bar_onset: Duration,
+        meter_beats: f64,
+        velocity: f32,
+        section_intensity: f32,
+    ) {
         if voiced.is_empty() {
             return;
         }
         let bar = Duration::new(meter_beats as i64, 1);
         let push = |score: &mut Score, pitch: Pitch, onset: Duration, dur: Duration, vel: f32| {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch,
                 onset,
                 duration: dur,
