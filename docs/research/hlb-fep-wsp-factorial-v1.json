@@ -731,7 +731,11 @@
         "tv_ambiguity_radius",
         "adversarial_outcome_distribution",
         "nominal_robust_selection_disagreement",
-        "calibration"
+        "calibration",
+        "prequential_mixture_e_value",
+        "anytime_alarm_observation_index",
+        "declared_alpha",
+        "alternative_model_coverage"
       ],
       "negative_controls": [
         "well_specified_family",
@@ -741,7 +745,10 @@
         "mild_likelihood_misspecification",
         "abrupt_regime_shift",
         "always_abstain",
-        "same_nominal_predictive_distribution"
+        "same_nominal_predictive_distribution",
+        "null_predictive_generator_type_one_error",
+        "alternatives_frozen_before_each_observation",
+        "alternative_weights_normalized"
       ]
     }
   ],
@@ -1184,6 +1191,10 @@
     {
       "id": "dro_robas_mmd_external_reference",
       "scope": "Dellaporta, O'Hara and Damoulas (Entropy 2026), robust Bayesian ambiguity sets using MMD; external reference only, not reproduced by this finite categorical TV implementation."
+    },
+    {
+      "id": "prequential_mixture_likelihood_ratio_e_process",
+      "scope": "Anytime-valid mixture of likelihood-ratio e-processes against preregistered predictable alternative categorical forecasts; Ville threshold 1/alpha is conditional on the declared null predictive model."
     }
   ],
   "seeds": {
@@ -1579,7 +1590,10 @@
     "Model-adequacy monitoring must use prequential predictions frozen before each observation; zero-support outcomes are counted as model-family violations and are never epsilon-smoothed or silently renormalized.",
     "NoDetectedInadequacy means only that frozen thresholds found no failure; it must never be reported as proof that the registered model family is correct.",
     "Finite-TV robust diagnostics must report the declared radius and adversarial outcome distribution; radius zero must exactly reproduce the nominal EVSI risk and selection.",
-    "Outcomes with zero nominal support receive the maximum declared task loss in the TV-robust envelope; all claims are conditional on the registered prior and declared ambiguity radius."
+    "Outcomes with zero nominal support receive the maximum declared task loss in the TV-robust envelope; all claims are conditional on the registered prior and declared ambiguity radius.",
+    "Prequential alternative forecasts and their mixture weights must be fixed from information available before each evaluated observation; retrospective fitting on evaluation outcomes invalidates the e-process guarantee.",
+    "The fixed alternative mixture weights must be normalized; sequential evidence is reported as a log e-value and crosses only at the preregistered Ville threshold log(1/alpha).",
+    "The anytime false-alarm guarantee is conditional on the declared null predictive distribution being correct; a zero-support observation is a separate hard adequacy violation and must not be epsilon-smoothed."
   ],
   "research_references": [
     {
