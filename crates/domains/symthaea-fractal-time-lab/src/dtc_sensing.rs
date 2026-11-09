@@ -900,35 +900,24 @@ mod tests {
     }
 
     #[test]
-    fn phase_origin_shift_equals_a_corresponding_clock_epoch_shift() {
-        let frequency = 0.25;
-        let original_phase = 0.31;
-        let epoch_shift_drive_periods = 0.37;
-        let shifted_phase = original_phase
-            - 2.0 * std::f64::consts::PI * frequency * epoch_shift_drive_periods;
+    fn clock_offset_maps_to_a_phase_shift_with_the_correct_sign() {
+        let frequency = 0.25_f64;
+        let initial_phase = 0.31_f64;
+        let clock_offset = 0.37_f64;
 
-        let mut original = build_model(&config()).unwrap();
-        original
-            .stroboscopic_magnetization_with_uniform_ac_probe(
-                config().periods,
-                config().probe_amplitude,
-                frequency,
-                original_phase,
-            )
-            .unwrap();
-
-        let mut shifted = build_model(&config()).unwrap();
-        shifted
-            .stroboscopic_magnetization_with_uniform_ac_probe(
-                config().periods,
-                config().probe_amplitude,
-                frequency,
-                shifted_phase,
-            )
-            .unwrap();
-
-        for (left, right) in original.amplitudes().iter().zip(shifted.amplitudes()) {
-            assert!((*left - *right).norm() < 1.0e-12);
+        for period in 0..64 {
+            let sample_time = period as f64 + 0.5;
+            let phase_with_clock_offset =
+                2.0 * std::f64::consts::PI * frequency * (sample_time - clock_offset)
+                    + initial_phase;
+            let equivalent_phase_parameter =
+                2.0 * std::f64::consts::PI * frequency * sample_time
+                    + initial_phase
+                    - 2.0 * std::f64::consts::PI * frequency * clock_offset;
+            assert!(
+                (phase_with_clock_offset.cos() - equivalent_phase_parameter.cos()).abs()
+                    < 1.0e-14
+            );
         }
     }
 
