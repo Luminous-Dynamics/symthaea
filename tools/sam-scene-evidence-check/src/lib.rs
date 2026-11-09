@@ -730,6 +730,13 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         &source_roles,
         &["local_sensor_observation", "synthetic_sensor_observation"],
     );
+    validate_uncertainty(
+        &mut errors,
+        "ego_state",
+        snapshot
+            .get("ego_state")
+            .and_then(|state| state.get("uncertainty")),
+    );
     check_ref(
         &mut errors,
         "road_geometry.reference_frame_id",
@@ -911,6 +918,28 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
     validate_follow_target_context(&mut errors, snapshot, &source_records, &frame_ids);
 
     errors
+}
+
+fn longitudinal_sigma_upper_bound(uncertainty: Option<&Value>) -> Option<f64> {
+    let uncertainty = uncertainty?;
+    if uncertainty.get("representation").and_then(Value::as_str)
+        != Some("diagonal_covariance")
+    {
+        return None;
+    }
+    let state_order = uncertainty.get("state_order")?.as_array()?;
+    let x_index = state_order
+        .iter()
+        .position(|field| field.as_str() == Some("x_m"))?;
+    let variance = uncertainty
+        .get("diagonal")?
+        .as_array()?
+        .get(x_index)?
+        .as_f64()?;
+    if !variance.is_finite() || variance < 0.0 {
+        return None;
+    }
+    Some(variance.sqrt())
 }
 
 fn validate_simulator_truth_actor_states(
@@ -1306,7 +1335,7 @@ fn validate_follow_target_context(
         .and_then(|state| state.get("velocity_mps"))
         .and_then(Value::as_array);
 
-    let (target_position, target_velocity, target_frame, target_scenario, target_tick) = if profile
+    let (target_position, target_velocity, target_frame, target_scenario, target_tick, target_uncertainty) = if profile
         == "simulation_benchmark"
     {
         let actor = snapshot
@@ -1329,12 +1358,13 @@ fn validate_follow_target_context(
                 actor.get("reference_frame_id").and_then(Value::as_str),
                 actor.get("scenario_id").and_then(Value::as_str),
                 actor.get("acquisition_tick_ns").and_then(Value::as_u64),
+                None,
             )
         } else {
             errors.push(format!(
                 "follow_target_context: unknown simulator truth actor {reference_id}"
             ));
-            (None, None, None, None, None)
+            (None, None, None, None, None, None)
         }
     } else {
         let object = snapshot
@@ -1384,12 +1414,13 @@ fn validate_follow_target_context(
                 object
                     .get("measurement_time_tick_ns")
                     .and_then(Value::as_u64),
+                object.get("uncertainty"),
             )
         } else {
             errors.push(format!(
                 "follow_target_context: unknown tracked object hypothesis {reference_id}"
             ));
-            (None, None, None, None, None)
+            (None, None, None, None, None, None)
         }
     };
     if target_frame != context_frame || target_frame != ego_frame {
@@ -1421,6 +1452,27 @@ fn validate_follow_target_context(
             "follow_target_context: gap, relative speed and uncertainty must be finite; distance and uncertainty must be non-negative"
                 .into(),
         );
+    }
+
+    if matches!(profile, "local_perception" | "deployment") {
+        let ego_sigma = longitudinal_sigma_upper_bound(
+            ego_state.and_then(|state| state.get("uncertainty")),
+        );
+        let target_sigma = longitudinal_sigma_upper_bound(target_uncertainty);
+        match (ego_sigma, target_sigma, uncertainty) {
+            (Some(ego_sigma), Some(target_sigma), Some(reported_bound)) => {
+                let conservative_bound = ego_sigma + target_sigma;
+                if reported_bound + 1e-6 < conservative_bound {
+                    errors.push(format!(
+                        "follow_target_context: distance_uncertainty_m understates the conservative longitudinal sigma bound ({reported_bound} < {conservative_bound})"
+                    ));
+                }
+            }
+            _ => errors.push(
+                "follow_target_context: local Follow requires diagonal covariance with an x_m component for ego and target, plus a finite distance uncertainty bound"
+                    .into(),
+            ),
+        }
     }
 
     if let (Some(ego_position), Some(target_position), Some(gap)) =
