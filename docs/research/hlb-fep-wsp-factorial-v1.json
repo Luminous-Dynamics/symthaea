@@ -440,7 +440,12 @@
         "native_cfc_candidate_only_two_batch_execution",
         "native_cfc_source_fingerprint_immutability",
         "verifier_rejection_session_non_advancement",
-        "latest_native_candidate_parent_binding"
+        "latest_native_candidate_parent_binding",
+        "cross_task_transfer_matrix",
+        "cross_task_regression_rate",
+        "trajectory_to_trajectory_repair_variance",
+        "qualified_no_op_retention_rate",
+        "accepted_edit_fraction_by_task"
       ],
       "negative_controls": [
         "no_edit",
@@ -454,7 +459,11 @@
         "native_cfc_sequential_batch_rejected_before_verifier_acceptance",
         "native_cfc_sequential_verifier_rejection_does_not_advance_session",
         "native_cfc_sequential_accepted_batches_advance_exactly_once",
-        "native_cfc_original_source_model_never_mutated"
+        "native_cfc_original_source_model_never_mutated",
+        "multi_trajectory_seeded_replicates",
+        "cross_task_holdout_tasks",
+        "retain_original_when_unqualified",
+        "edit_that_improves_source_task_but_regresses_protected_task"
       ]
     },
     {
@@ -611,7 +620,11 @@
         "paired_evsi_minus_baseline_decision_regret_delta",
         "paired_evsi_minus_baseline_total_cost_delta",
         "paired_normal_approximation_confidence_intervals",
-        "source_bound_diagnostic_result_digest"
+        "source_bound_diagnostic_result_digest",
+        "paired_task_loss_hoeffding_ci95",
+        "paired_decision_regret_hoeffding_ci95",
+        "paired_total_cost_hoeffding_ci95",
+        "total_cost_contrast_known_absolute_bound"
       ],
       "negative_controls": [
         "high_eig_zero_evsi_irrelevant_probe",
@@ -625,7 +638,8 @@
         "targeted_decision_eig_ignores_cost_while_evsi_declines",
         "decision_information_data_processing_inequality",
         "paired_evsi_contrast_episode_seed_alignment",
-        "paired_evsi_confidence_interval_source_data_preserved"
+        "paired_evsi_confidence_interval_source_data_preserved",
+        "paired_hoeffding_interval_support_and_shrinking"
       ],
       "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study.",
       "execution_artifact": {
@@ -1237,6 +1251,10 @@
       "scope": "Fixed reusable weight-editor with sequential experimental-feedback-driven predictor updates; reproduce matched feedback budget and candidate-validation protocol (Li et al., arXiv:2611.07319, 2026)."
     },
     {
+      "id": "wsp_scope_multi_trajectory_generalization_2026",
+      "scope": "Hu et al. (arXiv:2611.09382): 16 editing trajectories across seven benchmarks and Qwen3.5-0.8B/9B; register trajectory-level variance, no-op retention when improvements are not qualified, and cross-task transfer/regression matrices. External result is a comparator, not a reproduced result or a single-trajectory success target."
+    },
+    {
       "id": "finite_tv_robust_evsi",
       "scope": "Exact worst-case posterior Bayes risk over a finite categorical total-variation ball around each action's nominal predictive outcome distribution; implementation in open_world_robust_decision.rs."
     },
@@ -1803,6 +1821,14 @@
     {
       "id": "weightloop_wsp_experimental_feedback_2026",
       "url": "https://arxiv.org/abs/2611.07319"
+    },
+    {
+      "id": "wsp_scope_generalization_and_limits_2026",
+      "url": "https://arxiv.org/abs/2611.09382"
+    },
+    {
+      "id": "zero_probe_weight_reading_semantics_audit_2026",
+      "url": "https://arxiv.org/abs/2611.08070"
     }
   ]
 }
