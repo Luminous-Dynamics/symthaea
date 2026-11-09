@@ -114,9 +114,17 @@ Qualification states:
 
 The campaign object owns the common alpha budget, frozen protocol digest, candidate ordinal sequence, and no-reuse registries for candidate-model and confirmatory-shard digests. Each candidate verifier also binds its precondition-gate digest.
 
+### Restartable evidence state
+
+The campaign exposes a deterministic checkpoint containing its fixed alpha/configuration, frozen protocol digest, next candidate ordinal, and sorted no-reuse registries for candidate and confirmatory-shard digests. Restore validates the checkpoint version, digest, registry cardinalities, and duplicate entries before another candidate can be assigned.
+
+Each in-progress candidate can also be checkpointed with its immutable binding, frozen test configuration, and ordered paired observations. Restore rebuilds the running mean, duplicate-episode set, and observation hash by replaying every observation. It rejects altered checkpoint contents, a report digest that does not reproduce, malformed losses, duplicate episodes, and evidence appearing after a terminal decision.
+
+The checkpoint digest is an integrity check, not authentication. Durable storage must authenticate checkpoints and preserve access controls; the independent verifier still validates signed receipts and recomputes the raw confirmatory stream. Checkpointing preserves the campaign's no-reuse registry across restarts only when the authenticated checkpoint is actually restored rather than replaced with a fresh campaign.
+
 ### Assumptions and limitations
 
-The guarantee is conditional on bounded paired losses, a frozen candidate, a fixed evaluation protocol, and a valid confirmatory sampling process. Candidate-specific shards must be fresh and not reused to select later edits. The current campaign ledger prevents duplicate shard digests within one campaign, but it cannot prove that a caller has truthfully described the underlying data split or that two different digests do not encode overlapping observations.
+The guarantee is conditional on bounded paired losses, a frozen candidate, a fixed evaluation protocol, and a valid confirmatory sampling process. Candidate-specific shards must be fresh and not reused to select later edits. The campaign ledger prevents duplicate shard digests within a campaign and its checkpoint preserves that registry across authenticated restarts. It still cannot prove that a caller has truthfully described the underlying data split or that two different digests do not encode overlapping observations.
 
 The current implementation uses conservative Hoeffding bounds. It does not yet implement task-family guardrail sequences, a campaign-level episode-content overlap oracle, empirical-Bernstein confidence sequences, or betting-based e-process comparisons. These are tracked in #11278.
 
