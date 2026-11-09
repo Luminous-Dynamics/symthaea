@@ -15,8 +15,7 @@
 use super::decomposition::CnfProblem;
 use super::quantified_scope::{Quantifier, ValidatedQuantifierPrefix};
 use super::strategy_aig::{
-    StrategyAig, StrategyAigBudget, StrategyAigError, evaluate_strategy_aig,
-    validate_strategy_aig,
+    StrategyAig, StrategyAigBudget, StrategyAigError, evaluate_strategy_aig, validate_strategy_aig,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,22 +59,45 @@ impl Default for SynQbfBudget {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SynQbfError {
-    MatrixPrefixVariableCountMismatch { matrix: usize, prefix: usize },
-    VariableBudgetExceeded { required: usize, limit: usize },
-    VariableNameBudgetExceeded { required: usize, limit: usize },
-    EmptyVariableName { index: usize },
+    MatrixPrefixVariableCountMismatch {
+        matrix: usize,
+        prefix: usize,
+    },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    VariableNameBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    EmptyVariableName {
+        index: usize,
+    },
     DuplicateVariableName(String),
-    ClauseBudgetExceeded { required: usize, limit: usize },
-    LiteralBudgetExceeded { required: usize, limit: usize },
+    ClauseBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    LiteralBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     LiteralVariableOutOfRange {
         clause: usize,
         literal: usize,
         variable: usize,
         variable_count: usize,
     },
-    ProofVariableCountMismatch { proof: usize, source: usize },
+    ProofVariableCountMismatch {
+        proof: usize,
+        source: usize,
+    },
     PrefixBindingMismatch,
-    CircuitDependencyCountMismatch { expected: usize, actual: usize },
+    CircuitDependencyCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     CircuitDependencyOrderMismatch {
         position: usize,
         expected: usize,
@@ -83,8 +105,14 @@ pub enum SynQbfError {
     },
     CircuitValidation(StrategyAigError),
     CircuitEvaluation(StrategyAigError),
-    CircuitEvaluationBudgetExceeded { required: u128, limit: u128 },
-    EstimatedAigNodeVisitBudgetExceeded { required: u128, limit: u128 },
+    CircuitEvaluationBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    EstimatedAigNodeVisitBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
     SourceEquivalenceCounterexample {
         prefix_assignment: Vec<bool>,
         source_value: bool,
@@ -98,7 +126,10 @@ pub enum SynQbfError {
         branch_10_value: bool,
         required_value: bool,
     },
-    ClaimedTruthValueMismatch { claimed: bool, circuit_value: bool },
+    ClaimedTruthValueMismatch {
+        claimed: bool,
+        circuit_value: bool,
+    },
     ResourceAccountingOverflow,
 }
 
@@ -116,8 +147,7 @@ pub struct SynQbfVerificationReport {
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, SynQbfError> {
-    let shift =
-        u32::try_from(exponent).map_err(|_| SynQbfError::ResourceAccountingOverflow)?;
+    let shift = u32::try_from(exponent).map_err(|_| SynQbfError::ResourceAccountingOverflow)?;
     1u128
         .checked_shl(shift)
         .ok_or(SynQbfError::ResourceAccountingOverflow)
@@ -294,8 +324,7 @@ pub fn verify_synqbf_proof(
             });
         }
     }
-    validate_strategy_aig(&proof.circuit, budget.aig)
-        .map_err(SynQbfError::CircuitValidation)?;
+    validate_strategy_aig(&proof.circuit, budget.aig).map_err(SynQbfError::CircuitValidation)?;
 
     let source_assignments = checked_power_of_two(n)?;
     let representability_instances = source_assignments
@@ -402,12 +431,9 @@ pub fn verify_synqbf_proof(
             branch_10[position] = true;
             branch_10[n + position] = false;
 
-            let diagonal_value =
-                evaluate_counted(proof, &diagonal, budget, &mut report)?;
-            let branch_01_value =
-                evaluate_counted(proof, &branch_01, budget, &mut report)?;
-            let branch_10_value =
-                evaluate_counted(proof, &branch_10, budget, &mut report)?;
+            let diagonal_value = evaluate_counted(proof, &diagonal, budget, &mut report)?;
+            let branch_01_value = evaluate_counted(proof, &branch_01, budget, &mut report)?;
+            let branch_10_value = evaluate_counted(proof, &branch_10, budget, &mut report)?;
             let required_value = match quantifier {
                 Quantifier::Exists => branch_01_value || branch_10_value,
                 Quantifier::ForAll => branch_01_value && branch_10_value,
@@ -458,8 +484,8 @@ pub fn verify_synqbf_proof(
 mod tests {
     use super::super::decomposition::Literal;
     use super::super::quantified_scope::QuantifierBlock;
-    use super::super::strategy_aig::compile_strategy_function_to_aig;
     use super::super::quantified_strategy::BooleanStrategyFunction;
+    use super::super::strategy_aig::compile_strategy_function_to_aig;
     use super::*;
     use std::collections::BTreeMap;
 
@@ -596,9 +622,7 @@ mod tests {
             let xhat1 = bit(3);
             let xhat2 = bit(4);
             let xhat3 = bit(5);
-            values[mask] = (x1 && xhat3)
-                || ((x2 || x3) && (xhat2 || xhat1))
-                || (x1 && xhat2);
+            values[mask] = (x1 && xhat3) || ((x2 || x3) && (xhat2 || xhat1)) || (x1 && xhat2);
         }
         let proof = proof_from_values(3, quantifier_order, values, true);
         let report = verify_synqbf_proof(&problem, &prefix, &proof, budget()).unwrap();
