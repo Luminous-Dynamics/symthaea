@@ -20,11 +20,17 @@ pub enum ContextField {
     ActionChannels,
     ActionDimension,
     MaxActionsPerChunk,
+    ObservationBundleDigest,
+    PolicyArtifactDigest,
+    DeploymentConfigDigest,
+    AssistanceProfileDigest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContractError {
     EmptyExpectedField(ContextField),
+    InvalidDigest(ContextField),
+    DigestMismatch(ContextField),
     DuplicateExpectedEnvironment(u32),
     ZeroActionDimension(String),
     EnvironmentCountMismatch {
@@ -75,6 +81,22 @@ pub enum ContractError {
     PolicyServerRestarted,
 }
 
+/// A fixed-size digest value used only as an immutable run/call identity.
+/// Construction rejects the all-zero sentinel so an omitted digest cannot be
+/// represented as a valid identity. This type does not hash, sign, authenticate,
+/// or prove the integrity of the underlying artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Digest32([u8; 32]);
+
+impl Digest32 {
+    pub fn from_bytes(bytes: [u8; 32]) -> Result<Self, ContractError> {
+        if bytes.iter().all(|byte| *byte == 0) {
+            return Err(ContractError::InvalidDigest(ContextField::ObservationBundleDigest));
+        }
+        Ok(Self(bytes))
+    }
+}
+
 /// The environment-side caller freezes the values below before issuing one
 /// XPolicyLab model call. These identifiers are supplied by the Luminous
 /// adapter; they are not assumed to be fields returned by the upstream model.
@@ -98,6 +120,14 @@ pub struct ExpectedPolicyCall {
     pub channel_dimensions: BTreeMap<String, usize>,
     /// Bound policy-side output to a finite, preregistered chunk length.
     pub max_actions_per_chunk: usize,
+    /// Digest of the exact policy-visible observation bundle for this call.
+    pub observation_bundle_digest: Digest32,
+    /// Digest of policy source + weights/checkpoint manifest.
+    pub policy_artifact_digest: Digest32,
+    /// Digest of prompt, inference/runtime settings and resolved deployment lock.
+    pub deployment_config_digest: Digest32,
+    /// Digest of declared tools, skills, oracles and human-assistance profile.
+    pub assistance_profile_digest: Digest32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,6 +154,12 @@ pub struct PolicyActionResponse {
     pub policy_server_instance_id: String,
     pub schema_version: String,
     pub action_space: String,
+    /// Luminous wrapper-envelope identities bound to the active policy call;
+    /// these are not native XPolicyLab model-response fields.
+    pub observation_bundle_digest: Digest32,
+    pub policy_artifact_digest: Digest32,
+    pub deployment_config_digest: Digest32,
+    pub assistance_profile_digest: Digest32,
     /// The client binds each output slot to the original env_idx_list position.
     pub environment_chunks: Vec<EnvironmentActionChunk>,
 }
@@ -165,6 +201,35 @@ pub fn validate_action_response(
     }
     if response.action_space != expected.action_space {
         return Err(ContractError::ActionSpaceMismatch);
+    }
+    for (actual, frozen, field) in [
+        (
+            response.observation_bundle_digest,
+            expected.observation_bundle_digest,
+            ContextField::ObservationBundleDigest,
+        ),
+        (
+            response.policy_artifact_digest,
+            expected.policy_artifact_digest,
+            ContextField::PolicyArtifactDigest,
+        ),
+        (
+            response.deployment_config_digest,
+            expected.deployment_config_digest,
+            ContextField::DeploymentConfigDigest,
+        ),
+        (
+            response.assistance_profile_digest,
+            expected.assistance_profile_digest,
+            ContextField::AssistanceProfileDigest,
+        ),
+    ] {
+        if actual.0.iter().all(|byte| *byte == 0) {
+            return Err(ContractError::InvalidDigest(field));
+        }
+        if actual != frozen {
+            return Err(ContractError::DigestMismatch(field));
+        }
     }
 
     if response.environment_chunks.len() != expected.environments.len() {
@@ -345,6 +410,10 @@ mod tests {
                 ("right_ee_joint_state".into(), 1),
             ]),
             max_actions_per_chunk: 16,
+            observation_bundle_digest: Digest32::from_bytes([1; 32]).unwrap(),
+            policy_artifact_digest: Digest32::from_bytes([2; 32]).unwrap(),
+            deployment_config_digest: Digest32::from_bytes([3; 32]).unwrap(),
+            assistance_profile_digest: Digest32::from_bytes([4; 32]).unwrap(),
         }
     }
 
@@ -366,6 +435,10 @@ mod tests {
             policy_server_instance_id: "policy-server-process-9".into(),
             schema_version: "xpl-v1.0".into(),
             action_space: "joint".into(),
+            observation_bundle_digest: Digest32::from_bytes([1; 32]).unwrap(),
+            policy_artifact_digest: Digest32::from_bytes([2; 32]).unwrap(),
+            deployment_config_digest: Digest32::from_bytes([3; 32]).unwrap(),
+            assistance_profile_digest: Digest32::from_bytes([4; 32]).unwrap(),
             environment_chunks: vec![
                 EnvironmentActionChunk {
                     env_idx: 3,
@@ -578,6 +651,54 @@ mod tests {
         assert_eq!(
             validate_policy_call(&expected(), PolicyCallResult::Response(&response())),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn rejects_observation_bundle_digest_mismatch() {
+        let mut actual = response();
+        actual.observation_bundle_digest = Digest32::from_bytes([9; 32]).unwrap();
+        assert_eq!(
+            validate_action_response(&expected(), &actual),
+            Err(ContractError::DigestMismatch(ContextField::ObservationBundleDigest))
+        );
+    }
+
+    #[test]
+    fn rejects_policy_artifact_digest_mismatch() {
+        let mut actual = response();
+        actual.policy_artifact_digest = Digest32::from_bytes([9; 32]).unwrap();
+        assert_eq!(
+            validate_action_response(&expected(), &actual),
+            Err(ContractError::DigestMismatch(ContextField::PolicyArtifactDigest))
+        );
+    }
+
+    #[test]
+    fn rejects_deployment_config_digest_mismatch() {
+        let mut actual = response();
+        actual.deployment_config_digest = Digest32::from_bytes([9; 32]).unwrap();
+        assert_eq!(
+            validate_action_response(&expected(), &actual),
+            Err(ContractError::DigestMismatch(ContextField::DeploymentConfigDigest))
+        );
+    }
+
+    #[test]
+    fn rejects_assistance_profile_digest_mismatch() {
+        let mut actual = response();
+        actual.assistance_profile_digest = Digest32::from_bytes([9; 32]).unwrap();
+        assert_eq!(
+            validate_action_response(&expected(), &actual),
+            Err(ContractError::DigestMismatch(ContextField::AssistanceProfileDigest))
+        );
+    }
+
+    #[test]
+    fn zero_digest_sentinel_is_rejected() {
+        assert_eq!(
+            Digest32::from_bytes([0; 32]),
+            Err(ContractError::InvalidDigest(ContextField::ObservationBundleDigest))
         );
     }
 
