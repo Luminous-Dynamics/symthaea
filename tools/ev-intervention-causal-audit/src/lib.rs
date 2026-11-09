@@ -549,8 +549,8 @@ mod tests {
     #[test]
     fn frozen_corpus_checks_positive_null_harm_censoring_and_rejection() {
         let report = report();
-        assert_eq!(report.scenario_count, 7);
-        assert_eq!(report.estimated_count, 3);
+        assert_eq!(report.scenario_count, 8);
+        assert_eq!(report.estimated_count, 4);
         assert_eq!(report.abstain_count, 2);
         assert_eq!(report.rejected_count, 2);
     }
@@ -577,6 +577,16 @@ mod tests {
         assert_eq!(case.censored_unit_count, 1);
         assert_eq!(case.censored_unit_ids, vec!["treated-2"]);
         assert!(case.did_effect.is_none());
+    }
+
+    #[test]
+    fn lower_is_better_metric_direction_normalizes_benefit_positive() {
+        let report = report();
+        let case = report.cases.iter()
+            .find(|case| case.case_id == "lower-is-better-resistance-effect")
+            .expect("lower-is-better fixture");
+        assert_eq!(case.disposition, "estimated");
+        assert!((case.did_effect.unwrap() - 7.0).abs() < EPSILON);
     }
 
     #[test]
