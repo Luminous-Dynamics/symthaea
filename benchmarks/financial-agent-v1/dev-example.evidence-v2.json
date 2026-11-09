@@ -77,7 +77,8 @@
         "status": "shipment_schedule_disrupted",
         "buyer_purchase_share": "unknown",
         "buyer_inventory_buffer": "unknown"
-      }
+      },
+      "source_version_id": "SYN-REC-SUPPLIER-0001-v1"
     },
     {
       "schema_version": "luminous.financial-research-evidence.v2",
@@ -151,7 +152,8 @@
         "unit": "index_points",
         "period": "2026-09",
         "buyer_energy_tariff": "unknown"
-      }
+      },
+      "source_version_id": "SYN-REC-ENERGY-0001-v1"
     }
   ],
   "qualification": "synthetic_development_only",
