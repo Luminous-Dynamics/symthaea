@@ -1,0 +1,115 @@
+# MARINE-EXP-001A — deterministic experiment-selection crucible
+
+Status: source updated with paired policy-effect intervals; Rust build/tests and hosted checks are not yet verified on this exact head.
+
+Parent research issue: [MARINE-EXP-001 #7641](https://github.com/Luminous-Dynamics/symthaea/issues/7641)  
+Interval-screening foundation: [PR #7629](https://github.com/Luminous-Dynamics/symthaea/pull/7629)  
+Whole-system study: [MARINE-FREIGHT-001 #7444](https://github.com/Luminous-Dynamics/symthaea/issues/7444)
+
+## Paradigm shift
+
+Static screening answers whether today's evidence bounds establish a constraint. Experiment selection asks a more valuable follow-up question:
+
+> Under a finite budget, which measurement or validation experiment should run next to resolve the most consequential uncertainty?
+
+This is the first executable crucible for that idea. It does **not** claim calibrated expected information gain or Bayesian active learning. Until outcome distributions, bias, correlation, and coverage are empirically established, v1 uses explicit closed intervals and a synthetic measurement oracle.
+
+## Implementation
+
+- `src/experiment_selection.rs` — deterministic scenario generator, finite experiment catalog, four executable selection policies, exhaustive toy subset oracle, separate hard-constraint metrics, paired-seed summaries, paired policy-minus-cheapest-first effect estimates, and a SHA-256-addressed v2 report receipt.
+- `examples/experiment_selection_benchmark.rs` — runs the initial 1,000-scenario, 30-seed, 6-credit benchmark and prints a verifiable JSON receipt. Set `SYMTHAEA_SOURCE_REVISION` to the exact source-head SHA to bind that revision; otherwise the receipt says `unavailable`.
+- Tests cover catalog validity, generated interval containment, target-only interval updates, robust constraint classification, budget ceilings, seeded reproducibility, oracle dominance in the toy world, receipt integrity/tamper detection, invalid seed inputs, separate feasible/infeasible metrics, paired-comparison interval bounds, and undefined CIs for a one-scenario run.
+
+## Synthetic decision model
+
+The generator creates six hidden ground-truth parameters with initial closed ranges:
+
+1. propulsion + auxiliary energy demand (kWh);
+2. usable battery energy (kWh);
+3. required water depth (m), representing draft plus declared clearance;
+4. available water depth (m);
+5. required battery-side charge power (kW);
+6. available charging power (kW), limited by the synthetic terminal/grid envelope.
+
+The evaluator independently classifies three constraints: battery-energy sufficiency, under-keel clearance, and charge-power sufficiency.
+
+The finite catalog contains 12 experiment types representing evidence-gathering activities: telemetry/data review, instrumented propulsion trial, battery audit/capacity test, chart review/bathymetric survey, route-depth reference/survey, charge-schedule audit/instrumented cycle, and shore-power audit/load-bank test. Each has an explicit synthetic credit cost and retained-width factor.
+
+When an experiment is selected, its simulator outcome narrows only the declared target interval and is centered on the hidden truth, so the truth remains inside. This is an intentionally idealized, optimistic toy oracle. It tests policy plumbing and decision logic, not realistic measurement noise, bias, correlation, or the value of a real test.
+
+## Policies
+
+- `cheapest_first` — deterministic lower-cost experiment selection.
+- `round_robin` — rotates across parameter families, with the starting parameter rotated by paired seed. This avoids degenerating into the same order as cheapest-first because of catalog ordering.
+- `seeded_random` — seeded baseline reproducible for paired comparisons.
+- `constraint_criticality` — a transparent heuristic that prioritizes normalized interval width reduction per credit on currently indeterminate constraints.
+- `exhaustive_toy_oracle` — enumerates every subset of the 12 catalog entries within the budget and selects the best resulting synthetic outcome by resolved hard constraints, then lower total cost, then normalized interval-width reduction as a tie-breaker. It sees hidden synthetic truth and is **not a deployable policy**; its bound is only for this finite toy outcome model.
+
+The criticality policy is explicitly a heuristic, not expected information gain. The oracle is an idealized comparison, not evidence that any heuristic is optimal.
+
+## Receipt and reproducibility
+
+The report binds:
+- benchmark and schema identity;
+- paired-comparison method version (`paired-scenario-means-z95-v1`);
+- experiment-catalog version;
+- scenario-generator version;
+- toy-oracle version;
+- scenario count and ordered seed list;
+- per-scenario budget;
+- full experiment catalog;
+- paired strategy summaries;
+- scope limitations;
+- hash of the generated scenario corpus;
+- hash of the ordered policy/seed execution trace, including the experiment IDs selected for each scenario;
+- SHA-256 of the serialized benchmark body.
+
+The current receipt structure is specified in `crates/domains/symthaea-marine-bench/schemas/marine_experiment_selection_receipt_v2.schema.json`; the v1 schema is retained for historical receipts. The v2 receipt binds the paired-comparison method and three heuristic-versus-cheapest-first comparisons. These digests are tamper-evident when recomputed, but SHA-256 is not a signature and does not authenticate who supplied data.
+
+Receipt verification confirms the body digest matches. It does not authenticate measurement origins, validate scientific assumptions, or elevate synthetic evidence.
+
+## Proposed benchmark gates
+
+Run the frozen default suite: 1,000 scenarios × 30 paired seeds × 4 heuristic policies, compared with the exhaustive toy oracle. All policies receive the same scenario IDs, budget units, and experiment catalog.
+
+Report separate:
+- mean number of robustly resolved constraints (0–3);
+- robust-feasible versus robust-infeasible counts (never merged into a single score);
+- fraction of scenarios where all three questions are resolved;
+- mean budget consumed;
+- mean cost to full resolution among scenarios that reach it;
+- normalized interval-width reduction;
+- resolved-constraint regret against the clairvoyant toy oracle.
+
+Research targets, not measured outcomes:
+1. deterministic receipts reproduce byte-identically for the same inputs and tool generation;
+2. no heuristic exceeds its declared per-scenario budget;
+3. the exhaustive toy subset oracle resolves at least as many questions as any budget-matched heuristic on each generated scenario;
+4. no policy converts overlapping intervals into robust feasibility or robust infeasibility;
+5. each heuristic is compared with cheapest-first over identical scenarios and paired seeds; report policy-minus-baseline effects for resolved constraints, full-resolution fraction, budget spent and normalized interval-width reduction, with normal-approximation 95% confidence intervals over scenario-cluster means;
+6. when fewer than two scenarios are evaluated, CI bounds must be null/unknown, not zero-width;
+7. a 95% interval overlapping zero is not evidence of a robust advantage; even a non-overlapping interval is only a conditional synthetic-suite comparison, not a physical performance guarantee;
+8. an experiment is not credited as useful merely because it shrinks an interval unrelated to a currently indeterminate hard constraint.
+
+The synthetic simulator guarantees the hidden truth stays in nested intervals by construction. Therefore the new confidence intervals quantify variation across generated scenario clusters, conditional on the declared generator and seed list; they do not test real measurement coverage, model-bias misses, or operating-domain transfer. Do not call these physical validation benchmarks.
+
+## Research rationale and external anchors
+
+Recent work in ship design optimization explores constraint-aware sample selection to reduce expensive surrogate-model evaluations: [Engineering Applications of Artificial Intelligence, 2026, DOI 10.1016/j.engappai.2025.112716](https://doi.org/10.1016/j.engappai.2025.112716). Maritime scenario-testing research also explores sampling compact, high-coverage encounter sets rather than indiscriminately testing large scenario collections: [Transportation Research Part C, DOI 10.1016/j.trc.2025.105246](https://doi.org/10.1016/j.trc.2025.105246). These papers motivate constraint-critical experiment selection, but do not validate this implementation.
+
+Physical-model integration must use suitable external reference and validation procedures. The ITTC provides a [ship resistance/propulsion benchmark repository](https://www.ittc.info/benchmark-repository/), a [CFD validation database procedure for resistance and propulsion](https://ittc.info/search/?q=5415), and a [practical ship-CFD application guide](https://ittc.info/media/11958/75-03-02-03.pdf). The experiment-selection code does not execute a CFD solver.
+
+The ITTC's 2024 Practical Guidelines for Ship CFD Applications distinguish numerical uncertainty from modelling uncertainty (the gap between a mathematical model solution and reality), state that numerical uncertainty can be estimated through numerical studies while experimental data is needed to estimate modelling error, and warn that design rankings must be considered alongside uncertainty ([ITTC guideline, §4.2](https://ittc.info/media/11958/75-03-02-03.pdf)). This drives a required future evidence model: keep solver/discretization uncertainty, experimental measurement uncertainty, model discrepancy/systematic bias, and operating-domain applicability as separate fields. A converged residual is not a calibration result.
+
+## Next steps after the software crucible
+
+1. Execute and freeze v2 receipts on the exact PR head once Rust and hosted checks are available; no result is currently claimed.
+2. Add hostile selectors and adversarial catalogs (unknown or zero cost, irrelevant interval reduction, stale provenance, unsupported instrument, test range that fails to enclose truth, and test attempts that should be rejected).
+3. Evaluate a held-out synthetic scenario cohort; report paired effects and CI width alongside means, and keep tuning scenarios separate from evaluation scenarios.
+4. Introduce noisy, biased, correlated and invalid synthetic measurement outcomes with explicit truth-coverage metrics; remove the assumption that every experiment encloses truth automatically.
+5. Only then connect licensed, provenance-bound experimental records and validated solver cases. Report coverage, false-robust-feasibility rate, model-bias misses, and budget-to-resolution by operating envelope.
+6. Keep physical engineering authority outside this crate. It cannot certify a hull, battery, route, terminal, docking operation, seaworthiness, or autonomous navigation.
+
+## Explicit claim ceiling
+
+A PASS can establish only that this exact experiment-selection benchmark reproduces the declared rules on its frozen synthetic scenarios and cost model. It cannot establish real-world expected information gain, calibrated uncertainty, faster ship-design cycles, improved vessel performance, safety, economic superiority, or seaworthiness.

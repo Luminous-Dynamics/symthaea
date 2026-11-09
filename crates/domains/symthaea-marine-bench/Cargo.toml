@@ -9,3 +9,4 @@ description = "Deterministic, evidence-bounded screening arithmetic for marine f
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
