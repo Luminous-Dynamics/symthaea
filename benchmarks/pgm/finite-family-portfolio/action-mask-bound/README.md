@@ -251,7 +251,13 @@ they are not evidence of a Rust test having executed.
 
 ## Comparative benchmark programme
 
-Keep three test regimes distinct:
+Primary research references:
+- [KAPS, Lutz et al., arXiv:2608.02509 (3 Aug 2026)](https://arxiv.org/abs/2608.02509), pinned code revision `4d35eef6c442521139d1786e31c6d6fbf322788f`.
+- [Adaptive Policy Portfolios, Engelen et al., arXiv:2608.17929 (18 Aug 2026)](https://arxiv.org/abs/2608.17929).
+- [ORBE / Best-Effort Policies, Abate et al., AAAI 2026](https://doi.org/10.1609/aaai.v40i43.40929).
+- [Generic, Reliable, Efficient Robust MDP solving, Meggendorfer et al., AAAI 2025](https://doi.org/10.1609/aaai.v39i25.34865).
+
+Keep four test regimes distinct:
 
 1. **Exact finite UMDP comparison against KAPS** (SUMI-lab/KAPS, commit
    `4d35eef6c442521139d1786e31c6d6fbf322788f`). Use the same finite model
@@ -276,6 +282,13 @@ Keep three test regimes distinct:
    or non-adversarial performance, Pareto dominance, safety margins and
    stability of the selected policy. Do not collapse this into worst-case
    regret alone.
+4. **Adjacent robust-MDP solver baseline** against *Solving Robust Markov
+   Decision Processes: Generic, Reliable, Efficient* (AAAI 2025). That work
+   supports several uncertainty-set/objective classes and reports million-state
+   RMDP solving in under a minute. It is not a direct portfolio-regret
+   comparator: compare its robust Bellman/value-iteration throughput only on
+   matched rectangular single-policy subproblems, then separately report the
+   extra cost of multi-policy portfolio optimization and proof certificates.
 
 KAPS's public study reports its exact solver achieved the lowest
 single-policy regret in 11 of 13 benchmark instances and proved optimality
@@ -288,7 +301,14 @@ then seek a clear proof-time and memory improvement. (The published numbers
 are reference points, not measurements from this repository.)
 
 The 2026 adaptive-portfolio paper reports a sharp early gain from K=1 to K=2,
-then diminishing but continued improvements. Its experiments include
+then diminishing but continued improvements. In its exact experimental setup,
+the offline candidate pipeline discretizes each of two uncertainty parameters
+into 10 bins (100 cells), estimates portfolio regret on 1,000 sampled parameter
+points (explicitly an under-approximation), and uses UCB with empirical
+Bernstein bounds over length-100 trajectories. The reported construction runs
+use a 2022 MacBook Pro M1 with six threads and three seeds. These details must
+be mirrored or clearly normalized before interpreting runtime or regret
+differences. Its experiments include
 UAV-small/medium/large (98/358/1813 states) and Datacenter Climate Control
 (330 states), with empirical K values 1,2,3,5,7,10. At K=10, after 10,000
 UCB iterations only about half the runs recommend the best arm, although
