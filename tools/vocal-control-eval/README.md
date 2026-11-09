@@ -2,7 +2,7 @@
 
 A dependency-light Rust evaluator for one-factor vocal interventions. It measures whether a requested change was realized in the intended phrase or region while preserving protected features and regions.
 
-It consumes feature measurements from independent audio-analysis tools and listener studies. It does not inspect WAV bytes, infer F0/phonemes, or judge naturalness. Its job is to score supplied measurements against a provenance-bound intervention contract.
+It consumes feature measurements from independent audio-analysis tools and listener studies. It does not inspect WAV bytes, infer F0/phonemes, or judge naturalness. Its job is to score supplied measurements against a provenance-bound intervention contract. It accepts both a single matched pair and a multi-seed suite with a Student-t 95% confidence interval.
 
 ## Paradigm
 
@@ -36,11 +36,16 @@ Both render receipts must use the same code, backend/model artifacts, voice, inv
 
 The report includes independent values and exact receipts. There is no single quality composite. A case qualifies only when target response, direction consistency and collateral constraints all pass.
 
+For multi-seed suites, every replicate must keep the same code, renderer, model artifact, voice, invariant task and sample rate, while using a unique seed. The suite report includes mean target-response ratio, sample standard deviation, a two-sided 95% Student-t confidence interval, direction consistency, worst collateral drift, and the number of individually qualified replicates. A suite qualifies only when every pair qualifies and the aggregate interval is wholly inside the predeclared response bounds. Three seeds are the minimum contract; five or more are recommended for pilot work. Confirmatory sample sizes should be based on a separate power analysis.
+
 ## Run
 
 ~~~bash
 cargo run --manifest-path tools/vocal-control-eval/Cargo.toml -- control-case.json
 cargo test --manifest-path tools/vocal-control-eval/Cargo.toml
+
+# A multi-seed suite uses a top-level replicates array and requires at least 3 unique seeds.
+cargo run --manifest-path tools/vocal-control-eval/Cargo.toml -- control-suite.json
 ~~~
 
 Exit code 0 means the supplied case passed its machine-defined control contract. Exit code 2 means it was evaluated but failed. Exit code 1 means the file or contract was invalid. None of these means the singing audio is perceptually good; human naturalness, intelligibility and preference remain separate assessments.
