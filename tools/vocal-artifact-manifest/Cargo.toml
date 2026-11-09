@@ -1,0 +1,15 @@
+[package]
+name = "vocal-artifact-manifest"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Deterministic, fail-closed content manifests for vocal model artifacts"
+
+[dependencies]
+blake3 = "=1.8.5"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+
+[workspace]
