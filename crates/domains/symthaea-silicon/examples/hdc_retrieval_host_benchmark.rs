@@ -59,6 +59,15 @@ struct Observation {
     latency_ns: u128,
 }
 
+#[derive(Debug)]
+struct ScanOrderObservation {
+    repetition: usize,
+    arm: &'static str,
+    elapsed_ns: u128,
+    parity_mismatches: usize,
+    oracle_mismatches: usize,
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("NEURO-SILICON-003 host benchmark blocked: {error}");
@@ -170,6 +179,62 @@ fn run() -> Result<(), String> {
         for query in &queries {
             let _ = retrieve_top1(&store, &query.vector);
         }
+        let _ = retrieve_batch_store_major(&store, &queries)?;
+        let _ = retrieve_batch_store_major_tiled(&store, &queries, 8)?;
+    }
+
+    // A single canonical query-major output vector is the exact parity oracle
+    // for the alternative traversal orders. Each timed arm uses the same store,
+    // query batch and canonical BinaryHV::hamming_distance implementation.
+    let query_major_reference = retrieve_batch_query_major(&store, &queries)?;
+    let mut scan_order_observations = Vec::with_capacity(config.repetitions * 3);
+    let mut scan_order_elapsed_ns: [Vec<u128>; 3] =
+        std::array::from_fn(|_| Vec::with_capacity(config.repetitions));
+    let mut scan_order_parity_mismatches = [0usize; 3];
+    let mut scan_order_oracle_mismatches = [0usize; 3];
+
+    // Rotate the three arms each repetition to reduce fixed order bias.
+    // Per-arm samples are batch latencies; we do not fabricate per-query
+    // timing measurements for store-major traversal.
+    for repetition in 0..config.repetitions {
+        for offset in 0..3 {
+            let arm = (repetition + offset) % 3;
+            let started = Instant::now();
+            let results = match arm {
+                0 => retrieve_batch_query_major(&store, &queries)?,
+                1 => retrieve_batch_store_major(&store, &queries)?,
+                2 => retrieve_batch_store_major_tiled(&store, &queries, 8)?,
+                _ => unreachable!("three scan-order arms"),
+            };
+            let elapsed_ns = started.elapsed().as_nanos().max(1);
+            let parity_mismatches = results
+                .iter()
+                .zip(query_major_reference.iter())
+                .filter(|(actual, expected)| actual != expected)
+                .count()
+                + results.len().abs_diff(query_major_reference.len());
+            let oracle_mismatches = results
+                .iter()
+                .zip(queries.iter())
+                .filter(|((actual_id, _), query)| *actual_id != query.target_id)
+                .count()
+                + results.len().abs_diff(queries.len());
+            scan_order_parity_mismatches[arm] += parity_mismatches;
+            scan_order_oracle_mismatches[arm] += oracle_mismatches;
+            scan_order_elapsed_ns[arm].push(elapsed_ns);
+            scan_order_observations.push(ScanOrderObservation {
+                repetition,
+                arm: match arm {
+                    0 => "query_major",
+                    1 => "store_major",
+                    2 => "store_major_tiled_q8",
+                    _ => unreachable!("three scan-order arms"),
+                },
+                elapsed_ns,
+                parity_mismatches,
+                oracle_mismatches,
+            });
+        }
     }
 
     let mut observations = Vec::with_capacity(config.repetitions * config.batch_size);
@@ -215,7 +280,30 @@ fn run() -> Result<(), String> {
             "actual_id": observation.actual_id,
             "hamming_distance": observation.distance,
             "latency_ns": observation.latency_ns
-        })).collect::<Vec<_>>()
+        })).collect::<Vec<_>>(),
+        "scan_order_comparison": {
+            "boundary": "prebuilt resident store and prebuilt query batch; complete exact scan and top-1 selection; batch timed as one unit",
+            "canonical_distance": "BinaryHV::hamming_distance",
+            "arms": ["query_major", "store_major", "store_major_tiled_q8"],
+            "interleaving": "arm order rotated once per repetition",
+            "observations": scan_order_observations.iter().map(|observation| json!({
+                "repetition": observation.repetition,
+                "arm": observation.arm,
+                "batch_elapsed_ns": observation.elapsed_ns,
+                "parity_mismatches_vs_query_major": observation.parity_mismatches,
+                "oracle_top1_mismatches": observation.oracle_mismatches
+            })).collect::<Vec<_>>(),
+            "aggregate_parity_mismatches": {
+                "query_major": scan_order_parity_mismatches[0],
+                "store_major": scan_order_parity_mismatches[1],
+                "store_major_tiled_q8": scan_order_parity_mismatches[2]
+            },
+            "aggregate_oracle_mismatches": {
+                "query_major": scan_order_oracle_mismatches[0],
+                "store_major": scan_order_oracle_mismatches[1],
+                "store_major_tiled_q8": scan_order_oracle_mismatches[2]
+            }
+        }
     });
     let raw_bytes = json_bytes(&raw)?;
     let raw_artifact = write_artifact(&output_dir, "raw_observations.json", &raw_bytes)?;
@@ -226,19 +314,88 @@ fn run() -> Result<(), String> {
         .unwrap_or_else(detect_cpu_identity);
     let working_set_bytes = config.store_size * VECTOR_BYTES + config.batch_size * VECTOR_BYTES;
     let latency_scope = "single query: full scan of prebuilt host-resident store, exact canonical Hamming scoring, deterministic top-1 selection; excludes store/query construction and serialization";
-    let metrics = vec![
+    let mut metrics = vec![
         metric("latency_p50", percentile(&latency_samples, 0.50) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile over individually timed queries"),
         metric("latency_p95", percentile(&latency_samples, 0.95) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile over individually timed queries"),
-        metric("latency_p99", percentile(&latency_samples, 0.99) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile over individually timed queries"),
-        metric("throughput", throughput_qps, "queries/s", "measured", "aggregate retrieval loop wall time, including per-query timing instrumentation; excludes warm-up and setup", measured_queries, "measured query count divided by aggregate loop wall time"),
+        metric("throughput", throughput_qps, "queries/s", "measured", "aggregate query-major retrieval loop wall time, including per-query timing instrumentation; excludes warm-up and setup", measured_queries, "measured query count divided by aggregate loop wall time"),
         metric("working_set_bytes", working_set_bytes as f64, "bytes", "derived", "logical vector-store plus one batch of query hypervectors; excludes allocator metadata and runtime overhead", 1, "derived from canonical 2048-byte vectors"),
         metric("other", setup_ns as f64, "ns", "measured", "setup duration for deterministic store and query generation; outside retrieval latency", 1, "monotonic wall clock around generation")
     ];
+    if latency_samples.len() >= 1_000 {
+        metrics.push(metric("latency_p99", percentile(&latency_samples, 0.99) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile; emitted only with at least 1,000 individual query observations"));
+    }
+
+    for (arm_index, arm_name) in ["query_major", "store_major", "store_major_tiled_q8"].iter().enumerate() {
+        let mut samples = scan_order_elapsed_ns[arm_index].clone();
+        samples.sort_unstable();
+        let arm_scope = format!("complete prebuilt query-batch scan using {arm_name}; canonical BinaryHV::hamming_distance; excludes query/store construction and serialization");
+        metrics.push(metric(
+            &format!("{arm_name}_batch_latency_p50"),
+            percentile(&samples, 0.50) as f64,
+            "ns",
+            "measured",
+            &arm_scope,
+            samples.len(),
+            "nearest-rank percentile over whole-batch observations",
+        ));
+        metrics.push(metric(
+            &format!("{arm_name}_batch_latency_p95"),
+            percentile(&samples, 0.95) as f64,
+            "ns",
+            "measured",
+            &arm_scope,
+            samples.len(),
+            "nearest-rank percentile over whole-batch observations; exploratory at low sample counts",
+        ));
+        if samples.len() >= 1_000 {
+            metrics.push(metric(
+                &format!("{arm_name}_batch_latency_p99"),
+                percentile(&samples, 0.99) as f64,
+                "ns",
+                "measured",
+                &arm_scope,
+                samples.len(),
+                "nearest-rank percentile; emitted only with at least 1,000 whole-batch observations",
+            ));
+        }
+        let total_ns: u128 = samples.iter().copied().sum::<u128>().max(1);
+        let qps = (config.batch_size * samples.len()) as f64
+            / (total_ns as f64 / 1_000_000_000.0);
+        metrics.push(metric(
+            &format!("{arm_name}_throughput"),
+            qps,
+            "queries/s",
+            "measured",
+            &arm_scope,
+            samples.len(),
+            "query count divided by summed batch elapsed time; excludes warm-up",
+        ));
+        metrics.push(metric(
+            &format!("{arm_name}_parity_mismatches"),
+            scan_order_parity_mismatches[arm_index] as f64,
+            "count",
+            "derived",
+            "number of individual query results that differ from query-major (including length mismatches)",
+            samples.len(),
+            "exact tuple equality on (top1 id, Hamming distance)",
+        ));
+        metrics.push(metric(
+            &format!("{arm_name}_oracle_mismatches"),
+            scan_order_oracle_mismatches[arm_index] as f64,
+            "count",
+            "derived",
+            "number of top1 IDs that differ from the frozen expected target IDs",
+            samples.len(),
+            "exact ID equality against expected_results.json",
+        ));
+    }
     let mut limitations = vec![
         "Synthetic nearest-neighbour retrieval only; not a production semantic retrieval quality benchmark.".to_owned(),
         "The query vector store and queries are generated before timing; query encoding and store construction are not part of retrieval latency.".to_owned(),
         "CPU-only profile: no host/device transfer, GPU, FPGA, power, or energy result is measured.".to_owned(),
         "The receipt is incomplete for NEURO-SILICON-003's full end-to-end promotion gate because boundary_complete is false.".to_owned(),
+        "The scan-order comparison is an exact host-only traversal experiment; it does not measure remote placement, GPU/FPGA execution, hardware cache counters or energy.".to_owned(),
+        "Scan-order p99 batch latency is omitted unless each arm has at least 1,000 batch observations; p95 from the default 30 repetitions is exploratory.".to_owned(),
         "No malformed hardware frames are applicable to this host-only retrieval run; malformed_frames_accepted is null, not a tested zero.".to_owned(),
         "Command stdout/stderr hashes are not captured by this in-process example; preserve external runner logs with any qualification package.".to_owned(),
     ];
@@ -510,6 +667,84 @@ fn retrieve_top1(store: &[BinaryHV], query: &BinaryHV) -> (usize, u32) {
     (best_id, best_distance)
 }
 
+/// Query-major batch scan: the current single-query implementation is reused
+/// unchanged, and each output is (stable top-1 ID, exact Hamming distance).
+fn retrieve_batch_query_major(
+    store: &[BinaryHV],
+    queries: &[QueryCase],
+) -> Result<Vec<(usize, u32)>, String> {
+    if store.is_empty() && !queries.is_empty() {
+        return Err("cannot retrieve from an empty store".to_owned());
+    }
+    Ok(queries
+        .iter()
+        .map(|query| retrieve_top1(store, &query.vector))
+        .collect())
+}
+
+/// Store-major exact batch scan. Each resident store vector is traversed once
+/// per batch and compared with every query using the canonical Hamming kernel.
+fn retrieve_batch_store_major(
+    store: &[BinaryHV],
+    queries: &[QueryCase],
+) -> Result<Vec<(usize, u32)>, String> {
+    if store.is_empty() && !queries.is_empty() {
+        return Err("cannot retrieve from an empty store".to_owned());
+    }
+    let mut best_ids = vec![usize::MAX; queries.len()];
+    let mut best_distances = vec![u32::MAX; queries.len()];
+
+    for (item_id, item) in store.iter().enumerate() {
+        for (query_index, query) in queries.iter().enumerate() {
+            let distance = query.vector.hamming_distance(item);
+            if distance < best_distances[query_index]
+                || (distance == best_distances[query_index] && item_id < best_ids[query_index])
+            {
+                best_ids[query_index] = item_id;
+                best_distances[query_index] = distance;
+            }
+        }
+    }
+
+    Ok(best_ids.into_iter().zip(best_distances).collect())
+}
+
+/// Tiled store-major scan. The query tile bounds the active query working set;
+/// the inner operation still calls the canonical Hamming-distance kernel.
+fn retrieve_batch_store_major_tiled(
+    store: &[BinaryHV],
+    queries: &[QueryCase],
+    query_tile_size: usize,
+) -> Result<Vec<(usize, u32)>, String> {
+    if query_tile_size == 0 {
+        return Err("query tile size must be greater than zero".to_owned());
+    }
+    if store.is_empty() && !queries.is_empty() {
+        return Err("cannot retrieve from an empty store".to_owned());
+    }
+
+    let mut outputs = Vec::with_capacity(queries.len());
+    for query_tile in queries.chunks(query_tile_size) {
+        let mut best_ids = vec![usize::MAX; query_tile.len()];
+        let mut best_distances = vec![u32::MAX; query_tile.len()];
+
+        for (item_id, item) in store.iter().enumerate() {
+            for (tile_index, query) in query_tile.iter().enumerate() {
+                let distance = query.vector.hamming_distance(item);
+                if distance < best_distances[tile_index]
+                    || (distance == best_distances[tile_index] && item_id < best_ids[tile_index])
+                {
+                    best_ids[tile_index] = item_id;
+                    best_distances[tile_index] = distance;
+                }
+            }
+        }
+
+        outputs.extend(best_ids.into_iter().zip(best_distances));
+    }
+    Ok(outputs)
+}
+
 fn percentile(sorted_samples: &[u128], percentile: f64) -> u128 {
     let rank = ((sorted_samples.len() as f64) * percentile).ceil() as usize;
     sorted_samples[rank.saturating_sub(1).min(sorted_samples.len() - 1)]
@@ -623,6 +858,81 @@ mod tests {
         let vector = BinaryHV::random(99);
         let store = vec![vector, vector];
         assert_eq!(retrieve_top1(&store, &vector), (0, 0));
+    }
+
+    #[test]
+    fn store_major_exactly_matches_query_major_for_mixed_batch() {
+        let store: Vec<BinaryHV> = (0..256)
+            .map(|index| BinaryHV::random(0x4844_435f_5354_4f52_u64.wrapping_add(index)))
+            .collect();
+        let queries: Vec<QueryCase> = (0..16)
+            .map(|index| {
+                let target_id = (index * 17 + 3) % store.len();
+                QueryCase {
+                    index,
+                    target_id,
+                    vector: perturb_query(store[target_id], index, target_id, TARGET_NOISE_BITS),
+                }
+            })
+            .collect();
+
+        let reference = retrieve_batch_query_major(&store, &queries).unwrap();
+        let store_major = retrieve_batch_store_major(&store, &queries).unwrap();
+        let tiled = retrieve_batch_store_major_tiled(&store, &queries, 8).unwrap();
+        assert_eq!(store_major, reference);
+        assert_eq!(tiled, reference);
+        assert!(reference.iter().zip(&queries).all(|((id, _), query)| *id == query.target_id));
+    }
+
+    #[test]
+    fn tiled_store_major_matches_for_tile_sizes_and_partial_final_tile() {
+        let store: Vec<BinaryHV> = (0..64).map(|i| BinaryHV::random(i as u64)).collect();
+        let queries: Vec<QueryCase> = (0..7)
+            .map(|index| {
+                let target_id = (index * 9 + 1) % store.len();
+                QueryCase {
+                    index,
+                    target_id,
+                    vector: perturb_query(store[target_id], index, target_id, TARGET_NOISE_BITS),
+                }
+            })
+            .collect();
+        let expected = retrieve_batch_query_major(&store, &queries).unwrap();
+        for tile_size in [1, 2, 3, 8, 64] {
+            assert_eq!(
+                retrieve_batch_store_major_tiled(&store, &queries, tile_size).unwrap(),
+                expected,
+                "tile size {tile_size}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_scan_orders_preserve_lowest_id_tie_break() {
+        let vector = BinaryHV::random(199);
+        let store = vec![vector, vector, vector];
+        let queries = vec![QueryCase { index: 0, target_id: 0, vector }];
+        let expected = vec![(0, 0)];
+        assert_eq!(retrieve_batch_query_major(&store, &queries).unwrap(), expected);
+        assert_eq!(retrieve_batch_store_major(&store, &queries).unwrap(), expected);
+        assert_eq!(retrieve_batch_store_major_tiled(&store, &queries, 1).unwrap(), expected);
+    }
+
+    #[test]
+    fn empty_query_batch_is_supported_but_empty_store_is_not() {
+        assert!(retrieve_batch_query_major(&[], &[]).unwrap().is_empty());
+        assert!(retrieve_batch_store_major(&[], &[]).unwrap().is_empty());
+        assert!(retrieve_batch_store_major_tiled(&[], &[], 1).unwrap().is_empty());
+
+        let query = QueryCase { index: 0, target_id: 0, vector: BinaryHV::random(7) };
+        assert!(retrieve_batch_query_major(&[], &[query]).is_err());
+    }
+
+    #[test]
+    fn tiled_store_major_rejects_zero_tile_size() {
+        let store = vec![BinaryHV::random(1)];
+        let queries = vec![QueryCase { index: 0, target_id: 0, vector: BinaryHV::random(1) }];
+        assert!(retrieve_batch_store_major_tiled(&store, &queries, 0).is_err());
     }
 
     #[test]
