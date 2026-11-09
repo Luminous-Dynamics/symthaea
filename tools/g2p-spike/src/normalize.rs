@@ -163,6 +163,7 @@ pub fn normalize_piper_english(
                       current_tokens: &mut Vec<String>,
                       current_prosody: &mut Vec<Option<RawProsodyInfo>>,
                       stress_evidence: &mut Vec<StressEvidence>| {
+        let has_ipa_hypothesis = !current_tokens.is_empty();
         let raw_ipa = current_tokens.concat();
         words.push(RawWordHypothesis {
             word_index: words.len(),
