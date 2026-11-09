@@ -780,7 +780,7 @@ A dependency-free benchmark executable is now authored at:
 
 crates/domains/symthaea-memory/benches/hme_hierarchical_select.rs
 
-It is registered in crates/domains/symthaea-memory/Cargo.toml as a harness-free Cargo bench.
+It is registered in crates/domains/symthaea-memory/Cargo.toml as a harness-free Cargo bench. The executable caps the synthetic original-payload working set at 512 MiB and group count at 100,000 to avoid accidental host-memory exhaustion.
 
 Run:
 
