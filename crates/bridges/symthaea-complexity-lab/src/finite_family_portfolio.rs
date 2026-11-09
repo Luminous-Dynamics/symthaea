@@ -330,6 +330,8 @@ pub enum PolicyPortfolioError {
     PolicyMaskModelIndicesNotIncreasing { previous: usize, current: usize },
     PolicyMaskFamilyDigestMismatch,
     PolicyMaskCertificateMismatch,
+    PolicyRegretProfileSourceMismatch,
+    PolicyRegretProfileCertificateMismatch,
 }
 
 impl fmt::Display for PolicyPortfolioError {
@@ -376,6 +378,8 @@ impl fmt::Display for PolicyPortfolioError {
             Self::PolicyMaskModelIndicesNotIncreasing { previous, current } => write!(f, "cluster model indices must be strictly increasing: {previous} then {current}"),
             Self::PolicyMaskFamilyDigestMismatch => write!(f, "policy action mask belongs to a different model family"),
             Self::PolicyMaskCertificateMismatch => write!(f, "policy action-mask bound replay differs from the claimed result"),
+            Self::PolicyRegretProfileSourceMismatch => write!(f, "policy regret-profile source values or identities do not match the finite model family"),
+            Self::PolicyRegretProfileCertificateMismatch => write!(f, "policy regret-profile frontier replay differs from the claimed certificate"),
         }
     }
 }
@@ -2473,6 +2477,384 @@ pub fn verify_exact_cluster_policy_bnb(
     }
 }
 
+
+
+/// Limits for exact profile quotienting and componentwise dominance analysis.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PolicyRegretProfileBudget {
+    pub max_profile_entries: usize,
+    /// Worst-case equality plus directed dominance component comparisons.
+    pub max_profile_component_comparisons: usize,
+    pub max_rational_bit_width: usize,
+    pub max_output_memory_bytes: usize,
+}
+
+/// Exact group of policies with the same per-model regret vector.
+///
+/// All original policy indices are retained. The representative is always
+/// the smallest canonical policy index in the equivalence class.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PolicyRegretProfileGroup {
+    pub representative_policy_index: usize,
+    pub equivalent_policy_indices: Vec<usize>,
+    /// Model-order vector: V*_model - V_model(policy).
+    pub regret_profile: Vec<CheckedRational>,
+}
+
+/// A strict componentwise-dominance witness between two distinct profile
+/// equivalence classes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PolicyRegretProfileDominanceWitness {
+    pub dominated_profile_group_index: usize,
+    pub dominator_profile_group_index: usize,
+}
+
+/// Exact Pareto quotient of the policy regret-profile table.
+///
+/// A portfolio optimum always exists using only the groups named by
+/// frontier_profile_group_indices. Dominated groups and every original
+/// policy index remain available as witnesses, but this quotient intentionally
+/// does not enumerate every tied raw portfolio.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedPolicyRegretProfileFrontier {
+    pub model_family_sha256: [u8; 32],
+    pub policy_manifest_sha256: [u8; 32],
+    pub policy_values_sha256: [u8; 32],
+    pub model_count: usize,
+    pub policy_count: usize,
+    pub profile_groups: Vec<PolicyRegretProfileGroup>,
+    pub frontier_profile_group_indices: Vec<usize>,
+    pub dominance_witnesses: Vec<PolicyRegretProfileDominanceWitness>,
+    pub certificate_sha256: [u8; 32],
+}
+
+/// Return true only for strict componentwise dominance. Equality is represented
+/// by profile quotienting and does not produce a dominance edge.
+fn regret_profile_strictly_dominates(
+    left: &[CheckedRational],
+    right: &[CheckedRational],
+) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut strict = false;
+    for (left_value, right_value) in left.iter().zip(right) {
+        match compare_signed(*left_value, *right_value) {
+            Ordering::Greater => return false,
+            Ordering::Less => strict = true,
+            Ordering::Equal => {}
+        }
+    }
+    strict
+}
+
+fn policy_regret_profile_frontier_sha256(
+    family_sha256: [u8; 32],
+    policy_manifest: [u8; 32],
+    policy_values: [u8; 32],
+    model_count: usize,
+    policy_count: usize,
+    groups: &[PolicyRegretProfileGroup],
+    frontier_indices: &[usize],
+    dominance_witnesses: &[PolicyRegretProfileDominanceWitness],
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-FINITE-UMDP-REGRET-PROFILE-FRONTIER\0\x01");
+    hasher.update(family_sha256);
+    hasher.update(policy_manifest);
+    hasher.update(policy_values);
+    hasher.update((model_count as u64).to_le_bytes());
+    hasher.update((policy_count as u64).to_le_bytes());
+    hasher.update((groups.len() as u64).to_le_bytes());
+    for group in groups {
+        hasher.update((group.representative_policy_index as u64).to_le_bytes());
+        hasher.update((group.equivalent_policy_indices.len() as u64).to_le_bytes());
+        for index in &group.equivalent_policy_indices {
+            hasher.update((*index as u64).to_le_bytes());
+        }
+        hasher.update((group.regret_profile.len() as u64).to_le_bytes());
+        for value in &group.regret_profile {
+            hash_rational(&mut hasher, *value);
+        }
+    }
+    hasher.update((frontier_indices.len() as u64).to_le_bytes());
+    for index in frontier_indices {
+        hasher.update((*index as u64).to_le_bytes());
+    }
+    hasher.update((dominance_witnesses.len() as u64).to_le_bytes());
+    for witness in dominance_witnesses {
+        hasher.update((witness.dominated_profile_group_index as u64).to_le_bytes());
+        hasher.update((witness.dominator_profile_group_index as u64).to_le_bytes());
+    }
+    hasher.finalize().into()
+}
+
+/// Construct an exact regret-profile quotient and its Pareto-undominated
+/// subset from a fully evaluated finite-family policy table.
+///
+/// The exact minimax portfolio value is unchanged when search is restricted
+/// to the Pareto frontier: for every dominated policy b there is a policy a
+/// with r_i(a) <= r_i(b) for every model i, so replacing b by a can never
+/// increase any model's best-in-portfolio value. Equal profiles are grouped
+/// while retaining all original policy indices.
+///
+/// Source identities and the full policy-value table digest are revalidated
+/// before any profile is accepted. Rational comparisons are exact.
+pub fn compute_policy_regret_profile_frontier(
+    family: &FiniteUmdpModelFamily,
+    source: &FiniteFamilyPolicyPortfolioResult,
+    budget: PolicyRegretProfileBudget,
+) -> Result<VerifiedPolicyRegretProfileFrontier, PolicyPortfolioError> {
+    let models = family.model_count();
+    let states = family.state_count();
+    let actions = family.action_count();
+    let horizon = family.horizon();
+    let expected_policy_count = checked_policy_count(states, horizon, actions)?;
+    let expected_policy_manifest = policy_manifest_sha256(
+        states, actions, horizon, expected_policy_count,
+    );
+    let expected_evaluations = models.checked_mul(expected_policy_count)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+
+    if source.model_family_sha256 != family.sha256()
+        || source.policy_manifest_sha256 != expected_policy_manifest
+        || source.horizon != horizon
+        || source.state_count != states
+        || source.action_count != actions
+        || source.policy_count != expected_policy_count
+        || source.model_optimal_values.len() != models
+        || source.model_policy_values.len() != models
+        || source.model_policy_evaluations != expected_evaluations
+        || !source.enumeration_complete
+        || source.model_policy_values.iter().any(|row| row.len() != expected_policy_count)
+    {
+        return Err(PolicyPortfolioError::PolicyRegretProfileSourceMismatch);
+    }
+
+    let expected_values_digest = hash_policy_values(
+        family.sha256(),
+        expected_policy_manifest,
+        source.discount,
+        states,
+        actions,
+        horizon,
+        &source.model_optimal_values,
+        &source.model_policy_values,
+    );
+    if expected_values_digest != source.policy_values_sha256 {
+        return Err(PolicyPortfolioError::PolicyRegretProfileSourceMismatch);
+    }
+
+    let profile_entries = expected_policy_count.checked_mul(models)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if profile_entries > budget.max_profile_entries {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "regret profile entries",
+            required: profile_entries,
+            limit: budget.max_profile_entries,
+        });
+    }
+
+    // Worst case: every policy has a distinct profile. Grouping performs at
+    // most P(P-1)/2 profile comparisons; directed dominance performs at most
+    // P(P-1). Each profile comparison inspects at most M rational components.
+    let profile_pairs = expected_policy_count.checked_mul(expected_policy_count.saturating_sub(1))
+        .and_then(|value| value.checked_div(2))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let component_comparisons = profile_pairs.checked_mul(3)
+        .and_then(|value| value.checked_mul(models))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if component_comparisons > budget.max_profile_component_comparisons {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "regret profile component comparisons",
+            required: component_comparisons,
+            limit: budget.max_profile_component_comparisons,
+        });
+    }
+
+    for value in source.model_optimal_values.iter()
+        .chain(source.model_policy_values.iter().flatten())
+    {
+        let required = bit_width(*value);
+        if required > budget.max_rational_bit_width {
+            return Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "rational bit width",
+                required,
+                limit: budget.max_rational_bit_width,
+            });
+        }
+    }
+
+    let profile_value_bytes = profile_entries.checked_mul(std::mem::size_of::<CheckedRational>())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let policy_index_bytes = expected_policy_count.checked_mul(std::mem::size_of::<usize>())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let group_header_bytes = expected_policy_count.checked_mul(
+        std::mem::size_of::<PolicyRegretProfileGroup>()
+            + 2 * std::mem::size_of::<Vec<usize>>(),
+    ).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let witness_bytes = expected_policy_count.checked_mul(
+        std::mem::size_of::<PolicyRegretProfileDominanceWitness>(),
+    ).ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let output_bytes = profile_value_bytes
+        .checked_add(policy_index_bytes.checked_mul(2).ok_or(PolicyPortfolioError::DimensionOverflow)?)
+        .and_then(|value| value.checked_add(group_header_bytes))
+        .and_then(|value| value.checked_add(witness_bytes))
+        .and_then(|value| value.checked_add(models.checked_mul(std::mem::size_of::<CheckedRational>())?))
+        .and_then(|value| value.checked_add(5 * std::mem::size_of::<Vec<usize>>()))
+        .and_then(|value| value.checked_add(4 * std::mem::size_of::<Vec<PolicyRegretProfileGroup>>()))
+        .and_then(|value| value.checked_add(std::mem::size_of::<VerifiedPolicyRegretProfileFrontier>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if output_bytes > budget.max_output_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "regret profile frontier output bytes",
+            required: output_bytes,
+            limit: budget.max_output_memory_bytes,
+        });
+    }
+
+    let mut groups = Vec::new();
+    groups.try_reserve_exact(expected_policy_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "regret profile equivalence groups",
+            entries: expected_policy_count,
+        }
+    })?;
+
+    for policy_index in 0..expected_policy_count {
+        let mut profile = Vec::new();
+        profile.try_reserve_exact(models).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "one policy regret profile",
+                entries: models,
+            }
+        })?;
+        for model_index in 0..models {
+            let regret = sub_bounded(
+                source.model_optimal_values[model_index],
+                source.model_policy_values[model_index][policy_index],
+                budget.max_rational_bit_width,
+            )?;
+            if regret.is_negative() {
+                return Err(PolicyPortfolioError::NegativeRegret { model: model_index });
+            }
+            profile.push(regret);
+        }
+
+        let mut equal_group = None;
+        for (group_index, group) in groups.iter().enumerate() {
+            if group.regret_profile == profile {
+                equal_group = Some(group_index);
+                break;
+            }
+        }
+        if let Some(group_index) = equal_group {
+            groups[group_index].equivalent_policy_indices.try_reserve_exact(1).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed {
+                    resource: "profile equivalent policy indices",
+                    entries: groups[group_index].equivalent_policy_indices.len() + 1,
+                }
+            })?;
+            groups[group_index].equivalent_policy_indices.push(policy_index);
+        } else {
+            let mut equivalent_policy_indices = Vec::new();
+            equivalent_policy_indices.try_reserve_exact(1).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed {
+                    resource: "new profile policy index",
+                    entries: 1,
+                }
+            })?;
+            equivalent_policy_indices.push(policy_index);
+            groups.push(PolicyRegretProfileGroup {
+                representative_policy_index: policy_index,
+                equivalent_policy_indices,
+                regret_profile: profile,
+            });
+        }
+    }
+
+    let mut frontier_profile_group_indices = Vec::new();
+    frontier_profile_group_indices.try_reserve_exact(groups.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "undominated profile group indices",
+            entries: groups.len(),
+        }
+    })?;
+    let mut dominance_witnesses = Vec::new();
+    dominance_witnesses.try_reserve_exact(groups.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "profile dominance witnesses",
+            entries: groups.len(),
+        }
+    })?;
+
+    for dominated in 0..groups.len() {
+        let mut selected_dominator: Option<usize> = None;
+        for candidate in 0..groups.len() {
+            if candidate == dominated
+                || !regret_profile_strictly_dominates(
+                    &groups[candidate].regret_profile,
+                    &groups[dominated].regret_profile,
+                )
+            {
+                continue;
+            }
+            let replace = selected_dominator.map_or(true, |current| {
+                groups[candidate].representative_policy_index
+                    < groups[current].representative_policy_index
+            });
+            if replace {
+                selected_dominator = Some(candidate);
+            }
+        }
+        if let Some(dominator) = selected_dominator {
+            dominance_witnesses.push(PolicyRegretProfileDominanceWitness {
+                dominated_profile_group_index: dominated,
+                dominator_profile_group_index: dominator,
+            });
+        } else {
+            frontier_profile_group_indices.push(dominated);
+        }
+    }
+
+    let certificate_sha256 = policy_regret_profile_frontier_sha256(
+        family.sha256(),
+        expected_policy_manifest,
+        expected_values_digest,
+        models,
+        expected_policy_count,
+        &groups,
+        &frontier_profile_group_indices,
+        &dominance_witnesses,
+    );
+    Ok(VerifiedPolicyRegretProfileFrontier {
+        model_family_sha256: family.sha256(),
+        policy_manifest_sha256: expected_policy_manifest,
+        policy_values_sha256: expected_values_digest,
+        model_count: models,
+        policy_count: expected_policy_count,
+        profile_groups: groups,
+        frontier_profile_group_indices,
+        dominance_witnesses,
+        certificate_sha256,
+    })
+}
+
+/// Recompute source validation, exact regret profiles, equivalence classes,
+/// Pareto frontier and canonical digest for a claimed frontier.
+pub fn verify_policy_regret_profile_frontier(
+    family: &FiniteUmdpModelFamily,
+    source: &FiniteFamilyPolicyPortfolioResult,
+    budget: PolicyRegretProfileBudget,
+    claimed: &VerifiedPolicyRegretProfileFrontier,
+) -> Result<(), PolicyPortfolioError> {
+    let replay = compute_policy_regret_profile_frontier(family, source, budget)?;
+    if replay == *claimed {
+        Ok(())
+    } else {
+        Err(PolicyPortfolioError::PolicyRegretProfileCertificateMismatch)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct OuterPartitionSearchNode {
