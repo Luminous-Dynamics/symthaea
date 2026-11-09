@@ -288,18 +288,18 @@ impl SwarmSimulator {
                 ego_state.speed * (ego_state.heading - ego_projection.road_heading).cos();
             let peer_speed_along_road =
                 peer_state.speed * (peer_state.heading - peer_projection.road_heading).cos();
-            let candidate = SimulatorOracleFollowTarget {
-                actor_id: peer.id,
+            let candidate = SimulatorOracleFollowTarget::from_simulator_snapshot(
+                peer.id,
                 gap_m,
-                relative_speed_mps: peer_speed_along_road - ego_speed_along_road,
-                snapshot_time_s: *snapshot_time_s,
-                max_age_s: self.config.follow_target_max_age_s,
-            };
+                peer_speed_along_road - ego_speed_along_road,
+                *snapshot_time_s,
+                self.config.follow_target_max_age_s,
+            );
             if !candidate.is_current_at(ego_state.timestamp) {
                 continue;
             }
 
-            if best.is_none_or(|current| candidate.gap_m < current.gap_m) {
+            if best.is_none_or(|current| candidate.gap_m() < current.gap_m()) {
                 best = Some(candidate);
             }
         }
