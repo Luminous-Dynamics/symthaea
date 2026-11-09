@@ -1501,8 +1501,7 @@ fn validate_follow_target_context(
         let expected_relative_speed = target_vx - ego_vx;
         if (relative_speed - expected_relative_speed).abs() > 1e-6 {
             errors.push(
-                "follow_target_context: relative_speed_mps must equal target.vx - ego.vx"
-                    .into(),
+                "follow_target_context: relative_speed_mps must equal target.vx - ego.vx".into(),
             );
         }
     }
