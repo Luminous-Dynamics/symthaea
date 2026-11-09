@@ -1407,11 +1407,64 @@ mod tests {
         let score = episode.evaluate_after_submission().unwrap();
 
         assert!(!score.generating_model_in_version_space);
+        assert!(!score.generating_truth_behaviorally_represented);
         assert_eq!(score.set_score.oracle_model_count, 0);
         assert!(score.set_score.exact_version_space_match);
         assert!(score.decision_correct);
         assert!(score.evidence_references_valid);
         assert_eq!(score.structure_score.oracle_structure_count, 0);
+    }
+
+    #[test]
+    fn open_support_parameter_shift_is_accepted_when_an_equivalent_candidate_exists() {
+        let truth = numeric::ModelHypothesis {
+            gain: 4,
+            ..direct_numeric_truth()
+        };
+        let mut episode = BlindEpisode::new_numeric_open_support(
+            "open-support-equivalent-parameterization",
+            truth,
+            StructureAccess::NumericWithheld,
+            2,
+        )
+        .unwrap();
+
+        let probe = episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Numeric(1),
+            })
+            .unwrap();
+        assert_eq!(
+            probe.view.observations[0].measurement,
+            AgentMeasurement::Numeric(4)
+        );
+
+        let equivalent = numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::Double,
+        };
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                compatible_models: vec![equivalent],
+                disposition: ClaimDisposition::Identified,
+            },
+            evidence_prefix_sha256: probe.view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![probe.view.observations[0].evidence_id.clone()],
+            rationale: "Gain 4 with identity sensor is behaviorally equivalent to gain 2 with a double sensor over the declared intervention language.".to_owned(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        let score = episode.evaluate_after_submission().unwrap();
+
+        assert!(!score.generating_model_in_version_space);
+        assert!(score.generating_truth_behaviorally_represented);
+        assert_eq!(score.set_score.oracle_model_count, 1);
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.structure_score.exact_structure_set_match);
+        assert!(score.decision_correct);
+        assert!(score.evidence_references_valid);
     }
 
     #[test]
