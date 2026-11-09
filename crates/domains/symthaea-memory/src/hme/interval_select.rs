@@ -17,6 +17,7 @@
 //! work, but it cannot be substituted for the complete interval set.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use super::group_envelope::{
     ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
@@ -179,8 +180,8 @@ pub struct GroupScoreIntervalIdentity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroupScoreIntervalRecord {
     identity: GroupScoreIntervalIdentity,
-    member_ids: Vec<String>,
-    member_payload_digests: Vec<[u8; 32]>,
+    member_ids: Arc<[String]>,
+    member_payload_digests: Arc<[[u8; 32]]>,
     query_digest: [u8; 32],
     member_count: usize,
     interval: ContinuousHVScoreInterval,
@@ -243,8 +244,8 @@ impl GroupScoreIntervalRecord {
                 member_set_digest: expected_member_set_digest,
                 content_digest: expected_content_digest,
             },
-            member_ids: envelope.member_ids().to_vec(),
-            member_payload_digests: envelope.member_payload_digests().to_vec(),
+            member_ids: envelope.member_ids_shared(),
+            member_payload_digests: envelope.member_payload_digests_shared(),
             query_digest: continuous_hv_query_digest(query),
             member_count,
             interval,
@@ -722,19 +723,6 @@ pub enum GroupIntervalSelectionError {
         /// Later duplicate index.
         duplicate_index: usize,
     },
-    /// Group envelopes belong to different manifest or eligibility snapshots.
-    MixedSnapshot {
-        /// Pinned manifest generation shared by preceding groups.
-        expected_manifest_generation: u64,
-        /// Manifest generation of the mismatched group.
-        actual_manifest_generation: u64,
-        /// Pinned eligibility generation shared by preceding groups.
-        expected_eligibility_generation: u64,
-        /// Eligibility generation of the mismatched group.
-        actual_eligibility_generation: u64,
-        /// Index of the mismatched group.
-        group_index: usize,
-    },
     /// Group member IDs overlap, so the group partition is not disjoint.
     DuplicateMemberAcrossGroups {
         /// Stable member identifier appearing in multiple groups.
@@ -789,16 +777,6 @@ impl std::fmt::Display for GroupIntervalSelectionError {
             Self::DuplicateGroupId { first_index, duplicate_index } => write!(
                 f,
                 "duplicate group ID at indices {first_index} and {duplicate_index}"
-            ),
-            Self::MixedSnapshot {
-                expected_manifest_generation,
-                actual_manifest_generation,
-                expected_eligibility_generation,
-                actual_eligibility_generation,
-                group_index,
-            } => write!(
-                f,
-                "group {group_index} snapshot ({actual_manifest_generation}, {actual_eligibility_generation}) does not match pinned snapshot ({expected_manifest_generation}, {expected_eligibility_generation})"
             ),
             Self::DuplicateMemberAcrossGroups {
                 member_id,
@@ -1014,29 +992,7 @@ pub fn select_group_refinement_set(
     let mut first_group_by_member_id = BTreeMap::new();
     let mut lower_order: Vec<&GroupScoreIntervalRecord> =
         Vec::with_capacity(groups.len());
-    let pinned_snapshot = groups.first().map(|group| {
-        (
-            group.identity.manifest_generation,
-            group.identity.eligibility_generation,
-        )
-    });
-
     for (group_index, group) in groups.iter().enumerate() {
-        if let Some((expected_manifest_generation, expected_eligibility_generation)) =
-            pinned_snapshot
-        {
-            if group.identity.manifest_generation != expected_manifest_generation
-                || group.identity.eligibility_generation != expected_eligibility_generation
-            {
-                return Err(GroupIntervalSelectionError::MixedSnapshot {
-                    expected_manifest_generation,
-                    actual_manifest_generation: group.identity.manifest_generation,
-                    expected_eligibility_generation,
-                    actual_eligibility_generation: group.identity.eligibility_generation,
-                    group_index,
-                });
-            }
-        }
         if group.member_count == 0 {
             return Err(GroupIntervalSelectionError::EmptyGroup { group_index });
         }
@@ -1398,8 +1354,8 @@ mod tests {
                 member_set_digest,
                 content_digest,
             },
-            member_ids,
-            member_payload_digests,
+            member_ids: Arc::from(member_ids),
+            member_payload_digests: Arc::from(member_payload_digests),
             query_digest: [0x51u8; 32],
             member_count,
             interval: ContinuousHVScoreInterval { lower, upper },
@@ -2095,19 +2051,16 @@ mod tests {
         let groups = vec![first, stale];
         assert!(matches!(
             select_group_refinement_set(&groups, 1, complete_group_coverage(&groups)),
-            Err(GroupIntervalSelectionError::MixedSnapshot {
-                expected_eligibility_generation: 1,
-                actual_eligibility_generation: 2,
-                group_index: 1,
-                ..
-            })
+            Err(GroupIntervalSelectionError::SnapshotGenerationMismatch { group_index: 1 })
         ));
     }
 
     #[test]
     fn group_selector_rejects_inconsistent_member_payload_digest_count() {
         let mut group = synthetic_group("malformed", 2, 0.0, 1.0);
-        group.member_payload_digests.pop();
+        group.member_payload_digests = Arc::from(
+            group.member_payload_digests[..group.member_payload_digests.len() - 1].to_vec(),
+        );
         let groups = vec![group];
         assert!(matches!(
             select_group_refinement_set(&groups, 1, complete_group_coverage(&groups)),
