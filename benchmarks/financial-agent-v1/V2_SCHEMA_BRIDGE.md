@@ -11,16 +11,31 @@ The v2 schemas introduce one reusable evidence-version object for financial rese
 ## New files
 
 - `evidence-v2.schema.json`: exact evidence identity, temporal semantics, actor-scoped availability, rights authorization, provenance-family lineage and revision ancestry.
+- `evidence-proof-binding-v1.schema.json`: separate domain-separated availability and rights binding preimages; both include the exact `source_version_id`.
 - `evidence-manifest-v2.schema.json`: shared principal, rights profile, evaluation mode and decision frontier for a research evidence set.
 - `quant-observation-manifest-v2.schema.json`: per-observation link to the same evidence-v2 object; no whole-run point-in-time Boolean substitutes for per-observation proof.
 - `dev-example.evidence-v2.json` and `dev-example.quant-observations-v2.json`: synthetic development-only examples. Their proof references and digests are intentionally fixture markers, not valid authorization or availability proofs.
+
+## Canonical proof-binding preimages
+
+Each v2 attestation carries its typed `binding` preimage and a `binding_sha256`. The preimage schema is in `evidence-proof-binding-v1.schema.json`.
+
+- Availability uses domain `luminous.financial.availability-proof-binding.v1`.
+- Rights uses domain `luminous.financial.rights-proof-binding.v1`.
+- Both include `evidence_id`, `source_id`, `source_record_id`, exact `source_version_id`, `content_sha256`, `principal_id` and `rights_profile_id`.
+- Availability additionally binds precision, exact `known_at` or a bounded interval, and `retrieved_at`.
+- Rights additionally binds `disposition`, `valid_from` and `valid_until`.
+
+`binding_sha256` is SHA-256 of the RFC 8785 JCS UTF-8 serialization of the binding object, with no newline appended. Binding objects use only ASCII strings, nulls and fixed enumerations; they carry no floating-point numbers. The verifier receipt bytes must independently record the same binding digest, proof-artifact digest, verifier identity and verifier-build digest. The receipt is itself content-addressed and checked by the existing evidence-byte verification path.
+
+Availability and rights are separate attestations. Neither digest can be reused for the other domain. A producer-supplied `binding_sha256` is not trusted until the consumer recomputes it from the embedded preimage and validates the referenced proof/receipt artifacts. RFC 8785 defines JCS as deterministic, hashable JSON serialization with recursive property sorting: https://www.rfc-editor.org/rfc/rfc8785.html.
 
 ## Important trust boundary
 
 The JSON `proof.state` is an assertion supplied by a manifest producer. It is **not** authoritative. A trusted adapter must:
 1. Resolve the proof artifact reference and verify its exact bytes through the existing Mycelix / evidence-byte verification path (#9608 / #9429).
 2. Resolve and validate the independent verifier receipt, including verifier identity and build digest.
-3. Verify that the receipt binds the exact evidence ID, source ID, source-record/version ID, principal, rights profile and instant/interval.
+3. Verify that the receipt binds the exact evidence ID, source ID, source-record ID, exact source-version ID, content digest, principal, rights profile and instant/interval.
 4. Verify the entitlement disposition and validity at the run's decision frontier.
 5. Construct `AvailabilityProof::Verified` and `RightsProof::Verified` only after those checks pass. Missing, unresolved, mismatched or revoked proof stays Missing/Unverifiable and therefore cannot PASS.
 6. For `bounded_interval`, use the #11256 interval semantics. Until that extension exists, do not convert an interval to an exact instant; keep it Indeterminate.
