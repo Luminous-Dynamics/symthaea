@@ -91,6 +91,7 @@ pub mod lm;
 pub mod phonological_eval;
 pub mod acoustic_faithfulness;
 pub mod counterfactual_pairs;
+pub mod evidence_spans;
 pub mod ltc;
 #[cfg(feature = "gpu")]
 pub mod ltc_gpu;
