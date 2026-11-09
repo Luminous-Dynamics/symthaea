@@ -70,24 +70,53 @@ pub struct ExperimentCandidate {
 pub enum ActiveDesignError {
     NoHypotheses,
     NoCandidates,
-    TooManyHypotheses { count: usize, maximum: usize },
-    TooManyCandidates { count: usize, maximum: usize },
+    TooManyHypotheses {
+        count: usize,
+        maximum: usize,
+    },
+    TooManyCandidates {
+        count: usize,
+        maximum: usize,
+    },
     EmptyHypothesisId,
     EmptyCandidateId,
     DuplicateHypothesisId(String),
     DuplicateCandidateId(String),
-    InvalidPrior { hypothesis_id: String },
-    PriorProbabilitiesDoNotSumToOne { sum: f64 },
-    InvalidCandidateCost { candidate_id: String },
-    InvalidAvailability { candidate_id: String },
-    InvalidMeasurementSigma { candidate_id: String },
-    InvalidCalibrationSigma { candidate_id: String },
-    NonFinitePrediction { candidate_id: String, hypothesis_id: String },
-    PredictionSetMismatch { candidate_id: String },
+    InvalidPrior {
+        hypothesis_id: String,
+    },
+    PriorProbabilitiesDoNotSumToOne {
+        sum: f64,
+    },
+    InvalidCandidateCost {
+        candidate_id: String,
+    },
+    InvalidAvailability {
+        candidate_id: String,
+    },
+    InvalidMeasurementSigma {
+        candidate_id: String,
+    },
+    InvalidCalibrationSigma {
+        candidate_id: String,
+    },
+    NonFinitePrediction {
+        candidate_id: String,
+        hypothesis_id: String,
+    },
+    PredictionSetMismatch {
+        candidate_id: String,
+    },
     InvalidBudget,
     InvalidInformationGainFloor,
-    NumericalOverflow { candidate_id: String },
-    QuadratureOutOfBounds { candidate_id: String, eig: f64, entropy: f64 },
+    NumericalOverflow {
+        candidate_id: String,
+    },
+    QuadratureOutOfBounds {
+        candidate_id: String,
+        eig: f64,
+        entropy: f64,
+    },
 }
 
 impl fmt::Display for ActiveDesignError {
@@ -112,7 +141,10 @@ impl fmt::Display for ActiveDesignError {
                 write!(f, "hypothesis prior probabilities sum to {sum}, not one")
             }
             Self::InvalidCandidateCost { candidate_id } => {
-                write!(f, "cost for candidate {candidate_id} must be finite and positive")
+                write!(
+                    f,
+                    "cost for candidate {candidate_id} must be finite and positive"
+                )
             }
             Self::InvalidAvailability { candidate_id } => write!(
                 f,
@@ -126,7 +158,10 @@ impl fmt::Display for ActiveDesignError {
                 f,
                 "calibration sigma for candidate {candidate_id} must be finite and non-negative"
             ),
-            Self::NonFinitePrediction { candidate_id, hypothesis_id } => write!(
+            Self::NonFinitePrediction {
+                candidate_id,
+                hypothesis_id,
+            } => write!(
                 f,
                 "prediction for candidate {candidate_id} and hypothesis {hypothesis_id} is not finite"
             ),
@@ -139,9 +174,16 @@ impl fmt::Display for ActiveDesignError {
                 write!(f, "information-gain floor must be finite and non-negative")
             }
             Self::NumericalOverflow { candidate_id } => {
-                write!(f, "information calculation overflowed for candidate {candidate_id}")
+                write!(
+                    f,
+                    "information calculation overflowed for candidate {candidate_id}"
+                )
             }
-            Self::QuadratureOutOfBounds { candidate_id, eig, entropy } => write!(
+            Self::QuadratureOutOfBounds {
+                candidate_id,
+                eig,
+                entropy,
+            } => write!(
                 f,
                 "candidate {candidate_id} EIG {eig} exceeds prior entropy {entropy}"
             ),
@@ -238,10 +280,7 @@ pub fn rank_experiments(
                 prior.hypothesis_id.clone(),
             ));
         }
-        if !prior.probability.is_finite()
-            || prior.probability <= 0.0
-            || prior.probability > 1.0
-        {
+        if !prior.probability.is_finite() || prior.probability <= 0.0 || prior.probability > 1.0 {
             return Err(ActiveDesignError::InvalidPrior {
                 hypothesis_id: prior.hypothesis_id.clone(),
             });
@@ -316,7 +355,10 @@ pub fn rank_experiments(
                 });
             }
             if prediction_by_id
-                .insert(prediction.hypothesis_id.as_str(), prediction.expected_measurement)
+                .insert(
+                    prediction.hypothesis_id.as_str(),
+                    prediction.expected_measurement,
+                )
                 .is_some()
             {
                 return Err(ActiveDesignError::PredictionSetMismatch {
@@ -325,7 +367,9 @@ pub fn rank_experiments(
             }
         }
         if prediction_by_id.len() != priors.len()
-            || prediction_by_id.keys().any(|id| !priors_by_id.contains_key(id))
+            || prediction_by_id
+                .keys()
+                .any(|id| !priors_by_id.contains_key(id))
         {
             return Err(ActiveDesignError::PredictionSetMismatch {
                 candidate_id: candidate.candidate_id.clone(),
@@ -336,10 +380,7 @@ pub fn rank_experiments(
             .iter()
             .map(|prior| prediction_by_id[prior.hypothesis_id.as_str()])
             .collect();
-        let probabilities: Vec<f64> = priors
-            .iter()
-            .map(|prior| prior.probability)
-            .collect();
+        let probabilities: Vec<f64> = priors.iter().map(|prior| prior.probability).collect();
         let coarse = gaussian_hypothesis_eig(
             &probabilities,
             &means,
@@ -371,10 +412,8 @@ pub fn rank_experiments(
         let conditional_eig_nats = conditional_eig_nats.clamp(0.0, prior_entropy_nats);
         let availability_adjusted_eig_nats =
             candidate.availability_probability * conditional_eig_nats;
-        let expected_posterior_entropy_nats =
-            prior_entropy_nats - availability_adjusted_eig_nats;
-        let information_per_cost_nats =
-            availability_adjusted_eig_nats / candidate.cost;
+        let expected_posterior_entropy_nats = prior_entropy_nats - availability_adjusted_eig_nats;
+        let information_per_cost_nats = availability_adjusted_eig_nats / candidate.cost;
         let within_budget = candidate.cost <= budget;
         let eligible_for_selection = within_budget
             && candidate.availability_probability > 0.0
@@ -681,9 +720,12 @@ mod tests {
         assert!(report.ranked_candidates.iter().any(|x| {
             x.candidate_id == "expensive" && !x.within_budget && !x.eligible_for_selection
         }));
-        assert!(report.ranked_candidates.iter().any(|x| {
-            x.candidate_id == "unavailable" && !x.eligible_for_selection
-        }));
+        assert!(
+            report
+                .ranked_candidates
+                .iter()
+                .any(|x| { x.candidate_id == "unavailable" && !x.eligible_for_selection })
+        );
     }
 
     #[test]
@@ -703,10 +745,7 @@ mod tests {
         reversed.predictions.reverse();
         let reordered = rank_experiments(
             &reversed_priors,
-            &[
-                candidate("b", 1.0, -1.0, 0.5, 0.0, 0.5, 1.0),
-                reversed,
-            ],
+            &[candidate("b", 1.0, -1.0, 0.5, 0.0, 0.5, 1.0), reversed],
             10.0,
             0.0,
         )
@@ -719,9 +758,7 @@ mod tests {
                 .iter()
                 .find(|score| score.candidate_id == left.candidate_id)
                 .unwrap();
-            assert!(
-                (left.conditional_eig_nats - right.conditional_eig_nats).abs() < 1.0e-10
-            );
+            assert!((left.conditional_eig_nats - right.conditional_eig_nats).abs() < 1.0e-10);
         }
     }
 
@@ -735,7 +772,12 @@ mod tests {
         ));
 
         assert_eq!(
-            rank_experiments(&[], &[candidate("x", 0.0, 1.0, 1.0, 0.0, 1.0, 1.0)], 1.0, 0.0),
+            rank_experiments(
+                &[],
+                &[candidate("x", 0.0, 1.0, 1.0, 0.0, 1.0, 1.0)],
+                1.0,
+                0.0
+            ),
             Err(ActiveDesignError::NoHypotheses)
         );
         assert!(matches!(
