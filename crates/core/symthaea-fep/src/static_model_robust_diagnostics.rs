@@ -171,28 +171,26 @@ pub fn solve_two_stage_static_model_fixture() -> StaticModelRobustFixtureResult 
                     ObservationModelVertex::from_index(action_after_cal_a),
                     ObservationModelVertex::from_index(action_after_cal_b),
                 ],
-                    terminal_decision_by_history: [
-                        [
-                            (decision_mask & 0b0001) != 0,
-                            (decision_mask & 0b0010) != 0,
-                        ],
-                        [
-                            (decision_mask & 0b0100) != 0,
-                            (decision_mask & 0b1000) != 0,
-                        ],
+                terminal_decision_by_history: [
+                    [
+                        (decision_mask & 0b0001) != 0,
+                        (decision_mask & 0b0010) != 0,
                     ],
-                };
-                policies_evaluated += 1;
+                    [
+                        (decision_mask & 0b0100) != 0,
+                        (decision_mask & 0b1000) != 0,
+                    ],
+                ],
+            };
+            policies_evaluated += 1;
 
-                let risk_a =
-                    static_model_policy_risk(&policy, ObservationModelVertex::ModelA);
-                let risk_b =
-                    static_model_policy_risk(&policy, ObservationModelVertex::ModelB);
-                let static_risk = risk_a.max(risk_b);
-                if static_risk < best_static_risk {
-                    best_static_risk = static_risk;
-                    static_optimal_policy = Some(policy);
-                }
+            let risk_a = static_model_policy_risk(&policy, ObservationModelVertex::ModelA);
+            let risk_b = static_model_policy_risk(&policy, ObservationModelVertex::ModelB);
+            let static_risk = risk_a.max(risk_b);
+            if static_risk < best_static_risk {
+                best_static_risk = static_risk;
+                static_optimal_policy = Some(policy);
+            }
 
             let rectangular_risk = rectangular_model_policy_risk(&policy);
             if rectangular_risk < best_rectangular_risk {
