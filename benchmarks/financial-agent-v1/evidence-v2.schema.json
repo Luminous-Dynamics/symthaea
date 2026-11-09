@@ -9,6 +9,7 @@
     "evidence_id",
     "source_id",
     "source_record_id",
+    "source_version_id",
     "revision_group_id",
     "subject_refs",
     "evidence_kind",
@@ -413,6 +414,11 @@
     },
     "metadata": {
       "type": "object"
+    },
+    "source_version_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
     }
   },
   "$defs": {
