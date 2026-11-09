@@ -29,7 +29,7 @@ pub enum ContextField {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContractError {
     EmptyExpectedField(ContextField),
-    InvalidDigest(ContextField),
+    InvalidDigest,
     DigestMismatch(ContextField),
     DuplicateExpectedEnvironment(u32),
     ZeroActionDimension(String),
@@ -91,7 +91,7 @@ pub struct Digest32([u8; 32]);
 impl Digest32 {
     pub fn from_bytes(bytes: [u8; 32]) -> Result<Self, ContractError> {
         if bytes.iter().all(|byte| *byte == 0) {
-            return Err(ContractError::InvalidDigest(ContextField::ObservationBundleDigest));
+            return Err(ContractError::InvalidDigest);
         }
         Ok(Self(bytes))
     }
@@ -225,7 +225,7 @@ pub fn validate_action_response(
         ),
     ] {
         if actual.0.iter().all(|byte| *byte == 0) {
-            return Err(ContractError::InvalidDigest(field));
+            return Err(ContractError::InvalidDigest);
         }
         if actual != frozen {
             return Err(ContractError::DigestMismatch(field));
@@ -378,6 +378,16 @@ fn validate_expected_context(expected: &ExpectedPolicyCall) -> Result<(), Contra
         return Err(ContractError::EmptyExpectedField(
             ContextField::MaxActionsPerChunk,
         ));
+    }
+    for digest in [
+        expected.observation_bundle_digest,
+        expected.policy_artifact_digest,
+        expected.deployment_config_digest,
+        expected.assistance_profile_digest,
+    ] {
+        if digest.0.iter().all(|byte| *byte == 0) {
+            return Err(ContractError::InvalidDigest);
+        }
     }
     Ok(())
 }
@@ -698,7 +708,27 @@ mod tests {
     fn zero_digest_sentinel_is_rejected() {
         assert_eq!(
             Digest32::from_bytes([0; 32]),
-            Err(ContractError::InvalidDigest(ContextField::ObservationBundleDigest))
+            Err(ContractError::InvalidDigest)
+        );
+    }
+
+    #[test]
+    fn rejects_zero_digest_in_response_envelope() {
+        let mut actual = response();
+        actual.observation_bundle_digest = Digest32([0; 32]);
+        assert_eq!(
+            validate_action_response(&expected(), &actual),
+            Err(ContractError::InvalidDigest)
+        );
+    }
+
+    #[test]
+    fn rejects_zero_digest_in_expected_call_envelope() {
+        let mut context = expected();
+        context.assistance_profile_digest = Digest32([0; 32]);
+        assert_eq!(
+            validate_action_response(&context, &response()),
+            Err(ContractError::InvalidDigest)
         );
     }
 
