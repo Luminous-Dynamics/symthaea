@@ -71,6 +71,10 @@ Before any confirmatory run:
 - run process-spawn, fork-bomb, memory-exhaustion, CPU-spin, file-read, descriptor, protocol-malformation, timeout and supervisor-kill negative controls;
 - independently replay all receipts.
 
+## Adversarial qualification matrix
+
+The versioned red-team case families and their positive/negative controls are specified in [CEB_SANDBOX_ISOLATION_ADVERSARIAL_MATRIX_V0_1.md](CEB_SANDBOX_ISOLATION_ADVERSARIAL_MATRIX_V0_1.md). This matrix is owned by #9865/#10064, not a new benchmark lane or runner. It includes entry-point bypass, namespace downgrade, mount/path races, COW semantics, inherited descriptors, network and syscall restrictions, resource exhaustion, lifecycle/process-tree termination, cross-run leakage, control-plane attacks, virtual-device bounds, policy consistency, receipt spoofing and oracle/grader separation.
+
 ## Cgroup v2 read-back verifier tranche
 
 The next implementation slice adds `research/temporal-bench/src/cgroup_v2_verify.rs`, exported as `cgroup_v2_verify`. It consumes the exact systemd `ControlGroup` property from the trusted launcher, checks the trusted host's mountinfo for one unified cgroup2 mount, canonicalizes the scope path beneath that mount, reads the parent controller availability/delegation and the candidate scope's effective `memory.max`, `memory.swap.max`, `cpu.max`, `pids.max`, `memory.oom.group`, `cgroup.procs` and `cgroup.events`, and rejects any mismatch. The candidate PID must belong to the expected scope and the cgroup must report `populated 1`. A digest commits the exact observed limits; it is not a signature or hardware attestation. The module also parses an explicitly selected `systemctl show` KEY=VALUE response (without `--value`) and verifies `Id`, `ActiveState`, `SubState`, `ControlGroup`, `MemoryMax`, `MemorySwapMax`, `CPUQuotaPerSecUSec`, `TasksMax`, `RuntimeMaxUSec` and `OOMPolicy` against the requested scope policy. The response must be obtained by a trusted host-side query for the exact transient unit; parsing itself does not authenticate the manager or query D-Bus. Kernel cgroup-file read-back remains required and must match the same `ControlGroup`.
