@@ -14,7 +14,7 @@ pub struct VocalQualityMetrics {
     pub p95_pitch_error_cents: f32,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
-    /// Score-independent 70-500 Hz autocorrelation cross-check. Diagnostic
+    /// Score-independent 40-1200 Hz autocorrelation cross-check. Diagnostic
     /// only until calibrated on human-sung reference recordings.
     pub score_independent_pitch_median_error_cents: f32,
     pub score_independent_pitch_p95_error_cents: f32,
@@ -144,7 +144,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
                 attempted += 1;
                 expected_voiced_frames += 1;
 
-                let score_independent = estimate_f0(window, rate);
+                let score_independent = estimate_f0_global(window, rate);
                 if let (Some(expected), Some(independent)) = (expected_pitch, score_independent) {
                     let independent_error =
                         (1200.0 * (independent / expected).log2()).abs();
@@ -462,16 +462,34 @@ fn onset_error_ms(samples: &[f32], rate: u32, expected_s: f32) -> Option<f32> {
 }
 
 fn estimate_f0(x: &[f32], rate: u32) -> Option<f32> {
+    estimate_f0_in_range(x, rate, 70.0, 500.0)
+}
+
+/// Broader score-independent singing-range estimate. This is kept separate
+/// from the legacy V/UV detector so the diagnostic does not silently change
+/// existing unvoiced-frame behavior.
+fn estimate_f0_global(x: &[f32], rate: u32) -> Option<f32> {
+    estimate_f0_in_range(x, rate, 40.0, 1_200.0)
+}
+
+fn estimate_f0_in_range(
+    x: &[f32],
+    rate: u32,
+    minimum_hz: f32,
+    maximum_hz: f32,
+) -> Option<f32> {
     let rms = (x.iter().map(|v| v * v).sum::<f32>() / x.len().max(1) as f32).sqrt();
-    if rms < 0.003 {
+    if rms < 0.003
+        || !minimum_hz.is_finite()
+        || !maximum_hz.is_finite()
+        || minimum_hz <= 0.0
+        || maximum_hz <= minimum_hz
+        || rate == 0
+    {
         return None;
     }
-    // Singing fundamentals can fall well outside speech-oriented 70-500 Hz
-    // ranges. Keep the score-independent audit broad enough for low and high
-    // registers while leaving the score-conditioned tracker as a separate
-    // measurement path.
-    let min_lag = (rate as f32 / 1_200.0).floor().max(1.0) as usize;
-    let max_lag = (rate as usize / 40).min(x.len() / 2);
+    let min_lag = (rate as f32 / maximum_hz).floor().max(1.0) as usize;
+    let max_lag = ((rate as f32 / minimum_hz).ceil() as usize).min(x.len() / 2);
     if max_lag < min_lag {
         return None;
     }
@@ -614,9 +632,12 @@ mod tests {
         };
         let metrics = analyze_vocal_stem(&performance, &stem);
         assert!(metrics.median_pitch_error_cents < 15.0, "{:?}", metrics);
+        assert_eq!(metrics.score_independent_pitch_audit_pass, Some(true));
     }
 
     /// A score prior can make an incorrect pitch look close by constraining
+    /// the search to +/-300 cents. The unconstrained cross-check must expose
+    /// the true large mismatch and count the prior-induced disagreement.
     #[test]
     fn score_independent_pitch_audit_detects_prior_induced_false_reassurance() {
         let note = symthaea_muse::Note {
@@ -668,7 +689,8 @@ mod tests {
                         * 0.2
                 })
                 .collect();
-            let measured = estimate_f0(&samples, rate).expect("periodic tone must be detected");
+            let measured =
+                estimate_f0_global(&samples, rate).expect("periodic tone must be detected");
             assert!(
                 (measured - expected_hz).abs() < 2.0,
                 "expected {expected_hz} Hz, observed {measured} Hz"
