@@ -1004,7 +1004,7 @@ mod tests {
             baseline_record_id: "confirm-a".into(),
             variant_record_id: "confirm-b".into(),
             counterfactual_pair_manifest_sha256: A.into(),
-            counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
+            counterfactual_pair_manifest_path: "pair-manifests/confirm-pair.json".into(),
             split: CohortSplit::Confirmatory,
             purpose: PairPurpose::ConfirmatoryEvaluation,
         });
@@ -1129,6 +1129,17 @@ mod tests {
         let mut manifest = fixture();
         manifest.records[1].evaluation_audio_sha256 = A.to_ascii_uppercase();
         assert!(validate_cohort_manifest(&manifest).is_ok());
+    }
+
+    #[test]
+    fn rejects_reused_pair_manifest_path() {
+        let mut manifest = fixture();
+        manifest.pairs[1].counterfactual_pair_manifest_path =
+            manifest.pairs[0].counterfactual_pair_manifest_path.clone();
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::DuplicatePairManifestPath(_))
+        ));
     }
 
     #[test]
