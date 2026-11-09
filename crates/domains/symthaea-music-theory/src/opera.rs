@@ -46,6 +46,12 @@ use crate::phrase::Period;
 use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 
+// These are two distinct, independently authored musical identities. Theme
+// A remains one part through statement, dialogue, and cadence; Theme B remains
+// another through statement, dialogue, and its interrupted final entry.
+const THEME_A_PART: PartId = PartId(0);
+const THEME_B_PART: PartId = PartId(1);
+
 /// Character one: confident, triadic, rising to the octave.
 pub(crate) fn theme_a() -> Motif {
     Motif::from_degrees(&[
@@ -144,6 +150,7 @@ fn theme_b_for_seed(seed: u64) -> Motif {
 fn push_theme(
     score: &mut Score,
     motif: &Motif,
+    part: PartId,
     key: Key,
     start: Duration,
     role: VoiceRole,
@@ -161,7 +168,7 @@ fn push_theme(
         }
         if let Some(d) = n.degree {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part,
                 pitch: scale.degree_pitch(d, octave),
                 onset: start + t,
                 duration: n.duration,
@@ -264,6 +271,7 @@ pub(crate) fn realize_opera(
         push_theme(
             &mut score,
             &a,
+            THEME_A_PART,
             home_key,
             bar.scale(bar_idx, 1),
             VoiceRole::Melody,
@@ -277,6 +285,7 @@ pub(crate) fn realize_opera(
         push_theme(
             &mut score,
             &b,
+            THEME_B_PART,
             relative_key,
             bar.scale(bar_idx, 1),
             VoiceRole::CounterMelody,
@@ -292,6 +301,7 @@ pub(crate) fn realize_opera(
             push_theme(
                 &mut score,
                 &a,
+                THEME_A_PART,
                 home_key,
                 onset,
                 VoiceRole::Melody,
@@ -303,6 +313,7 @@ pub(crate) fn realize_opera(
             push_theme(
                 &mut score,
                 &b,
+                THEME_B_PART,
                 home_key,
                 onset,
                 VoiceRole::CounterMelody,
@@ -320,6 +331,7 @@ pub(crate) fn realize_opera(
     push_theme(
         &mut score,
         &b,
+        THEME_B_PART,
         home_key,
         final_bar,
         VoiceRole::CounterMelody,
@@ -330,6 +342,7 @@ pub(crate) fn realize_opera(
     push_theme(
         &mut score,
         &cadence,
+        THEME_A_PART,
         home_key,
         final_bar + cutoff,
         VoiceRole::Melody,
@@ -436,6 +449,46 @@ mod tests {
             "theme B must vary across seeds, got {} distinct value(s)",
             b_seen.len()
         );
+    }
+
+    #[test]
+    fn theme_a_and_theme_b_keep_distinct_part_identity_through_dialogue_and_interruption() {
+        let home = Key::major(PitchClass::C);
+        let score = realize_opera(home, 100.0, 4.0, 3, &intent());
+
+        let theme_a: Vec<&ScoreNote> = score.notes
+            .iter()
+            .filter(|note| note.part == THEME_A_PART)
+            .collect();
+        let theme_b: Vec<&ScoreNote> = score.notes
+            .iter()
+            .filter(|note| note.part == THEME_B_PART)
+            .collect();
+
+        assert!(!theme_a.is_empty(), "Theme A must have explicit material");
+        assert!(!theme_b.is_empty(), "Theme B must have explicit material");
+        assert!(theme_a.iter().all(|note| note.role == VoiceRole::Melody));
+        assert!(theme_b.iter().all(|note| note.role == VoiceRole::CounterMelody));
+        assert!(
+            theme_a.iter().all(|note| note.part != theme_b.first().unwrap().part),
+            "the two authored themes must not collapse into one PartId"
+        );
+
+        let bar = Duration::new(4, 1);
+        let a_in_bar = |bar_index: i64| theme_a.iter().any(|note| {
+            note.onset.beats() >= bar.scale(bar_index, 1).beats()
+                && note.onset.beats() < bar.scale(bar_index + 1, 1).beats()
+        });
+        let b_in_bar = |bar_index: i64| theme_b.iter().any(|note| {
+            note.onset.beats() >= bar.scale(bar_index, 1).beats()
+                && note.onset.beats() < bar.scale(bar_index + 1, 1).beats()
+        });
+        for bar_index in [0, 1, 4, 6, 8] {
+            assert!(a_in_bar(bar_index), "Theme A must retain identity in bar {bar_index}");
+        }
+        for bar_index in [2, 3, 5, 7, 8] {
+            assert!(b_in_bar(bar_index), "Theme B must retain identity in bar {bar_index}");
+        }
     }
 
     #[test]
