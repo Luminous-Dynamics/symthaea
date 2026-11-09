@@ -94,6 +94,30 @@ pub struct CandidateExperiment {
     pub predictions: Vec<GaussianModelPrediction>,
 }
 
+/// Model-conditional probability that an instrument returns a usable detection.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModelDetectionProbability {
+    pub model_id: String,
+    /// P(D=1 | model, instrument executed), in [0, 1].
+    pub probability_detected: f64,
+    /// Versioned physics/instrument derivation or calibration reference.
+    pub derivation_reference: String,
+}
+
+/// Candidate experiment with an explicit model-dependent detection channel.
+///
+/// The wrapped candidate's `availability_probability` remains the
+/// model-independent probability that the experiment is executed successfully.
+/// `detection_probabilities` describe P(D=1 | model, executed). When D=1 the
+/// wrapped scalar Gaussian measurement model applies; when D=0 this first
+/// version observes only the binary non-detection outcome.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DetectionAwareCandidateExperiment {
+    pub experiment: CandidateExperiment,
+    /// Exactly one calibrated/derived detection probability per named model.
+    pub detection_probabilities: Vec<ModelDetectionProbability>,
+}
+
 /// Quadrature and resource limits for model-identity EIG estimation.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModelDiscriminationConfig {
@@ -191,6 +215,55 @@ pub struct ModelDiscriminationReport {
     pub model_universe: ModelUniverseCoverage,
     pub prior_scenario_ids: Vec<String>,
     pub experiments: Vec<ExperimentDiscriminationScore>,
+}
+
+/// EIG decomposition for one prior scenario with model-dependent detection.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DetectionAwarePriorScenarioEIG {
+    pub scenario_id: String,
+    pub prior_entropy_nats: f64,
+    /// P(D=1) averaged over the current model prior.
+    pub expected_detection_probability: f64,
+    /// Mutual information I(M; D) from the detection/non-detection indicator.
+    pub detection_indicator_eig_nats: f64,
+    /// I(M; Y | D=1), using the model prior conditioned on detection.
+    pub conditional_detected_value_eig_nats: Option<f64>,
+    /// I(M; D,Y) conditional on the instrument executing successfully.
+    pub total_eig_given_execution_nats: f64,
+    /// Expected information after the model-independent execution probability.
+    pub availability_adjusted_total_eig_nats: f64,
+    pub expected_posterior_entropy_nats: f64,
+    /// Coarse/refined quadrature difference after weighting by P(D=1) and
+    /// execution probability. Detection-channel information is analytic.
+    pub quadrature_error_nats: f64,
+    pub converged: bool,
+}
+
+/// Cost-ranked result for one candidate with an explicit detection channel.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DetectionAwareExperimentScore {
+    pub experiment_id: String,
+    pub observable_id: String,
+    pub cost: f64,
+    /// Model-independent execution probability from the wrapped candidate.
+    pub execution_probability: f64,
+    pub status: ExperimentDiscriminationStatus,
+    pub prior_scenario_scores: Vec<DetectionAwarePriorScenarioEIG>,
+    pub worst_case_total_eig_nats: Option<f64>,
+    pub weighted_mean_total_eig_nats: Option<f64>,
+    pub worst_case_total_eig_per_cost: Option<f64>,
+    pub weighted_mean_total_eig_per_cost: Option<f64>,
+    pub open_world_unresolved_excluded: bool,
+}
+
+/// Model-discrimination report for a Bernoulli detection channel followed by
+/// the existing scalar Gaussian measurement channel.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DetectionAwareModelDiscriminationReport {
+    pub model_ids: Vec<String>,
+    pub model_universe: ModelUniverseCoverage,
+    pub prior_scenario_ids: Vec<String>,
+    pub experiments: Vec<DetectionAwareExperimentScore>,
 }
 
 /// Malformed inputs are errors; scientifically incomplete predictions remain
@@ -303,6 +376,34 @@ pub enum ModelDiscriminationError {
     InvalidQuadratureTolerance,
     #[error("Gaussian KL inputs must be finite with positive predictive and measurement sigmas")]
     InvalidGaussianKlInputs,
+    #[error("experiment {experiment_id} has {actual} detection probabilities; expected {expected}")]
+    DetectionProbabilityCount {
+        experiment_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("experiment {experiment_id} has duplicate detection probability for model {model_id}")]
+    DuplicateDetectionProbability {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id} is missing detection probability for model {model_id}")]
+    MissingDetectionProbability {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id}, model {model_id} has detection probability outside [0, 1]")]
+    InvalidDetectionProbability {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("experiment {experiment_id}, model {model_id} is missing a detection derivation reference")]
+    MissingDetectionDerivation {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("detection-channel mutual information exceeded prior entropy for experiment {0}")]
+    DetectionInformationExceedsPriorEntropy(String),
     #[error("numerical overflow while evaluating experiment {0}")]
     NumericalOverflow(String),
 }
@@ -540,6 +641,363 @@ pub fn rank_model_discriminating_experiments(
             .collect(),
         experiments: scores,
     })
+}
+
+/// Rank experiments when the detection/non-detection outcome can itself
+/// depend on the physical model.
+///
+/// The total information is decomposed as:
+/// `I(M;D,Y) = I(M;D) + P(D=1) I(M;Y | D=1)`.
+///
+/// The measurement-value EIG reuses the existing Gaussian quadrature kernel
+/// with the prior reweighted by each model's detection probability. The
+/// wrapped `availability_probability` is treated as a separate, model-
+—independent execution probability. A failed execution is assumed
+/// uninformative; model-dependent detection only applies after execution.
+///
+/// This is not a censored-value likelihood or a model for different failure
+/// causes. Those outcomes must be represented as explicit likelihood
+/// categories before they can contribute information.
+pub fn rank_detection_aware_model_discriminating_experiments(
+    hypotheses: &[DiscriminationHypothesis],
+    experiments: &[DetectionAwareCandidateExperiment],
+    config: &ModelDiscriminationConfig,
+) -> Result<DetectionAwareModelDiscriminationReport, ModelDiscriminationError> {
+    config.validate(hypotheses)?;
+    if experiments.is_empty() {
+        return Err(ModelDiscriminationError::NoExperiments);
+    }
+    if experiments.len() > MAX_DISCRIMINATION_EXPERIMENTS {
+        return Err(ModelDiscriminationError::TooManyExperiments {
+            count: experiments.len(),
+            maximum: MAX_DISCRIMINATION_EXPERIMENTS,
+        });
+    }
+
+    let mut experiment_ids = BTreeSet::new();
+    let mut scores = Vec::with_capacity(experiments.len());
+    for (index, candidate) in experiments.iter().enumerate() {
+        let experiment = &candidate.experiment;
+        validate_experiment(experiment, hypotheses, index, &mut experiment_ids)?;
+        let detection_by_model = validate_detection_probabilities(candidate, hypotheses)?;
+
+        // Reuse all of the existing measurement comparability gates. The
+        // wrapped score's old uninformative-missingness EIG is not used here.
+        let base_score = score_experiment(experiment, config)?;
+        let open_world_unresolved_excluded =
+            matches!(config.model_universe, ModelUniverseCoverage::OpenWorld);
+        if let ExperimentDiscriminationStatus::NotComparable { blockers } = base_score.status {
+            scores.push(DetectionAwareExperimentScore {
+                experiment_id: experiment.experiment_id.clone(),
+                observable_id: experiment.observable_id.clone(),
+                cost: experiment.cost,
+                execution_probability: experiment.availability_probability,
+                status: ExperimentDiscriminationStatus::NotComparable { blockers },
+                prior_scenario_scores: Vec::new(),
+                worst_case_total_eig_nats: None,
+                weighted_mean_total_eig_nats: None,
+                worst_case_total_eig_per_cost: None,
+                weighted_mean_total_eig_per_cost: None,
+                open_world_unresolved_excluded,
+            });
+            continue;
+        }
+
+        let measurement_sigma = experiment.measurement_sigma.expect("comparability gate");
+        let normal_predictions: Vec<(f64, f64)> = experiment
+            .predictions
+            .iter()
+            .map(|prediction| {
+                (
+                    prediction.predictive_mean.expect("comparability gate"),
+                    prediction.predictive_sigma.expect("comparability gate"),
+                )
+            })
+            .collect();
+        let detection_probabilities: Vec<f64> = hypotheses
+            .iter()
+            .map(|hypothesis| detection_by_model[&hypothesis.model_id])
+            .collect();
+
+        let max_scenario_weight = config
+            .prior_scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_weight)
+            .fold(0.0_f64, f64::max);
+        let normalized_weights: Vec<f64> = config
+            .prior_scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_weight / max_scenario_weight)
+            .collect();
+        let total_scenario_weight: f64 = normalized_weights.iter().sum();
+
+        let mut prior_scenario_scores = Vec::with_capacity(config.prior_scenarios.len());
+        let mut worst_case = f64::INFINITY;
+        let mut weighted_sum = 0.0;
+        let mut maximum_error = 0.0_f64;
+
+        for (scenario, scenario_weight) in config
+            .prior_scenarios
+            .iter()
+            .zip(normalized_weights.iter().copied())
+        {
+            let prior = normalize_probabilities(&scenario.probabilities);
+            let prior_entropy = discrete_entropy(&prior);
+            let expected_detection_probability: f64 = prior
+                .iter()
+                .zip(&detection_probabilities)
+                .map(|(probability, detection)| probability * detection)
+                .sum();
+
+            let detection_indicator_eig = binary_channel_mutual_information(
+                &prior,
+                &detection_probabilities,
+                expected_detection_probability,
+            )?;
+            let detected_prior = if expected_detection_probability > 0.0 {
+                prior
+                    .iter()
+                    .zip(&detection_probabilities)
+                    .map(|(probability, detection)| {
+                        probability * detection / expected_detection_probability
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                vec![0.0; prior.len()]
+            };
+            let (coarse_detected_eig, refined_detected_eig) =
+                if expected_detection_probability > 0.0 {
+                    let coarse = gaussian_model_identity_eig(
+                        &normal_predictions,
+                        measurement_sigma,
+                        &detected_prior,
+                        config.quadrature_intervals,
+                    )
+                    .ok_or_else(|| {
+                        ModelDiscriminationError::NumericalOverflow(
+                            experiment.experiment_id.clone(),
+                        )
+                    })?;
+                    let refined = gaussian_model_identity_eig(
+                        &normal_predictions,
+                        measurement_sigma,
+                        &detected_prior,
+                        config.quadrature_intervals * 2,
+                    )
+                    .ok_or_else(|| {
+                        ModelDiscriminationError::NumericalOverflow(
+                            experiment.experiment_id.clone(),
+                        )
+                    })?;
+                    (coarse, refined)
+                } else {
+                    (0.0, 0.0)
+                };
+
+            let total_given_execution =
+                detection_indicator_eig + expected_detection_probability * refined_detected_eig;
+            let execution_adjusted =
+                experiment.availability_probability * total_given_execution;
+            let quadrature_error = experiment.availability_probability
+                * expected_detection_probability
+                * (refined_detected_eig - coarse_detected_eig).abs();
+            let converged = quadrature_error <= config.quadrature_tolerance_nats;
+            if total_given_execution > prior_entropy + 1.0e-8
+                || execution_adjusted > prior_entropy + 1.0e-8
+                || !total_given_execution.is_finite()
+                || !execution_adjusted.is_finite()
+            {
+                return Err(
+                    ModelDiscriminationError::DetectionInformationExceedsPriorEntropy(
+                        experiment.experiment_id.clone(),
+                    ),
+                );
+            }
+            let execution_adjusted = execution_adjusted.min(prior_entropy);
+            let expected_posterior_entropy = (prior_entropy - execution_adjusted).max(0.0);
+            maximum_error = maximum_error.max(quadrature_error);
+            worst_case = worst_case.min(execution_adjusted);
+            weighted_sum += scenario_weight * execution_adjusted;
+            prior_scenario_scores.push(DetectionAwarePriorScenarioEIG {
+                scenario_id: scenario.scenario_id.clone(),
+                prior_entropy_nats: prior_entropy,
+                expected_detection_probability,
+                detection_indicator_eig_nats: detection_indicator_eig,
+                conditional_detected_value_eig_nats: (expected_detection_probability > 0.0)
+                    .then_some(refined_detected_eig),
+                total_eig_given_execution_nats: total_given_execution,
+                availability_adjusted_total_eig_nats: execution_adjusted,
+                expected_posterior_entropy_nats: expected_posterior_entropy,
+                quadrature_error_nats: quadrature_error,
+                converged,
+            });
+        }
+
+        if prior_scenario_scores.iter().any(|score| !score.converged) {
+            scores.push(DetectionAwareExperimentScore {
+                experiment_id: experiment.experiment_id.clone(),
+                observable_id: experiment.observable_id.clone(),
+                cost: experiment.cost,
+                execution_probability: experiment.availability_probability,
+                status: ExperimentDiscriminationStatus::QuadratureNotConverged {
+                    maximum_error_nats: maximum_error,
+                    tolerance_nats: config.quadrature_tolerance_nats,
+                },
+                prior_scenario_scores,
+                worst_case_total_eig_nats: None,
+                weighted_mean_total_eig_nats: None,
+                worst_case_total_eig_per_cost: None,
+                weighted_mean_total_eig_per_cost: None,
+                open_world_unresolved_excluded,
+            });
+            continue;
+        }
+
+        let worst_case = worst_case.max(0.0);
+        let weighted_mean = (weighted_sum / total_scenario_weight).max(0.0);
+        scores.push(DetectionAwareExperimentScore {
+            experiment_id: experiment.experiment_id.clone(),
+            observable_id: experiment.observable_id.clone(),
+            cost: experiment.cost,
+            execution_probability: experiment.availability_probability,
+            status: ExperimentDiscriminationStatus::Scored,
+            prior_scenario_scores,
+            worst_case_total_eig_nats: Some(worst_case),
+            weighted_mean_total_eig_nats: Some(weighted_mean),
+            worst_case_total_eig_per_cost: Some(worst_case / experiment.cost),
+            weighted_mean_total_eig_per_cost: Some(weighted_mean / experiment.cost),
+            open_world_unresolved_excluded,
+        });
+    }
+
+    scores.sort_by(|left, right| {
+        let left_scored = matches!(left.status, ExperimentDiscriminationStatus::Scored);
+        let right_scored = matches!(right.status, ExperimentDiscriminationStatus::Scored);
+        right_scored
+            .cmp(&left_scored)
+            .then_with(|| {
+                right
+                    .worst_case_total_eig_per_cost
+                    .unwrap_or(f64::NEG_INFINITY)
+                    .total_cmp(
+                        &left
+                            .worst_case_total_eig_per_cost
+                            .unwrap_or(f64::NEG_INFINITY),
+                    )
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+
+    Ok(DetectionAwareModelDiscriminationReport {
+        model_ids: hypotheses
+            .iter()
+            .map(|hypothesis| hypothesis.model_id.clone())
+            .collect(),
+        model_universe: config.model_universe.clone(),
+        prior_scenario_ids: config
+            .prior_scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_id.clone())
+            .collect(),
+        experiments: scores,
+    })
+}
+
+fn validate_detection_probabilities(
+    candidate: &DetectionAwareCandidateExperiment,
+    hypotheses: &[DiscriminationHypothesis],
+) -> Result<BTreeMap<String, f64>, ModelDiscriminationError> {
+    let experiment_id = &candidate.experiment.experiment_id;
+    if candidate.detection_probabilities.len() != hypotheses.len() {
+        return Err(ModelDiscriminationError::DetectionProbabilityCount {
+            experiment_id: experiment_id.clone(),
+            expected: hypotheses.len(),
+            actual: candidate.detection_probabilities.len(),
+        });
+    }
+    let expected: BTreeSet<&str> = hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.model_id.as_str())
+        .collect();
+    let mut actual = BTreeMap::new();
+    for detection in &candidate.detection_probabilities {
+        if !expected.contains(detection.model_id.as_str()) {
+            return Err(ModelDiscriminationError::MissingDetectionProbability {
+                experiment_id: experiment_id.clone(),
+                model_id: detection.model_id.clone(),
+            });
+        }
+        if actual.contains_key(&detection.model_id) {
+            return Err(ModelDiscriminationError::DuplicateDetectionProbability {
+                experiment_id: experiment_id.clone(),
+                model_id: detection.model_id.clone(),
+            });
+        }
+        if !detection.probability_detected.is_finite()
+            || !(0.0..=1.0).contains(&detection.probability_detected)
+        {
+            return Err(ModelDiscriminationError::InvalidDetectionProbability {
+                experiment_id: experiment_id.clone(),
+                model_id: detection.model_id.clone(),
+            });
+        }
+        if detection.derivation_reference.trim().is_empty() {
+            return Err(ModelDiscriminationError::MissingDetectionDerivation {
+                experiment_id: experiment_id.clone(),
+                model_id: detection.model_id.clone(),
+            });
+        }
+        actual.insert(
+            detection.model_id.clone(),
+            detection.probability_detected,
+        );
+    }
+    for hypothesis in hypotheses {
+        if !actual.contains_key(&hypothesis.model_id) {
+            return Err(ModelDiscriminationError::MissingDetectionProbability {
+                experiment_id: experiment_id.clone(),
+                model_id: hypothesis.model_id.clone(),
+            });
+        }
+    }
+    Ok(actual)
+}
+
+fn binary_channel_mutual_information(
+    prior: &[f64],
+    detection_probabilities: &[f64],
+    marginal_detection_probability: f64,
+) -> Result<f64, ModelDiscriminationError> {
+    if prior.len() != detection_probabilities.len()
+        || !marginal_detection_probability.is_finite()
+        || !(0.0..=1.0).contains(&marginal_detection_probability)
+    {
+        return Err(ModelDiscriminationError::InvalidGaussianKlInputs);
+    }
+    let conditional_entropy: f64 = prior
+        .iter()
+        .zip(detection_probabilities)
+        .map(|(weight, probability)| weight * binary_entropy(*probability))
+        .sum();
+    let information = binary_entropy(marginal_detection_probability) - conditional_entropy;
+    if !information.is_finite() || information < -1.0e-9 {
+        return Err(ModelDiscriminationError::InvalidGaussianKlInputs);
+    }
+    Ok(information.max(0.0))
+}
+
+fn binary_entropy(probability: f64) -> f64 {
+    let detected = if probability > 0.0 {
+        -probability * probability.ln()
+    } else {
+        0.0
+    };
+    let not_detected = if probability < 1.0 {
+        -(1.0 - probability) * (1.0 - probability).ln()
+    } else {
+        0.0
+    };
+    detected + not_detected
 }
 
 fn validate_experiment(
@@ -1270,6 +1728,302 @@ mod tests {
                 > score.prior_scenario_scores[1].refined_eig_nats
         );
         assert!(score.worst_case_model_identity_eig_nats.is_some());
+    }
+
+    fn detection_prediction(model_id: &str, probability_detected: f64) -> ModelDetectionProbability {
+        ModelDetectionProbability {
+            model_id: model_id.to_string(),
+            probability_detected,
+            derivation_reference: format!("detection-model://{model_id}"),
+        }
+    }
+
+    fn detection_candidate(
+        id: &str,
+        execution_probability: f64,
+        predictions: Vec<GaussianModelPrediction>,
+        detection: Vec<ModelDetectionProbability>,
+    ) -> DetectionAwareCandidateExperiment {
+        let mut experiment = experiment(id, 1.0, Some(0.1), predictions);
+        experiment.availability_probability = execution_probability;
+        DetectionAwareCandidateExperiment {
+            experiment,
+            detection_probabilities: detection,
+        }
+    }
+
+    #[test]
+    fn equal_model_detection_probability_reduces_to_uninformative_availability() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let predictions = vec![
+            prediction("model-a", Some(-0.8), Some(0.1)),
+            prediction("model-b", Some(0.8), Some(0.1)),
+        ];
+        let candidate = detection_candidate(
+            "equal-detection",
+            0.8,
+            predictions.clone(),
+            vec![
+                detection_prediction("model-a", 0.5),
+                detection_prediction("model-b", 0.5),
+            ],
+        );
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[candidate],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        let score = &report.experiments[0];
+        let scenario = &score.prior_scenario_scores[0];
+        assert_eq!(score.status, ExperimentDiscriminationStatus::Scored);
+        assert!(scenario.detection_indicator_eig_nats.abs() < 1.0e-12);
+        assert!((scenario.expected_detection_probability - 0.5).abs() < 1.0e-12);
+        let mut legacy = experiment("legacy", 1.0, Some(0.1), predictions);
+        legacy.availability_probability = 0.4;
+        let legacy_report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[legacy],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        assert!(
+            (scenario.availability_adjusted_total_eig_nats
+                - legacy_report.experiments[0]
+                    .availability_adjusted_weighted_mean_model_identity_eig_nats
+                    .unwrap())
+            .abs()
+                < 1.0e-8
+        );
+    }
+
+    #[test]
+    fn detection_indicator_can_discriminate_when_value_distributions_are_identical() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = detection_candidate(
+            "detection-only",
+            1.0,
+            vec![
+                prediction("model-a", Some(0.0), Some(0.2)),
+                prediction("model-b", Some(0.0), Some(0.2)),
+            ],
+            vec![
+                detection_prediction("model-a", 0.9),
+                detection_prediction("model-b", 0.1),
+            ],
+        );
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[candidate],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        let scenario = &report.experiments[0].prior_scenario_scores[0];
+        let expected = binary_entropy(0.5) - 0.5 * binary_entropy(0.9) - 0.5 * binary_entropy(0.1);
+        assert!((scenario.detection_indicator_eig_nats - expected).abs() < 1.0e-12);
+        assert!(scenario.conditional_detected_value_eig_nats.unwrap().abs() < 1.0e-10);
+        assert!((scenario.total_eig_given_execution_nats - expected).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn model_conditional_detection_reweights_the_detected_measurement_prior() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = detection_candidate(
+            "detection-conditioned-value",
+            0.5,
+            vec![
+                prediction("model-a", Some(-1.0), Some(0.1)),
+                prediction("model-b", Some(1.0), Some(0.1)),
+            ],
+            vec![
+                detection_prediction("model-a", 0.9),
+                detection_prediction("model-b", 0.1),
+            ],
+        );
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[candidate],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+        let scenario = &report.experiments[0].prior_scenario_scores[0];
+        assert!((scenario.expected_detection_probability - 0.5).abs() < 1.0e-12);
+        assert!(scenario.detection_indicator_eig_nats > 0.0);
+        assert!(scenario.conditional_detected_value_eig_nats.unwrap() > 0.0);
+        assert!(
+            (scenario.expected_posterior_entropy_nats
+                - (scenario.prior_entropy_nats
+                    - 0.5 * scenario.total_eig_given_execution_nats))
+                .abs()
+                < 1.0e-10
+        );
+    }
+
+    #[test]
+    fn zero_detection_execution_and_zero_prior_models_are_defined() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = detection_candidate(
+            "never-detected",
+            0.0,
+            vec![
+                prediction("model-a", Some(-1.0), Some(0.1)),
+                prediction("model-b", Some(1.0), Some(0.1)),
+            ],
+            vec![
+                detection_prediction("model-a", 0.0),
+                detection_prediction("model-b", 0.8),
+            ],
+        );
+        let mut prior = equal_prior();
+        prior.probabilities = vec![1.0, 0.0];
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[candidate],
+            &config(vec![prior], 256),
+        )
+        .unwrap();
+        let scenario = &report.experiments[0].prior_scenario_scores[0];
+        assert_eq!(scenario.expected_detection_probability, 0.0);
+        assert_eq!(scenario.detection_indicator_eig_nats, 0.0);
+        assert_eq!(scenario.total_eig_given_execution_nats, 0.0);
+        assert_eq!(scenario.availability_adjusted_total_eig_nats, 0.0);
+        assert_eq!(scenario.conditional_detected_value_eig_nats, None);
+        assert!((scenario.expected_posterior_entropy_nats).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn detection_aware_eig_matches_independent_joint_outcome_integral() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = detection_candidate(
+            "joint-reference",
+            0.7,
+            vec![
+                prediction("model-a", Some(-0.7), Some(0.1)),
+                prediction("model-b", Some(0.9), Some(0.2)),
+            ],
+            vec![
+                detection_prediction("model-a", 0.8),
+                detection_prediction("model-b", 0.25),
+            ],
+        );
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[candidate],
+            &config(vec![equal_prior()], 512),
+        )
+        .unwrap();
+        let observed = report.experiments[0].prior_scenario_scores[0]
+            .availability_adjusted_total_eig_nats;
+
+        // Independent direct joint likelihood integral over (D=0) and
+        // (D=1, Y=y), rather than reusing the conditional-EIG decomposition.
+        let prior = [0.5, 0.5];
+        let detection = [0.8, 0.25];
+        let means = [-0.7, 0.9];
+        let sigmas = [0.1_f64.hypot(0.1), 0.2_f64.hypot(0.1)];
+        let q_bar = prior[0] * detection[0] + prior[1] * detection[1];
+        let mut direct = 0.0;
+        for index in 0..2 {
+            let p_miss = prior[index] * (1.0 - detection[index]);
+            if p_miss > 0.0 && q_bar < 1.0 {
+                direct += p_miss * ((1.0 - detection[index]) / (1.0 - q_bar)).ln();
+            }
+        }
+        let lower = means[0] - 10.0 * sigmas[0].max(sigmas[1]);
+        let upper = means[1] + 10.0 * sigmas[0].max(sigmas[1]);
+        let intervals = 20_000_usize;
+        let step = (upper - lower) / intervals as f64;
+        let mut integral = 0.0;
+        for index in 0..=intervals {
+            let y = lower + index as f64 * step;
+            let densities = [
+                (-0.5 * (y - means[0]).powi(2) / sigmas[0].powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * sigmas[0]),
+                (-0.5 * (y - means[1]).powi(2) / sigmas[1].powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * sigmas[1]),
+            ];
+            let joints = [
+                prior[0] * detection[0] * densities[0],
+                prior[1] * detection[1] * densities[1],
+            ];
+            let mixture = joints[0] + joints[1];
+            let mut density = 0.0;
+            for model in 0..2 {
+                if joints[model] > 0.0 {
+                    density += joints[model] * (densities[model] / mixture).ln();
+                }
+            }
+            let weight = if index == 0 || index == intervals {
+                1.0
+            } else if index % 2 == 0 {
+                2.0
+            } else {
+                4.0
+            };
+            integral += weight * density;
+        }
+        direct += integral * step / 3.0;
+        direct *= 0.7;
+        assert!((observed - direct).abs() < 2.0e-6);
+    }
+
+    #[test]
+    fn detection_probabilities_fail_closed_on_missing_duplicate_or_invalid_rows() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let base = vec![
+            prediction("model-a", Some(-1.0), Some(0.1)),
+            prediction("model-b", Some(1.0), Some(0.1)),
+        ];
+        let missing = detection_candidate(
+            "missing",
+            1.0,
+            base.clone(),
+            vec![detection_prediction("model-a", 0.5)],
+        );
+        assert!(matches!(
+            rank_detection_aware_model_discriminating_experiments(
+                &hypotheses,
+                &[missing],
+                &config(vec![equal_prior()], 128)
+            ),
+            Err(ModelDiscriminationError::DetectionProbabilityCount { .. })
+        ));
+
+        let duplicate = detection_candidate(
+            "duplicate",
+            1.0,
+            base.clone(),
+            vec![
+                detection_prediction("model-a", 0.5),
+                detection_prediction("model-a", 0.4),
+            ],
+        );
+        assert!(matches!(
+            rank_detection_aware_model_discriminating_experiments(
+                &hypotheses,
+                &[duplicate],
+                &config(vec![equal_prior()], 128)
+            ),
+            Err(ModelDiscriminationError::DuplicateDetectionProbability { .. })
+        ));
+
+        let invalid = detection_candidate(
+            "invalid",
+            1.0,
+            base,
+            vec![
+                detection_prediction("model-a", 1.01),
+                detection_prediction("model-b", 0.5),
+            ],
+        );
+        assert!(matches!(
+            rank_detection_aware_model_discriminating_experiments(
+                &hypotheses,
+                &[invalid],
+                &config(vec![equal_prior()], 128)
+            ),
+            Err(ModelDiscriminationError::InvalidDetectionProbability { .. })
+        ));
     }
 
     #[test]
