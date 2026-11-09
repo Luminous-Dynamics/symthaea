@@ -32,7 +32,8 @@ so the dual slack checked by the implementation is \(s=c-A^Ty\geq0\).
 - It has no access to evaluator-only labels or known optimal solutions.
 - It rejects dimension mismatches, non-finite inputs, invalid tolerances and detected non-finite arithmetic.
 - Dot products use compensated summation.
-- Feasibility, nonnegativity, dual feasibility, gap and complementarity have separate scale-aware tolerances.
+- Feasibility, nonnegativity, dual feasibility, gap and complementarity have separate dimensionless relative/backward-error tolerances. Denominators are derived from the original model and candidate vectors; they are not floored at 1, which would silently turn a uniformly tiny inconsistent model into an absolute-tolerance pass.
+- Homogeneous Farkas multipliers and unbounded rays are normalized before checking, so positive rescaling of a valid certificate cannot change its disposition. Farkas cone violations use per-column scales to prevent a large column from hiding a violation in a small one.
 - This is a **floating-point numerical checker**, not an exact-arithmetic theorem prover. A successful result means the declared numerical certificate passed the declared tolerance contract. It must not be described as a formal proof over real arithmetic.
 - It does not yet support inequality constraints, variable bounds, presolve transformations, integer variables, exact rational certificates or interval-arithmetic proof.
 
@@ -45,7 +46,7 @@ When a Rust toolchain is available, run:
     rustc --edition=2021 --test research/physical_compute/lp_certificate_v1.rs -o /tmp/lp_certificate_v1_tests
     /tmp/lp_certificate_v1_tests
 
-The source currently authors 12 positive/negative unit tests covering:
+The source currently authors 16 positive/negative unit tests covering:
 - a known primal/dual optimality pair;
 - primal infeasibility and dual infeasibility;
 - excessive duality gap;
@@ -53,7 +54,10 @@ The source currently authors 12 positive/negative unit tests covering:
 - valid and invalid improving rays;
 - dimension mismatch;
 - non-finite model input;
-- invalid, non-finite and greater-than-one tolerance configurations.
+- invalid, non-finite and greater-than-one tolerance configurations;
+- positive scale invariance of Farkas vectors and unbounded rays across very small and very large magnitudes;
+- rejection of a tiny-scaled vector that is not actually in the null space;
+- rejection of an infeasible certificate on a uniformly tiny LP, guarding against absolute-floor false acceptance.
 
 **Execution status:** tests are authored but have not been compiled or run in the current authoring environment. No CI, repository or hardware qualification is implied.
 
