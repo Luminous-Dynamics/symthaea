@@ -25,6 +25,18 @@ The fixture uses only fictional IDs, values and sources. It carries exact synthe
 
 The first five frontiers are frozen before the shipment outcome is known. F5 is an outcome-resolution frontier.
 
+## Candidate delivery and oracle isolation
+
+The JSON stream is a public development source fixture, not a candidate prompt. A runner must:
+- hold the full stream and oracle on the evaluator side;
+- at frontier Fk, materialize only events whose exact `known_at <= decision_at` and whose rights/profile is admissible;
+- send the candidate only the current frontier, permitted evidence payloads, task prompt and its own prior response/snapshot (if the tested workflow has memory);
+- collect and freeze the candidate response before advancing to Fk+1;
+- retain exact input/output bytes, prompt/tool versions, frontier, run identity, timestamp and cost for every snapshot;
+- never expose the F5 receipt or expected oracle to a candidate at F0–F4.
+
+Because this development fixture is public, it cannot support a sealed confirmation claim. A confirmation cohort must be generated from precommitted hidden seeds and held-out outcome data not present in the candidate packet.
+
 ## Required behavior
 
 1. Emit a complete, immutable research snapshot at each frontier.
