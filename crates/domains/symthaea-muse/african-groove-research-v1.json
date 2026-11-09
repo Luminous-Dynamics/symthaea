@@ -120,13 +120,15 @@
     },
     {
       "id": "juju_directing",
-      "title": "Origin and development of Directing in juju music performance",
-      "kind": "research_article",
-      "url": "https://academicjournals.org/journal/JMD/article-full-text/777EB6547545",
+      "title": "Origin and development of 'Directing' in juju music performance",
+      "kind": "open_access_fieldwork_based_music_performance_article",
+      "url": "https://doi.org/10.5897/JMD2014.0027",
       "supports": [
         "juju"
       ],
-      "scope": "Describes instrumental, verbal and non-verbal performance direction, including lead guitar, talking drum and ensemble cues."
+      "scope": "Analyzes live performances and recordings; distinguishes instrumental, verbal and non-verbal directing, including guitar and talking-drum signals. Its terminology and sample are scoped to the studied Juju performances.",
+      "year": 2014,
+      "full_text_url": "https://academicjournals.org/journal/JMD/article-full-text/777EB6547545"
     },
     {
       "id": "zaire_urban_music",
