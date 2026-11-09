@@ -747,7 +747,7 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioDecision {
         selected_test_downtime_cost_units: selected_test.map(|test| test.downtime_cost_units),
         selected_test_net_value_units: selected_test.and_then(|test| test.net_value_units),
         expected_post_test_loss: expected_post,
-        expected_post_test_regret,
+        expected_post_test_regret: expected_post_regret,
         maximum_information_gain_test_id: best_info.map(|test| test.test_id.clone()),
         maximum_gross_evsi_test_id: best_gross.map(|test| test.test_id.clone()),
         eligible_test_count: evaluations.iter().filter(|test| test.eligible).count(),
