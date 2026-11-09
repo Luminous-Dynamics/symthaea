@@ -96,9 +96,26 @@ jobs:
             .policy_count == 7 and
             .pair_count == 2751 and
             .episode_count == 5502 and
+            .report_version == "symthaea-open-world-finite-policy-campaign-v1" and
             (.results | length) == 21 and
             (.pair_records | length) == 2751 and
+            (.paired_contrasts | length) == 21 and
             ([.pair_records[].pair_id] | unique | length) == 2751 and
+            all(.paired_contrasts[];
+              .pair_count > 0 and
+              (.exact_model_set_match.a0_only + .exact_model_set_match.a2_only + .exact_model_set_match.both_true + .exact_model_set_match.neither) == .pair_count and
+              (.exact_structure_set_match.a0_only + .exact_structure_set_match.a2_only + .exact_structure_set_match.both_true + .exact_structure_set_match.neither) == .pair_count and
+              (.generating_truth_retained.a0_only + .generating_truth_retained.a2_only + .generating_truth_retained.both_true + .generating_truth_retained.neither) == .pair_count and
+              (.decision_correct.a0_only + .decision_correct.a2_only + .decision_correct.both_true + .decision_correct.neither) == .pair_count and
+              (.evidence_references_valid.a0_only + .evidence_references_valid.a2_only + .evidence_references_valid.both_true + .evidence_references_valid.neither) == .pair_count and
+              (.false_unique_structure_claim.a0_only + .false_unique_structure_claim.a2_only + .false_unique_structure_claim.both_true + .false_unique_structure_claim.neither) == .pair_count and
+              (.false_unique_model_claim.a0_only + .false_unique_model_claim.a2_only + .false_unique_model_claim.both_true + .false_unique_model_claim.neither) == .pair_count and
+              (.correct_identified_structure.a0_only + .correct_identified_structure.a2_only + .correct_identified_structure.both_true + .correct_identified_structure.neither) == .pair_count and
+              (.missed_identifiable_structure.a0_only + .missed_identifiable_structure.a2_only + .missed_identifiable_structure.both_true + .missed_identifiable_structure.neither) == .pair_count and
+              (.safe_abstention.a0_only + .safe_abstention.a2_only + .safe_abstention.both_true + .safe_abstention.neither) == .pair_count and
+              (.unnecessary_abstention.a0_only + .unnecessary_abstention.a2_only + .unnecessary_abstention.both_true + .unnecessary_abstention.neither) == .pair_count and
+              .a2_minus_a0_probe_actions == (.a2_probe_actions - .a0_probe_actions)
+            ) and
             all(.pair_records[];
               .a0.generating_model_in_version_space and
               .a2.generating_model_in_version_space and
