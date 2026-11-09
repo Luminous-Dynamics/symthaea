@@ -840,7 +840,15 @@
         "unanswerable_false_answer_rate",
         "appropriate_abstention_rate",
         "answerable_abstention_rate",
-        "evidence_span_coverage"
+        "evidence_span_coverage",
+        "claim_id_precision",
+        "claim_id_recall",
+        "reference_claim_evidence_coverage",
+        "citation_sample_precision",
+        "reference_sample_recall",
+        "claim_conditioned_sample_iou",
+        "unsupported_predicted_claim_rate",
+        "unsupported_citation_sample_rate"
       ],
       "system_arms": [
         "asr_to_evidence_aware_semantic_pipeline",
@@ -862,7 +870,14 @@
         "claim_label_ontology_revision",
         "conflict_axis_annotation_revision",
         "trial_manifest_sha256",
-        "exact_metric_numerators_and_denominators"
+        "exact_metric_numerators_and_denominators",
+        "sample_rate_hz",
+        "audio_sample_count",
+        "evidence_interval_coordinate_system_half_open_samples",
+        "citation_source_audio_sha256",
+        "reference_support_interval_manifest_sha256",
+        "evidence_span_scorer_revision",
+        "claim_to_evidence_overlap_counts"
       ],
       "required_controls": [
         "context_predicts_wrong_word_audio_unambiguous",
@@ -870,7 +885,13 @@
         "number_unit_negation_role_counterfactuals",
         "silence_or_unanswerable_audio",
         "mixed_audio_source_ambiguity",
-        "text_only_negative_control"
+        "text_only_negative_control",
+        "correct_claim_wrong_interval",
+        "correct_claim_no_citation",
+        "wrong_claim_correct_interval",
+        "overbroad_citation_interval",
+        "overlapping_citations_union_not_double_counted",
+        "citation_from_wrong_audio_digest"
       ],
       "prospective_gates": [
         "zero_context_only_substitution_on_unambiguous_controls",
@@ -879,10 +900,18 @@
         "separate_context_override_and_prompt_override_rates",
         "privacy_and_consent_review_for_real_speakers",
         "frozen_acoustic_faithfulness_vectors_match_exact_numerators_and_denominators",
-        "unanswerable_false_answer_and_override_denominators_remain_separate"
+        "unanswerable_false_answer_and_override_denominators_remain_separate",
+        "zero_cross_audio_citations_accepted",
+        "zero_out_of_bounds_evidence_intervals_accepted",
+        "overlapping_intervals_union_before_sample_rate_calculation",
+        "claim_correctness_and_evidence_localization_reported_separately",
+        "zero_denominators_reported_non_estimable_not_zero_success"
       ],
-      "implementation_issue": 11140,
-      "implementation_pr": 11146
+      "implementation_issue": 11138,
+      "implementation_pr": 11146,
+      "evidence_span_implementation_issue": 11218,
+      "evidence_span_implementation_pr": 11220,
+      "note": "Binary evidence_span_present is retained only as a coarse trial-level coverage diagnostic. Confirmatory localization uses the source-bound sample-interval scorer from #11218/#11220; it reports claim correctness separately from citation precision/recall/IoU and does not prove model-internal reliance."
     },
     {
       "id": "paired_causal_counterfactual_evaluation",
