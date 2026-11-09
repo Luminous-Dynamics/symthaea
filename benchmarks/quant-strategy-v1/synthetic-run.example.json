@@ -1,0 +1,57 @@
+{
+  "schema_version": "luminous.quant-strategy-run.v1",
+  "run_id": "synthetic.cash.equal-weight.reference.0001",
+  "cohort": "synthetic_reference",
+  "decision_time": "2026-01-05T16:00:00Z",
+  "universe": {
+    "profile_id": "SYNTHETIC_TWO_ASSET_V1",
+    "membership_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "delisted_included": true,
+    "corporate_action_profile": "synthetic_no_actions_v1"
+  },
+  "strategy": {
+    "strategy_id": "equal_weight_v1",
+    "code_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "feature_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "model_family": "deterministic_rule"
+  },
+  "data_frontier": {
+    "mode": "streaming_known_at",
+    "source_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "point_in_time": true,
+    "event_time_and_known_at_separate": true
+  },
+  "split": {
+    "split_id": "synthetic_reference_no_training",
+    "training_cutoff": "2026-01-04T23:59:59Z",
+    "evaluation_start": "2026-01-05T00:00:00Z",
+    "evaluation_end": "2026-01-05T16:00:00Z",
+    "purge_policy": "not_applicable_synthetic_reference",
+    "embargo_seconds": 0
+  },
+  "portfolio": {
+    "base_currency": "USD",
+    "starting_cash_minor_units": 1000000,
+    "max_leverage_bps": 10000,
+    "long_only": true
+  },
+  "execution": {
+    "fill_profile": "synthetic_next_event_v1",
+    "fee_bps": 0,
+    "spread_bps": 0,
+    "slippage_bps": 0,
+    "market_impact_bps": 0,
+    "funding_bps_annualized": 0,
+    "borrow_bps_annualized": 0,
+    "unknown_costs": []
+  },
+  "baseline_ids": [
+    "cash_v1",
+    "buy_and_hold_v1",
+    "equal_weight_v1"
+  ],
+  "trial_id": "synthetic-reference-only",
+  "rights_profile": "synthetic-public-development",
+  "claim_ceiling": "synthetic_integrity_only"
+}
