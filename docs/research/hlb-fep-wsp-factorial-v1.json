@@ -740,7 +740,8 @@
         "robust_actual_expected_score",
         "known_truth_decision_regret",
         "e_process_crossing_index",
-        "mean_score_vs_sequential_detection_disagreement"
+        "mean_score_vs_sequential_detection_disagreement",
+        "strict_alpha_domain_validation"
       ],
       "negative_controls": [
         "well_specified_family",
@@ -1610,7 +1611,8 @@
     "The open-world stress runner must assert a preregistered nominal-to-TV-robust probe switch under a declared known-truth misspecification and report exact expected scores against a no-probe and known-truth oracle reference.",
     "The prequential benchmark must include a symmetric-predictive regime-shift fixture where aggregate log-loss and Brier thresholds do not cross but a predictable-alternative e-process crosses its preregistered Ville threshold.",
     "A deterministic out-of-support observation must trigger the hard model-adequacy failure even when the minimum-observation threshold is not met.",
-    "The open-world benchmark result must be marked synthetic-known-truth-only and bind its exact source SHA; it must not be presented as a live ActiveInferenceAgent, field, or SOTA result."
+    "The open-world benchmark result must be marked synthetic-known-truth-only and bind its exact source SHA; it must not be presented as a live ActiveInferenceAgent, field, or SOTA result.",
+    "The anytime e-process significance parameter must satisfy the strict open interval 0 < alpha < 1; zero, one, out-of-range, NaN, and infinite values fail closed."
   ],
   "research_references": [
     {
