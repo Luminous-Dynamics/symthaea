@@ -1,0 +1,748 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-structural-health-case:v0.1",
+  "title": "Marine structural health case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "status",
+    "mission_binding",
+    "asset_region",
+    "failure_mechanisms",
+    "exposure",
+    "observations",
+    "direct_inspections",
+    "assessment",
+    "decision",
+    "voi",
+    "evidence",
+    "claim_limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_fixture_not_structural_acceptance"
+    },
+    "mission_binding": {
+      "$ref": "#/$defs/missionBinding"
+    },
+    "asset_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "component_id",
+        "structure_revision",
+        "material_family",
+        "coordinate_frame",
+        "geometry_ref",
+        "criterion_ref"
+      ],
+      "properties": {
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structure_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "material_family": {
+          "enum": [
+            "aluminium",
+            "steel",
+            "fibre_reinforced_composite",
+            "hybrid_joint",
+            "unknown"
+          ]
+        },
+        "coordinate_frame": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometry_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "criterion_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "failure_mechanisms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "fatigue_crack",
+          "general_corrosion",
+          "localized_corrosion",
+          "coating_degradation",
+          "delamination",
+          "impact_damage",
+          "bond_joint_degradation",
+          "unknown"
+        ]
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration_h",
+        "sea_state_class",
+        "speed_kn",
+        "loading_ref",
+        "temperature_c",
+        "salinity_ppt",
+        "wet_dry_state",
+        "evidence_ref",
+        "evidence_class"
+      ],
+      "properties": {
+        "duration_h": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sea_state_class": {
+          "enum": [
+            "calm",
+            "moderate",
+            "severe",
+            "unknown"
+          ]
+        },
+        "speed_kn": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "loading_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temperature_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "salinity_ppt": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "wet_dry_state": {
+          "enum": [
+            "dry",
+            "wet",
+            "cyclic",
+            "submerged",
+            "unknown"
+          ]
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "measured",
+            "external_source"
+          ]
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "direct_inspections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/inspection"
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_ref",
+        "method_validation_status",
+        "applicability_status",
+        "condition_disposition",
+        "uncertainty_status",
+        "evidence_refs"
+      ],
+      "properties": {
+        "method_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method_validation_status": {
+          "enum": [
+            "qualified_for_declared_scope",
+            "research_only",
+            "synthetic_rule",
+            "unqualified",
+            "unknown"
+          ]
+        },
+        "applicability_status": {
+          "enum": [
+            "within_scope",
+            "out_of_domain",
+            "unknown"
+          ]
+        },
+        "condition_disposition": {
+          "enum": [
+            "valid_within_declared_scope",
+            "inspection_required",
+            "indeterminate",
+            "unsupported",
+            "rejected_by_qualified_evidence"
+          ]
+        },
+        "uncertainty_status": {
+          "enum": [
+            "quantified",
+            "partially_quantified",
+            "not_quantified",
+            "unknown"
+          ]
+        },
+        "probability_of_damage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rul_interval_days": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recommended_action",
+        "authority_mode",
+        "governing_limit_ref",
+        "reason",
+        "human_decision_status"
+      ],
+      "properties": {
+        "recommended_action": {
+          "enum": [
+            "continue_existing_approved_plan",
+            "targeted_inspection",
+            "competent_structural_review",
+            "authority_escalation",
+            "repair_or_restriction_review",
+            "no_recommendation"
+          ]
+        },
+        "authority_mode": {
+          "const": "advisory_only_no_authorization"
+        },
+        "governing_limit_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "human_decision_status": {
+          "enum": [
+            "not_reviewed",
+            "accepted_for_review",
+            "rejected",
+            "overridden",
+            "closed_with_evidence"
+          ]
+        }
+      }
+    },
+    "voi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "policy_id",
+        "cost_unit",
+        "expected_loss_before",
+        "expected_loss_after_information",
+        "evsi",
+        "acquisition_and_downtime_cost",
+        "net_voi",
+        "assumption_class",
+        "cost_model_ref"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "calculated_synthetic",
+            "calculated_qualified",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_loss_before": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "expected_loss_after_information": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evsi": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "acquisition_and_downtime_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "net_voi": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "assumption_class": {
+          "enum": [
+            "synthetic",
+            "qualified",
+            "unqualified",
+            "not_applicable"
+          ]
+        },
+        "cost_model_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "source_ref",
+        "raw_artifact_digest",
+        "time_sync_status",
+        "calibration_status",
+        "coverage_fraction"
+      ],
+      "properties": {
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "model_estimate",
+            "external_source",
+            "measured",
+            "hil",
+            "phil"
+          ]
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_artifact_digest": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "time_sync_status": {
+          "enum": [
+            "synchronized",
+            "uncertain",
+            "unsynchronized",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "current",
+            "expired",
+            "drift_suspected",
+            "missing",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "coverage_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "claim_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "nullableSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "missionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "modality",
+        "evidence_role",
+        "sensor_or_method_ref",
+        "region_id",
+        "data_quality",
+        "calibration_status",
+        "coverage_fraction",
+        "sample_rate_hz",
+        "time_sync_status",
+        "value",
+        "unit",
+        "uncertainty",
+        "raw_artifact_digest"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modality": {
+          "enum": [
+            "wave_radar",
+            "anemometer",
+            "gnss_speed_heading",
+            "strain_gauge",
+            "fiber_bragg_grating",
+            "accelerometer",
+            "acoustic_emission",
+            "electrochemical_impedance",
+            "electrochemical_noise",
+            "visual_rov",
+            "ultrasonic_thickness",
+            "phased_array_ut",
+            "composite_ndt",
+            "other"
+          ]
+        },
+        "evidence_role": {
+          "enum": [
+            "environment_context",
+            "structural_response",
+            "damage_indicator",
+            "direct_inspection"
+          ]
+        },
+        "sensor_or_method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_quality": {
+          "enum": [
+            "valid",
+            "missing",
+            "stale",
+            "drift_suspected",
+            "saturated",
+            "unsynchronized",
+            "out_of_domain",
+            "inconclusive"
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "current",
+            "expired",
+            "drift_suspected",
+            "missing",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "coverage_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sample_rate_hz": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "time_sync_status": {
+          "enum": [
+            "synchronized",
+            "uncertain",
+            "unsynchronized",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "raw_artifact_digest": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inspection_id",
+        "method",
+        "procedure_ref",
+        "procedure_revision",
+        "operator_qualification_ref",
+        "region_id",
+        "coverage_fraction",
+        "result",
+        "measured_value",
+        "unit",
+        "expanded_uncertainty",
+        "acceptance_lower_bound",
+        "acceptance_upper_bound",
+        "criterion_ref",
+        "evidence_class"
+      ],
+      "properties": {
+        "inspection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "visual",
+            "ultrasonic_thickness",
+            "phased_array_ut",
+            "radiography",
+            "eddy_current",
+            "dye_penetrant",
+            "magnetic_particle",
+            "eis",
+            "en",
+            "composite_ndt",
+            "other"
+          ]
+        },
+        "procedure_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "procedure_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator_qualification_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "result": {
+          "enum": [
+            "no_indication",
+            "indication",
+            "inconclusive",
+            "not_performed",
+            "reject_by_criterion"
+          ]
+        },
+        "measured_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expanded_uncertainty": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "acceptance_lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "acceptance_upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "criterion_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "measured",
+            "external_source"
+          ]
+        }
+      }
+    }
+  }
+}
