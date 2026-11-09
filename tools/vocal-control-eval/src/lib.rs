@@ -372,7 +372,9 @@ mod tests {
         );
 
         treatment.insert("breathiness".into(), 1.1);
-        assert!(score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).is_err());
+        assert!(
+            score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).is_err()
+        );
     }
 
     #[test]
