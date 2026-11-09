@@ -844,14 +844,16 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
         let Some(base_harmony_onset) = base_harmony_onset else {
             continue;
         };
-        let base_shape: Vec<(i32, f32)> = score
+        let base_shape: Vec<(i32, f32, PartId)> = score
             .notes
             .iter()
             .filter(|n| {
                 n.role == VoiceRole::Harmony
                     && (n.onset.beats() - base_harmony_onset.beats()).abs() < 1e-6
             })
-            .map(|n| (n.pitch.midi() as i32, n.velocity))
+            // Planing transforms the captured harmony material; it must keep
+            // the exact source part identity of each chord tone.
+            .map(|n| (n.pitch.midi() as i32, n.velocity, n.part))
             .collect();
         if base_shape.is_empty() {
             continue;
@@ -861,9 +863,9 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
         });
         for (onset, duration, midi, si_intensity) in melody {
             let shift = midi - base_melody_midi;
-            for &(base_midi, vel) in &base_shape {
+            for &(base_midi, vel, part) in &base_shape {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch: Pitch::from_midi((base_midi + shift).clamp(0, 127) as u8),
                     onset,
                     duration,
@@ -4815,6 +4817,78 @@ mod tests {
         apply_roll_ornaments(&mut score, key, &dna, 13);
         assert_eq!(score.notes.len(), 5);
         assert!(score.notes.iter().all(|note| note.part == PartId(44)));
+    }
+
+    #[test]
+    fn parallel_planing_preserves_the_source_harmony_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(1),
+            pitch: Pitch::new(crate::pitch::PitchClass::D, 4),
+            onset: Duration::new(8, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        score.push(ScoreNote {
+            part: PartId(1),
+            pitch: Pitch::new(crate::pitch::PitchClass::E, 4),
+            onset: Duration::new(9, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        for midi in [48u8, 55, 60] {
+            score.push(ScoreNote {
+                part: PartId(27),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(8, 1),
+                duration: Duration::new(4, 1),
+                velocity: 0.45,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 0.8,
+            });
+        }
+
+        let empty_phrase = crate::phrase::Phrase {
+            line: crate::motif::Motif::from_degrees(&[(1, Duration::quarter())]),
+            progression: vec![1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![
+                Section {
+                    role: SectionRole::A,
+                    key,
+                    period: crate::phrase::Period {
+                        antecedent: empty_phrase.clone(),
+                        consequent: empty_phrase.clone(),
+                    },
+                },
+                Section {
+                    role: SectionRole::B,
+                    key,
+                    period: crate::phrase::Period {
+                        antecedent: empty_phrase.clone(),
+                        consequent: empty_phrase,
+                    },
+                },
+            ],
+        };
+
+        apply_parallel_planing(&mut score, &form, 1, 4.0);
+        let planed: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Harmony && note.onset.beats() >= 8.0)
+            .collect();
+        assert_eq!(planed.len(), 6);
+        assert!(planed.iter().all(|note| note.part == PartId(27)));
+        assert!(score.has_part_identity());
     }
 
     /// Regression test for the counter-melody overlap bugs fixed in
