@@ -64,6 +64,27 @@ fn array_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Vec<Value>> {
         .ok_or_else(|| fail(format!("expected array at {}", path.join("."))))
 }
 
+fn validate_value_against_schema(schema_text: &str, instance: &Value, label: &str) -> Result<()> {
+    let schema: Value = serde_json::from_str(schema_text)
+        .map_err(|error| fail(format!("{label} schema JSON parse: {error}")))?;
+    draft202012::meta::validate(&schema)
+        .map_err(|error| fail(format!("{label} Draft 2020-12 meta-schema: {error}")))?;
+    let validator = draft202012::options()
+        .build(&schema)
+        .map_err(|error| fail(format!("{label} schema compile: {error}")))?;
+    let errors: Vec<String> = validator
+        .iter_errors(instance)
+        .map(|error| error.to_string())
+        .collect();
+    if !errors.is_empty() {
+        return Err(fail(format!(
+            "{label} instance does not conform: {}",
+            errors.join("; ")
+        )));
+    }
+    Ok(())
+}
+
 fn validate_schema_instance(schema_text: &str, instance_text: &str, label: &str) -> Result<Value> {
     let schema: Value = serde_json::from_str(schema_text)
         .map_err(|error| fail(format!("{label} schema JSON parse: {error}")))?;
@@ -294,6 +315,12 @@ fn validate_claim_ladder(episode: &Value) -> Result<()> {
 /// Cross-check agent-visible actions against grader-only transitions and
 /// verify that every expected stop decision matches the finite state machine.
 pub fn validate_cross_corpus(agent: &Value, grader: &Value) -> Result<()> {
+    // Revalidate caller-supplied values as well as the embedded corpus. This
+    // keeps mutation tests honest: cross-view checks must reject hidden fields
+    // even when invoked without validate_embedded_corpus().
+    validate_value_against_schema(AGENT_SCHEMA, agent, "agent view")?;
+    validate_value_against_schema(GRADER_SCHEMA, grader, "grader view")?;
+
     if string_at(agent, &["use"])? != "agent_visible_development_input_only"
         || string_at(grader, &["access_policy"])? != "never_mount_in_agent_workspace"
         || !bool_at(agent, &["not_human_adjudicated"])?
