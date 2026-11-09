@@ -680,7 +680,7 @@ pub struct GroupIntervalSelectionPlan {
     /// Number of records avoided by excluding whole groups.
     pub excluded_record_count: usize,
     /// Group-directory entries visited by validation and selection.
-    pub group_directory_records_scanned: usize,
+    pub group_directory_linear_pass_entries: usize,
     /// Stable member IDs walked for defensive disjointness validation.
     /// Zero when a build-time partition receipt is used.
     pub member_roster_ids_scanned: usize,
@@ -1434,8 +1434,8 @@ pub fn select_group_refinement_set_with_partition_receipt(
         });
     }
     let mut plan = select_group_refinement_set_impl(groups, top_k, coverage, false)?;
-    plan.group_directory_records_scanned = plan
-        .group_directory_records_scanned
+    plan.group_directory_linear_pass_entries = plan
+        .group_directory_linear_pass_entries
         .checked_add(groups.len())
         .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?;
     Ok(plan)
@@ -1582,7 +1582,7 @@ fn select_group_refinement_set_impl(
         excluded_groups,
         refinement_record_count,
         excluded_record_count,
-        group_directory_records_scanned: groups
+        group_directory_linear_pass_entries: groups
             .len()
             .checked_mul(2)
             .ok_or(GroupIntervalSelectionError::MemberCountOverflow)?,
@@ -2728,8 +2728,8 @@ mod tests {
         assert_eq!(fast.excluded_record_count, defensive.excluded_record_count);
         assert_eq!(defensive.member_roster_ids_scanned, 3);
         assert_eq!(fast.member_roster_ids_scanned, 0);
-        assert_eq!(defensive.group_directory_records_scanned, 4);
-        assert_eq!(fast.group_directory_records_scanned, 6);
+        assert_eq!(defensive.group_directory_linear_pass_entries, 4);
+        assert_eq!(fast.group_directory_linear_pass_entries, 6);
         assert_eq!(receipt.group_count(), 2);
         assert_eq!(receipt.eligible_records(), 3);
 
