@@ -3,6 +3,8 @@
 **Status:** research protocol and synthetic manifest foundation only  
 **Parent:** [SYM-QUANT-EVAL-001 #11234](https://github.com/Luminous-Dynamics/symthaea/issues/11234)  
 **Companion:** [SYM-FIN-EVAL-002 / PR #11233](https://github.com/Luminous-Dynamics/symthaea/pull/11233)
+**Shared temporal contract:** [SYM-FIN-TIME-001 #11241](https://github.com/Luminous-Dynamics/symthaea/issues/11241) — use the same bitemporal availability and revision semantics as financial research; do not reimplement a separate timestamp policy.
+**Evaluator/reference metrology:** [FIN-EVAL-METROLOGY-001 #11254](https://github.com/Luminous-Dynamics/symthaea/issues/11254) — use only for analyst/judge-scored workflow comparisons; deterministic portfolio accounting oracles remain independently specified.
 
 ## 1. Research question
 
@@ -44,6 +46,14 @@ None of these sources establishes one universal trading SOTA. All comparative re
 8. **Abstention is a policy.** Permit hold/cash/reduced risk/no-trade when evidence is stale, signal is weak, market regime is outside support, uncertainty is high or liquidity is inadequate.
 9. **Capacity is an outcome.** Report minimum viable and maximum practical capital, participation and liquidity strata; small illiquid-market alpha is not scalable by default.
 10. **No universal scalar.** Preserve return, risk, capacity, liquidity, cost, uncertainty, robustness and operational integrity as separate outcomes.
+
+## 3a. Temporal admissibility and evaluation measurement
+
+Use the shared temporal semantics in #11241 for every market observation, corporate-action revision, filing, macro vintage, constituent membership and feature source. The decision frontier is an inclusive upper bound; availability time is actor/entitlement-specific; retrieval time is distinct from source availability.
+
+For historical replay, later retrieval is admissible only when the exact vintage and its historical availability are independently evidenced. For prospective streaming, both availability and local ingestion must occur by the decision frontier. A backdated effective date is not a substitute for known-at time. Preserve revised and superseded versions so the evaluator can reconstruct what was visible at each frontier.
+
+Use deterministic reference oracles for cash, positions, returns, costs, fills and risk metrics wherever exact ground truth is available. For human- or LLM-judged research workflows, qualify references and judges under #11254; do not let an LLM judge replace accounting arithmetic or execution reconciliation.
 
 ## 4. Cohorts and split design
 
