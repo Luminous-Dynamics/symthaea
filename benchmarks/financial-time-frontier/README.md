@@ -37,6 +37,19 @@ requested period, independently corroborated, or sufficient to support an analyt
 Inspect `ValidityState` and reason codes separately; claim support and source-family
 independence belong to higher-level verifiers.
 
+## Rights and entitlement proof
+
+A matching `rights_profile_id` and `RightsDisposition::Authorized` value are not sufficient
+for qualification. Each evidence version also needs a separately verified `RightsProof`
+binding the exact evidence ID, evaluated principal, rights profile, authorization disposition,
+validity interval, verifier identity and verifier-build SHA-256. The rights proof must be valid
+at the decision frontier. Missing or unverifiable rights proof is Indeterminate; identity,
+profile, disposition, verifier or validity mismatches fail closed.
+
+The crate consumes the typed result from an independent Mycelix/provenance rights verifier.
+It does not authenticate signatures or licences itself. Do not construct `RightsProof::Verified`
+from an unverified JSON field; only the trusted adapter/verifier boundary may produce it.
+
 ## Timestamp precision
 
 Version 0.1 accepts only exact, offset-aware availability instants. Some source APIs expose only calendar dates or vintage dates. Do not convert a date-only vintage to midnight and claim an exact instant. For an intraday decision frontier, that source is Indeterminate unless another retained record proves the exact availability time. A later version should support interval-bounded availability (earliest possible / latest possible) and return Indeterminate whenever the interval straddles the frontier.
