@@ -2614,11 +2614,17 @@ fn portfolio_output_bytes(
 ) -> Result<usize, PolicyPortfolioError> {
     let models = family.model_count();
     let policies = partition.len();
+    let partition_header_bytes = policies
+        .checked_mul(std::mem::size_of::<Vec<usize>>())
+        .and_then(|value| value.checked_add(std::mem::size_of::<Vec<Vec<usize>>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     let partition_bytes = partition.iter().try_fold(
-        std::mem::size_of::<Vec<Vec<usize>>>() + policies * std::mem::size_of::<Vec<usize>>(),
-        |total, cluster| total.checked_add(
-            cluster.len().checked_mul(std::mem::size_of::<usize>())?
-        ).ok_or(PolicyPortfolioError::DimensionOverflow),
+        partition_header_bytes,
+        |total, cluster| {
+            let members = cluster.len().checked_mul(std::mem::size_of::<usize>())
+                .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+            total.checked_add(members).ok_or(PolicyPortfolioError::DimensionOverflow)
+        },
     )?;
     let cluster_bytes = cluster_solutions.iter().try_fold(
         policies.checked_mul(std::mem::size_of::<VerifiedClusterPolicyOptimum>())
@@ -2796,6 +2802,20 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         }
     })?;
     all_models.extend(0..model_count);
+
+    // Preflight a conservative outer/inner working-set floor before starting
+    // the seed solve. The solver itself performs its own detailed allocations.
+    let outer_base_bytes = std::mem::size_of::<Vec<ClusterPolicyCacheEntry>>()
+        .checked_add(std::mem::size_of::<Vec<OuterPartitionSearchNode>>())
+        .and_then(|value| value.checked_add(budget.per_cluster.max_total_memory_bytes))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if outer_base_bytes > budget.max_total_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "outer seed plus inner working-set memory bytes",
+            required: outer_base_bytes,
+            limit: budget.max_total_memory_bytes,
+        });
+    }
 
     // Seed a feasible upper bound using the exact single-cluster solver.
     let mut seed_inner_budget = budget.per_cluster;
@@ -3024,6 +3044,8 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         let current_node_bytes = outer_partition_node_bytes(&node)?;
         let mut split_frontier_bytes = frontier_bytes
             .checked_add(current_node_bytes)
+            .and_then(|value| value.checked_add(std::mem::size_of::<Vec<OuterPartitionSearchNode>>()))
+            .and_then(|value| value.checked_add(child_count.checked_mul(std::mem::size_of::<OuterPartitionSearchNode>())?))
             .ok_or(PolicyPortfolioError::DimensionOverflow)?;
         let mut children = Vec::new();
         children.try_reserve_exact(child_count).map_err(|_| {
@@ -3134,6 +3156,7 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
     let final_memory = cached_bytes.checked_add(output_bytes)
         .and_then(|value| value.checked_add(family.state_count()
             .checked_mul(2 * std::mem::size_of::<CheckedRational>())?))
+        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<CheckedRational>>()))
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     if final_memory > budget.max_total_memory_bytes {
         return Err(PolicyPortfolioError::BudgetExceeded {
