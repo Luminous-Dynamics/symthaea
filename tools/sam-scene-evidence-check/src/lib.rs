@@ -1926,7 +1926,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_local_follow_uncertainty_below_un correlated_covariance_bound() {
+    fn rejects_local_follow_uncertainty_below_uncorrelated_covariance_bound() {
         let (schema, mut fixture) = load_fixture();
         let context = &mut fixture["snapshot"]["follow_target_context"];
         context["consumer_profile"] = Value::String("local_perception".into());
