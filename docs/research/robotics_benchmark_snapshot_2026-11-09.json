@@ -1,0 +1,251 @@
+{
+  "schema": "luminous.robotics.benchmark-audit-snapshot.v1",
+  "snapshot_date": "2026-11-09",
+  "status": "source_snapshot_not_luminous_results",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11231",
+  "benchmarks": [
+    {
+      "id": "robocasa365-official-2026-11-01",
+      "name": "RoboCasa365",
+      "source": "https://robocasa.ai/leaderboard",
+      "source_updated": "2026-11-01",
+      "evidence_class": "official_simulation_leaderboard_snapshot",
+      "protocol_scope": {
+        "task_count_evaluated": 50,
+        "total_task_catalogue": 365,
+        "environment_count_in_training_description": 2500,
+        "splits": {
+          "atomic_seen": {
+            "task_count": 18
+          },
+          "composite_seen": {
+            "task_count": 16
+          },
+          "composite_unseen": {
+            "task_count": 16
+          }
+        },
+        "note": "Composite-unseen is task-composition generalization; evaluation is in pretraining kitchens, not unseen-kitchen generalization."
+      },
+      "listed_results": [
+        {
+          "model": "HexaShell 1.5",
+          "overall_pct": 85.6,
+          "atomic_seen_pct": 91.1,
+          "composite_seen_pct": 85,
+          "composite_unseen_pct": 80
+        },
+        {
+          "model": "Awomo-0.5I",
+          "overall_pct": 64.4,
+          "atomic_seen_pct": 86.5,
+          "composite_seen_pct": 58.8,
+          "composite_unseen_pct": 45.2
+        },
+        {
+          "model": "minionx",
+          "overall_pct": 62.6,
+          "atomic_seen_pct": 81.8,
+          "composite_seen_pct": 60,
+          "composite_unseen_pct": 43.6
+        },
+        {
+          "model": "Xiaomi-Robotics-1",
+          "overall_pct": 57.4,
+          "atomic_seen_pct": 80.2,
+          "composite_seen_pct": 57.1,
+          "composite_unseen_pct": 32.1
+        },
+        {
+          "model": "PatchWAM",
+          "overall_pct": 47.6,
+          "atomic_seen_pct": 78.7,
+          "composite_seen_pct": 46.4,
+          "composite_unseen_pct": 13.8
+        }
+      ],
+      "claim_ceiling": "leaderboard result on the 50-task multi-task benchmark only; not physical qualification or broad household generality"
+    },
+    {
+      "id": "robotwin2-official-2026-10-11",
+      "name": "RoboTwin 2.0",
+      "source": "https://robotwin-platform.github.io/leaderboard.html",
+      "source_updated": "2026-10-11",
+      "evidence_class": "official_simulation_leaderboard_snapshot",
+      "protocol_scope": {
+        "methods_listed": 25,
+        "ranking": "mean(clean_to_clean, clean_to_random)",
+        "note": "Do not compare this score directly with RoboCasa365."
+      },
+      "listed_results": [
+        {
+          "model": "PatchWAM",
+          "average_pct": 79.14,
+          "clean_to_clean_pct": 91.56,
+          "clean_to_random_pct": 66.72
+        },
+        {
+          "model": "ME-Dex-1.0",
+          "average_pct": 78.85,
+          "clean_to_clean_pct": 89.58,
+          "clean_to_random_pct": 68.12
+        },
+        {
+          "model": "ViGAR",
+          "average_pct": 74.51,
+          "clean_to_clean_pct": 82,
+          "clean_to_random_pct": 67.02
+        },
+        {
+          "model": "UniWAM",
+          "average_pct": 71.34,
+          "clean_to_clean_pct": 75.12,
+          "clean_to_random_pct": 67.56
+        },
+        {
+          "model": "GigaBrain-0.7",
+          "average_pct": 67.35,
+          "clean_to_clean_pct": 66.8,
+          "clean_to_random_pct": 67.9
+        }
+      ],
+      "claim_ceiling": "official leaderboard snapshot and its declared task protocol; no physical capability or safety claim"
+    },
+    {
+      "id": "robotwin2-secondary-aggregator-2026-10-30-protocol",
+      "name": "RoboTwin 2.0 (secondary public aggregator)",
+      "source": "https://openstarmap.com/en/benchmarks/robotwin2",
+      "source_updated": "2026-10-26",
+      "evidence_class": "secondary_aggregator_candidate_snapshot",
+      "protocol_scope": {
+        "protocol_label": "robotwin2-2026-10-30",
+        "note": "Different/later protocol label and aggregation; not merged into the official 2026-10-11 board."
+      },
+      "listed_results": [
+        {
+          "model": "GO-3 Nano Preview",
+          "score": 85.01
+        },
+        {
+          "model": "PrismWAM*",
+          "score": 83.67
+        },
+        {
+          "model": "PICA-WAM",
+          "score": 82.69
+        },
+        {
+          "model": "CloudRobo-WM",
+          "score": 81.95
+        },
+        {
+          "model": "PatchWAM",
+          "score": 79.14
+        }
+      ],
+      "claim_ceiling": "discovery lead; verify against official raw submission and exact evaluation protocol before ranking claims"
+    },
+    {
+      "id": "most-2026-10-31-preprint",
+      "name": "MOST: Memory of Object States and Task Progress",
+      "source": "https://arxiv.org/abs/2611.00734",
+      "source_date": "2026-10-31",
+      "evidence_class": "research_preprint_reported_experiments",
+      "reported_results": {
+        "robocasa365_success_pct": {
+          "baseline_xiaomi_robotics_1": 65.9,
+          "most": 72.1
+        },
+        "robocasa_long_average_max_task_progress_pct": {
+          "baseline_xiaomi_robotics_1": 20.83,
+          "most": 42.22
+        },
+        "real_world_success_pct": {
+          "baseline_xiaomi_robotics_1": 6.66,
+          "most_raw_visual_history": 36.66,
+          "most": 43.33
+        },
+        "real_world_trials_per_method_per_task": 10
+      },
+      "physical_scope": "Galbot G1, fixed base, waist rotation between pickup and placement tables; not mobile-base navigation qualification.",
+      "claim_ceiling": "paper-reported result; small real-world trial count and bounded task; not a general deployment claim"
+    },
+    {
+      "id": "robocasa-mem-2026-11-04-preprint",
+      "name": "RoboCasa-Mem",
+      "source": "https://arxiv.org/abs/2611.06475",
+      "source_date": "2026-11-04",
+      "evidence_class": "research_preprint_benchmark_proposal",
+      "protocol_scope": {
+        "task_count": 9,
+        "memory_categories": [
+          "environment_memory",
+          "process_memory"
+        ],
+        "successful_demonstrations": 1800,
+        "baseline": "Hierarchical Memory-Augmented Policy (HMAP)",
+        "evaluation_concept": "behavior-conditioned evaluation derives later constraints from the robot's earlier actions"
+      },
+      "claim_ceiling": "new benchmark and baseline; Luminous must pin code/data/rights and run adapter before claiming results"
+    },
+    {
+      "id": "behavior1k-challenge-2026",
+      "name": "BEHAVIOR-1K 2026 Challenge",
+      "source": "https://behavior.stanford.edu/challenge/index.html",
+      "source_updated": "2026-11-09",
+      "evidence_class": "official_challenge_definition",
+      "protocol_scope": {
+        "tasks": 100,
+        "scenes": 7,
+        "new_scenes": 4,
+        "observation_modalities": [
+          "RGB",
+          "depth",
+          "proprioception"
+        ],
+        "demonstrations": 20000,
+        "demonstration_hours": 1950,
+        "baselines": [
+          "pi0.5",
+          "GR00T N1.7"
+        ],
+        "submission_deadline": "2026-10-16",
+        "winners_announced": "2026-11-04",
+        "event": "CoRL 2026, 2026-11-09 through 2026-11-12"
+      },
+      "claim_ceiling": "challenge definition only in this snapshot; retrieve official leaderboard results/artifacts before ranking claims"
+    },
+    {
+      "id": "nist-physical-manipulation-reference",
+      "name": "NIST grasping, manipulation, contact safety and assembly performance research",
+      "source": "https://www.nist.gov/programs-projects/grasping-manipulation-and-contact-safety-performance-robotic-systems",
+      "evidence_class": "physical_test_method_reference",
+      "protocol_scope": {
+        "use": "map Luminous physical tests to applicable published NIST/ASTM methods; preserve native metrics"
+      },
+      "claim_ceiling": "method reference; not a Luminous test result or certification"
+    }
+  ],
+  "proposed_luminous_targets": {
+    "status": "aspirational_not_measured",
+    "rules": [
+      "freeze exact upstream protocol, artifacts, policy identity and resource budget before evaluation",
+      "report per-task results, confidence intervals, missing cases and failures",
+      "never combine incompatible benchmark scores",
+      "no safety failure can be offset by task success",
+      "no simulation result is promoted to physical evidence"
+    ],
+    "targets": {
+      "randomized_robustness": "reduce the matched baseline C2C-to-C2R degradation by at least 25%",
+      "memory_utility": "at least +15 percentage points on a preregistered memory-required subset versus matched memoryless/raw-history baselines, with <=2 percentage-point regression on memory-irrelevant controls",
+      "recoverable_fault_recovery": "at least 90% safe recovery on a bounded, preregistered recoverable-fault suite",
+      "invalid_dispatch": "zero invalid, expired, vetoed, duplicate or out-of-order commands reach the controller sink",
+      "traceability": "100% of qualification claims bind exact article/configuration/protocol/instrument evidence"
+    }
+  },
+  "non_claims": [
+    "No Luminous benchmark has been executed by recording this source snapshot.",
+    "No SOTA superiority, physical qualification, safety certification or production readiness is implied.",
+    "A credential signature or content digest does not prove the physical event or measurement is true."
+  ]
+}
