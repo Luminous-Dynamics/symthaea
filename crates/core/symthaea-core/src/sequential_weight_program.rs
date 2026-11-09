@@ -935,24 +935,41 @@ mod tests {
         assert!(prepared.candidate.receipt.total_l2_delta > 0.0);
         let signing_key = SigningKey::from_bytes(&[42_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let rejected = signed_attestation(&session, &prepared, &digest('9'), false, &signing_key);
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let rejected = signed_attestation(
+            &session,
+            &prepared,
+            &digest('9'),
+            &evidence_binding,
+            false,
+            &signing_key,
+        );
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &session,
                 &template,
                 &prepared,
                 &digest('9'),
+                &evidence_binding,
                 &rejected,
                 &pinned_key,
             ),
             Err(SequentialWeightProgramError::VerifierRejectedCandidate)
         ));
-        let attestation = signed_attestation(&session, &prepared, &digest('9'), true, &signing_key);
+        let attestation = signed_attestation(
+            &session,
+            &prepared,
+            &digest('9'),
+            &evidence_binding,
+            true,
+            &signing_key,
+        );
         let (advanced, receipt) = accept_verified_sequential_candidate(
             &session,
             &template,
             &prepared,
             &digest('9'),
+            &evidence_binding,
             &attestation,
             &pinned_key,
         )
@@ -1009,13 +1026,22 @@ mod tests {
         modified.batch.evidence_batch_digest = digest('2');
         let signing_key = SigningKey::from_bytes(&[43_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let attestation = signed_attestation(&session, &modified, &digest('9'), true, &signing_key);
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let attestation = signed_attestation(
+            &session,
+            &modified,
+            &digest('9'),
+            &evidence_binding,
+            true,
+            &signing_key,
+        );
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &session,
                 &template,
                 &modified,
                 &digest('9'),
+                &evidence_binding,
                 &attestation,
                 &pinned_key,
             ),
@@ -1039,13 +1065,21 @@ mod tests {
         .expect("prepare batch zero");
         let signing_key = SigningKey::from_bytes(&[44_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let attestation0 =
-            signed_attestation(&session, &prepared0, &digest('9'), true, &signing_key);
+        let evidence_binding0 = statistical_evidence_binding(&session, &digest('9'));
+        let attestation0 = signed_attestation(
+            &session,
+            &prepared0,
+            &digest('9'),
+            &evidence_binding0,
+            true,
+            &signing_key,
+        );
         let (advanced, _) = accept_verified_sequential_candidate(
             &session,
             &template,
             &prepared0,
             &digest('9'),
+            &evidence_binding0,
             &attestation0,
             &pinned_key,
         )
@@ -1061,14 +1095,22 @@ mod tests {
             &batch(&session_id, 1, &digest('9'), '2'),
         )
         .expect("prepare batch one");
-        let attestation1 =
-            signed_attestation(&advanced, &prepared1, &digest('7'), true, &signing_key);
+        let evidence_binding1 = statistical_evidence_binding(&advanced, &digest('7'));
+        let attestation1 = signed_attestation(
+            &advanced,
+            &prepared1,
+            &digest('7'),
+            &evidence_binding1,
+            true,
+            &signing_key,
+        );
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &advanced,
                 &template,
                 &prepared1,
                 &digest('7'),
+                &evidence_binding1,
                 &attestation1,
                 &pinned_key,
             ),
@@ -1092,17 +1134,31 @@ mod tests {
         .expect("prepare");
         let signing_key = SigningKey::from_bytes(&[45_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let correctly_bound =
-            signed_attestation(&session, &prepared, &digest('9'), true, &signing_key);
-
-        let wrong_candidate =
-            signed_attestation(&session, &prepared, &digest('7'), true, &signing_key);
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let wrong_candidate_binding = statistical_evidence_binding(&session, &digest('7'));
+        let correctly_bound = signed_attestation(
+            &session,
+            &prepared,
+            &digest('9'),
+            &evidence_binding,
+            true,
+            &signing_key,
+        );
+        let wrong_candidate = signed_attestation(
+            &session,
+            &prepared,
+            &digest('7'),
+            &wrong_candidate_binding,
+            true,
+            &signing_key,
+        );
         assert!(matches!(
             accept_verified_sequential_candidate(
                 &session,
                 &template,
                 &prepared,
                 &digest('9'),
+                &evidence_binding,
                 &wrong_candidate,
                 &pinned_key,
             ),
@@ -1119,6 +1175,7 @@ mod tests {
                 &template,
                 &prepared,
                 &digest('9'),
+                &evidence_binding,
                 &tampered,
                 &pinned_key,
             ),
@@ -1132,6 +1189,7 @@ mod tests {
                 &template,
                 &prepared,
                 &digest('9'),
+                &evidence_binding,
                 &correctly_bound,
                 &untrusted_key,
             ),
