@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "case_id": "synthetic-vibrato-depth-local-001",
+  "target_dimension": "vibrato_depth_cents",
+  "requested_delta": 10.0,
+  "min_response_ratio": 0.8,
+  "max_response_ratio": 1.2,
+  "min_target_region_direction_fraction": 1.0,
+  "max_collateral_ratio": 1.0,
+  "required_dimensions": [
+    "pitch_median_cents",
+    "vibrato_rate_hz",
+    "vibrato_depth_cents",
+    "breathiness_index",
+    "phone_error_rate",
+    "identity_similarity"
+  ],
+  "feature_tolerances": {
+    "pitch_median_cents": 2.0,
+    "vibrato_rate_hz": 0.1,
+    "vibrato_depth_cents": 1.0,
+    "breathiness_index": 0.02,
+    "phone_error_rate": 0.01,
+    "identity_similarity": 0.005
+  },
+  "target_regions": ["phrase-2"],
+  "protected_regions": ["phrase-1", "phrase-3"],
+  "locality_required": true,
+  "baseline_receipt": {
+    "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "backend_id": "synthetic-fixture-only",
+    "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "voice_id": "fixture-voice",
+    "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "performance_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "audio_digest": "blake3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "seed": 42,
+    "sample_rate_hz": 44100
+  },
+  "variant_receipt": {
+    "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "backend_id": "synthetic-fixture-only",
+    "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "voice_id": "fixture-voice",
+    "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "performance_digest": "blake3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "audio_digest": "blake3:1111111111111111111111111111111111111111111111111111111111111111",
+    "seed": 42,
+    "sample_rate_hz": 44100
+  },
+  "baseline_measurements": {
+    "phrase-1": {
+      "pitch_median_cents": 0.5,
+      "vibrato_rate_hz": 5.2,
+      "vibrato_depth_cents": 16.0,
+      "breathiness_index": 0.2,
+      "phone_error_rate": 0.02,
+      "identity_similarity": 0.99
+    },
+    "phrase-2": {
+      "pitch_median_cents": 1.0,
+      "vibrato_rate_hz": 5.2,
+      "vibrato_depth_cents": 18.0,
+      "breathiness_index": 0.2,
+      "phone_error_rate": 0.02,
+      "identity_similarity": 0.99
+    },
+    "phrase-3": {
+      "pitch_median_cents": -0.2,
+      "vibrato_rate_hz": 5.2,
+      "vibrato_depth_cents": 15.0,
+      "breathiness_index": 0.2,
+      "phone_error_rate": 0.02,
+      "identity_similarity": 0.99
+    }
+  },
+  "variant_measurements": {
+    "phrase-1": {
+      "pitch_median_cents": 0.5,
+      "vibrato_rate_hz": 5.2,
+      "vibrato_depth_cents": 16.0,
+      "breathiness_index": 0.2,
+      "phone_error_rate": 0.02,
+      "identity_similarity": 0.99
+    },
+    "phrase-2": {
+      "pitch_median_cents": 1.0,
+      "vibrato_rate_hz": 5.2,
+      "vibrato_depth_cents": 28.0,
+      "breathiness_index": 0.2,
+      "phone_error_rate": 0.02,
+      "identity_similarity": 0.99
+    },
+    "phrase-3": {
+      "pitch_median_cents": -0.2,
+      "vibrato_rate_hz": 5.2,
+      "vibrato_depth_cents": 15.0,
+      "breathiness_index": 0.2,
+      "phone_error_rate": 0.02,
+      "identity_similarity": 0.99
+    }
+  }
+}
