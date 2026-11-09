@@ -350,13 +350,13 @@
           "const": 1.385228886288832
         },
         "reproduction_point_planner_utility": {
-          "const": 0.3791889615344692
+          "const": 0.3791889615172332
         },
         "static_probe_robust_lower_tail_utility": {
           "const": 0.0007527606448437289
         },
         "reproduction_robust_lower_tail_utility": {
-          "const": 0.25734801211288016
+          "const": 0.25734801210118247
         }
       }
     }
