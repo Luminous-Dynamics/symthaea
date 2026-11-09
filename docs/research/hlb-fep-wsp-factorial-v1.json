@@ -778,6 +778,38 @@
         "no_detected_inadequacy_allows_detached_candidate_only",
         "adequacy_gate_never_authorizes_live_mutation_or_candidate_acceptance"
       ]
+    },
+    {
+      "id": "static_model_robust_sequential_diagnostics",
+      "environment": "Two-stage exact synthetic diagnostic campaigns with a hidden world/fault hypothesis and a latent observation-model vertex fixed for the whole episode; first-stage calibration outcome informs the second-stage action, while model identity remains hidden from the policy. Include persistent-model and genuinely switching-model control lanes.",
+      "primary_outcomes": [
+        "static_model_worst_case_terminal_risk",
+        "rectangular_worst_case_terminal_risk",
+        "static_vs_rectangular_conservatism_gap",
+        "calibration_value",
+        "decision_regret",
+        "probe_cost"
+      ],
+      "diagnostics": [
+        "clairvoyant_lower_bound",
+        "policy_tree_node_count",
+        "exact_policy_enumeration_count",
+        "model_vertex_posterior_calibration",
+        "non_anticipativity_check",
+        "static_vertex_consistency_check",
+        "rectangular_vertex_switch_count",
+        "realized_decision_information_gain",
+        "static_model_expected_value_of_sample_information"
+      ],
+      "negative_controls": [
+        "all_model_vertices_observationally_equivalent",
+        "uninformative_calibration",
+        "genuinely_switching_model_world",
+        "hidden_model_vertex_never_exposed_to_policy",
+        "truth_labels_and_evaluator_seeds_sealed",
+        "fixed_probe_without_calibration",
+        "static_risk_matches_second_brute_force_reference"
+      ]
     }
   ],
   "baselines": [
@@ -1235,6 +1267,18 @@
     {
       "id": "dirichlet_mixture_prequential_e_process",
       "scope": "Online Dirichlet-multinomial categorical alternative q_t(k)=(alpha_k+N_{t-1,k})/(sum alpha+t-1) against frozen predictable null forecasts; anytime-valid likelihood-ratio e-process under any correctly specified conditional null, strongest for persistent frequency shifts."
+    },
+    {
+      "id": "static_model_robust_sequential_policy",
+      "scope": "Finite policy-tree oracle minimizing worst-case risk over one latent observation-model vertex fixed for the full episode; policy branches only on observable histories."
+    },
+    {
+      "id": "rectangular_sequential_robust_relaxation",
+      "scope": "Comparator permitting a distinct ambiguity-set vertex at each stage/history; diagnostic conservatism bound, not assumed to represent one physically persistent model."
+    },
+    {
+      "id": "clairvoyant_model_vertex_policy_lower_bound",
+      "scope": "Diagnostic lower bound with the hidden model vertex revealed to the policy; never a deployable policy."
     }
   ],
   "seeds": {
