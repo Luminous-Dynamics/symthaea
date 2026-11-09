@@ -260,7 +260,7 @@ fn verifier_checkpoint_digest(
     let encoded = serde_json::to_vec(&claims)
         .map_err(|_| SequentialWeightVerificationError::VerifierCheckpointSerialization)?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-weight-verification-checkpoint-v1\\0");
+    hasher.update(b"symthaea-weight-verification-checkpoint-v2\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(hasher.finalize().to_hex().to_string())
@@ -287,8 +287,6 @@ pub enum SequentialWeightVerificationError {
     ObservationBudgetExhausted,
     #[error("candidate evaluation is already terminal")]
     AlreadyTerminal,
-    #[error("confirmatory data shard has already been assigned in this campaign")]
-    ConfirmatoryShardAlreadyUsed,
     #[error("confirmatory episode manifest is empty or invalid: {0}")]
     InvalidConfirmatoryEpisodeManifest(&'static str),
     #[error("confirmatory episode manifest must contain at least {expected} IDs, got {actual}")]
@@ -379,7 +377,8 @@ fn campaign_snapshot_digest(
 }
 
 /// Campaign ledger that fixes alpha and the evaluation protocol across candidate edits.
-/// It prevents reuse of candidate model digests and confirmatory data shards.
+/// It rejects reuse of candidate digests, shard digests, and episode IDs even when
+/// a reused subset is presented under a different shard digest.
 #[derive(Debug)]
 pub struct SequentialWeightVerificationCampaign {
     config: SequentialWeightVerificationConfig,
@@ -1168,7 +1167,10 @@ mod tests {
             "episode-b".into(),
         ])
         .expect("equivalent canonical manifest");
-        assert_eq!(forward.episode_ids, vec!["episode-a", "episode-b"]);
+        assert_eq!(
+            forward.episode_ids,
+            vec!["episode-a".to_owned(), "episode-b".to_owned()]
+        );
         assert_eq!(forward.manifest_digest, reverse.manifest_digest);
         assert!(matches!(
             ConfirmatoryEpisodeManifest::new(Vec::new()),
@@ -1184,6 +1186,30 @@ mod tests {
             ConfirmatoryEpisodeManifest::new(vec![" ".into()]),
             Err(SequentialWeightVerificationError::EmptyEpisodeId)
         ));
+    }
+
+    #[test]
+    fn candidate_manifest_must_cover_the_preregistered_observation_budget() {
+        let mut campaign = campaign(0.1, 10);
+        let short_manifest = ConfirmatoryEpisodeManifest::new(vec![
+            "episode-only-one".into(),
+        ])
+        .expect("valid but too-short manifest");
+        assert!(matches!(
+            campaign.start_candidate(
+                digest('a'),
+                digest('b'),
+                digest('d'),
+                short_manifest,
+                digest('e'),
+            ),
+            Err(SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
+                expected: 10,
+                actual: 1
+            })
+        ));
+        assert_eq!(campaign.next_candidate_index(), 1);
+        assert_eq!(campaign.used_confirmatory_episode_id_count(), 0);
     }
 
     #[test]
