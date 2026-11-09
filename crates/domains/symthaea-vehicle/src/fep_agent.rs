@@ -59,7 +59,10 @@ pub enum VehicleAction {
     ReduceLearningRate = 3,
     /// Increase prior on deceleration (ambiguity response).
     SlowDown = 4,
-    /// Increase mesh trust weight (swarm says brake).
+    /// Legacy action identifier. It has no control effect until a separately
+    /// qualified cooperative-message admission envelope exists.
+    ///
+    /// Retained to preserve the six-action observation/model layout.
     IncreaseMeshTrust = 5,
 }
 
@@ -199,7 +202,7 @@ impl ActiveInferenceVehicleAgent {
     /// 6. tau_ema           — current tau factor / 3.0 (normalized)
     /// 7. free_energy_trend — rising (>0.5) vs falling (<0.5)
     /// 8. control_effort    — mean |command| (already 0..1)
-    /// 9. mesh_brake_density— swarm brake fraction (0..1)
+    /// 9. mesh_brake_density— reserved neutral placeholder (raw aggregate excluded)
     /// 10. obs_stability    — EMA of observation delta (sensor health signal)
     fn build_observation(&self, state: &VehicleState, cmd: &VehicleCommand) -> Vec<f64> {
         // 0. Speed error (normalized by target)
@@ -244,8 +247,15 @@ impl ActiveInferenceVehicleAgent {
         // 8. Control effort
         let effort = cmd.control_effort() as f64;
 
-        // 9. Mesh brake density (direct — the swarm's emergency signal)
-        let mesh_brake = state.mesh_brake_density.clamp(0.0, 1.0);
+        // 9. Cooperative mesh advisories are not admitted as control-relevant
+        // evidence in this controller. Keep the legacy 11D observation shape
+        // stable while supplying a neutral value; raw peer aggregates do not
+        // carry sender authentication, freshness, replay, spatial applicability
+        // or source-independence evidence.
+        //
+        // See SAM-V2X-ADVISORY-001 (#11088). A future typed admission adapter
+        // must be independently qualified before this channel is re-enabled.
+        let mesh_brake = 0.5;
 
         // 10. Observation stability (sensor health signal)
         // High = sensors changing normally; near-zero = channels frozen (sensor failure)
@@ -273,13 +283,11 @@ impl ActiveInferenceVehicleAgent {
         let yaw_norm = obs[4];
         let safety_trend = obs[5];
         let fe_trend = obs[7];
-        let mesh_brake = obs[9];
         let obs_stability = obs[10];
 
-        // SUPREME: if mesh says brake, trust the swarm
-        if mesh_brake > 0.3 {
-            return VehicleAction::IncreaseMeshTrust;
-        }
+        // Raw cooperative traffic messages are deliberately non-authoritative.
+        // They cannot select a policy action until a typed, independently
+        // qualified advisory-admission contract is connected.
 
         // Sensor failure: observations frozen but speed error high → slow down
         // When channels are zeroed by SensorBlindness, obs_delta drops to ~0
@@ -379,9 +387,10 @@ impl ActiveInferenceVehicleAgent {
                 result.learning_rate_factor = 1.2;
             }
             VehicleAction::IncreaseMeshTrust => {
-                // When the swarm says brake: faster tau + moderate LR
-                result.tau_factor = 0.85;
-                result.learning_rate_factor = 1.3;
+                // Legacy action ID only. It is intentionally a no-op: remote
+                // peer aggregates must not alter controller modulation without
+                // authenticated, fresh, replay-protected, spatially applicable,
+                // independently corroborated advisory evidence and RTA review.
             }
         }
 
@@ -499,23 +508,31 @@ mod tests {
     }
 
     #[test]
-    fn test_fep_mesh_brake_response() {
-        let config = VehicleFepConfig::default();
-        let mut agent = ActiveInferenceVehicleAgent::new(config, VehicleTask::LaneKeep);
+    fn test_unqualified_mesh_advisory_does_not_change_fep_policy_input() {
+        let agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::LaneKeep);
 
-        let mut state = VehicleState::cruising(13.4);
-        state.mesh_brake_density = 0.6; // 60% of swarm braking
-        state.mesh_confidence = 0.9;
+        let baseline_state = VehicleState::cruising(13.4);
+        let mut spoofed_state = baseline_state.clone();
+        spoofed_state.mesh_brake_density = 1.0;
+        spoofed_state.mesh_confidence = 1.0;
 
         let cmd = VehicleCommand::zero();
-        let result = agent.step(&state, &cmd);
+        let baseline_observation = agent.build_observation(&baseline_state, &cmd);
+        let spoofed_observation = agent.build_observation(&spoofed_state, &cmd);
 
-        // Should trigger IncreaseMeshTrust
-        assert!(result.free_energy.is_finite());
-        assert!(
-            result.tau_factor < 1.0,
-            "Mesh brake should drop tau: {}",
-            result.tau_factor
+        assert_eq!(
+            baseline_observation, spoofed_observation,
+            "Unqualified mesh fields must not enter the FEP observation"
+        );
+        assert_eq!(
+            baseline_observation[9], 0.5,
+            "The retained legacy slot must be neutral, not a trust/confidence claim"
+        );
+        assert_eq!(
+            agent.rule_based_action(&baseline_observation),
+            agent.rule_based_action(&spoofed_observation),
+            "Unqualified mesh fields must not change rule-based policy selection"
         );
     }
 

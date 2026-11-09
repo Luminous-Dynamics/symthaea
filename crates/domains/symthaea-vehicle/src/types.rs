@@ -118,10 +118,10 @@ pub const CHANNEL_NAMES: [&str; NUM_STATE_CHANNELS] = [
 /// [14] lateral_offset    — distance from lane center (m), positive = left
 /// [15] curvature_ahead   — road curvature at look-ahead point (1/m)
 /// ── Swarm Vector (4) ──
-/// [16] nearest_peer_distance  — distance to nearest mesh peer (m)
-/// [17] peer_relative_speed    — speed of nearest peer minus ego speed (m/s)
-/// [18] mesh_brake_density     — fraction of swarm currently braking (0..1)
-/// [19] mesh_confidence        — aggregate mesh signal integrity (0..1)
+/// [16] nearest_peer_distance  — synthetic peer distance (m); live use unqualified
+/// [17] peer_relative_speed    — synthetic peer relative speed (m/s); live use unqualified
+/// [18] mesh_brake_density     — unverified aggregate; masked from learned policy inputs
+/// [19] mesh_confidence        — unverified claimed confidence; masked from learned policy inputs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VehicleState {
     // ── Proprioceptive Core (14) ──
@@ -167,9 +167,11 @@ pub struct VehicleState {
     pub nearest_peer_distance: f64,
     /// Speed of nearest peer minus ego speed (m/s). Negative = peer braking.
     pub peer_relative_speed: f64,
-    /// Fraction of swarm currently applying brakes (0..1).
+    /// Unverified synthetic aggregate of peer braking (0..1); not a local sensor
+    /// measurement or a control-authority signal. Current policy encoders mask it.
     pub mesh_brake_density: f64,
-    /// Aggregate mesh signal integrity (0..1). 0 = no mesh, 1 = full confidence.
+    /// Unverified aggregate-reported confidence (0..1), not a trust or truth score.
+    /// Current policy encoders mask it until a qualified advisory contract exists.
     pub mesh_confidence: f64,
 
     // ── Metadata ──

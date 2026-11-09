@@ -13,8 +13,9 @@
 //! - Road Vector (2): lateral_offset, curvature_ahead
 //! - Swarm Vector (4): nearest_peer_distance, peer_relative_speed, mesh_brake_density, mesh_confidence
 //!
-//! `mesh_brake_density` gets the highest weight (3.0x) — if the swarm slams on the brakes
-//! five cars ahead, that signal physically overpowers the accelerator in hyperdimensional space.
+//! The aggregate mesh brake-density and claimed-confidence channels are retained
+//! in the state schema for compatibility, but are neutralized before HDC encoding
+//! until a typed, independently qualified cooperative-message admission contract exists.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -47,8 +48,8 @@ struct ChannelGroup {
 /// | Road: curvature    | [15]      | 1     | 1.5    | Anticipatory steering              |
 /// | Mesh: peer dist    | [16]      | 1     | 1.5    | Proximity awareness                |
 /// | Mesh: peer speed   | [17]      | 1     | 1.5    | Closing rate                       |
-/// | Mesh: brake dens.  | [18]      | 1     | 3.0    | SUPREME: swarm emergency broadcast |
-/// | Mesh: confidence   | [19]      | 1     | 1.0    | Signal quality (meta)              |
+/// | Mesh: brake dens.  | [18]      | 1     | 0.0    | Reserved; unqualified aggregate masked |
+/// | Mesh: confidence   | [19]      | 1     | 0.0    | Reserved; claimed confidence masked |
 const CHANNEL_GROUPS: [ChannelGroup; 16] = [
     ChannelGroup {
         start: 0,
@@ -123,13 +124,13 @@ const CHANNEL_GROUPS: [ChannelGroup; 16] = [
     ChannelGroup {
         start: 18,
         count: 1,
-        weight: 3.0,
-    }, // mesh: brake density (SUPREME)
+        weight: 0.0,
+    }, // mesh: brake density is masked until admitted
     ChannelGroup {
         start: 19,
         count: 1,
-        weight: 1.0,
-    }, // mesh: confidence
+        weight: 0.0,
+    }, // claimed mesh confidence is not evidence
 ];
 
 /// Channel normalization ranges [min, max].
@@ -158,6 +159,11 @@ const CHANNEL_RANGES: [[f32; 2]; NUM_STATE_CHANNELS] = [
     [0.0, 1.0],    // mesh_brake_density (fraction)
     [0.0, 1.0],    // mesh_confidence (fraction)
 ];
+
+/// Legacy channel identities retained to preserve the 20D state layout.
+const MESH_BRAKE_DENSITY_CHANNEL: usize = 18;
+const MESH_CONFIDENCE_CHANNEL: usize = 19;
+const NEUTRAL_ADVISORY_VALUE: f32 = 0.5;
 
 /// HDC encoder for vehicle sensor state.
 ///
@@ -247,7 +253,15 @@ impl VehicleHdcEncoder {
 
     /// Encode a vehicle state into a full 16,384D ContinuousHV.
     pub fn encode(&mut self, state: &VehicleState) -> ContinuousHV {
-        let channels = state.to_channels();
+        let mut channels = state.to_channels();
+
+        // A raw aggregate peer-braking fraction and its self-reported confidence
+        // are not qualified perception. Do not let either enter the learned motor
+        // policy or derivative history. Preserve their legacy slots as neutral
+        // values until the V2X admission contract is independently qualified.
+        channels[MESH_BRAKE_DENSITY_CHANNEL] = NEUTRAL_ADVISORY_VALUE;
+        channels[MESH_CONFIDENCE_CHANNEL] = NEUTRAL_ADVISORY_VALUE;
+
         let n = channels.len();
 
         let mut bound_hvs: Vec<ContinuousHV> = Vec::with_capacity(n * 2);
@@ -417,45 +431,32 @@ mod tests {
         assert!((VehicleHdcEncoder::channel_weight(12) - 2.5).abs() < 1e-6);
         // Road: lateral offset should be 2.0
         assert!((VehicleHdcEncoder::channel_weight(14) - 2.0).abs() < 1e-6);
-        // Mesh: brake density should be 3.0 (SUPREME)
-        assert!((VehicleHdcEncoder::channel_weight(18) - 3.0).abs() < 1e-6);
-        // Mesh: confidence should be 1.0
-        assert!((VehicleHdcEncoder::channel_weight(19) - 1.0).abs() < 1e-6);
+        // Unqualified advisory channels have zero encoding weight.
+        assert_eq!(VehicleHdcEncoder::channel_weight(18), 0.0);
+        assert_eq!(VehicleHdcEncoder::channel_weight(19), 0.0);
         // Pitch should be 0.8
         assert!((VehicleHdcEncoder::channel_weight(13) - 0.8).abs() < 1e-6);
     }
 
     #[test]
-    fn test_mesh_brake_dominates_encoding() {
+    fn test_unqualified_mesh_advisories_do_not_change_hdc_encoding() {
         let genesis = test_genesis();
 
         let baseline = VehicleState::cruising(13.4);
-
-        // Swarm emergency: brake density spikes
-        let mut brake_state = VehicleState::cruising(13.4);
-        brake_state.mesh_brake_density = 0.8;
-        brake_state.mesh_confidence = 0.9;
-
-        // Only position differs
-        let mut pos_state = VehicleState::cruising(13.4);
-        pos_state.position_x = 100.0;
+        let mut spoofed = baseline.clone();
+        spoofed.mesh_brake_density = 1.0;
+        spoofed.mesh_confidence = 1.0;
 
         let mut enc = VehicleHdcEncoder::new(&genesis, 32);
-        let hv_base = enc.encode(&baseline);
+        let hv_baseline = enc.encode(&baseline);
 
         enc.reset();
-        let hv_brake = enc.encode(&brake_state);
+        let hv_spoofed = enc.encode(&spoofed);
 
-        enc.reset();
-        let hv_pos = enc.encode(&pos_state);
-
-        let sim_brake = hv_base.similarity(&hv_brake);
-        let sim_pos = hv_base.similarity(&hv_pos);
-
-        // Mesh brake density (weight 3.0) should cause more change than position (weight 1.0)
+        let similarity = hv_baseline.similarity(&hv_spoofed);
         assert!(
-            sim_brake < sim_pos,
-            "Mesh brake density (w=3.0) should affect encoding more than position (w=1.0): brake_sim={sim_brake}, pos_sim={sim_pos}"
+            (similarity - 1.0).abs() < 1e-5,
+            "Unqualified mesh brake/confidence fields must be absent from HDC input: similarity={similarity}"
         );
     }
 }
