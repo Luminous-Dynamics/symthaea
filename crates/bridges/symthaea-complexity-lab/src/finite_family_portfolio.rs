@@ -2708,6 +2708,257 @@ fn hash_outer_search_node(
     hasher.update([event]);
 }
 
+fn build_portfolio_point_from_partition(
+    family: &FiniteUmdpModelFamily,
+    discount: CheckedRational,
+    max_portfolio_size: usize,
+    partition: &[Vec<usize>],
+    cache: &[ClusterPolicyCacheEntry],
+    model_optimal_values: &[CheckedRational],
+    budget: ExactPolicyPortfolioSearchBudget,
+    outer_search_nodes: usize,
+    outer_pruned_nodes: usize,
+    complete_partitions_evaluated: usize,
+    total_cluster_search_nodes: usize,
+    shared_search_dp_work: usize,
+    partition_transcript_sha256: [u8; 32],
+    live_memory_before_point: usize,
+) -> Result<(VerifiedFiniteFamilyPolicyPortfolioOptimum, usize, usize), PolicyPortfolioError> {
+    let mut cache_indices = Vec::new();
+    cache_indices.try_reserve_exact(partition.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "Pareto point cache indices",
+            entries: partition.len(),
+        }
+    })?;
+    for cluster in partition {
+        let index = cache.iter().position(|entry| entry.model_indices == *cluster)
+            .ok_or(PolicyPortfolioError::PolicyMaskCertificateMismatch)?;
+        cache_indices.push(index);
+    }
+
+    // Estimate the complete returned point from cache references before
+    // duplicating its selected cluster certificates or allocating replay rows.
+    let output_bytes = portfolio_output_bytes(
+        family,
+        partition,
+        cache_indices.iter().map(|index| &cache[*index].solution),
+    )?;
+    let scratch_bytes = family.state_count()
+        .checked_mul(2 * std::mem::size_of::<CheckedRational>())
+        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<CheckedRational>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let point_peak = live_memory_before_point
+        .checked_add(output_bytes)
+        .and_then(|value| value.checked_add(scratch_bytes))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if point_peak > budget.max_total_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "Pareto point output and replay memory bytes",
+            required: point_peak,
+            limit: budget.max_total_memory_bytes,
+        });
+    }
+
+    let mut cluster_solutions = Vec::new();
+    cluster_solutions.try_reserve_exact(partition.len()).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "Pareto point selected cluster certificates",
+            entries: partition.len(),
+        }
+    })?;
+    for index in cache_indices {
+        cluster_solutions.push(try_clone_cluster_policy_optimum(&cache[index].solution)?);
+    }
+    let model_optimal_values = clone_rational_vec(
+        model_optimal_values,
+        "Pareto point model-optimal values",
+    )?;
+
+    let model_count = family.model_count();
+    let states = family.state_count();
+    let portfolio_evaluations = model_count.checked_mul(cluster_solutions.len())
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    let portfolio_eval_ops = fixed_policy_dp_multiply_adds(family, portfolio_evaluations)?;
+    let total_dp_multiply_adds = shared_search_dp_work.checked_add(portfolio_eval_ops)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if total_dp_multiply_adds > budget.max_total_inner_dp_multiply_adds {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "Pareto total DP work including cross-model portfolio replay",
+            required: total_dp_multiply_adds,
+            limit: budget.max_total_inner_dp_multiply_adds,
+        });
+    }
+
+    let mut model_policy_values = Vec::new();
+    model_policy_values.try_reserve_exact(model_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "Pareto model-policy value rows",
+            entries: model_count,
+        }
+    })?;
+    let mut model_portfolio_values = Vec::new();
+    model_portfolio_values.try_reserve_exact(model_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "Pareto model portfolio values",
+            entries: model_count,
+        }
+    })?;
+    let mut model_regrets = Vec::new();
+    model_regrets.try_reserve_exact(model_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "Pareto model regrets",
+            entries: model_count,
+        }
+    })?;
+    let mut worst_case_model_indices = Vec::new();
+    worst_case_model_indices.try_reserve_exact(model_count).map_err(|_| {
+        PolicyPortfolioError::AllocationFailed {
+            resource: "Pareto worst-case model indices",
+            entries: model_count,
+        }
+    })?;
+
+    let mut portfolio_regret = CheckedRational::zero();
+    for model_index in 0..model_count {
+        let model = &family.models[model_index];
+        let mut row = Vec::new();
+        row.try_reserve_exact(cluster_solutions.len()).map_err(|_| {
+            PolicyPortfolioError::AllocationFailed {
+                resource: "Pareto per-model policy values",
+                entries: cluster_solutions.len(),
+            }
+        })?;
+        let mut portfolio_value: Option<CheckedRational> = None;
+        for cluster_solution in &cluster_solutions {
+            let mut current = Vec::new();
+            current.try_reserve_exact(states).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed {
+                    resource: "Pareto replay current DP",
+                    entries: states,
+                }
+            })?;
+            current.resize(states, CheckedRational::zero());
+            let mut next = Vec::new();
+            next.try_reserve_exact(states).map_err(|_| {
+                PolicyPortfolioError::AllocationFailed {
+                    resource: "Pareto replay next DP",
+                    entries: states,
+                }
+            })?;
+            next.resize(states, CheckedRational::zero());
+            let value = evaluate_policy(
+                model,
+                discount,
+                &cluster_solution.policy_actions,
+                &mut current,
+                &mut next,
+                budget.per_cluster.per_node.max_rational_bit_width,
+            )?;
+            row.push(value);
+            if portfolio_value.map_or(true, |best| compare_signed(value, best) == Ordering::Greater) {
+                portfolio_value = Some(value);
+            }
+        }
+
+        let portfolio_value = portfolio_value.ok_or(PolicyPortfolioError::EmptyPortfolio)?;
+        let regret = sub_bounded(
+            model_optimal_values[model_index],
+            portfolio_value,
+            budget.per_cluster.per_node.max_rational_bit_width,
+        )?;
+        if regret.is_negative() {
+            return Err(PolicyPortfolioError::NegativeRegret { model: model_index });
+        }
+        if compare_signed(regret, portfolio_regret) == Ordering::Greater {
+            portfolio_regret = regret;
+            worst_case_model_indices.clear();
+            worst_case_model_indices.push(model_index);
+        } else if regret == portfolio_regret {
+            worst_case_model_indices.push(model_index);
+        }
+        model_policy_values.push(row);
+        model_portfolio_values.push(portfolio_value);
+        model_regrets.push(regret);
+    }
+
+    let partition_objective = cluster_solutions.iter().fold(
+        CheckedRational::zero(),
+        |worst, solution| {
+            if compare_signed(solution.minimax_regret, worst) == Ordering::Greater {
+                solution.minimax_regret
+            } else {
+                worst
+            }
+        },
+    );
+    if portfolio_regret != partition_objective {
+        return Err(PolicyPortfolioError::PortfolioCertificateMismatch);
+    }
+
+    let mut result = VerifiedFiniteFamilyPolicyPortfolioOptimum {
+        model_family_sha256: family.sha256(),
+        policy_manifest_sha256: policy_manifest_sha256(
+            family.state_count(),
+            family.action_count(),
+            family.horizon(),
+            checked_policy_count(family.state_count(), family.horizon(), family.action_count())?,
+        ),
+        discount,
+        max_portfolio_size,
+        partition: try_clone_partition(partition)?,
+        cluster_solutions,
+        model_optimal_values,
+        model_policy_values,
+        model_portfolio_values,
+        model_regrets,
+        worst_case_model_indices,
+        minimax_regret: portfolio_regret,
+        global_lower_bound: portfolio_regret,
+        global_upper_bound: portfolio_regret,
+        outer_search_nodes,
+        outer_pruned_nodes,
+        complete_partitions_evaluated,
+        cached_cluster_solutions: cache.len(),
+        total_cluster_search_nodes,
+        total_dp_multiply_adds,
+        partition_transcript_sha256,
+        certificate_sha256: [0; 32],
+        optimality_proven: true,
+    };
+    result.certificate_sha256 = portfolio_optimum_certificate_sha256(&result);
+    Ok((result, portfolio_eval_ops, output_bytes))
+}
+
+fn policy_budget_pareto_frontier_certificate_sha256(
+    frontier: &VerifiedPolicyBudgetParetoFrontier,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMPGM-FINITE-UMDP-POLICY-BUDGET-PARETO\0\x01");
+    hasher.update(frontier.model_family_sha256);
+    hasher.update(frontier.policy_manifest_sha256);
+    hash_rational(&mut hasher, frontier.discount);
+    hasher.update((frontier.max_policy_budget as u64).to_le_bytes());
+    hasher.update((frontier.points.len() as u64).to_le_bytes());
+    for point in &frontier.points {
+        hasher.update((point.max_portfolio_size as u64).to_le_bytes());
+        hasher.update(point.certificate_sha256);
+    }
+    for value in [
+        frontier.outer_search_nodes,
+        frontier.outer_pruned_nodes,
+        frontier.complete_partitions_evaluated,
+        frontier.cached_cluster_solutions,
+        frontier.total_cluster_search_nodes,
+        frontier.total_dp_multiply_adds,
+    ] {
+        hasher.update((value as u64).to_le_bytes());
+    }
+    hasher.update(frontier.partition_transcript_sha256);
+    hasher.update([u8::from(frontier.optimality_proven)]);
+    hasher.finalize().into()
+}
+
 fn portfolio_optimum_certificate_sha256(
     result: &VerifiedFiniteFamilyPolicyPortfolioOptimum,
 ) -> [u8; 32] {
