@@ -18,6 +18,36 @@ The central experiment is a one-factor intervention:
 
 This is causal system identification: does the requested control cause the intended musical change, and what else changes as a side effect?
 
+## New editing-benchmark frontier — 9 November 2026
+
+Two recent benchmarks sharpen the design of VCCB:
+
+### SMEBench — paired musical edit targets
+
+SMEBench (arXiv:2610.36715, 27 October 2026) creates controlled edits by changing symbolic MIDI performances, then rendering matched source and target audio. Its benchmark covers 12 instrumentation, articulation, dynamics and pitch operations, with a balanced 3,600-example test set and a smaller real-audio complement. It measures three different properties: preservation of the source, agreement with the intended paired target, and textual compatibility with the instruction. Its paper shows that rankings change depending on which metric is used.
+
+This reveals an important pitfall: a system that simply returns the original audio can score very well on preservation while failing to perform the edit. Likewise, text similarity can reward an output that sounds compatible with the instruction but misses the intended target.
+
+**VCCB implication:** report at least three separate dimensions—requested-change execution, agreement with a reference target, and preservation of all untargeted content. Do not rank a system by a single preservation metric or by text-audio similarity alone.
+
+Source: https://arxiv.org/abs/2610.36715
+
+### MMAE and the Audio Editing Challenge
+
+MMAE (arXiv:2606.07229) broadens audio editing evaluation to seven modalities, six task-complexity levels, eight operation types, 2,000 examples, and 17,741 atomic rubrics. It reports Instruction Following Rate (IFR), Consistency Rate (CR), and Exact Match Rate (EMR). The paper reports that EMR remains below 5% in evaluated systems and reaches 0% on complex mixed-modality tasks. This underlines how hard it is to satisfy a complete edit request while preserving the rest of an audio scene.
+
+The associated Audio Editing Challenge plans to open its leaderboard on **10 November 2026** with 500 previously unreleased examples in each of its Single Model and Agent tracks. Its primary ranking metric is EMR, with IFR and CR as tie-breakers. This is a useful near-term external evaluation target for general audio-editing agents, but it is not a singer-specific or score-conditioned benchmark.
+
+Sources:
+- MMAE paper: https://arxiv.org/abs/2606.07229
+- Official challenge protocol: https://audio-editing-challenge.github.io/leaderboard/
+
+### Commercial / research systems context
+
+Google Research's MAGE (2026) is a relevant architectural reference: one continuous latent framework handles multimodal music generation and mixture-grounded editing, using modality alignment, gated control, and modality masking for missing or ambiguous conditions. It is a research system and does not establish that any current product has solved local, score-conditioned vocal revision.
+
+Source: https://research.google/pubs/mage-modality-agnostic-music-generation-and-editing/
+
 ## Why current leaderboards are not enough
 
 Artificial Analysis AA-Music-Vocal v1.1 currently ranks prompt-to-song generation by blind pairwise preference. Its 9 November 2026 leaderboard lists Suno v6 at 1,144 ±18 Elo, Suno v6-mini at 1,132 ±18, Mureka V9.5 at 1,101 ±18, Mureka V9 at 1,063 ±18, and Lyria 3.5 at 1,050 ±18. The benchmark supplies prompts and lets each system generate its own lyrics and vocals. It is an appropriate commercial whole-song quality comparison, but it does not isolate whether a system follows a supplied score or whether one local revision preserves the rest of a song.
@@ -67,6 +97,7 @@ Change one word, phone, note, breath, or phrase without regenerating unrelated r
 
 Measure:
 - target-region success;
+- agreement with an independently specified paired target result;
 - collateral change in protected regions;
 - unchanged phone and note retention;
 - voice identity drift;
