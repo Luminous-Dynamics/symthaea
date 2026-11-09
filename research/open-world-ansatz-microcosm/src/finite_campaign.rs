@@ -91,6 +91,7 @@ pub struct ArmAggregate {
     pub exact_version_space_matches: usize,
     pub exact_structure_set_matches: usize,
     pub generating_model_retained: usize,
+    pub generating_truth_behaviorally_represented: usize,
     pub decision_correct: usize,
     pub evidence_references_valid: usize,
     pub oracle_singleton_model_cases: usize,
@@ -119,6 +120,7 @@ impl ArmAggregate {
             exact_version_space_matches: 0,
             exact_structure_set_matches: 0,
             generating_model_retained: 0,
+            generating_truth_behaviorally_represented: 0,
             decision_correct: 0,
             evidence_references_valid: 0,
             oracle_singleton_model_cases: 0,
@@ -143,6 +145,8 @@ impl ArmAggregate {
         self.exact_structure_set_matches +=
             bool_count(score.structure_score.exact_structure_set_match);
         self.generating_model_retained += bool_count(score.generating_model_in_version_space);
+        self.generating_truth_behaviorally_represented +=
+            bool_count(score.generating_truth_behaviorally_represented);
         self.decision_correct += bool_count(score.decision_correct);
         self.evidence_references_valid += bool_count(score.evidence_references_valid);
         self.oracle_singleton_model_cases += bool_count(score.set_score.oracle_model_count == 1);
@@ -264,6 +268,7 @@ pub struct PairedArmContrast {
     pub exact_model_set_match: PairedBooleanContrast,
     pub exact_structure_set_match: PairedBooleanContrast,
     pub generating_truth_retained: PairedBooleanContrast,
+    pub generating_truth_behaviorally_represented: PairedBooleanContrast,
     pub decision_correct: PairedBooleanContrast,
     pub evidence_references_valid: PairedBooleanContrast,
     pub false_unique_structure_claim: PairedBooleanContrast,
@@ -288,6 +293,7 @@ impl PairedArmContrast {
             exact_model_set_match: PairedBooleanContrast::default(),
             exact_structure_set_match: PairedBooleanContrast::default(),
             generating_truth_retained: PairedBooleanContrast::default(),
+            generating_truth_behaviorally_represented: PairedBooleanContrast::default(),
             decision_correct: PairedBooleanContrast::default(),
             evidence_references_valid: PairedBooleanContrast::default(),
             false_unique_structure_claim: PairedBooleanContrast::default(),
@@ -317,6 +323,10 @@ impl PairedArmContrast {
         self.generating_truth_retained.record(
             a0.generating_model_in_version_space,
             a2.generating_model_in_version_space,
+        );
+        self.generating_truth_behaviorally_represented.record(
+            a0.generating_truth_behaviorally_represented,
+            a2.generating_truth_behaviorally_represented,
         );
         self.decision_correct
             .record(a0.decision_correct, a2.decision_correct);
@@ -707,6 +717,7 @@ mod tests {
         let false_unique = EvaluatorScore {
             evidence_prefix_sha256: "sha256:".to_owned(),
             generating_model_in_version_space: true,
+            generating_truth_behaviorally_represented: true,
             set_score: SetScore {
                 claimed_model_count: 2,
                 oracle_model_count: 2,
