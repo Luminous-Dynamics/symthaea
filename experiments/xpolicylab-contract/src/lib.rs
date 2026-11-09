@@ -218,12 +218,12 @@ pub fn validate_action_response(
             }
 
             for (channel, expected_dimension) in &expected.channel_dimensions {
-                let values = step.channels.get(channel).ok_or_else(|| {
+                let values = step.channels.get(channel).ok_or(
                     ContractError::ChannelSetMismatch {
                         env_idx: expected_env.env_idx,
                         step_index,
-                    }
-                })?;
+                    },
+                )?;
                 if values.len() != *expected_dimension {
                     return Err(ContractError::ChannelDimensionMismatch {
                         env_idx: expected_env.env_idx,
