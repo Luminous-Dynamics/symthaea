@@ -21,3 +21,8 @@ uuid = { workspace = true }
 [dev-dependencies]
 tempfile = "3.8"
 tokio = { workspace = true, features = ["sync", "rt", "macros"] }
+
+[[bench]]
+name = "hme_hierarchical_select"
+path = "benches/hme_hierarchical_select.rs"
+harness = false
