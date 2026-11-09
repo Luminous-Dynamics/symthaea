@@ -17,6 +17,7 @@ pub mod causal_set_nd;
 pub mod curved_frw_1p1;
 pub mod curved_order_statistics;
 pub mod interval_profile;
+pub mod joint_signature;
 pub mod link_matrix;
 pub mod link_sampling_bias;
 
@@ -42,6 +43,10 @@ pub use curved_order_statistics::{
 };
 pub use interval_profile::{
     IntervalAbundanceProfile, IntervalProfileError, MAX_INTERVAL_PROFILE_BINS,
+};
+pub use joint_signature::{
+    JointCausalSetSignature, JointSignatureError, MAX_SIGNATURE_SPACETIME_DIMENSION,
+    MIN_SIGNATURE_SPACETIME_DIMENSION,
 };
 pub use link_matrix::{
     LinkMatrix, LinkMatrixError, MAX_LINK_MATRIX_BYTES, MAX_LINK_MATRIX_EVENTS,
