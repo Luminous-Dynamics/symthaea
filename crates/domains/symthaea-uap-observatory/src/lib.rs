@@ -820,15 +820,6 @@ pub use budgeted_design::{
     greedy_budgeted_design,
 };
 
-/// One-step Gaussian hypothesis-discriminating experiment design.
-pub mod active_design;
-
-pub use active_design::{
-    ActiveDesignError, ActiveDesignReport, ExperimentCandidate, ExperimentScore,
-    HypothesisPrediction, HypothesisPrior, MAX_ACTIVE_CANDIDATES, MAX_ACTIVE_HYPOTHESES,
-    rank_experiments,
-};
-
 /// Data-only Jacobian rank and singular-spectrum diagnostics.
 pub mod observability;
 
