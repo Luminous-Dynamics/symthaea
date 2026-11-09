@@ -688,6 +688,7 @@ pub fn verify_counterfactual_pair_manifest_artifacts(
 fn validate_relative_artifact_path(value: &str) -> Result<(), CohortAdmissionError> {
     let path = Path::new(value);
     if value.trim().is_empty()
+        || value.contains('\0')
         || value.contains('\\')
         || value.contains(':')
         || path.is_absolute()
