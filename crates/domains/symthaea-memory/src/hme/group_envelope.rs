@@ -391,11 +391,15 @@ fn next_down_f32(value: f32) -> f32 {
 }
 
 fn quantize_lower_coordinate(value: f32) -> u16 {
-    (((value as f64 + 1.0) * 32_767.5).floor().clamp(0.0, 65_535.0)) as u16
+    let shifted_lower = next_down_f64(value as f64 + 1.0);
+    let scaled_lower = next_down_f64(shifted_lower * 32_767.5);
+    scaled_lower.floor().clamp(0.0, 65_535.0) as u16
 }
 
 fn quantize_upper_coordinate(value: f32) -> u16 {
-    (((value as f64 + 1.0) * 32_767.5).ceil().clamp(0.0, 65_535.0)) as u16
+    let shifted_upper = next_up_f64(value as f64 + 1.0);
+    let scaled_upper = next_up_f64(shifted_upper * 32_767.5);
+    scaled_upper.ceil().clamp(0.0, 65_535.0) as u16
 }
 
 fn decode_lower_coordinate(value: u16) -> f32 {
@@ -1206,6 +1210,33 @@ mod tests {
             let upper = decode_upper_coordinate(quantize_upper_coordinate(value));
             assert!(lower <= value);
             assert!(upper >= value);
+        }
+    }
+
+    #[test]
+    fn quantized_coordinate_bounds_contain_neighbors_of_every_bin_boundary() {
+        for code in 0..=65_535u32 {
+            let boundary = (2.0 * code as f64 / 65_535.0) - 1.0;
+            let rounded = boundary as f32;
+            let candidates = [
+                next_down_f32(rounded).max(-1.0),
+                rounded.clamp(-1.0, 1.0),
+                next_up_f32(rounded).min(1.0),
+            ];
+            for value in candidates {
+                let lower =
+                    decode_lower_coordinate(quantize_lower_coordinate(value));
+                let upper =
+                    decode_upper_coordinate(quantize_upper_coordinate(value));
+                assert!(
+                    lower <= value,
+                    "boundary {code}: lower {lower} exceeds value {value}"
+                );
+                assert!(
+                    upper >= value,
+                    "boundary {code}: upper {upper} is below value {value}"
+                );
+            }
         }
     }
 
