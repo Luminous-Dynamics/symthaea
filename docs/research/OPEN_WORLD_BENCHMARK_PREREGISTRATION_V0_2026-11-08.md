@@ -109,6 +109,23 @@ The claim should receive credit as *evidence-grounded* only when it is supported
 
 Prospective Symthaea target: reduce the best-generated-to-submitted gap under matched candidate-generation budget, without trading away scientific validity or structural recovery. Evidence-grounded accuracy must improve against a frozen incumbent while intact-task accuracy does not regress. Set margins only after a development pilot and freeze them before confirmation.
 
+## 3C. Open-support / misspecification ladder
+
+Separate closed-catalogue recovery from support-misspecification recognition:
+
+| Stratum | Hidden truth relative to candidate catalogue | Required behavior |
+|---|---|---|
+| F0 | Truth is inside the declared catalogue | Exact compatible version space; identify or report the correct equivalence class |
+| F1 | Parameter is valid for the world generator but outside the catalogue | Reject all incompatible candidates; report no-compatible-model rather than nearest singleton |
+| F2 | Structural family or term is outside the catalogue | Detect misspecification, request discriminating evidence, then propose a typed grammar extension in a later policy track |
+| F3 | Measurement process differs from declared sensors | Diagnose instrument/model discrepancy rather than attribute every residual to the physical law |
+| F4 | Dynamics change regime or become history/intervention dependent beyond declared model | Detect regime/transport failure and avoid unsupported transfer |
+| F5 | Noise/discrepancy violates the declared observation model | Calibrate, model uncertainty or abstain; do not fit away structured error |
+
+The initial executable F1 control is the gain-7 numeric world: the world generator accepts gains 1–16, while the finite candidate catalogue contains {1,2,3}. It is paired with F0 negative controls. The ordinary closed-grammar evaluator remains fail-closed if truth is accidentally omitted from its oracle. Do not report F1 as structural out-of-grammar discovery.
+
+Required controls: an in-grammar case that must not be rejected; an out-of-catalogue case that must not be forced into a nearest singleton; an evaluator bug/omitted-truth closed-support case that must fail; and a shifted observation that could also arise from sensor or stochastic discrepancies. Detection and subsequent repair are separate outcomes.
+
 ## 4. Matched experimental arms
 
 ### 4.1 Structure-access treatment
@@ -302,6 +319,7 @@ This lane owns the matched benchmark experiment and thin adapter only. It does n
 - ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
 - AstaBench: https://allenai.org/asta/bench
 - SciLaws-Bench: https://yiyihum.github.io/SciLaws-Bench/ ; paper https://arxiv.org/abs/2609.01552
+- Open-world misspecification controls and acceptance gates: https://github.com/Luminous-Dynamics/symthaea/issues/11197
 - Evidence-grounded scientific evaluation: https://arxiv.org/abs/2610.04915
 - Semantic Calibration for long-form scientific QA: https://aclanthology.org/2026.uncertainlp-main.11/
 - ASI-Bench: https://arxiv.org/abs/2608.17271 ; leaderboard: https://asibench.apexin.ai/leaderboard/ ; prompt guidance FAQ: https://asibench.apexin.ai/faq/
