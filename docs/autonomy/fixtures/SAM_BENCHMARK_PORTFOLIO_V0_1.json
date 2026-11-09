@@ -1623,12 +1623,12 @@
       "id": "sam-follow-privilege-separation-v0.1",
       "name": "SAM Follow Privilege-Separation Benchmark v0.1",
       "category": "privilege_aware_internal_evaluation",
-      "source_status": "specification_only",
+      "source_status": "implementation_authored_ci_pending",
       "rights_status": "synthetic_no_external_dataset_required_for_initial_arms",
       "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
       "implementation_refs": [
-        "https://github.com/Luminous-Dynamics/symthaea/pull/11186",
-        "https://github.com/Luminous-Dynamics/symthaea/pull/11213"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11260"
       ],
       "capability_target": [
         "policy_observation_privilege_separation",
@@ -1712,18 +1712,27 @@
       },
       "validation_result": null,
       "caveats": [
-        "Specification only. No Follow campaign result, test pass or performance result is claimed.",
-        "Arms A–C are simulation-only; Arm D is ineligible until local metric tracks satisfy SAM scene admission.",
+        "Schema, fixture, validator and 17 Rust tests are authored in PR #11260; exact-head workflow is queued and no pass is claimed yet.",
+        "The canonical report fixture remains specification_only with zero trials.",
+        "Arms A-C are simulation-only; Arm D is blocked until local metric tracks satisfy SAM scene admission.",
         "A no-teacher/no-gradient-update run may still evolve recurrent/FEP state and must report these dynamics.",
         "A student may still observe simulator-derived peer channels even when teacher actions are not used.",
-        "This is an internal SAM experiment, not an external leaderboard or a vehicle safety demonstration."
+        "This is an internal SAM experiment, not an external leaderboard or vehicle safety demonstration."
       ],
       "sources": [
         "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
         "https://github.com/Luminous-Dynamics/symthaea/pull/11186",
         "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
         "https://github.com/Luminous-Dynamics/symthaea/issues/11109"
-      ]
+      ],
+      "validator": {
+        "schema": "docs/autonomy/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json",
+        "fixture": "docs/autonomy/fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json",
+        "tool": "tools/sam-follow-privilege-check",
+        "dedicated_workflow": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/42619481023",
+        "authored_rust_test_count": 17,
+        "exact_head": "7eb335423e6cee74d0293d50bfca1125ed83cfa1"
+      }
     }
   ],
   "world_model_benchmark_landscape_snapshot": {
