@@ -1843,7 +1843,9 @@ mod tests {
         fixture["snapshot"]["follow_target_context"]["max_age_ns"] = Value::from(1u64);
         fixture["snapshot"]["follow_target_context"]["observation_tick_ns"] =
             stale_tick.clone();
-        fixture["snapshot"]["sources"][3]["acquisition_tick_ns"] = stale_tick;
+        fixture["snapshot"]["sources"][3]["acquisition_tick_ns"] = stale_tick.clone();
+        fixture["snapshot"]["simulator_truth_actor_states"][0]["acquisition_tick_ns"] =
+            stale_tick;
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
