@@ -328,7 +328,10 @@ pub fn estimate_finite_size_dimension_posterior(
                 dimension: item.spacetime_dimension,
             });
         }
-        if !item.probability.is_finite() || item.probability < 0.0 {
+        if !item.probability.is_finite()
+            || item.probability < 0.0
+            || item.probability > 1.0
+        {
             return Err(BayesianDimensionError::InvalidPriorProbability {
                 dimension: item.spacetime_dimension,
             });
@@ -760,6 +763,23 @@ mod tests {
         assert_eq!(posterior.posterior_mean_dimension, None);
         assert_eq!(posterior.credible_set_95, Vec::<usize>::new());
         assert!(posterior.dimensions.iter().all(|entry| entry.posterior_probability.is_none()));
+    }
+
+    #[test]
+    fn prior_probabilities_above_one_are_rejected() {
+        let corpus = calibration(32, 8);
+        assert!(matches!(
+            estimate_finite_size_dimension_posterior(
+                32,
+                0.5,
+                &corpus,
+                &[DimensionPrior {
+                    spacetime_dimension: 2,
+                    probability: 1.5,
+                }]
+            ),
+            Err(BayesianDimensionError::InvalidPriorProbability { dimension: 2 })
+        ));
     }
 
     #[test]
