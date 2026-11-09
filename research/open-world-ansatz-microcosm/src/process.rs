@@ -120,15 +120,14 @@ pub struct ProcessAgent {
 
 impl ProcessAgent {
     pub fn spawn(config: ProcessAgentConfig) -> Result<Self, ProcessError> {
-        validate_frame_limits(
-            config.max_input_frame_bytes,
-            config.max_output_frame_bytes,
-        )?;
+        validate_frame_limits(config.max_input_frame_bytes, config.max_output_frame_bytes)?;
 
-        let executable = fs::canonicalize(&config.executable)
-            .map_err(|error| ProcessError::Io(format!("cannot resolve agent executable: {error}")))?;
-        let metadata = fs::metadata(&executable)
-            .map_err(|error| ProcessError::Io(format!("cannot inspect agent executable: {error}")))?;
+        let executable = fs::canonicalize(&config.executable).map_err(|error| {
+            ProcessError::Io(format!("cannot resolve agent executable: {error}"))
+        })?;
+        let metadata = fs::metadata(&executable).map_err(|error| {
+            ProcessError::Io(format!("cannot inspect agent executable: {error}"))
+        })?;
         if !metadata.is_file() {
             return Err(ProcessError::InvalidConfiguration(
                 "agent executable must resolve to a regular file".to_owned(),
@@ -167,12 +166,14 @@ impl ProcessAgent {
         let mut child = command
             .spawn()
             .map_err(|error| ProcessError::Io(format!("cannot spawn agent process: {error}")))?;
-        let stdin = child.stdin.take().ok_or_else(|| {
-            ProcessError::Io("agent stdin pipe was not created".to_owned())
-        })?;
-        let stdout = child.stdout.take().ok_or_else(|| {
-            ProcessError::Io("agent stdout pipe was not created".to_owned())
-        })?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| ProcessError::Io("agent stdin pipe was not created".to_owned()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| ProcessError::Io("agent stdout pipe was not created".to_owned()))?;
 
         Ok(Self {
             child: Some(child),
@@ -223,21 +224,18 @@ impl ProcessAgent {
         input.push(b'\n');
         let agent_view_frame_sha256 = sha256_frame(&input);
 
-        let stdin = self.stdin.as_mut().ok_or_else(|| {
-            ProcessError::Protocol("agent stdin was already closed".to_owned())
-        })?;
+        let stdin = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| ProcessError::Protocol("agent stdin was already closed".to_owned()))?;
         stdin
             .write_all(&input)
             .and_then(|()| stdin.flush())
             .map_err(|error| ProcessError::Io(format!("cannot send AgentView: {error}")))?;
 
         let mut output = Vec::new();
-        match read_bounded_line(
-            &mut self.stdout,
-            &mut output,
-            self.max_output_frame_bytes,
-        )
-        .map_err(|error| ProcessError::Io(format!("cannot read AgentAction: {error}")))?
+        match read_bounded_line(&mut self.stdout, &mut output, self.max_output_frame_bytes)
+            .map_err(|error| ProcessError::Io(format!("cannot read AgentAction: {error}")))?
         {
             BoundedLine::Eof => {
                 let status = self
@@ -300,16 +298,15 @@ impl ProcessAgent {
             ));
         }
 
-        let child = self.child.take().ok_or_else(|| {
-            ProcessError::Protocol("agent process was already reaped".to_owned())
-        })?;
+        let child = self
+            .child
+            .take()
+            .ok_or_else(|| ProcessError::Protocol("agent process was already reaped".to_owned()))?;
         let status = child
             .wait()
             .map_err(|error| ProcessError::Io(format!("cannot wait for agent: {error}")))?;
         if !status.success() {
-            return Err(ProcessError::AgentNonZeroExit(
-                status.code().unwrap_or(-1),
-            ));
+            return Err(ProcessError::AgentNonZeroExit(status.code().unwrap_or(-1)));
         }
         Ok(status.code().unwrap_or(0))
     }
@@ -402,12 +399,13 @@ pub fn run_process_episode(
             limit: MAX_PROCESS_PROBES,
         });
     }
-    let maximum_action_count = maximum_actions
-        .checked_add(1)
-        .ok_or(ProcessError::ProbeBudgetTooLarge {
-            requested: maximum_actions,
-            limit: MAX_PROCESS_PROBES,
-        })?;
+    let maximum_action_count =
+        maximum_actions
+            .checked_add(1)
+            .ok_or(ProcessError::ProbeBudgetTooLarge {
+                requested: maximum_actions,
+                limit: MAX_PROCESS_PROBES,
+            })?;
 
     let mut action_records = Vec::new();
     for action_index in 1..=maximum_action_count {
@@ -418,9 +416,9 @@ pub fn run_process_episode(
             .view()
             .map_err(|error| ProcessError::Protocol(error.to_string()))?;
         let exchange = agent.next_action(&before)?;
-        let response = episode
-            .apply(exchange.action.clone())
-            .map_err(|error| ProcessError::Protocol(format!("episode rejected agent action: {error}")))?;
+        let response = episode.apply(exchange.action.clone()).map_err(|error| {
+            ProcessError::Protocol(format!("episode rejected agent action: {error}"))
+        })?;
         action_records.push(ProcessActionRecord {
             action_index,
             agent_view_frame_sha256: exchange.agent_view_frame_sha256,
@@ -476,10 +474,16 @@ pub enum ProcessError {
     Io(String),
     Serialization(String),
     Protocol(String),
-    FrameTooLarge { direction: &'static str, limit: usize },
+    FrameTooLarge {
+        direction: &'static str,
+        limit: usize,
+    },
     AgentExited(String),
     AgentNonZeroExit(i32),
-    ProbeBudgetTooLarge { requested: usize, limit: usize },
+    ProbeBudgetTooLarge {
+        requested: usize,
+        limit: usize,
+    },
     MalformedAction(String),
 }
 
