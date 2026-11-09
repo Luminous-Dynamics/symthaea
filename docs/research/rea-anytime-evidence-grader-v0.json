@@ -133,10 +133,10 @@
         },
         {
           "after_event_index": 1,
-          "decision": "stop_unresolved",
-          "claim_id": null,
+          "decision": "stop_bounded",
+          "claim_id": "package_advisory_match",
           "action_id": null,
-          "reason": "The independent counterexample revokes readiness."
+          "reason": "The current-release claim is revoked, but the historical package/advisory match remains supported."
         }
       ],
       "final_ready_claim_id": "package_advisory_match"
