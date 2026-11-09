@@ -7,8 +7,10 @@ pub mod group_envelope;
 pub mod interval_select;
 
 pub use group_envelope::{
-    ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
-    continuous_hv_query_digest, member_id_set_digest,
+    ContinuousHVGroupEnvelope, GroupEnvelopeError, GroupEnvelopeMode,
+    GroupEnvelopeMemoryEstimate, GroupEnvelopeMemoryEstimateError,
+    continuous_hv_member_payload_digest,
+    continuous_hv_query_digest, estimate_group_envelope_memory, member_id_set_digest,
 };
 pub use interval_select::{
     ExactScoreRecord, GroupIntervalCoverageCounts, GroupIntervalSelectionError,
