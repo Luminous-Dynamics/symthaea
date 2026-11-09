@@ -620,6 +620,7 @@ impl SequentialWeightVerificationCampaign {
 pub struct SequentialWeightVerification {
     binding: WeightVerificationBinding,
     config: SequentialWeightVerificationConfig,
+    confirmatory_episode_manifest: ConfirmatoryEpisodeManifest,
     seen_episode_ids: BTreeSet<String>,
     observation_count: u64,
     mean_improvement: f64,
@@ -633,9 +634,24 @@ impl SequentialWeightVerification {
     fn from_binding(
         binding: WeightVerificationBinding,
         config: SequentialWeightVerificationConfig,
+        confirmatory_episode_manifest: ConfirmatoryEpisodeManifest,
     ) -> Result<Self, SequentialWeightVerificationError> {
         validate_binding(&binding)?;
         validate_config(config)?;
+        validate_confirmatory_episode_manifest(&confirmatory_episode_manifest)?;
+        if binding.confirmatory_episode_manifest_digest
+            != confirmatory_episode_manifest.manifest_digest
+        {
+            return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "binding digest does not match manifest",
+            ));
+        }
+        if confirmatory_episode_manifest.episode_count() < config.maximum_observations as usize {
+            return Err(SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
+                expected: config.maximum_observations as usize,
+                actual: confirmatory_episode_manifest.episode_count(),
+            });
+        }
 
         let mut observation_hasher = blake3::Hasher::new();
         observation_hasher.update(b"symthaea-weight-verification-observations-v1\0");
@@ -643,6 +659,7 @@ impl SequentialWeightVerification {
         Ok(Self {
             binding,
             config,
+            confirmatory_episode_manifest,
             seen_episode_ids: BTreeSet::new(),
             observation_count: 0,
             mean_improvement: 0.0,
@@ -669,6 +686,9 @@ impl SequentialWeightVerification {
         }
         if observation.episode_id.trim().is_empty() {
             return Err(SequentialWeightVerificationError::EmptyEpisodeId);
+        }
+        if !self.confirmatory_episode_manifest.contains(&observation.episode_id) {
+            return Err(SequentialWeightVerificationError::EpisodeNotInConfirmatoryManifest);
         }
         if !observation.baseline_loss.is_finite()
             || !(0.0..=1.0).contains(&observation.baseline_loss)
@@ -722,9 +742,10 @@ impl SequentialWeightVerification {
     ) -> Result<SequentialWeightVerificationCheckpoint, SequentialWeightVerificationError> {
         let report = self.current_report()?;
         let mut checkpoint = SequentialWeightVerificationCheckpoint {
-            format_version: 1,
+            format_version: 2,
             binding: self.binding.clone(),
             config: self.config,
+            confirmatory_episode_manifest: self.confirmatory_episode_manifest.clone(),
             observations: self.observations.clone(),
             report_digest: report.report_digest,
             checkpoint_digest: String::new(),
@@ -740,7 +761,7 @@ impl SequentialWeightVerification {
     pub fn from_checkpoint(
         checkpoint: SequentialWeightVerificationCheckpoint,
     ) -> Result<Self, SequentialWeightVerificationError> {
-        if checkpoint.format_version != 1 {
+        if checkpoint.format_version != 2 {
             return Err(
                 SequentialWeightVerificationError::UnsupportedVerifierCheckpointVersion(
                     checkpoint.format_version,
@@ -748,6 +769,12 @@ impl SequentialWeightVerification {
             );
         }
         validate_binding(&checkpoint.binding)?;
+        validate_confirmatory_episode_manifest(&checkpoint.confirmatory_episode_manifest)?;
+        if checkpoint.binding.confirmatory_episode_manifest_digest
+            != checkpoint.confirmatory_episode_manifest.manifest_digest
+        {
+            return Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch);
+        }
         validate_config(checkpoint.config)?;
         validate_hex_digest(&checkpoint.report_digest, "report_digest")?;
         validate_hex_digest(&checkpoint.checkpoint_digest, "checkpoint_digest")?;
@@ -761,7 +788,11 @@ impl SequentialWeightVerification {
             return Err(SequentialWeightVerificationError::VerifierCheckpointDigestMismatch);
         }
 
-        let mut verifier = Self::from_binding(checkpoint.binding, checkpoint.config)?;
+        let mut verifier = Self::from_binding(
+            checkpoint.binding,
+            checkpoint.config,
+            checkpoint.confirmatory_episode_manifest,
+        )?;
         for observation in checkpoint.observations {
             if verifier.terminal {
                 return Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch);
@@ -997,6 +1028,10 @@ fn validate_binding(
         (
             "confirmatory_shard_digest",
             binding.confirmatory_shard_digest.as_str(),
+        ),
+        (
+            "confirmatory_episode_manifest_digest",
+            binding.confirmatory_episode_manifest_digest.as_str(),
         ),
         (
             "precondition_gate_digest",
