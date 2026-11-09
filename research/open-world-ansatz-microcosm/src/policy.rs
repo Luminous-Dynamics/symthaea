@@ -151,6 +151,18 @@ impl StrategyEnumeratorBaseline {
         view: &AgentView,
         strategy: crate::strategies::ProbeStrategy,
     ) -> Result<AgentAction, PolicyError> {
+        Self::next_action_with_work(view, strategy).map(|(action, _)| action)
+    }
+
+    /// Select an action and return deterministic probe-scoring work counts.
+    /// The counters cover model predictions used by the one-step probe scorer;
+    /// they do not claim to measure discovery filtering, wall time or CPU cost.
+    pub fn next_action_with_work(
+        view: &AgentView,
+        strategy: crate::strategies::ProbeStrategy,
+    ) -> Result<(AgentAction, crate::strategies::ProbeScoringWork), PolicyError> {
+        use crate::strategies::ProbeScoringWork;
+
         if view.status != crate::protocol::EpisodeStatus::Open {
             return Err(PolicyError::EpisodeNotOpen);
         }
@@ -175,12 +187,15 @@ impl StrategyEnumeratorBaseline {
                     && (view.remaining_probe_actions == 0 || models.len() <= 1)
                 {
                     let count = models.len();
-                    return Ok(submit(
-                        view,
-                        AgentClaim::Boolean {
-                            compatible_models: models,
-                            disposition: disposition(count),
-                        },
+                    return Ok((
+                        submit(
+                            view,
+                            AgentClaim::Boolean {
+                                compatible_models: models,
+                                disposition: disposition(count),
+                            },
+                        ),
+                        ProbeScoringWork::default(),
                     ));
                 }
             }
@@ -204,12 +219,15 @@ impl StrategyEnumeratorBaseline {
                     && (view.remaining_probe_actions == 0 || models.len() <= 1)
                 {
                     let count = models.len();
-                    return Ok(submit(
-                        view,
-                        AgentClaim::Numeric {
-                            compatible_models: models,
-                            disposition: disposition(count),
-                        },
+                    return Ok((
+                        submit(
+                            view,
+                            AgentClaim::Numeric {
+                                compatible_models: models,
+                                disposition: disposition(count),
+                            },
+                        ),
+                        ProbeScoringWork::default(),
                     ));
                 }
             }
@@ -233,20 +251,23 @@ impl StrategyEnumeratorBaseline {
                     && (view.remaining_probe_actions == 0 || models.len() <= 1)
                 {
                     let count = models.len();
-                    return Ok(submit(
-                        view,
-                        AgentClaim::Interaction {
-                            compatible_models: models,
-                            disposition: disposition(count),
-                        },
+                    return Ok((
+                        submit(
+                            view,
+                            AgentClaim::Interaction {
+                                compatible_models: models,
+                                disposition: disposition(count),
+                            },
+                        ),
+                        ProbeScoringWork::default(),
                     ));
                 }
             }
         }
         let action_strategy = strategy_for_decision_step(strategy, view.observations.len());
-        let intervention = crate::strategies::choose_probe(view, action_strategy)
+        let (intervention, work) = crate::strategies::choose_probe_with_work(view, action_strategy)
             .map_err(|error| PolicyError::StrategyFailure(error.to_string()))?;
-        Ok(probe(intervention))
+        Ok((probe(intervention), work))
     }
 }
 
