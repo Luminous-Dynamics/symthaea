@@ -68,6 +68,7 @@ pub enum FloquetError {
         slices: usize,
         maximum: usize,
     },
+    InvalidProbeFrequency,
 }
 
 impl fmt::Display for FloquetError {
@@ -123,6 +124,9 @@ impl fmt::Display for FloquetError {
                     f,
                     "Trotter slice count must be in 1..={maximum}, got {slices}"
                 )
+            }
+            Self::InvalidProbeFrequency => {
+                write!(f, "AC probe frequency must be finite and in [0, 0.5] cycles per drive period")
             }
         }
     }
@@ -372,6 +376,82 @@ impl KickedIsingFloquet {
         self.apply_diagonal_ising_phase();
     }
 
+    /// Apply one Floquet period with a sampled uniform longitudinal AC probe.
+    ///
+    /// The probe is a piecewise-constant longitudinal field kick coupled to
+    /// `sum_i Z_i` after the global X rotation:
+    ///
+    /// `U_n = exp[-i(H_Ising + A cos(phi_n) sum_i Z_i)] exp[-i theta/2 sum_i X_i]`.
+    ///
+    /// This is an exact state-vector update for the declared sampled Floquet
+    /// map. It is not a continuous-time simulation of a dipolar diamond sensor.
+    pub fn step_with_uniform_ac_probe(
+        &mut self,
+        amplitude: f64,
+        phase_rad: f64,
+    ) -> Result<(), FloquetError> {
+        if !amplitude.is_finite() {
+            return Err(FloquetError::NonFiniteParameter {
+                name: "probe_amplitude",
+                index: 0,
+            });
+        }
+        if !phase_rad.is_finite() {
+            return Err(FloquetError::NonFiniteParameter {
+                name: "probe_phase_rad",
+                index: 0,
+            });
+        }
+        self.apply_global_x_rotation();
+        self.apply_diagonal_ising_phase_with_uniform_probe(amplitude * phase_rad.cos());
+        Ok(())
+    }
+
+    /// Stroboscopic magnetization under a sampled longitudinal AC probe.
+    ///
+    /// `frequency_cycles_per_drive_period` is restricted to the Nyquist
+    /// interval [0, 0.5] for one probe sample per Floquet period. The probe
+    /// phase is sampled at each period midpoint. This is a deterministic
+    /// piecewise-constant-kick model, not a calibrated continuous sensor.
+    pub fn stroboscopic_magnetization_with_uniform_ac_probe(
+        &mut self,
+        periods: usize,
+        amplitude: f64,
+        frequency_cycles_per_drive_period: f64,
+        initial_phase_rad: f64,
+    ) -> Result<Vec<f64>, FloquetError> {
+        if !frequency_cycles_per_drive_period.is_finite()
+            || !(0.0..=0.5).contains(&frequency_cycles_per_drive_period)
+        {
+            return Err(FloquetError::InvalidProbeFrequency);
+        }
+        if !amplitude.is_finite() {
+            return Err(FloquetError::NonFiniteParameter {
+                name: "probe_amplitude",
+                index: 0,
+            });
+        }
+        if !initial_phase_rad.is_finite() {
+            return Err(FloquetError::NonFiniteParameter {
+                name: "probe_initial_phase_rad",
+                index: 0,
+            });
+        }
+
+        let mut signal = Vec::with_capacity(periods + 1);
+        signal.push(self.magnetization());
+        for period in 0..periods {
+            let midpoint = period as f64 + 0.5;
+            let phase = 2.0 * std::f64::consts::PI
+                * frequency_cycles_per_drive_period
+                * midpoint
+                + initial_phase_rad;
+            self.step_with_uniform_ac_probe(amplitude, phase)?;
+            signal.push(self.magnetization());
+        }
+        Ok(signal)
+    }
+
     /// Norm squared; unitary evolution must preserve this at numerical precision.
     pub fn norm_squared(&self) -> f64 {
         self.amplitudes.iter().map(|amp| amp.norm_sqr()).sum()
@@ -431,6 +511,10 @@ impl KickedIsingFloquet {
     }
 
     fn apply_diagonal_ising_phase(&mut self) {
+        self.apply_diagonal_ising_phase_with_uniform_probe(0.0);
+    }
+
+    fn apply_diagonal_ising_phase_with_uniform_probe(&mut self, uniform_probe_field: f64) {
         for (basis, amplitude) in self.amplitudes.iter_mut().enumerate() {
             let mut energy = 0.0;
             for spin in 0..self.n_spins {
@@ -439,7 +523,7 @@ impl KickedIsingFloquet {
                 } else {
                     -1.0
                 };
-                energy += self.fields[spin] * z;
+                energy += (self.fields[spin] + uniform_probe_field) * z;
             }
             for edge in &self.edges {
                 let z_first = if (basis & (1 << edge.first)) == 0 {
