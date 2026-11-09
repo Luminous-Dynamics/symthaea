@@ -38,8 +38,19 @@ pub enum StaticDiagnosticFeasibilityStatus {
     NotAssessed,
 }
 
-/// Exact action feasibility evidence. The digest must bind the action's
-/// protocol and eligibility decision; a status label alone is not evidence.
+/// The risk/certificate outputs are conditional on this finite supplied model set.
+/// The enum is intentionally explicit so they cannot be mistaken for an open-world
+/// guarantee or evidence that the actual data-generating process is represented.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StaticDiagnosticClaimScope {
+    FiniteDeclaredModelSetOnly,
+}
+
+/// Caller-supplied action feasibility evidence. The digest is required to bind
+/// the action protocol and eligibility decision. This pure evaluator checks
+/// completeness and SHA-256 shape; it does not authenticate the receipt issuer
+/// or independently establish real-world feasibility. Those checks belong
+/// upstream before this input is constructed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StaticDiagnosticActionEligibility {
     pub action_id: String,
@@ -159,6 +170,7 @@ pub struct StaticDiagnosticPublicPosterior {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StaticModelDiagnosticReport {
     pub scenario_id: String,
+    pub claim_scope: StaticDiagnosticClaimScope,
     pub policy_evaluations: u64,
     pub static_robust_risk: f64,
     pub static_policy: StaticDiagnosticPolicyTree,
@@ -402,6 +414,7 @@ pub fn evaluate_static_model_diagnostic_problem(
 
     let report = StaticModelDiagnosticReport {
         scenario_id: problem.scenario_id.clone(),
+        claim_scope: StaticDiagnosticClaimScope::FiniteDeclaredModelSetOnly,
         policy_evaluations,
         static_robust_risk: best_static.static_robust_risk,
         static_policy: materialize_policy(
@@ -1389,6 +1402,10 @@ mod tests {
             &"a".repeat(40),
         )
         .expect("known-answer policy oracle");
+        assert_eq!(
+            result.report.claim_scope,
+            StaticDiagnosticClaimScope::FiniteDeclaredModelSetOnly
+        );
         assert_eq!(result.report.static_robust_risk, 0.0);
         assert_eq!(result.report.clairvoyant_lower_bound_risk, 0.0);
         assert!((result.report.rectangular_minimax_risk - 0.5).abs() < 1e-12);
