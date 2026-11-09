@@ -2607,11 +2607,14 @@ fn cluster_cache_bytes(
     )
 }
 
-fn portfolio_output_bytes(
+fn portfolio_output_bytes<'a, I>(
     family: &FiniteUmdpModelFamily,
     partition: &[Vec<usize>],
-    cluster_solutions: &[VerifiedClusterPolicyOptimum],
-) -> Result<usize, PolicyPortfolioError> {
+    cluster_solutions: I,
+) -> Result<usize, PolicyPortfolioError>
+where
+    I: Iterator<Item = &'a VerifiedClusterPolicyOptimum>,
+{
     let models = family.model_count();
     let policies = partition.len();
     let partition_header_bytes = policies
@@ -2626,7 +2629,7 @@ fn portfolio_output_bytes(
             total.checked_add(members).ok_or(PolicyPortfolioError::DimensionOverflow)
         },
     )?;
-    let cluster_bytes = cluster_solutions.iter().try_fold(
+    let cluster_bytes = cluster_solutions.try_fold(
         policies.checked_mul(std::mem::size_of::<VerifiedClusterPolicyOptimum>())
             .ok_or(PolicyPortfolioError::DimensionOverflow)?,
         |total, solution| total.checked_add(cluster_policy_optimum_bytes(solution)?)
@@ -3151,6 +3154,27 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         cache.iter().position(|entry| entry.model_indices == *cluster)
             .ok_or(PolicyPortfolioError::PolicyMaskCertificateMismatch)
     }).collect::<Result<_, _>>()?;
+
+    // Estimate the complete returned structure from cache references before
+    // allocating duplicate selected-cluster certificates.
+    let output_bytes = portfolio_output_bytes(
+        family,
+        &best_partition,
+        best_cache_indices.iter().map(|index| &cache[*index].solution),
+    )?;
+    let final_memory = cached_bytes.checked_add(output_bytes)
+        .and_then(|value| value.checked_add(family.state_count()
+            .checked_mul(2 * std::mem::size_of::<CheckedRational>())?))
+        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<CheckedRational>>()))
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if final_memory > budget.max_total_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "outer final portfolio output memory bytes",
+            required: final_memory,
+            limit: budget.max_total_memory_bytes,
+        });
+    }
+
     let mut output_cluster_solutions = Vec::new();
     output_cluster_solutions.try_reserve_exact(best_partition.len()).map_err(|_| {
         PolicyPortfolioError::AllocationFailed {
@@ -3168,23 +3192,6 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         &cache[all_model_cache_index].solution.model_optimal_values,
         "outer model-optimal values",
     )?;
-    let output_bytes = portfolio_output_bytes(
-        family,
-        &best_partition,
-        &output_cluster_solutions,
-    )?;
-    let final_memory = cached_bytes.checked_add(output_bytes)
-        .and_then(|value| value.checked_add(family.state_count()
-            .checked_mul(2 * std::mem::size_of::<CheckedRational>())?))
-        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<CheckedRational>>()))
-        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-    if final_memory > budget.max_total_memory_bytes {
-        return Err(PolicyPortfolioError::BudgetExceeded {
-            resource: "outer final portfolio output memory bytes",
-            required: final_memory,
-            limit: budget.max_total_memory_bytes,
-        });
-    }
 
     let portfolio_evaluation_count = model_count.checked_mul(best_partition.len())
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
