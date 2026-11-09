@@ -26,9 +26,32 @@ use symthaea_core::hdc::unified_hv::CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT
 use symthaea_core::hdc::ContinuousHV;
 
 /// Domain separator for deterministic group-envelope content identities.
-const GROUP_ENVELOPE_DOMAIN: &[u8] = b"hme_continuous_hv_group_envelope_v2";
+const GROUP_ENVELOPE_DOMAIN: &[u8] = b"hme_continuous_hv_group_envelope_v3";
 const MEMBER_PAYLOAD_DOMAIN: &[u8] = b"hme_continuous_hv_member_payload_v1";
 const QUERY_DOMAIN: &[u8] = b"hme_continuous_hv_query_v1";
+
+
+/// Storage profile for a group synopsis.
+///
+/// BallOnly stores a centroid and conservative L2 radius. BoxAndBall adds
+/// coordinate minima/maxima, trading 8 bytes per dimension for a potentially
+/// tighter intersection bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupEnvelopeMode {
+    /// Coordinate extrema plus centroid/radius.
+    BoxAndBall,
+    /// Centroid/radius only; lower synopsis memory, potentially looser pruning.
+    BallOnly,
+}
+
+impl GroupEnvelopeMode {
+    fn domain_tag(self) -> &'static [u8] {
+        match self {
+            Self::BoxAndBall => b"box_and_ball_v1",
+            Self::BallOnly => b"ball_only_v1",
+        }
+    }
+}
 
 /// Immutable coordinate envelope for one homogeneous ContinuousHV group.
 #[derive(Debug, Clone, PartialEq)]
@@ -36,12 +59,13 @@ pub struct ContinuousHVGroupEnvelope {
     manifest_generation: u64,
     eligibility_generation: u64,
     dimension: usize,
+    mode: GroupEnvelopeMode,
     member_ids: Arc<[String]>,
     member_payload_digests: Arc<[[u8; 32]]>,
     member_set_digest: [u8; 32],
     content_digest: [u8; 32],
-    coordinate_minima: Vec<f32>,
-    coordinate_maxima: Vec<f32>,
+    coordinate_minima: Option<Arc<[f32]>>,
+    coordinate_maxima: Option<Arc<[f32]>>,
     centroid: ContinuousHV,
     radius_l2_upper: f32,
 }
@@ -248,6 +272,21 @@ impl ContinuousHVGroupEnvelope {
         eligibility_generation: u64,
         members: &[(String, ContinuousHV)],
     ) -> Result<Self, GroupEnvelopeError> {
+        Self::from_original_members_with_mode(
+            manifest_generation,
+            eligibility_generation,
+            members,
+            GroupEnvelopeMode::BoxAndBall,
+        )
+    }
+
+    /// Build a group envelope using an explicit synopsis storage profile.
+    pub fn from_original_members_with_mode(
+        manifest_generation: u64,
+        eligibility_generation: u64,
+        members: &[(String, ContinuousHV)],
+        mode: GroupEnvelopeMode,
+    ) -> Result<Self, GroupEnvelopeError> {
         if members.is_empty() {
             return Err(GroupEnvelopeError::EmptyGroup);
         }
@@ -280,16 +319,20 @@ impl ContinuousHVGroupEnvelope {
             by_id.insert(id.as_str(), (member_index, vector));
         }
 
-        let mut coordinate_minima = vec![f32::INFINITY; dimension];
-        let mut coordinate_maxima = vec![f32::NEG_INFINITY; dimension];
-        for (_, vector) in by_id.values() {
-            for index in 0..dimension {
-                coordinate_minima[index] =
-                    coordinate_minima[index].min(vector.values[index]);
-                coordinate_maxima[index] =
-                    coordinate_maxima[index].max(vector.values[index]);
+        let (coordinate_minima, coordinate_maxima) = match mode {
+            GroupEnvelopeMode::BoxAndBall => {
+                let mut minima = vec![f32::INFINITY; dimension];
+                let mut maxima = vec![f32::NEG_INFINITY; dimension];
+                for (_, vector) in by_id.values() {
+                    for index in 0..dimension {
+                        minima[index] = minima[index].min(vector.values[index]);
+                        maxima[index] = maxima[index].max(vector.values[index]);
+                    }
+                }
+                (Some(minima), Some(maxima))
             }
-        }
+            GroupEnvelopeMode::BallOnly => (None, None),
+        };
 
         let member_ids: Vec<String> = by_id.keys().map(|id| (*id).to_owned()).collect();
         let member_set_digest = member_id_set_digest(&member_ids)?;
@@ -365,6 +408,7 @@ impl ContinuousHVGroupEnvelope {
         hasher.update(&manifest_generation.to_le_bytes());
         hasher.update(&eligibility_generation.to_le_bytes());
         hasher.update(&(dimension as u64).to_le_bytes());
+        hasher.update(mode.domain_tag());
         hasher.update(&(member_ids.len() as u64).to_le_bytes());
         hasher.update(&member_set_digest);
         for id in &member_ids {
@@ -380,8 +424,10 @@ impl ContinuousHVGroupEnvelope {
                 hasher.update(&value.to_bits().to_le_bytes());
             }
         }
-        for value in coordinate_minima.iter().chain(&coordinate_maxima) {
-            hasher.update(&value.to_bits().to_le_bytes());
+        if let (Some(minima), Some(maxima)) = (&coordinate_minima, &coordinate_maxima) {
+            for value in minima.iter().chain(maxima) {
+                hasher.update(&value.to_bits().to_le_bytes());
+            }
         }
         hasher.update(&radius_l2_upper.to_bits().to_le_bytes());
         for value in &centroid.values {
@@ -392,15 +438,36 @@ impl ContinuousHVGroupEnvelope {
             manifest_generation,
             eligibility_generation,
             dimension,
+            mode,
             member_ids: Arc::from(member_ids),
             member_payload_digests: Arc::from(member_payload_digests),
             member_set_digest,
             content_digest: *hasher.finalize().as_bytes(),
-            coordinate_minima,
-            coordinate_maxima,
+            coordinate_minima: coordinate_minima.map(Arc::from),
+            coordinate_maxima: coordinate_maxima.map(Arc::from),
             centroid,
             radius_l2_upper,
         })
+    }
+
+    /// Storage profile used by this synopsis.
+    pub fn mode(&self) -> GroupEnvelopeMode {
+        self.mode
+    }
+
+    /// Numeric synopsis bytes retained by this envelope, excluding IDs,
+    /// digests and allocator/Arc overhead.
+    pub fn numeric_synopsis_bytes(&self) -> usize {
+        self.centroid.values.len() * std::mem::size_of::<f32>()
+            + self
+                .coordinate_minima
+                .as_ref()
+                .map_or(0, |values| values.len() * std::mem::size_of::<f32>())
+            + self
+                .coordinate_maxima
+                .as_ref()
+                .map_or(0, |values| values.len() * std::mem::size_of::<f32>())
+            + std::mem::size_of::<f32>()
     }
 
     /// Manifest generation bound into this immutable group envelope.
@@ -510,17 +577,20 @@ impl ContinuousHVGroupEnvelope {
         if self.content_digest != expected_content_digest {
             return Err(GroupEnvelopeError::ContentDigestMismatch);
         }
-        let component_box = query
-            .similarity_interval_full_resolution_for_component_bounds(
-                &self.coordinate_minima,
-                &self.coordinate_maxima,
-            )
-            .map_err(GroupEnvelopeError::ScoreInterval)?;
         let centroid_ball = query
             .similarity_interval_full_resolution_for_l2_ball_center(
                 &self.centroid,
                 self.radius_l2_upper,
             )
+            .map_err(GroupEnvelopeError::ScoreInterval)?;
+
+        let (Some(minima), Some(maxima)) =
+            (&self.coordinate_minima, &self.coordinate_maxima)
+        else {
+            return Ok(centroid_ball);
+        };
+        let component_box = query
+            .similarity_interval_full_resolution_for_component_bounds(minima, maxima)
             .map_err(GroupEnvelopeError::ScoreInterval)?;
 
         // Both enclosures contain every member. Their intersection is also a
