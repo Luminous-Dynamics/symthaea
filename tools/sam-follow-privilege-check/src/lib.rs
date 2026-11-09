@@ -84,6 +84,7 @@ fn validate_semantics(report: &Value) -> Vec<String> {
     }
 
     let mut trial_ids = BTreeSet::new();
+    let mut paired_trials: BTreeMap<String, Vec<&Value>> = BTreeMap::new();
     if let Some(trials) = trials {
         for (index, trial) in trials.iter().enumerate() {
             let prefix = format!("trials[{index}]");
@@ -93,6 +94,24 @@ fn validate_semantics(report: &Value) -> Vec<String> {
                     errors.push(format!("{prefix}: duplicate trial_id {id}"));
                 }
             }
+            let pair_id = trial.get("paired_case_id").and_then(Value::as_str);
+            let pair_role = trial.get("paired_role").and_then(Value::as_str);
+            let intervention = trial.get("intervention_kind").and_then(Value::as_str);
+            match pair_role {
+                Some("standalone") if pair_id.is_some() || intervention != Some("none") => {
+                    errors.push(format!("{prefix}: standalone trial cannot declare a pair or intervention"));
+                }
+                Some("baseline") if pair_id.is_none() || intervention != Some("none") => {
+                    errors.push(format!("{prefix}: baseline trial requires paired_case_id and intervention_kind=none"));
+                }
+                Some("intervention") if pair_id.is_none() || intervention == Some("none") => {
+                    errors.push(format!("{prefix}: intervention trial requires paired_case_id and a non-none intervention"));
+                }
+                _ => {}
+            }
+            if let Some(pair_id) = pair_id {
+                paired_trials.entry(pair_id.to_owned()).or_default().push(trial);
+            }
             let arm_id = trial.get("arm_id").and_then(Value::as_str);
             let Some(arm) = arm_id.and_then(|id| arms.get(id).copied()) else {
                 errors.push(format!("{prefix}: arm_id does not resolve in benchmark arms"));
@@ -101,12 +120,132 @@ fn validate_semantics(report: &Value) -> Vec<String> {
             validate_trial(&mut errors, &prefix, trial, arm);
         }
     }
+    validate_paired_trials(&mut errors, &paired_trials);
     errors
+}
+
+fn validate_paired_trials(
+    errors: &mut Vec<String>,
+    groups: &BTreeMap<String, Vec<&Value>>,
+) {
+    for (pair_id, trials) in groups {
+        let prefix = format!("paired_case[{pair_id}]");
+        if trials.len() != 2 {
+            errors.push(format!("{prefix}: paired case must contain exactly two trials"));
+            continue;
+        }
+        let baseline = trials.iter().copied().find(|trial| {
+            trial.get("paired_role").and_then(Value::as_str) == Some("baseline")
+        });
+        let intervention = trials.iter().copied().find(|trial| {
+            trial.get("paired_role").and_then(Value::as_str) == Some("intervention")
+        });
+        let (Some(baseline), Some(intervention)) = (baseline, intervention) else {
+            errors.push(format!("{prefix}: requires exactly one baseline and one intervention"));
+            continue;
+        };
+        for field in [
+            "episode_id",
+            "scenario_id",
+            "actor_policy_id",
+            "arm_id",
+            "controller_digest",
+            "action_observation_tick",
+            "action_commit_tick",
+        ] {
+            if baseline.get(field) != intervention.get(field) {
+                errors.push(format!("{prefix}: paired trials differ in {field}"));
+            }
+        }
+        let kind = intervention
+            .get("intervention_kind")
+            .and_then(Value::as_str)
+            .unwrap_or("none");
+        match kind {
+            "oracle_sidecar_mutation" => {
+                if intervention.get("arm_id").and_then(Value::as_str) != Some("B") {
+                    errors.push(format!("{prefix}: oracle-sidecar mutation requires masked-observation Arm B"));
+                }
+                let before = baseline
+                    .get("observation")
+                    .and_then(|x| x.get("policy_input_digest"));
+                let after = intervention
+                    .get("observation")
+                    .and_then(|x| x.get("policy_input_digest"));
+                let raw_before = baseline
+                    .get("actions")
+                    .and_then(|x| x.get("student_raw_action_digest"));
+                let raw_after = intervention
+                    .get("actions")
+                    .and_then(|x| x.get("student_raw_action_digest"));
+                if before != after || raw_before != raw_after {
+                    errors.push(format!("{prefix}: masked oracle-sidecar mutation changed policy input or raw student action"));
+                }
+                if role_evidence_map(baseline, "simulator_oracle")
+                    == role_evidence_map(intervention, "simulator_oracle")
+                {
+                    errors.push(format!("{prefix}: oracle-sidecar intervention did not change simulator-oracle evidence"));
+                }
+            }
+            "raw_v2x_mutation" => {
+                if intervention.get("arm_id").and_then(Value::as_str) != Some("E") {
+                    errors.push(format!("{prefix}: V2X mutation requires cooperative-advisory Arm E"));
+                }
+                if baseline.get("follow_target") != intervention.get("follow_target") {
+                    errors.push(format!("{prefix}: V2X mutation changed the local Follow target"));
+                }
+                if role_evidence_map(baseline, "remote_cooperative_claim")
+                    == role_evidence_map(intervention, "remote_cooperative_claim")
+                {
+                    errors.push(format!("{prefix}: V2X intervention did not change remote-claim evidence"));
+                }
+            }
+            "post_commit_shadow_teacher" => {
+                if intervention.get("arm_id").and_then(Value::as_str) != Some("C") {
+                    errors.push(format!("{prefix}: post-commit shadow teacher requires frozen Arm C"));
+                }
+                if baseline.get("actions").and_then(|x| x.get("executed_action_digest"))
+                    != intervention.get("actions").and_then(|x| x.get("executed_action_digest"))
+                {
+                    errors.push(format!("{prefix}: post-commit shadow teacher changed executed action"));
+                }
+                let teacher = intervention.get("teacher");
+                if teacher.and_then(|x| x.get("evaluation_only")).and_then(Value::as_bool) != Some(true)
+                    || teacher.and_then(|x| x.get("reference_only")).and_then(Value::as_bool) != Some(true)
+                    || teacher.and_then(|x| x.get("blended")).and_then(Value::as_bool) != Some(false)
+                    || teacher.and_then(|x| x.get("supervised")).and_then(Value::as_bool) != Some(false)
+                {
+                    errors.push(format!("{prefix}: intervention must be an evaluator-only, reference-only, unblended and unsupervised teacher"));
+                }
+            }
+            other => errors.push(format!("{prefix}: unsupported paired intervention {other}")),
+        }
+    }
+}
+
+fn role_evidence_map(trial: &Value, role: &str) -> BTreeMap<String, String> {
+    trial
+        .get("observation")
+        .and_then(|x| x.get("sources"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|source| source.get("source_role").and_then(Value::as_str) == Some(role))
+        .filter_map(|source| {
+            Some((
+                source.get("source_id")?.as_str()?.to_owned(),
+                source.get("evidence_ref")?.as_str()?.to_owned(),
+            ))
+        })
+        .collect()
 }
 
 fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &Value) {
     let observation = trial.get("observation");
     let profile = observation.and_then(|x| x.get("profile_id")).and_then(Value::as_str);
+    if arm.get("arm_id").and_then(Value::as_str) == Some("D") {
+        errors.push(format!("{prefix}: Arm D is blocked until scene-admitted local perception is qualified"));
+    }
     let sources = observation
         .and_then(|x| x.get("sources"))
         .and_then(Value::as_array)
@@ -129,12 +268,14 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
             if source_roles.insert(source_id.to_owned(), role.to_owned()).is_some() {
                 errors.push(format!("{prefix}.observation.sources[{index}]: duplicate source_id {source_id}"));
             }
-            if profile == Some("local_sensor_only")
-                && visible
+            if matches!(
+                profile,
+                Some("local_sensor_only" | "simulation_20d_peer_channels_masked")
+            ) && visible
                 && matches!(role, "simulator_oracle" | "remote_cooperative_claim")
             {
                 errors.push(format!(
-                    "{prefix}.observation.sources[{index}]: {role} cannot be policy-visible in local_sensor_only profile"
+                    "{prefix}.observation.sources[{index}]: {role} cannot be policy-visible in this masked observation profile"
                 ));
             }
             if visible && role == "unknown" {
@@ -270,8 +411,7 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
         }
         let allowed_role = match arm.get("arm_id").and_then(Value::as_str) {
             Some("A") | Some("B") | Some("C") => target_role == "simulator_oracle",
-            Some("D") => target_role == "local_sensor_observation",
-            Some("E") => false,
+            Some("D") | Some("E") => target_role == "local_sensor_observation",
             _ => false,
         };
         if !allowed_role {
