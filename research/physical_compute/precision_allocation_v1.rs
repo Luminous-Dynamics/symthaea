@@ -126,7 +126,7 @@ pub fn allocate_precision(
     operations: &[OperationBudget],
     request: &AllocationRequest,
 ) -> Result<AllocationOutcome, AllocationError> {
-    if !request.task_error_budget.is_finite() || request.task_error_budget <= 0.0 {
+    if !request.task_error_budget.is_finite() || request.task_error_budget < 0.0 {
         return Err(AllocationError::InvalidTaskErrorBudget);
     }
     if request.max_combinations == 0 {
@@ -249,7 +249,7 @@ fn validate_digest(value: &str) -> Result<(), AllocationError> {
 
 fn next_up_nonnegative(value: f64) -> f64 {
     if value == 0.0 {
-        return 0.0;
+        return f64::from_bits(1);
     }
     f64::from_bits(value.to_bits() + 1)
 }
@@ -540,6 +540,44 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn zero_budget_accepts_only_zero_error_option() {
+        let operations = vec![OperationBudget {
+            operation_id: "op-a".to_string(),
+            sensitivity: sensitivity(1.0),
+            options: vec![option(4, 0.0, 2.0), option(8, 0.0, 3.0)],
+        }];
+        let outcome = allocate_precision(&operations, &request(0.0)).unwrap();
+        let AllocationOutcome::Plan(plan) = outcome else {
+            panic!("expected zero-error plan");
+        };
+        assert_eq!(plan.selections[0].reads, 4);
+        assert_eq!(plan.total_propagated_error_upper, 0.0);
+    }
+
+    #[test]
+    fn upward_product_covers_positive_subnormal_underflow() {
+        let smallest = f64::from_bits(1);
+        let upper = upward_product(smallest, smallest).unwrap();
+        assert_eq!(upper.to_bits(), 1);
+        assert!(upper > 0.0);
+    }
+
+    #[test]
+    fn zero_sensitivity_selects_cheapest_precision() {
+        let operations = vec![OperationBudget {
+            operation_id: "insensitive-op".to_string(),
+            sensitivity: sensitivity(0.0),
+            options: vec![option(4, 1.0, 1.0), option(8, 0.0, 2.0)],
+        }];
+        let outcome = allocate_precision(&operations, &request(0.0)).unwrap();
+        let AllocationOutcome::Plan(plan) = outcome else {
+            panic!("expected plan");
+        };
+        assert_eq!(plan.selections[0].reads, 4);
+        assert_eq!(plan.total_propagated_error_upper, 0.0);
+    }
     #[test]
     fn rejects_non_finite_task_budget() {
         let operations = vec![OperationBudget {
