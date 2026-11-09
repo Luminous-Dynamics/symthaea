@@ -142,6 +142,7 @@ pub mod bayesian_model_reduction;
 mod bridge;
 pub mod decision_diagnostic_benchmark;
 pub mod decision_relevant_information;
+pub mod gaussian_decision_diagnostic;
 pub mod sequential_diagnostic_planning;
 pub mod sequential_diagnostic_benchmark;
 pub mod static_model_diagnostic;
