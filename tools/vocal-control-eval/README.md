@@ -36,6 +36,8 @@ Both render receipts must use the same code, backend/model artifacts, voice, inv
 
 The report includes independent values and exact receipts. There is no single quality composite. A case qualifies only when target response, direction consistency and collateral constraints all pass.
 
+Before choosing intervention tolerances, run a no-op calibration with at least five unique seeds, the same serialized performance, and identical code, renderer, model artifact, voice and task. For every feature and region, it computes the 95th-percentile pairwise absolute drift across repeated renders; the worst region's value is combined with an explicit measurement-resolution floor to recommend a tolerance. This calibration output is empirical and must be frozen before any intervention result is observed.
+
 For multi-seed suites, every replicate must keep the same code, renderer, model artifact, voice, invariant task and sample rate, while using a unique seed. The suite report includes mean target-response ratio, sample standard deviation, a two-sided 95% Student-t confidence interval, direction consistency, worst collateral drift, and the number of individually qualified replicates. A suite qualifies only when every pair qualifies and the aggregate interval is wholly inside the predeclared response bounds. Three seeds are the minimum contract; five or more are recommended for pilot work. Confirmatory sample sizes should be based on a separate power analysis.
 
 ## Run
