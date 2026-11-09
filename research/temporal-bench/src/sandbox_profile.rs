@@ -360,9 +360,10 @@ fn build_systemd_run_arguments(
     let mut args = vec![
         "--user".into(),
         "--scope".into(),
-        // Scope mode runs as a child of systemd-run and inherits the launcher
-        // environment/stdio. The trusted launcher must explicitly preserve fd 3
-        // across fork/exec; --pipe is a transient-service mode and is unnecessary.
+        // Scope mode runs as a child of systemd-run and inherits the launcher's
+        // environment/stdio. The trusted launcher must sanitize all unrelated
+        // descriptors and explicitly preserve only the planned fd 3-7 contract
+        // across fork/exec; --pipe is unnecessary for scope mode.
         format!("--property=MemoryMax={}", spec.memory_max_bytes),
         "--property=MemorySwapMax=0".into(),
         format!("--property=CPUQuota={}%", spec.cpu_quota_percent),
@@ -380,9 +381,11 @@ fn build_systemd_run_arguments(
 /// Validate the requested profile and create deterministic, exact argv vectors.
 ///
 /// The caller must separately verify executable/store tree digests, inherit
-/// fds 3-7 as pinned by this plan, launch under the system manager, verify
-/// Bubblewrap JSON status plus live namespaces/cgroup state, and operate a
-/// trusted post-seccomp gate. This plan is not a qualified execution boundary.
+/// only the planned fds 3-7 across systemd-run's exec, launch under the system
+/// manager, parse Bubblewrap JSON status, and verify live namespaces/cgroup
+/// state. Bubblewrap's pre-seccomp block-fd is staging only; the pinned gate
+/// helper on fd 6 must deny EOF/malformed release and run before the candidate.
+/// This plan is not a qualified execution boundary.
 pub fn build_candidate_sandbox_plan(
     spec: &CandidateSandboxSpec,
 ) -> Result<CandidateSandboxPlan, SandboxPlanError> {
@@ -498,7 +501,7 @@ mod tests {
         let bind_count = plan.bubblewrap_arguments.iter()
             .filter(|arg| arg.as_str() == "--ro-bind")
             .count();
-        assert_eq!(bind_count, 3);
+        assert_eq!(bind_count, 4);
         for (index, argument) in plan.bubblewrap_arguments.iter().enumerate() {
             if argument == "--ro-bind" {
                 assert_ne!(plan.bubblewrap_arguments[index + 1], "/nix/store");
@@ -555,6 +558,33 @@ mod tests {
             let index = plan.bubblewrap_arguments.iter().position(|arg| arg == flag).unwrap();
             assert_eq!(plan.bubblewrap_arguments[index + 1], descriptor, "{flag}");
         }
+    }
+
+    #[test]
+    fn bubblewrap_staging_barrier_precedes_seccomp_and_is_not_the_gate() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        let block = plan.bubblewrap_arguments.iter().position(|arg| arg == "--block-fd").unwrap();
+        let seccomp = plan.bubblewrap_arguments.iter().position(|arg| arg == "--seccomp").unwrap();
+        let gate = plan.bubblewrap_arguments.iter().position(|arg| arg == "--gate-control-fd").unwrap();
+        assert!(block < seccomp);
+        assert!(seccomp < gate);
+        assert_eq!(plan.bubblewrap_arguments[block + 1], PRE_SECCOMP_BLOCK_FD.to_string());
+        assert_eq!(plan.bubblewrap_arguments[gate + 1], GATE_CONTROL_FD.to_string());
+    }
+
+    #[test]
+    fn candidate_digest_is_bound_into_gate_argv_and_plan_commitment() {
+        let first = build_candidate_sandbox_plan(&spec()).unwrap();
+        let digest = hex_digest(&spec().candidate_sha256);
+        let digest_index = first.bubblewrap_arguments.iter()
+            .position(|arg| arg == "--candidate-sha256")
+            .unwrap();
+        assert_eq!(first.bubblewrap_arguments[digest_index + 1], digest);
+
+        let mut changed = spec();
+        changed.candidate_sha256[0] ^= 0xff;
+        let second = build_candidate_sandbox_plan(&changed).unwrap();
+        assert_ne!(first.plan_sha256, second.plan_sha256);
     }
 
     #[test]
