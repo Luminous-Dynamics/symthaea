@@ -617,6 +617,16 @@ mod tests {
         }
     }
 
+    fn direct_truth() -> ModelHypothesis {
+        ModelHypothesis {
+            mechanism: Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: SensorMap::Identity,
+        }
+    }
+
     #[test]
     fn leaky_world_emits_state_before_applying_current_intervention() {
         let mut world = NumericWorld::new(leaky_truth()).unwrap();
