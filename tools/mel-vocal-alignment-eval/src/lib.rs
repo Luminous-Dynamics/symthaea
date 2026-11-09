@@ -719,13 +719,17 @@ mod tests {
     }
 
     #[test]
-    fn same_ipa_with_wrong_vowel_class_is_not_an_exact_match() {
+    fn same_ipa_with_wrong_vowel_class_matches_phone_symbol_but_not_strict_identity() {
         let reference = vec![reference("m", 0, 100, 500, false)];
         let predicted = vec![prediction("m", 0, 100, 500, true)];
 
         let result = score_alignment(16_000, 1_000, &reference, &predicted, &[]).unwrap();
-        assert_eq!(result.edits.exact_matches, 0);
-        assert_eq!(result.edits.substitutions, 1);
+        assert_eq!(result.edits.exact_matches, 1);
+        assert_eq!(result.edits.substitutions, 0);
+        assert_eq!(result.phone_error_rate, 0.0);
+        assert_eq!(result.reference_phone_match_fraction, 1.0);
+        assert_eq!(result.reference_identity_match_fraction, 0.0);
+        assert_eq!(result.timing.exact_phone_pairs, 0);
         assert_eq!(result.timing.offset_mae_ms, None);
     }
 
