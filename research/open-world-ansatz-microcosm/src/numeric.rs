@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub const INPUT_LEVELS: [i64; 3] = [-1, 0, 1];
-pub const GAIN_VALUES: [i64; 3] = [1, 2, 3];
+/// Closed candidate-grammar gains; this is deliberately narrower than the world generator.\npub const GAIN_VALUES: [i64; 3] = [1, 2, 3];\n/// Maximum gain accepted by the reference world generator, including out-of-catalogue controls.\npub const MAX_WORLD_GAIN: i64 = 16;
 pub const DECAY_VALUES: [i64; 3] = [0, 1, 2];
 pub const INITIAL_STATES: [i64; 3] = [-1, 0, 1];
 pub const MAX_ORACLE_HORIZON: usize = 6;
@@ -67,7 +67,7 @@ pub struct ModelHypothesis {
 
 impl ModelHypothesis {
     pub fn validate(&self) -> Result<(), NumericError> {
-        if !GAIN_VALUES.contains(&self.gain) {
+        if !(1..=MAX_WORLD_GAIN).contains(&self.gain) {
             return Err(NumericError::InvalidGain);
         }
         match (self.mechanism, self.decay, self.initial_state) {
@@ -574,7 +574,7 @@ pub enum NumericError {
 impl fmt::Display for NumericError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidGain => write!(f, "gain must be one of the declared candidate values"),
+            Self::InvalidGain => write!(f, "gain must be within the world-generator range 1..={MAX_WORLD_GAIN}"),
             Self::InvalidParameterBinding => write!(
                 f,
                 "direct models have no decay or initial state; leaky-memory models require both"
@@ -794,6 +794,24 @@ mod tests {
         );
         let mut world = NumericWorld::new(leaky_truth()).unwrap();
         assert!(world.run(&[2]).is_err());
+    }
+
+    #[test]
+    fn world_generator_accepts_bounded_gains_outside_candidate_catalogue() {
+        let out_of_catalogue = ModelHypothesis {
+            gain: 7,
+            ..direct_truth()
+        };
+        let mut world = NumericWorld::new(out_of_catalogue).unwrap();
+        let log = world.run(&[1]).unwrap();
+        assert_eq!(log.measurements, vec![7]);
+        assert!(!candidate_models(StructureAccess::Withheld).contains(&out_of_catalogue));
+        assert!(ModelHypothesis {
+            gain: MAX_WORLD_GAIN + 1,
+            ..direct_truth()
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]
