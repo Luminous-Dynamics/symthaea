@@ -40,6 +40,7 @@ pub mod strategy_portfolio;
 pub mod synqbf;
 pub mod synqbf_artifact;
 pub mod synqbf_construction;
+pub mod synqbf_pipeline;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
