@@ -1,0 +1,13 @@
+[package]
+name = "financial-v2-schema-validation"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Offline Draft 2020-12 validation and semantic checks for financial evidence v2"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+jsonschema = { version = "=0.61.0", default-features = false }
+serde_json = "1"
+sha2 = "0.10"
