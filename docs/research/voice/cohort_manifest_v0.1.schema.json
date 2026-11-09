@@ -251,6 +251,7 @@
         "pair_id",
         "baseline_record_id",
         "variant_record_id",
+        "counterfactual_pair_manifest_sha256",
         "split",
         "purpose"
       ],
@@ -277,9 +278,13 @@
             "PILOT_EVALUATION",
             "CONFIRMATORY_EVALUATION"
           ]
+        },
+        "counterfactual_pair_manifest_sha256": {
+          "$ref": "#/$defs/digest"
         }
       },
       "additionalProperties": false
     }
-  }
+  },
+  "$comment": "Cross-record split disjointness, rights authorization, consent, pair membership, manifest digests, and conditional reviewer gates are enforced by symthaea_stt::cohort_manifest::validate_cohort_manifest; JSON Schema validation alone is not cohort admission."
 }
