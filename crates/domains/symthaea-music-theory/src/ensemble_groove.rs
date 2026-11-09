@@ -599,8 +599,10 @@ fn response_coverage(
     }
     let responded = calls
         .iter()
-        .filter(|(call_onset, _)| {
-            responses.iter().any(|(response_onset, _)| {
+        .filter(|call| {
+            let call_onset = call.0;
+            responses.iter().any(|response| {
+                let response_onset = response.0;
                 let delay = if response_onset >= call_onset {
                     response_onset - call_onset
                 } else {
@@ -746,6 +748,26 @@ mod tests {
         let issues = validate_ensemble_groove(&groove).unwrap_err();
         assert!(issues.iter().any(|item| item.code == "accent_out_of_range"));
         assert!(issues.iter().any(|item| item.code == "unknown_constraint_layer"));
+    }
+
+    #[test]
+    fn rejects_layer_count_above_the_declared_bound() {
+        let layers = (0..=MAX_GROOVE_LAYERS)
+            .map(|index| GrooveLayerV1 {
+                id: format!("layer_{index}"),
+                role: "empty_fixture".into(),
+                cycle_ticks: 24,
+                events: vec![],
+            })
+            .collect();
+        let groove = EnsembleGrooveV1 {
+            schema: ENSEMBLE_GROOVE_SCHEMA_V1.into(),
+            ticks_per_beat: 24,
+            layers,
+            constraints: vec![],
+        };
+        let issues = validate_ensemble_groove(&groove).unwrap_err();
+        assert!(issues.iter().any(|item| item.code == "too_many_layers"));
     }
 
     #[test]
