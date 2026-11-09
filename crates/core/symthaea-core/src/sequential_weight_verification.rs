@@ -295,6 +295,8 @@ pub enum SequentialWeightVerificationError {
     ConfirmatoryEpisodeOverlap,
     #[error("episode ID is not part of this candidate's confirmatory manifest")]
     EpisodeNotInConfirmatoryManifest,
+    #[error("confirmatory episode manifest must contain at least one episode")]
+    EmptyConfirmatoryEpisodeManifest,
     #[error("confirmatory data shard has already been assigned in this campaign")]
     ConfirmatoryShardAlreadyUsed,
     #[error("candidate model digest has already been evaluated in this campaign")]
