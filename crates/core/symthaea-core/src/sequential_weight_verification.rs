@@ -780,6 +780,51 @@ mod tests {
         assert_ne!(left_report.report_digest, altered_report.report_digest);
     }
 
+    fn qualified_report() -> SequentialWeightVerificationReport {
+        let mut campaign = campaign(0.05, 600);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
+        let mut report = verifier.report().expect("initial report");
+        for index in 0..600 {
+            report = verifier
+                .observe(observation(index, 0.9, 0.5))
+                .expect("paired episode");
+            if report.status == SequentialWeightVerificationStatus::BenefitEstablished {
+                break;
+            }
+        }
+        assert_eq!(report.status, SequentialWeightVerificationStatus::BenefitEstablished);
+        report
+    }
+
+    #[test]
+    fn qualified_report_validation_recomputes_bounds_and_digest() {
+        let report = qualified_report();
+        validate_qualified_report(&report).expect("qualified report validates");
+
+        let mut altered_bound = report.clone();
+        altered_bound.lower_confidence_bound += 0.001;
+        assert!(matches!(
+            validate_qualified_report(&altered_bound),
+            Err(SequentialWeightVerificationError::ReportFieldMismatch(
+                "lower_confidence_bound"
+            ))
+        ));
+
+        let mut altered_digest = report.clone();
+        altered_digest.report_digest = "e".repeat(64);
+        assert!(matches!(
+            validate_qualified_report(&altered_digest),
+            Err(SequentialWeightVerificationError::ReportDigestMismatch)
+        ));
+
+        let mut unqualified = report;
+        unqualified.status = SequentialWeightVerificationStatus::BenefitNotEstablished;
+        assert!(matches!(
+            validate_qualified_report(&unqualified),
+            Err(SequentialWeightVerificationError::ReportNotQualified)
+        ));
+    }
+
     #[test]
     fn inconclusive_budget_is_terminal_and_cannot_be_extended() {
         let mut campaign = campaign(0.5, 2);
