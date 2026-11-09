@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-intervention-causal-scenario/0.1",
+  "title": "EV intervention causal-audit scenario v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_version",
+    "scenario_id",
+    "evidence_class",
+    "estimand",
+    "outcome_metric",
+    "outcome_unit",
+    "outcome_direction",
+    "matched_sets"
+  ],
+  "properties": {
+    "scenario_version": {
+      "const": "ev-intervention-causal-scenario/0.1"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "const": "synthetic_fixture"
+    },
+    "estimand": {
+      "const": "matched_difference_in_differences"
+    },
+    "outcome_metric": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome_direction": {
+      "enum": [
+        "higher_is_better",
+        "lower_is_better"
+      ]
+    },
+    "matched_sets": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/matchedSet"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "observation_digest",
+        "protocol_digest",
+        "condition_digest"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "observation_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "protocol_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "condition_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "family",
+        "procedure_ref",
+        "service_event_ref",
+        "authority_ref",
+        "completion_digest"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified_complete",
+            "work_order_only",
+            "not_performed",
+            "unknown",
+            "no_intervention"
+          ]
+        },
+        "family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "procedure_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "service_event_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authority_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "completion_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_id",
+        "vehicle_ref",
+        "pack_ref",
+        "matching_profile_digest",
+        "pre_configuration_digest",
+        "post_configuration_digest",
+        "follow_up_status",
+        "censoring_reason",
+        "pre",
+        "post",
+        "intervention"
+      ],
+      "properties": {
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matching_profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "pre_configuration_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "post_configuration_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "follow_up_status": {
+          "enum": [
+            "complete",
+            "administrative_censoring",
+            "lost_to_follow_up",
+            "retired_due_to_fault"
+          ]
+        },
+        "censoring_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pre": {
+          "$ref": "#/$defs/measurement"
+        },
+        "post": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/measurement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intervention": {
+          "$ref": "#/$defs/intervention"
+        }
+      }
+    },
+    "matchedSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match_set_id",
+        "matching_profile_digest",
+        "treated",
+        "comparator"
+      ],
+      "properties": {
+        "match_set_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matching_profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "treated": {
+          "$ref": "#/$defs/unit"
+        },
+        "comparator": {
+          "$ref": "#/$defs/unit"
+        }
+      }
+    }
+  }
+}
