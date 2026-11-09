@@ -1464,6 +1464,41 @@ pub struct ExactClusterPolicySearchBudget {
     pub max_total_memory_bytes: usize,
 }
 
+/// One exactly proven point on the policy-budget/regret Pareto frontier.
+///
+/// The embedded portfolio result is the same proof-carrying output as the
+/// single-k outer search. Its `max_portfolio_size` is the budget k, while
+/// `partition.len()` is the number of policies actually used.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedPolicyBudgetRegretPoint {
+    pub max_portfolio_size: usize,
+    pub used_policy_count: usize,
+    pub minimax_regret: CheckedRational,
+    pub portfolio_certificate_sha256: [u8; 32],
+}
+
+/// All exact policy-budget optima for k=1..=K, obtained from one shared
+/// restricted-growth partition traversal and one content-addressed cluster
+/// cache.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedPolicyBudgetParetoFrontier {
+    pub model_family_sha256: [u8; 32],
+    pub policy_manifest_sha256: [u8; 32],
+    pub discount: CheckedRational,
+    pub max_policy_budget: usize,
+    /// Points are ordered by increasing maximum policy budget, starting at 1.
+    pub points: Vec<VerifiedFiniteFamilyPolicyPortfolioOptimum>,
+    pub outer_search_nodes: usize,
+    pub outer_pruned_nodes: usize,
+    pub complete_partitions_evaluated: usize,
+    pub cached_cluster_solutions: usize,
+    pub total_cluster_search_nodes: usize,
+    pub total_dp_multiply_adds: usize,
+    pub partition_transcript_sha256: [u8; 32],
+    pub certificate_sha256: [u8; 32],
+    pub optimality_proven: bool,
+}
+
 /// Aggregate fail-closed limits for the outer finite-family partition search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExactPolicyPortfolioSearchBudget {
