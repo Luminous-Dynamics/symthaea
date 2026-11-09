@@ -364,6 +364,217 @@ pub fn evaluate(case: &ControlCase) -> Result<ControlReport, String> {
     })
 }
 
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ControlSuite {
+    pub schema_version: u32,
+    pub suite_id: String,
+    /// Require at least three independent seeds; five is recommended for pilots.
+    pub minimum_replicates: usize,
+    pub replicates: Vec<ControlCase>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ControlSuiteReport {
+    pub schema_version: u32,
+    pub suite_id: String,
+    pub replicate_count: usize,
+    pub qualifying_replicates: usize,
+    pub mean_target_response_ratio: f64,
+    pub target_response_ratio_sample_sd: f64,
+    pub target_response_ratio_ci95: [f64; 2],
+    pub mean_target_direction_fraction: f64,
+    pub max_collateral_ratio: f64,
+    pub qualification: Qualification,
+    pub failures: Vec<String>,
+    pub replicate_reports: Vec<ControlReport>,
+}
+
+impl ControlSuite {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != CASE_SCHEMA_VERSION {
+            return Err(format!("unsupported control-suite schema version {}", self.schema_version));
+        }
+        if self.suite_id.trim().is_empty() {
+            return Err("suite_id must not be empty".into());
+        }
+        if self.minimum_replicates < 3 {
+            return Err("minimum_replicates must be at least three".into());
+        }
+        if self.replicates.len() < self.minimum_replicates {
+            return Err(format!(
+                "suite has {} replicates but requires {}",
+                self.replicates.len(),
+                self.minimum_replicates
+            ));
+        }
+
+        let first = &self.replicates[0];
+        first.validate()?;
+        let mut seeds = BTreeSet::new();
+        for (index, replicate) in self.replicates.iter().enumerate() {
+            replicate.validate()?;
+            if !seeds.insert(replicate.baseline_receipt.seed) {
+                return Err(format!("replicate {index} reuses a random seed"));
+            }
+            if !same_suite_contract(first, replicate) {
+                return Err(format!(
+                    "replicate {index} changes the suite contract, backend, model, voice, source revision, or invariant task"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn same_suite_contract(a: &ControlCase, b: &ControlCase) -> bool {
+    a.case_id == b.case_id
+        && a.target_dimension == b.target_dimension
+        && a.requested_delta == b.requested_delta
+        && a.min_response_ratio == b.min_response_ratio
+        && a.max_response_ratio == b.max_response_ratio
+        && a.min_target_region_direction_fraction == b.min_target_region_direction_fraction
+        && a.max_collateral_ratio == b.max_collateral_ratio
+        && a.required_dimensions == b.required_dimensions
+        && a.feature_tolerances == b.feature_tolerances
+        && a.target_regions == b.target_regions
+        && a.protected_regions == b.protected_regions
+        && a.locality_required == b.locality_required
+        && a.baseline_receipt.source_revision == b.baseline_receipt.source_revision
+        && a.baseline_receipt.backend_id == b.baseline_receipt.backend_id
+        && a.baseline_receipt.model_artifact_digest == b.baseline_receipt.model_artifact_digest
+        && a.baseline_receipt.voice_id == b.baseline_receipt.voice_id
+        && a.baseline_receipt.invariant_task_digest == b.baseline_receipt.invariant_task_digest
+        && a.baseline_receipt.sample_rate_hz == b.baseline_receipt.sample_rate_hz
+        && a.variant_receipt.source_revision == b.variant_receipt.source_revision
+        && a.variant_receipt.backend_id == b.variant_receipt.backend_id
+        && a.variant_receipt.model_artifact_digest == b.variant_receipt.model_artifact_digest
+        && a.variant_receipt.voice_id == b.variant_receipt.voice_id
+        && a.variant_receipt.invariant_task_digest == b.variant_receipt.invariant_task_digest
+        && a.variant_receipt.sample_rate_hz == b.variant_receipt.sample_rate_hz
+}
+
+/// Two-sided 95% Student-t critical values for small samples; 1.96 is used
+/// once df >= 30. The lookup is explicit so the report is reproducible.
+fn t_critical_95(degrees_of_freedom: usize) -> f64 {
+    match degrees_of_freedom {
+        1 => 12.706,
+        2 => 4.303,
+        3 => 3.182,
+        4 => 2.776,
+        5 => 2.571,
+        6 => 2.447,
+        7 => 2.365,
+        8 => 2.306,
+        9 => 2.262,
+        10 => 2.228,
+        11 => 2.201,
+        12 => 2.179,
+        13 => 2.160,
+        14 => 2.145,
+        15 => 2.131,
+        16 => 2.120,
+        17 => 2.110,
+        18 => 2.101,
+        19 => 2.093,
+        20 => 2.086,
+        21..=24 => 2.064,
+        25..=29 => 2.045,
+        _ => 1.96,
+    }
+}
+
+/// Score repeated matched intervention pairs and report a t-based 95% CI.
+///
+/// This is a small-sample qualification aid, not a substitute for a preregistered
+/// power analysis. It requires independent seeds and an identical experiment
+/// contract across replicates. For confirmatory studies, select replicate count
+/// from pilot variance and the desired minimum detectable effect.
+pub fn evaluate_suite(suite: &ControlSuite) -> Result<ControlSuiteReport, String> {
+    suite.validate()?;
+    let replicate_reports: Vec<ControlReport> = suite
+        .replicates
+        .iter()
+        .map(evaluate)
+        .collect::<Result<_, _>>()?;
+    let ratios: Vec<f64> = replicate_reports
+        .iter()
+        .map(|report| report.target_response_ratio)
+        .collect();
+    let mean_ratio = ratios.iter().sum::<f64>() / ratios.len() as f64;
+    let sample_variance = ratios
+        .iter()
+        .map(|ratio| (ratio - mean_ratio).powi(2))
+        .sum::<f64>()
+        / (ratios.len() - 1) as f64;
+    let sample_sd = sample_variance.sqrt();
+    let critical = t_critical_95(ratios.len() - 1);
+    let half_width = critical * sample_sd / (ratios.len() as f64).sqrt();
+    let ci = [mean_ratio - half_width, mean_ratio + half_width];
+
+    let first_case = &suite.replicates[0];
+    let mean_direction = replicate_reports
+        .iter()
+        .map(|report| report.target_region_direction_fraction)
+        .sum::<f64>()
+        / replicate_reports.len() as f64;
+    let max_collateral = replicate_reports
+        .iter()
+        .map(|report| report.max_collateral_ratio)
+        .fold(0.0, f64::max);
+    let qualifying_replicates = replicate_reports
+        .iter()
+        .filter(|report| report.qualification == Qualification::Qualified)
+        .count();
+
+    let mut failures = Vec::new();
+    if qualifying_replicates != replicate_reports.len() {
+        failures.push(format!(
+            "only {qualifying_replicates}/{} replicate pairs qualified",
+            replicate_reports.len()
+        ));
+    }
+    if ci[0] < first_case.min_response_ratio || ci[1] > first_case.max_response_ratio {
+        failures.push(format!(
+            "95% response-ratio CI [{:.4}, {:.4}] is not contained in [{:.4}, {:.4}]",
+            ci[0],
+            ci[1],
+            first_case.min_response_ratio,
+            first_case.max_response_ratio
+        ));
+    }
+    if mean_direction < first_case.min_target_region_direction_fraction {
+        failures.push(format!(
+            "mean target direction consistency {:.1}% is below {:.1}%",
+            mean_direction * 100.0,
+            first_case.min_target_region_direction_fraction * 100.0
+        ));
+    }
+    if max_collateral > first_case.max_collateral_ratio {
+        failures.push(format!(
+            "suite maximum collateral ratio {max_collateral:.4} exceeds {:.4}",
+            first_case.max_collateral_ratio
+        ));
+    }
+
+    Ok(ControlSuiteReport {
+        schema_version: CASE_SCHEMA_VERSION,
+        suite_id: suite.suite_id.clone(),
+        replicate_count: replicate_reports.len(),
+        qualifying_replicates,
+        mean_target_response_ratio: mean_ratio,
+        target_response_ratio_sample_sd: sample_sd,
+        target_response_ratio_ci95: ci,
+        mean_target_direction_fraction: mean_direction,
+        max_collateral_ratio: max_collateral,
+        qualification: if failures.is_empty() { Qualification::Qualified } else { Qualification::Failed },
+        failures,
+        replicate_reports,
+    })
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +737,84 @@ mod tests {
         let mut case = fixture();
         case.baseline_receipt.audio_digest = "no-audio-digest".into();
         assert!(evaluate(&case).unwrap_err().contains("digest"));
+    }
+
+    fn replicate(seed: u64, variant_depth: f64, baseline_audio: char, variant_audio: char) -> ControlCase {
+        let mut case = fixture();
+        case.baseline_receipt.seed = seed;
+        case.variant_receipt.seed = seed;
+        case.baseline_receipt.audio_digest = digest(baseline_audio);
+        case.variant_receipt.audio_digest = digest(variant_audio);
+        case.variant_measurements.get_mut("phrase-2").unwrap()
+            .insert(FeatureDimension::VibratoDepthCents, variant_depth);
+        case
+    }
+
+    #[test]
+    fn repeated_seed_suite_qualifies_only_when_confidence_interval_is_inside_bounds() {
+        let suite = ControlSuite {
+            schema_version: CASE_SCHEMA_VERSION,
+            suite_id: "vibrato-depth-five-seed".into(),
+            minimum_replicates: 3,
+            replicates: vec![
+                replicate(101, 27.9, '1', '2'),
+                replicate(102, 28.0, '3', '4'),
+                replicate(103, 28.1, '5', '6'),
+            ],
+        };
+        let report = evaluate_suite(&suite).unwrap();
+        assert_eq!(report.qualification, Qualification::Qualified);
+        assert_eq!(report.replicate_count, 3);
+        assert_eq!(report.qualifying_replicates, 3);
+        assert!((report.mean_target_response_ratio - 1.0).abs() < 1e-12);
+        assert!(report.target_response_ratio_ci95[0] >= 0.8);
+        assert!(report.target_response_ratio_ci95[1] <= 1.2);
+    }
+
+    #[test]
+    fn suite_rejects_reused_seeds_and_changed_model_artifacts() {
+        let duplicate_seed = ControlSuite {
+            schema_version: CASE_SCHEMA_VERSION,
+            suite_id: "duplicate-seeds".into(),
+            minimum_replicates: 3,
+            replicates: vec![
+                replicate(101, 28.0, '1', '2'),
+                replicate(101, 28.0, '3', '4'),
+                replicate(103, 28.0, '5', '6'),
+            ],
+        };
+        assert!(evaluate_suite(&duplicate_seed).unwrap_err().contains("reuses a random seed"));
+
+        let mut mismatch = replicate(102, 28.0, '7', '8');
+        mismatch.baseline_receipt.model_artifact_digest = digest('z');
+        let changed_artifact = ControlSuite {
+            schema_version: CASE_SCHEMA_VERSION,
+            suite_id: "changed-artifact".into(),
+            minimum_replicates: 3,
+            replicates: vec![
+                replicate(101, 28.0, '1', '2'),
+                mismatch,
+                replicate(103, 28.0, '5', '6'),
+            ],
+        };
+        assert!(evaluate_suite(&changed_artifact).unwrap_err().contains("changes the suite contract"));
+    }
+
+    #[test]
+    fn suite_rejects_mean_response_whose_confidence_interval_is_too_wide() {
+        let suite = ControlSuite {
+            schema_version: CASE_SCHEMA_VERSION,
+            suite_id: "high-variance-control".into(),
+            minimum_replicates: 3,
+            replicates: vec![
+                replicate(101, 26.0, '1', '2'),
+                replicate(102, 28.0, '3', '4'),
+                replicate(103, 30.0, '5', '6'),
+            ],
+        };
+        let report = evaluate_suite(&suite).unwrap();
+        assert_eq!(report.qualification, Qualification::Failed);
+        assert!(report.failures.iter().any(|failure| failure.contains("95% response-ratio CI")));
     }
 
     #[test]
