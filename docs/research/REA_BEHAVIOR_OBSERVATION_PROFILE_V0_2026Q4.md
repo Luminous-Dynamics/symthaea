@@ -90,3 +90,26 @@ Reference: https://www.turing.com/blog/behavior2code-benchmark-reverse-engineer-
 ## Claim ceiling
 
 This v0 validates sidecar capture structure and consistency only. It does not authenticate the referenced Evidence record, prove producer identity, verify that a runner really executed the named binary, establish absence of unrecorded side effects, prove behavioral completeness, or establish equivalence for untested inputs. Synthetic fixtures are not original-program observations.
+
+
+## Behavioral clauses: observation-backed versus untested
+
+The profile now includes a small `behavioral_spec` section. Its v0 support states are deliberately limited:
+
+- `observed_exact_invocation`: must cite an existing `observation_id` and an assertion within that observation. Its scope is fixed to that exact invocation and environment.
+- `untested`: may describe a bounded input class and must include a falsification condition, but it cannot cite an observation as though the broader rule had already been established.
+
+There is no `universal` scope in v0. A single matching example cannot be promoted to “always”, and a finite collection of observations does not become exhaustive merely because the assertions pass. A future `inferred_hypothesis` state would require explicit inference rules, input-class coverage, held-out counterexamples and independent adjudication; it is intentionally not enabled by this first slice.
+
+The validator checks that observed clauses resolve to real observation/assertion IDs and that untested bounded rules have no observation/assertion reference. Its report separately counts exact-observation clauses and untested clauses.
+
+## Research-to-engineering progression
+
+The next tranche should be:
+1. connect the sidecar to actual REA Evidence bytes via the existing Evidence v1 verifier (currently v0 pins all references to `unverified_reference`);
+2. create a small real, licensed CLI capture corpus with deterministic repeat runs and oracle self-tests;
+3. add a claim/spec evaluator with explicit input classes, test discoverability and falsification coverage;
+4. run blind differential reconstruction against the original executable;
+5. compare against Behavior2Code only under its published task/budget and submission rules.
+
+The sidecar and synthetic tests are scaffolding for that path; they are not an original-program behavioral benchmark result.
