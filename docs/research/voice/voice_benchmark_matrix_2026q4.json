@@ -935,7 +935,9 @@
         "audio_relevant_joint_answer_coverage",
         "audio_relevant_joint_sensitivity_given_answered",
         "audio_nuisance_joint_claim_coverage",
-        "audio_nuisance_joint_correct_given_answered"
+        "audio_nuisance_joint_correct_given_answered",
+        "task_relative_false_sensitivity_rate",
+        "task_relative_conditional_field_stability"
       ],
       "system_arms": [
         "trial_level_acoustic_faithfulness_only",
@@ -965,7 +967,14 @@
         "audio_relevant_joint_answer_coverage_numerator_denominator",
         "audio_relevant_joint_sensitivity_given_answered_numerator_denominator",
         "audio_nuisance_joint_claim_coverage_numerator_denominator",
-        "audio_nuisance_joint_correct_given_answered_numerator_denominator"
+        "audio_nuisance_joint_correct_given_answered_numerator_denominator",
+        "target_task_id",
+        "target_task_ontology_revision",
+        "acoustic_dimension_id",
+        "task_relative_expected_relation",
+        "expected_unchanged_output_fields",
+        "expected_changed_output_fields",
+        "task_relative_adjudication_manifest_sha256"
       ],
       "required_controls": [
         "same_audio_same_truth_text_context_changed",
@@ -975,7 +984,10 @@
         "both_abstain_is_not_evidence_sensitivity",
         "differential_abstention_under_acoustic_nuisance",
         "pair_id_trial_reuse_and_manifest_digest_rejection",
-        "speaker_identity_task_role_declared_per_target_task"
+        "speaker_identity_task_role_declared_per_target_task",
+        "speaker_change_invariant_for_transcription_but_sensitive_for_diarization",
+        "speaking_rate_invariant_for_word_sequence_but_sensitive_for_word_timing",
+        "prosody_invariant_for_lexical_content_but_sensitive_for_emotion_or_pragmatic_intent"
       ],
       "prospective_gates": [
         "100_percent_frozen_pair_relation_validation",
@@ -999,7 +1011,8 @@
         "CLAIM_ONTOLOGY_REVISION",
         "SOURCE_LINEAGE_REVISION"
       ],
-      "implementation_branch": "feat/voice-counterfactual-pair-scorer-v0.1"
+      "implementation_branch": "feat/voice-counterfactual-pair-scorer-v0.1",
+      "note": "undefined Task-relative extension: acoustic dimensions are not globally nuisance/relevant. Each confirmatory pair must pin target task, ontology revision, acoustic dimension and expected invariant/sensitive/conditional relation; see #11200. These task-relative semantics are a research contract, not yet implemented by the v0.1 pair scorer."
     }
   ],
   "promotion_gates": [
