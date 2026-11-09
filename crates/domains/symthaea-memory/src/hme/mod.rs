@@ -15,7 +15,7 @@ pub use interval_select::{
     GroupIntervalSelectionPlan, GroupMemberScoreIntervalBuildError,
     GroupMemberScoreIntervalRecord, GroupPartitionCoverageReceipt,
     GroupPartitionReceiptError, GroupScoreIntervalBuildError,
-    GroupScoreIntervalIdentity, GroupScoreIntervalRecord,
+    GroupScoreIntervalIdentity, GroupScoreIntervalRecord, HmeEligibilityScopeBinding,
     HierarchicalIntervalSelectionError, HierarchicalIntervalSelectionPlan,
     IntervalCoverageCounts, IntervalSelectionError, IntervalSelectionPlan,
     ScoreIntervalBuildError, ScoreIntervalRecord, VerifiedMemberResidualCertificate,
