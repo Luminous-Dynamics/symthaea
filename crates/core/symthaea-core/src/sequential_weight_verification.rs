@@ -371,6 +371,17 @@ impl SequentialWeightVerificationCampaign {
         if candidate_count != expected_count || shard_count != expected_count {
             return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
         }
+        if snapshot
+            .used_candidate_digests
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+            || snapshot
+                .used_confirmatory_shard_digests
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+        }
 
         let mut used_candidate_digests = BTreeSet::new();
         for digest in &snapshot.used_candidate_digests {
@@ -538,7 +549,9 @@ impl SequentialWeightVerification {
         validate_config(checkpoint.config)?;
         validate_hex_digest(&checkpoint.report_digest, "report_digest")?;
         validate_hex_digest(&checkpoint.checkpoint_digest, "checkpoint_digest")?;
-        if checkpoint.observations.len() > checkpoint.config.maximum_observations as usize {
+        let observation_count = u64::try_from(checkpoint.observations.len())
+            .map_err(|_| SequentialWeightVerificationError::VerifierCheckpointReportMismatch)?;
+        if observation_count > checkpoint.config.maximum_observations {
             return Err(SequentialWeightVerificationError::VerifierCheckpointReportMismatch);
         }
         let expected_digest = verifier_checkpoint_digest(&checkpoint)?;
