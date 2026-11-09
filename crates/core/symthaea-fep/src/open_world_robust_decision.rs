@@ -471,7 +471,9 @@ pub fn calibrate_categorical_tv_radius_from_counts(
     let per_category_absolute_error_bound = if category_count == 1 {
         0.0
     } else {
-        ((2.0 * category_count as f64 / alpha).ln() / (2.0 * sample_count as f64)).sqrt()
+        (((2.0 * category_count as f64).ln() - alpha.ln())
+            / (2.0 * sample_count as f64))
+            .sqrt()
     };
     let total_variation_radius =
         (0.5 * category_count as f64 * per_category_absolute_error_bound).min(1.0);
@@ -732,7 +734,7 @@ pub fn evaluate_prequential_e_process(
     let mut log_likelihood_ratios = vec![Some(0.0_f64); alternatives.len()];
     let mut log_e_value_by_observation = Vec::with_capacity(null_observations.len());
     let mut crossed_at_observation = None;
-    let log_e_threshold = (1.0 / alpha).ln();
+    let log_e_threshold = -alpha.ln();
 
     for (observation_index, null_observation) in null_observations.iter().enumerate() {
         let null_probabilities = &null_observation.predicted_outcome_probabilities;
@@ -1105,6 +1107,27 @@ mod tests {
     }
 
     #[test]
+    fn prequential_e_process_keeps_tiny_valid_alpha_threshold_finite() {
+        let observations = vec![PrequentialCategoricalObservation {
+            predicted_outcome_probabilities: vec![0.5, 0.5],
+            observed_outcome_index: 0,
+        }];
+        let alternative = PrequentialAlternativeModel {
+            id: "other".into(),
+            prior_weight: 1.0,
+            predicted_outcome_probabilities: vec![vec![0.5, 0.5]],
+        };
+        let report = evaluate_prequential_e_process(
+            &observations,
+            &[alternative],
+            f64::from_bits(1),
+        )
+        .expect("subnormal but valid alpha");
+        assert!(report.log_e_threshold.is_finite());
+        assert!((report.log_e_threshold + f64::from_bits(1).ln()).abs() < 1e-12);
+    }
+
+    #[test]
     fn prequential_e_process_requires_strictly_positive_alpha_below_one() {
         let observations = vec![PrequentialCategoricalObservation {
             predicted_outcome_probabilities: vec![0.5, 0.5],
@@ -1159,6 +1182,14 @@ mod tests {
         assert!(
             (calibration.total_variation_radius - expected_coordinate_bound).abs() < 1e-12
         );
+    }
+
+    #[test]
+    fn tv_calibration_uses_log_domain_for_tiny_valid_alpha() {
+        let calibration = calibrate_categorical_tv_radius_from_counts(&[25, 25], f64::from_bits(1))
+            .expect("subnormal but valid calibration alpha");
+        assert!(calibration.per_category_absolute_error_bound.is_finite());
+        assert_eq!(calibration.total_variation_radius, 1.0);
     }
 
     #[test]
