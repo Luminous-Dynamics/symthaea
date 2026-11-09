@@ -100,13 +100,14 @@ impl InstrumentKindV1 {
             Self::Piano | Self::Harpsichord | Self::Celesta | Self::Organ => {
                 InstrumentFamilyV1::Keyboard
             }
-            Self::Violin | Self::Viola | Self::Cello | Self::DoubleBass | Self::UprightBass => {
+            Self::Violin | Self::Viola | Self::Cello | Self::DoubleBass => {
                 InstrumentFamilyV1::BowedStrings
             }
             Self::Harp
             | Self::ClassicalGuitar
             | Self::AcousticGuitar
             | Self::ElectricBass
+            | Self::UprightBass
             | Self::Mandolin
             | Self::Banjo
             | Self::Sitar
@@ -262,7 +263,7 @@ pub fn validate_instrument_orchestration(
     score: &Score,
     plan: &InstrumentOrchestrationPlanV1,
 ) -> OrchestrationReportV1 {
-    let mut report = OrchestrationReportV1::new(score.parts().len());
+    let mut report = OrchestrationReportV1::new(0);
 
     if plan.schema != ORCHESTRATION_PLAN_SCHEMA_V1 {
         report.push(
@@ -282,17 +283,7 @@ pub fn validate_instrument_orchestration(
             "an empty score cannot establish an instrument allocation",
         );
     }
-    if !score.notes.is_empty() && !score.has_part_identity() {
-        report.push(
-            OrchestrationIssueCodeV1::MissingPartIdentity,
-            None,
-            None,
-            None,
-            "every note must carry an assigned PartId before instrument allocation can be verified",
-        );
-    }
     if score.notes.len() > MAX_ORCHESTRATION_NOTES
-        || score.parts().len() > MAX_ORCHESTRATION_PARTS
         || plan.assignments.len() > MAX_ORCHESTRATION_PARTS
         || plan.instruments.len() > MAX_ORCHESTRATION_INSTRUMENTS
     {
@@ -304,6 +295,36 @@ pub fn validate_instrument_orchestration(
             "score or plan exceeds a declared orchestration validation resource ceiling",
         );
         return report.finish();
+    }
+
+    // Build part identity in O(n log p) rather than Score::parts()'s
+    // repeated Vec membership scan. The note-count ceiling is checked first.
+    let score_parts: BTreeSet<u16> = score
+        .notes
+        .iter()
+        .filter(|note| note.part.is_assigned())
+        .map(|note| note.part.0)
+        .collect();
+    report.part_count = score_parts.len();
+
+    if score_parts.len() > MAX_ORCHESTRATION_PARTS {
+        report.push(
+            OrchestrationIssueCodeV1::ResourceLimitExceeded,
+            None,
+            None,
+            None,
+            "score contains more distinct parts than the declared orchestration limit",
+        );
+        return report.finish();
+    }
+    if !score.notes.is_empty() && !score.has_part_identity() {
+        report.push(
+            OrchestrationIssueCodeV1::MissingPartIdentity,
+            None,
+            None,
+            None,
+            "every note must carry an assigned PartId before instrument allocation can be verified",
+        );
     }
 
     let mut instrument_map: HashMap<&str, &InstrumentCapabilityV1> = HashMap::new();
@@ -336,13 +357,6 @@ pub fn validate_instrument_orchestration(
         }
         instrument_map.insert(instrument.id.as_str(), instrument);
     }
-
-    let score_parts: BTreeSet<u16> = score
-        .parts()
-        .into_iter()
-        .filter(|part| part.is_assigned())
-        .map(|part| part.0)
-        .collect();
 
     let mut assignment_map: BTreeMap<u16, &InstrumentPartAssignmentV1> = BTreeMap::new();
     for assignment in &plan.assignments {
@@ -409,7 +423,7 @@ pub fn validate_instrument_orchestration(
     }
 
     let mut used_instruments: BTreeSet<String> = BTreeSet::new();
-    let mut used_families: BTreeSet<String> = BTreeSet::new();
+    let mut used_families: HashSet<InstrumentFamilyV1> = HashSet::new();
     let mut polyphony_events: BTreeMap<String, Vec<PolyphonyEvent>> = BTreeMap::new();
 
     for (note_index, note) in score.notes.iter().enumerate() {
@@ -425,7 +439,7 @@ pub fn validate_instrument_orchestration(
         };
 
         used_instruments.insert(instrument.id.clone());
-        used_families.insert(format!("{:?}", instrument.kind.family()));
+        used_families.insert(instrument.kind.family());
 
         let midi = note.pitch.midi();
         if midi < instrument.sounding_range.lowest_midi
@@ -764,6 +778,10 @@ mod tests {
         assert_eq!(
             InstrumentKindV1::Saxophone.family(),
             InstrumentFamilyV1::Woodwinds
+        );
+        assert_eq!(
+            InstrumentKindV1::UprightBass.family(),
+            InstrumentFamilyV1::PluckedStrings
         );
     }
 
