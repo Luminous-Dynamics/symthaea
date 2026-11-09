@@ -28,6 +28,7 @@ pub mod graph;
 pub mod inventory;
 pub mod queue;
 pub mod service_continuity;
+pub mod service_quality;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
