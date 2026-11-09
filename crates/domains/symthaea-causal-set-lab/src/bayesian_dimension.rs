@@ -304,7 +304,8 @@ pub fn estimate_finite_size_dimension_posterior(
     prior: &[DimensionPrior],
 ) -> Result<FiniteSizeDimensionPosterior, BayesianDimensionError> {
     validate_event_count(event_count)?;
-    if !observed_ordering_fraction.is_finite() || !(0.0..=1.0).contains(&observed_ordering_fraction) {
+    if !observed_ordering_fraction.is_finite() || !(0.0..=1.0).contains(&observed_ordering_fraction)
+    {
         return Err(BayesianDimensionError::InvalidObservedOrderingFraction);
     }
     validate_calibration(calibration)?;
