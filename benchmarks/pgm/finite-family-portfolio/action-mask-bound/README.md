@@ -277,11 +277,25 @@ Keep three test regimes distinct:
    stability of the selected policy. Do not collapse this into worst-case
    regret alone.
 
+KAPS's public study reports its exact solver achieved the lowest
+single-policy regret in 11 of 13 benchmark instances and proved optimality
+in 9, versus 3 for the exact MILP baseline within a five-minute limit. Its
+Maintenance scaling experiment reports proofs up to 500 states and 100
+distinct MDPs in under 100 seconds. These are the concrete external scale
+targets: first reproduce the 13-instance k=1 comparison, then match the
+500-state/100-model maintenance result under the same machine and protocol,
+then seek a clear proof-time and memory improvement. (The published numbers
+are reference points, not measurements from this repository.)
+
 The 2026 adaptive-portfolio paper reports a sharp early gain from K=1 to K=2,
-then diminishing but continued improvements; on its sampled UAV/Datacenter
-cases it also reports online UCB identifying the best arm more slowly as K
-grows. Those are useful targets to reproduce, not results this finite-family
-deterministic reference has already beaten.
+then diminishing but continued improvements. Its experiments include
+UAV-small/medium/large (98/358/1813 states) and Datacenter Climate Control
+(330 states), with empirical K values 1,2,3,5,7,10. At K=10, after 10,000
+UCB iterations only about half the runs recommend the best arm, although
+the value gap between the recommended and best member is small. Reproduce
+those metrics as a separate continuous/parametric and online-selection
+track. Do not claim that the finite-family deterministic reference has
+already beaten the randomized-policy, polytopic RMDP results.
 
 ## Paradigm shifts to pursue next
 
