@@ -917,7 +917,7 @@ impl VehicleTrainer {
                             .map(|value| format!("{value:.6}"))
                             .unwrap_or_default();
                         csv.push_str(&format!(
-                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
                             t.step,
                             t.time,
                             t.speed,
@@ -1265,7 +1265,14 @@ mod tests {
         assert!(summary_header.contains("follow_oracle_unavailable_steps"));
 
         let step_csv = std::fs::read_to_string(format!("{}/episode_0000.csv", dir)).unwrap();
-        let step_header = step_csv.lines().next().unwrap();
+        let mut step_lines = step_csv.lines();
+        let step_header = step_lines.next().unwrap();
+        let header_columns = step_header.split(',').count();
+        assert_eq!(header_columns, 36, "telemetry CSV header schema changed");
+        assert!(
+            step_lines.all(|line| line.split(',').count() == header_columns),
+            "Every episode telemetry row must match the CSV header column count"
+        );
         assert!(step_header.contains("follow_oracle_available"));
         assert!(step_header.contains("follow_oracle_actor_id"));
         assert!(step_header.contains("follow_oracle_snapshot_age_s"));
