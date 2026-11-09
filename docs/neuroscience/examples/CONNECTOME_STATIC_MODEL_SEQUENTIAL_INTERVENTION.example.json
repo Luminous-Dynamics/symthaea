@@ -1,0 +1,479 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-connectome-static-model-sequential-v1",
+  "claim_scope": "synthetic_known_truth",
+  "query": {
+    "query_id": "does-query-critical-circuit-exist",
+    "query_spec_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "decision_rule_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "certificate_max_expected_loss": 0.01
+  },
+  "worlds": [
+    {
+      "world_id": "QUERY_TRUE",
+      "source_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "query_decision": true
+    },
+    {
+      "world_id": "QUERY_FALSE",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "query_decision": false
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "CALIBRATE",
+      "action_kind": "CALIBRATION",
+      "stage_one_available": true,
+      "one_shot_eligible": false,
+      "stage_one_cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "action_id": "ACTION-A",
+      "action_kind": "OPTOGENETIC",
+      "stage_one_available": true,
+      "one_shot_eligible": true,
+      "stage_one_cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "action_id": "ACTION-B",
+      "action_kind": "OPTOGENETIC",
+      "stage_one_available": true,
+      "one_shot_eligible": true,
+      "stage_one_cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "model_vertices": [
+    {
+      "model_vertex_id": "MODEL-A",
+      "model_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dependence_group_ids": [
+        "shared-assay-protocol",
+        "shared-connectome-revision"
+      ],
+      "prior": [
+        {
+          "world_id": "QUERY_TRUE",
+          "probability": 0.5
+        },
+        {
+          "world_id": "QUERY_FALSE",
+          "probability": 0.5
+        }
+      ],
+      "stage_one_kernels": [
+        {
+          "action_id": "CALIBRATE",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "CAL-A",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "CALIBRATE",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "CAL-A",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        }
+      ],
+      "stage_two_kernels": [
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model_vertex_id": "MODEL-B",
+      "model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dependence_group_ids": [
+        "shared-assay-protocol",
+        "shared-connectome-revision"
+      ],
+      "prior": [
+        {
+          "world_id": "QUERY_TRUE",
+          "probability": 0.5
+        },
+        {
+          "world_id": "QUERY_FALSE",
+          "probability": 0.5
+        }
+      ],
+      "stage_one_kernels": [
+        {
+          "action_id": "CALIBRATE",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "CAL-B",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "CALIBRATE",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "CAL-B",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        }
+      ],
+      "stage_two_kernels": [
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-A",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-A",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_TRUE",
+          "outcomes": [
+            {
+              "outcome_id": "POSITIVE",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "first_outcome_id": "CAL-B",
+          "action_id": "ACTION-B",
+          "world_id": "QUERY_FALSE",
+          "outcomes": [
+            {
+              "outcome_id": "NEGATIVE",
+              "probability": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "policy_space": {
+    "root_action_id": "CALIBRATE",
+    "first_stage_outcome_ids": [
+      "CAL-A",
+      "CAL-B"
+    ],
+    "second_stage_options_by_first_outcome": [
+      {
+        "first_outcome_id": "CAL-A",
+        "options": [
+          {
+            "action_id": "ACTION-A",
+            "cost_units": 1
+          },
+          {
+            "action_id": "ACTION-B",
+            "cost_units": 3
+          }
+        ]
+      },
+      {
+        "first_outcome_id": "CAL-B",
+        "options": [
+          {
+            "action_id": "ACTION-A",
+            "cost_units": 3
+          },
+          {
+            "action_id": "ACTION-B",
+            "cost_units": 1
+          }
+        ]
+      }
+    ],
+    "second_stage_outcome_ids": [
+      "NEGATIVE",
+      "POSITIVE"
+    ],
+    "max_worst_branch_cost_units": 2
+  },
+  "oracle_expectations": {
+    "one_shot_robust_loss_by_action": {
+      "ACTION-A": 0.5,
+      "ACTION-B": 0.5
+    },
+    "best_one_shot_robust_loss": 0.5,
+    "static_robust_loss": 0,
+    "rectangular_risk_of_static_policy": 1,
+    "rectangular_minimax_loss": 0.5,
+    "static_rectangular_gap": 0.5,
+    "static_gain_over_one_shot": 0.5,
+    "static_worst_branch_cost": 2,
+    "rectangular_worst_branch_cost": 2,
+    "static_certificate": true,
+    "rectangular_certificate": false,
+    "expected_static_second_action_by_history": {
+      "CAL-A": "ACTION-A",
+      "CAL-B": "ACTION-B"
+    },
+    "expected_static_terminal_decision_by_history": {
+      "CAL-A|NEGATIVE": "REFUTE",
+      "CAL-A|POSITIVE": "SUPPORT",
+      "CAL-B|NEGATIVE": "REFUTE",
+      "CAL-B|POSITIVE": "SUPPORT"
+    },
+    "expected_rectangular_terminal_decision_by_history": {
+      "CAL-A|NEGATIVE": "SUPPORT",
+      "CAL-A|POSITIVE": "SUPPORT",
+      "CAL-B|NEGATIVE": "SUPPORT",
+      "CAL-B|POSITIVE": "SUPPORT"
+    }
+  },
+  "split_manifest": {
+    "split_unit": "synthetic_unit",
+    "train_units": [
+      "train-01"
+    ],
+    "validation_units": [
+      "validation-01"
+    ],
+    "lockbox_units": [
+      "lockbox-01"
+    ],
+    "split_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  }
+}
