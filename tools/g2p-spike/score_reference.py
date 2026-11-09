@@ -76,7 +76,10 @@ def normalize_ipa(tokens: list[str]) -> list[str]:
     return codepoints
 
 
-def split_normalized_piper_words(raw_json: str) -> list[list[str]]:
+def split_normalized_piper_words(
+    raw_json: str,
+    raw_tokens: list[str] | None = None,
+) -> list[list[str]]:
     """Read the loss-preserving Rust word view; punctuation remains separate."""
     try:
         payload = json.loads(raw_json)
@@ -84,6 +87,18 @@ def split_normalized_piper_words(raw_json: str) -> list[list[str]]:
         raise ValueError("invalid normalized Piper hypothesis JSON") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("words"), list):
         raise ValueError("normalized Piper hypothesis must contain a words array")
+
+    provider_tokens = payload.get("raw_tokens")
+    provider_prosody = payload.get("raw_prosody")
+    if not isinstance(provider_tokens, list) or not all(
+        isinstance(token, str) for token in provider_tokens
+    ):
+        raise ValueError("normalized Piper hypothesis must preserve raw_tokens")
+    if not isinstance(provider_prosody, list) or len(provider_prosody) != len(provider_tokens):
+        raise ValueError("normalized Piper raw token/prosody arrays are misaligned")
+    if raw_tokens is not None and provider_tokens != raw_tokens:
+        raise ValueError("normalized Piper raw token stream differs from the TSV source stream")
+    expected_word_slots = split_piper_words(provider_tokens)
 
     words: list[list[str]] = []
     for expected_index, word in enumerate(payload["words"]):
@@ -106,6 +121,14 @@ def split_normalized_piper_words(raw_json: str) -> list[list[str]]:
                 f"normalized Piper word {expected_index} character/prosody arrays are misaligned"
             )
         words.append(raw_tokens)
+    if len(words) != len(expected_word_slots):
+        raise ValueError(
+            "normalized Piper word count differs from the raw token stream's explicit separator count"
+        )
+    if words != expected_word_slots:
+        raise ValueError(
+            "normalized Piper word tokens do not reconstruct the raw stream after removing only stress/punctuation"
+        )
     return words
 
 
@@ -220,7 +243,11 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
             case_id = row["case_id"]
             if case_id in candidate_rows:
                 raise ValueError(f"duplicate candidate case_id {case_id!r}")
-            piper_words = split_normalized_piper_words(row["normalized_word_hypotheses_json"])
+            raw_piper_tokens = parse_debug_list(row["piper_ipa_tokens"])
+            piper_words = split_normalized_piper_words(
+                row["normalized_word_hypotheses_json"],
+                raw_tokens=raw_piper_tokens,
+            )
             muse_words = parse_debug_list(row["muse_word_ipa_tokens"], expected_nested=True)
             candidate_rows[case_id] = {
                 "piper": piper_words,
