@@ -22,6 +22,8 @@ pub struct VocalQualityMetrics {
     /// Frames where the score-conditioned estimate appears reassuring while
     /// the global estimate finds a large pitch mismatch.
     pub pitch_prior_mismatch_frames: usize,
+    /// Mismatch frames divided by frames where both pitch estimates exist.
+    pub pitch_prior_mismatch_fraction: f32,
     /// None means the score-independent estimate did not have enough voiced
     /// support to qualify this diagnostic.
     pub score_independent_pitch_audit_pass: Option<bool>,
@@ -113,7 +115,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let mut transition_errors = Vec::new();
     let mut score_independent_errors = Vec::new();
     let mut pitch_prior_mismatch_frames = 0usize;
-    let mut expected_voiced_frames = 0usize;
+    let mut score_independent_attempted = 0usize;
     let mut attempted = 0usize;
     let mut vuv_errors = 0usize;
     let mut all_frames = 0usize;
@@ -142,14 +144,12 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
             }
             if expected_voiced {
                 attempted += 1;
-                expected_voiced_frames += 1;
-
-                let score_independent = estimate_f0_global(window, rate);
-                if let (Some(expected), Some(independent)) = (expected_pitch, score_independent) {
-                    let independent_error =
-                        (1200.0 * (independent / expected).log2()).abs();
-                    score_independent_errors.push(independent_error);
-                    if let Some(constrained) = actual {
+                if let (Some(expected), Some(constrained)) = (expected_pitch, actual) {
+                    score_independent_attempted += 1;
+                    if let Some(independent) = estimate_f0_global(window, rate) {
+                        let independent_error =
+                            (1200.0 * (independent / expected).log2()).abs();
+                        score_independent_errors.push(independent_error);
                         let constrained_error =
                             (1200.0 * (constrained / expected).log2()).abs();
                         if independent_error > 400.0
@@ -197,10 +197,15 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let score_independent_pitch_p95_error_cents =
         percentile(&score_independent_errors, 0.95);
     let score_independent_pitch_valid_fraction =
-        score_independent_errors.len() as f32 / expected_voiced_frames.max(1) as f32;
+        score_independent_errors.len() as f32 / score_independent_attempted.max(1) as f32;
+    let pitch_prior_mismatch_fraction =
+        pitch_prior_mismatch_frames as f32 / score_independent_errors.len().max(1) as f32;
+    // A 10% mismatch fraction is a conservative initial blocker for gross
+    // prior-induced errors. Calibrate it on independently annotated singing
+    // before treating it as a universal perceptual threshold.
     let score_independent_pitch_audit_pass =
         (score_independent_pitch_valid_fraction >= 0.8)
-            .then_some(pitch_prior_mismatch_frames == 0);
+            .then_some(pitch_prior_mismatch_fraction <= 0.10);
     // An onset-from-silence metric is meaningful for the first note and after
     // an actual gap, not at a connected legato boundary where audio continues.
     let mut previous_end = None;
@@ -275,6 +280,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         score_independent_pitch_p95_error_cents,
         score_independent_pitch_valid_fraction,
         pitch_prior_mismatch_frames,
+        pitch_prior_mismatch_fraction,
         score_independent_pitch_audit_pass,
         median_onset_error_ms,
         duration_error_ms,
@@ -677,6 +683,7 @@ mod tests {
             "the evaluator must explicitly flag false reassurance: {metrics:?}"
         );
         assert_eq!(metrics.score_independent_pitch_audit_pass, Some(false));
+        assert!(metrics.pitch_prior_mismatch_fraction > 0.9);
         assert!(
             !metrics.objective_pass,
             "a high-confidence prior mismatch must block the objective gate: {metrics:?}"
