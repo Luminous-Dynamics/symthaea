@@ -60,6 +60,7 @@ pub enum InstrumentKindV1 {
     Viola,
     Cello,
     DoubleBass,
+    UprightBass,
     Harp,
     ClassicalGuitar,
     AcousticGuitar,
@@ -99,7 +100,7 @@ impl InstrumentKindV1 {
             Self::Piano | Self::Harpsichord | Self::Celesta | Self::Organ => {
                 InstrumentFamilyV1::Keyboard
             }
-            Self::Violin | Self::Viola | Self::Cello | Self::DoubleBass => {
+            Self::Violin | Self::Viola | Self::Cello | Self::DoubleBass | Self::UprightBass => {
                 InstrumentFamilyV1::BowedStrings
             }
             Self::Harp
