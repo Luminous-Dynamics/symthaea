@@ -741,7 +741,11 @@
         "known_truth_decision_regret",
         "e_process_crossing_index",
         "mean_score_vs_sequential_detection_disagreement",
-        "strict_alpha_domain_validation"
+        "strict_alpha_domain_validation",
+        "calibration_sample_count",
+        "calibrated_tv_radius",
+        "ambiguity_radius_confidence",
+        "fixed_vs_calibrated_radius_selection_disagreement"
       ],
       "negative_controls": [
         "well_specified_family",
@@ -1209,6 +1213,10 @@
     {
       "id": "known_truth_open_world_robustness_runner",
       "scope": "Source-bound deterministic runner with exact nominal-vs-TV-robust decision regret, prequential mean-score and regime-shift controls, e-process sequential evidence, and zero-support adequacy failure. Synthetic fixture only."
+    },
+    {
+      "id": "categorical_hoeffding_union_bound_tv_calibration",
+      "scope": "Finite-sample distribution-free TV-radius reference from independent IID categorical calibration counts; per-category Hoeffding intervals plus Bonferroni/union bound, explicitly conservative and not valid under dependent or shifted calibration."
     }
   ],
   "seeds": {
@@ -1612,7 +1620,9 @@
     "The prequential benchmark must include a symmetric-predictive regime-shift fixture where aggregate log-loss and Brier thresholds do not cross but a predictable-alternative e-process crosses its preregistered Ville threshold.",
     "A deterministic out-of-support observation must trigger the hard model-adequacy failure even when the minimum-observation threshold is not met.",
     "The open-world benchmark result must be marked synthetic-known-truth-only and bind its exact source SHA; it must not be presented as a live ActiveInferenceAgent, field, or SOTA result.",
-    "The anytime e-process significance parameter must satisfy the strict open interval 0 < alpha < 1; zero, one, out-of-range, NaN, and infinite values fail closed."
+    "The anytime e-process significance parameter must satisfy the strict open interval 0 < alpha < 1; zero, one, out-of-range, NaN, and infinite values fail closed.",
+    "A calibrated TV ambiguity radius must be computed from an independent IID calibration sample using a declared confidence parameter and explicit finite-sample bound; calibration observations may not be reused as evaluation outcomes.",
+    "The categorical Hoeffding/union-bound radius must report category count, sample count, empirical distribution, per-coordinate bound, alpha, confidence level, and derived TV radius; it must not be described as valid under temporal dependence or calibration/deployment shift."
   ],
   "research_references": [
     {
