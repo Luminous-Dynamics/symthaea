@@ -80,7 +80,7 @@ The exact-reference tests require:
 7. Missing, duplicate, unexpected and invalid detection rows are rejected.
 8. Quadrature convergence, model comparability and open-world blockers remain explicit.
 
-The benchmark reports prior entropy, expected detection probability, detection-indicator EIG, conditional value EIG, total EIG, operationally adjusted EIG, expected posterior entropy and numerical error separately. The metrics must not be collapsed into one opaque score.
+The benchmark reports prior entropy, expected detection probability, detection-indicator EIG, conditional value EIG, total EIG, operationally adjusted EIG and expected posterior entropy separately. The quadrature gate is applied to the unweighted conditional detected-value integral; the report separately gives its smaller operational error bound after multiplying by detection and execution probabilities. A low operational probability must never mask a numerically under-resolved conditional likelihood. The metrics must not be collapsed into one opaque score.
 
 ## What this does not model yet
 
