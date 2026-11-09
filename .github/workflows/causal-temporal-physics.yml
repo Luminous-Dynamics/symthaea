@@ -343,6 +343,21 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run Bayesian causal-set dimension scale sweep
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example bayesian_dimension_scale_sweep | tee bayesian-dimension-scale-sweep.csv
+          grep -q 'event_count,truth_dimension,prior_family' bayesian-dimension-scale-sweep.csv
+          grep -q 'next_gate=posterior_coverage_and_out_of_family_abstention' bayesian-dimension-scale-sweep.csv
+          {
+            echo "## Bayesian finite-size dimension calibration sweep"
+            echo '```csv'
+            cat bayesian-dimension-scale-sweep.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run joint interval-profile and longest-chain signature reference
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
