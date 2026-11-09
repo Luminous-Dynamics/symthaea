@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/quant-strategy-v1/run.schema.json",
+  "title": "Luminous Quant Strategy Run Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "cohort",
+    "decision_time",
+    "universe",
+    "strategy",
+    "data_frontier",
+    "split",
+    "portfolio",
+    "execution",
+    "baseline_ids",
+    "trial_id",
+    "rights_profile",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.quant-strategy-run.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "cohort": {
+      "enum": [
+        "synthetic_reference",
+        "public_development_history",
+        "historical_confirmation",
+        "regime_transfer",
+        "prospective_shadow",
+        "analyst_comparison"
+      ]
+    },
+    "decision_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "universe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "membership_sha256",
+        "delisted_included",
+        "corporate_action_profile"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "membership_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "delisted_included": {
+          "type": "boolean"
+        },
+        "corporate_action_profile": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy_id",
+        "code_sha256",
+        "feature_set_sha256",
+        "policy_sha256",
+        "model_family"
+      ],
+      "properties": {
+        "strategy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "feature_set_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "model_family": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "data_frontier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "source_manifest_sha256",
+        "point_in_time",
+        "event_time_and_known_at_separate"
+      ],
+      "properties": {
+        "mode": {
+          "const": "streaming_known_at"
+        },
+        "source_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "point_in_time": {
+          "const": true
+        },
+        "event_time_and_known_at_separate": {
+          "const": true
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_id",
+        "training_cutoff",
+        "evaluation_start",
+        "evaluation_end",
+        "purge_policy",
+        "embargo_seconds"
+      ],
+      "properties": {
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "training_cutoff": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evaluation_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evaluation_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "purge_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "embargo_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "portfolio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_currency",
+        "starting_cash_minor_units",
+        "max_leverage_bps",
+        "long_only"
+      ],
+      "properties": {
+        "base_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "starting_cash_minor_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_leverage_bps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "long_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fill_profile",
+        "fee_bps",
+        "spread_bps",
+        "slippage_bps",
+        "market_impact_bps",
+        "funding_bps_annualized",
+        "borrow_bps_annualized",
+        "unknown_costs"
+      ],
+      "properties": {
+        "fill_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fee_bps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "spread_bps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "slippage_bps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "market_impact_bps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "funding_bps_annualized": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "borrow_bps_annualized": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unknown_costs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "baseline_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "trial_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rights_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "enum": [
+        "synthetic_integrity_only",
+        "historical_research_only",
+        "prospective_shadow_only"
+      ]
+    }
+  }
+}
