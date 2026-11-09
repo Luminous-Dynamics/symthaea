@@ -230,13 +230,16 @@ impl VehicleTrainer {
         self.run_episode_with_sim_mode(encoder, controller, fep_agent, physics, episode, true)
     }
 
-    /// Run a frozen-policy evaluation episode with any physics simulator.
+    /// Run a no-teacher, no-weight-update evaluation episode with any physics simulator.
     ///
     /// This path disables PD action blending, BPTT supervision, replay updates
-    /// and exploration noise. Simulator-oracle targets may still be retained
-    /// for outcome/reward measurement, but are not passed to the policy or
-    /// training target. The student still consumes the existing simulated
-    /// VehicleState vector; this is not a local-sensor-only deployment test.
+    /// and exploration noise. Trainable controller weights remain fixed, while
+    /// recurrent hidden-state evolution, state normalization and state-dependent
+    /// FEP time-constant modulation remain active as inference-time dynamics.
+    /// Simulator-oracle targets may still be retained for outcome/reward measurement
+    /// or an evaluator-only shadow action, but are not passed to the policy.
+    /// The student still consumes the existing simulated VehicleState vector;
+    /// this is not a local-sensor-only deployment test.
     pub fn run_evaluation_episode_with_sim(
         &self,
         encoder: &mut VehicleHdcEncoder,
@@ -273,7 +276,7 @@ impl VehicleTrainer {
         let cognitive_interval = self.config.cognitive_interval();
         let (task, curriculum_pd_weight, target_speed, use_perturbations) =
             self.curriculum(episode);
-        // Evaluation never inherits the curriculum's teacher blend.
+        // Evaluation never inherits the curriculum's teacher blend or train updates.
         let pd_weight = if train_controller {
             curriculum_pd_weight
         } else {
@@ -538,8 +541,8 @@ impl VehicleTrainer {
             }
             let blended_action_command = command;
 
-            // Training may explore; frozen-policy evaluation is deterministic
-            // with respect to the controller proposal and has no exploration noise.
+            // Training may explore; no-weight-update evaluation has no exploration
+            // noise, while recurrent/FEP inference-time state dynamics remain active.
             if train_controller {
                 if let Some(noise) = &fep_result.exploration_noise {
                     command = command.with_noise(*noise);
