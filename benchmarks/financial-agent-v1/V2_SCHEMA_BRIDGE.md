@@ -55,8 +55,9 @@ The schemas enforce structure, not source truth, signatures, permissions or enti
 
 - V1 data rejected/indeterminate in qualified profiles.
 - Exact v2 proof round-trip into the Rust `EvidenceVersion`.
-- Availability proof bound to the wrong evidence/version/principal rejected.
-- Rights proof wrong-profile, expired, revoked or mismatched rejected.
+- Availability proof bound to the wrong evidence/version/principal rejected; tampered `binding_sha256` recomputation fails.
+- Rights proof wrong-profile, expired, revoked or mismatched rejected; domain tags prevent availability/rights proof substitution.
+- JCS binding preimages round-trip with stable SHA-256 across property insertion orders.
 - Bounded availability interval entirely before / after / straddling the frontier has PASS / FAIL / INDETERMINATE under #11256.
 - Quant observations each carry an evidence object; no global Boolean can qualify missing proofs.
 - Mutated proof bytes, receipt bytes, verifier build, revision ancestry or frontier produce a different canonical input and fail/review.
