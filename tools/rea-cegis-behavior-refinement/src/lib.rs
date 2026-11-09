@@ -381,9 +381,9 @@ pub fn rank_distinguishing_inputs(
         }
 
         let mut separated_pairs = 0usize;
-        for left in 0..predicted.len() {
-            for right in (left + 1)..predicted.len() {
-                if predicted[left] != predicted[right] {
+        for (left_index, left_outcome) in predicted.iter().enumerate() {
+            for right_outcome in predicted.iter().skip(left_index + 1) {
+                if left_outcome != right_outcome {
                     separated_pairs += 1;
                 }
             }
