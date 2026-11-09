@@ -428,7 +428,7 @@ The actual effective compiler flags and runtime floating-point mode still need t
 
 ## 14. Hierarchical group-to-member selection and build-time partition receipts (2026-11-09)
 
-The source now has a two-stage query path:
+The source now has a two-stage query path, with persistent receipt/reopen authentication explicitly owned by [#11221](https://github.com/Luminous-Dynamics/symthaea/issues/11221):
 
 - select_group_refinement_set_with_partition_receipt
 - select_hierarchical_refinement_set_with_partition_receipt
@@ -564,7 +564,7 @@ Do not confuse MEMORA (embodied action memory) with Memora (personalized agent-m
 | Track | Near-term bar | Stretch target |
 |---|---|---|
 | Exact HME top-k | 100% exact ID agreement; zero false prunes | Same at 1M+ records and 16K–256K dimensions |
-| Fast group selector | Receipt verification O(G); no per-member roster walk on fast path | Metadata work ≤10% of per-record baseline on homogeneous workloads |
+| Fast group selector | Receipt verification O(G log G); no per-member roster walk on fast path | Metadata work ≤10% of per-record baseline on homogeneous workloads |
 | Cold payload I/O | Measure physical block reads; do not infer from candidate counts | ≥50% cold payload bytes avoided at p50 and ≥20% at p95 with exact output |
 | Lifecycle / deletion | 100% fixture correctness; zero stale emission/resurrection | Maintain under compaction, restart, replay and policy change |
 | COLLABMEM / TimlMemBench | Zero unauthorized read/emission; publish per-competency scores | Outperform matched public baselines on provenance, scope and restraint |
@@ -606,7 +606,7 @@ The group query records and partition receipt now carry HmeEligibilityScopeBindi
 
 Each query-specific GroupScoreIntervalRecord carries this binding. GroupIntervalCoverageCounts carries the same binding. The partition receipt commits to it, the fast path checks the coverage binding against the receipt, and both fast and defensive selector paths reject group intervals carrying a different scope. The GroupIntervalSelectionPlan preserves the binding for downstream completion receipts.
 
-This is deliberately an integration contract with #11003, not a new policy engine. The binding fields must be produced from the authoritative eligibility/policy/source-ledger decision. Constructing an HmeEligibilityScopeBinding in application code does not prove authorization. The HME layer verifies consistency; #11003 remains the owner of eligibility truth and #11221 owns persistent receipt authentication after reopen.
+This is deliberately an integration contract with #11003, not a new policy engine. The binding fields must be produced from the authoritative eligibility/policy/source-ledger decision. Constructing an HmeEligibilityScopeBinding in application code does not prove authorization. Every query-specific group interval record, coverage record, partition receipt and returned group selection plan carries the binding; the selectors reject cross-scope group intervals. The HME layer verifies consistency; #11003 remains the owner of eligibility truth and #11221 owns persistent receipt authentication after reopen.
 
 The new machine-readable benchmark contract is docs/research/fixtures/hme_benchmark_matrix_v0.json. It separates:
 - exact full-resolution HDC retrieval and receipt-backed hierarchy;
