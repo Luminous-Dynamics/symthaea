@@ -60,10 +60,7 @@ fn child_args(strategy: &str) -> Vec<OsString> {
     if strategy == "finite" {
         Vec::new()
     } else {
-        vec![
-            OsString::from("--strategy"),
-            OsString::from(strategy),
-        ]
+        vec![OsString::from("--strategy"), OsString::from(strategy)]
     }
 }
 
@@ -75,13 +72,8 @@ fn run_arm(
     arm_label: &str,
     truth: ModelHypothesis,
 ) -> Result<ProcessEpisodeReceipt, String> {
-    let episode = BlindEpisode::new_numeric(
-        episode_id,
-        truth,
-        access,
-        6,
-    )
-    .map_err(|error| format!("cannot create evaluator episode: {error}"))?;
+    let episode = BlindEpisode::new_numeric(episode_id, truth, access, 6)
+        .map_err(|error| format!("cannot create evaluator episode: {error}"))?;
 
     let config = ProcessAgentConfig::new(executable)
         .with_args(child_args(strategy))
@@ -148,10 +140,7 @@ fn run() -> Result<(), String> {
     )?;
     let out_of_catalogue = run_open_support_arm(&executable, &strategy)?;
 
-    for (label, score) in [
-        ("a0", &a0.evaluator_score),
-        ("a2", &a2.evaluator_score),
-    ] {
+    for (label, score) in [("a0", &a0.evaluator_score), ("a2", &a2.evaluator_score)] {
         if !score.generating_model_in_version_space
             || !score.set_score.exact_version_space_match
             || !score.evidence_references_valid
@@ -167,18 +156,35 @@ fn run() -> Result<(), String> {
         }
     }
 
-    if out_of_catalogue.evaluator_score.generating_model_in_version_space
-        || out_of_catalogue.evaluator_score.set_score.oracle_model_count != 0
-        || !out_of_catalogue.evaluator_score.set_score.exact_version_space_match
+    if out_of_catalogue
+        .evaluator_score
+        .generating_model_in_version_space
+        || out_of_catalogue
+            .evaluator_score
+            .set_score
+            .oracle_model_count
+            != 0
+        || !out_of_catalogue
+            .evaluator_score
+            .set_score
+            .exact_version_space_match
         || !out_of_catalogue.evaluator_score.decision_correct
         || !out_of_catalogue.evaluator_score.evidence_references_valid
         || out_of_catalogue.evaluator_score.probe_count > 6
     {
         return Err(format!(
             "out-of-catalogue support control failed: truth={}, oracle_models={}, exact_set={}, decision_correct={}, evidence_refs={}, probes={}",
-            out_of_catalogue.evaluator_score.generating_model_in_version_space,
-            out_of_catalogue.evaluator_score.set_score.oracle_model_count,
-            out_of_catalogue.evaluator_score.set_score.exact_version_space_match,
+            out_of_catalogue
+                .evaluator_score
+                .generating_model_in_version_space,
+            out_of_catalogue
+                .evaluator_score
+                .set_score
+                .oracle_model_count,
+            out_of_catalogue
+                .evaluator_score
+                .set_score
+                .exact_version_space_match,
             out_of_catalogue.evaluator_score.decision_correct,
             out_of_catalogue.evaluator_score.evidence_references_valid,
             out_of_catalogue.evaluator_score.probe_count
