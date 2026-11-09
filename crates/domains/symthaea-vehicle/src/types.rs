@@ -610,6 +610,10 @@ pub struct VehicleTelemetry {
     /// Whether the teacher action was supplied as the BPTT target on this step.
     #[serde(default)]
     pub teacher_action_used_for_supervision: bool,
+    /// Whether the teacher action was computed only as an evaluator-side shadow
+    /// reference and was not used for blending, supervision or controller updates.
+    #[serde(default)]
+    pub teacher_action_evaluation_only: bool,
     /// Actual teacher blend coefficient; zero when no teacher blend occurred.
     #[serde(default)]
     pub pd_teacher_blend_weight: f32,
