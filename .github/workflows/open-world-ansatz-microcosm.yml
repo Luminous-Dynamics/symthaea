@@ -54,14 +54,10 @@ jobs:
             .campaign_kind == "paired_process_baseline_smoke" and
             .same_agent_artifact == true and
             .comparison_design == "adaptive_budget" and
-            .a0.agent.executable_sha256 == .a2.agent.executable_sha256 and
-            .a0.agent.executable_sha256 == .out_of_catalogue.agent.executable_sha256 and
-            .a0.agent.executable_sha256 == .equivalent_out_of_catalogue.agent.executable_sha256 and
-            .a0.agent.executable_sha256 == .structural_out_of_catalogue.agent.executable_sha256 and
-            .a0.agent.arguments == .a2.agent.arguments and
-            .a0.agent.arguments == .out_of_catalogue.agent.arguments and
-            .a0.agent.arguments == .equivalent_out_of_catalogue.agent.arguments and
-            .a0.agent.arguments == .structural_out_of_catalogue.agent.arguments and
+            .a0.agent == .a2.agent and
+            .a0.agent == .out_of_catalogue.agent and
+            .a0.agent == .equivalent_out_of_catalogue.agent and
+            .a0.agent == .structural_out_of_catalogue.agent and
             .a0.agent.environment_inherited == false and
             .a2.agent.environment_inherited == false and
             .a0.agent.max_input_frame_bytes <= 16777216 and
