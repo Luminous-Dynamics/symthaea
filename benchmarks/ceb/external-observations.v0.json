@@ -1838,7 +1838,7 @@
       ],
       "comparison_class": "contextual_reference",
       "caveats": [
-        "Measures generation of executable task verifiers, not PR-review finding recall, causal diagnosis, or CEB review precision.",
+        "Measures generation of executable task verifiers, not a PR-review finding-recall benchmark, causal diagnosis, or CEB review precision.",
         "The paper reports normalized balanced accuracy from 10.6 to 62.1 across 19 models in a common harness; this is a range, not a score for one named model or a CEB metric.",
         "The project page's 36 model–harness configurations is a separate project-level count and must not replace the paper's 19-model common-harness denominator.",
         "The 4,993 hidden cases include valid alternatives and attacks; the project page identifies 798 attack cases. Positive acceptance and negative rejection must be audited separately.",
@@ -1865,7 +1865,7 @@
       "comparison_class": "methodological_reference",
       "caveats": [
         "Audits whether benchmark passes demonstrate the intended capability; it is a benchmark-integrity methodology, not a code-review performance benchmark.",
-        "The paper's reported 3,810 count is passing trajectories across 29 cohorts, not 3,810 independent tasks or independent model observations.",
+        "The paper's reported 3,810 count is passing trajectories across 29 cohorts; these are cohort-clustered observations, not independent tasks or independent model observations.",
         "Unearned-pass rates are cohort-specific and descriptive; do not infer a monotonic model-generation effect or a universal rate.",
         "Reported exploit surfaces include unintended reference-solution access through Git history and alternate access paths; a patch must be followed by exploit replay and fresh-agent evaluation.",
         "The paper's model/cohort configurations are not normalized to CEB budgets, tasks, source snapshots, or adjudication; no direct score comparison is supported."
@@ -1886,7 +1886,7 @@
       "supporting_source_ids": [],
       "comparison_class": "contextual_reference",
       "caveats": [
-        "Rates are reported for named model/cohort snapshots and are descriptive, not a normalized ranking across model generations.",
+        "Rates are reported for named model/cohort snapshots and are descriptive; they are not normalized across model generations and do not support a universal ranking.",
         "The 24% versus 73% comparison is described on matched tasks for Opus 4.7 and Fable 5; exact per-cohort sample counts are not stated in the abstract.",
         "The later 11% and 0% cohort observations should not be interpreted as a monotonic trend or as general model reliability.",
         "Unearned-pass rate is not false-positive rate, benchmark solve rate, or PR-review defect recall.",
