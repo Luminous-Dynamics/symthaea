@@ -53,6 +53,20 @@ The initial corpus contains 18 fixtures: 5 accepted shapes and 13 expected rejec
 
 Synthetic fixtures exercise the contract only. They are not battery measurements, calibrated SOH labels, fault-injection results on hardware, safety evidence or model-accuracy results.
 
+## 2026 research evidence and benchmark implications
+
+The following results are recent external research anchors, not results produced by Symthaea:
+
+- Barua et al. (2026), *Predictor Structure Modulates Validation Inflation and Cell-Transfer Reliability*: on four NASA cells, median random 80:20 split RMSE improved from 5.00 to 1.52 SOH points with richer predictors, while median leave-one-cell-out RMSE moved only from 5.83 to 4.61. This shows how within-cell validation can materially overstate transfer performance in that corpus; the four-cell result is not a universal error law. https://www.mdpi.com/2313-0105/12/9/342
+- Wu et al. (first published 1 October 2026), *Uncertainty-Aware Transformer*: four NASA PCoE cells; its 95% interval coverage was near nominal on in-range held-out cells but fell substantially on cells aging beyond the training range. The paper reports 0.984 / 0.945 PICP on two in-range held-out cells and 0.735 / 0.660 on two shifted cells; its within-cell test PICP was only about 0.653. This is a direct argument for reporting calibration by domain and test protocol rather than only pooled interval coverage. https://journals.sagepub.com/doi/full/10.3233/ATDE260884
+- Applied Energy (1 November 2026), *Geometry-aware curation for data-efficient SOH estimation*: reported a cross-vehicle study spanning 400 EVs and more than 65,000 charging segments; a geometry-aware curation method retained 10–20% of training data while reporting RMSE below 2% and large training-time reductions. Treat this as a study-specific data-efficiency baseline, not an independently reproduced universal result. https://doi.org/10.1016/j.apenergy.2026.128284
+- Rizanov et al. (15 July 2026), *Toward Trustworthy and Transferable SOH/RUL Estimation*: proposes a multi-fidelity validation ladder from laboratory cells through modules/packs and fleet shadow operation, with calibration, transfer and deployment criteria. https://www.mdpi.com/2313-0105/12/7/255
+- Battery-Hub indexes public battery datasets across cycling, operational traces, EIS and degradation tasks. Use it for discovery, but evaluate the exact original source, revision, label definition, licence and redistribution conditions for every dataset before admission. https://battery-hub.org/datasets
+
+### Strategic consequence
+
+The research target is not "lowest NASA RMSE." It is **calibrated transfer with useful abstention**: maximize coverage of decisions that meet a predeclared error/risk budget, while widening intervals or abstaining when the operating domain changes. Compare data curation methods at matched held-out performance and report data fraction, compute, memory, energy and update cost. A small calibrated model that is correct about its limitations may be more useful than a larger model with silent extrapolation.
+
 ## Benchmark protocol to implement next
 
 Before fitting an estimator, freeze a source/rights registry and dataset manifests. Initial dataset candidates include NASA PCoE, CALCE, Oxford, Severson/MATR, XJTU and rights-cleared real-world fleet/BMS records where available. Dataset names alone do not grant reuse or redistribution rights.
