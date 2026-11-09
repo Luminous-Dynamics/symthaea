@@ -37,9 +37,9 @@ jobs:
             --corpus fixtures/ev_battery/intervention_causal_scenarios_v0_1.json \
             > "$RUNNER_TEMP/ev-intervention-causal-report.json"
           jq -e '
-            .scenario_count == 6 and
+            .scenario_count == 7 and
             .estimated_count == 3 and
-            .abstain_count == 1 and
+            .abstain_count == 2 and
             .rejected_count == 2 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-intervention-causal-report.json"
