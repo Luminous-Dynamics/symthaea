@@ -8,8 +8,8 @@
 
 #![forbid(unsafe_code)]
 
-use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const CASE_SCHEMA_VERSION: u32 = 1;
 
@@ -126,7 +126,10 @@ pub struct ControlReport {
 impl ControlCase {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != CASE_SCHEMA_VERSION {
-            return Err(format!("unsupported control-case schema version {}", self.schema_version));
+            return Err(format!(
+                "unsupported control-case schema version {}",
+                self.schema_version
+            ));
         }
         if self.case_id.trim().is_empty() {
             return Err("case_id must not be empty".into());
@@ -153,7 +156,9 @@ impl ControlCase {
             return Err("at least one target region is required".into());
         }
         if self.locality_required && self.protected_regions.is_empty() {
-            return Err("locality-required cases need at least one of the protected regions".into());
+            return Err(
+                "locality-required cases need at least one of the protected regions".into(),
+            );
         }
 
         let dimensions: BTreeSet<_> = self.required_dimensions.iter().copied().collect();
@@ -161,7 +166,9 @@ impl ControlCase {
             || !dimensions.contains(&self.target_dimension)
             || dimensions.is_empty()
         {
-            return Err("required dimensions must be unique and include the target dimension".into());
+            return Err(
+                "required dimensions must be unique and include the target dimension".into(),
+            );
         }
         let tolerance_dimensions: BTreeSet<_> = self.feature_tolerances.keys().copied().collect();
         if tolerance_dimensions != dimensions {
@@ -169,23 +176,37 @@ impl ControlCase {
         }
         for (dimension, tolerance) in &self.feature_tolerances {
             if !tolerance.is_finite() || *tolerance <= 0.0 {
-                return Err(format!("tolerance for {} must be finite and positive", dimension.label()));
+                return Err(format!(
+                    "tolerance for {} must be finite and positive",
+                    dimension.label()
+                ));
             }
         }
 
         let mut regions = BTreeSet::new();
         for region in self.target_regions.iter().chain(&self.protected_regions) {
             if region.trim().is_empty() || !regions.insert(region.as_str()) {
-                return Err(format!("region IDs must be non-empty and unique: {region:?}"));
+                return Err(format!(
+                    "region IDs must be non-empty and unique: {region:?}"
+                ));
             }
         }
         let expected_regions: BTreeSet<&str> = regions.iter().copied().collect();
-        let baseline_regions: BTreeSet<&str> =
-            self.baseline_measurements.keys().map(String::as_str).collect();
-        let variant_regions: BTreeSet<&str> =
-            self.variant_measurements.keys().map(String::as_str).collect();
+        let baseline_regions: BTreeSet<&str> = self
+            .baseline_measurements
+            .keys()
+            .map(String::as_str)
+            .collect();
+        let variant_regions: BTreeSet<&str> = self
+            .variant_measurements
+            .keys()
+            .map(String::as_str)
+            .collect();
         if baseline_regions != expected_regions || variant_regions != expected_regions {
-            return Err("baseline and variant measurements must contain exactly the declared regions".into());
+            return Err(
+                "baseline and variant measurements must contain exactly the declared regions"
+                    .into(),
+            );
         }
         for (side, measurements) in [
             ("baseline", &self.baseline_measurements),
@@ -200,7 +221,10 @@ impl ControlCase {
                 }
                 for (dimension, value) in values {
                     if !value.is_finite() {
-                        return Err(format!("{side} region {region_id:?} has non-finite {}", dimension.label()));
+                        return Err(format!(
+                            "{side} region {region_id:?} has non-finite {}",
+                            dimension.label()
+                        ));
                     }
                 }
             }
@@ -219,27 +243,42 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     };
     let length = match algorithm {
         "blake3" | "sha256" => 64,
-        _ => return Err(format!("{label} uses unsupported digest algorithm {algorithm:?}")),
+        _ => {
+            return Err(format!(
+                "{label} uses unsupported digest algorithm {algorithm:?}"
+            ));
+        }
     };
     if encoded.len() != length
-        || !encoded.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || !encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
     {
-        return Err(format!("{label} is not a valid lowercase {algorithm} digest"));
+        return Err(format!(
+            "{label} is not a valid lowercase {algorithm} digest"
+        ));
     }
     Ok(())
 }
 
 fn validate_revision(value: &str, label: &str) -> Result<(), String> {
     if ![40, 64].contains(&value.len())
-        || !value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
     {
-        return Err(format!("{label} must be a lowercase 40- or 64-character commit ID"));
+        return Err(format!(
+            "{label} must be a lowercase 40- or 64-character commit ID"
+        ));
     }
     Ok(())
 }
 
 fn validate_receipt(receipt: &RenderReceipt, label: &str) -> Result<(), String> {
-    validate_revision(&receipt.source_revision, &format!("{label} source_revision"))?;
+    validate_revision(
+        &receipt.source_revision,
+        &format!("{label} source_revision"),
+    )?;
     if receipt.backend_id.trim().is_empty() || receipt.voice_id.trim().is_empty() {
         return Err(format!("{label} backend_id and voice_id are required"));
     }
@@ -281,17 +320,24 @@ pub fn evaluate(case: &ControlCase) -> Result<ControlReport, String> {
     case.validate()?;
 
     let direction = case.requested_delta.signum();
-    let target_deltas: Vec<f64> = case.target_regions.iter().map(|region| {
-        case.variant_measurements[region][&case.target_dimension]
-            - case.baseline_measurements[region][&case.target_dimension]
-    }).collect();
+    let target_deltas: Vec<f64> = case
+        .target_regions
+        .iter()
+        .map(|region| {
+            case.variant_measurements[region][&case.target_dimension]
+                - case.baseline_measurements[region][&case.target_dimension]
+        })
+        .collect();
     let observed_mean_target_delta = target_deltas.iter().sum::<f64>() / target_deltas.len() as f64;
     let target_response_ratio = observed_mean_target_delta / case.requested_delta;
     if !observed_mean_target_delta.is_finite() || !target_response_ratio.is_finite() {
         return Err("target response calculation overflowed or became non-finite".into());
     }
-    let target_region_direction_fraction = target_deltas.iter()
-        .filter(|delta| **delta * direction > 0.0).count() as f64 / target_deltas.len() as f64;
+    let target_region_direction_fraction = target_deltas
+        .iter()
+        .filter(|delta| **delta * direction > 0.0)
+        .count() as f64
+        / target_deltas.len() as f64;
 
     let target_set: BTreeSet<&str> = case.target_regions.iter().map(String::as_str).collect();
     let protected_set: BTreeSet<&str> = case.protected_regions.iter().map(String::as_str).collect();
@@ -357,7 +403,11 @@ pub fn evaluate(case: &ControlCase) -> Result<ControlReport, String> {
     Ok(ControlReport {
         schema_version: CASE_SCHEMA_VERSION,
         case_id: case.case_id.clone(),
-        qualification: if failures.is_empty() { Qualification::Qualified } else { Qualification::Failed },
+        qualification: if failures.is_empty() {
+            Qualification::Qualified
+        } else {
+            Qualification::Failed
+        },
         target_dimension: case.target_dimension,
         requested_delta: case.requested_delta,
         observed_mean_target_delta,
@@ -372,7 +422,6 @@ pub fn evaluate(case: &ControlCase) -> Result<ControlReport, String> {
         variant_receipt: case.variant_receipt.clone(),
     })
 }
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -403,7 +452,10 @@ pub struct ControlSuiteReport {
 impl ControlSuite {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != CASE_SCHEMA_VERSION {
-            return Err(format!("unsupported control-suite schema version {}", self.schema_version));
+            return Err(format!(
+                "unsupported control-suite schema version {}",
+                self.schema_version
+            ));
         }
         if self.suite_id.trim().is_empty() {
             return Err("suite_id must not be empty".into());
@@ -562,10 +614,7 @@ pub fn evaluate_suite(suite: &ControlSuite) -> Result<ControlSuiteReport, String
     if ci[0] < first_case.min_response_ratio || ci[1] > first_case.max_response_ratio {
         failures.push(format!(
             "95% response-ratio CI [{:.4}, {:.4}] is not contained in [{:.4}, {:.4}]",
-            ci[0],
-            ci[1],
-            first_case.min_response_ratio,
-            first_case.max_response_ratio
+            ci[0], ci[1], first_case.min_response_ratio, first_case.max_response_ratio
         ));
     }
     if mean_direction < first_case.min_target_region_direction_fraction {
@@ -592,13 +641,15 @@ pub fn evaluate_suite(suite: &ControlSuite) -> Result<ControlSuiteReport, String
         target_response_ratio_ci95: ci,
         mean_target_direction_fraction: mean_direction,
         max_collateral_ratio: max_collateral,
-        qualification: if failures.is_empty() { Qualification::Qualified } else { Qualification::Failed },
+        qualification: if failures.is_empty() {
+            Qualification::Qualified
+        } else {
+            Qualification::Failed
+        },
         failures,
         replicate_reports,
     })
 }
-
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -647,7 +698,10 @@ pub struct NoOpCalibrationReport {
 impl NoOpCalibration {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != CASE_SCHEMA_VERSION {
-            return Err(format!("unsupported no-op calibration schema version {}", self.schema_version));
+            return Err(format!(
+                "unsupported no-op calibration schema version {}",
+                self.schema_version
+            ));
         }
         if self.calibration_id.trim().is_empty() {
             return Err("calibration_id must not be empty".into());
@@ -658,7 +712,8 @@ impl NoOpCalibration {
         if self.runs.len() < self.minimum_replicates {
             return Err(format!(
                 "calibration has {} runs but requires {}",
-                self.runs.len(), self.minimum_replicates
+                self.runs.len(),
+                self.minimum_replicates
             ));
         }
         let dimensions: BTreeSet<_> = self.required_dimensions.iter().copied().collect();
@@ -671,7 +726,10 @@ impl NoOpCalibration {
         }
         for (dimension, floor) in &self.resolution_floors {
             if !floor.is_finite() || *floor <= 0.0 {
-                return Err(format!("resolution floor for {} must be finite and positive", dimension.label()));
+                return Err(format!(
+                    "resolution floor for {} must be finite and positive",
+                    dimension.label()
+                ));
             }
         }
         let region_set: BTreeSet<&str> = self.regions.iter().map(String::as_str).collect();
@@ -745,7 +803,9 @@ pub fn calibrate_noop(calibration: &NoOpCalibration) -> Result<NoOpCalibrationRe
         let mut worst_region_p95 = 0.0f64;
         let mut maximum_pairwise_delta = 0.0f64;
         for region in &calibration.regions {
-            let values: Vec<f64> = calibration.runs.iter()
+            let values: Vec<f64> = calibration
+                .runs
+                .iter()
                 .map(|run| run.measurements[region][dimension])
                 .collect();
             let mut pairwise = Vec::with_capacity(pair_count);
@@ -769,12 +829,15 @@ pub fn calibrate_noop(calibration: &NoOpCalibration) -> Result<NoOpCalibrationRe
         }
         let resolution_floor = calibration.resolution_floors[dimension];
         let recommended_tolerance = worst_region_p95.max(resolution_floor);
-        features.insert(*dimension, FeatureCalibration {
-            resolution_floor,
-            worst_region_p95_pairwise_delta: worst_region_p95,
-            maximum_pairwise_delta,
-            recommended_tolerance,
-        });
+        features.insert(
+            *dimension,
+            FeatureCalibration {
+                resolution_floor,
+                worst_region_p95_pairwise_delta: worst_region_p95,
+                maximum_pairwise_delta,
+                recommended_tolerance,
+            },
+        );
     }
 
     Ok(NoOpCalibrationReport {
@@ -793,12 +856,13 @@ pub fn calibrate_noop(calibration: &NoOpCalibration) -> Result<NoOpCalibrationRe
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn digest(byte: char) -> String { format!("blake3:{}", byte.to_string().repeat(64)) }
+    fn digest(byte: char) -> String {
+        format!("blake3:{}", byte.to_string().repeat(64))
+    }
 
     fn receipt(performance: char, audio: char) -> RenderReceipt {
         RenderReceipt {
@@ -814,8 +878,13 @@ mod tests {
         }
     }
 
-    fn vector(pitch: f64, vibrato_rate: f64, vibrato_depth: f64,
-        breathiness: f64, phone_error: f64, identity: f64,
+    fn vector(
+        pitch: f64,
+        vibrato_rate: f64,
+        vibrato_depth: f64,
+        breathiness: f64,
+        phone_error: f64,
+        identity: f64,
     ) -> BTreeMap<FeatureDimension, f64> {
         BTreeMap::from([
             (FeatureDimension::PitchMedianCents, pitch),
@@ -885,17 +954,26 @@ mod tests {
     #[test]
     fn collateral_drift_in_protected_phrase_fails() {
         let mut case = fixture();
-        case.variant_measurements.get_mut("phrase-1").unwrap()
+        case.variant_measurements
+            .get_mut("phrase-1")
+            .unwrap()
             .insert(FeatureDimension::PitchMedianCents, 8.0);
         let report = evaluate(&case).unwrap();
         assert_eq!(report.qualification, Qualification::Failed);
-        assert!(report.collateral_exceedances.iter().any(|drift| drift.protected_region));
+        assert!(
+            report
+                .collateral_exceedances
+                .iter()
+                .any(|drift| drift.protected_region)
+        );
     }
 
     #[test]
     fn unintended_change_inside_target_region_fails() {
         let mut case = fixture();
-        case.variant_measurements.get_mut("phrase-2").unwrap()
+        case.variant_measurements
+            .get_mut("phrase-2")
+            .unwrap()
             .insert(FeatureDimension::BreathinessIndex, 0.25);
         let report = evaluate(&case).unwrap();
         assert_eq!(report.qualification, Qualification::Failed);
@@ -909,9 +987,13 @@ mod tests {
         let mut case = fixture();
         case.target_regions = vec!["phrase-1".into(), "phrase-2".into()];
         case.protected_regions = vec!["phrase-3".into()];
-        case.variant_measurements.get_mut("phrase-1").unwrap()
+        case.variant_measurements
+            .get_mut("phrase-1")
+            .unwrap()
             .insert(FeatureDimension::VibratoDepthCents, 12.0);
-        case.variant_measurements.get_mut("phrase-2").unwrap()
+        case.variant_measurements
+            .get_mut("phrase-2")
+            .unwrap()
             .insert(FeatureDimension::VibratoDepthCents, 5.0);
         let report = evaluate(&case).unwrap();
         assert_eq!(report.qualification, Qualification::Failed);
@@ -928,7 +1010,9 @@ mod tests {
     #[test]
     fn missing_features_are_not_imputed_as_zero() {
         let mut case = fixture();
-        case.variant_measurements.get_mut("phrase-2").unwrap()
+        case.variant_measurements
+            .get_mut("phrase-2")
+            .unwrap()
             .remove(&FeatureDimension::IdentitySimilarity);
         assert!(evaluate(&case).unwrap_err().contains("required dimensions"));
     }
@@ -936,7 +1020,10 @@ mod tests {
     #[test]
     fn non_finite_measurements_and_zero_requests_fail_closed() {
         let mut invalid = fixture();
-        invalid.variant_measurements.get_mut("phrase-2").unwrap()
+        invalid
+            .variant_measurements
+            .get_mut("phrase-2")
+            .unwrap()
             .insert(FeatureDimension::PitchMedianCents, f64::NAN);
         assert!(evaluate(&invalid).unwrap_err().contains("non-finite"));
         let mut zero = fixture();
@@ -958,13 +1045,20 @@ mod tests {
         assert!(evaluate(&case).unwrap_err().contains("digest"));
     }
 
-    fn replicate(seed: u64, variant_depth: f64, baseline_audio: char, variant_audio: char) -> ControlCase {
+    fn replicate(
+        seed: u64,
+        variant_depth: f64,
+        baseline_audio: char,
+        variant_audio: char,
+    ) -> ControlCase {
         let mut case = fixture();
         case.baseline_receipt.seed = seed;
         case.variant_receipt.seed = seed;
         case.baseline_receipt.audio_digest = digest(baseline_audio);
         case.variant_receipt.audio_digest = digest(variant_audio);
-        case.variant_measurements.get_mut("phrase-2").unwrap()
+        case.variant_measurements
+            .get_mut("phrase-2")
+            .unwrap()
             .insert(FeatureDimension::VibratoDepthCents, variant_depth);
         case
     }
@@ -1002,7 +1096,11 @@ mod tests {
                 replicate(103, 28.0, '5', '6'),
             ],
         };
-        assert!(evaluate_suite(&duplicate_seed).unwrap_err().contains("reuses a random seed"));
+        assert!(
+            evaluate_suite(&duplicate_seed)
+                .unwrap_err()
+                .contains("reuses a random seed")
+        );
 
         let mut mismatch = replicate(102, 28.0, '7', '8');
         mismatch.baseline_receipt.model_artifact_digest = digest('z');
@@ -1016,7 +1114,11 @@ mod tests {
                 replicate(103, 28.0, '5', '6'),
             ],
         };
-        assert!(evaluate_suite(&changed_artifact).unwrap_err().contains("changes the suite contract"));
+        assert!(
+            evaluate_suite(&changed_artifact)
+                .unwrap_err()
+                .contains("changes the suite contract")
+        );
     }
 
     #[test]
@@ -1033,30 +1135,45 @@ mod tests {
         };
         let report = evaluate_suite(&suite).unwrap();
         assert_eq!(report.qualification, Qualification::Failed);
-        assert!(report.failures.iter().any(|failure| failure.contains("95% response-ratio CI")));
+        assert!(
+            report
+                .failures
+                .iter()
+                .any(|failure| failure.contains("95% response-ratio CI"))
+        );
     }
 
     fn noop_calibration() -> NoOpCalibration {
         let values = [0.10, 0.11, 0.09, 0.10, 0.12];
-        let runs = values.iter().enumerate().map(|(index, value)| {
-            let mut receipt = receipt('d', 'e');
-            receipt.seed = 200 + index as u64;
-            receipt.performance_digest = digest('d');
-            receipt.audio_digest = digest(char::from_digit(index as u32 + 1, 16).unwrap());
-            NoOpRun {
-                receipt,
-                measurements: BTreeMap::from([
-                    ("phrase-1".into(), BTreeMap::from([
-                        (FeatureDimension::BreathinessIndex, *value),
-                        (FeatureDimension::VibratoDepthCents, 16.0),
-                    ])),
-                    ("phrase-2".into(), BTreeMap::from([
-                        (FeatureDimension::BreathinessIndex, *value + 0.01),
-                        (FeatureDimension::VibratoDepthCents, 18.0),
-                    ])),
-                ]),
-            }
-        }).collect();
+        let runs = values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                let mut receipt = receipt('d', 'e');
+                receipt.seed = 200 + index as u64;
+                receipt.performance_digest = digest('d');
+                receipt.audio_digest = digest(char::from_digit(index as u32 + 1, 16).unwrap());
+                NoOpRun {
+                    receipt,
+                    measurements: BTreeMap::from([
+                        (
+                            "phrase-1".into(),
+                            BTreeMap::from([
+                                (FeatureDimension::BreathinessIndex, *value),
+                                (FeatureDimension::VibratoDepthCents, 16.0),
+                            ]),
+                        ),
+                        (
+                            "phrase-2".into(),
+                            BTreeMap::from([
+                                (FeatureDimension::BreathinessIndex, *value + 0.01),
+                                (FeatureDimension::VibratoDepthCents, 18.0),
+                            ]),
+                        ),
+                    ]),
+                }
+            })
+            .collect();
         NoOpCalibration {
             schema_version: CASE_SCHEMA_VERSION,
             calibration_id: "noop-calibration-fixture".into(),
@@ -1090,19 +1207,34 @@ mod tests {
     fn no_op_calibration_rejects_reused_seed_or_changed_performance() {
         let mut duplicate_seed = noop_calibration();
         duplicate_seed.runs[1].receipt.seed = duplicate_seed.runs[0].receipt.seed;
-        assert!(calibrate_noop(&duplicate_seed).unwrap_err().contains("reuses a random seed"));
+        assert!(
+            calibrate_noop(&duplicate_seed)
+                .unwrap_err()
+                .contains("reuses a random seed")
+        );
 
         let mut changed_performance = noop_calibration();
         changed_performance.runs[1].receipt.performance_digest = digest('f');
-        assert!(calibrate_noop(&changed_performance).unwrap_err().contains("changed code"));
+        assert!(
+            calibrate_noop(&changed_performance)
+                .unwrap_err()
+                .contains("changed code")
+        );
     }
 
     #[test]
     fn no_op_calibration_rejects_missing_features_and_too_few_repeats() {
         let mut missing = noop_calibration();
-        missing.runs[0].measurements.get_mut("phrase-1").unwrap()
+        missing.runs[0]
+            .measurements
+            .get_mut("phrase-1")
+            .unwrap()
             .remove(&FeatureDimension::BreathinessIndex);
-        assert!(calibrate_noop(&missing).unwrap_err().contains("missing required dimensions"));
+        assert!(
+            calibrate_noop(&missing)
+                .unwrap_err()
+                .contains("missing required dimensions")
+        );
 
         let mut too_few = noop_calibration();
         too_few.runs.truncate(4);
