@@ -25,6 +25,8 @@ pub struct EvidenceEvent {
     pub component_revision_digest: String,
     /// Work-order identity for maintenance, spare, test and release events.
     pub maintenance_task_id: Option<String>,
+    /// Stable identity for one service/component fault-and-restoration episode.
+    pub fault_episode_id: Option<String>,
     pub delivered_rate_after: f64, pub evidence_ref: String,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -32,6 +34,8 @@ pub enum SpareState { NotRequired, CompatibleOnboard, CompatibleArrivesLater, Wr
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaintenanceTask {
     pub task_id: String, pub service_id: String, pub component_id: String,
+    /// Exact fault episode this work order is intended to restore.
+    pub fault_episode_id: String,
     pub procedure_approved: bool, pub qualified_personnel_present: bool,
     /// Revision on the failed component at fault observation.
     pub faulted_component_revision_digest: String,
@@ -60,11 +64,14 @@ pub enum EvaluationError {
     ConflictingRatesAtSameInstant { service_id: String, at_seconds: u64 },
     EmptyTaskId, DuplicateTaskId(String), UnknownTaskService(String), EmptyTaskComponent(String),
     InvalidRevisionDigest(String), UnknownMaintenanceTask(String), MaintenanceTaskIdentityMismatch(String),
+    EmptyFaultEpisodeId(String), UnknownFaultEpisode(String), FaultEpisodeIdentityMismatch(String),
+    MaintenanceFaultEpisodeMismatch(String), DuplicateFaultEpisodeTask(String),
 }
 /// Deficit integral is in that service's unit-hours; never sum across unlike services.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServiceEvaluation {
     pub service_id: String, pub unit: String, pub minimum_rate: f64,
+    pub restoration_episodes: Vec<RestorationEpisodeEvaluation>,
     pub minimum_observed_rate: f64, pub time_below_floor_seconds: u64,
     pub floor_breach_episodes: u32, pub first_floor_breach_seconds: Option<u64>,
     /// 0 if the floor was never breached; Some(t) for the latest recovery;
@@ -77,6 +84,28 @@ pub struct ServiceEvaluation {
     pub accepted_restoration_seconds: Option<u64>, pub tasr_seconds: Option<u64>,
     pub rejected_release_attempts: u32,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RestorationEpisodeDisposition {
+    Restored,
+    Open,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RestorationEpisodeEvaluation {
+    pub fault_episode_id: String,
+    pub component_id: String,
+    pub fault_observed_seconds: u64,
+    pub repair_started_seconds: Option<u64>,
+    pub spare_arrived_seconds: Option<u64>,
+    pub repair_completed_seconds: Option<u64>,
+    pub post_test_passed_seconds: Option<u64>,
+    pub configuration_updated_seconds: Option<u64>,
+    pub accepted_restoration_seconds: Option<u64>,
+    pub tasr_seconds: Option<u64>,
+    pub rejected_release_attempts: u32,
+    pub disposition: RestorationEpisodeDisposition,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServiceContinuityEvaluation {
     pub case_id: String, pub disposition: ContinuityDisposition,
@@ -183,41 +212,115 @@ fn validate_case(case: &ServiceContinuityCase) -> Result<(), EvaluationError> {
             }
         }
     }
-    let mut task_ids = BTreeSet::new();
-    let task_by_id: BTreeMap<&str, &MaintenanceTask> = case.maintenance_tasks.iter()
-        .map(|t| (t.task_id.as_str(), t)).collect();
-    for t in &case.maintenance_tasks {
-        if t.task_id.trim().is_empty() { return Err(EvaluationError::EmptyTaskId); }
-        if !task_ids.insert(t.task_id.as_str()) {
-            return Err(EvaluationError::DuplicateTaskId(t.task_id.clone()));
-        }
-        if !service_ids.contains(t.service_id.as_str()) {
-            return Err(EvaluationError::UnknownTaskService(t.service_id.clone()));
-        }
-        if t.component_id.trim().is_empty() { return Err(EvaluationError::EmptyTaskComponent(t.task_id.clone())); }
-        if !is_sha256_digest(&t.faulted_component_revision_digest)
-            || !is_sha256_digest(&t.target_component_revision_digest)
-            || t.spare_component_revision_digest.as_deref().is_some_and(|d| !is_sha256_digest(d)) {
-            return Err(EvaluationError::InvalidRevisionDigest(t.task_id.clone()));
+    let mut fault_episode_identity: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
+    for event in &case.events {
+        let is_fault = matches!(
+            event.kind,
+            EventKind::ComponentFailure
+                | EventKind::ServiceUnavailable
+                | EventKind::CommonDependencyFailure
+        );
+        if is_fault {
+            let Some(episode_id) = event.fault_episode_id.as_deref() else {
+                return Err(EvaluationError::EmptyFaultEpisodeId(event.event_id.clone()));
+            };
+            if episode_id.trim().is_empty() {
+                return Err(EvaluationError::EmptyFaultEpisodeId(event.event_id.clone()));
+            }
+            match fault_episode_identity.get(episode_id) {
+                Some((service_id, component_id))
+                    if *service_id != event.service_id || *component_id != event.component_id =>
+                {
+                    return Err(EvaluationError::FaultEpisodeIdentityMismatch(
+                        episode_id.to_owned(),
+                    ));
+                }
+                Some(_) => {}
+                None => {
+                    fault_episode_identity.insert(
+                        episode_id,
+                        (event.service_id.as_str(), event.component_id.as_str()),
+                    );
+                }
+            }
         }
     }
-    for e in &case.events {
-        if let Some(task_id) = e.maintenance_task_id.as_deref() {
+
+    let mut task_ids = BTreeSet::new();
+    let mut task_episode_ids = BTreeSet::new();
+    let task_by_id: BTreeMap<&str, &MaintenanceTask> = case.maintenance_tasks.iter()
+        .map(|task| (task.task_id.as_str(), task)).collect();
+    for task in &case.maintenance_tasks {
+        if task.task_id.trim().is_empty() { return Err(EvaluationError::EmptyTaskId); }
+        if !task_ids.insert(task.task_id.as_str()) {
+            return Err(EvaluationError::DuplicateTaskId(task.task_id.clone()));
+        }
+        if !service_ids.contains(task.service_id.as_str()) {
+            return Err(EvaluationError::UnknownTaskService(task.service_id.clone()));
+        }
+        if task.component_id.trim().is_empty() {
+            return Err(EvaluationError::EmptyTaskComponent(task.task_id.clone()));
+        }
+        if task.fault_episode_id.trim().is_empty() {
+            return Err(EvaluationError::EmptyFaultEpisodeId(task.task_id.clone()));
+        }
+        if !task_episode_ids.insert(task.fault_episode_id.as_str()) {
+            return Err(EvaluationError::DuplicateFaultEpisodeTask(
+                task.fault_episode_id.clone(),
+            ));
+        }
+        let Some((fault_service, fault_component)) =
+            fault_episode_identity.get(task.fault_episode_id.as_str())
+        else {
+            return Err(EvaluationError::UnknownFaultEpisode(task.task_id.clone()));
+        };
+        if *fault_service != task.service_id || *fault_component != task.component_id {
+            return Err(EvaluationError::FaultEpisodeIdentityMismatch(
+                task.fault_episode_id.clone(),
+            ));
+        }
+        if !is_sha256_digest(&task.faulted_component_revision_digest)
+            || !is_sha256_digest(&task.target_component_revision_digest)
+            || task.spare_component_revision_digest.as_deref()
+                .is_some_and(|digest| !is_sha256_digest(digest))
+        {
+            return Err(EvaluationError::InvalidRevisionDigest(task.task_id.clone()));
+        }
+    }
+
+    for event in &case.events {
+        if let Some(task_id) = event.maintenance_task_id.as_deref() {
             let Some(task) = task_by_id.get(task_id) else {
                 return Err(EvaluationError::UnknownMaintenanceTask(task_id.to_owned()));
             };
-            if task.service_id != e.service_id || task.component_id != e.component_id {
-                return Err(EvaluationError::MaintenanceTaskIdentityMismatch(e.event_id.clone()));
+            if task.service_id != event.service_id || task.component_id != event.component_id {
+                return Err(EvaluationError::MaintenanceTaskIdentityMismatch(
+                    event.event_id.clone(),
+                ));
             }
-            let requires_target_revision = matches!(e.kind,
-                EventKind::RepairCompleted | EventKind::PostTestPassed | EventKind::PostTestFailed
-                    | EventKind::ConfigurationUpdated | EventKind::SpareArrived | EventKind::AuthorizedRelease);
-            if requires_target_revision && e.component_revision_digest != task.target_component_revision_digest {
-                return Err(EvaluationError::InvalidRevisionDigest(e.event_id.clone()));
+            if event.fault_episode_id.as_deref() != Some(task.fault_episode_id.as_str()) {
+                return Err(EvaluationError::MaintenanceFaultEpisodeMismatch(
+                    event.event_id.clone(),
+                ));
             }
-            if e.kind == EventKind::ComponentFailure
-                && e.component_revision_digest != task.faulted_component_revision_digest {
-                return Err(EvaluationError::InvalidRevisionDigest(e.event_id.clone()));
+            let requires_target_revision = matches!(
+                event.kind,
+                EventKind::RepairCompleted
+                    | EventKind::PostTestPassed
+                    | EventKind::PostTestFailed
+                    | EventKind::ConfigurationUpdated
+                    | EventKind::SpareArrived
+                    | EventKind::AuthorizedRelease
+            );
+            if requires_target_revision
+                && event.component_revision_digest != task.target_component_revision_digest
+            {
+                return Err(EvaluationError::InvalidRevisionDigest(event.event_id.clone()));
+            }
+            if event.kind == EventKind::ComponentFailure
+                && event.component_revision_digest != task.faulted_component_revision_digest
+            {
+                return Err(EvaluationError::InvalidRevisionDigest(event.event_id.clone()));
             }
         }
     }
@@ -317,6 +420,7 @@ fn evaluate_service(
             .map(|e| e.at_seconds).max(),
         accepted_restoration_seconds: restoration, tasr_seconds: tasr,
         rejected_release_attempts: rejected,
+        restoration_episodes: evaluate_restoration_episodes(events, tasks, c.minimum_rate),
     }
 }
 fn release_accepted(
@@ -330,45 +434,80 @@ fn release_accepted(
         return false;
     }
     let Some(task_id) = release.maintenance_task_id.as_deref() else { return false; };
-    let Some(task) = tasks.iter().copied().find(|t| t.task_id == task_id
-        && t.service_id == release.service_id && t.component_id == release.component_id) else {
+    let Some(episode_id) = release.fault_episode_id.as_deref() else { return false; };
+    let Some(task) = tasks.iter().copied().find(|task| {
+        task.task_id == task_id
+            && task.fault_episode_id == episode_id
+            && task.service_id == release.service_id
+            && task.component_id == release.component_id
+    }) else {
         return false;
     };
     if release.component_revision_digest != task.target_component_revision_digest {
         return false;
     }
+
     let evidence: Vec<&EvidenceEvent> = events.iter().copied()
-        .filter(|e| e.component_id == release.component_id && e.at_seconds < release.at_seconds)
+        .filter(|event| {
+            event.fault_episode_id.as_deref() == Some(episode_id)
+                && event.component_id == release.component_id
+                && event.at_seconds < release.at_seconds
+        })
         .collect();
-    let latest_fault = evidence.iter().filter(|e| matches!(e.kind, EventKind::ComponentFailure
-        | EventKind::ServiceUnavailable | EventKind::CommonDependencyFailure))
-        .max_by_key(|e| e.at_seconds);
+    let latest_fault = evidence.iter().filter(|event| matches!(
+        event.kind,
+        EventKind::ComponentFailure
+            | EventKind::ServiceUnavailable
+            | EventKind::CommonDependencyFailure
+    )).max_by_key(|event| event.at_seconds);
     let Some(fault) = latest_fault else { return false; };
     if fault.component_revision_digest != task.faulted_component_revision_digest {
         return false;
     }
+
     let task_evidence: Vec<&EvidenceEvent> = evidence.iter().copied()
-        .filter(|e| e.maintenance_task_id.as_deref() == Some(task_id)
-            && e.component_revision_digest == task.target_component_revision_digest).collect();
-    let last_repair = task_evidence.iter().filter(|e| e.kind == EventKind::RepairCompleted)
-        .map(|e| e.at_seconds).max();
-    let Some(repair) = last_repair else { return false; };
-    if repair <= fault.at_seconds { return false; }
-    let last_failed_test = task_evidence.iter().filter(|e| e.kind == EventKind::PostTestFailed)
-        .map(|e| e.at_seconds).max();
-    let pass = task_evidence.iter().filter(|e| e.kind == EventKind::PostTestPassed)
-        .map(|e| e.at_seconds).max();
-    let Some(pass) = pass else { return false; };
-    if pass <= repair || last_failed_test.is_some_and(|failed| failed >= pass) { return false; }
-    if !task_evidence.iter().any(|e| e.kind == EventKind::ConfigurationUpdated && e.at_seconds > pass) {
+        .filter(|event| {
+            event.maintenance_task_id.as_deref() == Some(task_id)
+                && event.component_revision_digest == task.target_component_revision_digest
+        })
+        .collect();
+    let repair_started = task_evidence.iter()
+        .filter(|event| event.kind == EventKind::RepairStarted)
+        .map(|event| event.at_seconds).min();
+    let Some(repair_started) = repair_started else { return false; };
+    let repair_completed = task_evidence.iter()
+        .filter(|event| event.kind == EventKind::RepairCompleted)
+        .map(|event| event.at_seconds).max();
+    let Some(repair) = repair_completed else { return false; };
+    if repair_started <= fault.at_seconds || repair <= repair_started {
         return false;
     }
-    let spare_arrived = task_evidence.iter().any(|e| e.kind == EventKind::SpareArrived);
+
+    let last_failed_test = task_evidence.iter()
+        .filter(|event| event.kind == EventKind::PostTestFailed)
+        .map(|event| event.at_seconds).max();
+    let pass = task_evidence.iter()
+        .filter(|event| event.kind == EventKind::PostTestPassed)
+        .map(|event| event.at_seconds).max();
+    let Some(pass) = pass else { return false; };
+    if pass <= repair || last_failed_test.is_some_and(|failed| failed >= pass) {
+        return false;
+    }
+    if !task_evidence.iter().any(|event| {
+        event.kind == EventKind::ConfigurationUpdated && event.at_seconds > pass
+    }) {
+        return false;
+    }
+
+    let spare_arrival_before_repair = task_evidence.iter()
+        .filter(|event| event.kind == EventKind::SpareArrived)
+        .map(|event| event.at_seconds)
+        .any(|arrival| arrival < repair);
     let spare_matches = match task.spare_state {
         SpareState::NotRequired => task.spare_component_revision_digest.is_none(),
         SpareState::CompatibleOnboard => task.spare_component_revision_digest.as_deref()
             == Some(task.target_component_revision_digest.as_str()),
-        SpareState::CompatibleArrivesLater => spare_arrived
+        SpareState::CompatibleArrivesLater => spare_arrival_before_repair
             && task.spare_component_revision_digest.as_deref()
                 == Some(task.target_component_revision_digest.as_str()),
         SpareState::WrongRevision | SpareState::Unknown => false,
@@ -377,6 +516,98 @@ fn release_accepted(
         task.completed_tests.iter().any(|done| done == required));
     task.procedure_approved && task.qualified_personnel_present && tests_ok
         && task.configuration_updated && task.authorized_release && spare_matches
+}
+
+fn evaluate_restoration_episodes(
+    events: &[&EvidenceEvent],
+    tasks: &[&MaintenanceTask],
+    minimum_rate: f64,
+) -> Vec<RestorationEpisodeEvaluation> {
+    let mut fault_events: BTreeMap<&str, Vec<&EvidenceEvent>> = BTreeMap::new();
+    for event in events.iter().copied().filter(|event| matches!(
+        event.kind,
+        EventKind::ComponentFailure
+            | EventKind::ServiceUnavailable
+            | EventKind::CommonDependencyFailure
+    )) {
+        if let Some(episode_id) = event.fault_episode_id.as_deref() {
+            fault_events.entry(episode_id).or_default().push(event);
+        }
+    }
+
+    let mut reports = Vec::with_capacity(fault_events.len());
+    for (episode_id, episode_faults) in fault_events {
+        let first_fault = episode_faults
+            .iter()
+            .min_by_key(|event| (event.at_seconds, event.event_id.as_str()))
+            .expect("fault episode inventory cannot contain an empty event set");
+        let task = tasks.iter().copied()
+            .find(|task| task.fault_episode_id == episode_id);
+        let task_events: Vec<&EvidenceEvent> = task.map(|task| {
+            events.iter().copied().filter(|event| {
+                event.maintenance_task_id.as_deref() == Some(task.task_id.as_str())
+                    && event.fault_episode_id.as_deref() == Some(episode_id)
+            }).collect()
+        }).unwrap_or_default();
+        let repair_started = task_events.iter()
+            .filter(|event| event.kind == EventKind::RepairStarted)
+            .map(|event| event.at_seconds).min();
+        let spare_arrived = task_events.iter()
+            .filter(|event| event.kind == EventKind::SpareArrived)
+            .map(|event| event.at_seconds).min();
+        let repair_completed = task_events.iter()
+            .filter(|event| event.kind == EventKind::RepairCompleted)
+            .map(|event| event.at_seconds).max();
+        let post_test_passed = task_events.iter()
+            .filter(|event| event.kind == EventKind::PostTestPassed)
+            .map(|event| event.at_seconds).max();
+        let configuration_updated = task_events.iter()
+            .filter(|event| event.kind == EventKind::ConfigurationUpdated)
+            .map(|event| event.at_seconds).max();
+
+        let mut accepted_release: Option<u64> = None;
+        let mut rejected_releases = 0_u32;
+        for release in events.iter().copied().filter(|event| {
+            event.kind == EventKind::AuthorizedRelease
+                && event.fault_episode_id.as_deref() == Some(episode_id)
+                && event.component_id == first_fault.component_id
+        }) {
+            if release.delivered_rate_after >= minimum_rate
+                && release_accepted(release, events, tasks)
+            {
+                accepted_release = Some(
+                    accepted_release.map_or(release.at_seconds, |time| time.min(release.at_seconds))
+                );
+            } else {
+                rejected_releases = rejected_releases.saturating_add(1);
+            }
+        }
+        let tasr_seconds = accepted_release
+            .and_then(|done| done.checked_sub(first_fault.at_seconds));
+        reports.push(RestorationEpisodeEvaluation {
+            fault_episode_id: episode_id.to_owned(),
+            component_id: first_fault.component_id.clone(),
+            fault_observed_seconds: first_fault.at_seconds,
+            repair_started_seconds: repair_started,
+            spare_arrived_seconds: spare_arrived,
+            repair_completed_seconds: repair_completed,
+            post_test_passed_seconds: post_test_passed,
+            configuration_updated_seconds: configuration_updated,
+            accepted_restoration_seconds: accepted_release,
+            tasr_seconds,
+            rejected_release_attempts: rejected_releases,
+            disposition: if accepted_release.is_some() {
+                RestorationEpisodeDisposition::Restored
+            } else {
+                RestorationEpisodeDisposition::Open
+            },
+        });
+    }
+    reports.sort_by(|left, right| {
+        left.fault_observed_seconds.cmp(&right.fault_observed_seconds)
+            .then_with(|| left.fault_episode_id.cmp(&right.fault_episode_id))
+    });
+    reports
 }
 
 #[cfg(test)]
@@ -394,9 +625,16 @@ mod tests {
     fn event_with_revision(
         id:&str, t:u64, kind:EventKind, rate:f64, revision:&str,
     ) -> EvidenceEvent {
+        let fault_episode_id = matches!(
+            kind,
+            EventKind::ComponentFailure
+                | EventKind::ServiceUnavailable
+                | EventKind::CommonDependencyFailure
+        ).then(|| id.to_owned());
         EvidenceEvent { event_id:id.into(), at_seconds:t, kind, service_id:"water".into(),
             component_id:"maker_A".into(), component_revision_digest:revision.into(),
-            maintenance_task_id:None, delivered_rate_after:rate, evidence_ref:format!("fixture:{id}") }
+            maintenance_task_id:None, fault_episode_id,
+            delivered_rate_after:rate, evidence_ref:format!("fixture:{id}") }
     }
     fn event(id:&str, t:u64, kind:EventKind, rate:f64) -> EvidenceEvent {
         event_with_revision(id,t,kind,rate,REV_A)
@@ -406,6 +644,7 @@ mod tests {
     ) -> EvidenceEvent {
         let mut e=event_with_revision(id,t,kind,rate,revision);
         e.maintenance_task_id=Some(TASK_ID.into());
+        e.fault_episode_id=Some("failure".into());
         e
     }
     fn task_event(id:&str,t:u64,kind:EventKind,rate:f64) -> EvidenceEvent {
@@ -413,7 +652,8 @@ mod tests {
     }
     fn task() -> MaintenanceTask {
         MaintenanceTask { task_id:TASK_ID.into(), service_id:"water".into(),
-            component_id:"maker_A".into(), procedure_approved:true, qualified_personnel_present:true,
+            component_id:"maker_A".into(), fault_episode_id:"failure".into(),
+            procedure_approved:true, qualified_personnel_present:true,
             faulted_component_revision_digest:REV_A.into(),
             target_component_revision_digest:REV_A.into(),
             spare_component_revision_digest:Some(REV_A.into()),
