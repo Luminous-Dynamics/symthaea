@@ -462,7 +462,12 @@ mod tests {
         let calibration =
             JointGaussianCalibration::fit_whole_sprinkling_features(3, &samples, 0.25, 1.0e-5)
                 .unwrap();
-        assert!(calibration.log_likelihood(&[0.0, 0.0, 0.0]).unwrap().is_finite());
+        assert!(
+            calibration
+                .log_likelihood(&[0.0, 0.0, 0.0])
+                .unwrap()
+                .is_finite()
+        );
     }
 
     #[test]
