@@ -316,6 +316,8 @@ pub fn evaluate_option_preservation(
 
     let mut parent_action_ids = input.current_action_ids.clone();
     parent_action_ids.sort();
+    let mut continuation_action_ids = input.continuation_action_ids.clone();
+    continuation_action_ids.sort();
 
     let mut parent_actions = Vec::with_capacity(parent_action_ids.len());
     for parent_action_id in parent_action_ids {
@@ -343,8 +345,7 @@ pub fn evaluate_option_preservation(
             for expected in &expected_cells {
                 match actual_by_key.get(&expected.key) {
                     Some(cell) => {
-                        let missing = input
-                            .continuation_action_ids
+                        let missing = continuation_action_ids
                             .iter()
                             .filter(|action_id| !cell.dispositions.contains_key(*action_id))
                             .count();
@@ -389,7 +390,7 @@ pub fn evaluate_option_preservation(
                 let mut clairvoyant_union = Vec::new();
                 let mut all_outcomes_known = true;
 
-                for action_id in &input.continuation_action_ids {
+                for action_id in &continuation_action_ids {
                     let dispositions: Vec<&FeasibilityDisposition> = observed_cells
                         .iter()
                         .filter_map(|cell| cell.dispositions.get(action_id))
@@ -468,9 +469,10 @@ pub fn evaluate_option_preservation(
             ParentActionStatus::Unresolved
         };
 
-        let all_classes_have_bounds = observation_classes
-            .iter()
-            .all(|class| class.robust_option_width.is_some() && class.possible_option_width.is_some());
+        let all_classes_have_bounds = !observation_classes.is_empty()
+            && observation_classes
+                .iter()
+                .all(|class| class.robust_option_width.is_some() && class.possible_option_width.is_some());
         let minimum_robust_option_width = all_classes_have_bounds.then(|| {
             observation_classes
                 .iter()
@@ -485,9 +487,10 @@ pub fn evaluate_option_preservation(
                 .min()
                 .unwrap_or(0)
         });
-        let total_clairvoyance_gap = observation_classes
-            .iter()
-            .all(|class| class.clairvoyance_gap.is_some())
+        let total_clairvoyance_gap = !observation_classes.is_empty()
+            && observation_classes
+                .iter()
+                .all(|class| class.clairvoyance_gap.is_some())
             .then(|| {
                 observation_classes
                     .iter()
