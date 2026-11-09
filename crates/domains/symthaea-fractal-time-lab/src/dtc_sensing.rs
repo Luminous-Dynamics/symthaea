@@ -17,6 +17,7 @@
 use crate::exact_floquet::{
     FloquetError, KickedIsingFloquet, SubharmonicResponse, analyze_subharmonic_response,
 };
+use rustfft::num_complex::Complex;
 use std::error::Error;
 use std::fmt;
 
@@ -88,6 +89,7 @@ pub enum DtcProbeError {
         outcome_down_spins: usize,
     },
     NonFiniteFisherInformation,
+    InvalidStateVector,
     Floquet(FloquetError),
 }
 
@@ -105,7 +107,10 @@ impl fmt::Display for DtcProbeError {
                 "readout outcome {outcome_down_spins} has zero nominal probability but nonzero local derivative"
             ),
             Self::NonFiniteFisherInformation => {
-                write!(f, "classical Fisher information is not finite and non-negative")
+                write!(f, "Fisher information is not finite and non-negative")
+            }
+            Self::InvalidStateVector => {
+                write!(f, "state vectors are invalid for finite-difference QFI")
             }
             Self::Floquet(error) => write!(f, "Floquet reference failed: {error}"),
         }
@@ -219,9 +224,19 @@ pub struct DtcProbeSensingReport {
     /// Local classical Fisher information for the total-Z readout, per shot.
     /// Units are inverse squared dimensionless probe-kick amplitude.
     pub classical_fisher_information_per_shot: f64,
+    /// Pure-state quantum Fisher information from the same centered
+    /// finite-difference state derivative. This is an upper bound for
+    /// measurements on the declared ideal pure state, not achieved readout.
+    pub quantum_fisher_information_per_shot: f64,
+    /// Classical total-Z Fisher information divided by the pure-state QFI.
+    /// None means that the QFI is numerically zero.
+    pub classical_to_quantum_fisher_ratio: Option<f64>,
+    /// Allowance includes finite-difference truncation and roundoff.
+    pub classical_fisher_within_quantum_bound: bool,
     /// Fisher information divided by simulated Floquet periods. This omits
     /// state preparation, measurement and dead-time costs.
     pub fisher_information_per_drive_period: f64,
+    pub quantum_fisher_information_per_drive_period: f64,
     pub norm_error: f64,
 }
 
@@ -289,6 +304,12 @@ pub fn evaluate_dtc_probe_sensing(
     let minus_readout = readout_distribution(&minus_model);
     validate_readout(&minus_readout)?;
 
+    let quantum_fisher = pure_state_quantum_fisher_information(
+        nominal_model.amplitudes(),
+        plus_model.amplitudes(),
+        minus_model.amplitudes(),
+        delta,
+    )?;
     let fisher = total_z_classical_fisher_information(
         &probe_readout.probability_by_down_spins,
         &plus_readout.probability_by_down_spins,
@@ -296,9 +317,21 @@ pub fn evaluate_dtc_probe_sensing(
         delta,
     )?;
     let fisher_per_period = fisher / config.periods as f64;
+    let quantum_fisher_per_period = quantum_fisher / config.periods as f64;
+    let classical_to_quantum_fisher_ratio = if quantum_fisher > f64::EPSILON {
+        Some(fisher / quantum_fisher)
+    } else {
+        None
+    };
+    let classical_fisher_within_quantum_bound =
+        fisher <= quantum_fisher + quantum_fisher.max(1.0) * 1.0e-3;
     let norm_error = (nominal_model.norm_squared() - 1.0).abs();
 
-    if !fisher_per_period.is_finite() || !norm_error.is_finite() {
+    if !fisher_per_period.is_finite()
+        || !quantum_fisher.is_finite()
+        || !quantum_fisher_per_period.is_finite()
+        || !norm_error.is_finite()
+    {
         return Err(DtcProbeError::NonFiniteFisherInformation);
     }
 
@@ -314,7 +347,11 @@ pub fn evaluate_dtc_probe_sensing(
         probed_lifetime,
         probe_readout,
         classical_fisher_information_per_shot: fisher,
+        quantum_fisher_information_per_shot: quantum_fisher,
+        classical_to_quantum_fisher_ratio,
+        classical_fisher_within_quantum_bound,
         fisher_information_per_drive_period: fisher_per_period,
+        quantum_fisher_information_per_drive_period: quantum_fisher_per_period,
         norm_error,
     })
 }
@@ -353,6 +390,56 @@ fn validate_readout(readout: &MagnetizationReadout) -> Result<(), DtcProbeError>
         return Err(DtcProbeError::InvalidProbabilityDistribution);
     }
     Ok(())
+}
+
+/// Pure-state quantum Fisher information for the probe-amplitude parameter.
+///
+/// For a normalized pure state, F_Q = 4 ( <dpsi|dpsi> - |<psi|dpsi>|^2 ).
+/// The state derivative is evaluated from the same plus/minus amplitude
+/// trajectories used by the classical-readout Fisher estimator.
+fn pure_state_quantum_fisher_information(
+    nominal: &[Complex<f64>],
+    plus: &[Complex<f64>],
+    minus: &[Complex<f64>],
+    derivative_step: f64,
+) -> Result<f64, DtcProbeError> {
+    if nominal.is_empty()
+        || nominal.len() != plus.len()
+        || nominal.len() != minus.len()
+        || !derivative_step.is_finite()
+        || derivative_step <= 0.0
+    {
+        return Err(DtcProbeError::InvalidStateVector);
+    }
+
+    let mut nominal_norm = 0.0;
+    let mut derivative_norm = 0.0;
+    let mut overlap = Complex::new(0.0, 0.0);
+    for index in 0..nominal.len() {
+        let psi = nominal[index];
+        let derivative = (plus[index] - minus[index]) / (2.0 * derivative_step);
+        if !psi.re.is_finite()
+            || !psi.im.is_finite()
+            || !plus[index].re.is_finite()
+            || !plus[index].im.is_finite()
+            || !minus[index].re.is_finite()
+            || !minus[index].im.is_finite()
+        {
+            return Err(DtcProbeError::InvalidStateVector);
+        }
+        nominal_norm += psi.norm_sqr();
+        derivative_norm += derivative.norm_sqr();
+        overlap += psi.conj() * derivative;
+    }
+
+    if (nominal_norm - 1.0).abs() > 1.0e-8 {
+        return Err(DtcProbeError::InvalidStateVector);
+    }
+    let raw = 4.0 * (derivative_norm - overlap.norm_sqr());
+    if !raw.is_finite() || raw < -1.0e-8 {
+        return Err(DtcProbeError::NonFiniteFisherInformation);
+    }
+    Ok(raw.max(0.0))
 }
 
 fn total_z_classical_fisher_information(
@@ -456,6 +543,8 @@ mod tests {
         assert!(report.classical_fisher_information_per_shot.is_finite());
         assert!(report.classical_fisher_information_per_shot >= 0.0);
         assert!(report.fisher_information_per_drive_period.is_finite());
+        assert!(report.quantum_fisher_information_per_shot.is_finite());
+        assert!(report.quantum_fisher_information_per_drive_period.is_finite());
         assert!(report.norm_error < 1.0e-10);
     }
 
@@ -515,6 +604,26 @@ mod tests {
             evaluate_dtc_probe_sensing(&invalid),
             Err(DtcProbeError::InvalidConfiguration)
         );
+    }
+
+    #[test]
+    fn pure_state_qfi_matches_analytic_single_qubit_rotation() {
+        let parameter = 0.3_f64;
+        let delta = 1.0e-4_f64;
+        let state = [
+            Complex::new(parameter.cos(), 0.0),
+            Complex::new(parameter.sin(), 0.0),
+        ];
+        let plus = [
+            Complex::new((parameter + delta).cos(), 0.0),
+            Complex::new((parameter + delta).sin(), 0.0),
+        ];
+        let minus = [
+            Complex::new((parameter - delta).cos(), 0.0),
+            Complex::new((parameter - delta).sin(), 0.0),
+        ];
+        let qfi = pure_state_quantum_fisher_information(&state, &plus, &minus, delta).unwrap();
+        assert!((qfi - 4.0).abs() < 1.0e-7);
     }
 
     #[test]
