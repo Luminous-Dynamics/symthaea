@@ -71,6 +71,10 @@ Beyond JSON Schema, the validator checks:
 10. Frozen/no-teacher arm C has no blend, supervision, optimizer, replay or exploration update; parameter digests remain equal. Recurrent-state evolution is allowed and separately reported.
 11. Weight-change and recurrent-evolution flags agree with before/after digest equality.
 12. Missing/stale/rejected Follow target evidence remains explicit; no simulator or V2X source is silently relabeled as local perception.
+13. Paired baseline/intervention trials have exactly one of each and bind identical episode/scenario/actor/controller/tick context.
+14. A masked simulator-sidecar mutation on Arm B preserves the exact policy-input and raw-student-action digests.
+15. A raw V2X mutation on Arm E preserves the complete local Follow-target record.
+16. Adding a post-commit shadow teacher on Arm C preserves the executed-action digest.
 
 ## 6. Outcome metrics
 
