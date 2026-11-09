@@ -73,11 +73,20 @@ pub fn score_available_probes(view: &AgentView) -> Result<Vec<ProbeMetrics>, Str
     }
 }
 
-/// Select a legal one-step action using one of the explicit comparison strategies.
-pub fn choose_probe(
+/// Deterministic algorithmic-work proxy for one probe-selection decision.
+/// These counts describe enumerated candidate predictions, not CPU time.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProbeScoringWork {
+    pub legal_actions_scored: u64,
+    pub model_prediction_evaluations: u64,
+}
+
+/// Select a legal one-step action and return the exact number of model/action
+/// predictions consumed by the finite partition scorer.
+pub fn choose_probe_with_work(
     view: &AgentView,
     strategy: ProbeStrategy,
-) -> Result<AgentIntervention, StrategyError> {
+) -> Result<(AgentIntervention, ProbeScoringWork), StrategyError> {
     let metrics = score_available_probes(view)?;
     if metrics.is_empty() {
         return Err(StrategyError::NoCompatibleModels);
@@ -93,9 +102,23 @@ pub fn choose_probe(
             .iter()
             .max_by(|left, right| compare_metrics(left, right, strategy)),
     };
-    selected
-        .map(|value| value.intervention)
-        .ok_or(StrategyError::NoLegalProbe)
+    let selected = selected.ok_or(StrategyError::NoLegalProbe)?;
+    let work = ProbeScoringWork {
+        legal_actions_scored: metrics.len() as u64,
+        model_prediction_evaluations: metrics
+            .iter()
+            .map(|metric| metric.expected_remaining_denominator as u64)
+            .sum(),
+    };
+    Ok((selected.intervention, work))
+}
+
+/// Compatibility helper for callers that need only the selected intervention.
+pub fn choose_probe(
+    view: &AgentView,
+    strategy: ProbeStrategy,
+) -> Result<AgentIntervention, StrategyError> {
+    choose_probe_with_work(view, strategy).map(|(intervention, _)| intervention)
 }
 
 fn compare_metrics(left: &ProbeMetrics, right: &ProbeMetrics, strategy: ProbeStrategy) -> Ordering {
