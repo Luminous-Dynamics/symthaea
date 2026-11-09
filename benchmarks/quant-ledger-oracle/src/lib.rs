@@ -220,7 +220,12 @@ pub fn evaluate(config: &Config, fills: &[Fill], marks: &[Mark]) -> Result<Ledge
             if m.price_minor_units<=0 {return Err(Error::InvalidPrice(m.mark_id.clone()));}
             eligible.push(m);
         }
-        eligible.sort_by_key(|m|(m.event_time_ms,m.known_at_ms,m.mark_id.as_str()));
+        eligible.sort_by(|left, right| {
+            left.event_time_ms
+                .cmp(&right.event_time_ms)
+                .then_with(|| left.known_at_ms.cmp(&right.known_at_ms))
+                .then_with(|| left.mark_id.cmp(&right.mark_id))
+        });
         let selected=*eligible.last().ok_or_else(||Error::MissingMark(instrument.clone()))?;
         if eligible.iter().filter(|m|m.event_time_ms==selected.event_time_ms).count()>1 {
             return Err(Error::AmbiguousMark(instrument.clone(),selected.event_time_ms));
