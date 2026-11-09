@@ -21,6 +21,11 @@ Use these as complementary, non-interchangeable cohorts:
 | [AgenticFinBench](https://arxiv.org/abs/2611.04813) | 230 real-world requests; 8 categories, 2 languages and 4 complexity levels | Two-stage claim audit; paper reports a 7.58-point reduction to the initial baseline leader after hallucination audit | Recent arXiv preprint; small task set and reference-free evaluation require independent replication |
 | [FinancialAuditBench](https://arxiv.org/abs/2609.32835) | 90 tasks across 6 synthetic audit engagements, averaging 179 files each | Privacy-aware synthetic engagements using differentially private aggregate priors and extensive expert review | Audit-workpaper specialization, not general market research |
 | [Herculean](https://arxiv.org/abs/2605.14355) | v4 reports 424 offline and 246 live instances across Trading, Hedging, Market Insights and Auditing | MCP-based end-to-end workflows with task-specific tools and operational constraints | Trading/hedging/auditing workflows are not the same construct as evidence-grounded company research; match only comparable tasks |
+| [FinTrace](https://arxiv.org/abs/2604.10015) | 800 expert-annotated tool-use trajectories across 34 financial task categories; companion preference set of 8,196 trajectories | Nine metrics across action correctness, execution efficiency, process quality and output quality | Excellent trajectory comparator, but tool/action correctness does not alone establish claim truth or financial decision quality |
+| [ICBCBench](https://arxiv.org/abs/2606.17458) | Industry-consortium deep research; 50+ experts across 40+ organizations, with objective and subjective tracks | Retrieval/reasoning plus expert-facing long-form report quality, citation consistency and source quality | Access/terms and evaluator protocol must be checked; a consortium label is not a universal human gold standard |
+| [FinDeepResearch](https://arxiv.org/abs/2510.13936) | 64 listed companies across 8 markets, 4 languages and 15,808 rubric items | Hierarchical company-analysis reports spanning data recognition, calculation, abstraction and interpretation | Public benchmark and its rubric define its own scope; preserve market/language splits and avoid equating LLM rubric scores with human truth |
+| [FinBalance](https://arxiv.org/abs/2606.15949) | 710-record evaluation split; eight industries, three period types and 23 inconsistency labels | Multi-document source-to-journal-to-statement reconciliation; ledger-replayed balance sheets | Accounting-specific; compose with Mycelix FIN-ACC-BENCH rather than duplicate its ledger/oracle |
+
 | [FinanceBench](https://arxiv.org/abs/2311.11944), [FinQA](https://arxiv.org/abs/2109.00122), [ConvFinQA](https://arxiv.org/abs/2210.03849), [TAT-QA](https://aclanthology.org/2021.acl-long.254/) | Filing QA, numerical reasoning, dialogue and table/text tasks | Mature task-level regression suites | Isolated subtasks do not measure an end-to-end analyst workflow |
 
 Published scores are not directly comparable unless the benchmark, split, evaluator, tools, model version, data frontier and budget match. Do not concatenate scores into one leaderboard. FinanceBenchmark's own published methodology attributes scores to underlying evaluations and uses tier weights; treat any composite as that publisher's method, not an objective universal measure ([methodology](https://financebenchmark.ai/methodology)).
@@ -140,6 +145,8 @@ For each scoring-eligible material claim, retain the exact claim, type, subject,
 
 Compare deterministic calculation/reference oracles where exact ground truth exists, a single LLM judge, a calibrated multi-judge jury, a two-stage claim-extraction/evidence-audit pipeline, blinded human evaluators and human adjudication. Pin model/provider/version, prompt/rubric digests, decoding, retrieval access, candidate ordering, repetitions and cost.
 
+**Rater identity rule:** an AI adjudicator (including this assistant when used under a masked candidate ID) is an AI judge, not a human rater. Report AI votes separately from human votes and never count an AI score as a blinded-human observation. An AI-assisted human reviewer remains a human vote only when the human independently inspects the packet, makes and records their own decision, and retains responsibility for it. Preserve whether the reviewer saw other votes or prior scores.
+
 Required evaluator metrics include class-specific false-accept/false-reject rates, balanced accuracy, macro-F1, claim-extraction and trace-support precision/recall, evidence-span and temporal-admissibility accuracy, amount/unit/currency/period consistency, calibration, abstention/selective risk, prompt/order/repeat flip rates, judge-to-human and human-human disagreement, rubric exploit success, latency and full cost. Cluster uncertainty by task and source family; several claims from one filing are not independent observations.
 
 Adversarial controls must cover citation laundering, stale or superseded filings, wrong entity/instrument, mirrored sources presented as independent, causal overreach, future-known information, unit/currency/period mismatches, incomplete coverage, scenario-as-fact, unsupported forecast precision, irrelevant citation volume, verbosity/keyword stuffing, candidate-order swaps and consistently wrong but repeatable judges.
@@ -151,6 +158,12 @@ AgenticFinBench's November 2026 preprint is particularly relevant: in its tested
 FinanceBenchmark's methodology also keeps attempts, confidence intervals, held-out items, task-family scores and benchmark coverage visible. We should adopt those transparency practices without treating its weighted composite as a universal financial competence score. [FinanceBenchmark methodology](https://financebenchmark.ai/methodology)
 
 No SOTA or Symthaea-superiority claim is permitted until blind reference-label audit, judge qualification and matched-budget holdout evaluation are complete.
+
+## 8d. Second masked AI rubric audit
+
+A second AI-only rubric consistency/traceability review is recorded in [BLINDED_AI_ADJUDICATION_REVIEW_2026-11-09.md](BLINDED_AI_ADJUDICATION_REVIEW_2026-11-09.md). It identifies a missing alias-to-canonical-evidence-ID crosswalk in the first pilot draft and one-point ambiguity in the competing-hypotheses score anchor. The alias crosswalk is now explicit in the pilot artifact.
+
+The second reviewer saw the first score table, so this is **not an independent blind replicate**. It is a rubric audit only. The AI vote is not a human vote and must not enter human agreement or human-vs-agent comparisons.
 
 ## 8c. Masked AI adjudication calibration pilot
 
