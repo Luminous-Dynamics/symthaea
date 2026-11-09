@@ -182,6 +182,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("epistemic_status=SYNTHETIC_GEOMETRY_DERIVED_BUDGETED_DESIGN_NOT_DEPLOYMENT_ADVICE");
     println!("state=target_x_m,target_y_m,target_z_m,clock_offset_s");
+    println!("target_parameter_count=3");
+    println!("objective=target_marginal_D_optimal;full_joint_EIG_reported_separately");
     println!("jacobian_source=analytic_azimuth_elevation_geometry_whitened_by_sigma");
     println!("budget={:.6}", config.budget);
     println!("candidate_options={}", options.len());
