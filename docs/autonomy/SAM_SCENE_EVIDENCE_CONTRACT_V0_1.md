@@ -180,15 +180,15 @@ Use distinct labels for at least `observed_free`, `occupied`, `occluded`, `unobs
 
 A controller or teacher that needs a lead-actor gap must name the evidence domain supplying it. The typed `follow_target_context` is separate from the legacy `VehicleState` mesh channels.
 
-- `simulation_benchmark`: may consume only a current, exact-scenario `simulator_oracle` source. The benchmark and resulting measurements must remain labelled simulation-only.
-- `local_perception`: requires a current, frame-resolved `local_sensor_observation` measurement from the declared scene. Image-space HDC proposals and simulator truth are not local metric tracks.
-- `deployment`: requires a current local sensor measurement with matching calibration/frame/time provenance. The schema does not itself attest a sensor, calibration or physical installation.
+- `simulation_benchmark`: may consume only a current, exact-scenario `simulator_oracle` source, linked by `target_reference_kind=simulator_truth_actor` and an exact `target_reference_id` into `simulator_truth_actor_states`. The actor-state record must share the same oracle source, scenario, frame and acquisition tick.
+- `local_perception`: may use a current local sensor measurement or an explicitly synthetic sensor observation for conformance. It must use `target_reference_kind=tracked_object_hypothesis` and link `target_reference_id` to an exact object hypothesis. The context actor ID must equal that hypothesis's track-lineage ID, and the evidence source must appear in the hypothesis's own source references.
+- `deployment`: requires a current, non-synthetic camera/LiDAR/radar/ultrasonic local sensor measurement, linked to a tracked object hypothesis with matching calibration/frame/time provenance. A passing contract check still does not attest the installed sensor or physical vehicle.
 - `remote_cooperative_claim`: is not a valid Follow-target source in any profile. V2X provenance may enrich an advisory stream, but cannot silently substitute for a locally observed lead track.
-- `unknown` / `rejected`: carries no selected source and no numeric gap fallback. The controller must expose the target as unavailable and let the separately qualified planner/RTA determine the admissible response.
+- `unknown` / `rejected`: carries no selected source, actor reference or numeric gap fallback. The controller must expose the target as unavailable and let the separately qualified planner/RTA determine the admissible response.
 
-The source must match the scene scenario, frame, acquisition time, clock domain and transform. The snapshot event time is compared to the normalized observation tick and declared maximum age. Missing, future-dated, stale, wrong-frame or role-incompatible targets are rejected or remain unknown.
+The source, target actor/track and scene must agree on scenario, frame, acquisition/measurement tick, clock domain and transform. The v0.1 Follow calculation is deliberately restricted to a resolved `local_road` frame with x forward: the checker recomputes `gap_m = target.x - ego.x` and `relative_speed_mps = target.vx - ego.vx`. A caller cannot pass a plausible-looking scalar that contradicts the linked scene state. Missing, future-dated, stale, wrong-frame, unlinked, non-actor-modality or role-incompatible targets are rejected or remain unknown.
 
-The canonical fixture demonstrates the simulation-benchmark path using simulator oracle truth and includes a separate local-lidar measurement source solely to exercise the deployment/local-perception contract. Both are synthetic fixture records; no physical sensing is claimed.
+The canonical fixture includes an explicit simulator-oracle actor-state record and a separate synthetic-LiDAR local-perception track. The latter can exercise the local-perception conformance path but is intentionally rejected for the deployment profile. All fixture records are synthetic; no physical sensing is claimed.
 
 ## 10. Ownership boundaries
 
