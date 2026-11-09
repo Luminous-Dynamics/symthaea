@@ -1,6 +1,6 @@
 {
   "schema": "sam-benchmark-evidence-registry-v0.1",
-  "snapshot_date": "2026-11-08",
+  "snapshot_date": "2026-11-09",
   "parent_issue": "Luminous-Dynamics/symthaea#6256",
   "semantics": {
     "source_status": [
@@ -1188,7 +1188,9 @@
     "ReactSim-Bench evaluates surrounding-agent responses to pre-generated ego deviations; it is not a complete reciprocal online ego/actor policy loop.",
     "System architecture references (for example Autoware 2.0) are not benchmark results and are stored separately from benchmark entries.",
     "SAM-developed synthetic conformance crucibles are stored separately from external benchmark leaderboard records; a passing synthetic suite is not external benchmark reproduction or physical-safety evidence.",
-    "nuPlan-R is a reciprocal reactive loop at the planner/actor layer, but interaction-selected top-k agents receive diffusion rollouts while remaining agents follow log replay; distinguish this from all-agent reciprocal re-planning and from physical vehicle validation."
+    "nuPlan-R is a reciprocal reactive loop at the planner/actor layer, but interaction-selected top-k agents receive diffusion rollouts while remaining agents follow log replay; distinguish this from all-agent reciprocal re-planning and from physical vehicle validation.",
+    "World-model benchmark-landscape counts are cross-domain taxonomy data, not driving-only counts; preserve target-specific denominators and distinguish closed-loop protocol from downstream outcome metrics.",
+    "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result."
   ],
   "system_references": [
     {
@@ -1352,6 +1354,89 @@
         "https://www.iso.org/standard/78951.html",
         "https://saemobilus.sae.org/standards/j3164_202301-ontology-lexicon-automated-driving-system-ads-operated-vehicle-behaviors-maneuvers-routine-normal-operating-scenarios"
       ]
+    },
+    {
+      "id": "sam-follow-oracle-observation-separation-v0.1",
+      "name": "SAM Follow Oracle / Observation-Domain Separation v0.1",
+      "category": "synthetic_training_information_privilege",
+      "capability_target": [
+        "simulator_truth_source_separation",
+        "observation_time_alignment",
+        "same_road_lead_selection",
+        "fail_closed_target_freshness",
+        "privileged_teacher_vs_observed_input_distinction"
+      ],
+      "protocol": {
+        "kind": "synthetic_action_teacher_and_target_admission",
+        "ego_time_policy": "select latest peer history snapshot at or before ego observation time; never future",
+        "target_selection": [
+          "positive_forward_gap",
+          "same_road_projection",
+          "lateral_corridor",
+          "maximum_range",
+          "maximum_age"
+        ],
+        "consumer": "training_teacher_and_follow_reward",
+        "student_input_layout": "legacy_20_channel_vehicle_state_unchanged",
+        "missing_or_stale_target": "baseline_cruise_teacher_and_zero_follow_gap_reward",
+        "evidence_domains": [
+          "simulator_oracle_truth",
+          "delayed_mesh_aggregate",
+          "local_tracked_object_observation",
+          "remote_cooperative_v2x_claim"
+        ]
+      },
+      "metrics": [
+        "valid_target_availability_fraction",
+        "target_snapshot_age_ms_p50_p95_p99",
+        "future_snapshot_rejection_count",
+        "stale_target_rejection_count",
+        "off_corridor_rejection_count",
+        "behind_or_out_of_range_rejection_count",
+        "wrong_actor_selection_count",
+        "gap_residual_m",
+        "relative_speed_residual_mps",
+        "teacher_action_delta",
+        "no_target_fallback_fraction",
+        "selector_latency_us_p50_p95_p99"
+      ],
+      "source_status": "implementation_in_review_not_yet_executed",
+      "rights_status": "synthetic_simulator_only",
+      "current_artifacts": {
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
+        "source_branch": "research/sam-follow-oracle-evidence-v0-1"
+      },
+      "caveats": [
+        "Simulator-oracle teacher input is privileged; the learned student still observes the existing simulated 20D vector, which currently includes synthetic mesh-derived peer channels.",
+        "This does not create a local perception adapter or make the mesh values equivalent to local sensor tracks.",
+        "A local-perception comparison must consume a tracked-object hypothesis admitted by SAM scene evidence contract #11109.",
+        "Remote V2X claims are not local tracks and do not gain control authority.",
+        "Exact PR CI and performance results have not yet been recorded; authored tests are not passes.",
+        "This internal conformance experiment is not an external benchmark result or road-safety measure."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11109",
+        "https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0"
+      ]
     }
-  ]
+  ],
+  "world_model_benchmark_landscape_snapshot": {
+    "date": "2026-11-08",
+    "survey_name": "A Survey of World Model Benchmarks",
+    "representative_benchmarks": 130,
+    "cross_category_benchmarks": 108,
+    "control_fidelity_interactive_dynamics": {
+      "benchmark_tracks": 74,
+      "includes_closed_loop_interaction": 6,
+      "includes_closed_loop_interaction_percent": 8.1,
+      "includes_downstream_outcome_metrics": 4,
+      "includes_downstream_outcome_metrics_percent": 5.4
+    },
+    "scope_note": "Counts refer to the survey's Control Fidelity & Interactive Dynamics target across world-model domains; they are not driving-only counts.",
+    "source_status": "upstream_survey_coding",
+    "source": "https://world-model-benchmarks.github.io/World-Model-Benchmarks/"
+  }
 }
