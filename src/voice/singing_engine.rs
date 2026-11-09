@@ -915,7 +915,7 @@ impl SingingBackendCapabilities {
 
 /// Requirements a caller places on one render. This makes backend control
 /// claims executable instead of leaving the capability manifest as metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SingingRenderPolicy {
     pub required_controls: Vec<SingingControl>,
     pub allow_approximated: bool,
