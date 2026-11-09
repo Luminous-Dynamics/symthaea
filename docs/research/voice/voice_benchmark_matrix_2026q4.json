@@ -874,10 +874,11 @@
         "sample_rate_hz",
         "audio_sample_count",
         "evidence_interval_coordinate_system_half_open_samples",
-        "citation_source_audio_sha256",
+        "citation_evaluation_audio_sha256",
         "reference_support_interval_manifest_sha256",
         "evidence_span_scorer_revision",
-        "claim_to_evidence_overlap_counts"
+        "claim_to_evidence_overlap_counts",
+        "evaluation_audio_sha256"
       ],
       "required_controls": [
         "context_predicts_wrong_word_audio_unambiguous",
@@ -911,7 +912,7 @@
       "implementation_pr": 11146,
       "evidence_span_implementation_issue": 11218,
       "evidence_span_implementation_pr": 11220,
-      "note": "Binary evidence_span_present is retained only as a coarse trial-level coverage diagnostic. Confirmatory localization uses the source-bound sample-interval scorer from #11218/#11220; it reports claim correctness separately from citation precision/recall/IoU and does not prove model-internal reliance."
+      "note": "Binary evidence_span_present is retained only as a coarse trial-level coverage diagnostic. Confirmatory localization uses the exact evaluation-audio SHA-256 and half-open sample coordinate system from #11218/#11220; the cohort derivation manifest separately maps any transformed evaluation waveform back to its original source. Claim correctness and citation quality remain separate; the scorer does not prove model-internal reliance."
     },
     {
       "id": "paired_causal_counterfactual_evaluation",
