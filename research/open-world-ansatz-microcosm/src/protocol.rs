@@ -216,6 +216,9 @@ pub struct BlindEpisode {
     /// Only explicit open-support episodes may treat omitted generating truth
     /// as a valid "no compatible model" outcome.
     allow_outside_candidate_grammar: bool,
+    /// Evaluator-only coefficient for the F2 structural-support control.
+    /// Zero for ordinary closed/open parameter-support worlds.
+    numeric_quadratic_term: i64,
     observations: Vec<ObservationRecord>,
     submission: Option<AgentSubmission>,
 }
@@ -230,6 +233,7 @@ struct EpisodeInit {
     world: WorldState,
     generating_truth: GeneratingTruth,
     allow_outside_candidate_grammar: bool,
+    numeric_quadratic_term: i64,
 }
 
 impl BlindEpisode {
@@ -265,6 +269,7 @@ impl BlindEpisode {
             world: WorldState::Boolean(world),
             generating_truth: GeneratingTruth::Boolean(truth),
             allow_outside_candidate_grammar: false,
+            numeric_quadratic_term: 0,
         })
     }
 
@@ -275,7 +280,7 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
-        Self::new_numeric_with_support(episode_id, truth, access, max_probe_actions, false)
+        Self::new_numeric_with_support(episode_id, truth, access, max_probe_actions, false, 0)
     }
 
     /// Evaluator-side open-support control. The world generator may use a
@@ -289,7 +294,26 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
-        Self::new_numeric_with_support(episode_id, truth, access, max_probe_actions, true)
+        Self::new_numeric_with_support(episode_id, truth, access, max_probe_actions, true, 0)
+    }
+
+    /// Evaluator-only F2 control: adds a nonzero quadratic term to an otherwise
+    /// ordinary direct-response world while leaving the agent-visible numeric
+    /// candidate grammar unchanged. Only withheld-structure episodes are legal.
+    pub fn new_numeric_structural_shift(
+        episode_id: impl Into<String>,
+        truth: numeric::ModelHypothesis,
+        quadratic_term: i64,
+        max_probe_actions: usize,
+    ) -> Result<Self, ProtocolError> {
+        Self::new_numeric_with_support(
+            episode_id,
+            truth,
+            StructureAccess::NumericWithheld,
+            max_probe_actions,
+            true,
+            quadratic_term,
+        )
     }
 
     fn new_numeric_with_support(
@@ -298,6 +322,7 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
         allow_outside_candidate_grammar: bool,
+        quadratic_term: i64,
     ) -> Result<Self, ProtocolError> {
         match access {
             StructureAccess::NumericWithheld => {}
@@ -307,7 +332,7 @@ impl BlindEpisode {
             }
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
-        let world = numeric::NumericWorld::new(truth)
+        let world = numeric::NumericWorld::new_with_quadratic_term(truth, quadratic_term)
             .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
         Self::new_internal(EpisodeInit {
             episode_id: episode_id.into(),
@@ -319,6 +344,7 @@ impl BlindEpisode {
             world: WorldState::Numeric(world),
             generating_truth: GeneratingTruth::Numeric(truth),
             allow_outside_candidate_grammar,
+            numeric_quadratic_term: quadratic_term,
         })
     }
 
@@ -351,6 +377,7 @@ impl BlindEpisode {
             world: WorldState::Interaction(world),
             generating_truth: GeneratingTruth::Interaction(truth),
             allow_outside_candidate_grammar: false,
+            numeric_quadratic_term: 0,
         })
     }
 
@@ -365,6 +392,7 @@ impl BlindEpisode {
             world,
             generating_truth,
             allow_outside_candidate_grammar,
+            numeric_quadratic_term,
         } = init;
 
         if episode_id.trim().is_empty() || max_probe_actions == 0 {
@@ -385,6 +413,7 @@ impl BlindEpisode {
             world,
             generating_truth,
             allow_outside_candidate_grammar,
+            numeric_quadratic_term,
             observations: Vec::new(),
             submission: None,
         })
@@ -771,7 +800,11 @@ impl BlindEpisode {
                     }
                     _ => return Err(ProtocolError::ClaimFamilyMismatch),
                 };
-                numeric_truth_behaviorally_represented(truth, access)?
+                numeric_truth_behaviorally_represented(
+                    truth,
+                    self.numeric_quadratic_term,
+                    access,
+                )?
             }
         };
 
@@ -1020,7 +1053,10 @@ const NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON: usize = 4;
 /// candidate ModelHypothesis::predict implementation. All possible length-4
 /// intervention sequences are included, so a parameter/sensor reparameterization
 /// is recognized when it is observationally identical over the declared domain.
-fn numeric_truth_signature(truth: &numeric::ModelHypothesis) -> Result<Vec<i64>, ProtocolError> {
+fn numeric_truth_signature(
+    truth: &numeric::ModelHypothesis,
+    quadratic_term: i64,
+) -> Result<Vec<i64>, ProtocolError> {
     let horizon = NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON;
     let sequence_count = numeric::INPUT_LEVELS.len().pow(horizon as u32);
     let mut signature = Vec::with_capacity(sequence_count * horizon);
@@ -1036,7 +1072,15 @@ fn numeric_truth_signature(truth: &numeric::ModelHypothesis) -> Result<Vec<i64>,
         let mut state = truth.initial_state;
         for input in inputs {
             let latent = match truth.mechanism {
-                numeric::Mechanism::DirectResponse => truth.gain.checked_mul(input),
+                numeric::Mechanism::DirectResponse => truth
+                    .gain
+                    .checked_mul(input)
+                    .and_then(|base| {
+                        input
+                            .checked_mul(input)
+                            .and_then(|square| quadratic_term.checked_mul(square))
+                            .and_then(|term| base.checked_add(term))
+                    }),
                 numeric::Mechanism::LeakyMemory => state,
             }
             .ok_or_else(|| {
@@ -1116,9 +1160,10 @@ fn numeric_candidate_signature(
 
 fn numeric_truth_behaviorally_represented(
     truth: &numeric::ModelHypothesis,
+    quadratic_term: i64,
     access: numeric::StructureAccess,
 ) -> Result<bool, ProtocolError> {
-    let truth_signature = numeric_truth_signature(truth)?;
+    let truth_signature = numeric_truth_signature(truth, quadratic_term)?;
     for candidate in reference_numeric_candidates(access) {
         if numeric_candidate_signature(&candidate)? == truth_signature {
             return Ok(true);
