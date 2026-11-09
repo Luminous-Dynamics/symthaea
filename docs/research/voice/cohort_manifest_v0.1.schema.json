@@ -6,6 +6,7 @@
   "required": [
     "schema_version",
     "cohort_id",
+    "evidence_state",
     "records",
     "pairs"
   ],
@@ -30,6 +31,13 @@
       "items": {
         "$ref": "#/$defs/pair"
       }
+    },
+    "evidence_state": {
+      "enum": [
+        "SYNTHETIC_ONLY",
+        "PILOT",
+        "CONFIRMATORY"
+      ]
     }
   },
   "additionalProperties": false,
