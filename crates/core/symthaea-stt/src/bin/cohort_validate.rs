@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use symthaea_stt::cohort_manifest::{
     CohortManifest, canonical_cohort_manifest_digest,
     require_external_processing_authorization, validate_cohort_manifest,
-    verify_counterfactual_pair_manifest_artifacts,
+    verify_cohort_evidence_artifacts, verify_counterfactual_pair_manifest_artifacts,
 };
 
 #[derive(Debug, Parser)]
@@ -19,7 +19,7 @@ use symthaea_stt::cohort_manifest::{
     about = "Fail-closed structural and provenance checks for a speech cohort manifest"
 )]
 struct Args {
-    /// Path to the cohort_manifest_v0.1.json file.
+    /// Path to the cohort_manifest_v0.2.json file.
     manifest: PathBuf,
 
     /// Also require explicit authorization to send every record to an external model/API.
@@ -45,6 +45,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
+    let verified_evidence_artifacts =
+        verify_cohort_evidence_artifacts(&manifest, manifest_directory)?;
     let verified_pair_artifacts =
         verify_counterfactual_pair_manifest_artifacts(&manifest, manifest_directory)?;
 
@@ -61,6 +63,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     println!("manifest_blake3={digest}");
     println!("records={}", summary.record_count);
     println!("pairs={}", summary.pair_count);
+    println!("source_annotation_derivation_artifacts_verified={verified_evidence_artifacts}");
     println!("pair_manifest_artifacts_verified={verified_pair_artifacts}");
     println!("preference_pairs={}", summary.preference_pair_count);
     println!("development_pairs={}", summary.development_pair_count);
