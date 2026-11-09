@@ -68,6 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let scenarios = vec![
         DesignScenario {
             scenario_id: "nominal-target-region".to_string(),
+            target_parameter_count: 3,
             weight: 0.65,
             prior_precision: vec![
                 vec![0.01, 0.0, 0.0, 0.0],
@@ -78,6 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         DesignScenario {
             scenario_id: "high-altitude-target-region".to_string(),
+            target_parameter_count: 3,
             weight: 0.35,
             prior_precision: vec![
                 vec![0.01, 0.0, 0.0, 0.0],
@@ -187,8 +189,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("greedy_selected={}", greedy.selected_option_ids.join(";"));
     println!("greedy_cost={:.6}", greedy.total_cost);
     println!(
-        "greedy_expected_eig_nats={:.9}",
+        "greedy_expected_target_eig_nats={:.9}",
         greedy.expected_information_gain_nats
+    );
+    println!(
+        "greedy_expected_joint_eig_nats={:.9}",
+        greedy.expected_joint_information_gain_nats
     );
     println!(
         "greedy_worst_case_eig_nats={:.9}",
@@ -197,12 +203,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("exact_selected={}", exact.selected_option_ids.join(";"));
     println!("exact_cost={:.6}", exact.total_cost);
     println!(
-        "exact_expected_eig_nats={:.9}",
+        "exact_expected_target_eig_nats={:.9}",
         exact.expected_information_gain_nats
     );
     println!(
-        "greedy_optimality_gap_nats={:.9}",
+        "exact_expected_joint_eig_nats={:.9}",
+        exact.expected_joint_information_gain_nats
+    );
+    println!(
+        "greedy_target_optimality_gap_nats={:.9}",
         exact.expected_information_gain_nats - greedy.expected_information_gain_nats
+    );
+    println!(
+        "greedy_joint_optimality_gap_nats={:.9}",
+        exact.expected_joint_information_gain_nats - greedy.expected_joint_information_gain_nats
     );
     println!("selection_step,option_id,cost,marginal_expected_eig,marginal_eig_per_cost");
     for (index, step) in greedy.steps.iter().enumerate() {
