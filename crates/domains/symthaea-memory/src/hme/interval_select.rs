@@ -500,12 +500,6 @@ impl GroupPartitionCoverageReceipt {
             {
                 return Err(GroupPartitionReceiptError::InvalidGroupMembership { group_index });
             }
-            if member_id_set_digest(&group.member_ids)
-                .map_err(|_| GroupPartitionReceiptError::InvalidGroupMembership { group_index })?
-                != group.identity.member_set_digest
-            {
-                return Err(GroupPartitionReceiptError::MemberSetDigestMismatch { group_index });
-            }
             member_count = member_count
                 .checked_add(group.member_count)
                 .ok_or(GroupPartitionReceiptError::MemberCountOverflow)?;
@@ -1015,6 +1009,8 @@ pub enum GroupIntervalSelectionError {
         /// Group index that disagreed with the pinned query.
         group_index: usize,
     },
+    /// The supplied partition receipt does not match the group directory.
+    PartitionReceipt(GroupPartitionReceiptError),
     /// Summing group member counts overflowed usize.
     MemberCountOverflow,
 }
@@ -1063,6 +1059,7 @@ impl std::fmt::Display for GroupIntervalSelectionError {
             Self::QueryDigestMismatch { group_index } => {
                 write!(f, "group {group_index} was scored for another query vector")
             }
+            Self::PartitionReceipt(error) => write!(f, "group partition receipt rejected: {error}"),
             Self::MemberCountOverflow => write!(f, "group member count overflow"),
         }
     }
@@ -1250,10 +1247,56 @@ where
 /// a pinned membership/eligibility snapshot, and a genuine group enclosure.
 /// The public constructor for GroupScoreIntervalRecord revalidates the
 /// ContinuousHVGroupEnvelope snapshot before it supplies the interval.
+/// Select groups using a full member-roster disjointness scan.
+///
+/// This is the defensive path for untrusted/in-memory inputs. It performs
+/// O(number of eligible member IDs) partition validation on every call.
 pub fn select_group_refinement_set(
     groups: &[GroupScoreIntervalRecord],
     top_k: usize,
     coverage: GroupIntervalCoverageCounts,
+) -> Result<GroupIntervalSelectionPlan, GroupIntervalSelectionError> {
+    select_group_refinement_set_impl(groups, top_k, coverage, true)
+}
+
+/// Select groups using a previously verified build-time partition receipt.
+///
+/// The receipt proves group membership disjointness and completeness for one
+/// manifest/eligibility generation. Query-time validation is O(number of
+/// groups): it checks group identities, counts, query digests and snapshot
+/// fields, without walking each member ID. A persisted receipt must be
+/// authenticated against the immutable segment manifest by #10917 after reopen.
+pub fn select_group_refinement_set_with_partition_receipt(
+    groups: &[GroupScoreIntervalRecord],
+    top_k: usize,
+    coverage: GroupIntervalCoverageCounts,
+    receipt: &GroupPartitionCoverageReceipt,
+) -> Result<GroupIntervalSelectionPlan, GroupIntervalSelectionError> {
+    receipt
+        .verify_group_records(groups)
+        .map_err(GroupIntervalSelectionError::PartitionReceipt)?;
+    if coverage.expected_manifest_generation != receipt.manifest_generation
+        || coverage.expected_eligibility_generation != receipt.eligibility_generation
+        || coverage.eligible_records != receipt.eligible_records
+        || coverage.covered_records != receipt.eligible_records
+        || coverage.interval_groups != receipt.group_count
+    {
+        return Err(GroupIntervalSelectionError::IncompleteCoverage {
+            eligible_records: receipt.eligible_records,
+            covered_records: coverage.covered_records,
+            interval_groups: receipt.group_count,
+            supplied_groups: groups.len(),
+            unbounded_unopened_groups: coverage.unbounded_unopened_groups,
+        });
+    }
+    select_group_refinement_set_impl(groups, top_k, coverage, false)
+}
+
+fn select_group_refinement_set_impl(
+    groups: &[GroupScoreIntervalRecord],
+    top_k: usize,
+    coverage: GroupIntervalCoverageCounts,
+    verify_member_disjointness: bool,
 ) -> Result<GroupIntervalSelectionPlan, GroupIntervalSelectionError> {
     let mut covered_records = 0usize;
     let mut first_index_by_id = BTreeMap::new();
@@ -1287,17 +1330,19 @@ pub fn select_group_refinement_set(
             });
         }
         first_index_by_id.insert(group.identity.member_set_digest, group_index);
-        for member_id in &group.member_ids {
-            if let Some(first_group_index) =
-                first_group_by_member_id.get(member_id.as_str()).copied()
-            {
-                return Err(GroupIntervalSelectionError::DuplicateMemberAcrossGroups {
-                    member_id: member_id.clone(),
-                    first_group_index,
-                    duplicate_group_index: group_index,
-                });
+        if verify_member_disjointness {
+            for member_id in group.member_ids.iter() {
+                if let Some(first_group_index) =
+                    first_group_by_member_id.get(member_id.as_str()).copied()
+                {
+                    return Err(GroupIntervalSelectionError::DuplicateMemberAcrossGroups {
+                        member_id: member_id.clone(),
+                        first_group_index,
+                        duplicate_group_index: group_index,
+                    });
+                }
+                first_group_by_member_id.insert(member_id.as_str(), group_index);
             }
-            first_group_by_member_id.insert(member_id.as_str(), group_index);
         }
         covered_records = covered_records
             .checked_add(group.member_count)
