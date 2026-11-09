@@ -1,0 +1,120 @@
+{
+  "schema_id": "luminous.sam.world-model-decision-utility-gate",
+  "schema_version": "0.1.0",
+  "status": "specification_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9010",
+  "claim_ceiling": "no_model_promotion_no_campaign_result_no_physical_safety_claim",
+  "candidate_arms": [
+    {
+      "id": "A",
+      "name": "direct_reactive",
+      "role": "matched_policy_baseline"
+    },
+    {
+      "id": "B",
+      "name": "direct_plus_same_memory",
+      "role": "memory_ablation"
+    },
+    {
+      "id": "C",
+      "name": "model_assisted",
+      "role": "candidate"
+    },
+    {
+      "id": "D",
+      "name": "shuffled_dynamics_control",
+      "role": "causal_controllability_negative_control"
+    },
+    {
+      "id": "E",
+      "name": "stale_model_control",
+      "role": "shift_robustness_negative_control"
+    },
+    {
+      "id": "F",
+      "name": "qualified_oracle",
+      "role": "evaluator_only_not_leaderboard_eligible"
+    },
+    {
+      "id": "G",
+      "name": "distilled_student",
+      "role": "teacher_student_efficiency"
+    }
+  ],
+  "evaluation_layers": [
+    {
+      "id": "scene_fidelity",
+      "benchmarks": [
+        "DrivingGen"
+      ],
+      "metrics": [
+        "visual_quality",
+        "temporal_scene_consistency",
+        "agent_consistency",
+        "trajectory_plausibility",
+        "ego_controllability"
+      ],
+      "is_closed_loop_av": false
+    },
+    {
+      "id": "prediction",
+      "owners": [
+        "Symthaea #10256",
+        "#10257"
+      ],
+      "metrics": [
+        "ADE",
+        "FDE",
+        "miss_rate",
+        "prediction_set_coverage",
+        "set_sharpness",
+        "horizon_residual",
+        "shift_residual"
+      ]
+    },
+    {
+      "id": "decision_utility",
+      "owners": [
+        "Symthaea #10237",
+        "#9010"
+      ],
+      "metrics": [
+        "paired_task_success_delta",
+        "selected_action_regret",
+        "action_ranking_reversal",
+        "hard_constraint_disposition",
+        "false_safe",
+        "abstention",
+        "model_query_cost"
+      ]
+    },
+    {
+      "id": "interaction",
+      "benchmarks": [
+        "WOD-E2E",
+        "NAVSIM v2",
+        "ReactSim-Bench",
+        "nuPlan-R",
+        "Symtropy #3532"
+      ],
+      "protocol_classes": [
+        "open_loop_preference",
+        "pseudo_simulation_non_interactive",
+        "one_sided_reactive",
+        "selective_reciprocal",
+        "declared_full_reciprocal_synthetic"
+      ]
+    }
+  ],
+  "promotion_requirements": [
+    "prediction_fidelity_and_uncertainty_qualified",
+    "positive_decision_lift_or_regret_reduction_under_matched_compute",
+    "shuffled_and_stale_model_controls_expose_failure",
+    "qualified_reference_disagreement_retained",
+    "held_out_interaction_family_improvement",
+    "no_worst_family_hard_constraint_regression",
+    "p50_p95_p99_latency_deadline_memory_energy_reported",
+    "no_evaluator_or_teacher_privilege_leakage"
+  ],
+  "not_a_result": true
+}
