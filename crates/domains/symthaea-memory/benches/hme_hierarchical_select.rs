@@ -535,6 +535,10 @@ fn run() -> Result<(), String> {
     println!("physical_io_measured=false");
     println!("physical_io_note=requires immutable-segment integration and device/page telemetry");
     println!("group_partition_receipt_query_verification=O(G_log_G)");
+    println!("defensive_member_roster_ids_scanned={}", cfg.records);
+    println!("receipt_backed_member_roster_ids_scanned={}", group_plan.member_roster_ids_scanned);
+    println!("receipt_backed_group_directory_records_scanned={}", group_plan.group_directory_records_scanned);
+    println!("stage2_member_interval_records_scanned={}", hierarchy_plan.member_interval_records_scanned);
     println!("receipt_selector_p50_ns={}", percentile_ns(&receipt_samples, 50));
     println!("receipt_selector_p95_ns={}", percentile_ns(&receipt_samples, 95));
     println!("receipt_selector_p99_ns={}", percentile_ns(&receipt_samples, 99));
