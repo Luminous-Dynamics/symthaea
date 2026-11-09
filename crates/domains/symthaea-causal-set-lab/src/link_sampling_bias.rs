@@ -340,7 +340,7 @@ impl ProductWindowLinkProfile {
             if x <= 0.0 {
                 f64::NEG_INFINITY
             } else {
-                (d + 1) as f64 + (d + 1) as f64 * x.ln() - x.powi((d + 1) as i32)
+                ((d + 1) as f64).ln() + (d + 1) as f64 * x.ln() - x.powi((d + 1) as i32)
             }
         })?;
         let tail_exponent = self.dimensionless_proper_time_cutoff.powi((d + 1) as i32);
@@ -402,10 +402,7 @@ pub fn double_scaling_product_window(
     {
         return Err(LinkSamplingBiasError::InvalidTimeExtent);
     }
-    if !mu.is_finite()
-        || !eta.is_finite()
-        || !(0.0..1.0).contains(&mu)
-        || !(0.0..1.0).contains(&eta)
+    if !mu.is_finite() || !eta.is_finite() || mu <= 0.0 || mu >= 1.0 || eta <= 0.0 || eta >= 1.0
     {
         return Err(LinkSamplingBiasError::InvalidWindowFraction);
     }
@@ -610,7 +607,7 @@ mod tests {
                 MAX_DIMENSIONLESS_TIME_FOR_QUADRATURE,
                 SIMPSON_PANELS,
                 &|x| {
-                    (dimension + 1) as f64 + (dimension + 1) as f64 * x.ln()
+                    ((dimension + 1) as f64).ln() + dimension as f64 * x.ln()
                         - x.powi((dimension + 1) as i32)
                 },
             )
