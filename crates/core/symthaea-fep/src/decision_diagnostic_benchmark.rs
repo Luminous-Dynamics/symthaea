@@ -303,11 +303,8 @@ fn run_policy(
 ) -> Result<(DiagnosticPolicyMetrics, Vec<DiagnosticEpisodeMetrics>), DiagnosticBenchmarkError> {
     let joint = to_joint_hypotheses(&scenario.hypotheses);
     let information = compute_hierarchical_information_gains(&joint)?;
-    let decision_evaluation = evaluate_decision_focused_diagnostics(
-        &scenario.hypotheses,
-        &scenario.actions,
-        config,
-    )?;
+    let decision_evaluation =
+        evaluate_decision_focused_diagnostics(&scenario.hypotheses, &scenario.actions, config)?;
     let decision_count = scenario.hypotheses[0].loss_by_final_decision.len();
     let prior = scenario
         .hypotheses
@@ -702,7 +699,9 @@ mod tests {
         assert_eq!(decision_eig.selected_action_counts, vec![0, 10_000]);
         assert_eq!(evsi.selected_action_counts, vec![0, 10_000]);
         assert_eq!(always.selected_action_counts, vec![10_000, 0]);
-        assert!(pure_eig.mean_predicted_model_eig_nats > decision_eig.mean_predicted_model_eig_nats);
+        assert!(
+            pure_eig.mean_predicted_model_eig_nats > decision_eig.mean_predicted_model_eig_nats
+        );
         assert!(decision_eig.mean_predicted_decision_eig_nats > 0.0);
         assert!(evsi.mean_predicted_decision_eig_nats > 0.0);
         assert!(evsi.mean_task_loss < pure_eig.mean_task_loss - 0.15);
