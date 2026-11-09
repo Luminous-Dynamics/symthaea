@@ -26,6 +26,7 @@
 pub mod decomposition;
 pub mod graph;
 pub mod inventory;
+pub mod maxqbf;
 pub mod queue;
 pub mod quantified_proof;
 pub mod quantified_game_dag;
