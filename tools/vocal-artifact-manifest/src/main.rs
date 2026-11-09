@@ -90,7 +90,10 @@ fn build_manifest(root: &Path) -> Result<ArtifactManifest, String> {
     let root_metadata = fs::symlink_metadata(root)
         .map_err(|error| format!("inspect root {}: {error}", root.display()))?;
     if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
-        return Err(format!("artifact root must be a real directory: {}", root.display()));
+        return Err(format!(
+            "artifact root must be a real directory: {}",
+            root.display()
+        ));
     }
     let root = root
         .canonicalize()
@@ -103,10 +106,11 @@ fn build_manifest(root: &Path) -> Result<ArtifactManifest, String> {
         return Err("artifact root contains no files".to_string());
     }
 
-    let total_files = u64::try_from(entries.len())
-        .map_err(|_| "artifact file count exceeds u64".to_string())?;
+    let total_files =
+        u64::try_from(entries.len()).map_err(|_| "artifact file count exceeds u64".to_string())?;
     let total_bytes = entries.iter().try_fold(0u64, |total, entry| {
-        total.checked_add(entry.size_bytes)
+        total
+            .checked_add(entry.size_bytes)
             .ok_or_else(|| "artifact total byte count overflow".to_string())
     })?;
     let root_blake3 = root_digest(&entries)?;
@@ -138,14 +142,20 @@ fn walk_directory(
             .map_err(|error| format!("inspect {}: {error}", path.display()))?;
         let kind = metadata.file_type();
         if kind.is_symlink() {
-            return Err(format!("symlink is not allowed in artifact tree: {}", path.display()));
+            return Err(format!(
+                "symlink is not allowed in artifact tree: {}",
+                path.display()
+            ));
         }
         if kind.is_dir() {
             walk_directory(root, &path, entries)?;
             continue;
         }
         if !kind.is_file() {
-            return Err(format!("special file is not allowed in artifact tree: {}", path.display()));
+            return Err(format!(
+                "special file is not allowed in artifact tree: {}",
+                path.display()
+            ));
         }
 
         let relative = path
@@ -187,13 +197,15 @@ fn normalize_relative_path(path: &Path) -> Result<String, String> {
 fn hash_stable_file(path: &Path) -> Result<(u64, String), String> {
     let before = fs::metadata(path)
         .map_err(|error| format!("metadata before hashing {}: {error}", path.display()))?;
-    let mut file = File::open(path)
-        .map_err(|error| format!("open {}: {error}", path.display()))?;
+    let mut file = File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
     let opened = file
         .metadata()
         .map_err(|error| format!("inspect opened file {}: {error}", path.display()))?;
     if !opened.is_file() || opened.len() != before.len() || modified(&opened) != modified(&before) {
-        return Err(format!("artifact changed before hashing: {}", path.display()));
+        return Err(format!(
+            "artifact changed before hashing: {}",
+            path.display()
+        ));
     }
     let mut hasher = blake3::Hasher::new();
     let mut buffer = vec![0u8; BUFFER_BYTES];
@@ -225,7 +237,10 @@ fn hash_stable_file(path: &Path) -> Result<(u64, String), String> {
         || modified(&before) != modified(&after)
         || modified(&before) != modified(&after_path)
     {
-        return Err(format!("artifact changed while being hashed: {}", path.display()));
+        return Err(format!(
+            "artifact changed while being hashed: {}",
+            path.display()
+        ));
     }
     Ok((bytes_read, hasher.finalize().to_hex().to_string()))
 }
@@ -267,22 +282,33 @@ fn validate_manifest_shape(manifest: &ArtifactManifest) -> Result<(), String> {
     if manifest.schema != SCHEMA || manifest.algorithm != "BLAKE3-256" {
         return Err("unsupported artifact manifest schema or digest algorithm".to_string());
     }
-    if manifest.entries.windows(2).any(|pair| pair[0].path >= pair[1].path) {
+    if manifest
+        .entries
+        .windows(2)
+        .any(|pair| pair[0].path >= pair[1].path)
+    {
         return Err("manifest entries must be strictly sorted and unique".to_string());
     }
     for entry in &manifest.entries {
         if entry.path.starts_with('/')
             || entry.path.contains('\\')
-            || entry.path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
+            || entry
+                .path
+                .split('/')
+                .any(|part| part.is_empty() || part == "." || part == "..")
         {
-            return Err(format!("manifest contains unsafe relative path: {}", entry.path));
+            return Err(format!(
+                "manifest contains unsafe relative path: {}",
+                entry.path
+            ));
         }
         decode_hex_32(&entry.blake3)?;
     }
     let expected_count = u64::try_from(manifest.entries.len())
         .map_err(|_| "manifest entry count exceeds u64".to_string())?;
     let expected_bytes = manifest.entries.iter().try_fold(0u64, |total, entry| {
-        total.checked_add(entry.size_bytes)
+        total
+            .checked_add(entry.size_bytes)
             .ok_or_else(|| "manifest total byte count overflow".to_string())
     })?;
     if manifest.total_files != expected_count || manifest.total_bytes != expected_bytes {
@@ -316,10 +342,16 @@ fn ensure_output_outside_root(root: &Path, output: &Path) -> Result<(), String> 
 }
 
 fn describe_manifest_difference(expected: &ArtifactManifest, actual: &ArtifactManifest) -> String {
-    let expected_paths: std::collections::BTreeMap<_, _> =
-        expected.entries.iter().map(|entry| (&entry.path, entry)).collect();
-    let actual_paths: std::collections::BTreeMap<_, _> =
-        actual.entries.iter().map(|entry| (&entry.path, entry)).collect();
+    let expected_paths: std::collections::BTreeMap<_, _> = expected
+        .entries
+        .iter()
+        .map(|entry| (&entry.path, entry))
+        .collect();
+    let actual_paths: std::collections::BTreeMap<_, _> = actual
+        .entries
+        .iter()
+        .map(|entry| (&entry.path, entry))
+        .collect();
 
     let missing: Vec<_> = expected_paths
         .keys()
@@ -336,7 +368,9 @@ fn describe_manifest_difference(expected: &ArtifactManifest, actual: &ArtifactMa
     let changed: Vec<_> = expected_paths
         .iter()
         .filter_map(|(path, expected_entry)| {
-            actual_paths.get(*path).filter(|actual_entry| *actual_entry != *expected_entry)
+            actual_paths
+                .get(*path)
+                .filter(|actual_entry| *actual_entry != *expected_entry)
                 .map(|_| path.as_str())
         })
         .take(8)
@@ -454,19 +488,13 @@ mod tests {
     fn manifest_output_must_be_outside_the_artifact_root() {
         let tree = TempTree::new();
         fs::write(tree.path().join("model.onnx"), b"weights").unwrap();
-        assert!(ensure_output_outside_root(
-            tree.path(),
-            &tree.path().join("manifest.json")
-        )
-        .is_err());
+        assert!(
+            ensure_output_outside_root(tree.path(), &tree.path().join("manifest.json")).is_err()
+        );
 
         let outside = tree.path().with_extension("evidence");
         fs::create_dir_all(&outside).unwrap();
-        assert!(ensure_output_outside_root(
-            tree.path(),
-            &outside.join("manifest.json")
-        )
-        .is_ok());
+        assert!(ensure_output_outside_root(tree.path(), &outside.join("manifest.json")).is_ok());
         let _ = fs::remove_dir_all(outside);
     }
 
