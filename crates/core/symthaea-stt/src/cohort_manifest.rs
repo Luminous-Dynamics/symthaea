@@ -99,6 +99,8 @@ pub struct RightsAuthorization {
 pub struct CohortRecord {
     /// Stable unique record ID.
     pub record_id: String,
+    /// Pair membership, when this record is one side of a registered pair.
+    pub pair_id: Option<String>,
     /// Underlying corpus/source-family cluster (not a URL).
     pub source_family_id: String,
     /// Pseudonymous speaker cluster, when known.
@@ -264,6 +266,9 @@ pub fn validate_cohort_manifest(
         require_identifier(&record.record_id, "record_id")?;
         require_identifier(&record.source_family_id, "source_family_id")?;
         require_identifier(&record.utterance_family_id, "utterance_family_id")?;
+        if let Some(pair_id) = record.pair_id.as_deref() {
+            require_identifier(pair_id, "pair_id")?;
+        }
         if record_index.insert(&record.record_id, record).is_some() {
             return Err(CohortAdmissionError::DuplicateRecordId(
                 record.record_id.clone(),
