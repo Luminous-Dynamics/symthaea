@@ -320,10 +320,8 @@ impl PairedArmContrast {
         );
         self.decision_correct
             .record(a0.decision_correct, a2.decision_correct);
-        self.evidence_references_valid.record(
-            a0.evidence_references_valid,
-            a2.evidence_references_valid,
-        );
+        self.evidence_references_valid
+            .record(a0.evidence_references_valid, a2.evidence_references_valid);
         self.false_unique_structure_claim.record(
             !a0.structure_score.oracle_structure_identified
                 && a0.structure_score.claimed_structure_identified,
@@ -348,7 +346,8 @@ impl PairedArmContrast {
             a2.structure_score.oracle_structure_identified
                 && !a2.structure_score.claimed_structure_identified,
         );
-        self.safe_abstention.record(a0.safe_abstention, a2.safe_abstention);
+        self.safe_abstention
+            .record(a0.safe_abstention, a2.safe_abstention);
         self.unnecessary_abstention
             .record(a0.unnecessary_abstention, a2.unnecessary_abstention);
         self.a0_probe_actions += a0.probe_count;
@@ -357,9 +356,7 @@ impl PairedArmContrast {
     }
 }
 
-fn paired_arm_contrasts(
-    pair_records: &[PairedEpisodeRecord],
-) -> Vec<PairedArmContrast> {
+fn paired_arm_contrasts(pair_records: &[PairedEpisodeRecord]) -> Vec<PairedArmContrast> {
     let families = [
         WorldFamily::BooleanMechanism,
         WorldFamily::NumericMechanism,
@@ -369,9 +366,10 @@ fn paired_arm_contrasts(
     for family in families {
         for policy in policies() {
             let mut contrast = PairedArmContrast::new(family, policy.name);
-            for pair in pair_records.iter().filter(|pair| {
-                pair.world_family == family && pair.policy == policy.name
-            }) {
+            for pair in pair_records
+                .iter()
+                .filter(|pair| pair.world_family == family && pair.policy == policy.name)
+            {
                 contrast.record(pair);
             }
             if contrast.pair_count > 0 {
