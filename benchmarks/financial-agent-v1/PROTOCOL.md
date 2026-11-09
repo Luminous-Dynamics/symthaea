@@ -152,6 +152,12 @@ FinanceBenchmark's methodology also keeps attempts, confidence intervals, held-o
 
 No SOTA or Symthaea-superiority claim is permitted until blind reference-label audit, judge qualification and matched-budget holdout evaluation are complete.
 
+## 8c. Masked AI adjudication calibration pilot
+
+A deliberately synthetic calibration artifact is recorded in [BLINDED_AI_ADJUDICATION_PILOT_2026-11-09.md](BLINDED_AI_ADJUDICATION_PILOT_2026-11-09.md). One GPT-based AI adjudicator scored four masked, rubric-probe responses against the public supplier/energy fixture. The best response scored 20/20, a terse but safe response 14/20, and two responses containing temporal/unit or fabricated-financial claims failed hard gates.
+
+**Interpretation ceiling:** the candidate responses were authored as synthetic rubric probes, not collected from independent model executions. This is a test that the scoring rubric can distinguish known-good and known-bad examples. It is not a model tournament, human-subject evaluation, inter-rater reliability result, generalized accuracy estimate or SOTA claim. The adjudicator is an AI system, not a human. Genuine blind human adjudication remains required for human-comparison results.
+
 ## 9. Non-compensable hard gates
 
 Any of the following blocks a qualified label, whatever the average score:
