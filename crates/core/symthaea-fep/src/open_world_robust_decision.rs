@@ -678,6 +678,20 @@ pub enum PrequentialEProcessError {
     NullSupportViolation { observation_index: usize },
     #[error("sequential log-likelihood ratio became non-finite")]
     NonFiniteLogLikelihoodRatio,
+    #[error("Dirichlet alternative concentration is empty")]
+    EmptyDirichletConcentration,
+    #[error("Dirichlet alternative concentration is invalid at category {category_index}")]
+    InvalidDirichletConcentration { category_index: usize },
+    #[error("Dirichlet concentration sum is non-finite")]
+    NonFiniteDirichletConcentrationMass,
+    #[error("null observation {observation_index} has {actual} categories; expected {expected}")]
+    DirichletCategoryCountMismatch {
+        observation_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("prequential observation count overflowed the supported counter")]
+    ObservationCountOverflow,
 }
 
 /// Compute a fixed mixture of likelihood-ratio e-processes.
@@ -846,6 +860,167 @@ pub fn evaluate_prequential_e_process(
     })
 }
 
+/// Anytime-valid e-process against a declared prequential null using a
+/// Dirichlet-multinomial universal categorical alternative.
+///
+/// Before observing time t, the alternative predictive probability is
+///
+/// q_t(k) = (alpha_k + N_{t-1,k}) / (sum_j alpha_j + t - 1),
+///
+/// where N_{t-1,k} counts earlier outcomes in category k. Because q_t is
+/// predictable, the likelihood ratio product_t q_t(y_t) / p_t(y_t) is a
+/// non-negative martingale under any correctly specified prequential null
+/// p_t = P(Y_t | history), even when p_t changes over time. Ville's inequality
+/// therefore controls the probability of ever crossing 1/alpha.
+///
+/// This universal alternative does not require a finite hand-authored list of
+/// misspecification forecasts. Its power is strongest against persistent
+/// categorical frequency shifts; context-specific or rapidly changing
+/// alternatives should use separately preregistered predictable specialists.
+/// A zero-probability null observation remains a hard support violation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirichletPrequentialEProcessReport {
+    pub alpha: f64,
+    pub log_e_threshold: f64,
+    pub log_e_value: f64,
+    pub log_e_value_by_observation: Vec<f64>,
+    pub log_likelihood_ratio_increment_by_observation: Vec<f64>,
+    /// First one-based observation index at which the e-value crossed 1 / alpha.
+    pub crossed_at_observation: Option<usize>,
+    pub prior_concentration: Vec<f64>,
+    pub final_counts: Vec<u64>,
+    /// Posterior-predictive categorical distribution after all supplied data.
+    pub final_alternative_predictive_probabilities: Vec<f64>,
+}
+
+/// Evaluate a Dirichlet-multinomial alternative against frozen pre-observation
+/// null forecasts. The supplied predictions must be in a stable category order.
+pub fn evaluate_dirichlet_prequential_e_process(
+    null_observations: &[PrequentialCategoricalObservation],
+    prior_concentration: &[f64],
+    alpha: f64,
+) -> Result<DirichletPrequentialEProcessReport, PrequentialEProcessError> {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(PrequentialEProcessError::InvalidAlpha);
+    }
+    if prior_concentration.is_empty() {
+        return Err(PrequentialEProcessError::EmptyDirichletConcentration);
+    }
+
+    let mut concentration_mass = 0.0;
+    for (category_index, concentration) in prior_concentration.iter().copied().enumerate() {
+        if !concentration.is_finite() || concentration <= 0.0 {
+            return Err(PrequentialEProcessError::InvalidDirichletConcentration {
+                category_index,
+            });
+        }
+        concentration_mass += concentration;
+    }
+    if !concentration_mass.is_finite() || concentration_mass <= 0.0 {
+        return Err(PrequentialEProcessError::NonFiniteDirichletConcentrationMass);
+    }
+
+    let category_count = prior_concentration.len();
+    let mut counts = vec![0_u64; category_count];
+    let mut observation_count = 0_u64;
+    let mut log_e_value = 0.0_f64;
+    let log_e_threshold = -alpha.ln();
+    let mut crossed_at_observation = None;
+    let mut log_e_value_by_observation = Vec::with_capacity(null_observations.len());
+    let mut log_likelihood_ratio_increment_by_observation =
+        Vec::with_capacity(null_observations.len());
+
+    for (observation_index, observation) in null_observations.iter().enumerate() {
+        let null_probabilities = &observation.predicted_outcome_probabilities;
+        if null_probabilities.is_empty() {
+            return Err(PrequentialEProcessError::EmptyNullOutcomeSet { observation_index });
+        }
+        if null_probabilities.len() != category_count {
+            return Err(
+                PrequentialEProcessError::DirichletCategoryCountMismatch {
+                    observation_index,
+                    expected: category_count,
+                    actual: null_probabilities.len(),
+                },
+            );
+        }
+        validate_categorical_distribution(null_probabilities).map_err(
+            |(category_index, sum)| {
+                if let Some(category_index) = category_index {
+                    PrequentialEProcessError::InvalidNullProbability {
+                        observation_index,
+                        category_index,
+                    }
+                } else {
+                    PrequentialEProcessError::NullProbabilityMassNotNormalized {
+                        observation_index,
+                        sum,
+                    }
+                }
+            },
+        )?;
+        let outcome_index = observation.observed_outcome_index;
+        if outcome_index >= category_count {
+            return Err(PrequentialEProcessError::NullOutcomeIndexOutOfRange {
+                observation_index,
+                outcome_index,
+                outcome_count: category_count,
+            });
+        }
+        let null_probability = null_probabilities[outcome_index];
+        if null_probability == 0.0 {
+            return Err(PrequentialEProcessError::NullSupportViolation { observation_index });
+        }
+
+        let denominator = concentration_mass + observation_count as f64;
+        let alternative_probability =
+            (prior_concentration[outcome_index] + counts[outcome_index] as f64) / denominator;
+        if !alternative_probability.is_finite() || alternative_probability <= 0.0 {
+            return Err(PrequentialEProcessError::NonFiniteLogLikelihoodRatio);
+        }
+        let increment = alternative_probability.ln() - null_probability.ln();
+        if !increment.is_finite() {
+            return Err(PrequentialEProcessError::NonFiniteLogLikelihoodRatio);
+        }
+        log_e_value += increment;
+        if !log_e_value.is_finite() {
+            return Err(PrequentialEProcessError::NonFiniteLogLikelihoodRatio);
+        }
+
+        counts[outcome_index] = counts[outcome_index]
+            .checked_add(1)
+            .ok_or(PrequentialEProcessError::ObservationCountOverflow)?;
+        observation_count = observation_count
+            .checked_add(1)
+            .ok_or(PrequentialEProcessError::ObservationCountOverflow)?;
+
+        if crossed_at_observation.is_none() && log_e_value >= log_e_threshold {
+            crossed_at_observation = Some(observation_index + 1);
+        }
+        log_likelihood_ratio_increment_by_observation.push(increment);
+        log_e_value_by_observation.push(log_e_value);
+    }
+
+    let final_denominator = concentration_mass + observation_count as f64;
+    let final_alternative_predictive_probabilities = prior_concentration
+        .iter()
+        .zip(&counts)
+        .map(|(concentration, count)| (concentration + *count as f64) / final_denominator)
+        .collect();
+
+    Ok(DirichletPrequentialEProcessReport {
+        alpha,
+        log_e_threshold,
+        log_e_value,
+        log_e_value_by_observation,
+        log_likelihood_ratio_increment_by_observation,
+        crossed_at_observation,
+        prior_concentration: prior_concentration.to_vec(),
+        final_counts: counts,
+        final_alternative_predictive_probabilities,
+    })
+}
+
 fn mixture_log_e_value(
     alternatives: &[PrequentialAlternativeModel],
     log_likelihood_ratios: &[Option<f64>],
@@ -919,6 +1094,137 @@ mod tests {
                 safety_risk: 0.0,
             }],
         )
+    }
+
+    #[test]
+    fn dirichlet_e_process_has_unit_expected_value_for_one_step_null() {
+        let null = [0.7, 0.3];
+        let mut expected_e_value = 0.0;
+        for outcome in 0..2 {
+            let report = evaluate_dirichlet_prequential_e_process(
+                &[PrequentialCategoricalObservation {
+                    predicted_outcome_probabilities: null.to_vec(),
+                    observed_outcome_index: outcome,
+                }],
+                &[1.0, 1.0],
+                0.05,
+            )
+            .expect("valid one-step e-process");
+            expected_e_value += null[outcome] * report.log_e_value.exp();
+        }
+        assert!((expected_e_value - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn dirichlet_e_process_is_valid_for_arbitrary_predictable_null_sequence() {
+        let first_null = [0.8, 0.2];
+        let second_null_after_zero = [0.3, 0.7];
+        let second_null_after_one = [0.9, 0.1];
+        let mut expected_e_value = 0.0;
+
+        for first_outcome in 0..2 {
+            let second_null = if first_outcome == 0 {
+                second_null_after_zero
+            } else {
+                second_null_after_one
+            };
+            for second_outcome in 0..2 {
+                let path_probability =
+                    first_null[first_outcome] * second_null[second_outcome];
+                let report = evaluate_dirichlet_prequential_e_process(
+                    &[
+                        PrequentialCategoricalObservation {
+                            predicted_outcome_probabilities: first_null.to_vec(),
+                            observed_outcome_index: first_outcome,
+                        },
+                        PrequentialCategoricalObservation {
+                            predicted_outcome_probabilities: second_null.to_vec(),
+                            observed_outcome_index: second_outcome,
+                        },
+                    ],
+                    &[1.0, 1.0],
+                    0.05,
+                )
+                .expect("valid predictable null path");
+                expected_e_value += path_probability * report.log_e_value.exp();
+            }
+        }
+
+        assert!((expected_e_value - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn dirichlet_e_process_detects_persistent_frequency_misspecification() {
+        let observations = (0..40)
+            .map(|_| PrequentialCategoricalObservation {
+                predicted_outcome_probabilities: vec![0.5, 0.5],
+                observed_outcome_index: 0,
+            })
+            .collect::<Vec<_>>();
+        let report = evaluate_dirichlet_prequential_e_process(
+            &observations,
+            &[1.0, 1.0],
+            0.05,
+        )
+        .expect("valid persistent-shift sequence");
+
+        assert!(report.log_e_value >= report.log_e_threshold);
+        assert!(report.crossed_at_observation.is_some());
+        assert_eq!(report.final_counts, vec![40, 0]);
+        assert!(report.final_alternative_predictive_probabilities[0] > 0.95);
+    }
+
+    #[test]
+    fn dirichlet_e_process_rejects_null_support_and_category_drift() {
+        let support_violation = evaluate_dirichlet_prequential_e_process(
+            &[PrequentialCategoricalObservation {
+                predicted_outcome_probabilities: vec![1.0, 0.0],
+                observed_outcome_index: 1,
+            }],
+            &[1.0, 1.0],
+            0.05,
+        );
+        assert!(matches!(
+            support_violation,
+            Err(PrequentialEProcessError::NullSupportViolation {
+                observation_index: 0
+            })
+        ));
+
+        let category_drift = evaluate_dirichlet_prequential_e_process(
+            &[PrequentialCategoricalObservation {
+                predicted_outcome_probabilities: vec![1.0, 0.0, 0.0],
+                observed_outcome_index: 0,
+            }],
+            &[1.0, 1.0],
+            0.05,
+        );
+        assert!(matches!(
+            category_drift,
+            Err(PrequentialEProcessError::DirichletCategoryCountMismatch {
+                observation_index: 0,
+                expected: 2,
+                actual: 3
+            })
+        ));
+    }
+
+    #[test]
+    fn dirichlet_e_process_rejects_invalid_concentration_and_alpha() {
+        assert!(matches!(
+            evaluate_dirichlet_prequential_e_process(&[], &[], 0.05),
+            Err(PrequentialEProcessError::EmptyDirichletConcentration)
+        ));
+        assert!(matches!(
+            evaluate_dirichlet_prequential_e_process(&[], &[1.0, 0.0], 0.05),
+            Err(PrequentialEProcessError::InvalidDirichletConcentration {
+                category_index: 1
+            })
+        ));
+        assert!(matches!(
+            evaluate_dirichlet_prequential_e_process(&[], &[1.0, 1.0], 1.0),
+            Err(PrequentialEProcessError::InvalidAlpha)
+        ));
     }
 
     #[test]
