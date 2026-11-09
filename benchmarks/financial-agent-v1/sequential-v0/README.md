@@ -7,6 +7,8 @@
 
 ## Files
 
+- `sequence-stream.schema.json`: structural contract for stream events, exact timestamps, principal/rights profiles and frontier declarations.
+- `sequence-oracle.schema.json`: structural contract for expected frontier-local admitted evidence, claims, unknowns and snapshot invariants.
 - `supplier-correction.stream.json`: ordered evidence versions and six decision frontiers.
 - `supplier-correction.oracle.json`: expected admitted evidence and permitted conclusions at every frontier.
 
