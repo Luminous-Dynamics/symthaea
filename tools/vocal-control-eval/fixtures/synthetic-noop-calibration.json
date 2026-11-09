@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "calibration_id": "synthetic-noop-calibration-001",
+  "minimum_replicates": 5,
+  "required_dimensions": [
+    "breathiness_index",
+    "vibrato_depth_cents"
+  ],
+  "resolution_floors": {
+    "breathiness_index": 0.005,
+    "vibrato_depth_cents": 0.25
+  },
+  "regions": [
+    "phrase-1",
+    "phrase-2"
+  ],
+  "runs": [
+    {
+      "receipt": {
+        "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_id": "synthetic-calibration-only",
+        "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "voice_id": "fixture-voice",
+        "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "performance_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "audio_digest": "blake3:1111111111111111111111111111111111111111111111111111111111111111",
+        "seed": 300,
+        "sample_rate_hz": 44100
+      },
+      "measurements": {
+        "phrase-1": {
+          "breathiness_index": 0.1,
+          "vibrato_depth_cents": 16
+        },
+        "phrase-2": {
+          "breathiness_index": 0.11,
+          "vibrato_depth_cents": 18
+        }
+      }
+    },
+    {
+      "receipt": {
+        "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_id": "synthetic-calibration-only",
+        "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "voice_id": "fixture-voice",
+        "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "performance_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "audio_digest": "blake3:2222222222222222222222222222222222222222222222222222222222222222",
+        "seed": 301,
+        "sample_rate_hz": 44100
+      },
+      "measurements": {
+        "phrase-1": {
+          "breathiness_index": 0.11,
+          "vibrato_depth_cents": 16
+        },
+        "phrase-2": {
+          "breathiness_index": 0.12,
+          "vibrato_depth_cents": 18
+        }
+      }
+    },
+    {
+      "receipt": {
+        "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_id": "synthetic-calibration-only",
+        "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "voice_id": "fixture-voice",
+        "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "performance_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "audio_digest": "blake3:3333333333333333333333333333333333333333333333333333333333333333",
+        "seed": 302,
+        "sample_rate_hz": 44100
+      },
+      "measurements": {
+        "phrase-1": {
+          "breathiness_index": 0.09,
+          "vibrato_depth_cents": 16
+        },
+        "phrase-2": {
+          "breathiness_index": 0.09999999999999999,
+          "vibrato_depth_cents": 18
+        }
+      }
+    },
+    {
+      "receipt": {
+        "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_id": "synthetic-calibration-only",
+        "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "voice_id": "fixture-voice",
+        "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "performance_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "audio_digest": "blake3:4444444444444444444444444444444444444444444444444444444444444444",
+        "seed": 303,
+        "sample_rate_hz": 44100
+      },
+      "measurements": {
+        "phrase-1": {
+          "breathiness_index": 0.1,
+          "vibrato_depth_cents": 16
+        },
+        "phrase-2": {
+          "breathiness_index": 0.11,
+          "vibrato_depth_cents": 18
+        }
+      }
+    },
+    {
+      "receipt": {
+        "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_id": "synthetic-calibration-only",
+        "model_artifact_digest": "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "voice_id": "fixture-voice",
+        "invariant_task_digest": "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "performance_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "audio_digest": "blake3:5555555555555555555555555555555555555555555555555555555555555555",
+        "seed": 304,
+        "sample_rate_hz": 44100
+      },
+      "measurements": {
+        "phrase-1": {
+          "breathiness_index": 0.12,
+          "vibrato_depth_cents": 16
+        },
+        "phrase-2": {
+          "breathiness_index": 0.13,
+          "vibrato_depth_cents": 18
+        }
+      }
+    }
+  ]
+}
