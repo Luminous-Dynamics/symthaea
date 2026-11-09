@@ -134,7 +134,7 @@ jobs:
             .policy_count == 7 and
             .pair_count == 2751 and
             .episode_count == 5502 and
-            .report_version == "symthaea-open-world-finite-policy-campaign-v1" and
+            .report_version == "symthaea-open-world-finite-policy-campaign-v2" and
             (.results | length) == 21 and
             (.pair_records | length) == 2751 and
             (.paired_contrasts | length) == 21 and
