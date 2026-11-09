@@ -402,8 +402,7 @@ pub fn double_scaling_product_window(
     {
         return Err(LinkSamplingBiasError::InvalidTimeExtent);
     }
-    if !mu.is_finite() || !eta.is_finite() || mu <= 0.0 || mu >= 1.0 || eta <= 0.0 || eta >= 1.0
-    {
+    if !mu.is_finite() || !eta.is_finite() || mu <= 0.0 || mu >= 1.0 || eta <= 0.0 || eta >= 1.0 {
         return Err(LinkSamplingBiasError::InvalidWindowFraction);
     }
 
