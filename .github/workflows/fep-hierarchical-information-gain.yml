@@ -3,7 +3,6 @@ name: FEP Hierarchical Information Gain Qualification
 on:
   pull_request:
     paths:
-      - ".github/workflows/fep-hierarchical-information-gain.yml"
       - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
       - "crates/core/symthaea-fep/src/lib.rs"
