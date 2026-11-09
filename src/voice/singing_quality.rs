@@ -22,6 +22,9 @@ pub struct VocalQualityMetrics {
     /// Frames where the score-conditioned estimate appears reassuring while
     /// the global estimate finds a large pitch mismatch.
     pub pitch_prior_mismatch_frames: usize,
+    /// None means the score-independent estimate did not have enough voiced
+    /// support to qualify this diagnostic.
+    pub score_independent_pitch_audit_pass: Option<bool>,
     pub median_onset_error_ms: f32,
     pub duration_error_ms: f32,
     pub rest_interval_count: usize,
@@ -195,6 +198,9 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         percentile(&score_independent_errors, 0.95);
     let score_independent_pitch_valid_fraction =
         score_independent_errors.len() as f32 / expected_voiced_frames.max(1) as f32;
+    let score_independent_pitch_audit_pass =
+        (score_independent_pitch_valid_fraction >= 0.8)
+            .then_some(pitch_prior_mismatch_frames == 0);
     // An onset-from-silence metric is meaningful for the first note and after
     // an actual gap, not at a connected legato boundary where audio continues.
     let mut previous_end = None;
@@ -266,6 +272,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         score_independent_pitch_p95_error_cents,
         score_independent_pitch_valid_fraction,
         pitch_prior_mismatch_frames,
+        score_independent_pitch_audit_pass,
         median_onset_error_ms,
         duration_error_ms,
         rest_interval_count,
@@ -459,8 +466,15 @@ fn estimate_f0(x: &[f32], rate: u32) -> Option<f32> {
     if rms < 0.003 {
         return None;
     }
-    let min_lag = rate as usize / 500;
-    let max_lag = (rate as usize / 70).min(x.len() / 2);
+    // Singing fundamentals can fall well outside speech-oriented 70-500 Hz
+    // ranges. Keep the score-independent audit broad enough for low and high
+    // registers while leaving the score-conditioned tracker as a separate
+    // measurement path.
+    let min_lag = (rate as f32 / 1_200.0).floor().max(1.0) as usize;
+    let max_lag = (rate as usize / 40).min(x.len() / 2);
+    if max_lag < min_lag {
+        return None;
+    }
     let mut scores = Vec::with_capacity(max_lag - min_lag + 1);
     let mut best_score = 0.0f64;
     for lag in min_lag..=max_lag {
@@ -602,17 +616,7 @@ mod tests {
         assert!(metrics.median_pitch_error_cents < 15.0, "{:?}", metrics);
     }
 
-    /// `estimate_f0_near`'s octave-safety window is fixed at +/-300 cents
-    /// (line: `let ratio = 2.0f32.powf(300.0 / 1200.0)`). When the actual
-    /// pitch is further from the expected note than that, the search can
-    /// only find its best match at the window's edge -- so the reported
-    /// error saturates near the window boundary rather than reflecting the
-    /// true (potentially much larger) mistracking. This reproduces that
-    /// saturation with a sine wave synthesized nearly an octave away from
-    /// the note it is meant to represent, and confirms the reported error
     /// A score prior can make an incorrect pitch look close by constraining
-    /// the search to +/-300 cents. The unconstrained cross-check must expose
-    /// the true large mismatch and count the prior-induced disagreement.
     #[test]
     fn score_independent_pitch_audit_detects_prior_induced_false_reassurance() {
         let note = symthaea_muse::Note {
@@ -647,9 +651,29 @@ mod tests {
             metrics.pitch_prior_mismatch_frames > 0,
             "the evaluator must explicitly flag false reassurance: {metrics:?}"
         );
+        assert_eq!(metrics.score_independent_pitch_audit_pass, Some(false));
         assert!(
             metrics.score_independent_pitch_valid_fraction >= 0.8,
             "the score-independent diagnostic should have adequate frame coverage: {metrics:?}"
         );
     }
+    #[test]
+    fn unconstrained_pitch_estimator_covers_low_and_high_singing_registers() {
+        let rate = 24_000;
+        for expected_hz in [80.0f32, 800.0f32] {
+            let samples: Vec<_> = (0..rate / 20)
+                .map(|index| {
+                    (std::f32::consts::TAU * expected_hz * index as f32 / rate as f32)
+                        .sin()
+                        * 0.2
+                })
+                .collect();
+            let measured = estimate_f0(&samples, rate).expect("periodic tone must be detected");
+            assert!(
+                (measured - expected_hz).abs() < 2.0,
+                "expected {expected_hz} Hz, observed {measured} Hz"
+            );
+        }
+    }
+
 }
