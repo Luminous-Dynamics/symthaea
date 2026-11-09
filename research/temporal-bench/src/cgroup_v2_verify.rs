@@ -6,12 +6,14 @@
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::Path;
 
 use super::digest::CanonicalHasher;
 
 const REQUIRED_CONTROLLERS: [&str; 3] = ["cpu", "memory", "pids"];
+const MAX_CGROUP_CONTROL_FILE_BYTES: u64 = 64 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CgroupV2Error {
@@ -23,6 +25,7 @@ pub enum CgroupV2Error {
     InvalidMountInfoEscape,
     InvalidMountInfoUtf8,
     ReadFailed { path: String, reason: String },
+    ControlFileTooLarge { path: String, maximum_bytes: u64 },
     ScopePathMismatch,
     MissingController(&'static str),
     ControllerNotEnabled(&'static str),
@@ -52,6 +55,7 @@ impl fmt::Display for CgroupV2Error {
             Self::InvalidMountInfoEscape => write!(f, "mountinfo contains an invalid escaped path field"),
             Self::InvalidMountInfoUtf8 => write!(f, "mountinfo path field is not valid UTF-8"),
             Self::ReadFailed { path, reason } => write!(f, "could not read cgroup evidence at {path}: {reason}"),
+            Self::ControlFileTooLarge { path, maximum_bytes } => write!(f, "cgroup control file {path} exceeds {maximum_bytes} bytes"),
             Self::ScopePathMismatch => write!(f, "observed cgroup path differs from the expected systemd scope"),
             Self::MissingController(name) => write!(f, "parent cgroup does not expose required {name} controller"),
             Self::ControllerNotEnabled(name) => write!(f, "parent cgroup has not enabled {name} for its children"),
@@ -152,10 +156,13 @@ fn decode_mountinfo_path(value: &str) -> Result<String, CgroupV2Error> {
         if !escaped.iter().all(|byte| (b'0'..=b'7').contains(byte)) {
             return Err(CgroupV2Error::InvalidMountInfoEscape);
         }
-        let byte = ((escaped[0] - b'0') << 6)
-            | ((escaped[1] - b'0') << 3)
-            | (escaped[2] - b'0');
-        decoded.push(byte);
+        let byte = (u16::from(escaped[0] - b'0') << 6)
+            | (u16::from(escaped[1] - b'0') << 3)
+            | u16::from(escaped[2] - b'0');
+        if byte > u16::from(u8::MAX) {
+            return Err(CgroupV2Error::InvalidMountInfoEscape);
+        }
+        decoded.push(byte as u8);
         index += 4;
     }
 
@@ -202,9 +209,27 @@ pub fn verify_cgroup2_mount(
 }
 
 fn read_control_file(path: &Path) -> Result<String, CgroupV2Error> {
-    fs::read_to_string(path).map_err(|error| CgroupV2Error::ReadFailed {
-        path: path.display().to_string(),
+    let display_path = path.display().to_string();
+    let file = File::open(path).map_err(|error| CgroupV2Error::ReadFailed {
+        path: display_path.clone(),
         reason: error.to_string(),
+    })?;
+    let mut bytes = Vec::new();
+    file.take(MAX_CGROUP_CONTROL_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| CgroupV2Error::ReadFailed {
+            path: display_path.clone(),
+            reason: error.to_string(),
+        })?;
+    if bytes.len() as u64 > MAX_CGROUP_CONTROL_FILE_BYTES {
+        return Err(CgroupV2Error::ControlFileTooLarge {
+            path: display_path,
+            maximum_bytes: MAX_CGROUP_CONTROL_FILE_BYTES,
+        });
+    }
+    String::from_utf8(bytes).map_err(|error| CgroupV2Error::ReadFailed {
+        path: display_path,
+        reason: format!("control file is not UTF-8: {error}"),
     })
 }
 
@@ -660,6 +685,15 @@ mod tests {
         assert_eq!(
             verify_cgroup2_mount(escaped, Path::new("/sys/fs/group root")),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn mountinfo_rejects_octal_escapes_outside_single_byte_range() {
+        let invalid = "36 25 0:32 / /sys/fs/group\\777 rw - cgroup2 cgroup rw\\n";
+        assert_eq!(
+            verify_cgroup2_mount(invalid, Path::new("/sys/fs/group")),
+            Err(CgroupV2Error::InvalidMountInfoEscape)
         );
     }
 
