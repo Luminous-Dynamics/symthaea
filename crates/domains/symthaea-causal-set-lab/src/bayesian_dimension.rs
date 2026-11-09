@@ -136,8 +136,14 @@ impl fmt::Display for BayesianDimensionError {
             Self::InvalidEventCount { event_count } => {
                 write!(f, "event count {event_count} must be at least 8")
             }
-            Self::TooManyCalibrationEvents { event_count, maximum } => {
-                write!(f, "event count {event_count} exceeds calibration cap {maximum}")
+            Self::TooManyCalibrationEvents {
+                event_count,
+                maximum,
+            } => {
+                write!(
+                    f,
+                    "event count {event_count} exceeds calibration cap {maximum}"
+                )
             }
             Self::InvalidProperTime => write!(f, "proper time must be finite and positive"),
             Self::InvalidReplicateCount { count } => write!(
@@ -178,10 +184,9 @@ impl fmt::Display for BayesianDimensionError {
             Self::DuplicatePriorDimension { dimension } => {
                 write!(f, "prior dimension {dimension} appears more than once")
             }
-            Self::PriorDimensionMissingCalibration { dimension } => write!(
-                f,
-                "prior dimension {dimension} has no calibration samples"
-            ),
+            Self::PriorDimensionMissingCalibration { dimension } => {
+                write!(f, "prior dimension {dimension} has no calibration samples")
+            }
             Self::InvalidPriorProbability { dimension } => {
                 write!(f, "prior probability for dimension {dimension} is invalid")
             }
@@ -190,7 +195,9 @@ impl fmt::Display for BayesianDimensionError {
                 write!(f, "calibration metadata is inconsistent or invalid")
             }
             Self::NumericalOverflow => write!(f, "finite-size dimension inference overflowed"),
-            Self::Sprinkling(error) => write!(f, "causal-set calibration sprinkling failed: {error}"),
+            Self::Sprinkling(error) => {
+                write!(f, "causal-set calibration sprinkling failed: {error}")
+            }
         }
     }
 }
@@ -297,9 +304,7 @@ pub fn estimate_finite_size_dimension_posterior(
     prior: &[DimensionPrior],
 ) -> Result<FiniteSizeDimensionPosterior, BayesianDimensionError> {
     validate_event_count(event_count)?;
-    if !observed_ordering_fraction.is_finite()
-        || !(0.0..=1.0).contains(&observed_ordering_fraction)
-    {
+    if !observed_ordering_fraction.is_finite() || !(0.0..=1.0).contains(&observed_ordering_fraction) {
         return Err(BayesianDimensionError::InvalidObservedOrderingFraction);
     }
     validate_calibration(calibration)?;
@@ -316,9 +321,7 @@ pub fn estimate_finite_size_dimension_posterior(
     let mut prior_dimensions = BTreeSet::new();
     let mut prior_mass = 0.0;
     for item in prior {
-        if !(MIN_BAYESIAN_DIMENSION..=MAX_BAYESIAN_DIMENSION)
-            .contains(&item.spacetime_dimension)
-        {
+        if !(MIN_BAYESIAN_DIMENSION..=MAX_BAYESIAN_DIMENSION).contains(&item.spacetime_dimension) {
             return Err(BayesianDimensionError::UnsupportedDimension {
                 dimension: item.spacetime_dimension,
             });
@@ -328,10 +331,7 @@ pub fn estimate_finite_size_dimension_posterior(
                 dimension: item.spacetime_dimension,
             });
         }
-        if !item.probability.is_finite()
-            || item.probability < 0.0
-            || item.probability > 1.0
-        {
+        if !item.probability.is_finite() || item.probability < 0.0 || item.probability > 1.0 {
             return Err(BayesianDimensionError::InvalidPriorProbability {
                 dimension: item.spacetime_dimension,
             });
@@ -354,10 +354,8 @@ pub fn estimate_finite_size_dimension_posterior(
             .ok_or(BayesianDimensionError::PriorDimensionMissingCalibration {
                 dimension: item.spacetime_dimension,
             })?;
-        let (mean, standard_deviation, bandwidth) = kde_bandwidth(
-            &samples.ordering_fractions,
-            event_count,
-        )?;
+        let (mean, standard_deviation, bandwidth) =
+            kde_bandwidth(&samples.ordering_fractions, event_count)?;
         let nearest = samples
             .ordering_fractions
             .iter()
@@ -404,19 +402,31 @@ pub fn estimate_finite_size_dimension_posterior(
             credible_set_95: Vec::new(),
             dimensions: intermediate
                 .into_iter()
-                .map(|(dimension, prior_probability, log_likelihood, mean, sd, bandwidth, nearest, within, _)| {
-                    DimensionPosteriorEntry {
-                        spacetime_dimension: dimension,
+                .map(
+                    |(
+                        dimension,
                         prior_probability,
                         log_likelihood,
-                        posterior_probability: None,
-                        calibration_mean: mean,
-                        calibration_standard_deviation: sd,
-                        kde_bandwidth: bandwidth,
-                        nearest_sample_distance_bandwidths: nearest,
-                        within_calibration_support: within,
-                    }
-                })
+                        mean,
+                        sd,
+                        bandwidth,
+                        nearest,
+                        within,
+                        _,
+                    )| {
+                        DimensionPosteriorEntry {
+                            spacetime_dimension: dimension,
+                            prior_probability,
+                            log_likelihood,
+                            posterior_probability: None,
+                            calibration_mean: mean,
+                            calibration_standard_deviation: sd,
+                            kde_bandwidth: bandwidth,
+                            nearest_sample_distance_bandwidths: nearest,
+                            within_calibration_support: within,
+                        }
+                    },
+                )
                 .collect(),
         });
     }
@@ -463,7 +473,12 @@ pub fn estimate_finite_size_dimension_posterior(
             )
         })
         .collect();
-    ranking.sort_by(|left, right| right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    ranking.sort_by(|left, right| {
+        right
+            .1
+            .total_cmp(&left.1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
     let mut cumulative = 0.0;
     let mut credible_set_95 = Vec::new();
     for (dimension, probability) in ranking {
@@ -605,9 +620,7 @@ fn kde_bandwidth(
     } else {
         standard_deviation
     };
-    let silverman = SILVERMAN_FACTOR
-        * robust_scale
-        * (samples.len() as f64).powf(-0.2);
+    let silverman = SILVERMAN_FACTOR * robust_scale * (samples.len() as f64).powf(-0.2);
     let pair_count = (event_count as f64) * (event_count.saturating_sub(1) as f64) / 2.0;
     let discrete_resolution = 1.0 / pair_count.max(1.0);
     let bandwidth = silverman.max(discrete_resolution).max(MIN_BANDWIDTH_FLOOR);
@@ -633,7 +646,10 @@ fn gaussian_kde_log_density(
             -0.5 * standardized * standardized - GAUSSIAN_LOG_NORMALIZER - bandwidth.ln()
         })
         .collect();
-    let maximum = log_terms.iter().copied().max_by(f64::total_cmp)
+    let maximum = log_terms
+        .iter()
+        .copied()
+        .max_by(f64::total_cmp)
         .ok_or(BayesianDimensionError::NumericalOverflow)?;
     if !maximum.is_finite() {
         return Err(BayesianDimensionError::NumericalOverflow);
@@ -672,14 +688,8 @@ mod tests {
     }
 
     fn calibration(events: usize, replicates: usize) -> FiniteSizeDimensionCalibration {
-        calibrate_minkowski_ordering_fraction(
-            events,
-            1.0,
-            &[2, 3, 4],
-            replicates,
-            0xB4A9_2026,
-        )
-        .unwrap()
+        calibrate_minkowski_ordering_fraction(events, 1.0, &[2, 3, 4], replicates, 0xB4A9_2026)
+            .unwrap()
     }
 
     #[test]
@@ -688,7 +698,11 @@ mod tests {
         let right = calibration(48, 12);
         assert_eq!(left, right);
         assert_eq!(left.dimensions.len(), 3);
-        assert!(left.dimensions.iter().all(|entry| entry.ordering_fractions.len() == 12));
+        assert!(
+            left.dimensions
+                .iter()
+                .all(|entry| entry.ordering_fractions.len() == 12)
+        );
     }
 
     #[test]
@@ -699,7 +713,10 @@ mod tests {
         let posterior =
             estimate_finite_size_dimension_posterior(96, observed, &corpus, &prior()).unwrap();
 
-        assert_eq!(posterior.status, DimensionInferenceStatus::CalibratedPosterior);
+        assert_eq!(
+            posterior.status,
+            DimensionInferenceStatus::CalibratedPosterior
+        );
         let p4 = posterior
             .dimensions
             .iter()
@@ -719,10 +736,16 @@ mod tests {
         let boosted_fraction = boosted.ordering_fraction().unwrap();
         assert!((base - boosted_fraction).abs() < 1.0e-12);
 
-        let original = estimate_finite_size_dimension_posterior(64, base, &corpus, &prior()).unwrap();
+        let original =
+            estimate_finite_size_dimension_posterior(64, base, &corpus, &prior()).unwrap();
         let transformed =
-            estimate_finite_size_dimension_posterior(64, boosted_fraction, &corpus, &prior()).unwrap();
-        for (left, right) in original.dimensions.iter().zip(transformed.dimensions.iter()) {
+            estimate_finite_size_dimension_posterior(64, boosted_fraction, &corpus, &prior())
+                .unwrap();
+        for (left, right) in original
+            .dimensions
+            .iter()
+            .zip(transformed.dimensions.iter())
+        {
             assert_eq!(left.spacetime_dimension, right.spacetime_dimension);
             assert!(
                 (left.posterior_probability.unwrap() - right.posterior_probability.unwrap()).abs()
@@ -738,15 +761,30 @@ mod tests {
             .unwrap()
             .ordering_fraction()
             .unwrap();
-        let uniform = estimate_finite_size_dimension_posterior(64, observed, &corpus, &prior()).unwrap();
+        let uniform =
+            estimate_finite_size_dimension_posterior(64, observed, &corpus, &prior()).unwrap();
         let d2_prior = vec![
-            DimensionPrior { spacetime_dimension: 2, probability: 0.8 },
-            DimensionPrior { spacetime_dimension: 3, probability: 0.1 },
-            DimensionPrior { spacetime_dimension: 4, probability: 0.1 },
+            DimensionPrior {
+                spacetime_dimension: 2,
+                probability: 0.8,
+            },
+            DimensionPrior {
+                spacetime_dimension: 3,
+                probability: 0.1,
+            },
+            DimensionPrior {
+                spacetime_dimension: 4,
+                probability: 0.1,
+            },
         ];
-        let biased = estimate_finite_size_dimension_posterior(64, observed, &corpus, &d2_prior).unwrap();
+        let biased =
+            estimate_finite_size_dimension_posterior(64, observed, &corpus, &d2_prior).unwrap();
 
-        let total: f64 = uniform.dimensions.iter().map(|entry| entry.posterior_probability.unwrap()).sum();
+        let total: f64 = uniform
+            .dimensions
+            .iter()
+            .map(|entry| entry.posterior_probability.unwrap())
+            .sum();
         assert!((total - 1.0).abs() < 1.0e-12);
         assert!(
             biased.dimensions[0].posterior_probability.unwrap()
@@ -759,10 +797,18 @@ mod tests {
         let corpus = calibration(64, 32);
         let posterior =
             estimate_finite_size_dimension_posterior(64, 1.0, &corpus, &prior()).unwrap();
-        assert_eq!(posterior.status, DimensionInferenceStatus::OutsideCalibrationSupport);
+        assert_eq!(
+            posterior.status,
+            DimensionInferenceStatus::OutsideCalibrationSupport
+        );
         assert_eq!(posterior.posterior_mean_dimension, None);
         assert_eq!(posterior.credible_set_95, Vec::<usize>::new());
-        assert!(posterior.dimensions.iter().all(|entry| entry.posterior_probability.is_none()));
+        assert!(
+            posterior
+                .dimensions
+                .iter()
+                .all(|entry| entry.posterior_probability.is_none())
+        );
     }
 
     #[test]
@@ -795,8 +841,14 @@ mod tests {
                 0.5,
                 &corpus,
                 &[
-                    DimensionPrior { spacetime_dimension: 2, probability: 0.5 },
-                    DimensionPrior { spacetime_dimension: 2, probability: 0.5 }
+                    DimensionPrior {
+                        spacetime_dimension: 2,
+                        probability: 0.5
+                    },
+                    DimensionPrior {
+                        spacetime_dimension: 2,
+                        probability: 0.5
+                    }
                 ]
             ),
             Err(BayesianDimensionError::DuplicatePriorDimension { .. })
