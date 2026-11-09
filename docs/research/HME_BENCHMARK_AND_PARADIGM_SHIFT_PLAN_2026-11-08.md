@@ -797,6 +797,9 @@ HME_BENCH_GROUP_SIZE=64 \\
 HME_BENCH_TOP_K=10 \\
 HME_BENCH_REPEATS=21 \\
 cargo bench -p symthaea-memory --bench hme_hierarchical_select
+
+# Synopsis profile: box (default) or ball
+HME_BENCH_MODE=ball cargo bench -p symthaea-memory --bench hme_hierarchical_select
 \`\`\`
 
 The harness:
@@ -875,3 +878,14 @@ Scores across these suites are not commensurate. Use a common frozen answerer/re
 4. HME can outperform existing memory systems on lifecycle correctness only if raw ingestion, update/revocation, retention, activation and restraint are measured—not just final question answering.
 
 These hypotheses need independent benchmark runs. Current HME benchmark status remains authored-but-not-executed.
+
+
+## 21. BlockBall synopsis research path (issue #11259)
+
+A further synopsis point is now tracked in #11259: **BlockBall**, an intermediate representation between BallOnly and per-coordinate BoxAndBall.
+
+For a fixed block partition of D coordinates, store the centroid c and one conservative per-block L2 residual radius r_b. Since every coordinate deviation is bounded by its block L2 norm, each member coordinate j in block b is enclosed by [c_j-r_b,c_j+r_b]. A global safe radius follows from sqrt(sum_b r_b^2). The query can generate these endpoint pairs through the core no-allocation indexed component-bound callback, then intersect that component enclosure with the global centroid-ball interval.
+
+The estimated numeric synopsis is 4D + 4 ceil(D/B) + 4 bytes per group, excluding all IDs/digests/index/allocator overhead. Compare B = 32/64/128/256/512/1024 against BallOnly (4D+4), QuantizedBoxAndBall (8D+4) and BoxAndBall (12D+4). BlockBall remains an issue-level research hypothesis, not yet an implemented or promoted source mode.
+
+The selection criterion is not "tightest interval wins": measure the full memory/pruning/metadata/payload-read/latency/build-cost Pareto frontier. A query-time no-allocation bound only helps if the group metadata it requires remains cache-efficient and the additional build/update work is justified.
