@@ -6,6 +6,7 @@ on:
       - "src/voice/mod.rs"
       - "src/voice/formant_singing_engine.rs"
       - "src/voice/singing_quality.rs"
+      - "docs/research/VOCAL_PITCH_PRIOR_AUDIT_V1.md"
       - "src/voice/singing_engine.rs"
       - "src/voice/kokoro_singing.rs"
       - "src/voice/diffsinger.rs"
