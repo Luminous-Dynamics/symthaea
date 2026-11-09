@@ -291,8 +291,8 @@ pub fn evaluate_open_world_decision_gate(
         }
         ModelAdequacyStatus::Inadequate => OpenWorldGateDisposition::ModelRevisionRequired,
     };
-    let candidate_work_permitted = disposition
-        == OpenWorldGateDisposition::DetachedCandidateEvaluationPermitted;
+    let candidate_work_permitted =
+        disposition == OpenWorldGateDisposition::DetachedCandidateEvaluationPermitted;
 
     OpenWorldDecisionGateReport {
         declared_adequacy_status: adequacy.status,
@@ -989,9 +989,7 @@ pub fn evaluate_dirichlet_prequential_e_process(
     let mut concentration_mass = 0.0;
     for (category_index, concentration) in prior_concentration.iter().copied().enumerate() {
         if !concentration.is_finite() || concentration <= 0.0 {
-            return Err(PrequentialEProcessError::InvalidDirichletConcentration {
-                category_index,
-            });
+            return Err(PrequentialEProcessError::InvalidDirichletConcentration { category_index });
         }
         concentration_mass += concentration;
     }
@@ -1015,13 +1013,11 @@ pub fn evaluate_dirichlet_prequential_e_process(
             return Err(PrequentialEProcessError::EmptyNullOutcomeSet { observation_index });
         }
         if null_probabilities.len() != category_count {
-            return Err(
-                PrequentialEProcessError::DirichletCategoryCountMismatch {
-                    observation_index,
-                    expected: category_count,
-                    actual: null_probabilities.len(),
-                },
-            );
+            return Err(PrequentialEProcessError::DirichletCategoryCountMismatch {
+                observation_index,
+                expected: category_count,
+                actual: null_probabilities.len(),
+            });
         }
         validate_categorical_distribution(null_probabilities).map_err(
             |(category_index, sum)| {
@@ -1208,8 +1204,7 @@ mod tests {
                 second_null_after_one
             };
             for second_outcome in 0..2 {
-                let path_probability =
-                    first_null[first_outcome] * second_null[second_outcome];
+                let path_probability = first_null[first_outcome] * second_null[second_outcome];
                 let report = evaluate_dirichlet_prequential_e_process(
                     &[
                         PrequentialCategoricalObservation {
@@ -1240,12 +1235,8 @@ mod tests {
                 observed_outcome_index: 0,
             })
             .collect::<Vec<_>>();
-        let report = evaluate_dirichlet_prequential_e_process(
-            &observations,
-            &[1.0, 1.0],
-            0.05,
-        )
-        .expect("valid persistent-shift sequence");
+        let report = evaluate_dirichlet_prequential_e_process(&observations, &[1.0, 1.0], 0.05)
+            .expect("valid persistent-shift sequence");
 
         assert!(report.log_e_value >= report.log_e_threshold);
         assert!(report.crossed_at_observation.is_some());
@@ -1296,9 +1287,7 @@ mod tests {
         ));
         assert!(matches!(
             evaluate_dirichlet_prequential_e_process(&[], &[1.0, 0.0], 0.05),
-            Err(PrequentialEProcessError::InvalidDirichletConcentration {
-                category_index: 1
-            })
+            Err(PrequentialEProcessError::InvalidDirichletConcentration { category_index: 1 })
         ));
         assert!(matches!(
             evaluate_dirichlet_prequential_e_process(&[], &[1.0, 1.0], 1.0),
@@ -1363,8 +1352,7 @@ mod tests {
 
     #[test]
     fn anytime_evidence_overrides_aggregate_no_detected_inadequacy() {
-        let adequacy =
-            adequacy_report_with_status(ModelAdequacyStatus::NoDetectedInadequacy);
+        let adequacy = adequacy_report_with_status(ModelAdequacyStatus::NoDetectedInadequacy);
         let gate = evaluate_open_world_decision_gate(&adequacy, Some(66));
 
         assert_eq!(
@@ -1385,8 +1373,7 @@ mod tests {
 
     #[test]
     fn open_world_gate_only_permits_detached_candidates_and_never_live_mutation() {
-        let adequacy =
-            adequacy_report_with_status(ModelAdequacyStatus::NoDetectedInadequacy);
+        let adequacy = adequacy_report_with_status(ModelAdequacyStatus::NoDetectedInadequacy);
         let gate = evaluate_open_world_decision_gate(&adequacy, None);
 
         assert_eq!(
