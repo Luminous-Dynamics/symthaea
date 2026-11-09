@@ -42,7 +42,7 @@ The contract validates syntax, identity consistency, basic time/calibration line
 
 ## Frozen synthetic corpus
 
-The initial corpus contains 17 fixtures: 5 accepted shapes and 12 expected rejections. It includes:
+The initial corpus contains 18 fixtures: 5 accepted shapes and 13 expected rejections. It includes:
 - pack and module resolution;
 - stale-but-retained and explicitly unavailable readings;
 - a BMS-reported SOC value kept separate from direct sensor observations;
