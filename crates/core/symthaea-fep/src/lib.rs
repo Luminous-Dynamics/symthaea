@@ -144,6 +144,7 @@ pub mod decision_diagnostic_benchmark;
 pub mod decision_relevant_information;
 pub mod sequential_diagnostic_planning;
 pub mod sequential_diagnostic_benchmark;
+pub mod static_model_diagnostic;
 pub mod dirichlet_model_reduction;
 pub mod free_energy;
 pub mod gaussian_model_information_gain;
