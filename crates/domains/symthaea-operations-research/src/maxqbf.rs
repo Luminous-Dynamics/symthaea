@@ -178,8 +178,8 @@ struct DirectOracleStats {
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, MaxQbfError> {
-    let shift = u32::try_from(exponent)
-        .map_err(|_| MaxQbfError::DirectSubsetMaskSpaceOverflow {
+    let shift =
+        u32::try_from(exponent).map_err(|_| MaxQbfError::DirectSubsetMaskSpaceOverflow {
             clause_count: exponent,
         })?;
     1u128
@@ -299,10 +299,7 @@ fn build_blocking_encoding(
             })
             .collect::<Result<_, _>>()?;
 
-        if block_index == 0
-            && source_block.quantifier == Quantifier::Exists
-            && clause_count > 0
-        {
+        if block_index == 0 && source_block.quantifier == Quantifier::Exists && clause_count > 0 {
             blocks[0].variables.extend(shifted_variables);
         } else {
             blocks.push(QuantifierBlock {
@@ -317,12 +314,9 @@ fn build_blocking_encoding(
         max_blocks: budget.game_dag.max_variables.saturating_add(1),
         max_variable_occurrences: augmented_variable_count,
     };
-    let augmented_prefix = ValidatedQuantifierPrefix::new(
-        augmented_variable_count,
-        blocks,
-        prefix_budget,
-    )
-    .map_err(MaxQbfError::PrefixConstruction)?;
+    let augmented_prefix =
+        ValidatedQuantifierPrefix::new(augmented_variable_count, blocks, prefix_budget)
+            .map_err(MaxQbfError::PrefixConstruction)?;
 
     Ok(BlockingEncoding {
         problem: CnfProblem { variables, clauses },
@@ -353,8 +347,8 @@ fn dynamic_program_blocker_costs(
     blocker_count: usize,
     budget: MaxQbfBudget,
 ) -> Result<(Vec<Option<usize>>, u128), MaxQbfError> {
-    let visits = u128::try_from(dag.nodes.len())
-        .map_err(|_| MaxQbfError::ResourceAccountingOverflow)?;
+    let visits =
+        u128::try_from(dag.nodes.len()).map_err(|_| MaxQbfError::ResourceAccountingOverflow)?;
     if visits > budget.max_dp_node_visits {
         return Err(MaxQbfError::DynamicProgrammingBudgetExceeded {
             required: visits,
@@ -429,13 +423,8 @@ fn recover_blocker_assignment(
                 low_child,
                 high_child,
             } if variable == expected_variable => {
-                let low_cost = costs
-                    .get(low_child)
-                    .copied()
-                    .flatten();
-                let high_cost = add_blocker_cost(
-                    costs.get(high_child).copied().flatten(),
-                )?;
+                let low_cost = costs.get(low_child).copied().flatten();
+                let high_cost = add_blocker_cost(costs.get(high_child).copied().flatten())?;
                 let choose_high = match (low_cost, high_cost) {
                     (Some(low), Some(high)) => high < low,
                     (Some(_), None) => false,
@@ -462,11 +451,10 @@ fn retained_clause_indices(blockers: &[bool]) -> Vec<usize> {
 fn clause_subset_mask(indices: &[usize]) -> Result<u128, MaxQbfError> {
     let mut mask = 0u128;
     for &index in indices {
-        let shift = u32::try_from(index).map_err(|_| {
-            MaxQbfError::DirectSubsetMaskSpaceOverflow {
+        let shift =
+            u32::try_from(index).map_err(|_| MaxQbfError::DirectSubsetMaskSpaceOverflow {
                 clause_count: index.saturating_add(1),
-            }
-        })?;
+            })?;
         let bit = 1u128
             .checked_shl(shift)
             .ok_or(MaxQbfError::DirectSubsetMaskSpaceOverflow {
@@ -477,22 +465,14 @@ fn clause_subset_mask(indices: &[usize]) -> Result<u128, MaxQbfError> {
     Ok(mask)
 }
 
-fn direct_matrix_satisfied(
-    problem: &CnfProblem,
-    subset_mask: u128,
-    assignment: &[bool],
-) -> bool {
-    problem
-        .clauses
-        .iter()
-        .enumerate()
-        .all(|(index, clause)| {
-            let selected = ((subset_mask >> index) & 1) != 0;
-            !selected
-                || clause
-                    .iter()
-                    .any(|literal| assignment[literal.variable] == literal.positive)
-        })
+fn direct_matrix_satisfied(problem: &CnfProblem, subset_mask: u128, assignment: &[bool]) -> bool {
+    problem.clauses.iter().enumerate().all(|(index, clause)| {
+        let selected = ((subset_mask >> index) & 1) != 0;
+        !selected
+            || clause
+                .iter()
+                .any(|literal| assignment[literal.variable] == literal.positive)
+    })
 }
 
 fn direct_qbf_visit(
@@ -652,8 +632,7 @@ pub fn solve_maxqbf(
     }
 
     let (source_game_dag, _) =
-        build_qbf_game_proof_dag(problem, prefix, budget.game_dag)
-            .map_err(MaxQbfError::GameDag)?;
+        build_qbf_game_proof_dag(problem, prefix, budget.game_dag).map_err(MaxQbfError::GameDag)?;
     let source_verification =
         verify_qbf_game_proof_dag(problem, prefix, &source_game_dag, budget.game_dag)
             .map_err(MaxQbfError::GameDag)?;
@@ -692,11 +671,8 @@ pub fn solve_maxqbf(
         .len()
         .checked_sub(minimum_blocking_weight)
         .ok_or(MaxQbfError::DynamicProgrammingCostOverflow)?;
-    let blocker_assignment = recover_blocker_assignment(
-        &transformed_game_dag,
-        &costs,
-        problem.clauses.len(),
-    )?;
+    let blocker_assignment =
+        recover_blocker_assignment(&transformed_game_dag, &costs, problem.clauses.len())?;
     let selected_indices = retained_clause_indices(&blocker_assignment);
     let optimization = MaxQbfOptimizationReport {
         minimum_blocking_weight,
@@ -763,13 +739,9 @@ pub fn verify_maxqbf_evidence(
         });
     }
 
-    let source_dag_report = verify_qbf_game_proof_dag(
-        problem,
-        prefix,
-        &evidence.source_game_dag,
-        budget.game_dag,
-    )
-    .map_err(MaxQbfError::GameDag)?;
+    let source_dag_report =
+        verify_qbf_game_proof_dag(problem, prefix, &evidence.source_game_dag, budget.game_dag)
+            .map_err(MaxQbfError::GameDag)?;
     if source_dag_report.root_value {
         return Err(MaxQbfError::SourceQbfMustBeFalse {
             actual: source_dag_report.root_value,
@@ -790,11 +762,8 @@ pub fn verify_maxqbf_evidence(
         });
     }
 
-    let (costs, dp_node_visits) = dynamic_program_blocker_costs(
-        &evidence.transformed_game_dag,
-        clause_count,
-        budget,
-    )?;
+    let (costs, dp_node_visits) =
+        dynamic_program_blocker_costs(&evidence.transformed_game_dag, clause_count, budget)?;
     let recomputed_minimum = costs
         .get(evidence.transformed_game_dag.root)
         .copied()
@@ -830,11 +799,8 @@ pub fn verify_maxqbf_evidence(
         });
     }
 
-    let canonical_blockers = recover_blocker_assignment(
-        &evidence.transformed_game_dag,
-        &costs,
-        clause_count,
-    )?;
+    let canonical_blockers =
+        recover_blocker_assignment(&evidence.transformed_game_dag, &costs, clause_count)?;
     if canonical_blockers != evidence.optimization.blocker_assignment {
         return Err(MaxQbfError::BlockerAssignmentMismatch);
     }
@@ -848,40 +814,21 @@ pub fn verify_maxqbf_evidence(
     let source_mask = checked_power_of_two(clause_count)?
         .checked_sub(1)
         .ok_or(MaxQbfError::ResourceAccountingOverflow)?;
-    if direct_qbf_value(
-        problem,
-        prefix,
-        source_mask,
-        &mut direct_stats,
-        budget,
-    )? {
+    if direct_qbf_value(problem, prefix, source_mask, &mut direct_stats, budget)? {
         return Err(MaxQbfError::SourceQbfMustBeFalse { actual: true });
     }
-    if !direct_qbf_value(
-        problem,
-        prefix,
-        selected_mask,
-        &mut direct_stats,
-        budget,
-    )? {
+    if !direct_qbf_value(problem, prefix, selected_mask, &mut direct_stats, budget)? {
         return Err(MaxQbfError::SelectedClauseSubsetIsFalse);
     }
 
-    let masks_to_check =
-        preflight_direct_oracle(problem, recomputed_retained, budget)?;
+    let masks_to_check = preflight_direct_oracle(problem, recomputed_retained, budget)?;
     let mut better_subsets_rejected = 0u128;
     let total_masks = checked_power_of_two(clause_count)?;
     for mask in 0..total_masks {
         if mask.count_ones() as usize <= recomputed_retained {
             continue;
         }
-        let value = direct_qbf_value(
-            problem,
-            prefix,
-            mask,
-            &mut direct_stats,
-            budget,
-        )?;
+        let value = direct_qbf_value(problem, prefix, mask, &mut direct_stats, budget)?;
         if value {
             let counterexample_clause_indices = (0..clause_count)
                 .filter(|index| ((mask >> index) & 1) != 0)
@@ -934,10 +881,7 @@ mod tests {
         }
     }
 
-    fn prefix(
-        blocks: Vec<QuantifierBlock>,
-        variable_count: usize,
-    ) -> ValidatedQuantifierPrefix {
+    fn prefix(blocks: Vec<QuantifierBlock>, variable_count: usize) -> ValidatedQuantifierPrefix {
         ValidatedQuantifierPrefix::new(
             variable_count,
             blocks,
@@ -960,10 +904,7 @@ mod tests {
     fn contradictory_unit_problem() -> CnfProblem {
         CnfProblem {
             variables: vec!["x".into()],
-            clauses: vec![
-                vec![Literal::positive(0)],
-                vec![Literal::negative(0)],
-            ],
+            clauses: vec![vec![Literal::positive(0)], vec![Literal::negative(0)]],
         }
     }
 
@@ -974,8 +915,14 @@ mod tests {
         let result = solve_maxqbf(&problem, &prefix, budget()).unwrap();
         assert_eq!(result.evidence.optimization.maximum_retained_clauses, 1);
         assert_eq!(result.evidence.optimization.minimum_blocking_weight, 1);
-        assert_eq!(result.evidence.optimization.blocker_assignment, vec![false, true]);
-        assert_eq!(result.evidence.optimization.retained_clause_indices, vec![0]);
+        assert_eq!(
+            result.evidence.optimization.blocker_assignment,
+            vec![false, true]
+        );
+        assert_eq!(
+            result.evidence.optimization.retained_clause_indices,
+            vec![0]
+        );
         assert_eq!(result.verification.better_subsets_rejected, 1);
     }
 
@@ -986,7 +933,10 @@ mod tests {
         let result = solve_maxqbf(&problem, &prefix, budget()).unwrap();
         assert_eq!(result.evidence.optimization.maximum_retained_clauses, 0);
         assert_eq!(result.evidence.optimization.minimum_blocking_weight, 2);
-        assert_eq!(result.evidence.optimization.blocker_assignment, vec![true, true]);
+        assert_eq!(
+            result.evidence.optimization.blocker_assignment,
+            vec![true, true]
+        );
         assert_eq!(result.evidence.optimization.retained_clause_indices, vec![]);
     }
 
@@ -1009,22 +959,25 @@ mod tests {
         );
         let result = solve_maxqbf(&problem, &prefix, budget()).unwrap();
         assert_eq!(result.evidence.optimization.maximum_retained_clauses, 2);
-        assert_eq!(result.evidence.optimization.retained_clause_indices, vec![0, 1]);
+        assert_eq!(
+            result.evidence.optimization.retained_clause_indices,
+            vec![0, 1]
+        );
     }
 
     #[test]
     fn tautological_source_clause_is_retained_over_an_empty_clause() {
         let problem = CnfProblem {
             variables: vec!["x".into()],
-            clauses: vec![
-                vec![],
-                vec![Literal::positive(0), Literal::negative(0)],
-            ],
+            clauses: vec![vec![], vec![Literal::positive(0), Literal::negative(0)]],
         };
         let prefix = prefix(vec![block(Quantifier::ForAll, &[0])], 1);
         let result = solve_maxqbf(&problem, &prefix, budget()).unwrap();
         assert_eq!(result.evidence.optimization.maximum_retained_clauses, 1);
-        assert_eq!(result.evidence.optimization.retained_clause_indices, vec![1]);
+        assert_eq!(
+            result.evidence.optimization.retained_clause_indices,
+            vec![1]
+        );
     }
 
     #[test]
@@ -1091,6 +1044,8 @@ mod tests {
         assert!(matches!(
             verify_maxqbf_evidence(&problem, &prefix, &result.evidence, budget()),
             Err(MaxQbfError::BlockerAssignmentMismatch)
+                | Err(MaxQbfError::ObjectiveMismatch { .. })
+                | Err(MaxQbfError::BlockerWeightMismatch { .. })
                 | Err(MaxQbfError::BetterClauseSubsetExists { .. })
         ));
     }
