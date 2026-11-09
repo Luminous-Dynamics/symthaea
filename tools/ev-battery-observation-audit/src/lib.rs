@@ -341,9 +341,9 @@ mod tests {
     #[test]
     fn schema_and_corpus_meta_contract_are_valid() {
         let summary = audit_corpus(SCHEMA, CORPUS).expect("frozen corpus must audit");
-        assert_eq!(summary.case_count, 17);
+        assert_eq!(summary.case_count, 18);
         assert_eq!(summary.expected_accept_count, 5);
-        assert_eq!(summary.expected_reject_count, 12);
+        assert_eq!(summary.expected_reject_count, 13);
     }
 
     #[test]
