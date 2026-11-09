@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benches/18-consciousness/fixtures/phi-qualification-cases-v0.1.schema.json",
+  "title": "Symthaea Phi Qualification Case Catalogue v0.1",
+  "description": "Defines a case catalogue only; it does not assert that any case has been executed or passed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "protocol",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "phi-qualification-cases-v0.1"
+    },
+    "status": {
+      "const": "case_catalogue_only_not_evaluated"
+    },
+    "protocol": {
+      "const": "docs/research/PHI_QUALIFICATION_V0_1.md"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "invalid-transition-model"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "task-utility-negative-control"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "construction",
+        "minimum_units",
+        "model_requirements",
+        "assertions",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "family": {
+          "type": "string",
+          "enum": [
+            "disconnected_independent",
+            "feedforward",
+            "recurrent_ring",
+            "modular_coupling",
+            "causal_confound",
+            "intervention_perturbation",
+            "representation_invariance",
+            "redundancy_and_scale",
+            "estimator_calibration",
+            "boundary_sensitivity",
+            "temporal_grain",
+            "model_misspecification",
+            "invalid_input",
+            "cognitive_utility"
+          ]
+        },
+        "construction": {
+          "type": "string",
+          "minLength": 10
+        },
+        "minimum_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "assertions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    }
+  }
+}

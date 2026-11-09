@@ -1,14 +1,14 @@
 # IIT Φ Validation Results
 
 **Date**: January 10, 2026
-**Status**: ✅ VALIDATION PASSED
-**Conclusion**: HDC-based Φ is a valid Topological Integration Index
+**Status**: Historical exploratory report — not currently qualification-passed
+**Conclusion**: The reported experiment supports only a synthetic topology/proxy observation; it does not establish IIT agreement or consciousness measurement
 
 ---
 
 ## Executive Summary
 
-We validated our HDC-based Φ approximation against a simplified IIT (Integrated Information Theory) implementation. **The key finding: relative rankings are preserved across methods and system sizes.**
+This historical experiment compared a graph-spectral HDC metric against a simplified IIT 3.0-like implementation created in-repository. The comparator was not an independent PyPhi oracle, and the HDC metric described below is algebraic connectivity rather than formal IIT Φ. Any reported agreement is limited to the explicitly constructed examples and should be treated as preliminary topology/proxy evidence.
 
 ### Key Result
 
@@ -21,7 +21,7 @@ We validated our HDC-based Φ approximation against a simplified IIT (Integrated
 
 *Complete graph wasn't tested in original HDC validation; Ring was highest among tested topologies.
 
-**Critical Hypothesis Validated**: Ring > Star > Random holds in **both methods** across **all system sizes tested**.
+**Historical claim not established:** the table combines different topology sets and system sizes, so it does not demonstrate a general, method-invariant ordering. Preserve the raw observations as exploratory results; qualify any cross-method ranking claim against matched, independently checked fixtures.
 
 ---
 
@@ -76,7 +76,7 @@ From `src/hdc/phi_real.rs`:
 | Star | 0.178 | 0.125 | 0.096 | ↓ |
 | Line | 0.125 | 0.093 | 0.074 | ↓ |
 
-**Observation**: Absolute Φ decreases with system size, but **relative rankings are perfectly preserved**.
+**Observation in this constructed family:** the tabulated values decrease with system size and retain the displayed order for those rows. This is not evidence of scale invariance outside the tested generator and parameters.
 
 ### Ranking Consistency
 
@@ -86,26 +86,17 @@ n=5: Complete > Ring > Star > Line  ✅
 n=6: Complete > Ring > Star > Line  ✅
 ```
 
-**Ring > Star at all sizes: CONFIRMED**
+**Ring > Star at all sizes: limited historical observation only; requires matched-fixture requalification**
 
 ---
 
 ## Interpretation
 
-### What This Validates
+### What This Experiment Can Support
 
-1. **Our HDC Φ captures topological integration**
-   - High connectivity → High Φ (Complete wins)
-   - Symmetric structure → Higher Φ (Ring > Star)
-   - Reducibility → Low Φ (Line/Random lose)
-
-2. **Rankings are method-invariant**
-   - IIT and HDC agree on which topologies are "more integrated"
-   - This is the key property for a consciousness correlate
-
-3. **Rankings are scale-invariant**
-   - Same ordering at n=4, 5, 6
-   - Suggests validity extends to larger systems
+1. **A graph-spectral proxy was evaluated on a small synthetic topology set.** The reported HDC value is the Laplacian algebraic-connectivity eigenvalue, not a formal IIT quantity.
+2. **Some orderings were similar under the chosen constructions.** That observation motivates a controlled comparison but does not establish universal ranking preservation or agreement between formalisms.
+3. **The tabulated family showed a repeated order at n=4, 5, 6.** Generalization requires independently generated, held-out topology families, uncertainty estimates, and explicit model matching.
 
 ### What This Doesn't Validate
 
@@ -127,9 +118,9 @@ n=6: Complete > Ring > Star > Line  ✅
 
 ### For Publication
 
-We can confidently describe our method as:
+A claim-bounded description suitable before further qualification is:
 
-> "A tractable topological integration measure that preserves the relative rankings of integrated information theory while scaling to arbitrarily large systems."
+> "A tractable graph-spectral proxy whose rankings were observed on a specified synthetic topology set. Its agreement with IIT, error outside that set, and cognitive utility remain to be established."
 
 ### Naming Recommendation
 
@@ -175,11 +166,9 @@ Instead of claiming to compute "Φ" (which implies IIT), consider:
 
 ## Conclusion
 
-**Our HDC-based Φ is scientifically valid as a Topological Integration Index.**
+The reported experiment is not sufficient to establish that the HDC metric is valid as an IIT approximation or a consciousness measure. It defines a graph property—algebraic connectivity—that can be useful for topology analysis at tractable cost.
 
-The critical insight: we don't need exact Φ values to identify which systems are "more conscious" - we only need correct *rankings*. Our method provides exactly that, at computational costs that scale polynomially rather than super-exponentially.
-
-This makes Symthaea's consciousness measurement **practical for real-world applications** where true IIT is intractable.
+Relative rankings do not identify which systems are "more conscious" without an independently validated bridge from the metric to that claim. A scalable proxy is useful only for the proposition and task for which it is separately qualified. See [`PHI_QUALIFICATION_V0_1.md`](PHI_QUALIFICATION_V0_1.md) for the current qualification contract.
 
 ---
 
