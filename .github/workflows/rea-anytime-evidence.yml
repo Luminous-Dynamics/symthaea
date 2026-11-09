@@ -1,0 +1,66 @@
+name: REA Anytime Evidence Acquisition Fixture Validation
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/REA_ANYTIME_EVIDENCE_ACQUISITION_2026Q4.md"
+      - "docs/research/rea-anytime-evidence-*.json"
+      - "tools/rea-anytime-evidence-checker/**"
+      - ".github/workflows/rea-anytime-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-anytime-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUSTUP_TOOLCHAIN: "1.99.1"
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.99.1"
+          components: rustfmt, clippy
+
+      - name: Generate isolated checker lockfile
+        run: cargo generate-lockfile --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml
+
+      - name: Verify exact revision and toolchain
+        run: |
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          rustc --version --verbose
+          cargo --version
+          sha256sum tools/rea-anytime-evidence-checker/Cargo.lock
+
+      - name: Rust formatting
+        run: cargo fmt --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml -- --check
+
+      - name: Schema, stopping, revocation and mutation tests
+        run: cargo test --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml --locked
+
+      - name: Warnings-denied Clippy
+        run: cargo clippy --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml --all-targets --locked -- -D warnings
+
+      - name: Archive exact checker lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-anytime-evidence-checker-lockfile
+          path: tools/rea-anytime-evidence-checker/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 7
