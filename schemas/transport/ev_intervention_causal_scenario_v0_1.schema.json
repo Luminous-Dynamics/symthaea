@@ -12,6 +12,7 @@
     "outcome_metric",
     "outcome_unit",
     "outcome_direction",
+    "parallel_trends_tolerance",
     "matched_sets"
   ],
   "properties": {
@@ -48,6 +49,10 @@
       "items": {
         "$ref": "#/$defs/matchedSet"
       }
+    },
+    "parallel_trends_tolerance": {
+      "type": "number",
+      "minimum": 0
     }
   },
   "$defs": {
@@ -144,6 +149,7 @@
         "post_configuration_digest",
         "follow_up_status",
         "censoring_reason",
+        "pretrend",
         "pre",
         "post",
         "intervention"
@@ -199,6 +205,9 @@
         },
         "intervention": {
           "$ref": "#/$defs/intervention"
+        },
+        "pretrend": {
+          "$ref": "#/$defs/measurement"
         }
       }
     },
