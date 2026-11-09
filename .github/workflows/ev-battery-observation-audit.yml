@@ -1,0 +1,51 @@
+name: EV battery observation contract audit
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "schemas/transport/ev_battery_observation_batch_v0_1.schema.json"
+      - "fixtures/ev_battery/observation_batches_v0_1.json"
+      - "tools/ev-battery-observation-audit/**"
+      - "docs/transport/EV_BATTERY_OBSERVATION_CONTRACT_V0_1.md"
+      - ".github/workflows/ev-battery-observation-audit.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "schemas/transport/ev_battery_observation_batch_v0_1.schema.json"
+      - "fixtures/ev_battery/observation_batches_v0_1.json"
+      - "tools/ev-battery-observation-audit/**"
+      - "docs/transport/EV_BATTERY_OBSERVATION_CONTRACT_V0_1.md"
+      - ".github/workflows/ev-battery-observation-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ev-battery-observation-audit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-battery-observation-audit/Cargo.toml -- --check
+      - name: Run validator and mutation tests
+        run: cargo test --manifest-path tools/ev-battery-observation-audit/Cargo.toml --all-targets
+      - name: Audit frozen fixture corpus
+        run: |
+          cargo run --manifest-path tools/ev-battery-observation-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_battery_observation_batch_v0_1.schema.json \
+            --corpus fixtures/ev_battery/observation_batches_v0_1.json \
+            > "$RUNNER_TEMP/ev-battery-observation-report.json"
+          sha256sum "$RUNNER_TEMP/ev-battery-observation-report.json"
+          jq -e '.case_count == 17 and .expected_accept_count == 5 and .expected_reject_count == 12' \
+            "$RUNNER_TEMP/ev-battery-observation-report.json"
