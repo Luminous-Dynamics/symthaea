@@ -2120,7 +2120,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            report.experiments[0].status,
+            &report.experiments[0].status,
             ExperimentDiscriminationStatus::NotComparable { .. }
         ));
     }
