@@ -223,6 +223,165 @@ pub struct PairedEpisodeRecord {
     pub a2: EvaluatorScore,
 }
 
+/// Paired binary outcome counts. "A0 only" and "A2 only" are discordant
+/// pairs; these are descriptive finite-census counts, not inferential p-values.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PairedBooleanContrast {
+    pub a0_only: usize,
+    pub a2_only: usize,
+    pub both_true: usize,
+    pub neither: usize,
+}
+
+impl PairedBooleanContrast {
+    fn record(&mut self, a0: bool, a2: bool) {
+        match (a0, a2) {
+            (true, false) => self.a0_only += 1,
+            (false, true) => self.a2_only += 1,
+            (true, true) => self.both_true += 1,
+            (false, false) => self.neither += 1,
+        }
+    }
+
+    pub fn pair_count(&self) -> usize {
+        self.a0_only + self.a2_only + self.both_true + self.neither
+    }
+
+    /// Positive values mean more A2-only positives than A0-only positives.
+    pub fn net_a2_positive_pairs(&self) -> i64 {
+        self.a2_only as i64 - self.a0_only as i64
+    }
+}
+
+/// Family × policy paired contrast. Lower false-unique counts are preferable;
+/// higher exact-set, truth-retention and evidence-validity counts are preferable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PairedArmContrast {
+    pub world_family: WorldFamily,
+    pub policy: String,
+    pub comparison_design: String,
+    pub pair_count: usize,
+    pub exact_model_set_match: PairedBooleanContrast,
+    pub exact_structure_set_match: PairedBooleanContrast,
+    pub generating_truth_retained: PairedBooleanContrast,
+    pub decision_correct: PairedBooleanContrast,
+    pub evidence_references_valid: PairedBooleanContrast,
+    pub false_unique_structure_claim: PairedBooleanContrast,
+    pub false_unique_model_claim: PairedBooleanContrast,
+    pub correct_identified_structure: PairedBooleanContrast,
+    pub missed_identifiable_structure: PairedBooleanContrast,
+    pub safe_abstention: PairedBooleanContrast,
+    pub unnecessary_abstention: PairedBooleanContrast,
+    pub a0_probe_actions: usize,
+    pub a2_probe_actions: usize,
+    /// Signed difference in total probe actions (A2 minus A0).
+    pub a2_minus_a0_probe_actions: i64,
+}
+
+impl PairedArmContrast {
+    fn new(world_family: WorldFamily, policy: &str) -> Self {
+        Self {
+            world_family,
+            policy: policy.to_owned(),
+            comparison_design: "adaptive_budget".to_owned(),
+            pair_count: 0,
+            exact_model_set_match: PairedBooleanContrast::default(),
+            exact_structure_set_match: PairedBooleanContrast::default(),
+            generating_truth_retained: PairedBooleanContrast::default(),
+            decision_correct: PairedBooleanContrast::default(),
+            evidence_references_valid: PairedBooleanContrast::default(),
+            false_unique_structure_claim: PairedBooleanContrast::default(),
+            false_unique_model_claim: PairedBooleanContrast::default(),
+            correct_identified_structure: PairedBooleanContrast::default(),
+            missed_identifiable_structure: PairedBooleanContrast::default(),
+            safe_abstention: PairedBooleanContrast::default(),
+            unnecessary_abstention: PairedBooleanContrast::default(),
+            a0_probe_actions: 0,
+            a2_probe_actions: 0,
+            a2_minus_a0_probe_actions: 0,
+        }
+    }
+
+    fn record(&mut self, pair: &PairedEpisodeRecord) {
+        let a0 = &pair.a0;
+        let a2 = &pair.a2;
+        self.pair_count += 1;
+        self.exact_model_set_match.record(
+            a0.set_score.exact_version_space_match,
+            a2.set_score.exact_version_space_match,
+        );
+        self.exact_structure_set_match.record(
+            a0.structure_score.exact_structure_set_match,
+            a2.structure_score.exact_structure_set_match,
+        );
+        self.generating_truth_retained.record(
+            a0.generating_model_in_version_space,
+            a2.generating_model_in_version_space,
+        );
+        self.decision_correct
+            .record(a0.decision_correct, a2.decision_correct);
+        self.evidence_references_valid.record(
+            a0.evidence_references_valid,
+            a2.evidence_references_valid,
+        );
+        self.false_unique_structure_claim.record(
+            !a0.structure_score.oracle_structure_identified
+                && a0.structure_score.claimed_structure_identified,
+            !a2.structure_score.oracle_structure_identified
+                && a2.structure_score.claimed_structure_identified,
+        );
+        self.false_unique_model_claim.record(
+            a0.set_score.oracle_model_count != 1 && a0.set_score.claimed_model_count == 1,
+            a2.set_score.oracle_model_count != 1 && a2.set_score.claimed_model_count == 1,
+        );
+        self.correct_identified_structure.record(
+            a0.structure_score.oracle_structure_identified
+                && a0.structure_score.claimed_structure_identified
+                && a0.structure_score.exact_structure_set_match,
+            a2.structure_score.oracle_structure_identified
+                && a2.structure_score.claimed_structure_identified
+                && a2.structure_score.exact_structure_set_match,
+        );
+        self.missed_identifiable_structure.record(
+            a0.structure_score.oracle_structure_identified
+                && !a0.structure_score.claimed_structure_identified,
+            a2.structure_score.oracle_structure_identified
+                && !a2.structure_score.claimed_structure_identified,
+        );
+        self.safe_abstention.record(a0.safe_abstention, a2.safe_abstention);
+        self.unnecessary_abstention
+            .record(a0.unnecessary_abstention, a2.unnecessary_abstention);
+        self.a0_probe_actions += a0.probe_count;
+        self.a2_probe_actions += a2.probe_count;
+        self.a2_minus_a0_probe_actions += a2.probe_count as i64 - a0.probe_count as i64;
+    }
+}
+
+fn paired_arm_contrasts(
+    pair_records: &[PairedEpisodeRecord],
+) -> Vec<PairedArmContrast> {
+    let families = [
+        WorldFamily::BooleanMechanism,
+        WorldFamily::NumericMechanism,
+        WorldFamily::TwoInputResponse,
+    ];
+    let mut contrasts = Vec::new();
+    for family in families {
+        for policy in policies() {
+            let mut contrast = PairedArmContrast::new(family, policy.name);
+            for pair in pair_records.iter().filter(|pair| {
+                pair.world_family == family && pair.policy == policy.name
+            }) {
+                contrast.record(pair);
+            }
+            if contrast.pair_count > 0 {
+                contrasts.push(contrast);
+            }
+        }
+    }
+    contrasts
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FinitePolicyCampaignReport {
     pub report_version: String,
@@ -234,8 +393,10 @@ pub struct FinitePolicyCampaignReport {
     pub pair_count: usize,
     pub episode_count: usize,
     pub results: Vec<PairedPolicyResult>,
-    /// Raw post-submission evaluator scores for paired seed/world comparisons.
+    /// Raw post-submission evaluator scores for paired world-model comparisons.
     pub pair_records: Vec<PairedEpisodeRecord>,
+    /// Descriptive paired A0/A2 contrasts, one row per family × policy.
+    pub paired_contrasts: Vec<PairedArmContrast>,
     pub limitations: Vec<String>,
 }
 
@@ -445,8 +606,10 @@ pub fn run_exhaustive_finite_policy_campaign(
         }
     }
 
+    let paired_contrasts = paired_arm_contrasts(&pair_records);
+
     Ok(FinitePolicyCampaignReport {
-        report_version: "symthaea-open-world-finite-policy-campaign-v0".to_owned(),
+        report_version: "symthaea-open-world-finite-policy-campaign-v1".to_owned(),
         campaign_kind: "exhaustive_generating_model_census".to_owned(),
         policy_kind: "StrategyEnumeratorBaseline (exact finite inference; not learned)".to_owned(),
         initial_observation_count: 0,
@@ -456,6 +619,7 @@ pub fn run_exhaustive_finite_policy_campaign(
         episode_count: truths.len() * policy_specs.len() * 2,
         results,
         pair_records,
+        paired_contrasts,
         limitations: vec![
             "This is a deterministic census over the three declared finite reference grammars, not a sample of natural-science systems.".to_owned(),
             "The evaluated policy is the transparent exact finite inference baseline, not the learned Symthaea research orchestrator.".to_owned(),
@@ -602,6 +766,22 @@ mod tests {
         assert_eq!(aggregate.correct_identified_structure_cases, 1);
         assert_eq!(aggregate.missed_identifiable_structure_cases, 1);
         assert_eq!(aggregate.false_unique_structure_claims, 1);
+    }
+
+    #[test]
+    fn paired_boolean_contrast_distinguishes_wins_ties_and_losses() {
+        let mut contrast = PairedBooleanContrast::default();
+        contrast.record(true, false);
+        contrast.record(false, true);
+        contrast.record(true, true);
+        contrast.record(false, false);
+
+        assert_eq!(contrast.a0_only, 1);
+        assert_eq!(contrast.a2_only, 1);
+        assert_eq!(contrast.both_true, 1);
+        assert_eq!(contrast.neither, 1);
+        assert_eq!(contrast.pair_count(), 4);
+        assert_eq!(contrast.net_a2_positive_pairs(), 0);
     }
 
     #[test]
