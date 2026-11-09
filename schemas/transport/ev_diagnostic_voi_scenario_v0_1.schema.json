@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-diagnostic-voi-scenario/0.1",
+  "title": "EV diagnostic value-of-information scenario v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_version",
+    "scenario_id",
+    "oracle_evidence_class",
+    "context",
+    "states",
+    "actions",
+    "tests"
+  ],
+  "properties": {
+    "scenario_version": {
+      "const": "ev-diagnostic-voi-scenario/0.1"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "oracle_evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "independently_adjudicated_reference"
+      ]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chemistry",
+        "temperature_c",
+        "soc_fraction"
+      ],
+      "properties": {
+        "chemistry": {
+          "enum": [
+            "lfp",
+            "lmfp",
+            "nmc",
+            "nca",
+            "lco",
+            "sodium_ion",
+            "other",
+            "unknown"
+          ]
+        },
+        "temperature_c": {
+          "type": "number"
+        },
+        "soc_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "states": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state_id",
+          "prior_probability"
+        ],
+        "properties": {
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "gate_status",
+          "losses"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gate_status": {
+            "enum": [
+              "satisfied",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "losses": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state_id",
+                "loss_units"
+              ],
+              "properties": {
+                "state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "loss_units": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id",
+          "protocol_ref",
+          "equipment_ref",
+          "protocol_digest",
+          "equipment_digest",
+          "calibration_digest",
+          "interpretation_status",
+          "cost",
+          "applicability",
+          "preconditions",
+          "outcomes"
+        ],
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "equipment_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "equipment_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "interpretation_status": {
+            "enum": [
+              "qualified_for_domain",
+              "unqualified",
+              "unknown"
+            ]
+          },
+          "cost": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "test_cost_units",
+              "downtime_cost_units",
+              "cost_unit_ref",
+              "evidence_class",
+              "evidence_digest"
+            ],
+            "properties": {
+              "test_cost_units": {
+                "type": "number",
+                "minimum": 0
+              },
+              "downtime_cost_units": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cost_unit_ref": {
+                "const": "decision-loss-unit/0.1"
+              },
+              "evidence_class": {
+                "enum": [
+                  "declared_synthetic_cost",
+                  "reference_quote",
+                  "measured_cost"
+                ]
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "applicability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "supported_chemistries",
+              "minimum_temperature_c",
+              "maximum_temperature_c",
+              "minimum_soc_fraction",
+              "maximum_soc_fraction"
+            ],
+            "properties": {
+              "supported_chemistries": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "enum": [
+                    "lfp",
+                    "lmfp",
+                    "nmc",
+                    "nca",
+                    "lco",
+                    "sodium_ion",
+                    "other",
+                    "unknown"
+                  ]
+                }
+              },
+              "minimum_temperature_c": {
+                "type": "number"
+              },
+              "maximum_temperature_c": {
+                "type": "number"
+              },
+              "minimum_soc_fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "maximum_soc_fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "preconditions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "safety_review",
+              "qualified_facility",
+              "protocol_approved",
+              "calibration_valid",
+              "authority_approved"
+            ],
+            "properties": {
+              "safety_review": {
+                "enum": [
+                  "satisfied",
+                  "blocked",
+                  "unknown"
+                ]
+              },
+              "qualified_facility": {
+                "enum": [
+                  "satisfied",
+                  "blocked",
+                  "unknown"
+                ]
+              },
+              "protocol_approved": {
+                "enum": [
+                  "satisfied",
+                  "blocked",
+                  "unknown"
+                ]
+              },
+              "calibration_valid": {
+                "enum": [
+                  "satisfied",
+                  "blocked",
+                  "unknown"
+                ]
+              },
+              "authority_approved": {
+                "enum": [
+                  "satisfied",
+                  "blocked",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome_id",
+                "likelihoods"
+              ],
+              "properties": {
+                "outcome_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "likelihoods": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "state_id",
+                      "probability"
+                    ],
+                    "properties": {
+                      "state_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "probability": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
