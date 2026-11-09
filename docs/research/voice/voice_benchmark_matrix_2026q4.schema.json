@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_benchmark_matrix_2026q4.schema.json",
+  "title": "Luminous African and Historical Speech Benchmark Matrix",
+  "description": "Machine-readable benchmark lane and source-admission registry. This schema validates structure, not rights, scientific truth, or benchmark qualification.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "program_id",
+    "evidence_state",
+    "governance",
+    "scoring_policy",
+    "tracks",
+    "promotion_gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_state": {
+      "type": "string",
+      "enum": [
+        "RESEARCH_DRAFT",
+        "IMPLEMENTED_UNQUALIFIED",
+        "QUALIFIED_PASS",
+        "INDEPENDENTLY_VERIFIED",
+        "REPLICATED"
+      ]
+    },
+    "governance": {
+      "type": "object",
+      "required": [
+        "governor_issue",
+        "admission_issue",
+        "external_comparison_issue",
+        "south_africa_programme_issue",
+        "statement"
+      ],
+      "properties": {
+        "governor_issue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "admission_issue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "external_comparison_issue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "south_africa_programme_issue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "scoring_policy": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "task",
+          "metrics"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "parent_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "parent_issues": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "admission_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scorer_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "implementation_pr": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "language_profiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "complexity_axes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "split_units": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_outputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "system_arms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "candidate_labelled_hour_budgets": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "selection_arms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "candidate_sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "status"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "card_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "paper_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_inferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          },
+          "adaptation_arms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "implementation_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selection_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prospective_gates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "profile_schema_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_example_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "implementation_branch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_requirements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "promotion_gates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "test_vector_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "path",
+          "schema_path",
+          "cases",
+          "linked_issue",
+          "metrics"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schema_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cases": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "linked_issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "note": {
+            "type": "string"
+          },
+          "linked_pr": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

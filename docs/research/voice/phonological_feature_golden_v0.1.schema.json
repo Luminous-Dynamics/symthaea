@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/phonological_feature_golden_v0.1.schema.json",
+  "title": "Synthetic FER and TER golden vectors",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "purpose",
+    "feature_profile",
+    "scoring_policy",
+    "vectors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "feature_profile": {
+      "type": "object",
+      "required": [
+        "profile_id",
+        "profile_revision",
+        "dimension_names",
+        "tone_dimensions",
+        "g2p_authority"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string"
+        },
+        "profile_revision": {
+          "type": "string"
+        },
+        "dimension_names": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "tone_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "g2p_authority": {
+          "const": "SYNTHETIC_FEATURE_LABELS_ONLY"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scoring_policy": {
+      "type": "object",
+      "required": [
+        "alignment",
+        "gap_penalty_default",
+        "tie_break",
+        "substitution_cost",
+        "gap_cost",
+        "fer_denominator",
+        "ter_denominator",
+        "normalization"
+      ],
+      "properties": {
+        "alignment": {
+          "const": "GLOBAL_NEEDLEMAN_WUNSCH"
+        },
+        "gap_penalty_default": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tie_break": {
+          "type": "string"
+        },
+        "substitution_cost": {
+          "type": "string"
+        },
+        "gap_cost": {
+          "type": "string"
+        },
+        "fer_denominator": {
+          "type": "string"
+        },
+        "ter_denominator": {
+          "type": "string"
+        },
+        "normalization": {
+          "const": "NONE"
+        }
+      },
+      "additionalProperties": false
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "gap_penalty",
+          "reference",
+          "hypothesis",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "gap_penalty": {
+            "type": "number",
+            "minimum": 0
+          },
+          "tone_dimensions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "reference": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  -1,
+                  0,
+                  1
+                ]
+              }
+            }
+          },
+          "hypothesis": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  -1,
+                  0,
+                  1
+                ]
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "fer",
+              "ter",
+              "feature_dimension_diagnostics"
+            ],
+            "properties": {
+              "matches": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "substitutions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "deletions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "insertions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "active_feature_dimensions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fer": {
+                "$ref": "#/$defs/metric"
+              },
+              "ter": {
+                "$ref": "#/$defs/metric"
+              },
+              "feature_dimension_diagnostics": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "dimension_index",
+                    "active_pairs",
+                    "mismatches",
+                    "error_rate"
+                  ],
+                  "properties": {
+                    "dimension_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "active_pairs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "mismatches": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "error_rate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "required": [
+        "numerator",
+        "denominator",
+        "value",
+        "reason"
+      ],
+      "properties": {
+        "numerator": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

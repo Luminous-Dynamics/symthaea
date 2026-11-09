@@ -1,0 +1,805 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_state": "SYNTHETIC_ONLY",
+  "coordinate_system": "ZERO_BASED_HALF_OPEN_SAMPLES",
+  "purpose": "Golden vectors for claim-ID correctness and source-bound temporal evidence citation localization.",
+  "policy": {
+    "claim_identity": "Predicted claim IDs must exactly match benchmark-owned reference claim IDs; semantic equivalence mapping belongs upstream and is versioned separately.",
+    "citation_binding": "Every citation must carry the exact source-audio SHA-256 and use zero-based half-open sample intervals.",
+    "interval_union": "Reference and predicted intervals are unioned per claim before sample counts and intersections are calculated; overlapping or touching intervals cannot double-count.",
+    "localization": "Only intervals attached to an exactly matched claim ID can contribute to evidence overlap.",
+    "denominators": "Each rate stores an exact integer numerator and denominator; zero denominators have null rate.",
+    "limitations": "These synthetic vectors test arithmetic and structural policy only; they do not validate audio truth or model-internal evidence use."
+  },
+  "vectors": [
+    {
+      "id": "exact_claim_and_evidence",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "door-open",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "door-open",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                10,
+                20
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 1,
+        "predicted_citation_samples": 10,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 10,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "citation_sample_precision": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "reference_sample_recall": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "sample_iou": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 0,
+          "denominator": 10,
+          "rate": 0
+        }
+      }
+    },
+    {
+      "id": "broad_citation_penalized",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "door-open",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "door-open",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                0,
+                30
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 1,
+        "predicted_citation_samples": 30,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 10,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "citation_sample_precision": {
+          "numerator": 10,
+          "denominator": 30,
+          "rate": 0.3333333333333333
+        },
+        "reference_sample_recall": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "sample_iou": {
+          "numerator": 10,
+          "denominator": 30,
+          "rate": 0.3333333333333333
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 20,
+          "denominator": 30,
+          "rate": 0.6666666666666666
+        }
+      }
+    },
+    {
+      "id": "partial_temporal_overlap",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "quantity",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "quantity",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                15,
+                25
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 1,
+        "predicted_citation_samples": 10,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 5,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "citation_sample_precision": {
+          "numerator": 5,
+          "denominator": 10,
+          "rate": 0.5
+        },
+        "reference_sample_recall": {
+          "numerator": 5,
+          "denominator": 10,
+          "rate": 0.5
+        },
+        "sample_iou": {
+          "numerator": 5,
+          "denominator": 15,
+          "rate": 0.3333333333333333
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 5,
+          "denominator": 10,
+          "rate": 0.5
+        }
+      }
+    },
+    {
+      "id": "correct_claim_missing_citation",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "negation",
+          "support_intervals": [
+            [
+              30,
+              35
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "negation",
+          "citations": []
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 1,
+        "reference_claims_with_supported_citations": 0,
+        "citation_count": 0,
+        "predicted_citation_samples": 0,
+        "reference_support_samples": 5,
+        "overlapping_support_samples": 0,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "citation_sample_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "reference_sample_recall": {
+          "numerator": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "sample_iou": {
+          "numerator": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      }
+    },
+    {
+      "id": "wrong_claim_id_cannot_borrow_evidence",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "heard-go",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "heard-stop",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                10,
+                20
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 0,
+        "unsupported_predicted_claims": 1,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 0,
+        "citation_count": 1,
+        "predicted_citation_samples": 10,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 0,
+        "claim_precision": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "claim_recall": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "citation_sample_precision": {
+          "numerator": 0,
+          "denominator": 10,
+          "rate": 0
+        },
+        "reference_sample_recall": {
+          "numerator": 0,
+          "denominator": 10,
+          "rate": 0
+        },
+        "sample_iou": {
+          "numerator": 0,
+          "denominator": 20,
+          "rate": 0
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        }
+      }
+    },
+    {
+      "id": "overlapping_predicted_intervals_are_unioned",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "event",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "event",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                10,
+                18
+              ]
+            },
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                15,
+                22
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 2,
+        "predicted_citation_samples": 12,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 10,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "citation_sample_precision": {
+          "numerator": 10,
+          "denominator": 12,
+          "rate": 0.8333333333333334
+        },
+        "reference_sample_recall": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "sample_iou": {
+          "numerator": 10,
+          "denominator": 12,
+          "rate": 0.8333333333333334
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 2,
+          "denominator": 12,
+          "rate": 0.16666666666666666
+        }
+      }
+    },
+    {
+      "id": "overlapping_reference_intervals_are_unioned",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "event",
+          "support_intervals": [
+            [
+              10,
+              18
+            ],
+            [
+              15,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "event",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                10,
+                20
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 1,
+        "predicted_citation_samples": 10,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 10,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "citation_sample_precision": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "reference_sample_recall": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "sample_iou": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 0,
+          "denominator": 10,
+          "rate": 0
+        }
+      }
+    },
+    {
+      "id": "unsupported_claim_stays_in_denominator",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "answer",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "answer",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                10,
+                20
+              ]
+            }
+          ]
+        },
+        {
+          "claim_id": "invented-answer",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                40,
+                50
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "matched_claims": 1,
+        "unsupported_predicted_claims": 1,
+        "predicted_claims_without_citations": 0,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 2,
+        "predicted_citation_samples": 20,
+        "reference_support_samples": 10,
+        "overlapping_support_samples": 10,
+        "claim_precision": {
+          "numerator": 1,
+          "denominator": 2,
+          "rate": 0.5
+        },
+        "claim_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "citation_sample_precision": {
+          "numerator": 10,
+          "denominator": 20,
+          "rate": 0.5
+        },
+        "reference_sample_recall": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "sample_iou": {
+          "numerator": 10,
+          "denominator": 20,
+          "rate": 0.5
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 1,
+          "denominator": 2,
+          "rate": 0.5
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 10,
+          "denominator": 20,
+          "rate": 0.5
+        }
+      }
+    },
+    {
+      "id": "two_claims_one_missing_citation",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 16000,
+      "sample_count": 100,
+      "reference_claims": [
+        {
+          "claim_id": "go",
+          "support_intervals": [
+            [
+              10,
+              20
+            ]
+          ]
+        },
+        {
+          "claim_id": "stop",
+          "support_intervals": [
+            [
+              30,
+              40
+            ]
+          ]
+        }
+      ],
+      "predicted_claims": [
+        {
+          "claim_id": "go",
+          "citations": [
+            {
+              "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "interval": [
+                10,
+                20
+              ]
+            }
+          ]
+        },
+        {
+          "claim_id": "stop",
+          "citations": []
+        }
+      ],
+      "expected": {
+        "matched_claims": 2,
+        "unsupported_predicted_claims": 0,
+        "predicted_claims_without_citations": 1,
+        "reference_claims_with_supported_citations": 1,
+        "citation_count": 1,
+        "predicted_citation_samples": 10,
+        "reference_support_samples": 20,
+        "overlapping_support_samples": 10,
+        "claim_precision": {
+          "numerator": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "claim_recall": {
+          "numerator": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "reference_claim_evidence_coverage": {
+          "numerator": 1,
+          "denominator": 2,
+          "rate": 0.5
+        },
+        "citation_sample_precision": {
+          "numerator": 10,
+          "denominator": 10,
+          "rate": 1
+        },
+        "reference_sample_recall": {
+          "numerator": 10,
+          "denominator": 20,
+          "rate": 0.5
+        },
+        "sample_iou": {
+          "numerator": 10,
+          "denominator": 20,
+          "rate": 0.5
+        },
+        "unsupported_predicted_claim_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "unsupported_citation_sample_rate": {
+          "numerator": 0,
+          "denominator": 10,
+          "rate": 0
+        }
+      }
+    }
+  ],
+  "rejected_controls": [
+    {
+      "id": "cross_audio_citation",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "citation_evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "interval": [
+        10,
+        20
+      ],
+      "expected_error": "CitationEvaluationDigestMismatch"
+    },
+    {
+      "id": "out_of_bounds_citation",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_count": 100,
+      "interval": [
+        90,
+        101
+      ],
+      "expected_error": "InvalidInterval"
+    },
+    {
+      "id": "zero_length_citation",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_count": 100,
+      "interval": [
+        20,
+        20
+      ],
+      "expected_error": "InvalidInterval"
+    }
+  ]
+}

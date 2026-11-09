@@ -1,0 +1,194 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_state": "SYNTHETIC_ONLY",
+  "description": "Synthetic token-aligned reference and predicted language-tag sequences for exact switch-boundary precision, recall and F1. These vectors do not evaluate transcript recognition.",
+  "token_indexing": "zero_based",
+  "boundary_definition": "Boundary at position i (i > 0) when tag[i] differs from tag[i-1].",
+  "matching_policy": "Exact position equality only (tolerance 0). A one-token shift is one false positive plus one false negative. Tolerant matching requires a separate one-to-one matching specification.",
+  "metric_definitions": {
+    "true_positives": "Intersection of reference and predicted switch-entry positions.",
+    "false_positives": "Predicted switch-entry positions not present in the reference.",
+    "false_negatives": "Reference switch-entry positions not predicted.",
+    "precision": "TP / (TP + FP), non-estimable if there are no predicted boundaries.",
+    "recall": "TP / (TP + FN), non-estimable if there are no reference boundaries.",
+    "f1": "2TP / (2TP + FP + FN), non-estimable when both boundary sets are empty."
+  },
+  "cases": [
+    {
+      "id": "exact_match_multiple_switches",
+      "reference_tags": [
+        "en",
+        "en",
+        "zu",
+        "zu",
+        "en"
+      ],
+      "predicted_tags": [
+        "en",
+        "en",
+        "zu",
+        "zu",
+        "en"
+      ],
+      "expected": {
+        "reference_positions": [
+          2,
+          4
+        ],
+        "predicted_positions": [
+          2,
+          4
+        ],
+        "true_positives": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      }
+    },
+    {
+      "id": "all_reference_switches_missed",
+      "reference_tags": [
+        "en",
+        "en",
+        "zu",
+        "zu"
+      ],
+      "predicted_tags": [
+        "en",
+        "en",
+        "en",
+        "en"
+      ],
+      "expected": {
+        "reference_positions": [
+          2
+        ],
+        "predicted_positions": [],
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": null,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "false_extra_switch",
+      "reference_tags": [
+        "en",
+        "en",
+        "en"
+      ],
+      "predicted_tags": [
+        "en",
+        "zu",
+        "en"
+      ],
+      "expected": {
+        "reference_positions": [],
+        "predicted_positions": [
+          1,
+          2
+        ],
+        "true_positives": 0,
+        "false_positives": 2,
+        "false_negatives": 0,
+        "precision": 0,
+        "recall": null,
+        "f1": 0
+      }
+    },
+    {
+      "id": "one_token_boundary_shift",
+      "reference_tags": [
+        "en",
+        "en",
+        "zu",
+        "zu"
+      ],
+      "predicted_tags": [
+        "en",
+        "en",
+        "en",
+        "zu"
+      ],
+      "expected": {
+        "reference_positions": [
+          2
+        ],
+        "predicted_positions": [
+          3
+        ],
+        "true_positives": 0,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "no_boundaries_in_either_sequence",
+      "reference_tags": [
+        "zu",
+        "zu",
+        "zu"
+      ],
+      "predicted_tags": [
+        "zu",
+        "zu",
+        "zu"
+      ],
+      "expected": {
+        "reference_positions": [],
+        "predicted_positions": [],
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "reason": "NO_BOUNDARIES"
+      }
+    },
+    {
+      "id": "direction_changes_are_separate_boundaries",
+      "reference_tags": [
+        "en",
+        "zu",
+        "en",
+        "af",
+        "en"
+      ],
+      "predicted_tags": [
+        "en",
+        "zu",
+        "en",
+        "af",
+        "en"
+      ],
+      "expected": {
+        "reference_positions": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "predicted_positions": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      }
+    }
+  ]
+}

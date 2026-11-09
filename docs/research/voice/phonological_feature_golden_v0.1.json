@@ -1,0 +1,687 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_state": "SYNTHETIC_ONLY",
+  "purpose": "Golden arithmetic vectors for generic language-profiled NA-masked FER and tone-only TER.",
+  "feature_profile": {
+    "profile_id": "synthetic-fer-ter-profile",
+    "profile_revision": "v1",
+    "dimension_names": [
+      "segment_feature_a",
+      "segment_feature_b",
+      "tone_feature",
+      "segment_feature_c"
+    ],
+    "tone_dimensions": [
+      2
+    ],
+    "g2p_authority": "SYNTHETIC_FEATURE_LABELS_ONLY",
+    "note": "Dimension meanings are invented for arithmetic tests; this is not a phonological inventory."
+  },
+  "scoring_policy": {
+    "alignment": "GLOBAL_NEEDLEMAN_WUNSCH",
+    "gap_penalty_default": 1,
+    "tie_break": "DIAGONAL_THEN_DELETION_THEN_INSERTION",
+    "substitution_cost": "mismatched active dimensions / dimensions where either side is non-zero",
+    "gap_cost": "declared gap penalty only when the gapped segment carries at least one active feature; otherwise zero",
+    "fer_denominator": "reference segment count",
+    "ter_denominator": "reference segment count; TER not estimable when no reference tone feature is active",
+    "normalization": "NONE"
+  },
+  "vectors": [
+    {
+      "id": "exact_match",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0,
+        "fer": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "ter": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "one_of_four_active_mismatch",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          1,
+          -1,
+          1
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          -1,
+          -1,
+          1
+        ]
+      ],
+      "expected": {
+        "matches": 0,
+        "substitutions": 1,
+        "deletions": 0,
+        "insertions": 0,
+        "fer": {
+          "numerator": 0.25,
+          "denominator": 1,
+          "value": 0.25,
+          "reason": null
+        },
+        "ter": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 1,
+            "error_rate": 1
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "na_zero_zero_exclusion",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          0,
+          0,
+          -1
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          0,
+          0,
+          -1
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0,
+        "active_feature_dimensions": 2,
+        "fer": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "ter": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "reason": "NO_ACTIVE_REFERENCE_TONE_FEATURES"
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "tone_mismatch",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          1,
+          -1,
+          1
+        ]
+      ],
+      "expected": {
+        "matches": 0,
+        "substitutions": 1,
+        "deletions": 0,
+        "insertions": 0,
+        "fer": {
+          "numerator": 0.25,
+          "denominator": 1,
+          "value": 0.25,
+          "reason": null
+        },
+        "ter": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1,
+          "reason": null
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 1,
+            "error_rate": 1
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "segmental_mismatch_without_tone_error",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "hypothesis": [
+        [
+          -1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "expected": {
+        "matches": 0,
+        "substitutions": 1,
+        "deletions": 0,
+        "insertions": 0,
+        "fer": {
+          "numerator": 0.25,
+          "denominator": 1,
+          "value": 0.25,
+          "reason": null
+        },
+        "ter": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 1,
+            "error_rate": 1
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "tone_dimension_not_configured",
+      "gap_penalty": 1,
+      "tone_dimensions": [],
+      "reference": [
+        [
+          1,
+          1,
+          0,
+          0
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          1,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "fer": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "ter": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "reason": "NO_TONE_DIMENSIONS_CONFIGURED"
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "tone_bearing_deletion",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          1,
+          1,
+          0
+        ],
+        [
+          -1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "hypothesis": [
+        [
+          -1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "substitutions": 0,
+        "deletions": 1,
+        "insertions": 0,
+        "fer": {
+          "numerator": 1,
+          "denominator": 2,
+          "value": 0.5,
+          "reason": null
+        },
+        "ter": {
+          "numerator": 1,
+          "denominator": 2,
+          "value": 0.5,
+          "reason": null
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "custom_gap_penalty_insertion",
+      "gap_penalty": 1.5,
+      "reference": [
+        [
+          1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          -1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 1,
+        "fer": {
+          "numerator": 1.5,
+          "denominator": 1,
+          "value": 1.5,
+          "reason": null
+        },
+        "ter": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "reason": "NO_TONE_DIMENSIONS_CONFIGURED"
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
+      },
+      "tone_dimensions": []
+    },
+    {
+      "id": "all_na_insertion_is_unscorable",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "hypothesis": [
+        [
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 1,
+        "fer": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0,
+          "reason": null
+        },
+        "ter": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "reason": "NO_ACTIVE_REFERENCE_TONE_FEATURES"
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 1,
+            "mismatches": 0,
+            "error_rate": 0
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "no_active_reference_features",
+      "gap_penalty": 1,
+      "reference": [
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "hypothesis": [
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "matches": 1,
+        "fer": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "reason": "NO_ACTIVE_REFERENCE_FEATURES"
+        },
+        "ter": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "reason": "NO_ACTIVE_REFERENCE_TONE_FEATURES"
+        },
+        "feature_dimension_diagnostics": [
+          {
+            "dimension_index": 0,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 1,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 2,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          },
+          {
+            "dimension_index": 3,
+            "active_pairs": 0,
+            "mismatches": 0,
+            "error_rate": null
+          }
+        ]
+      }
+    }
+  ]
+}

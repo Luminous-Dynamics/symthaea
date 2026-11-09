@@ -1,0 +1,571 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_state": "SYNTHETIC_ONLY",
+  "purpose": "Golden arithmetic vectors for paired nuisance invariance and relevant-audio evidence sensitivity.",
+  "policy": {
+    "text_nuisance": "Same source-audio digest and same adjudicated truth; non-audio condition digest must change.",
+    "audio_relevant": "Different source-audio digest and different answerable truth; non-audio condition digest must remain fixed.",
+    "audio_nuisance": "Different source-audio digest but same truth and same non-audio condition digest.",
+    "correct_pair": "Both model outputs exactly equal their own adjudicated audio truths.",
+    "response_invariance": "Exact canonical CLAIM label or ABSTAIN outcomes match.",
+    "false_invariance": "Same non-abstaining claim is emitted despite different adjudicated audio truths.",
+    "abstention": "Reported separately; abstention does not count as evidence sensitivity or joint correctness.",
+    "denominator": "Every rate includes exact numerator and eligible-pair denominator; zero-denominator groups are null.",
+    "joint_answer_coverage": "Both members emit CLAIM, divided by all eligible pairs; report separately for each intervention kind.",
+    "conditional_correctness": "Both members are correct, conditioned on both members emitting CLAIM; null when no pair is jointly answered."
+  },
+  "vectors": [
+    {
+      "id": "text_nuisance_correct_invariance",
+      "kind": "TEXT_NUISANCE",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "TEXT_NUISANCE",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "CONTEXT_TEXT"
+        ]
+      },
+      "expected": {
+        "text_response_invariance": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_correct": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_nuisance_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_correct_given_answered": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      }
+    },
+    {
+      "id": "text_nuisance_prompt_override",
+      "kind": "TEXT_NUISANCE",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "TEXT_NUISANCE",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "PROMPT_TEXT"
+        ]
+      },
+      "expected": {
+        "text_response_invariance": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_joint_correct": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_joint_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_nuisance_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_correct_given_answered": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      }
+    },
+    {
+      "id": "text_nuisance_both_abstain",
+      "kind": "TEXT_NUISANCE",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": "ABSTAIN",
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": "ABSTAIN",
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "TEXT_NUISANCE",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "PROMPT_TEXT"
+        ]
+      },
+      "expected": {
+        "text_response_invariance": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_joint_correct": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_joint_abstention": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "text_nuisance_joint_answer_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "text_joint_correct_given_answered": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      }
+    },
+    {
+      "id": "audio_relevant_correct_sensitivity",
+      "kind": "AUDIO_RELEVANT",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "audio_truth": {
+            "supported_claim": "C"
+          },
+          "outcome": {
+            "claim": "C"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "AUDIO_RELEVANT",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "NEGATION"
+        ]
+      },
+      "expected": {
+        "audio_counterfactual_sensitivity": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_false_invariance": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_joint_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_relevant_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_relevant_joint_sensitivity_given_answered": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      }
+    },
+    {
+      "id": "audio_relevant_false_invariance",
+      "kind": "AUDIO_RELEVANT",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "audio_truth": {
+            "supported_claim": "C"
+          },
+          "outcome": {
+            "claim": "A"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "AUDIO_RELEVANT",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "LEXICAL_CONTENT"
+        ]
+      },
+      "expected": {
+        "audio_counterfactual_sensitivity": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_false_invariance": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_joint_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_relevant_joint_answer_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_relevant_joint_sensitivity_given_answered": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      }
+    },
+    {
+      "id": "audio_relevant_both_abstain",
+      "kind": "AUDIO_RELEVANT",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": "ABSTAIN",
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "audio_truth": {
+            "supported_claim": "C"
+          },
+          "outcome": "ABSTAIN",
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "AUDIO_RELEVANT",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "EVENT_PRESENCE"
+        ]
+      },
+      "expected": {
+        "audio_counterfactual_sensitivity": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_false_invariance": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "audio_joint_abstention": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_relevant_joint_answer_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_relevant_joint_sensitivity_given_answered": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      }
+    },
+    {
+      "id": "audio_nuisance_correct_stability",
+      "kind": "AUDIO_NUISANCE",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "AUDIO_NUISANCE",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "ACOUSTIC_NUISANCE"
+        ]
+      },
+      "expected": {
+        "audio_nuisance_semantic_stability": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_nuisance_joint_correct": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_nuisance_differential_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_nuisance_joint_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_nuisance_joint_claim_coverage": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_nuisance_joint_correct_given_answered": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      }
+    },
+    {
+      "id": "audio_nuisance_differential_abstention",
+      "kind": "AUDIO_NUISANCE",
+      "trials": [
+        {
+          "trial_id": "a",
+          "pair_id": "p",
+          "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": {
+            "claim": "B"
+          },
+          "evidence_span_present": true
+        },
+        {
+          "trial_id": "b",
+          "pair_id": "p",
+          "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "audio_truth": {
+            "supported_claim": "B"
+          },
+          "outcome": "ABSTAIN",
+          "evidence_span_present": true
+        }
+      ],
+      "pair": {
+        "pair_id": "p",
+        "baseline_trial_id": "a",
+        "variant_trial_id": "b",
+        "intervention_kind": "AUDIO_NUISANCE",
+        "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "variant_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "changed_dimensions": [
+          "ACOUSTIC_NUISANCE"
+        ]
+      },
+      "expected": {
+        "audio_nuisance_semantic_stability": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "audio_nuisance_joint_correct": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_nuisance_differential_abstention": {
+          "numerator": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "audio_nuisance_joint_abstention": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_nuisance_joint_claim_coverage": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "audio_nuisance_joint_correct_given_answered": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      }
+    }
+  ]
+}

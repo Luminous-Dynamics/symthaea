@@ -1,0 +1,445 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/acoustic_faithfulness_golden_v0.1.schema.json",
+  "title": "Synthetic acoustic-faithfulness score vectors",
+  "description": "Validates the structure and basic types of synthetic acoustic-faithfulness score vectors. Cross-field scoring arithmetic is checked by a separate formula audit.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "purpose",
+    "policy",
+    "vectors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "trials",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trials": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "trial_id",
+                "pair_id",
+                "source_audio_sha256",
+                "audio_truth",
+                "context_claim",
+                "prompt_claim",
+                "conflict_axis",
+                "outcome",
+                "evidence_span_present"
+              ],
+              "properties": {
+                "trial_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "pair_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_audio_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{64}$"
+                },
+                "audio_truth": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "const": "UNANSWERABLE"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "supported_claim"
+                      ],
+                      "properties": {
+                        "supported_claim": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "context_claim": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "prompt_claim": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "conflict_axis": {
+                  "enum": [
+                    "NONE",
+                    "CONTEXT",
+                    "PROMPT",
+                    "CONTEXT_AND_PROMPT"
+                  ]
+                },
+                "outcome": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "const": "ABSTAIN"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "claim"
+                      ],
+                      "properties": {
+                        "claim": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "evidence_span_present": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "audio_adherence",
+              "context_override_rate",
+              "prompt_override_rate",
+              "unsupported_claim_rate",
+              "unanswerable_false_answer_rate",
+              "appropriate_abstention_rate",
+              "abstention_rate",
+              "answerable_abstention_rate",
+              "evidence_span_coverage",
+              "total_trials",
+              "answerable_trials",
+              "unanswerable_trials",
+              "context_conflict_trials",
+              "prompt_conflict_trials",
+              "claimed_outputs",
+              "abstained_outputs"
+            ],
+            "properties": {
+              "audio_adherence": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_override_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_override_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "unsupported_claim_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "unanswerable_false_answer_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "appropriate_abstention_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "abstention_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "answerable_abstention_rate": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "evidence_span_coverage": {
+                "type": "object",
+                "required": [
+                  "numerator",
+                  "denominator",
+                  "value"
+                ],
+                "properties": {
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "total_trials": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "answerable_trials": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unanswerable_trials": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "context_conflict_trials": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "prompt_conflict_trials": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "claimed_outputs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "abstained_outputs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

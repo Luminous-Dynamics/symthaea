@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/acoustic_counterfactual_pair_golden_v0.1.schema.json",
+  "title": "Synthetic paired acoustic counterfactual vectors",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "purpose",
+    "policy",
+    "vectors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "trials",
+          "pair",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "TEXT_NUISANCE",
+              "AUDIO_RELEVANT",
+              "AUDIO_NUISANCE"
+            ]
+          },
+          "trials": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/$defs/trial"
+            }
+          },
+          "pair": {
+            "$ref": "#/$defs/pair"
+          },
+          "expected": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "$ref": "#/$defs/rate"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "trial": {
+      "type": "object",
+      "required": [
+        "trial_id",
+        "pair_id",
+        "source_audio_sha256",
+        "audio_truth",
+        "outcome",
+        "evidence_span_present"
+      ],
+      "properties": {
+        "trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_audio_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "audio_truth": {
+          "oneOf": [
+            {
+              "type": "string",
+              "const": "UNANSWERABLE"
+            },
+            {
+              "type": "object",
+              "required": [
+                "supported_claim"
+              ],
+              "properties": {
+                "supported_claim": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "string",
+              "const": "ABSTAIN"
+            },
+            {
+              "type": "object",
+              "required": [
+                "claim"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "evidence_span_present": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "pair": {
+      "type": "object",
+      "required": [
+        "pair_id",
+        "baseline_trial_id",
+        "variant_trial_id",
+        "intervention_kind",
+        "baseline_condition_manifest_sha256",
+        "variant_condition_manifest_sha256",
+        "intervention_manifest_sha256",
+        "changed_dimensions"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant_trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_kind": {
+          "enum": [
+            "TEXT_NUISANCE",
+            "AUDIO_RELEVANT",
+            "AUDIO_NUISANCE"
+          ]
+        },
+        "baseline_condition_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "variant_condition_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "intervention_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "changed_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "CONTEXT_TEXT",
+              "PROMPT_TEXT",
+              "LEXICAL_CONTENT",
+              "NEGATION",
+              "NUMBER_OR_ENTITY",
+              "EVENT_PRESENCE",
+              "TEMPORAL_ORDER",
+              "ACOUSTIC_NUISANCE"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rate": {
+      "type": "object",
+      "required": [
+        "numerator",
+        "denominator",
+        "rate"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
