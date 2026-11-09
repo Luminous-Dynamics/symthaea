@@ -298,7 +298,7 @@ impl ProcessAgent {
             ));
         }
 
-        let child = self
+        let mut child = self
             .child
             .take()
             .ok_or_else(|| ProcessError::Protocol("agent process was already reaped".to_owned()))?;
