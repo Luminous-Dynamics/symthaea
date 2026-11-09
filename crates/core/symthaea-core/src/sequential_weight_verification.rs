@@ -85,20 +85,23 @@ pub struct ConfirmatoryEpisodeManifest {
 
 impl ConfirmatoryEpisodeManifest {
     /// Construct a canonical manifest from episode identifiers.
-    pub fn new(
-        mut episode_ids: Vec<String>,
-    ) -> Result<Self, SequentialWeightVerificationError> {
+    pub fn new(mut episode_ids: Vec<String>) -> Result<Self, SequentialWeightVerificationError> {
         if episode_ids.is_empty() {
             return Err(SequentialWeightVerificationError::EmptyConfirmatoryEpisodeManifest);
         }
-        if episode_ids.iter().any(|episode_id| episode_id.trim().is_empty()) {
+        if episode_ids
+            .iter()
+            .any(|episode_id| episode_id.trim().is_empty())
+        {
             return Err(SequentialWeightVerificationError::EmptyEpisodeId);
         }
         episode_ids.sort();
         if episode_ids.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-                "duplicate episode identifiers",
-            ));
+            return Err(
+                SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                    "duplicate episode identifiers",
+                ),
+            );
         }
         let mut manifest = Self {
             format_version: 1,
@@ -149,27 +152,39 @@ fn validate_confirmatory_episode_manifest(
     manifest: &ConfirmatoryEpisodeManifest,
 ) -> Result<(), SequentialWeightVerificationError> {
     if manifest.format_version != 1 {
-        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-            "unsupported format version",
-        ));
+        return Err(
+            SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "unsupported format version",
+            ),
+        );
     }
     if manifest.episode_ids.is_empty()
-        || manifest.episode_ids.iter().any(|episode_id| episode_id.trim().is_empty())
+        || manifest
+            .episode_ids
+            .iter()
+            .any(|episode_id| episode_id.trim().is_empty())
     {
-        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-            "empty manifest or episode identifier",
-        ));
+        return Err(
+            SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "empty manifest or episode identifier",
+            ),
+        );
     }
     if manifest
         .episode_ids
         .windows(2)
         .any(|pair| pair[0] >= pair[1])
     {
-        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-            "episode identifiers are not strictly sorted and unique",
-        ));
+        return Err(
+            SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "episode identifiers are not strictly sorted and unique",
+            ),
+        );
     }
-    validate_hex_digest(&manifest.manifest_digest, "confirmatory_episode_manifest_digest")?;
+    validate_hex_digest(
+        &manifest.manifest_digest,
+        "confirmatory_episode_manifest_digest",
+    )?;
     let expected = confirmatory_episode_manifest_digest(manifest)?;
     if expected != manifest.manifest_digest {
         return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
@@ -423,13 +438,14 @@ impl SequentialWeightVerificationCampaign {
             return Err(SequentialWeightVerificationError::CandidateIndexExhausted);
         }
         validate_confirmatory_episode_manifest(&confirmatory_episode_manifest)?;
-        if confirmatory_episode_manifest.episode_count()
-            < self.config.maximum_observations as usize
+        if confirmatory_episode_manifest.episode_count() < self.config.maximum_observations as usize
         {
-            return Err(SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
-                expected: self.config.maximum_observations as usize,
-                actual: confirmatory_episode_manifest.episode_count(),
-            });
+            return Err(
+                SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
+                    expected: self.config.maximum_observations as usize,
+                    actual: confirmatory_episode_manifest.episode_count(),
+                },
+            );
         }
         if self
             .used_candidate_digests
@@ -587,8 +603,9 @@ impl SequentialWeightVerificationCampaign {
         let expected_episode_id_count = expected_count
             .checked_mul(snapshot.config.maximum_observations)
             .ok_or(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
-        let episode_id_count = u64::try_from(snapshot.used_confirmatory_episode_id_digests.len())
-            .map_err(|_| SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
+        let episode_id_count =
+            u64::try_from(snapshot.used_confirmatory_episode_id_digests.len())
+                .map_err(|_| SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
         if episode_id_count < expected_episode_id_count {
             return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
         }
@@ -643,15 +660,19 @@ impl SequentialWeightVerification {
         if binding.confirmatory_episode_manifest_digest
             != confirmatory_episode_manifest.manifest_digest
         {
-            return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-                "binding digest does not match manifest",
-            ));
+            return Err(
+                SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                    "binding digest does not match manifest",
+                ),
+            );
         }
         if confirmatory_episode_manifest.episode_count() < config.maximum_observations as usize {
-            return Err(SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
-                expected: config.maximum_observations as usize,
-                actual: confirmatory_episode_manifest.episode_count(),
-            });
+            return Err(
+                SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
+                    expected: config.maximum_observations as usize,
+                    actual: confirmatory_episode_manifest.episode_count(),
+                },
+            );
         }
 
         let mut observation_hasher = blake3::Hasher::new();
@@ -688,7 +709,10 @@ impl SequentialWeightVerification {
         if observation.episode_id.trim().is_empty() {
             return Err(SequentialWeightVerificationError::EmptyEpisodeId);
         }
-        if !self.confirmatory_episode_manifest.contains(&observation.episode_id) {
+        if !self
+            .confirmatory_episode_manifest
+            .contains(&observation.episode_id)
+        {
             return Err(SequentialWeightVerificationError::EpisodeNotInConfirmatoryManifest);
         }
         if !observation.baseline_loss.is_finite()
@@ -1159,16 +1183,12 @@ mod tests {
 
     #[test]
     fn confirmatory_manifest_is_canonical_and_rejects_duplicate_or_empty_ids() {
-        let forward = ConfirmatoryEpisodeManifest::new(vec![
-            "episode-b".into(),
-            "episode-a".into(),
-        ])
-        .expect("canonical manifest");
-        let reverse = ConfirmatoryEpisodeManifest::new(vec![
-            "episode-a".into(),
-            "episode-b".into(),
-        ])
-        .expect("equivalent canonical manifest");
+        let forward =
+            ConfirmatoryEpisodeManifest::new(vec!["episode-b".into(), "episode-a".into()])
+                .expect("canonical manifest");
+        let reverse =
+            ConfirmatoryEpisodeManifest::new(vec!["episode-a".into(), "episode-b".into()])
+                .expect("equivalent canonical manifest");
         assert_eq!(
             forward.episode_ids,
             vec!["episode-a".to_owned(), "episode-b".to_owned()]
@@ -1180,9 +1200,11 @@ mod tests {
         ));
         assert!(matches!(
             ConfirmatoryEpisodeManifest::new(vec!["duplicate".into(), "duplicate".into()]),
-            Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-                "duplicate episode identifiers"
-            ))
+            Err(
+                SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                    "duplicate episode identifiers"
+                )
+            )
         ));
         assert!(matches!(
             ConfirmatoryEpisodeManifest::new(vec![" ".into()]),
@@ -1193,10 +1215,8 @@ mod tests {
     #[test]
     fn candidate_manifest_must_cover_the_preregistered_observation_budget() {
         let mut campaign = campaign(0.1, 10);
-        let short_manifest = ConfirmatoryEpisodeManifest::new(vec![
-            "episode-only-one".into(),
-        ])
-        .expect("valid but too-short manifest");
+        let short_manifest = ConfirmatoryEpisodeManifest::new(vec!["episode-only-one".into()])
+            .expect("valid but too-short manifest");
         assert!(matches!(
             campaign.start_candidate(
                 digest('a'),
@@ -1205,10 +1225,12 @@ mod tests {
                 short_manifest,
                 digest('e'),
             ),
-            Err(SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
-                expected: 10,
-                actual: 1
-            })
+            Err(
+                SequentialWeightVerificationError::ConfirmatoryManifestTooSmall {
+                    expected: 10,
+                    actual: 1
+                }
+            )
         ));
         assert_eq!(campaign.next_candidate_index(), 1);
         assert_eq!(campaign.used_confirmatory_episode_id_count(), 0);
@@ -1222,7 +1244,13 @@ mod tests {
             verifier.observe(observation_for_shard('e', 0, 0.8, 0.4)),
             Err(SequentialWeightVerificationError::EpisodeNotInConfirmatoryManifest)
         ));
-        assert_eq!(verifier.report().expect("unchanged report").observation_count, 0);
+        assert_eq!(
+            verifier
+                .report()
+                .expect("unchanged report")
+                .observation_count,
+            0
+        );
     }
 
     #[test]
@@ -1585,9 +1613,11 @@ mod tests {
             verifier_checkpoint_digest(&altered_manifest).expect("recompute checkpoint digest");
         assert!(matches!(
             SequentialWeightVerification::from_checkpoint(altered_manifest),
-            Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-                "manifest digest mismatch"
-            ))
+            Err(
+                SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                    "manifest digest mismatch"
+                )
+            )
         ));
 
         let mut altered_claim = checkpoint;
