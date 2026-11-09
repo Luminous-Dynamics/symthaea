@@ -693,6 +693,7 @@ pub struct GroupIntervalSelectionPlan {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedMemberResidualCertificate {
     group_identity: GroupScoreIntervalIdentity,
+    scope_binding: HmeEligibilityScopeBinding,
     member_id: String,
     original_payload_digest: [u8; 32],
     reconstruction_digest: [u8; 32],
@@ -706,6 +707,8 @@ pub struct VerifiedMemberResidualCertificate {
 pub enum VerifiedMemberResidualError {
     /// Receipt was admitted for another immutable group snapshot.
     GroupIdentityMismatch,
+    /// Receipt was admitted under a different principal/policy/bitemporal scope.
+    EligibilityScopeMismatch,
     /// Receipt member ID is not present in the supplied group.
     MemberNotInGroup,
     /// The group does not bind the same original payload bytes.
@@ -724,6 +727,7 @@ impl std::fmt::Display for VerifiedMemberResidualError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GroupIdentityMismatch => write!(f, "residual receipt belongs to another group snapshot"),
+            Self::EligibilityScopeMismatch => write!(f, "residual receipt belongs to another eligibility scope"),
             Self::MemberNotInGroup => write!(f, "residual receipt member is not in the group"),
             Self::OriginalPayloadDigestMismatch => write!(f, "original payload digest differs from group membership"),
             Self::ReconstructionDigestMismatch => write!(f, "compact reconstruction differs from admitted reconstruction"),
@@ -776,6 +780,7 @@ impl VerifiedMemberResidualCertificate {
         })?;
         Ok(Self {
             group_identity: group.identity,
+            scope_binding: group.scope_binding,
             member_id,
             original_payload_digest,
             reconstruction_digest: continuous_hv_member_payload_digest(
@@ -791,6 +796,11 @@ impl VerifiedMemberResidualCertificate {
     /// Parent group identity bound when the residual was verified.
     pub fn group_identity(&self) -> GroupScoreIntervalIdentity {
         self.group_identity
+    }
+
+    /// Principal/policy/source-ledger/bitemporal scope bound at admission.
+    pub fn scope_binding(&self) -> HmeEligibilityScopeBinding {
+        self.scope_binding
     }
 
     /// Stable member identifier bound into the receipt.
@@ -814,6 +824,7 @@ impl VerifiedMemberResidualCertificate {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroupMemberScoreIntervalRecord {
     group_identity: GroupScoreIntervalIdentity,
+    scope_binding: HmeEligibilityScopeBinding,
     query_digest: [u8; 32],
     record: ScoreIntervalRecord<String>,
 }
@@ -877,6 +888,7 @@ impl GroupMemberScoreIntervalRecord {
         .map_err(GroupMemberScoreIntervalBuildError::ScoreInterval)?;
         Ok(Self {
             group_identity: group.identity,
+            scope_binding: group.scope_binding,
             query_digest: continuous_hv_query_digest(query),
             record,
         })
@@ -897,6 +909,11 @@ impl GroupMemberScoreIntervalRecord {
         if group.identity != certificate.group_identity {
             return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
                 VerifiedMemberResidualError::GroupIdentityMismatch,
+            ));
+        }
+        if group.scope_binding != certificate.scope_binding {
+            return Err(GroupMemberScoreIntervalBuildError::VerifiedCertificate(
+                VerifiedMemberResidualError::EligibilityScopeMismatch,
             ));
         }
         let member_index = group
@@ -946,6 +963,7 @@ impl GroupMemberScoreIntervalRecord {
         }
         Ok(Self {
             group_identity: group.identity,
+            scope_binding: group.scope_binding,
             query_digest: continuous_hv_query_digest(query),
             record: ScoreIntervalRecord {
                 id: certificate.member_id.clone(),
@@ -1010,6 +1028,11 @@ pub enum HierarchicalIntervalSelectionError {
         /// Member whose intervals are disjoint.
         member_id: String,
     },
+    /// Member interval metadata was admitted under a different policy or temporal scope.
+    EligibilityScopeMismatch {
+        /// Member whose scope binding disagreed.
+        member_id: String,
+    },
     /// The second-stage per-record selector rejected its input.
     MemberSelection(IntervalSelectionError),
 }
@@ -1036,6 +1059,9 @@ impl std::fmt::Display for HierarchicalIntervalSelectionError {
                 f,
                 "member and parent-group intervals are disjoint for {member_id}"
             ),
+            Self::EligibilityScopeMismatch { member_id } => {
+                write!(f, "member {member_id} was admitted under another eligibility scope")
+            }
             Self::MemberSelection(error) => write!(f, "member selection failed: {error}"),
         }
     }
@@ -1632,6 +1658,11 @@ fn select_hierarchical_refinement_set_impl(
     > = BTreeMap::new();
 
     for member in member_records {
+        if member.scope_binding != group_plan.scope_binding {
+            return Err(HierarchicalIntervalSelectionError::EligibilityScopeMismatch {
+                member_id: member.id().to_owned(),
+            });
+        }
         if member.query_digest != group_plan.query_digest {
             return Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup {
                 group_identity: member.group_identity,
