@@ -24,9 +24,7 @@
 //! is not analytic differentiation. Step-size sweeps and a future AD/analytic
 //! derivative route remain required for numerical qualification.
 
-use crate::adm_reference::{
-    AdmReferenceError, AmplifierAdmMetric, implied_source_diagnostics,
-};
+use crate::adm_reference::{AdmReferenceError, AmplifierAdmMetric, implied_source_diagnostics};
 use std::error::Error;
 use std::fmt;
 
@@ -61,7 +59,10 @@ impl fmt::Display for AdmConstraintError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidDerivativeStep => {
-                write!(f, "ADM constraint derivative step must be finite and positive")
+                write!(
+                    f,
+                    "ADM constraint derivative step must be finite and positive"
+                )
             }
             Self::NonFiniteDerivative => {
                 write!(f, "ADM shift derivative is not finite")
@@ -108,8 +109,9 @@ pub fn adm_constraint_diagnostics(
             extrinsic_curvature[i][j] = 0.5 * (first[j][i] + first[i][j]);
         }
     }
-    let extrinsic_curvature_trace =
-        (0..3).map(|axis| extrinsic_curvature[axis][axis]).sum::<f64>();
+    let extrinsic_curvature_trace = (0..3)
+        .map(|axis| extrinsic_curvature[axis][axis])
+        .sum::<f64>();
     let extrinsic_curvature_squared = extrinsic_curvature
         .iter()
         .flatten()
@@ -124,10 +126,8 @@ pub fn adm_constraint_diagnostics(
     let stress = source.stress_energy;
     let mut eulerian_momentum_density = [0.0; 3];
     for i in 0..3 {
-        eulerian_momentum_density[i] = -stress[i + 1][0]
-            + (0..3)
-                .map(|k| beta[k] * stress[i + 1][k + 1])
-                .sum::<f64>();
+        eulerian_momentum_density[i] =
+            -stress[i + 1][0] + (0..3).map(|k| beta[k] * stress[i + 1][k + 1]).sum::<f64>();
     }
 
     // For Euclidean gamma_ij=delta_ij, D_j is an ordinary partial derivative.
@@ -257,7 +257,12 @@ fn second_shift_derivatives(
         }
     }
 
-    if second.iter().flatten().flatten().any(|value| !value.is_finite()) {
+    if second
+        .iter()
+        .flatten()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
         return Err(AdmConstraintError::NonFiniteDerivative);
     }
     Ok(second)
@@ -306,15 +311,16 @@ mod tests {
     #[test]
     fn shifted_metric_reports_finite_independent_constraint_residuals() {
         let diagnostics =
-            adm_constraint_diagnostics(&shifted_field(1.0e-2), [0.0, 15.0, 0.5, 0.25], 48)
-                .unwrap();
+            adm_constraint_diagnostics(&shifted_field(1.0e-2), [0.0, 15.0, 0.5, 0.25], 48).unwrap();
         assert!(diagnostics.hamiltonian_residual.is_finite());
         assert!(diagnostics.momentum_residual_norm.is_finite());
-        assert!(diagnostics
-            .extrinsic_curvature
-            .iter()
-            .flatten()
-            .all(|value| value.is_finite()));
+        assert!(
+            diagnostics
+                .extrinsic_curvature
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]
@@ -323,18 +329,16 @@ mod tests {
         let diagnostics: Vec<_> = steps
             .iter()
             .map(|step| {
-                adm_constraint_diagnostics(
-                    &shifted_field(*step),
-                    [0.0, 15.0, 0.5, 0.25],
-                    24,
-                )
-                .unwrap()
+                adm_constraint_diagnostics(&shifted_field(*step), [0.0, 15.0, 0.5, 0.25], 24)
+                    .unwrap()
             })
             .collect();
-        assert!(diagnostics
-            .iter()
-            .all(|entry| entry.hamiltonian_residual.is_finite()
-                && entry.momentum_residual_norm.is_finite()));
+        assert!(
+            diagnostics
+                .iter()
+                .all(|entry| entry.hamiltonian_residual.is_finite()
+                    && entry.momentum_residual_norm.is_finite())
+        );
         // Do not require monotone convergence from nested finite differences;
         // the executable report exposes the actual step dependence.
     }
