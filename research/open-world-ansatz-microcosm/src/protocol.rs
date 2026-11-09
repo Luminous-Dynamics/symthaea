@@ -209,6 +209,9 @@ pub struct BlindEpisode {
     manifest: PublicTaskManifest,
     world: WorldState,
     generating_truth: GeneratingTruth,
+    /// Only explicit open-support episodes may treat omitted generating truth
+    /// as a valid "no compatible model" outcome.
+    allow_outside_candidate_grammar: bool,
     observations: Vec<ObservationRecord>,
     submission: Option<AgentSubmission>,
 }
@@ -222,6 +225,7 @@ struct EpisodeInit {
     max_probe_actions: usize,
     world: WorldState,
     generating_truth: GeneratingTruth,
+    allow_outside_candidate_grammar: bool,
 }
 
 impl BlindEpisode {
@@ -256,15 +260,40 @@ impl BlindEpisode {
             max_probe_actions,
             world: WorldState::Boolean(world),
             generating_truth: GeneratingTruth::Boolean(truth),
+            allow_outside_candidate_grammar: false,
         })
     }
 
-    /// Evaluator-side constructor. The full generating model remains private.
+    /// Evaluator-side constructor over the declared closed candidate grammar.
     pub fn new_numeric(
         episode_id: impl Into<String>,
         truth: numeric::ModelHypothesis,
         access: StructureAccess,
         max_probe_actions: usize,
+    ) -> Result<Self, ProtocolError> {
+        Self::new_numeric_with_support(episode_id, truth, access, max_probe_actions, false)
+    }
+
+    /// Evaluator-side open-support control. The world generator may use a
+    /// valid parameter value outside the agent's declared candidate catalogue.
+    /// The agent receives the same public task contract and is not told that
+    /// the hidden truth is out of catalogue. Only this explicit constructor
+    /// permits the evaluator to score a correct empty version space.
+    pub fn new_numeric_open_support(
+        episode_id: impl Into<String>,
+        truth: numeric::ModelHypothesis,
+        access: StructureAccess,
+        max_probe_actions: usize,
+    ) -> Result<Self, ProtocolError> {
+        Self::new_numeric_with_support(episode_id, truth, access, max_probe_actions, true)
+    }
+
+    fn new_numeric_with_support(
+        episode_id: impl Into<String>,
+        truth: numeric::ModelHypothesis,
+        access: StructureAccess,
+        max_probe_actions: usize,
+        allow_outside_candidate_grammar: bool,
     ) -> Result<Self, ProtocolError> {
         match access {
             StructureAccess::NumericWithheld => {}
@@ -285,6 +314,7 @@ impl BlindEpisode {
             max_probe_actions,
             world: WorldState::Numeric(world),
             generating_truth: GeneratingTruth::Numeric(truth),
+            allow_outside_candidate_grammar,
         })
     }
 
@@ -316,6 +346,7 @@ impl BlindEpisode {
             max_probe_actions,
             world: WorldState::Interaction(world),
             generating_truth: GeneratingTruth::Interaction(truth),
+            allow_outside_candidate_grammar: false,
         })
     }
 
@@ -329,6 +360,7 @@ impl BlindEpisode {
             max_probe_actions,
             world,
             generating_truth,
+            allow_outside_candidate_grammar,
         } = init;
 
         if episode_id.trim().is_empty() || max_probe_actions == 0 {
@@ -348,6 +380,7 @@ impl BlindEpisode {
             manifest,
             world,
             generating_truth,
+            allow_outside_candidate_grammar,
             observations: Vec::new(),
             submission: None,
         })
@@ -605,7 +638,7 @@ impl BlindEpisode {
                     };
                     let oracle_models = reference_boolean_version_space(&log, model_access)?;
                     let truth_present = oracle_models.contains(truth);
-                    if !truth_present {
+                    if !truth_present && !self.allow_outside_candidate_grammar {
                         return Err(ProtocolError::GeneratingTruthMissingFromOracle);
                     }
                     (
@@ -656,7 +689,7 @@ impl BlindEpisode {
                     };
                     let oracle_models = reference_numeric_version_space(&log, access);
                     let truth_present = oracle_models.contains(truth);
-                    if !truth_present {
+                    if !truth_present && !self.allow_outside_candidate_grammar {
                         return Err(ProtocolError::GeneratingTruthMissingFromOracle);
                     }
                     (
@@ -709,7 +742,7 @@ impl BlindEpisode {
                     };
                     let oracle_models = reference_interaction_version_space(&log, access);
                     let truth_present = oracle_models.contains(truth);
-                    if !truth_present {
+                    if !truth_present && !self.allow_outside_candidate_grammar {
                         return Err(ProtocolError::GeneratingTruthMissingFromOracle);
                     }
                     (
@@ -1200,6 +1233,94 @@ mod tests {
             assert!(evaluated.contains(&truth), "truth omitted: {truth:?}");
             assert_eq!(inferred.compatible_hypotheses, evaluated, "truth={truth:?}");
         }
+    }
+
+    #[test]
+    fn open_support_episode_scores_empty_version_space_without_forcing_nearest_model() {
+        let truth = numeric::ModelHypothesis {
+            gain: 7,
+            ..direct_numeric_truth()
+        };
+        let mut episode = BlindEpisode::new_numeric_open_support(
+            "open-support-out-of-catalogue-gain",
+            truth,
+            StructureAccess::NumericWithheld,
+            2,
+        )
+        .unwrap();
+
+        let probe = episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Numeric(1),
+            })
+            .unwrap();
+        assert_eq!(probe.view.observations.len(), 1);
+        assert_eq!(
+            probe.view.observations[0].measurement,
+            AgentMeasurement::Numeric(7)
+        );
+
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                compatible_models: Vec::new(),
+                disposition: ClaimDisposition::NoCompatibleModel,
+            },
+            evidence_prefix_sha256: probe.view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![probe.view.observations[0].evidence_id.clone()],
+            rationale: "The observation lies outside every declared candidate response.".to_owned(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        let score = episode.evaluate_after_submission().unwrap();
+
+        assert!(!score.generating_model_in_version_space);
+        assert_eq!(score.set_score.oracle_model_count, 0);
+        assert!(score.set_score.exact_version_space_match);
+        assert!(score.decision_correct);
+        assert!(score.evidence_references_valid);
+        assert_eq!(score.structure_score.oracle_structure_count, 0);
+    }
+
+    #[test]
+    fn closed_support_episode_fails_closed_when_generating_truth_is_outside_candidates() {
+        let truth = numeric::ModelHypothesis {
+            gain: 7,
+            ..direct_numeric_truth()
+        };
+        assert!(matches!(
+            BlindEpisode::new_numeric(
+                "closed-support-out-of-catalogue-gain",
+                truth,
+                StructureAccess::NumericWithheld,
+                2,
+            ),
+            Ok(_)
+        ));
+        let mut episode = BlindEpisode::new_numeric(
+            "closed-support-out-of-catalogue-gain-score",
+            truth,
+            StructureAccess::NumericWithheld,
+            2,
+        )
+        .unwrap();
+        let probe = episode
+            .apply(AgentAction::Probe {
+                intervention: AgentIntervention::Numeric(1),
+            })
+            .unwrap();
+        let submission = AgentSubmission {
+            claim: AgentClaim::Numeric {
+                compatible_models: Vec::new(),
+                disposition: ClaimDisposition::NoCompatibleModel,
+            },
+            evidence_prefix_sha256: probe.view.evidence_prefix_sha256,
+            cited_evidence_ids: vec![probe.view.observations[0].evidence_id.clone()],
+            rationale: "No compatible declared model.".to_owned(),
+        };
+        episode.apply(AgentAction::Submit { submission }).unwrap();
+        assert_eq!(
+            episode.evaluate_after_submission(),
+            Err(ProtocolError::GeneratingTruthMissingFromOracle)
+        );
     }
 
     #[test]
