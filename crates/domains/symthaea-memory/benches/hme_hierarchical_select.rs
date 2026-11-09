@@ -79,10 +79,23 @@ fn config() -> Result<Config, String> {
     if cfg.dimension > 1_048_576 || cfg.records > 10_000_000 {
         return Err("benchmark dimensions exceed the safety cap".to_owned());
     }
-    cfg.records
+    let payload_bytes = cfg.records
         .checked_mul(cfg.dimension)
         .and_then(|x| x.checked_mul(std::mem::size_of::<f32>()))
         .ok_or_else(|| "vector payload byte calculation overflowed usize".to_owned())?;
+    const MAX_ORIGINAL_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
+    if payload_bytes > MAX_ORIGINAL_PAYLOAD_BYTES {
+        return Err(format!(
+            "synthetic original payload budget exceeded: {payload_bytes} bytes > {MAX_ORIGINAL_PAYLOAD_BYTES}; reduce RECORDS or DIM"
+        ));
+    }
+    let group_count = cfg.records / cfg.group_size
+        + usize::from(cfg.records % cfg.group_size != 0);
+    if group_count > 100_000 {
+        return Err(format!(
+            "synthetic group count {group_count} exceeds 100000; increase GROUP_SIZE"
+        ));
+    }
     Ok(cfg)
 }
 
