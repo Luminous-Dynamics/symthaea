@@ -22,9 +22,8 @@ use super::quantified_game_values::{
 use super::quantified_scope::{Quantifier, ValidatedQuantifierPrefix};
 use super::quantified_strategy::BooleanStrategyFunction;
 use super::strategy_aig::{
-    AigLiteral, AigNode, StrategyAig, StrategyAigBudget, StrategyAigError,
-    StrategyAigReport, compile_strategy_function_to_aig,
-    verify_aig_matches_strategy_function, validate_strategy_aig,
+    AigLiteral, AigNode, StrategyAig, StrategyAigBudget, StrategyAigError, StrategyAigReport,
+    compile_strategy_function_to_aig, validate_strategy_aig, verify_aig_matches_strategy_function,
 };
 use super::synqbf::{
     SynQbfBudget, SynQbfError, SynQbfProof, SynQbfVerificationReport, verify_synqbf_proof,
@@ -62,13 +61,30 @@ pub enum SynQbfConstructionError {
     GameValueProfile(GameValueProfileError),
     LayerAigCompilation(StrategyAigError),
     LayerAigVerification(StrategyAigError),
-    LayerAndNodeBudgetExceeded { required: usize, limit: usize },
-    ComposedAndNodeBudgetExceeded { required: usize, limit: usize },
-    ComposeOperationBudgetExceeded { required: u128, limit: u128 },
+    LayerAndNodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ComposedAndNodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ComposeOperationBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
     InputCountOverflow,
-    LayerDependencyScopeMismatch { layer: usize },
-    LayerInputOutOfRange { layer: usize, dependency_index: usize },
-    CircuitCompositionOutOfRange { node: usize, node_count: usize },
+    LayerDependencyScopeMismatch {
+        layer: usize,
+    },
+    LayerInputOutOfRange {
+        layer: usize,
+        dependency_index: usize,
+    },
+    CircuitCompositionOutOfRange {
+        node: usize,
+        node_count: usize,
+    },
     FinalAigValidation(StrategyAigError),
     SynQbfVerification(SynQbfError),
     ResourceAccountingOverflow,
@@ -226,14 +242,12 @@ impl AigComposer {
         if let Some(value) = memo.get(local_index).copied().flatten() {
             return Ok(value);
         }
-        let node = local_aig
-            .nodes
-            .get(local_index)
-            .copied()
-            .ok_or(SynQbfConstructionError::CircuitCompositionOutOfRange {
+        let node = local_aig.nodes.get(local_index).copied().ok_or(
+            SynQbfConstructionError::CircuitCompositionOutOfRange {
                 node: local_index,
                 node_count: local_aig.nodes.len(),
-            })?;
+            },
+        )?;
         let value = match node {
             AigNode::Input { dependency_index } => {
                 let paired_input = *dependency_to_paired_input.get(dependency_index).ok_or(
@@ -328,13 +342,9 @@ pub fn construct_synqbf_from_game_value_profile(
     profile: &QuantifiedGameValueProfile,
     budget: SynQbfConstructionBudget,
 ) -> Result<ConstructedSynQbfProof, SynQbfConstructionError> {
-    let profile_verification = verify_game_value_profile(
-        problem,
-        prefix,
-        profile,
-        budget.game_values,
-    )
-    .map_err(SynQbfConstructionError::GameValueProfile)?;
+    let profile_verification =
+        verify_game_value_profile(problem, prefix, profile, budget.game_values)
+            .map_err(SynQbfConstructionError::GameValueProfile)?;
 
     let n = profile.prefix_order.len();
     if n > budget.checker.max_variables {
@@ -400,28 +410,24 @@ pub fn construct_synqbf_from_game_value_profile(
 
     let mut initial_mapping = Vec::with_capacity(layer_circuits[0].dependencies.len());
     for &variable in &layer_circuits[0].dependencies {
-        let position = *variable_position_by_id.get(variable).ok_or(
-            SynQbfConstructionError::LayerDependencyScopeMismatch { layer: 0 },
-        )?;
+        let position = *variable_position_by_id
+            .get(variable)
+            .ok_or(SynQbfConstructionError::LayerDependencyScopeMismatch { layer: 0 })?;
         if position == usize::MAX {
             return Err(SynQbfConstructionError::LayerDependencyScopeMismatch { layer: 0 });
         }
         initial_mapping.push(position);
     }
-    let mut result = composer.clone_local_output(
-        0,
-        &layer_circuits[0],
-        &initial_mapping,
-        budget,
-    )?;
+    let mut result =
+        composer.clone_local_output(0, &layer_circuits[0], &initial_mapping, budget)?;
 
     for position in 1..=n {
         let layer = &layer_circuits[position];
         let mut mapping = Vec::with_capacity(layer.dependencies.len());
         for &variable in &layer.dependencies {
-            let position_of_variable = *variable_position_by_id.get(variable).ok_or(
-                SynQbfConstructionError::LayerDependencyScopeMismatch { layer: position },
-            )?;
+            let position_of_variable = *variable_position_by_id
+                .get(variable)
+                .ok_or(SynQbfConstructionError::LayerDependencyScopeMismatch { layer: position })?;
             if position_of_variable == usize::MAX || position_of_variable >= position {
                 return Err(SynQbfConstructionError::LayerDependencyScopeMismatch {
                     layer: position,
@@ -430,8 +436,7 @@ pub fn construct_synqbf_from_game_value_profile(
             mapping.push(position_of_variable);
         }
 
-        let layer_value =
-            composer.clone_local_output(position, layer, &mapping, budget)?;
+        let layer_value = composer.clone_local_output(position, layer, &mapping, budget)?;
         let current = AigLiteral::node(position - 1);
         let dual = AigLiteral::node(n + position - 1);
         let differs = composer.xor(current, dual, budget)?;
@@ -471,16 +476,14 @@ pub fn construct_synqbf_from_game_value_profile(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::decomposition::Literal;
-    use super::super::quantified_game_dag::{
-        QbfGameDagBudget, build_qbf_game_proof_dag,
-    };
+    use super::super::quantified_game_dag::{QbfGameDagBudget, build_qbf_game_proof_dag};
     use super::super::quantified_game_values::{
         GameValueProfileBudget, extract_game_value_profile_from_dag,
     };
     use super::super::quantified_scope::QuantifierBlock;
-    use super::super::qdimacs::{parse_qdimacs, QdimacsParseBudget};
+    use super::super::qdimacs::{QdimacsParseBudget, parse_qdimacs};
+    use super::*;
 
     fn block(quantifier: Quantifier, variables: &[usize]) -> QuantifierBlock {
         QuantifierBlock {
@@ -621,22 +624,27 @@ mod tests {
             construction_budget().game_values,
         )
         .unwrap();
-        let result =
-            construct_synqbf_from_game_value_profile(
-                &problem,
-                &prefix,
-                &profile,
-                construction_budget(),
-            )
-            .unwrap();
+        let result = construct_synqbf_from_game_value_profile(
+            &problem,
+            &prefix,
+            &profile,
+            construction_budget(),
+        )
+        .unwrap();
         assert!(result.proof.claimed_truth_value);
         assert_eq!(result.report.layers.len(), 4);
         assert_eq!(
-            result.report.final_synqbf_verification.source_equivalence_assignments_checked,
+            result
+                .report
+                .final_synqbf_verification
+                .source_equivalence_assignments_checked,
             8
         );
         assert_eq!(
-            result.report.final_synqbf_verification.representability_instances_checked,
+            result
+                .report
+                .final_synqbf_verification
+                .representability_instances_checked,
             7
         );
     }
@@ -716,8 +724,7 @@ mod tests {
                         .collect();
                     let prefix = prefix(2, blocks);
                     let dag_budget = dag_budget();
-                    let (dag, _) =
-                        build_qbf_game_proof_dag(problem, &prefix, dag_budget).unwrap();
+                    let (dag, _) = build_qbf_game_proof_dag(problem, &prefix, dag_budget).unwrap();
                     let profile = extract_game_value_profile_from_dag(
                         problem,
                         &prefix,
@@ -739,8 +746,7 @@ mod tests {
                     });
 
                     assert_eq!(
-                        constructed.proof.claimed_truth_value,
-                        profile.truth_value,
+                        constructed.proof.claimed_truth_value, profile.truth_value,
                         "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
                     );
                     assert_eq!(constructed.report.layers.len(), 3);
@@ -779,8 +785,7 @@ mod tests {
             };
             let prefix = prefix(0, vec![]);
             let dag_budget = dag_budget();
-            let (dag, _) =
-                build_qbf_game_proof_dag(&problem, &prefix, dag_budget).unwrap();
+            let (dag, _) = build_qbf_game_proof_dag(&problem, &prefix, dag_budget).unwrap();
             let profile = extract_game_value_profile_from_dag(
                 &problem,
                 &prefix,
@@ -830,9 +835,7 @@ mod tests {
         )
         .unwrap();
         let old_value = profile.layers[1].values[&vec![false]];
-        profile.layers[1]
-            .values
-            .insert(vec![false], !old_value);
+        profile.layers[1].values.insert(vec![false], !old_value);
         assert!(matches!(
             construct_synqbf_from_game_value_profile(
                 &problem,
