@@ -401,17 +401,23 @@ pub enum ModelDiscriminationError {
         experiment_id: String,
         model_id: String,
     },
-    #[error("experiment {experiment_id}, model {model_id} has detection probability outside [0, 1]")]
+    #[error(
+        "experiment {experiment_id}, model {model_id} has detection probability outside [0, 1]"
+    )]
     InvalidDetectionProbability {
         experiment_id: String,
         model_id: String,
     },
-    #[error("experiment {experiment_id}, model {model_id} is missing a detection derivation reference")]
+    #[error(
+        "experiment {experiment_id}, model {model_id} is missing a detection derivation reference"
+    )]
     MissingDetectionDerivation {
         experiment_id: String,
         model_id: String,
     },
-    #[error("experiment {experiment_id} contains a detection probability for unknown model {model_id}")]
+    #[error(
+        "experiment {experiment_id} contains a detection probability for unknown model {model_id}"
+    )]
     UnexpectedDetectionProbability {
         experiment_id: String,
         model_id: String,
@@ -791,39 +797,35 @@ pub fn rank_detection_aware_model_discriminating_experiments(
             } else {
                 vec![0.0; prior.len()]
             };
-            let (coarse_detected_eig, refined_detected_eig) =
-                if expected_detection_probability > 0.0 {
-                    let coarse = gaussian_model_identity_eig(
-                        &normal_predictions,
-                        measurement_sigma,
-                        &detected_prior,
-                        config.quadrature_intervals,
-                    )
-                    .ok_or_else(|| {
-                        ModelDiscriminationError::NumericalOverflow(
-                            experiment.experiment_id.clone(),
-                        )
-                    })?;
-                    let refined = gaussian_model_identity_eig(
-                        &normal_predictions,
-                        measurement_sigma,
-                        &detected_prior,
-                        config.quadrature_intervals * 2,
-                    )
-                    .ok_or_else(|| {
-                        ModelDiscriminationError::NumericalOverflow(
-                            experiment.experiment_id.clone(),
-                        )
-                    })?;
-                    (coarse, refined)
-                } else {
-                    (0.0, 0.0)
-                };
+            let (coarse_detected_eig, refined_detected_eig) = if expected_detection_probability
+                > 0.0
+            {
+                let coarse = gaussian_model_identity_eig(
+                    &normal_predictions,
+                    measurement_sigma,
+                    &detected_prior,
+                    config.quadrature_intervals,
+                )
+                .ok_or_else(|| {
+                    ModelDiscriminationError::NumericalOverflow(experiment.experiment_id.clone())
+                })?;
+                let refined = gaussian_model_identity_eig(
+                    &normal_predictions,
+                    measurement_sigma,
+                    &detected_prior,
+                    config.quadrature_intervals * 2,
+                )
+                .ok_or_else(|| {
+                    ModelDiscriminationError::NumericalOverflow(experiment.experiment_id.clone())
+                })?;
+                (coarse, refined)
+            } else {
+                (0.0, 0.0)
+            };
 
             let total_given_execution =
                 detection_indicator_eig + expected_detection_probability * refined_detected_eig;
-            let execution_adjusted =
-                experiment.availability_probability * total_given_execution;
+            let execution_adjusted = experiment.availability_probability * total_given_execution;
             // Gate on the conditional detected-value integral itself. A
             // small detection/execution probability must not hide an
             // under-resolved conditional likelihood calculation.
@@ -978,10 +980,7 @@ fn validate_detection_probabilities(
                 model_id: detection.model_id.clone(),
             });
         }
-        actual.insert(
-            detection.model_id.clone(),
-            detection.probability_detected,
-        );
+        actual.insert(detection.model_id.clone(), detection.probability_detected);
     }
     for hypothesis in hypotheses {
         if !actual.contains_key(&hypothesis.model_id) {
@@ -1761,7 +1760,10 @@ mod tests {
         assert!(score.worst_case_model_identity_eig_nats.is_some());
     }
 
-    fn detection_prediction(model_id: &str, probability_detected: f64) -> ModelDetectionProbability {
+    fn detection_prediction(
+        model_id: &str,
+        probability_detected: f64,
+    ) -> ModelDetectionProbability {
         ModelDetectionProbability {
             model_id: model_id.to_string(),
             probability_detected,
@@ -1883,8 +1885,7 @@ mod tests {
         assert!(scenario.conditional_detected_value_eig_nats.unwrap() > 0.0);
         assert!(
             (scenario.expected_posterior_entropy_nats
-                - (scenario.prior_entropy_nats
-                    - 0.5 * scenario.total_eig_given_execution_nats))
+                - (scenario.prior_entropy_nats - 0.5 * scenario.total_eig_given_execution_nats))
                 .abs()
                 < 1.0e-10
         );
@@ -1943,8 +1944,8 @@ mod tests {
             &config(vec![equal_prior()], 512),
         )
         .unwrap();
-        let observed = report.experiments[0].prior_scenario_scores[0]
-            .availability_adjusted_total_eig_nats;
+        let observed =
+            report.experiments[0].prior_scenario_scores[0].availability_adjusted_total_eig_nats;
 
         // Independent direct joint likelihood integral over (D=0) and
         // (D=1, Y=y), rather than reusing the conditional-EIG decomposition.
@@ -2057,7 +2058,11 @@ mod tests {
         let second = detection_candidate(
             "permuted-order",
             0.9,
-            vec![predictions[2].clone(), predictions[0].clone(), predictions[1].clone()],
+            vec![
+                predictions[2].clone(),
+                predictions[0].clone(),
+                predictions[1].clone(),
+            ],
             vec![
                 detection_rows[1].clone(),
                 detection_rows[2].clone(),
@@ -2084,14 +2089,37 @@ mod tests {
             ),
         )
         .unwrap();
-        let first = report.experiments.iter().find(|score| score.experiment_id == "first-order").unwrap();
-        let second = report.experiments.iter().find(|score| score.experiment_id == "permuted-order").unwrap();
+        let first = report
+            .experiments
+            .iter()
+            .find(|score| score.experiment_id == "first-order")
+            .unwrap();
+        let second = report
+            .experiments
+            .iter()
+            .find(|score| score.experiment_id == "permuted-order")
+            .unwrap();
         assert_eq!(first.status, ExperimentDiscriminationStatus::Scored);
         assert_eq!(second.status, ExperimentDiscriminationStatus::Scored);
-        for (left, right) in first.prior_scenario_scores.iter().zip(&second.prior_scenario_scores) {
-            assert!((left.detection_indicator_eig_nats - right.detection_indicator_eig_nats).abs() < 1.0e-12);
-            assert!((left.total_eig_given_execution_nats - right.total_eig_given_execution_nats).abs() < 1.0e-10);
-            assert!((left.availability_adjusted_total_eig_nats - right.availability_adjusted_total_eig_nats).abs() < 1.0e-10);
+        for (left, right) in first
+            .prior_scenario_scores
+            .iter()
+            .zip(&second.prior_scenario_scores)
+        {
+            assert!(
+                (left.detection_indicator_eig_nats - right.detection_indicator_eig_nats).abs()
+                    < 1.0e-12
+            );
+            assert!(
+                (left.total_eig_given_execution_nats - right.total_eig_given_execution_nats).abs()
+                    < 1.0e-10
+            );
+            assert!(
+                (left.availability_adjusted_total_eig_nats
+                    - right.availability_adjusted_total_eig_nats)
+                    .abs()
+                    < 1.0e-10
+            );
         }
     }
 
