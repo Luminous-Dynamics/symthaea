@@ -173,37 +173,43 @@ pub fn verify_optimal(
     let x_inf = norm_inf(&certificate.primal);
     let b_inf = norm_inf(&problem.b);
     let a_inf = matrix_inf_norm(problem)?;
-    let primal_scale = checked_max3(1.0, b_inf, a_inf * x_inf)?;
-    let mut primal_residual_inf = 0.0_f64;
+    // These are dimensionless backward/relative errors. Do not floor their
+    // denominators at 1: doing so makes a uniformly tiny but inconsistent LP
+    // appear feasible, which is precisely the failure mode this checker must
+    // catch after solver scaling is mapped back to the original model.
+    let primal_scale = checked_sum(checked_product(a_inf, x_inf)?, b_inf)?;
+    let mut primal_residual_raw = 0.0_f64;
     for (ax_i, b_i) in ax.iter().zip(problem.b.iter()) {
-        primal_residual_inf = primal_residual_inf.max((ax_i - b_i).abs());
+        primal_residual_raw = primal_residual_raw.max((ax_i - b_i).abs());
     }
-    let primal_residual_inf = primal_residual_inf / primal_scale;
+    let primal_residual_inf = normalized_ratio(primal_residual_raw, primal_scale);
 
     let primal_nonnegativity_violation =
-        max_negative_part(&certificate.primal) / checked_max2(1.0, x_inf)?;
+        normalized_ratio(max_negative_part(&certificate.primal), x_inf);
 
     let aty_inf = norm_inf(&aty);
     let c_inf = norm_inf(&problem.c);
-    let dual_scale = checked_max3(1.0, c_inf, aty_inf)?;
-    let dual_nonnegativity_violation = max_negative_part(&slack) / dual_scale;
+    let dual_scale = checked_sum(c_inf, aty_inf)?;
+    let dual_nonnegativity_violation =
+        normalized_ratio(max_negative_part(&slack), dual_scale);
 
     let primal_objective = dot(&problem.c, &certificate.primal)?;
     let dual_objective = dot(&problem.b, &certificate.dual)?;
-    let objective_scale = checked_max3(
-        1.0,
-        primal_objective.abs(),
-        dual_objective.abs(),
-    )?;
-    let relative_duality_gap = (primal_objective - dual_objective).abs() / objective_scale;
+    let objective_scale = checked_sum(primal_objective.abs(), dual_objective.abs())?;
+    let relative_duality_gap = normalized_ratio(
+        (primal_objective - dual_objective).abs(),
+        objective_scale,
+    );
 
     let slack_inf = norm_inf(&slack);
-    let complementarity_scale = checked_max2(1.0, x_inf * slack_inf)?;
-    let mut complementarity_inf = 0.0_f64;
-    for (x_i, s_i) in certificate.primal.iter().zip(slack.iter()) {
-        complementarity_inf = complementarity_inf.max((x_i * s_i).abs());
+    let mut relative_complementarity = 0.0_f64;
+    if x_inf > 0.0 && slack_inf > 0.0 {
+        for (x_i, s_i) in certificate.primal.iter().zip(slack.iter()) {
+            let normalized_product = (x_i / x_inf) * (s_i / slack_inf);
+            relative_complementarity =
+                relative_complementarity.max(normalized_product.abs());
+        }
     }
-    let relative_complementarity = complementarity_inf / complementarity_scale;
 
     if ![
         primal_residual_inf,
@@ -348,12 +354,12 @@ pub fn verify_unbounded(
     let a_inf = matrix_inf_norm(problem)?;
     let b_inf = norm_inf(&problem.b);
     let x_inf = norm_inf(&certificate.feasible_point);
-    let base_scale = checked_max3(1.0, b_inf, a_inf * x_inf)?;
+    let base_scale = checked_sum(checked_product(a_inf, x_inf)?, b_inf)?;
     let mut base_residual = 0.0_f64;
     for (ax_i, b_i) in base_ax.iter().zip(problem.b.iter()) {
         base_residual = base_residual.max((ax_i - b_i).abs());
     }
-    let base_point_residual_inf = base_residual / base_scale;
+    let base_point_residual_inf = normalized_ratio(base_residual, base_scale);
 
     // An improving ray is homogeneous under positive scaling. Normalize it
     // before checking A*d = 0, d >= 0 and c^T*d < 0; otherwise a tiny copy of
@@ -408,7 +414,7 @@ pub fn verify_unbounded(
     if base_point_residual_inf > tolerances.primal_feasibility {
         return Err(VerifyError::RayNotFeasible);
     }
-    if max_negative_part(&certificate.feasible_point) / checked_max2(1.0, x_inf)?
+    if normalized_ratio(max_negative_part(&certificate.feasible_point), x_inf)
         > tolerances.primal_feasibility
     {
         return Err(VerifyError::RayNotFeasible);
@@ -526,15 +532,33 @@ fn all_finite(values: &[f64]) -> bool {
     values.iter().all(|value| value.is_finite())
 }
 
-fn checked_max2(a: f64, b: f64) -> Result<f64, VerifyError> {
-    if !a.is_finite() || !b.is_finite() {
+fn checked_sum(a: f64, b: f64) -> Result<f64, VerifyError> {
+    let value = a + b;
+    if !value.is_finite() {
         return Err(VerifyError::NonFiniteArithmetic);
     }
-    Ok(a.max(b))
+    Ok(value)
 }
 
-fn checked_max3(a: f64, b: f64, c: f64) -> Result<f64, VerifyError> {
-    checked_max2(checked_max2(a, b)?, c)
+fn checked_product(a: f64, b: f64) -> Result<f64, VerifyError> {
+    let value = a * b;
+    if !value.is_finite() {
+        return Err(VerifyError::NonFiniteArithmetic);
+    }
+    Ok(value)
+}
+
+/// Relative error with explicit zero-scale semantics. A nonzero residual
+/// against a zero reference scale is a rejection, not an absolute-tolerance pass.
+fn normalized_ratio(numerator: f64, denominator: f64) -> f64 {
+    if denominator > 0.0 {
+        let ratio = numerator / denominator;
+        if ratio.is_finite() { ratio } else { f64::MAX }
+    } else if numerator == 0.0 {
+        0.0
+    } else {
+        f64::MAX
+    }
 }
 
 #[cfg(test)]
@@ -745,6 +769,27 @@ mod tests {
         assert_eq!(
             verify_optimal(&problem, &certificate, invalid),
             Err(VerifyError::InvalidTolerance)
+        );
+    }
+
+    #[test]
+    fn rejects_infeasible_certificate_after_uniform_model_scaling() {
+        // Scaling the whole LP by 1e-12 must not make x=0 satisfy Ax=b.
+        // The previous max(1, scale) denominator accepted this false certificate.
+        let problem = LpProblem {
+            rows: 1,
+            cols: 1,
+            a: vec![1.0e-12],
+            b: vec![1.0e-12],
+            c: vec![-1.0e-12],
+        };
+        let certificate = OptimalCertificate {
+            primal: vec![0.0],
+            dual: vec![-1.0e-12],
+        };
+        assert_eq!(
+            verify_optimal(&problem, &certificate, tolerances()),
+            Err(VerifyError::PrimalInfeasible)
         );
     }
 
