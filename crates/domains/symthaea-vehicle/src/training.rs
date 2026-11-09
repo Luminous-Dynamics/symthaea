@@ -332,7 +332,10 @@ impl VehicleTrainer {
             }
             let mut scaled_cfg = cfg.clone();
             scaled_cfg.num_peers = num_peers;
-            Some(SwarmSimulator::new_at_time(scaled_cfg, physics.state().timestamp))
+            Some(SwarmSimulator::new_at_time(
+                scaled_cfg,
+                physics.state().timestamp,
+            ))
         });
 
         let subterranean_bridge = self
@@ -443,15 +446,13 @@ impl VehicleTrainer {
             // Blend with PD teacher during curriculum
             if pd_weight > 0.01 {
                 let pd_cmd = match task {
-                    VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(
-                            &state,
-                            drive_target,
-                            road_heading,
-                            target_gap,
-                            follow_oracle_target.as_ref(),
-                        )
-                    }
+                    VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
+                        &state,
+                        drive_target,
+                        road_heading,
+                        target_gap,
+                        follow_oracle_target.as_ref(),
+                    ),
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
                 };
                 command = VehicleCommand {
@@ -527,24 +528,21 @@ impl VehicleTrainer {
                     follow_oracle_gap_m: follow_oracle_target.map(|target| target.gap_m),
                     follow_oracle_relative_speed_mps: follow_oracle_target
                         .map(|target| target.relative_speed_mps),
-                    follow_oracle_snapshot_age_s: follow_oracle_target.map(|target| {
-                        (state.timestamp - target.snapshot_time_s).max(0.0)
-                    }),
+                    follow_oracle_snapshot_age_s: follow_oracle_target
+                        .map(|target| (state.timestamp - target.snapshot_time_s).max(0.0)),
                 });
             }
 
             // -- TRAINING (every train_every steps, 50Hz) --
             if step % self.config.train_every == 0 {
                 let target = match task {
-                    VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(
-                            &state,
-                            drive_target,
-                            road_heading,
-                            target_gap,
-                            follow_oracle_target.as_ref(),
-                        )
-                    }
+                    VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
+                        &state,
+                        drive_target,
+                        road_heading,
+                        target_gap,
+                        follow_oracle_target.as_ref(),
+                    ),
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
                 };
 
@@ -1562,10 +1560,7 @@ mod tests {
         let episode = &metrics[0];
 
         assert_eq!(episode.follow_oracle_available_steps, 0);
-        assert_eq!(
-            episode.follow_oracle_unavailable_steps,
-            episode.total_steps
-        );
+        assert_eq!(episode.follow_oracle_unavailable_steps, episode.total_steps);
         assert!(episode.telemetry.iter().all(|row| {
             !row.follow_oracle_available
                 && row.follow_oracle_actor_id.is_none()
@@ -1586,8 +1581,7 @@ mod tests {
             task: VehicleTask::Follow { target_gap: 30.0 },
             ..VehicleConfig::default()
         };
-        let mut trainer =
-            VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
         let metrics = trainer.train();
         let episode = &metrics[0];
 
