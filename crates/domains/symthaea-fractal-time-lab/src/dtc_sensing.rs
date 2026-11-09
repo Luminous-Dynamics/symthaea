@@ -36,6 +36,8 @@ pub struct DtcProbeConfig {
     pub periods: usize,
     pub analysis_start: usize,
     pub probe_frequency_cycles_per_drive_period: f64,
+    /// Nominal phase at the first probe midpoint. The report also treats this
+    /// as an unknown local nuisance when computing the joint Fisher matrix.
     pub probe_initial_phase_rad: f64,
     /// Dimensionless longitudinal probe-kick amplitude A multiplying sum_i Z_i.
     pub probe_amplitude: f64,
@@ -230,12 +232,12 @@ pub struct DtcProbeSensingReport {
     pub baseline_lifetime: SubharmonicLifetime,
     pub probed_lifetime: SubharmonicLifetime,
     pub probe_readout: MagnetizationReadout,
-    /// Local classical Fisher information for the total-Z readout, per shot.
+    /// Known-phase conditional classical FI for the total-Z readout, per shot.
     /// Units are inverse squared dimensionless probe-kick amplitude.
     pub classical_fisher_information_per_shot: f64,
-    /// Pure-state quantum Fisher information from the same centered
-    /// finite-difference state derivative. This is an upper bound for
-    /// measurements on the declared ideal pure state, not achieved readout.
+    /// Known-phase conditional pure-state QFI from the centered amplitude
+    /// derivative. This is an upper bound for measurements on the declared
+    /// ideal pure state, not achieved readout.
     pub quantum_fisher_information_per_shot: f64,
     /// Joint classical Fisher matrix for [probe amplitude, initial phase].
     pub classical_fisher_matrix_per_shot: [[f64; 2]; 2],
@@ -266,12 +268,14 @@ pub struct DtcProbeSensingReport {
     pub norm_error: f64,
 }
 
-/// Run baseline, nominal-probe and +/-delta probe simulations, then compute
-/// the local classical Fisher information of a final total-Z measurement.
+/// Run baseline, nominal, +/-amplitude and +/-phase probe simulations, then
+/// compute joint amplitude/phase Fisher information for a final total-Z readout.
 ///
-/// The derivative is a centered finite difference in probe-kick amplitude.
-/// All runs use the same initial state, Hamiltonian, drive, frequency, phase,
-/// duration and readout. Only the probe amplitude changes.
+/// Both derivatives use centered finite differences. All runs share the same
+/// Hamiltonian, drive, frequency, duration, preparation and readout; only the
+/// amplitude or nominal phase is perturbed. The known-phase scalar FI/QFI
+/// remain available as the amplitude diagonal, while nuisance-adjusted
+/// amplitude information is reported separately via a Schur complement.
 pub fn evaluate_dtc_probe_sensing(
     config: &DtcProbeConfig,
 ) -> Result<DtcProbeSensingReport, DtcProbeError> {
@@ -329,12 +333,6 @@ pub fn evaluate_dtc_probe_sensing(
     let minus_readout = readout_distribution(&minus_model);
     validate_readout(&minus_readout)?;
 
-    let quantum_fisher = pure_state_quantum_fisher_information(
-        nominal_model.amplitudes(),
-        plus_model.amplitudes(),
-        minus_model.amplitudes(),
-        delta,
-    )?;
     let phase_delta = config.phase_derivative_step_rad;
     let mut phase_plus_model = build_model(config)?;
     phase_plus_model.stroboscopic_magnetization_with_uniform_ac_probe(
@@ -905,6 +903,16 @@ mod tests {
         let report = evaluate_dtc_probe_sensing(&zero_frequency).unwrap();
         assert_eq!(report.phase_time_offset_drive_periods_per_radian, None);
         assert!(report.classical_effective_amplitude_fisher_with_phase_nuisance.is_some());
+    }
+
+    #[test]
+    fn invalid_phase_derivative_step_fails_closed() {
+        let mut invalid = config();
+        invalid.phase_derivative_step_rad = f64::NAN;
+        assert_eq!(
+            evaluate_dtc_probe_sensing(&invalid),
+            Err(DtcProbeError::InvalidConfiguration)
+        );
     }
 
     #[test]
