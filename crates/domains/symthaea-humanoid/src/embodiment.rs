@@ -211,6 +211,11 @@ impl HumanoidEmbodiment {
 }
 
 impl symthaea_core::embodiment::EmbodimentBridge for HumanoidEmbodiment {
+    fn plant_step_authority(&self) -> symthaea_core::embodiment::PlantStepAuthorityV1 {
+        // This implementation advances an in-process model, not a hardware clock.
+        symthaea_core::embodiment::PlantStepAuthorityV1::ConfiguredSimulation
+    }
+
     fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         self.step(hv, dt, phi)
     }

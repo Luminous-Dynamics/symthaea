@@ -224,6 +224,11 @@ impl MotorBridge {
 
 #[cfg(feature = "humanoid")]
 impl EmbodimentBridge for MotorBridge {
+    fn plant_step_authority(&self) -> symthaea_core::embodiment::PlantStepAuthorityV1 {
+        // This implementation advances an in-process model, not a hardware clock.
+        symthaea_core::embodiment::PlantStepAuthorityV1::ConfiguredSimulation
+    }
+
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
         self.current_safety = match self.safety_override {
