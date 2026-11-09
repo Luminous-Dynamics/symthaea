@@ -614,6 +614,10 @@ pub struct VehicleTelemetry {
     /// reference and was not used for blending, supervision or controller updates.
     #[serde(default)]
     pub teacher_action_evaluation_only: bool,
+    /// Whether a teacher action was recorded only as a reference on this step,
+    /// without action blending or BPTT supervision.
+    #[serde(default)]
+    pub teacher_action_reference_only: bool,
     /// Actual teacher blend coefficient; zero when no teacher blend occurred.
     #[serde(default)]
     pub pd_teacher_blend_weight: f32,
