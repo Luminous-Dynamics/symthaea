@@ -20,6 +20,7 @@ Use these as complementary, non-interchangeable cohorts:
 | [ProFinR / ProFinAgent](https://proceedings.mlr.press/v306/huang26ap.html) | 528 expert-designed professional-finance problems; 53 tools in 13 categories | Structured DAG tool execution and case-based memory; paper reports 49.81% gain and 47.1% lower inference latency against its sequential baselines | Reproduction requires exact benchmark/tool/model conditions; those gains do not establish alpha |
 | [AgenticFinBench](https://arxiv.org/abs/2611.04813) | 230 real-world requests; 8 categories, 2 languages and 4 complexity levels | Two-stage claim audit; paper reports a 7.58-point reduction to the initial baseline leader after hallucination audit | Recent arXiv preprint; small task set and reference-free evaluation require independent replication |
 | [FinancialAuditBench](https://arxiv.org/abs/2609.32835) | 90 tasks across 6 synthetic audit engagements, averaging 179 files each | Privacy-aware synthetic engagements using differentially private aggregate priors and extensive expert review | Audit-workpaper specialization, not general market research |
+| [Herculean](https://arxiv.org/abs/2605.14355) | v4 reports 424 offline and 246 live instances across Trading, Hedging, Market Insights and Auditing | MCP-based end-to-end workflows with task-specific tools and operational constraints | Trading/hedging/auditing workflows are not the same construct as evidence-grounded company research; match only comparable tasks |
 | [FinanceBench](https://arxiv.org/abs/2311.11944), [FinQA](https://arxiv.org/abs/2109.00122), [ConvFinQA](https://arxiv.org/abs/2210.03849), [TAT-QA](https://aclanthology.org/2021.acl-long.254/) | Filing QA, numerical reasoning, dialogue and table/text tasks | Mature task-level regression suites | Isolated subtasks do not measure an end-to-end analyst workflow |
 
 Published scores are not directly comparable unless the benchmark, split, evaluator, tools, model version, data frontier and budget match. Do not concatenate scores into one leaderboard. FinanceBenchmark's own published methodology attributes scores to underlying evaluations and uses tier weights; treat any composite as that publisher's method, not an objective universal measure ([methodology](https://financebenchmark.ai/methodology)).
@@ -108,6 +109,44 @@ Publish each axis separately, with numerator, denominator, exclusions, confidenc
 - robustness by language, jurisdiction, asset class, source type, complexity and provider.
 
 Use paired comparisons, bootstrap confidence intervals or other pre-registered uncertainty estimates. Correct for multiple comparisons where appropriate. Preserve raw task-level results.
+
+## 8a. Evaluator, rubric and reference metrology
+
+A frozen rubric, a committed reference digest or agreement among multiple LLM judges does not establish that the evaluation is valid. The scorer is itself a measurement instrument and must be qualified before it is used to claim a financial-agent improvement.
+
+This composes, rather than duplicates:
+- [EVAL-JUDGE-METROLOGY-001 #9022](https://github.com/Luminous-Dynamics/symthaea/issues/9022) — judge accuracy, repeatability, prompt/order sensitivity and calibrated uncertainty.
+- [SCI-RUBRIC-EXPLOITABILITY-001 #9123](https://github.com/Luminous-Dynamics/symthaea/issues/9123) — rubric adequacy, score gaming and Goodhart effects.
+- [SCI-REFERENCE-ASSURANCE-001 #9081](https://github.com/Luminous-Dynamics/symthaea/issues/9081) — evidence-backed reference labels and adjudicator provenance.
+- [FIN-EVAL-METROLOGY-001 #11254](https://github.com/Luminous-Dynamics/symthaea/issues/11254) — finance-specific integration.
+- [SYM-FIN-TIME-001 #11241](https://github.com/Luminous-Dynamics/symthaea/issues/11241) — shared source-version and decision-frontier admissibility.
+
+Keep four objects distinct:
+
+1. **Claim correctness:** whether an atomic claim is accurate within its entity, instrument, unit, currency, period, jurisdiction and temporal scope.
+2. **Trace support:** whether the permitted trace actually contains admissible evidence and a correct derivation supporting the claim.
+3. **Reference confidence:** how strongly the independent reference process supports a disposition.
+4. **Judge reliability:** how accurately and robustly an evaluator reproduces those reference decisions.
+
+A true statement absent from the permitted trace can fail trace support without being factually false. A statement missing from the trace is not automatically contradicted. A valid URL does not prove that the cited span supports the claim.
+
+Reference dispositions must preserve at least: supported, contradicted, mixed/contested, insufficient evidence, scope/unit mismatch, temporally inadmissible/stale and not evaluable. Do not force unresolved cases into binary gold labels.
+
+For each scoring-eligible material claim, retain the exact claim, type, subject, temporal target/frontier, source snapshot digests, evidence spans, support/refute/qualify/contradict relations, source-family ancestry, calculation lineage and separate blinded adjudicator votes. Preserve abstentions and disagreement; adjudication must not erase initial votes.
+
+Compare deterministic calculation/reference oracles where exact ground truth exists, a single LLM judge, a calibrated multi-judge jury, a two-stage claim-extraction/evidence-audit pipeline, blinded human evaluators and human adjudication. Pin model/provider/version, prompt/rubric digests, decoding, retrieval access, candidate ordering, repetitions and cost.
+
+Required evaluator metrics include class-specific false-accept/false-reject rates, balanced accuracy, macro-F1, claim-extraction and trace-support precision/recall, evidence-span and temporal-admissibility accuracy, amount/unit/currency/period consistency, calibration, abstention/selective risk, prompt/order/repeat flip rates, judge-to-human and human-human disagreement, rubric exploit success, latency and full cost. Cluster uncertainty by task and source family; several claims from one filing are not independent observations.
+
+Adversarial controls must cover citation laundering, stale or superseded filings, wrong entity/instrument, mirrored sources presented as independent, causal overreach, future-known information, unit/currency/period mismatches, incomplete coverage, scenario-as-fact, unsupported forecast precision, irrelevant citation volume, verbosity/keyword stuffing, candidate-order swaps and consistently wrong but repeatable judges.
+
+A consistently wrong judge must fail. A missing or uncertain reference must become contested/not-evaluable, not an invented gold answer. Surface-cue attacks must not improve scores without corresponding reference-grounded improvement.
+
+AgenticFinBench's November 2026 preprint is particularly relevant: in its tested configurations, evaluator-harness differences explained more variation in evidence grounding than model differences (28.6% versus 8.8%). Treat this as a study-specific result, not a universal law; it is a strong reason to qualify the harness and reference process rather than attributing every improvement to the model. [AgenticFinBench](https://arxiv.org/abs/2611.04813)
+
+FinanceBenchmark's methodology also keeps attempts, confidence intervals, held-out items, task-family scores and benchmark coverage visible. We should adopt those transparency practices without treating its weighted composite as a universal financial competence score. [FinanceBenchmark methodology](https://financebenchmark.ai/methodology)
+
+No SOTA or Symthaea-superiority claim is permitted until blind reference-label audit, judge qualification and matched-budget holdout evaluation are complete.
 
 ## 9. Non-compensable hard gates
 
