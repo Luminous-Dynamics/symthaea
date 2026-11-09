@@ -709,6 +709,40 @@
         "dimension_mismatch_rejected"
       ],
       "scope_note": "This benchmark is an operator characterization only. It does not establish improved forecasting, associative retrieval, HDC-LTC task performance, or SOTA. Integration into the unified neuron is a separate preregistered ablation after operator-level qualification."
+    },
+    {
+      "id": "open_world_model_adequacy_and_tv_robust_diagnostics",
+      "environment": "Paired categorical diagnostic episodes with frozen prequential predictive distributions, well-specified and misspecified registered model families, omitted outcome support, abrupt regime changes, and candidate probes evaluated under finite total-variation ambiguity radii",
+      "primary_outcomes": [
+        "false_adequacy_rate",
+        "false_abstention_rate",
+        "worst_case_decision_regret",
+        "held_out_task_loss",
+        "diagnostic_coverage",
+        "probe_cost"
+      ],
+      "diagnostics": [
+        "prequential_log_loss",
+        "multiclass_brier_score",
+        "zero_support_count",
+        "low_probability_rate",
+        "nominal_evsi",
+        "worst_case_evsi",
+        "tv_ambiguity_radius",
+        "adversarial_outcome_distribution",
+        "nominal_robust_selection_disagreement",
+        "calibration"
+      ],
+      "negative_controls": [
+        "well_specified_family",
+        "zero_tv_radius_matches_nominal_evsi",
+        "outcome_outside_registered_support",
+        "omitted_fault_hypothesis",
+        "mild_likelihood_misspecification",
+        "abrupt_regime_shift",
+        "always_abstain",
+        "same_nominal_predictive_distribution"
+      ]
     }
   ],
   "baselines": [
@@ -1134,6 +1168,22 @@
     {
       "id": "weightloop_experimental_feedback_2026",
       "scope": "Fixed reusable weight-editor with sequential experimental-feedback-driven predictor updates; reproduce matched feedback budget and candidate-validation protocol (Li et al., arXiv:2611.07319, 2026)."
+    },
+    {
+      "id": "finite_tv_robust_evsi",
+      "scope": "Exact worst-case posterior Bayes risk over a finite categorical total-variation ball around each action's nominal predictive outcome distribution; implementation in open_world_robust_decision.rs."
+    },
+    {
+      "id": "prequential_predictive_adequacy_gate",
+      "scope": "Frozen pre-observation categorical predictions evaluated with support violations, prequential log loss, multiclass Brier score, and externally calibrated thresholds."
+    },
+    {
+      "id": "out_of_support_abstention",
+      "scope": "Hard adequacy-failure response when a subsequently observed outcome has zero predictive support under the registered model family."
+    },
+    {
+      "id": "dro_robas_mmd_external_reference",
+      "scope": "Dellaporta, O'Hara and Damoulas (Entropy 2026), robust Bayesian ambiguity sets using MMD; external reference only, not reproduced by this finite categorical TV implementation."
     }
   ],
   "seeds": {
@@ -1525,7 +1575,11 @@
     "Optimal-decision information gain is computed from a deterministic hypothesis-to-optimal-decision map and must not exceed model information gain beyond the preregistered numerical tolerance.",
     "The decision-diagnostic harness must run no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, and always-inspect on paired episode seeds; report paired EVSI-versus-baseline differences and identify the confidence-interval method.",
     "WeightLoop comparisons must match endpoint/assay budget, candidate/forward-pass budget, parameter-edit budget, and editor-call/token budget; author-reported offline replay results must remain distinct from independent reproduction.",
-    "The standalone diagnostic runner must emit a JSON result bound to the exact 40-character source SHA, the declared scenario, fixed seed, and all five policies; four paired EVSI contrasts must be present, and the result must remain explicitly marked synthetic-only."
+    "The standalone diagnostic runner must emit a JSON result bound to the exact 40-character source SHA, the declared scenario, fixed seed, and all five policies; four paired EVSI contrasts must be present, and the result must remain explicitly marked synthetic-only.",
+    "Model-adequacy monitoring must use prequential predictions frozen before each observation; zero-support outcomes are counted as model-family violations and are never epsilon-smoothed or silently renormalized.",
+    "NoDetectedInadequacy means only that frozen thresholds found no failure; it must never be reported as proof that the registered model family is correct.",
+    "Finite-TV robust diagnostics must report the declared radius and adversarial outcome distribution; radius zero must exactly reproduce the nominal EVSI risk and selection.",
+    "Outcomes with zero nominal support receive the maximum declared task loss in the TV-robust envelope; all claims are conditional on the registered prior and declared ambiguity radius."
   ],
   "research_references": [
     {
