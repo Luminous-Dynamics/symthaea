@@ -802,9 +802,7 @@ fn invert_fisher_matrix_2x2(information: [[f64; 2]; 2]) -> Option<[[f64; 2]; 2]>
     // For a positive-definite 2x2 matrix, lambda_min = det/lambda_max.
     // This avoids subtracting nearly equal eigenvalues near rank deficiency.
     let condition_number = largest_eigenvalue * largest_eigenvalue / determinant;
-    if !condition_number.is_finite()
-        || condition_number > MAX_JOINT_FISHER_CONDITION_NUMBER
-    {
+    if !condition_number.is_finite() || condition_number > MAX_JOINT_FISHER_CONDITION_NUMBER {
         return None;
     }
 
@@ -910,13 +908,11 @@ mod tests {
             let phase_with_clock_offset =
                 2.0 * std::f64::consts::PI * frequency * (sample_time - clock_offset)
                     + initial_phase;
-            let equivalent_phase_parameter =
-                2.0 * std::f64::consts::PI * frequency * sample_time
-                    + initial_phase
-                    - 2.0 * std::f64::consts::PI * frequency * clock_offset;
+            let equivalent_phase_parameter = 2.0 * std::f64::consts::PI * frequency * sample_time
+                + initial_phase
+                - 2.0 * std::f64::consts::PI * frequency * clock_offset;
             assert!(
-                (phase_with_clock_offset.cos() - equivalent_phase_parameter.cos()).abs()
-                    < 1.0e-14
+                (phase_with_clock_offset.cos() - equivalent_phase_parameter.cos()).abs() < 1.0e-14
             );
         }
     }
