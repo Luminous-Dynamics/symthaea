@@ -402,10 +402,7 @@ impl fmt::Display for BudgetedDesignError {
                 f,
                 "option {option_id}, scenario {scenario_index} selects measurement {index} more than once"
             ),
-            Self::DuplicateSelectedMeasurement {
-                scenario_id,
-                index,
-            } => write!(
+            Self::DuplicateSelectedMeasurement { scenario_id, index } => write!(
                 f,
                 "selected actions duplicate measurement {index} in scenario {scenario_id}"
             ),
@@ -1454,11 +1451,10 @@ mod tests {
             vec!["bearing-mixed-target-and-clock", "clock-calibration"]
         );
         assert_eq!(greedy.selected_option_ids, exact.selected_option_ids);
+        assert!((greedy.expected_information_gain_nats - (5.0_f64 / 3.0).ln()).abs() < 1.0e-12);
         assert!(
-            (greedy.expected_information_gain_nats - (5.0_f64 / 3.0).ln()).abs()
-                < 1.0e-12
+            greedy.expected_joint_information_gain_nats > greedy.expected_information_gain_nats
         );
-        assert!(greedy.expected_joint_information_gain_nats > greedy.expected_information_gain_nats);
     }
 
     #[test]
@@ -1475,22 +1471,13 @@ mod tests {
             None,
             vec![vec![vec![0.0, 1.0]]],
         )];
-        let scores = evaluate_selection(
-            &scenarios,
-            &options,
-            &[0],
-            &[1.0, 1.0],
-            2,
-        )
-        .unwrap();
+        let scores = evaluate_selection(&scenarios, &options, &[0], &[1.0, 1.0], 2).unwrap();
 
         // Prior target marginal precision is 2 - 0.5^2/1 = 1.75.
         // After measuring only the nuisance parameter it becomes
         // 2 - 0.5^2/2 = 1.875, so target information legitimately improves.
         let expected_target_gain = (1.875_f64 / 1.75).ln();
-        assert!(
-            (scores[0].information_gain_nats - expected_target_gain).abs() < 1.0e-12
-        );
+        assert!((scores[0].information_gain_nats - expected_target_gain).abs() < 1.0e-12);
         assert!(scores[0].joint_information_gain_nats > scores[0].information_gain_nats);
     }
 
@@ -1542,17 +1529,11 @@ mod tests {
 
         let shared_expected = (5.0_f64 / 3.0).ln();
         let independent_expected = 2.0_f64.ln();
+        assert!((shared_clock[0].information_gain_nats - shared_expected).abs() < 1.0e-12);
         assert!(
-            (shared_clock[0].information_gain_nats - shared_expected).abs() < 1.0e-12
+            (independent_clocks[0].information_gain_nats - independent_expected).abs() < 1.0e-12
         );
-        assert!(
-            (independent_clocks[0].information_gain_nats - independent_expected).abs()
-                < 1.0e-12
-        );
-        assert!(
-            independent_clocks[0].information_gain_nats
-                > shared_clock[0].information_gain_nats
-        );
+        assert!(independent_clocks[0].information_gain_nats > shared_clock[0].information_gain_nats);
     }
 
     #[test]
@@ -1585,8 +1566,7 @@ mod tests {
                 vec![precision[3][2], precision[3][3]],
             ];
             let nuisance_logdet = cholesky_log_determinant(&nuisance).unwrap();
-            let target_schur_logdet =
-                marginal_target_log_determinant(&precision, 2).unwrap();
+            let target_schur_logdet = marginal_target_log_determinant(&precision, 2).unwrap();
             assert!(
                 (target_schur_logdet - (full_logdet - nuisance_logdet)).abs() < 1.0e-10,
                 "trial={trial}"
