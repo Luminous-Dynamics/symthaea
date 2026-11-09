@@ -1433,8 +1433,8 @@ mod tests {
         GroupScoreIntervalRecord::from_group_envelope(
             envelope,
             query,
-            20,
-            3,
+            envelope.manifest_generation(),
+            envelope.eligibility_generation(),
             envelope.member_set_digest(),
             envelope.content_digest(),
         )
