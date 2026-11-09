@@ -401,6 +401,96 @@ pub fn evaluate_tv_robust_decision_diagnostics(
     })
 }
 
+/// Finite-sample calibration of a categorical total-variation radius.
+///
+/// The bound uses Hoeffding's inequality for each of K categories and a
+/// union bound across categories. With n independent calibration observations,
+/// let epsilon = sqrt(ln(2K/alpha) / (2n)); then, with probability at least
+/// 1-alpha, every coordinate differs from its true probability by at most
+/// epsilon, implying TV(p_hat, p_true) <= min(1, K*epsilon/2).
+///
+/// This is deliberately a simple distribution-free reference, not a tight
+/// multinomial confidence region. Calibration samples must be independent of
+/// the episodes used to evaluate the policy.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TvAmbiguityCalibration {
+    pub category_count: usize,
+    pub sample_count: u64,
+    pub alpha: f64,
+    pub confidence_level: f64,
+    pub empirical_probabilities: Vec<f64>,
+    pub per_category_absolute_error_bound: f64,
+    pub total_variation_radius: f64,
+    pub method: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum TvAmbiguityCalibrationError {
+    #[error("at least one categorical outcome is required")]
+    EmptyCategorySet,
+    #[error("calibration sample count must be positive")]
+    EmptyCalibrationSample,
+    #[error("calibration count sum overflowed u64")]
+    CountOverflow,
+    #[error("alpha must be finite and in (0, 1)")]
+    InvalidAlpha,
+    #[error("calibration radius calculation became non-finite")]
+    NonFiniteBound,
+}
+
+/// Calibrate a finite categorical TV ambiguity radius from independent counts.
+///
+/// The returned radius satisfies the stated Hoeffding/union-bound coverage
+/// under i.i.d. categorical calibration draws. It should not be treated as a
+/// valid coverage radius under temporal dependence, covariate shift between
+/// calibration and deployment, adaptive reuse of the same observations, or
+/// misspecified category definitions.
+pub fn calibrate_categorical_tv_radius_from_counts(
+    category_counts: &[u64],
+    alpha: f64,
+) -> Result<TvAmbiguityCalibration, TvAmbiguityCalibrationError> {
+    if category_counts.is_empty() {
+        return Err(TvAmbiguityCalibrationError::EmptyCategorySet);
+    }
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(TvAmbiguityCalibrationError::InvalidAlpha);
+    }
+    let sample_count = category_counts
+        .iter()
+        .try_fold(0_u64, |total, count| total.checked_add(*count))
+        .ok_or(TvAmbiguityCalibrationError::CountOverflow)?;
+    if sample_count == 0 {
+        return Err(TvAmbiguityCalibrationError::EmptyCalibrationSample);
+    }
+
+    let empirical_probabilities = category_counts
+        .iter()
+        .map(|count| *count as f64 / sample_count as f64)
+        .collect::<Vec<_>>();
+    let category_count = category_counts.len();
+    let per_category_absolute_error_bound = if category_count == 1 {
+        0.0
+    } else {
+        ((2.0 * category_count as f64 / alpha).ln() / (2.0 * sample_count as f64)).sqrt()
+    };
+    let total_variation_radius =
+        (0.5 * category_count as f64 * per_category_absolute_error_bound).min(1.0);
+    if !per_category_absolute_error_bound.is_finite() || !total_variation_radius.is_finite() {
+        return Err(TvAmbiguityCalibrationError::NonFiniteBound);
+    }
+
+    Ok(TvAmbiguityCalibration {
+        category_count,
+        sample_count,
+        alpha,
+        confidence_level: 1.0 - alpha,
+        empirical_probabilities,
+        per_category_absolute_error_bound,
+        total_variation_radius,
+        method: "categorical_hoeffding_union_bound_tv_radius_v1".to_owned(),
+    })
+}
+
 /// Return an adversarial distribution q maximizing E_q[loss] subject to
 /// TV(q, p) <= radius. This is exact for a finite categorical outcome space.
 pub fn worst_case_distribution_within_tv(
@@ -1049,6 +1139,56 @@ mod tests {
             Err(PrequentialEProcessError::NullSupportViolation {
                 observation_index: 0
             })
+        ));
+    }
+
+    #[test]
+    fn categorical_tv_calibration_matches_the_declared_hoeffding_bound() {
+        let calibration =
+            calibrate_categorical_tv_radius_from_counts(&[25, 25], 0.05)
+                .expect("valid independent calibration counts");
+        let expected_coordinate_bound =
+            ((2.0 * 2.0_f64 / 0.05).ln() / (2.0 * 50.0)).sqrt();
+        assert_eq!(calibration.sample_count, 50);
+        assert_eq!(calibration.confidence_level, 0.95);
+        assert_eq!(calibration.empirical_probabilities, vec![0.5, 0.5]);
+        assert!(
+            (calibration.per_category_absolute_error_bound - expected_coordinate_bound).abs()
+                < 1e-12
+        );
+        assert!(
+            (calibration.total_variation_radius - expected_coordinate_bound).abs() < 1e-12
+        );
+    }
+
+    #[test]
+    fn calibrated_tv_radius_shrinks_with_more_independent_samples() {
+        let smaller = calibrate_categorical_tv_radius_from_counts(&[25, 25], 0.05)
+            .expect("small calibration");
+        let larger = calibrate_categorical_tv_radius_from_counts(&[250, 250], 0.05)
+            .expect("large calibration");
+        assert!(larger.total_variation_radius < smaller.total_variation_radius);
+    }
+
+    #[test]
+    fn tv_calibration_rejects_invalid_alpha_empty_samples_and_overflow() {
+        assert!(matches!(
+            calibrate_categorical_tv_radius_from_counts(&[], 0.05),
+            Err(TvAmbiguityCalibrationError::EmptyCategorySet)
+        ));
+        assert!(matches!(
+            calibrate_categorical_tv_radius_from_counts(&[0, 0], 0.05),
+            Err(TvAmbiguityCalibrationError::EmptyCalibrationSample)
+        ));
+        for alpha in [0.0, 1.0, -0.1, 1.1, f64::NAN] {
+            assert!(matches!(
+                calibrate_categorical_tv_radius_from_counts(&[1, 1], alpha),
+                Err(TvAmbiguityCalibrationError::InvalidAlpha)
+            ));
+        }
+        assert!(matches!(
+            calibrate_categorical_tv_radius_from_counts(&[u64::MAX, 1], 0.05),
+            Err(TvAmbiguityCalibrationError::CountOverflow)
         ));
     }
 
