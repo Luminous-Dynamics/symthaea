@@ -2,7 +2,7 @@
   "schema_version": 0,
   "registry_id": "CEB-EXTERNAL-OBSERVATIONS-V0",
   "status": "design_only_external_reference_snapshot",
-  "snapshot_date": "2026-11-08",
+  "snapshot_date": "2026-11-09",
   "policy": {
     "unit_of_observation": "One row represents one metric from one benchmark split and one named system configuration. Never combine metrics from different configurations into a synthetic system.",
     "comparison_ceiling": "All included external scores are contextual or historical references unless a separately preregistered matched comparison is recorded; no direct CEB superiority claim is supported by this registry.",
@@ -605,6 +605,28 @@
       "source_type": "paper",
       "accessed_on": "2026-11-08",
       "published_on": "2026-09-28",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "sandboxgym-isolation-audit-2026",
+      "source_url": "https://sandboxgym.io/",
+      "title": "SandboxGym open-source sandbox and VM isolation audit",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-09",
+      "published_on": "2026-08-15",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "sre-bench-columbia-2026",
+      "source_url": "https://daplab.cs.columbia.edu/benchmarks/sre-bench/",
+      "title": "SRE-Bench: contamination-free agentic software reverse-engineering benchmark",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-09",
+      "published_on": null,
       "supports": [
         "CEB-EVAL"
       ]
@@ -1816,7 +1838,7 @@
       ],
       "comparison_class": "contextual_reference",
       "caveats": [
-        "Measures generation of executable task verifiers, not PR-review finding recall, causal diagnosis, or CEB review precision.",
+        "Measures generation of executable task verifiers, not a PR-review finding-recall benchmark, causal diagnosis, or CEB review precision.",
         "The paper reports normalized balanced accuracy from 10.6 to 62.1 across 19 models in a common harness; this is a range, not a score for one named model or a CEB metric.",
         "The project page's 36 model–harness configurations is a separate project-level count and must not replace the paper's 19-model common-harness denominator.",
         "The 4,993 hidden cases include valid alternatives and attacks; the project page identifies 798 attack cases. Positive acceptance and negative rejection must be audited separately.",
@@ -1843,7 +1865,7 @@
       "comparison_class": "methodological_reference",
       "caveats": [
         "Audits whether benchmark passes demonstrate the intended capability; it is a benchmark-integrity methodology, not a code-review performance benchmark.",
-        "The paper's reported 3,810 count is passing trajectories across 29 cohorts, not 3,810 independent tasks or independent model observations.",
+        "The paper's reported 3,810 count is passing trajectories across 29 cohorts; these are cohort-clustered observations, not independent tasks or independent model observations.",
         "Unearned-pass rates are cohort-specific and descriptive; do not infer a monotonic model-generation effect or a universal rate.",
         "Reported exploit surfaces include unintended reference-solution access through Git history and alternate access paths; a patch must be followed by exploit replay and fresh-agent evaluation.",
         "The paper's model/cohort configurations are not normalized to CEB budgets, tasks, source snapshots, or adjudication; no direct score comparison is supported."
@@ -1864,11 +1886,58 @@
       "supporting_source_ids": [],
       "comparison_class": "contextual_reference",
       "caveats": [
-        "Rates are reported for named model/cohort snapshots and are descriptive, not a normalized ranking across model generations.",
+        "Rates are reported for named model/cohort snapshots and are descriptive; they are not normalized across model generations and do not support a universal ranking.",
         "The 24% versus 73% comparison is described on matched tasks for Opus 4.7 and Fable 5; exact per-cohort sample counts are not stated in the abstract.",
         "The later 11% and 0% cohort observations should not be interpreted as a monotonic trend or as general model reliability.",
         "Unearned-pass rate is not false-positive rate, benchmark solve rate, or PR-review defect recall.",
         "Use these rates to motivate post-patch exploit replay and fresh-agent re-evaluation, not as CEB performance targets."
+      ]
+    },
+    {
+      "comparator_id": "sandboxgym-open-source-isolation-audit",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "SandboxGym open-source sandbox/VM isolation audit",
+      "benchmark_version": "Public snapshot last updated 2026-08-15",
+      "split": "Nine open-source sandbox/VM projects at fixed source commits; whole-codebase agent audit; findings retained when exploitable from inside and capable of collapsing intended isolation.",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 9,
+        "unit": "sandbox/VM projects"
+      },
+      "source_id": "sandboxgym-isolation-audit-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Self-published vendor/security-audit project by Nebula Security; not an independent academic replication and not a controlled live candidate-execution benchmark.",
+        "The nine projects are a selected open-source sample, not a random sample of all sandbox products; no population-wide failure-rate inference is supported.",
+        "The 32 high-impact isolation failures are findings, not 32 independent attack trials or 32 independently vulnerable products.",
+        "The 2 full escapes are included in the 32 findings; do not add them as separate findings.",
+        "The audit uses an agentic code scanner against fixed source snapshots; it does not establish that every finding was reproduced in a separately provisioned live host environment.",
+        "Reported totals include direct host memory corruption, host file overwrite, network-policy bypass or impact on other sandboxes; some unauthorized out-of-sandbox reads and GPU-dependent findings are explicitly excluded.",
+        "Finding counts are not a normalized risk score: impact, exploit chaining, privilege drop, remediation and disclosure response differ across products.",
+        "Use as a threat-model and attack-family reference for entry-point, policy, mount, path, descriptor and control-plane failures; not as a CEB candidate performance metric."
+      ]
+    },
+    {
+      "comparator_id": "sre-bench-isolated-binary-evaluation",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "SRE-Bench: agentic software reverse engineering with isolated evaluation",
+      "benchmark_version": "Columbia DAPLab project page; updated October 2026",
+      "split": "1,572 deterministic tasks over 262 binary instances from 19 private programs; per-binary task grading through a separate grading server.",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 1572,
+        "unit": "graded tasks"
+      },
+      "source_id": "sre-bench-columbia-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Measures reverse-engineering capability on compiled binaries, not code-review accuracy, sandbox escape resistance or CEB evidence-continuity metrics.",
+        "The project reports 19 private programs, 262 binary instances, 1,572 graded tasks, four source languages, five domains and 44 anti-analysis mechanisms.",
+        "Candidate-facing work occurs in an isolated container; source code, grader code and reference solutions are unavailable to the agent, with solutions submitted to a separate deterministic grading server.",
+        "This is a useful evaluation-boundary architecture reference; it does not establish that CEB's own runner, grader, trust roots or isolation are qualified.",
+        "Reported task scores use per-binary graded tasks and are not comparable to CEB review or security metrics without a matched protocol."
       ]
     }
   ],
@@ -7974,6 +8043,302 @@
       "notes": [
         "This is mutation coverage for the source reference material, not a model run count or independent task denominator."
       ]
+    },
+    {
+      "observation_id": "sandboxgym-audited-product-count",
+      "comparator_id": "sandboxgym-open-source-isolation-audit",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "sandboxgym-nine-products",
+        "model": "Nebula Security audit population",
+        "harness": "SandboxGym agentic code scanning audit",
+        "configuration": "Selected open-source products"
+      },
+      "metric": {
+        "metric_id": "audited_sandbox_product_count",
+        "label": "Sandbox/VM products surveyed",
+        "definition": "Number of open-source sandbox and virtual-machine projects selected for the fixed-snapshot audit.",
+        "value": 9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "products",
+        "direction": "not_applicable",
+        "raw_display": "9 products",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "audited_sandbox_product_count",
+          "applies_to_task_count": 9
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "sandboxgym-high-impact-finding-count",
+      "comparator_id": "sandboxgym-open-source-isolation-audit",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "sandboxgym-finding-population",
+        "model": "Nebula Security audit population",
+        "harness": "SandboxGym agentic code scanning audit",
+        "configuration": "All retained findings"
+      },
+      "metric": {
+        "metric_id": "high_impact_isolation_finding_count",
+        "label": "High-impact isolation failures",
+        "definition": "Number of reported findings exploitable from inside the sandbox and capable of collapsing the intended isolation boundary.",
+        "value": 32,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "findings",
+        "direction": "minimize",
+        "raw_display": "32 high-impact isolation failures",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "high_impact_isolation_finding_count",
+          "applies_to_task_count": 9
+        }
+      },
+      "notes": [
+        "Finding count is not a count of independent attack trials or affected products."
+      ]
+    },
+    {
+      "observation_id": "sandboxgym-full-escape-count",
+      "comparator_id": "sandboxgym-open-source-isolation-audit",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "sandboxgym-full-escape-findings",
+        "model": "Nebula Security audit population",
+        "harness": "SandboxGym agentic code scanning audit",
+        "configuration": "Subset of high-impact findings"
+      },
+      "metric": {
+        "metric_id": "full_escape_finding_count",
+        "label": "Full escapes",
+        "definition": "Number of reported full escapes described as host code execution and/or host memory corruption.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "findings",
+        "direction": "minimize",
+        "raw_display": "2 full escapes",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "full_escape_finding_count",
+          "applies_to_task_count": 9
+        }
+      },
+      "notes": [
+        "The two full escapes are included within the 32 high-impact findings."
+      ]
+    },
+    {
+      "observation_id": "sandboxgym-products-with-failure-rate",
+      "comparator_id": "sandboxgym-open-source-isolation-audit",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "sandboxgym-product-failure-rate",
+        "model": "Nebula Security audit population",
+        "harness": "SandboxGym agentic code scanning audit",
+        "configuration": "Selected fixed-snapshot product sample"
+      },
+      "metric": {
+        "metric_id": "products_with_isolation_failure_rate",
+        "label": "Products with an isolation failure",
+        "definition": "Fraction of the nine scored sandbox/VM products with at least one retained isolation finding.",
+        "value": 100,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent of products",
+        "direction": "minimize",
+        "raw_display": "100% of scored products",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "products_with_isolation_failure_rate",
+          "applies_to_task_count": 9
+        }
+      },
+      "notes": [
+        "Descriptive rate for this selected nine-product sample only; not a population-wide estimate."
+      ]
+    },
+    {
+      "observation_id": "srebench-private-program-count",
+      "comparator_id": "sre-bench-isolated-binary-evaluation",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "srebench-program-population",
+        "model": "SRE-Bench population",
+        "harness": "Isolated-container reverse-engineering benchmark",
+        "configuration": "Dataset population"
+      },
+      "metric": {
+        "metric_id": "private_program_count",
+        "label": "Private programs",
+        "definition": "Number of expert-built private programs represented in the benchmark.",
+        "value": 19,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "programs",
+        "direction": "not_applicable",
+        "raw_display": "19 private programs",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "private_program_count",
+          "applies_to_task_count": 1572
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "srebench-binary-instance-count",
+      "comparator_id": "sre-bench-isolated-binary-evaluation",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "srebench-binary-population",
+        "model": "SRE-Bench population",
+        "harness": "Isolated-container reverse-engineering benchmark",
+        "configuration": "Dataset population"
+      },
+      "metric": {
+        "metric_id": "binary_instance_count",
+        "label": "Binary instances",
+        "definition": "Number of compiled binary instances presented to agents across the benchmark.",
+        "value": 262,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "instances",
+        "direction": "not_applicable",
+        "raw_display": "262 binary instances",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "binary_instance_count",
+          "applies_to_task_count": 1572
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "srebench-graded-task-count",
+      "comparator_id": "sre-bench-isolated-binary-evaluation",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "srebench-task-population",
+        "model": "SRE-Bench population",
+        "harness": "Isolated-container reverse-engineering benchmark",
+        "configuration": "Dataset population"
+      },
+      "metric": {
+        "metric_id": "graded_task_count",
+        "label": "Deterministically graded tasks",
+        "definition": "Number of task instances with deterministic grading in the released benchmark.",
+        "value": 1572,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "1,572 graded tasks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "graded_task_count",
+          "applies_to_task_count": 1572
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "srebench-anti-analysis-mechanism-count",
+      "comparator_id": "sre-bench-isolated-binary-evaluation",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "srebench-anti-analysis-population",
+        "model": "SRE-Bench population",
+        "harness": "Isolated-container reverse-engineering benchmark",
+        "configuration": "Benchmark construction"
+      },
+      "metric": {
+        "metric_id": "anti_analysis_mechanism_count",
+        "label": "Anti-analysis mechanisms",
+        "definition": "Number of in-house anti-analysis mechanisms used to protect benchmark binaries.",
+        "value": 44,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "mechanisms",
+        "direction": "not_applicable",
+        "raw_display": "44 in-house anti-analysis mechanisms",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "anti_analysis_mechanism_count",
+          "applies_to_task_count": 1572
+        }
+      },
+      "notes": [
+        "Mechanism count is a benchmark construction descriptor, not a model capability score."
+      ]
+    },
+    {
+      "observation_id": "srebench-source-language-count",
+      "comparator_id": "sre-bench-isolated-binary-evaluation",
+      "source_locator": "Project page/methodology snapshot accessed 2026-11-09",
+      "system": {
+        "system_id": "srebench-language-population",
+        "model": "SRE-Bench population",
+        "harness": "Isolated-container reverse-engineering benchmark",
+        "configuration": "Benchmark construction"
+      },
+      "metric": {
+        "metric_id": "source_language_count",
+        "label": "Source languages",
+        "definition": "Number of source languages used to build the private benchmark programs.",
+        "value": 4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "languages",
+        "direction": "not_applicable",
+        "raw_display": "4 languages: C, C++, Rust and Go",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported benchmark descriptor or audit count",
+          "applies_to_metric_id": "source_language_count",
+          "applies_to_task_count": 1572
+        }
+      },
+      "notes": []
     }
   ]
 }

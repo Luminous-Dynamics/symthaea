@@ -270,6 +270,72 @@ def semantic_errors(payload: dict) -> list[str]:
         if "not normalized" not in caveats or "not stated in the abstract" not in caveats:
             errors.append("unearned-pass rates must retain descriptive and denominator caveats")
 
+    # Sandbox isolation audits and protected-binary evaluation architecture are
+    # methodological/context comparators, not CEB review or runner qualification scores.
+    required_execution_boundary_comparators = {
+        "sandboxgym-open-source-isolation-audit": ("CEB-EVAL", "sandboxgym-isolation-audit-2026", "reported", 9),
+        "sre-bench-isolated-binary-evaluation": ("CEB-EVAL", "sre-bench-columbia-2026", "reported", 1572),
+    }
+    for comparator_id, expected in required_execution_boundary_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing sandbox/evaluation-boundary comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        denominator = comparator["sample_denominator"]
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        if denominator["status"] != denominator_status or denominator["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_execution_boundary_observations = {
+        "sandboxgym-audited-product-count": ("sandboxgym-open-source-isolation-audit", "audited_sandbox_product_count", 9),
+        "sandboxgym-high-impact-finding-count": ("sandboxgym-open-source-isolation-audit", "high_impact_isolation_finding_count", 32),
+        "sandboxgym-full-escape-count": ("sandboxgym-open-source-isolation-audit", "full_escape_finding_count", 2),
+        "sandboxgym-products-with-failure-rate": ("sandboxgym-open-source-isolation-audit", "products_with_isolation_failure_rate", 100),
+        "srebench-private-program-count": ("sre-bench-isolated-binary-evaluation", "private_program_count", 19),
+        "srebench-binary-instance-count": ("sre-bench-isolated-binary-evaluation", "binary_instance_count", 262),
+        "srebench-graded-task-count": ("sre-bench-isolated-binary-evaluation", "graded_task_count", 1572),
+        "srebench-anti-analysis-mechanism-count": ("sre-bench-isolated-binary-evaluation", "anti_analysis_mechanism_count", 44),
+        "srebench-source-language-count": ("sre-bench-isolated-binary-evaluation", "source_language_count", 4),
+    }
+    for observation_id, expected in required_execution_boundary_observations.items():
+        row = next((item for item in observations if item["observation_id"] == observation_id), None)
+        if row is None:
+            errors.append(f"missing sandbox/evaluation-boundary observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if row["comparator_id"] != comparator_id or row["metric"]["metric_id"] != metric_id or row["metric"]["value"] != value:
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    sandboxgym_rows = {
+        row["observation_id"]: row
+        for row in observations
+        if row["observation_id"] in {
+            "sandboxgym-audited-product-count",
+            "sandboxgym-high-impact-finding-count",
+            "sandboxgym-full-escape-count",
+            "sandboxgym-products-with-failure-rate",
+        }
+    }
+    if len(sandboxgym_rows) == 4:
+        if sandboxgym_rows["sandboxgym-full-escape-count"]["metric"]["value"] > sandboxgym_rows["sandboxgym-high-impact-finding-count"]["metric"]["value"]:
+            errors.append("SandboxGym full-escape findings exceed the parent high-impact-finding count")
+        if sandboxgym_rows["sandboxgym-products-with-failure-rate"]["metric"]["value"] > 100:
+            errors.append("SandboxGym product failure rate exceeds 100 percent")
+    if "sandboxgym-open-source-isolation-audit" in comparators:
+        caveats = " ".join(comparators["sandboxgym-open-source-isolation-audit"]["caveats"]).lower()
+        if "self-published" not in caveats or "not a random sample" not in caveats:
+            errors.append("SandboxGym must retain self-published and selected-sample caveats")
+        if "not 32 independent attack trials" not in caveats or "not a normalized risk score" not in caveats:
+            errors.append("SandboxGym must retain finding-count and risk-score scope boundaries")
+        if "not a controlled live candidate-execution benchmark" not in caveats:
+            errors.append("SandboxGym must retain its fixed-source-audit vs live-run distinction")
+    if "sre-bench-isolated-binary-evaluation" in comparators:
+        caveats = " ".join(comparators["sre-bench-isolated-binary-evaluation"]["caveats"]).lower()
+        if "not code-review accuracy" not in caveats or "separate deterministic grading server" not in caveats:
+            errors.append("SRE-Bench must retain capability/isolated-grading scope caveats")
+
     # Guard the current actual-causality / repair / partial-identifiability comparators.
     required_method_comparators = {
         "cbfl-softrex-defects4j": ("CEB-DEBUG", "cbfl-softrex-paper", 827),
@@ -904,6 +970,26 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "benchmark-maintenance-pass-audit")
     comparator["sample_denominator"]["value"] = 29
     must_reject(mutant, "unearned-pass trajectory count conflated with cohort count")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "sandboxgym-full-escape-count")
+    row["metric"]["value"] = 32
+    must_reject(mutant, "SandboxGym full escapes conflated with all high-impact findings")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "sandboxgym-open-source-isolation-audit")
+    comparator["sample_denominator"]["value"] = 32
+    must_reject(mutant, "SandboxGym finding count conflated with product denominator")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "srebench-graded-task-count")
+    row["metric"]["value"] = 262
+    must_reject(mutant, "SRE-Bench graded tasks conflated with binary instances")
+
+    mutant = copy.deepcopy(payload)
+    comparator = next(row for row in mutant["comparators"] if row["comparator_id"] == "sre-bench-isolated-binary-evaluation")
+    comparator["caveats"] = [item for item in comparator["caveats"] if "separate deterministic grading server" not in item]
+    must_reject(mutant, "SRE-Bench grading-boundary caveat removed")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
