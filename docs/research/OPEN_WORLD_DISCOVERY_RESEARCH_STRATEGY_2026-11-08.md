@@ -259,6 +259,7 @@ A0 must pass first. If the supplied-structure arm fails, do not attribute the pa
 - Exact generating-parameter membership versus behavioral representation/equivalence-class coverage.
 - F0 closed-grammar exact version-space recovery.
 - F1 parameter-support extrapolation; F2 structural support shift; F3 measurement-process shift; F4 regime shift; F5 stochastic/discrepancy shift.
+- The first F2 microcosm fixture adds an evaluator-only quadratic term (q u^2) to direct response; the agent still sees the original linear direct / leaky-memory grammar and must return an exact empty version space. This tests rejection of one missing term, not arbitrary structure discovery or automatic repair.
 - OOD detection precision/recall and false-rejection rate on in-grammar controls.
 - Best-generated versus submitted-candidate performance and selection regret.
 - Scientific-validity rubric, held-out predictive fit and structure recovery are independent scores.
@@ -372,7 +373,8 @@ A useful starting design is six or more structural families, with separate ident
 ### M6 — Open-support and model-repair capability
 - F1a unsupported parameter/system controls must produce no-compatible-model rather than a nearest false law.
 - F1b behaviorally equivalent parameterizations must be accepted as equivalence classes, without false exact-parameter claims.
-- F2–F5 structural, measurement, regime and stochastic shifts must each have independent hidden generators and confirmation.
+- F2 now has one exact bounded quadratic-term support-shift fixture. Extend it across independently generated missing terms, latent variables and interaction families before claiming general F2 competence.
+- F3–F5 measurement, regime and stochastic shifts still require independent hidden generators and confirmation.
 - Detecting misspecification and repairing the model are separate gates.
 
 ### M7 — Scientific validity and candidate selection
