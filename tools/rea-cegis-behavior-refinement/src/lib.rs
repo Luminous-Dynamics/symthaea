@@ -758,6 +758,51 @@ mod tests {
     }
 
     #[test]
+    fn environment_mismatch_rejects_instead_of_reusing_observation() {
+        let hypotheses = vec![hypothesis(
+            "h1",
+            vec![(b"x".to_vec(), outcome(b"ok"))],
+        )];
+        let mut observation = observation(b"x", outcome(b"ok"));
+        observation.environment_sha256 = "d".repeat(64);
+
+        assert!(refine_hypotheses(&context(), &hypotheses, &[observation]).is_err());
+    }
+
+    #[test]
+    fn no_observation_is_not_evidence_of_absence_or_contradiction() {
+        let hypotheses = vec![hypothesis(
+            "h1",
+            vec![(b"vulnerability-probe".to_vec(), outcome(b"not-found"))],
+        )];
+        let report = refine_hypotheses(&context(), &hypotheses, &[]).unwrap();
+
+        assert_eq!(
+            report.hypotheses[0].disposition,
+            HypothesisDisposition::NotEvaluated
+        );
+    }
+
+    #[test]
+    fn observation_outside_hypothesis_domain_does_not_eliminate_it() {
+        let hypotheses = vec![hypothesis(
+            "h1",
+            vec![(b"declared-input".to_vec(), outcome(b"expected"))],
+        )];
+        let report = refine_hypotheses(
+            &context(),
+            &hypotheses,
+            &[observation(b"outside-domain", outcome(b"different"))],
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.hypotheses[0].disposition,
+            HypothesisDisposition::NotEvaluated
+        );
+    }
+
+    #[test]
     fn complete_capture_without_outcome_rejects() {
         let hypotheses = vec![hypothesis(
             "h1",
