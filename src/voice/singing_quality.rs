@@ -257,7 +257,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     // A high-confidence score-prior disagreement blocks the objective gate
     // even when the constrained tracker itself reports a reassuring pitch.
     let objective_pass = pitch_tracking_pass
-        && score_independent_pitch_audit_pass != Some(false)
+        && score_independent_pitch_audit_pass == Some(true)
         && transition_pitch_pass
         && timing_pass
         && physical_stability_pass
@@ -693,6 +693,26 @@ mod tests {
             "the score-independent diagnostic should have adequate frame coverage: {metrics:?}"
         );
     }
+    #[test]
+    fn pitch_prior_audit_is_undefined_when_independent_pitch_has_no_support() {
+        let note = symthaea_muse::Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let stem = VocalStem {
+            samples: vec![0.0; 12_000],
+            sample_rate: 24_000,
+            backend: "test".into(),
+        };
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert_eq!(metrics.score_independent_pitch_audit_pass, None);
+        assert_eq!(metrics.score_independent_pitch_valid_fraction, 0.0);
+        assert!(!metrics.objective_pass);
+    }
+
     #[test]
     fn unconstrained_pitch_estimator_covers_low_and_high_singing_registers() {
         let rate = 24_000;
