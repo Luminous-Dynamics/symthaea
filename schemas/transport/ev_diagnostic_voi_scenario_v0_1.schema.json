@@ -273,35 +273,35 @@
               "safety_review": {
                 "enum": [
                   "satisfied",
-                  "blocked",
+                  "missing",
                   "unknown"
                 ]
               },
               "qualified_facility": {
                 "enum": [
                   "satisfied",
-                  "blocked",
+                  "missing",
                   "unknown"
                 ]
               },
               "protocol_approved": {
                 "enum": [
                   "satisfied",
-                  "blocked",
+                  "missing",
                   "unknown"
                 ]
               },
               "calibration_valid": {
                 "enum": [
                   "satisfied",
-                  "blocked",
+                  "missing",
                   "unknown"
                 ]
               },
               "authority_approved": {
                 "enum": [
                   "satisfied",
-                  "blocked",
+                  "missing",
                   "unknown"
                 ]
               }
