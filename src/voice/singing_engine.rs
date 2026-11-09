@@ -1020,7 +1020,15 @@ pub trait SingingVoiceEngine {
         policy: &SingingRenderPolicy,
     ) -> Result<VocalStem> {
         performance.validate()?;
-        policy.validate_against(&self.capabilities())?;
+        let capabilities = self.capabilities();
+        if capabilities.backend_id != self.id() {
+            bail!(
+                "backend capability ID {:?} does not match renderer ID {:?}",
+                capabilities.backend_id,
+                self.id()
+            );
+        }
+        policy.validate_against(&capabilities)?;
         self.render(performance)
     }
 
@@ -1121,6 +1129,48 @@ mod tests {
 
         let unsupported = SingingBackendCapabilities::undeclared("unverified");
         assert!(conditional_policy.validate_against(&unsupported).is_err());
+    }
+
+    struct MismatchedCapabilityBackend {
+        render_called: bool,
+    }
+
+    impl SingingVoiceEngine for MismatchedCapabilityBackend {
+        fn id(&self) -> &str {
+            "actual-renderer-id"
+        }
+
+        fn capabilities(&self) -> SingingBackendCapabilities {
+            capability_fixture(CapabilitySupport::Native)
+        }
+
+        fn render(&mut self, _performance: &VocalPerformance) -> Result<VocalStem> {
+            self.render_called = true;
+            bail!("render must not be dispatched after a capability identity mismatch");
+        }
+    }
+
+    #[test]
+    fn policy_render_rejects_a_manifest_for_a_different_backend_id() {
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let mut backend = MismatchedCapabilityBackend {
+            render_called: false,
+        };
+        let error = backend
+            .render_with_policy(
+                &performance,
+                &SingingRenderPolicy::score_conditioned_comparison(),
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("does not match renderer ID"), "{error}");
+        assert!(!backend.render_called);
     }
 
     #[test]
