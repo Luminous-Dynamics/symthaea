@@ -954,7 +954,7 @@ fn report_from_selection(
 /// The target precision after nuisance elimination is the Schur complement
 /// A - B C^-1 B^T of the full precision [[A, B], [B^T, C]]. Cholesky solves
 /// are used for C^-1 B^T; no explicit inverse or pseudo-inverse is formed.
-fn marginal_target_log_determinant(
+pub(super) fn marginal_target_log_determinant(
     precision: &[Vec<f64>],
     target_parameter_count: usize,
 ) -> Result<f64, ()> {
@@ -1038,7 +1038,7 @@ fn cholesky_solve(lower: &[Vec<f64>], rhs: &[f64]) -> Result<Vec<f64>, ()> {
     Ok(solution)
 }
 
-fn cholesky_factor(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, ()> {
+pub(super) fn cholesky_factor(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, ()> {
     let dimension = matrix.len();
     if dimension == 0 || matrix.iter().any(|row| row.len() != dimension) {
         return Err(());
@@ -1074,7 +1074,7 @@ fn cholesky_factor(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, ()> {
 }
 
 /// Cholesky log-determinant for a symmetric positive-definite matrix.
-fn cholesky_log_determinant(matrix: &[Vec<f64>]) -> Result<f64, ()> {
+pub(super) fn cholesky_log_determinant(matrix: &[Vec<f64>]) -> Result<f64, ()> {
     let dimension = matrix.len();
     let mut lower = vec![vec![0.0; dimension]; dimension];
     let mut log_determinant = 0.0;
