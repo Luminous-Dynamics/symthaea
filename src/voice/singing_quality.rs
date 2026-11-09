@@ -249,7 +249,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     // contextual detector additionally requires a robust local outlier, so
     // sustained frication is not rejected merely for being noisy.
     let render_cleanliness_pass = cleanliness.render_cleanliness_pass;
+    // A high-confidence score-prior disagreement blocks the objective gate
+    // even when the constrained tracker itself reports a reassuring pitch.
     let objective_pass = pitch_tracking_pass
+        && pitch_prior_mismatch_frames == 0
         && transition_pitch_pass
         && timing_pass
         && physical_stability_pass
@@ -641,14 +644,15 @@ mod tests {
     #[test]
     fn score_independent_pitch_audit_detects_prior_induced_false_reassurance() {
         let note = symthaea_muse::Note {
-            frequency: 220.0,
+            frequency: 240.0,
             start_time: 0.0,
             duration: 0.5,
             velocity: 0.8,
         };
-        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        performance.syllables[0].vibrato_depth_cents = 0.0;
         let rate = 24_000;
-        let actual_hz: f32 = 500.0;
+        let actual_hz: f32 = 480.0;
         let samples = (0..rate / 2)
             .map(|i| (std::f32::consts::TAU * actual_hz * i as f32 / rate as f32).sin() * 0.2)
             .collect();
@@ -661,8 +665,8 @@ mod tests {
         let true_error_cents = 1200.0f32 * (actual_hz / note.frequency).log2();
 
         assert!(
-            metrics.median_pitch_error_cents < 400.0,
-            "the constrained estimate still illustrates the old prior-limited result: {metrics:?}"
+            metrics.median_pitch_error_cents < 25.0,
+            "the constrained estimate should falsely look like a good octave match: {metrics:?}"
         );
         assert!(
             (metrics.score_independent_pitch_median_error_cents - true_error_cents).abs() < 5.0,
@@ -673,6 +677,10 @@ mod tests {
             "the evaluator must explicitly flag false reassurance: {metrics:?}"
         );
         assert_eq!(metrics.score_independent_pitch_audit_pass, Some(false));
+        assert!(
+            !metrics.objective_pass,
+            "a high-confidence prior mismatch must block the objective gate: {metrics:?}"
+        );
         assert!(
             metrics.score_independent_pitch_valid_fraction >= 0.8,
             "the score-independent diagnostic should have adequate frame coverage: {metrics:?}"
