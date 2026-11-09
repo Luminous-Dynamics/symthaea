@@ -110,6 +110,10 @@ Publish each axis separately, with numerator, denominator, exclusions, confidenc
 
 Use paired comparisons, bootstrap confidence intervals or other pre-registered uncertainty estimates. Correct for multiple comparisons where appropriate. Preserve raw task-level results.
 
+## 8b. Source timestamp precision
+
+The v0.1 shared temporal kernel (#11241 / PR #11253) accepts only exact, offset-aware availability instants. Date-only filing dates and macro vintage dates must not be converted to midnight and treated as exact intraday availability. Preserve source precision; use an explicit interval or return INDETERMINATE when the possible availability interval straddles the decision frontier. The interval-censored extension is tracked in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256). A date can identify a vintage without proving its release hour.
+
 ## 8a. Evaluator, rubric and reference metrology
 
 A frozen rubric, a committed reference digest or agreement among multiple LLM judges does not establish that the evaluation is valid. The scorer is itself a measurement instrument and must be qualified before it is used to claim a financial-agent improvement.
