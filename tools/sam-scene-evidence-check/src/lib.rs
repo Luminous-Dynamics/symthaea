@@ -650,7 +650,6 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         })
         .collect();
 
-
     let frame_ids: BTreeSet<String> = snapshot
         .get("reference_frames")
         .and_then(Value::as_array)
@@ -908,12 +907,7 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         &source_roles,
         &["simulator_oracle"],
     );
-    validate_follow_target_context(
-        &mut errors,
-        snapshot,
-        &source_records,
-        &frame_ids,
-    );
+    validate_follow_target_context(&mut errors, snapshot, &source_records, &frame_ids);
 
     errors
 }
@@ -974,14 +968,11 @@ fn validate_follow_target_context(
     let scenario = context.get("scenario_id").and_then(Value::as_str);
     let snapshot_scenario = snapshot.get("scenario_id").and_then(Value::as_str);
     if scenario != snapshot_scenario {
-        errors.push(
-            "follow_target_context: scenario_id must match the exact scene scenario".into(),
-        );
+        errors
+            .push("follow_target_context: scenario_id must match the exact scene scenario".into());
     }
 
-    let source_id = context
-        .get("evidence_source_ref")
-        .and_then(Value::as_str);
+    let source_id = context.get("evidence_source_ref").and_then(Value::as_str);
     let Some(source_id) = source_id else {
         errors.push("follow_target_context: available target requires evidence_source_ref".into());
         return;
@@ -1069,14 +1060,9 @@ fn validate_follow_target_context(
         _ => {}
     }
 
-    let context_frame = context
-        .get("coordinate_frame_id")
-        .and_then(Value::as_str);
-    let source_frame = source
-        .get("reference_frame_id")
-        .and_then(Value::as_str);
-    if context_frame != source_frame
-        || context_frame.is_none_or(|frame| !frame_ids.contains(frame))
+    let context_frame = context.get("coordinate_frame_id").and_then(Value::as_str);
+    let source_frame = source.get("reference_frame_id").and_then(Value::as_str);
+    if context_frame != source_frame || context_frame.is_none_or(|frame| !frame_ids.contains(frame))
     {
         errors.push(
             "follow_target_context: evidence source frame must resolve and match the follow-target frame"
@@ -1088,25 +1074,15 @@ fn validate_follow_target_context(
         .get("time")
         .and_then(|time| time.get("event_tick_ns"))
         .and_then(Value::as_u64);
-    let source_tick = source
-        .get("acquisition_tick_ns")
-        .and_then(Value::as_u64);
-    let observation_tick = context
-        .get("observation_tick_ns")
-        .and_then(Value::as_u64);
-    let max_age = context
-        .get("max_age_ns")
-        .and_then(Value::as_u64);
-    let source_clock = source
-        .get("clock_domain_id")
-        .and_then(Value::as_str);
+    let source_tick = source.get("acquisition_tick_ns").and_then(Value::as_u64);
+    let observation_tick = context.get("observation_tick_ns").and_then(Value::as_u64);
+    let max_age = context.get("max_age_ns").and_then(Value::as_u64);
+    let source_clock = source.get("clock_domain_id").and_then(Value::as_str);
     let scene_clock = snapshot
         .get("time")
         .and_then(|time| time.get("clock_domain_id"))
         .and_then(Value::as_str);
-    let source_transform = source
-        .get("clock_transform_id")
-        .and_then(Value::as_str);
+    let source_transform = source.get("clock_transform_id").and_then(Value::as_str);
     let scene_transform = snapshot
         .get("time")
         .and_then(|time| time.get("clock_transform_id"))
@@ -1131,9 +1107,7 @@ fn validate_follow_target_context(
     }
 
     let gap = context.get("gap_m").and_then(Value::as_f64);
-    let relative_speed = context
-        .get("relative_speed_mps")
-        .and_then(Value::as_f64);
+    let relative_speed = context.get("relative_speed_mps").and_then(Value::as_f64);
     let uncertainty = context
         .get("distance_uncertainty_m")
         .and_then(Value::as_f64);
@@ -1506,8 +1480,7 @@ mod tests {
     #[test]
     fn unknown_follow_target_cannot_retain_oracle_or_remote_fallback() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["follow_target_context"]["status"] =
-            Value::String("unknown".into());
+        fixture["snapshot"]["follow_target_context"]["status"] = Value::String("unknown".into());
         for key in [
             "evidence_source_ref",
             "scenario_id",
