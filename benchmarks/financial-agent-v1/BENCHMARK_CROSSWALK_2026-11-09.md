@@ -40,6 +40,28 @@ Published counts and scores are statements from the referenced papers/projects. 
 
 A directory/aggregator such as [FinanceBenchmark.ai](https://financebenchmark.ai/benchmarks) can provide a discovery map, but its composite score and leaderboard methodology are publisher-defined. Treat aggregator ranks as leads for further investigation; use primary papers, exact benchmark versions and locally reproduced runs for claims.
 
+## 3.1 Current proprietary analyst-agent comparator — Vals Finance Agent v2.1
+
+The official [Vals Finance Agent v2.1 leaderboard](https://www.vals-ai.com/benchmarks/fabv2-1), updated 5 November 2026, reports partial-credit accuracy and cost per test as follows:
+
+| Rank | System | Partial-credit accuracy | Reported cost/test | Reported duration/test |
+|---:|---|---:|---:|---:|
+| 1 | Claude Opus 5.5 | 67.85% | $8.91 | 33m00s |
+| 2 | Gemini 4 Argon | 67.66% | $4.32 | 13m13s |
+| 3 | Wonder Full | 67.58% | $2.68 | 14m10s |
+| 4 | Inkling 2 Small | 67.54% | $0.18 | 4m56s |
+| 5 | Claude Sonnet 5.5 | 67.28% | $6.95 | 34m26s |
+| 6 | Gemini 4 Carbon | 67.16% | $7.29 | 29m40s |
+
+Interpretation:
+- The top three are separated by only 0.27 percentage points. Without confidence intervals and task-level paired results, this is not evidence of a meaningful capability ordering.
+- Inkling 2 Small is 0.31 points below the leader while reporting about 1/50 the per-question cost. This is a better reminder to evaluate the quality-cost frontier than to optimize rank alone.
+- Vals v1.1 and v2.1 use different question sets; do not compare their scores as a time series.
+- These are publisher-reported results on a proprietary task set. They are not a Symthaea result, independent reproduction, human-expert score or proof of broad investment/research competence.
+- A numerical match against this benchmark is only meaningful if the same release, task access, scoring rules, tool availability, run budget, refusals/fallback handling and model versions can lawfully be reproduced. Otherwise treat it as a capability/cost reference, not a scored head-to-head.
+
+The broader [Vals Finance Index](https://www.vals-ai.com/benchmarks/finance_index) covers additional finance work (research/modeling/tax) and applies publisher-defined GDP-share weights. Keep it separate from the narrower Finance Agent v2.1 task score.
+
 ## 4. Matched evaluation rules
 
 For every external dataset or product:
