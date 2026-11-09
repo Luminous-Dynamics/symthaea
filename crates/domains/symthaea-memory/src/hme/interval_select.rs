@@ -2405,6 +2405,30 @@ mod tests {
             .unwrap(),
         ];
         let receipt = receipt_for_fixture_envelopes(&disjoint);
+        let all_ids: Vec<String> = disjoint
+            .iter()
+            .flat_map(|envelope| envelope.member_ids().iter().cloned())
+            .collect();
+        let authoritative_digest = member_id_set_digest(&all_ids).unwrap();
+        assert!(matches!(
+            GroupPartitionCoverageReceipt::from_group_envelopes(
+                &disjoint,
+                all_ids.len() + 1,
+                authoritative_digest,
+            ),
+            Err(GroupPartitionReceiptError::EligiblePopulationCountMismatch {
+                expected,
+                actual
+            }) if expected == all_ids.len() + 1 && actual == all_ids.len()
+        ));
+        assert!(matches!(
+            GroupPartitionCoverageReceipt::from_group_envelopes(
+                &disjoint,
+                all_ids.len(),
+                [0xFFu8; 32],
+            ),
+            Err(GroupPartitionReceiptError::EligibleMemberSetDigestMismatch)
+        ));
         let groups: Vec<GroupScoreIntervalRecord> = disjoint
             .iter()
             .map(|envelope| build_group_record(envelope, &query))
