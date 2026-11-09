@@ -443,6 +443,47 @@ mod tests {
         assert!(error.contains("added=[\"new.onnx\"]"), "{error}");
     }
 
+    #[test]
+    fn empty_artifact_roots_are_rejected() {
+        let tree = TempTree::new();
+        let error = build_manifest(tree.path()).unwrap_err();
+        assert!(error.contains("contains no files"), "{error}");
+    }
+
+    #[test]
+    fn manifest_output_must_be_outside_the_artifact_root() {
+        let tree = TempTree::new();
+        fs::write(tree.path().join("model.onnx"), b"weights").unwrap();
+        assert!(ensure_output_outside_root(
+            tree.path(),
+            &tree.path().join("manifest.json")
+        )
+        .is_err());
+
+        let outside = tree.path().with_extension("evidence");
+        fs::create_dir_all(&outside).unwrap();
+        assert!(ensure_output_outside_root(
+            tree.path(),
+            &outside.join("manifest.json")
+        )
+        .is_ok());
+        let _ = fs::remove_dir_all(outside);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlink_used_as_the_root_is_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let target = TempTree::new();
+        fs::write(target.path().join("model.onnx"), b"weights").unwrap();
+        let alias = target.path().with_extension("alias");
+        symlink(target.path(), &alias).unwrap();
+        let error = build_manifest(&alias).unwrap_err();
+        assert!(error.contains("real directory"), "{error}");
+        let _ = fs::remove_file(alias);
+    }
+
     #[cfg(unix)]
     #[test]
     fn symlinks_are_rejected_instead_of_followed() {
