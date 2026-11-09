@@ -374,7 +374,7 @@ fn run() -> Result<(), String> {
             let group_index = *selected
                 .get(&group_identity.member_set_digest)
                 .ok_or_else(|| "selected group was absent from group directory".to_owned())?;
-            for ((id, _original), (_, reconstruction), certificate) in groups[group_index]
+            for (((id, _original), (_, reconstruction)), certificate) in groups[group_index]
                 .iter()
                 .zip(reconstructions[group_index].iter())
                 .zip(certificates[group_index].iter())
