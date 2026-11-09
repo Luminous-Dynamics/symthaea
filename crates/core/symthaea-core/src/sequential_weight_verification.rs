@@ -291,10 +291,16 @@ impl SequentialWeightVerificationCampaign {
         if self.next_candidate_index == u64::MAX {
             return Err(SequentialWeightVerificationError::CandidateIndexExhausted);
         }
-        if self.used_candidate_digests.contains(&candidate_model_digest) {
+        if self
+            .used_candidate_digests
+            .contains(&candidate_model_digest)
+        {
             return Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated);
         }
-        if self.used_confirmatory_shards.contains(&confirmatory_shard_digest) {
+        if self
+            .used_confirmatory_shards
+            .contains(&confirmatory_shard_digest)
+        {
             return Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed);
         }
         let binding = WeightVerificationBinding {
@@ -307,7 +313,8 @@ impl SequentialWeightVerificationCampaign {
         };
         let verifier = SequentialWeightVerification::from_binding(binding, self.config)?;
         self.used_candidate_digests.insert(candidate_model_digest);
-        self.used_confirmatory_shards.insert(confirmatory_shard_digest);
+        self.used_confirmatory_shards
+            .insert(confirmatory_shard_digest);
         self.next_candidate_index += 1;
         Ok(verifier)
     }
@@ -325,14 +332,19 @@ impl SequentialWeightVerificationCampaign {
     /// Create a deterministic checkpoint suitable for durable storage.
     pub fn snapshot(
         &self,
-    ) -> Result<SequentialWeightVerificationCampaignSnapshot, SequentialWeightVerificationError> {
+    ) -> Result<SequentialWeightVerificationCampaignSnapshot, SequentialWeightVerificationError>
+    {
         let mut snapshot = SequentialWeightVerificationCampaignSnapshot {
             format_version: 1,
             config: self.config,
             evaluation_protocol_digest: self.evaluation_protocol_digest.clone(),
             next_candidate_index: self.next_candidate_index,
             used_candidate_digests: self.used_candidate_digests.iter().cloned().collect(),
-            used_confirmatory_shard_digests: self.used_confirmatory_shards.iter().cloned().collect(),
+            used_confirmatory_shard_digests: self
+                .used_confirmatory_shards
+                .iter()
+                .cloned()
+                .collect(),
             snapshot_digest: String::new(),
         };
         snapshot.snapshot_digest = campaign_snapshot_digest(&snapshot)?;
@@ -675,9 +687,7 @@ pub fn validate_qualified_report(
     {
         return Err(SequentialWeightVerificationError::ReportNotQualified);
     }
-    if !report.mean_improvement.is_finite()
-        || !(-1.0..=1.0).contains(&report.mean_improvement)
-    {
+    if !report.mean_improvement.is_finite() || !(-1.0..=1.0).contains(&report.mean_improvement) {
         return Err(SequentialWeightVerificationError::ReportFieldMismatch(
             "mean_improvement",
         ));
@@ -685,8 +695,8 @@ pub fn validate_qualified_report(
 
     let n = report.observation_count as f64;
     let candidate = report.binding.candidate_index as f64;
-    let alpha_at_look = report.config.campaign_alpha
-        / (candidate * (candidate + 1.0) * n * (n + 1.0));
+    let alpha_at_look =
+        report.config.campaign_alpha / (candidate * (candidate + 1.0) * n * (n + 1.0));
     let log_tail_ratio = std::f64::consts::LN_2 - report.config.campaign_alpha.ln()
         + candidate.ln()
         + (candidate + 1.0).ln()
@@ -704,8 +714,16 @@ pub fn validate_qualified_report(
             report.confidence_radius,
             confidence_radius,
         ),
-        ("lower_confidence_bound", report.lower_confidence_bound, lower),
-        ("upper_confidence_bound", report.upper_confidence_bound, upper),
+        (
+            "lower_confidence_bound",
+            report.lower_confidence_bound,
+            lower,
+        ),
+        (
+            "upper_confidence_bound",
+            report.upper_confidence_bound,
+            upper,
+        ),
     ] {
         if !actual.is_finite() || actual.to_bits() != expected.to_bits() {
             return Err(SequentialWeightVerificationError::ReportFieldMismatch(
@@ -865,7 +883,12 @@ mod tests {
         shard_marker: char,
     ) -> SequentialWeightVerification {
         campaign
-            .start_candidate(digest('a'), digest(model_marker), digest(shard_marker), digest('e'))
+            .start_candidate(
+                digest('a'),
+                digest(model_marker),
+                digest(shard_marker),
+                digest('e'),
+            )
             .expect("fresh candidate")
     }
 
@@ -972,14 +995,16 @@ mod tests {
         let encoded = serde_json::to_vec(&snapshot).expect("serialize checkpoint");
         let decoded: SequentialWeightVerificationCampaignSnapshot =
             serde_json::from_slice(&encoded).expect("deserialize checkpoint");
-        let mut restored =
-            SequentialWeightVerificationCampaign::from_snapshot(decoded.clone())
-                .expect("restore checkpoint");
+        let mut restored = SequentialWeightVerificationCampaign::from_snapshot(decoded.clone())
+            .expect("restore checkpoint");
 
         assert_eq!(restored.next_candidate_index(), 3);
         assert_eq!(restored.used_confirmatory_shard_count(), 2);
         assert_eq!(
-            restored.snapshot().expect("repeat snapshot").snapshot_digest,
+            restored
+                .snapshot()
+                .expect("repeat snapshot")
+                .snapshot_digest,
             snapshot.snapshot_digest
         );
         assert!(matches!(
@@ -1043,12 +1068,7 @@ mod tests {
 
         let mut campaign = campaign(0.1, 10);
         assert!(matches!(
-            campaign.start_candidate(
-                digest('a'),
-                "not-a-digest".into(),
-                digest('d'),
-                digest('e'),
-            ),
+            campaign.start_candidate(digest('a'), "not-a-digest".into(), digest('d'), digest('e'),),
             Err(SequentialWeightVerificationError::InvalidDigest(_))
         ));
         let mut verifier = candidate(&mut campaign, 'b', 'd');
@@ -1071,7 +1091,10 @@ mod tests {
             left_report = left.observe(episode.clone()).expect("left");
             right_report = right.observe(episode).expect("right");
         }
-        assert_eq!(left_report.observation_digest, right_report.observation_digest);
+        assert_eq!(
+            left_report.observation_digest,
+            right_report.observation_digest
+        );
         assert_eq!(left_report.report_digest, right_report.report_digest);
 
         let mut altered_campaign = campaign(0.05, 20);
@@ -1103,7 +1126,10 @@ mod tests {
                 break;
             }
         }
-        assert_eq!(report.status, SequentialWeightVerificationStatus::BenefitEstablished);
+        assert_eq!(
+            report.status,
+            SequentialWeightVerificationStatus::BenefitEstablished
+        );
         report
     }
 
@@ -1128,7 +1154,9 @@ mod tests {
         );
         for index in 12..30 {
             let next = observation(index, 0.9, 0.5);
-            let original_report = original.observe(next.clone()).expect("original continuation");
+            let original_report = original
+                .observe(next.clone())
+                .expect("original continuation");
             let restored_report = restored.observe(next).expect("restored continuation");
             assert_eq!(original_report.report_digest, restored_report.report_digest);
         }
