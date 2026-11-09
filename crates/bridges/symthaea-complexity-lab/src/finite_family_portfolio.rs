@@ -4868,6 +4868,18 @@ mod tests {
                 dominator_profile_group_index: 0,
             }]
         );
+        assert_eq!(
+            policy_portfolio_sha256_hex(frontier.model_family_sha256),
+            "4b004bccbec0e45c3fbaf42b29e5303811aa0085ce61014df274ceb6dab067d2"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(frontier.policy_values_sha256),
+            "f78dfbd81c56209d3f6c444c5b6b59c7eb473432ea5f60d8f9ef5f6afae5768e"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(frontier.certificate_sha256),
+            "05fd42a60adf45e9b6496be260a1dd8ecb524033f7fe60a4549e030c225dbbac"
+        );
         // The exact optimum is unchanged after eliminating the dominated
         // profile; original equivalent policy indices are not discarded.
         assert_eq!(source.minimax_regret, q(0,1));
