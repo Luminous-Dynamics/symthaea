@@ -630,6 +630,9 @@ impl VehicleTrainer {
                         && train_this_step
                         && teacher_command.is_some(),
                     teacher_action_evaluation_only: !train_controller && teacher_command.is_some(),
+                    teacher_action_reference_only: teacher_command.is_some()
+                        && !teacher_action_used_for_blend
+                        && !(train_controller && train_this_step && teacher_command.is_some()),
                     pd_teacher_blend_weight,
                     blended_action_steering: blended_action_command.steering,
                     blended_action_throttle: blended_action_command.throttle,
@@ -881,7 +884,7 @@ impl VehicleTrainer {
                 if !metrics.telemetry.is_empty() {
                     let step_path = format!("{}/episode_{:04}.csv", dir, ep);
                     let mut csv = String::from(
-                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,teacher_action_evaluation_only,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake,training_enabled,follow_oracle_used_for_policy\n",
+                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,teacher_action_evaluation_only,teacher_action_reference_only,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake,training_enabled,follow_oracle_used_for_policy\n",
                     );
                     for t in &metrics.telemetry {
                         let actor_id = t
@@ -917,7 +920,7 @@ impl VehicleTrainer {
                             .map(|value| format!("{value:.6}"))
                             .unwrap_or_default();
                         csv.push_str(&format!(
-                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
                             t.step,
                             t.time,
                             t.speed,
@@ -945,6 +948,7 @@ impl VehicleTrainer {
                             t.teacher_action_used_for_blend,
                             t.teacher_action_used_for_supervision,
                             t.teacher_action_evaluation_only,
+                            t.teacher_action_reference_only,
                             t.pd_teacher_blend_weight,
                             t.blended_action_steering,
                             t.blended_action_throttle,
@@ -1268,7 +1272,7 @@ mod tests {
         let mut step_lines = step_csv.lines();
         let step_header = step_lines.next().unwrap();
         let header_columns = step_header.split(',').count();
-        assert_eq!(header_columns, 36, "telemetry CSV header schema changed");
+        assert_eq!(header_columns, 37, "telemetry CSV header schema changed");
         assert!(
             step_lines.all(|line| line.split(',').count() == header_columns),
             "Every episode telemetry row must match the CSV header column count"
@@ -1281,6 +1285,7 @@ mod tests {
         assert!(step_header.contains("student_teacher_action_delta_l1"));
         assert!(step_header.contains("teacher_action_used_for_supervision"));
         assert!(step_header.contains("teacher_action_evaluation_only"));
+        assert!(step_header.contains("teacher_action_reference_only"));
         assert!(step_header.contains("pd_teacher_blend_weight"));
         assert!(step_header.contains("blended_action_steering"));
         assert!(step_header.contains("executed_action_steering"));
@@ -1836,6 +1841,10 @@ mod tests {
                 .all(|row| row.pd_teacher_blend_weight == 0.0)
         );
         assert!(
+            telemetry.iter().any(|row| row.teacher_action_reference_only),
+            "Training telemetry should distinguish teacher reference-only steps"
+        );
+        assert!(
             telemetry.iter().any(|row| {
                 row.teacher_action_used_for_supervision
                     && row.teacher_target_steering.is_some()
@@ -1887,6 +1896,7 @@ mod tests {
                 && !row.teacher_action_used_for_supervision
                 && !row.follow_oracle_used_for_policy
                 && row.teacher_action_evaluation_only
+                && row.teacher_action_reference_only
                 && row.pd_teacher_blend_weight == 0.0
                 && row.student_teacher_action_delta_l1.is_some_and(|value| {
                     (value - expected_delta).abs() < 1e-6
