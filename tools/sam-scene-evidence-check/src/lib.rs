@@ -1797,6 +1797,30 @@ mod tests {
     }
 
     #[test]
+    fn rejects_simulator_truth_actor_with_unregistered_source() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["simulator_truth_actor_states"][0]["source_ref"] =
+            Value::String("front-lidar-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_simulator_truth_actor_from_another_scenario() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["simulator_truth_actor_states"][0]["scenario_id"] =
+            Value::String("different-scenario".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_link_to_unknown_simulator_actor() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["target_reference_id"] =
+            Value::String("oracle-actor-missing".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
     fn rejects_follow_target_gap_scalar_not_supported_by_scene_geometry() {
         let (schema, mut fixture) = load_fixture();
         fixture["snapshot"]["follow_target_context"]["gap_m"] = Value::from(99.0);
