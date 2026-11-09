@@ -5,6 +5,7 @@ on:
     paths:
       - "src/voice/mod.rs"
       - "src/voice/formant_singing_engine.rs"
+      - "src/voice/resolved_singing_engine.rs"
       - "src/voice/singing_engine.rs"
       - "src/voice/kokoro_singing.rs"
       - "src/voice/diffsinger.rs"
@@ -63,7 +64,7 @@ jobs:
           components: rustfmt
 
       - name: Format-check only the changed Rust files
-        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/formant_singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/resolved_singing_engine.rs src/voice/formant_singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
 
       - name: Format-check standalone pronunciation lattice
         run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
@@ -82,6 +83,9 @@ jobs:
 
       - name: Test resolved-plan formant rendering and route-specific capability policies
         run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::formant_singing_engine::tests -- --test-threads=1
+
+      - name: Test renderer-neutral resolved-plan receipt primitives
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::resolved_singing_engine::tests -- --test-threads=1
 
       - name: Test Kokoro score-gap preservation
         run: cargo +1.96.0 test --locked -p symthaea --lib --features "singing,voice-tts" voice::kokoro_singing::tests -- --test-threads=1
