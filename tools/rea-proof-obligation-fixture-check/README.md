@@ -1,40 +1,42 @@
-# REA proof-obligation acquisition fixture checker
+# REA proof-obligation acquisition fixture checker and scorer
 
-This standalone Rust crate checks the REA-RUST-050 synthetic development corpus. It validates the Draft 2020-12 schemas and instances, cross-view semantic relationships, and a small deterministic reference contract for claim readiness.
+This standalone Rust workspace validates the REA-RUST-050 synthetic development corpus and scores one-step policy submissions against the public development agent/grader fixtures.
 
-## Files and trust boundary
+## Trust boundary
 
-- `rea-proof-obligation-acquisition-agent-view-v0.json` contains the public, agent-visible development inputs: claim, current obligation states, candidate experiment descriptions/outcomes, authorization, reversibility, impact and cost. It contains no hidden world-state oracle, expected preferred policy, or outcome-to-obligation effects.
-- `rea-proof-obligation-acquisition-grader-v0.json` contains synthetic world-state labels, expected-policy annotations and candidate outcome effects. It declares `never_mount_in_agent_workspace`.
-- `rea-proof-obligation-acquisition-fixtures-v0.json` is a combined development-authoring source used to keep the two views synchronized. It is not an agent prompt or benchmark task input.
+- The agent view contains claim text, current obligation states, candidate descriptions/outcomes, authorization, reversibility, impact and relative cost.
+- The grader view contains synthetic world-state labels, design-reference policy choices and possible outcome-to-obligation effects.
+- Both views and the combined authoring source are public development data. They are not a hidden test set and cannot support contamination-resistant performance claims.
+- A real held-out grader must live in an access-controlled evaluator service or private repository unavailable to the evaluated agent.
 
-The grader view is still public development data. It is not a hidden test set and must not be used to claim contamination-resistant evaluation. Future hidden cases must live in an access-controlled benchmark service or private repository, with grader-only material unavailable to the evaluated system.
+## Checker
 
-## What the checker enforces
+The checker validates Draft 2020-12 schemas and instances, exact agent/grader projections, case/candidate/obligation identity, outcome references, evidence-class admissibility, and authorization/reversibility/impact gates.
 
-- Each schema is valid Draft 2020-12 and each fixture conforms.
-- The agent view rejects unknown fields and contains no grader-only keys.
-- Agent and grader case IDs and candidate IDs match exactly; both are exact projections of the combined authoring source.
-- Every grader effect references an outcome actually declared to the agent and an obligation visible in that case.
-- Evidence classes not admitted by an obligation cannot change its status in either direction.
-- Unauthorized, irreversible or destructive candidates cannot change obligation state.
-- Preferred candidates must be eligible and capable of changing at least one mandatory obligation using admissible evidence.
-- Abstention is permitted when no eligible candidate can make such a transition.
-- Candidate costs are finite and positive; mutation controls exercise leakage and invalid transitions.
+## Policy scorer
 
-## Small reference readiness semantics
+Run:
 
-The checker exposes `evaluate_claim_readiness`: a claim is ready only when every mandatory obligation's *current independently assessed state* is `satisfied`. Any mandatory `unknown`, `unsatisfied`, `conflicted`, `incomplete` or `contradicted` state blocks readiness. Optional obligations do not block it.
+```bash
+cargo run --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --bin rea-proof-obligation-score -- \
+  docs/research/rea-proof-obligation-acquisition-agent-view-v0.json \
+  docs/research/rea-proof-obligation-acquisition-grader-v0.json \
+  policy-run.json
+```
 
-The test-only fixture simulator `apply_observed_fixture_outcome` applies only grader effects associated with one already observed outcome. Candidate predictions do not modify obligations. It rejects undeclared outcomes and ineligible experiments. The simulator is a deterministic synthetic reference, not a production evidence verifier, action planner or proof that the underlying world state is true.
+A policy run contains exactly one decision per case: a selected candidate ID or abstain, plus the system's readiness assertion against the current pre-action evidence state.
 
-## Run
+The scorer reports coverage, invalid/unsafe selections, false-ready and false-not-ready claims, initial readiness accuracy, potential mandatory-obligation updates, unnecessary abstention, relative acquisition cost, and agreement with the synthetic design reference.
+
+**Synthetic design-reference agreement is not benchmark accuracy.** The grader's preferred action is a design annotation, not a human-adjudicated gold policy. No experiment is executed and predicted candidate outcomes never change current readiness. The report explicitly states that it is not an official benchmark score.
+
+Input files are byte-bounded and parsed with duplicate-key and trailing-data rejection. Submission JSON is validated against Draft 2020-12 before scoring.
+
+## Tests and claim ceiling
 
 ```bash
 cargo test --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --locked
 cargo clippy --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --all-targets --locked -- -D warnings
 ```
 
-## Claim ceiling
-
-This qualifies fixture integrity and finite synthetic readiness/transition rules only. It does not adjudicate world states, prove evidence truth, authenticate lineage, calibrate likelihoods, execute experiments, choose optimal acquisition policies, or measure planner performance.
+This tool qualifies a finite synthetic protocol and scores policy submissions against that development fixture. It does not execute experiments, authenticate observations, prove world-state truth, adjudicate human evidence labels, calibrate EIG/EVSI likelihoods, or establish generalized capability or SOTA performance.
