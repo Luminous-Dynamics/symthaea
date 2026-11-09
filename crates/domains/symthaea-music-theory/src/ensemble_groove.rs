@@ -81,14 +81,22 @@ pub enum GrooveConstraintKindV1 {
     MinimumCircularSeparation {
         minimum_ticks: u32,
     },
+    /// The left layer is the caller/leader and the right layer is the
+    /// responder/follower. Every left-layer attack must receive at least one
+    /// right-layer attack in the forward circular delay window. The required
+    /// coverage is expressed in basis points (0..=10000), avoiding float
+    /// thresholds in a hard musical obligation.
+    CallResponseWithinWindow {
+        minimum_delay_ticks: u32,
+        maximum_delay_ticks: u32,
+        minimum_coverage_basis_points: u16,
+    },
 }
 
 /// A named, directed pair of layer IDs and their intended relationship.
 ///
-/// The analysis is symmetric for the current constraint set, but the source
-/// and target remain explicit so the wire contract can grow to include
-/// directed call/response and leader/follower relationships without changing
-/// layer identity.
+/// Some relationships are symmetric (collision/separation); call/response
+/// constraints are directed: left is the caller and right is the responder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GrooveConstraintV1 {
     pub left_layer_id: String,
@@ -155,6 +163,8 @@ pub struct GrooveConstraintResultV1 {
     pub rule: GrooveConstraintKindV1,
     pub observed_coincident_pairs: u64,
     pub observed_minimum_separation_ticks: Option<u64>,
+    pub calls_with_response: Option<u64>,
+    pub response_coverage_basis_points: Option<u16>,
     pub passed: bool,
 }
 
@@ -339,15 +349,39 @@ pub fn validate_ensemble_groove(
                 format!("unknown layer {}", constraint.right_layer_id),
             ));
         }
-        if let GrooveConstraintKindV1::MinimumCircularSeparation { minimum_ticks } =
-            constraint.rule
-        {
-            if minimum_ticks == 0 || minimum_ticks as u64 > supercycle / 2 {
-                issues.push(issue(
-                    "invalid_minimum_separation",
-                    format!("{path}.rule.minimum_ticks"),
-                    "minimum separation must be positive and no greater than half the supercycle",
-                ));
+        match constraint.rule {
+            GrooveConstraintKindV1::NoCoincidentAttacks => {}
+            GrooveConstraintKindV1::MinimumCircularSeparation { minimum_ticks } => {
+                if minimum_ticks == 0 || minimum_ticks as u64 > supercycle / 2 {
+                    issues.push(issue(
+                        "invalid_minimum_separation",
+                        format!("{path}.rule.minimum_ticks"),
+                        "minimum separation must be positive and no greater than half the supercycle",
+                    ));
+                }
+            }
+            GrooveConstraintKindV1::CallResponseWithinWindow {
+                minimum_delay_ticks,
+                maximum_delay_ticks,
+                minimum_coverage_basis_points,
+            } => {
+                if minimum_delay_ticks == 0
+                    || maximum_delay_ticks < minimum_delay_ticks
+                    || maximum_delay_ticks as u64 >= supercycle
+                {
+                    issues.push(issue(
+                        "invalid_call_response_window",
+                        format!("{path}.rule"),
+                        "call/response delay window must be positive, ordered and shorter than the supercycle",
+                    ));
+                }
+                if minimum_coverage_basis_points > 10_000 {
+                    issues.push(issue(
+                        "invalid_response_coverage",
+                        format!("{path}.rule.minimum_coverage_basis_points"),
+                        "response coverage threshold must be in [0, 10000]",
+                    ));
+                }
             }
         }
     }
@@ -428,6 +462,16 @@ pub fn analyze_ensemble_groove(
 
     let mut constraint_results = Vec::with_capacity(groove.constraints.len());
     for constraint in &groove.constraints {
+        let left_index = groove
+            .layers
+            .iter()
+            .position(|layer| layer.id == constraint.left_layer_id)
+            .expect("left constraint layer was validated");
+        let right_index = groove
+            .layers
+            .iter()
+            .position(|layer| layer.id == constraint.right_layer_id)
+            .expect("right constraint layer was validated");
         let pair = pair_analyses
             .iter()
             .find(|pair| {
@@ -437,6 +481,20 @@ pub fn analyze_ensemble_groove(
                         && pair.right_layer_id == constraint.left_layer_id)
             })
             .expect("constraint layers were validated and all layer pairs are analyzed");
+        let response = match constraint.rule {
+            GrooveConstraintKindV1::CallResponseWithinWindow {
+                minimum_delay_ticks,
+                maximum_delay_ticks,
+                ..
+            } => response_coverage(
+                &materialized[left_index],
+                &materialized[right_index],
+                supercycle_ticks,
+                minimum_delay_ticks as u64,
+                maximum_delay_ticks as u64,
+            ),
+            _ => None,
+        };
         let passed = match constraint.rule {
             GrooveConstraintKindV1::NoCoincidentAttacks => {
                 pair.coincident_attack_pairs == 0
@@ -444,6 +502,11 @@ pub fn analyze_ensemble_groove(
             GrooveConstraintKindV1::MinimumCircularSeparation { minimum_ticks } => pair
                 .minimum_circular_separation_ticks
                 .is_some_and(|observed| observed >= minimum_ticks as u64),
+            GrooveConstraintKindV1::CallResponseWithinWindow {
+                minimum_coverage_basis_points,
+                ..
+            } => response
+                .is_some_and(|(_, coverage)| coverage >= minimum_coverage_basis_points),
         };
         constraint_results.push(GrooveConstraintResultV1 {
             left_layer_id: constraint.left_layer_id.clone(),
@@ -451,6 +514,8 @@ pub fn analyze_ensemble_groove(
             rule: constraint.rule,
             observed_coincident_pairs: pair.coincident_attack_pairs,
             observed_minimum_separation_ticks: pair.minimum_circular_separation_ticks,
+            calls_with_response: response.map(|(count, _)| count),
+            response_coverage_basis_points: response.map(|(_, coverage)| coverage),
             passed,
         });
     }
@@ -520,6 +585,33 @@ fn analyze_pair(
         },
         minimum_circular_separation_ticks: minimum_separation,
     }
+}
+
+fn response_coverage(
+    calls: &[(u64, u8)],
+    responses: &[(u64, u8)],
+    horizon: u64,
+    minimum_delay: u64,
+    maximum_delay: u64,
+) -> Option<(u64, u16)> {
+    if calls.is_empty() {
+        return None;
+    }
+    let responded = calls
+        .iter()
+        .filter(|(call_onset, _)| {
+            responses.iter().any(|(response_onset, _)| {
+                let delay = if response_onset >= call_onset {
+                    response_onset - call_onset
+                } else {
+                    horizon - (call_onset - response_onset)
+                };
+                delay >= minimum_delay && delay <= maximum_delay
+            })
+        })
+        .count() as u64;
+    let coverage = (responded.saturating_mul(10_000) / calls.len() as u64) as u16;
+    Some((responded, coverage))
 }
 
 fn checked_lcm(left: u64, right: u64) -> Option<u64> {
@@ -729,5 +821,62 @@ mod tests {
         let report = analyze_ensemble_groove(&groove).unwrap();
         assert!(report.all_constraints_passed);
         assert!(report.pair_analyses[0].coincident_attack_pairs > 0);
+    }
+
+    #[test]
+    fn directed_call_response_is_measured_over_the_full_supercycle() {
+        let mut groove = EnsembleGrooveV1 {
+            schema: ENSEMBLE_GROOVE_SCHEMA_V1.into(),
+            ticks_per_beat: 24,
+            layers: vec![
+                GrooveLayerV1 {
+                    id: "leader".into(),
+                    role: "lead_cue".into(),
+                    cycle_ticks: 96,
+                    events: [0, 32, 64]
+                        .into_iter()
+                        .map(|onset_tick| GrooveEventV1 {
+                            onset_tick,
+                            accent: 3,
+                        })
+                        .collect(),
+                },
+                GrooveLayerV1 {
+                    id: "responder".into(),
+                    role: "response".into(),
+                    cycle_ticks: 96,
+                    events: [4, 36, 80]
+                        .into_iter()
+                        .map(|onset_tick| GrooveEventV1 {
+                            onset_tick,
+                            accent: 2,
+                        })
+                        .collect(),
+                },
+            ],
+            constraints: vec![GrooveConstraintV1 {
+                left_layer_id: "leader".into(),
+                right_layer_id: "responder".into(),
+                rule: GrooveConstraintKindV1::CallResponseWithinWindow {
+                    minimum_delay_ticks: 2,
+                    maximum_delay_ticks: 8,
+                    minimum_coverage_basis_points: 6_000,
+                },
+            }],
+        };
+        let report = analyze_ensemble_groove(&groove).unwrap();
+        let result = &report.constraint_results[0];
+        assert_eq!(result.calls_with_response, Some(2));
+        assert_eq!(result.response_coverage_basis_points, Some(6_666));
+        assert!(result.passed);
+
+        groove.constraints[0].rule =
+            GrooveConstraintKindV1::CallResponseWithinWindow {
+                minimum_delay_ticks: 2,
+                maximum_delay_ticks: 8,
+                minimum_coverage_basis_points: 7_000,
+            };
+        let report = analyze_ensemble_groove(&groove).unwrap();
+        assert!(!report.constraint_results[0].passed);
     }
 }
