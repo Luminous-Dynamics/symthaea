@@ -42,14 +42,16 @@ This is a nested Cargo workspace and is intentionally not part of the root works
 The scene fixture now carries a typed `follow_target_context` that records the consumer profile, disposition, evidence-source reference, scenario/actor identity, coordinate frame, observation time, maximum age, gap, relative speed and distance uncertainty.
 
 The checker enforces:
-- `simulation_benchmark` may use only a current, scenario-matched `simulator_oracle` source.
-- `local_perception` and `deployment` require a current `local_sensor_observation` measurement; simulator oracle data cannot satisfy this profile.
+- `simulation_benchmark` links an exact simulator-oracle source to a `simulator_truth_actor_states` actor under the same scenario, frame and acquisition tick.
+- `local_perception` can exercise the adapter with an explicitly synthetic or current local sensor observation, but must link the reference to an object hypothesis and the source must appear in that hypothesis's own provenance.
+- `deployment` rejects synthetic sources and requires a current camera/LiDAR/radar/ultrasonic local sensor measurement linked to a tracked object hypothesis.
 - `remote_cooperative_claim` is never a Follow-target source. A signature or V2X claim does not become a local lead track.
-- The source frame must resolve and match the Follow context frame.
-- The observation tick must match the admitted source acquisition tick under the exact scene clock and clock-transform identity; age is bounded by the declared maximum.
-- `unknown` / `rejected` status must carry no source reference or numeric fallback. Missing local tracks do not silently fall back to oracle or remote peer distance.
+- Actor/track ID, source ID, frame, scenario and observation tick must resolve and agree.
+- The v0.1 Follow calculation is restricted to a local-road frame with x forward. The checker recomputes gap and relative speed from the linked target and ego states; mismatched free-floating scalars reject.
+- Observation time must match the source acquisition time under the exact scene clock and clock-transform identity; age is bounded by the declared maximum.
+- `unknown` / `rejected` status carries no source, actor reference or numeric fallback. Missing local tracks do not silently fall back to oracle or remote peer distance.
 
-This is a contract checker, not an implementation of a local object tracker or production vehicle controller. The synthetic local-lidar source is a conformance vector, not physical sensor qualification.
+This is a contract checker, not an implementation of a local object tracker or production vehicle controller. The synthetic local-lidar source exercises local-perception conformance only and is rejected for deployment; it is not physical sensor qualification.
 
 ## Traffic convention / mirror benchmark
 
