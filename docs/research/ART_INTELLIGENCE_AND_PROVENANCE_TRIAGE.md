@@ -81,6 +81,27 @@ Do not random-split image crops or catalogue duplicates as independent examples.
 
 Compare on identical data, candidates, filters, hardware budget, and rights permissions. Separate frozen pretrained embeddings from fine-tuned models.
 
+### External cultural-RAG benchmark anchors (2026)
+
+Use these as complementary comparators, not as substitutes for artwork-specific, rights-cleared evaluation:
+
+- **RAVENEA (ICLR 2026)** evaluates culture-focused visual QA and culture-informed image captioning. It integrates 11,396+ human-curated/ranked Wikipedia documents and compares seven multimodal retrievers with fifteen VLMs. The paper reports average downstream improvements of roughly +6% on cVQA and +11% on culture-informed captioning when using culture-aware retrieval augmentation, but also reports large performance variation across countries. This supports retrieval-grounded explanations and country-held-out evaluation, not the assumption that one culture label or corpus represents a community. [Paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/1f2dbafda518a76a57381548453f337a-Abstract-Conference.html).
+- **M4-RAG (CVPR 2026)** covers 42 languages, 56 regional dialects/registers, 189 countries and 80,000+ culturally diverse image-question pairs. Its reported results caution that RAG benefits do not necessarily scale with VLM size; retrieval can degrade larger models, and non-English prompts/context remain a weakness. Evaluate retrieval-on versus retrieval-off per model, language and task. [Paper and benchmark](https://openaccess.thecvf.com/content/CVPR2026/html/Anugraha_M4-RAG_A_Massive-Scale_Multilingual_Multi-Cultural_Multimodal_RAG_CVPR_2026_paper.html).
+- A current public RAVENEA retrieval leaderboard snapshot reports MRR 82.17 for fine-tuned Ravenea-CLIP and 75.44 for frozen CLIP-L/14; fine-tuned SigLIP2-SO/14 reports 70.95 versus 68.62 frozen. Treat these as leaderboard-specific reference points, not official end-to-end art-discovery results, and reproduce the exact split/protocol before using them as a comparison. [Leaderboard snapshot](https://www.sota2.com/research/sota/multimodal-retrieval-on-ravenea-test).
+
+The resulting benchmark design should include:
+- retrieval-on/retrieval-off comparisons for every VLM and task, with per-language/per-region deltas;
+- country- and institution-held-out tests plus language-held-out and dialect/register-held-out tests;
+- curator/artist/community-created relevance judgments with explicit disagreement and an appeals/correction process;
+- evidence-sufficiency tests: when retrieved material is irrelevant, contradictory, outdated, or silent, the answer should abstain or clearly state the gap;
+- source-grounding accuracy, citation support, contradiction preservation and provenance leakage tests;
+- rights filtering before retrieval, before ranking, before snippet construction and before model context assembly;
+- separate reporting for historical fact retrieval, visual resemblance, cultural interpretation and contemporary community knowledge.
+
+For the South African pilot, include multilingual query and annotation slices for Afrikaans, isiZulu, isiXhosa and Sesotho where artists and community reviewers choose the vocabulary and evaluation rubric. Language coverage must not be represented as cultural competence by itself.
+
+A key paradigm shift is **conditional, evidence-sensitive retrieval**: retrieve only when it improves the task under matched evaluation; do not inject context indiscriminately. Symthaea should measure when retrieval helps, when it harms, when sources disagree, and when the available evidence is insufficient.
+
 ### Retrieval metrics
 - Recall@1/5/10/50;
 - nDCG@5/10/20;
