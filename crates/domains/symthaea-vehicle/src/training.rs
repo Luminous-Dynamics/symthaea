@@ -1793,7 +1793,8 @@ mod tests {
         let teacher_delta = ((supervised.student_proposal_steering
             - supervised.teacher_target_steering.unwrap())
         .abs()
-            + (supervised.student_proposal_throttle - supervised.teacher_target_throttle.unwrap()).abs()
+            + (supervised.student_proposal_throttle - supervised.teacher_target_throttle.unwrap())
+                .abs()
             + (supervised.student_proposal_brake - supervised.teacher_target_brake.unwrap()).abs())
             / 3.0;
         assert!(
