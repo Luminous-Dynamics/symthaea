@@ -453,6 +453,11 @@ fn validate_correlated_inputs(
         }
     }
 
+    let total_weight = scenarios.iter().map(|scenario| scenario.weight).sum::<f64>();
+    if !total_weight.is_finite() || total_weight <= 0.0 {
+        return Err(BudgetedDesignError::NumericalOverflow);
+    }
+
     Ok(dimension)
 }
 
@@ -886,6 +891,32 @@ mod tests {
             Err(BudgetedDesignError::MeasurementCovarianceNotPositiveDefinite { .. })
         ));
 
+        let asymmetric = vec![scenario(
+            vec![vec![1.0, 0.1], vec![0.2, 1.0]],
+            vec![vec![1.0], vec![1.0]],
+        )];
+        assert!(matches!(
+            greedy_correlated_budgeted_design(
+                &asymmetric,
+                &[option("both", 1.0, vec![0, 1])],
+                &config(1.0, 1)
+            ),
+            Err(BudgetedDesignError::InvalidMeasurementCovarianceSymmetry { .. })
+        ));
+
+        let non_finite = vec![scenario(
+            vec![vec![1.0, f64::NAN], vec![f64::NAN, 1.0]],
+            vec![vec![1.0], vec![1.0]],
+        )];
+        assert!(matches!(
+            greedy_correlated_budgeted_design(
+                &non_finite,
+                &[option("both", 1.0, vec![0, 1])],
+                &config(1.0, 1)
+            ),
+            Err(BudgetedDesignError::NumericalOverflow)
+        ));
+
         let valid = vec![scenario(
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
             vec![vec![1.0], vec![1.0]],
@@ -897,6 +928,14 @@ mod tests {
         assert!(matches!(
             evaluate_correlated_selection(&valid, &duplicate, &[0, 1], &config(2.0, 1), 1),
             Err(BudgetedDesignError::DuplicateSelectedMeasurement { .. })
+        ));
+        assert!(matches!(
+            validate_correlated_inputs(
+                &valid,
+                &[option("out-of-range", 1.0, vec![2])],
+                &config(1.0, 1)
+            ),
+            Err(BudgetedDesignError::MeasurementIndexOutOfRange { .. })
         ));
     }
 
