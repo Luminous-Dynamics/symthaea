@@ -1837,12 +1837,20 @@ mod tests {
             ContinuousHVGroupEnvelope::from_original_members(20, 3, &middle_members).unwrap(),
             ContinuousHVGroupEnvelope::from_original_members(20, 3, &low_members).unwrap(),
         ];
+        let partition_receipt =
+            GroupPartitionCoverageReceipt::from_group_envelopes(&envelopes).unwrap();
         let group_records: Vec<GroupScoreIntervalRecord> = envelopes
             .iter()
             .map(|envelope| build_group_record(envelope, &query))
             .collect();
         let coverage = complete_group_coverage(&group_records);
-        let group_plan = select_group_refinement_set(&group_records, 2, coverage).unwrap();
+        let group_plan = select_group_refinement_set_with_partition_receipt(
+            &group_records,
+            2,
+            coverage,
+            &partition_receipt,
+        )
+        .unwrap();
 
         assert!(group_plan.refinement_groups.contains(&group_records[0].identity));
         assert!(group_plan.refinement_groups.contains(&group_records[1].identity));
@@ -1880,11 +1888,12 @@ mod tests {
             }
         }
 
-        let plan = select_hierarchical_refinement_set(
+        let plan = select_hierarchical_refinement_set_with_partition_receipt(
             &group_records,
             &member_records,
             2,
             coverage,
+            &partition_receipt,
         )
         .unwrap();
         assert_eq!(plan.group_plan, group_plan);
@@ -1986,15 +1995,18 @@ mod tests {
                     .unwrap()
                 })
                 .collect();
+            let partition_receipt =
+                GroupPartitionCoverageReceipt::from_group_envelopes(&envelopes).unwrap();
             let groups: Vec<GroupScoreIntervalRecord> = envelopes
                 .iter()
                 .map(|envelope| build_group_record(envelope, &query))
                 .collect();
             let coverage = complete_group_coverage(&groups);
-            let group_plan = select_group_refinement_set(
+            let group_plan = select_group_refinement_set_with_partition_receipt(
                 &groups,
                 top_k.min(total_members),
                 coverage,
+                &partition_receipt,
             )
             .unwrap();
             let selected: BTreeSet<GroupScoreIntervalIdentity> =
@@ -2030,11 +2042,12 @@ mod tests {
             }
 
             let k = top_k.min(total_members);
-            let plan = select_hierarchical_refinement_set(
+            let plan = select_hierarchical_refinement_set_with_partition_receipt(
                 &groups,
                 &member_records,
                 k,
                 coverage,
+                &partition_receipt,
             )
             .unwrap();
 
@@ -2295,6 +2308,75 @@ mod tests {
         assert!(matches!(
             select_group_refinement_set(&duplicate, 1, complete_group_coverage(&duplicate)),
             Err(GroupIntervalSelectionError::DuplicateGroupId { .. })
+        ));
+    }
+
+    #[test]
+    fn build_time_partition_receipt_rejects_overlap_and_matches_fast_query_path() {
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let shared = ContinuousHV::from_vec(vec![0.8; 8]);
+        let first_members = vec![
+            ("shared".to_owned(), shared.clone()),
+            ("first-only".to_owned(), ContinuousHV::from_vec(vec![0.7; 8])),
+        ];
+        let second_members = vec![
+            ("shared".to_owned(), shared.clone()),
+            ("second-only".to_owned(), ContinuousHV::from_vec(vec![-0.7; 8])),
+        ];
+        let overlapping = vec![
+            ContinuousHVGroupEnvelope::from_original_members(88, 12, &first_members).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(88, 12, &second_members).unwrap(),
+        ];
+        assert!(matches!(
+            GroupPartitionCoverageReceipt::from_group_envelopes(&overlapping),
+            Err(GroupPartitionReceiptError::DuplicateMember {
+                member_id,
+                ..
+            }) if member_id == "shared"
+        ));
+
+        let disjoint = vec![
+            ContinuousHVGroupEnvelope::from_original_members(88, 12, &first_members).unwrap(),
+            ContinuousHVGroupEnvelope::from_original_members(
+                88,
+                12,
+                &[(
+                    "second-only".to_owned(),
+                    ContinuousHV::from_vec(vec![-0.7; 8]),
+                )],
+            )
+            .unwrap(),
+        ];
+        let receipt = GroupPartitionCoverageReceipt::from_group_envelopes(&disjoint).unwrap();
+        let groups: Vec<GroupScoreIntervalRecord> = disjoint
+            .iter()
+            .map(|envelope| build_group_record(envelope, &query))
+            .collect();
+        let coverage = complete_group_coverage(&groups);
+        let fast = select_group_refinement_set_with_partition_receipt(
+            &groups,
+            1,
+            coverage,
+            &receipt,
+        )
+        .unwrap();
+        let defensive = select_group_refinement_set(&groups, 1, coverage).unwrap();
+        assert_eq!(fast, defensive);
+        assert_eq!(receipt.group_count(), 2);
+        assert_eq!(receipt.eligible_records(), 3);
+
+        let mut tampered = groups.clone();
+        tampered[0].identity.content_digest[0] ^= 0x80;
+        assert!(matches!(
+            select_group_refinement_set_with_partition_receipt(
+                &tampered,
+                1,
+                coverage,
+                &receipt,
+            ),
+            Err(GroupIntervalSelectionError::PartitionReceipt(
+                GroupPartitionReceiptError::ReceiptMismatch
+            ))
         ));
     }
 
