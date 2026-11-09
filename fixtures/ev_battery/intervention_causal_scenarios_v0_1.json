@@ -1185,6 +1185,176 @@
         ],
         "parallel_trends_tolerance": 0.5
       }
+    },
+    {
+      "case_id": "lower-is-better-resistance-effect",
+      "expected_disposition": "estimated",
+      "expected_did_effect": 7,
+      "expected_tolerance": 1e-9,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-resistance-reduction",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_dc_resistance",
+        "outcome_unit": "mOhm",
+        "outcome_direction": "lower_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "resistance-matched-1",
+            "matching_profile_digest": "0000000000000000000000000000000000000000000000000000000000000fa0",
+            "treated": {
+              "unit_id": "resistance-treated-1",
+              "vehicle_ref": "vehicle-resistance-treated-1",
+              "pack_ref": "pack-resistance-treated-1",
+              "matching_profile_digest": "0000000000000000000000000000000000000000000000000000000000000fa0",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fa1",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fa2",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fa4",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 62,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fa5",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-resistance-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "0000000000000000000000000000000000000000000000000000000000000fa6"
+              },
+              "pretrend": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fa3",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              }
+            },
+            "comparator": {
+              "unit_id": "resistance-control-1",
+              "vehicle_ref": "vehicle-resistance-control-1",
+              "pack_ref": "pack-resistance-control-1",
+              "matching_profile_digest": "0000000000000000000000000000000000000000000000000000000000000fa0",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fa7",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fa8",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000faa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 69,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fab",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              },
+              "pretrend": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fa9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              }
+            }
+          },
+          {
+            "match_set_id": "resistance-matched-2",
+            "matching_profile_digest": "0000000000000000000000000000000000000000000000000000000000000fac",
+            "treated": {
+              "unit_id": "resistance-treated-2",
+              "vehicle_ref": "vehicle-resistance-treated-2",
+              "pack_ref": "pack-resistance-treated-2",
+              "matching_profile_digest": "0000000000000000000000000000000000000000000000000000000000000fac",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fad",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fae",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fb0",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 63,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fb1",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-resistance-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "0000000000000000000000000000000000000000000000000000000000000fb2"
+              },
+              "pretrend": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000faf",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              }
+            },
+            "comparator": {
+              "unit_id": "resistance-control-2",
+              "vehicle_ref": "vehicle-resistance-control-2",
+              "pack_ref": "pack-resistance-control-2",
+              "matching_profile_digest": "0000000000000000000000000000000000000000000000000000000000000fac",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fb3",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000fb4",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fb6",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fb7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              },
+              "pretrend": {
+                "value": 70,
+                "observation_digest": "0000000000000000000000000000000000000000000000000000000000000fb5",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              }
+            }
+          }
+        ],
+        "parallel_trends_tolerance": 0.5
+      }
     }
   ]
 }
