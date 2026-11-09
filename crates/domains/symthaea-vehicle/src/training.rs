@@ -1828,7 +1828,7 @@ mod tests {
         assert!(
             telemetry
                 .iter()
-                .all(|row| !row.teacher_action_used_for_blend)
+                .all(|row| !row.teacher_action_used_for_blend && !row.teacher_action_evaluation_only)
         );
         assert!(
             telemetry
@@ -1876,16 +1876,24 @@ mod tests {
         assert_eq!(telemetry.len(), 5);
         assert_eq!(controller.output_projection(), original_projection);
         assert!(telemetry.iter().all(|row| {
+            let expected_delta = ((row.student_proposal_steering
+                - row.teacher_target_steering.unwrap())
+            .abs()
+                + (row.student_proposal_throttle - row.teacher_target_throttle.unwrap()).abs()
+                + (row.student_proposal_brake - row.teacher_target_brake.unwrap()).abs())
+                / 3.0;
             !row.training_enabled
                 && !row.teacher_action_used_for_blend
                 && !row.teacher_action_used_for_supervision
                 && !row.follow_oracle_used_for_policy
                 && row.teacher_action_evaluation_only
                 && row.pd_teacher_blend_weight == 0.0
-                && row.teacher_target_steering.is_some()
-                && row.teacher_target_throttle.is_some()
-                && row.teacher_target_brake.is_some()
-                && row.student_teacher_action_delta_l1.is_some()
+                && row.student_teacher_action_delta_l1.is_some_and(|value| {
+                    (value - expected_delta).abs() < 1e-6
+                })
+                && (row.student_proposal_steering - row.blended_action_steering).abs() < 1e-6
+                && (row.student_proposal_throttle - row.blended_action_throttle).abs() < 1e-6
+                && (row.student_proposal_brake - row.blended_action_brake).abs() < 1e-6
                 && (row.executed_action_steering - row.blended_action_steering).abs() < 1e-6
                 && (row.executed_action_throttle - row.blended_action_throttle).abs() < 1e-6
                 && (row.executed_action_brake - row.blended_action_brake).abs() < 1e-6
