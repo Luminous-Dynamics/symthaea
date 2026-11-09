@@ -445,7 +445,13 @@
         "cross_task_regression_rate",
         "trajectory_to_trajectory_repair_variance",
         "qualified_no_op_retention_rate",
-        "accepted_edit_fraction_by_task"
+        "accepted_edit_fraction_by_task",
+        "confirmatory_episode_manifest_digest",
+        "campaign_wide_unique_episode_id_reservation_count",
+        "cross_shard_episode_overlap_rejection_rate",
+        "out_of_manifest_observation_rejection_rate",
+        "manifest_episode_count_covers_maximum_observation_budget",
+        "manifest_to_immutable_shard_provenance_binding"
       ],
       "negative_controls": [
         "no_edit",
@@ -463,7 +469,13 @@
         "multi_trajectory_seeded_replicates",
         "cross_task_holdout_tasks",
         "retain_original_when_unqualified",
-        "edit_that_improves_source_task_but_regresses_protected_task"
+        "edit_that_improves_source_task_but_regresses_protected_task",
+        "same_episode_ids_with_different_shard_digest_rejected",
+        "out_of_manifest_episode_id_fails_before_consuming_budget",
+        "too_short_episode_manifest_fails_before_candidate_ordinal_advances",
+        "episode_reservation_survives_campaign_snapshot_restore",
+        "tampered_manifest_fails_checkpoint_replay",
+        "manifest_uses_canonical_stable_source_record_ids"
       ]
     },
     {
