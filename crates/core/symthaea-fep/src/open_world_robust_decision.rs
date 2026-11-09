@@ -471,9 +471,7 @@ pub fn calibrate_categorical_tv_radius_from_counts(
     let per_category_absolute_error_bound = if category_count == 1 {
         0.0
     } else {
-        (((2.0 * category_count as f64).ln() - alpha.ln())
-            / (2.0 * sample_count as f64))
-            .sqrt()
+        (((2.0 * category_count as f64).ln() - alpha.ln()) / (2.0 * sample_count as f64)).sqrt()
     };
     let total_variation_radius =
         (0.5 * category_count as f64 * per_category_absolute_error_bound).min(1.0);
@@ -1117,12 +1115,9 @@ mod tests {
             prior_weight: 1.0,
             predicted_outcome_probabilities: vec![vec![0.5, 0.5]],
         };
-        let report = evaluate_prequential_e_process(
-            &observations,
-            &[alternative],
-            f64::from_bits(1),
-        )
-        .expect("subnormal but valid alpha");
+        let report =
+            evaluate_prequential_e_process(&observations, &[alternative], f64::from_bits(1))
+                .expect("subnormal but valid alpha");
         assert!(report.log_e_threshold.is_finite());
         assert!((report.log_e_threshold + f64::from_bits(1).ln()).abs() < 1e-12);
     }
@@ -1167,11 +1162,9 @@ mod tests {
 
     #[test]
     fn categorical_tv_calibration_matches_the_declared_hoeffding_bound() {
-        let calibration =
-            calibrate_categorical_tv_radius_from_counts(&[25, 25], 0.05)
-                .expect("valid independent calibration counts");
-        let expected_coordinate_bound =
-            ((2.0 * 2.0_f64 / 0.05).ln() / (2.0 * 50.0)).sqrt();
+        let calibration = calibrate_categorical_tv_radius_from_counts(&[25, 25], 0.05)
+            .expect("valid independent calibration counts");
+        let expected_coordinate_bound = ((2.0 * 2.0_f64 / 0.05).ln() / (2.0 * 50.0)).sqrt();
         assert_eq!(calibration.sample_count, 50);
         assert_eq!(calibration.confidence_level, 0.95);
         assert_eq!(calibration.empirical_probabilities, vec![0.5, 0.5]);
@@ -1179,9 +1172,7 @@ mod tests {
             (calibration.per_category_absolute_error_bound - expected_coordinate_bound).abs()
                 < 1e-12
         );
-        assert!(
-            (calibration.total_variation_radius - expected_coordinate_bound).abs() < 1e-12
-        );
+        assert!((calibration.total_variation_radius - expected_coordinate_bound).abs() < 1e-12);
     }
 
     #[test]
