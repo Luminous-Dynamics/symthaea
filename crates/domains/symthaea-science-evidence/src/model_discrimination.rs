@@ -1949,8 +1949,8 @@ mod tests {
 
         // Independent direct joint likelihood integral over (D=0) and
         // (D=1, Y=y), rather than reusing the conditional-EIG decomposition.
-        let prior = [0.5, 0.5];
-        let detection = [0.8, 0.25];
+        let prior = [0.5_f64, 0.5];
+        let detection = [0.8_f64, 0.25];
         let means = [-0.7, 0.9];
         let sigmas = [0.1_f64.hypot(0.1), 0.2_f64.hypot(0.1)];
         let q_bar = prior[0] * detection[0] + prior[1] * detection[1];
