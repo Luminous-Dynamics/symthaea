@@ -23,6 +23,7 @@ on:
       - "docs/research/dtc-phase-rigidity-benchmark-v0.1.md"
       - "docs/research/dtc-quantum-sensing-benchmark-v0.1.md"
       - "docs/research/uap-asynchronous-trajectory-observability-v0.1.md"
+      - "docs/research/uap-model-dependent-detection-eig-v0.1.md"
       - "docs/research/uap-hypothesis-discriminating-active-design-v0.1.md"
       - "docs/research/global-identifiability-benchmark-v0.1.md"
       - "docs/research/curved-causal-set-order-inference-v0.1.md"
