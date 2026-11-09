@@ -167,8 +167,7 @@ fn run() -> Result<(), String> {
         truth,
     )?;
     let out_of_catalogue = run_open_support_arm(&executable, &strategy)?;
-    let equivalent_out_of_catalogue =
-        run_equivalent_open_support_arm(&executable, &strategy)?;
+    let equivalent_out_of_catalogue = run_equivalent_open_support_arm(&executable, &strategy)?;
 
     for (label, score) in [("a0", &a0.evaluator_score), ("a2", &a2.evaluator_score)] {
         if !score.generating_model_in_version_space
@@ -221,7 +220,9 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    if equivalent_out_of_catalogue.evaluator_score.generating_model_in_version_space
+    if equivalent_out_of_catalogue
+        .evaluator_score
+        .generating_model_in_version_space
         || !equivalent_out_of_catalogue
             .evaluator_score
             .generating_truth_behaviorally_represented
@@ -247,14 +248,24 @@ fn run() -> Result<(), String> {
     {
         return Err(format!(
             "equivalent out-of-catalogue control failed: exact_truth={}, behavioral_representation={}, oracle_models={}, exact_set={}, decision_correct={}, evidence_refs={}, probes={}",
-            equivalent_out_of_catalogue.evaluator_score.generating_model_in_version_space,
+            equivalent_out_of_catalogue
+                .evaluator_score
+                .generating_model_in_version_space,
             equivalent_out_of_catalogue
                 .evaluator_score
                 .generating_truth_behaviorally_represented,
-            equivalent_out_of_catalogue.evaluator_score.set_score.oracle_model_count,
-            equivalent_out_of_catalogue.evaluator_score.set_score.exact_version_space_match,
+            equivalent_out_of_catalogue
+                .evaluator_score
+                .set_score
+                .oracle_model_count,
+            equivalent_out_of_catalogue
+                .evaluator_score
+                .set_score
+                .exact_version_space_match,
             equivalent_out_of_catalogue.evaluator_score.decision_correct,
-            equivalent_out_of_catalogue.evaluator_score.evidence_references_valid,
+            equivalent_out_of_catalogue
+                .evaluator_score
+                .evidence_references_valid,
             equivalent_out_of_catalogue.evaluator_score.probe_count
         ));
     }
@@ -266,7 +277,9 @@ fn run() -> Result<(), String> {
         || a0.agent.arguments != out_of_catalogue.agent.arguments
         || a0.agent.arguments != equivalent_out_of_catalogue.agent.arguments
     {
-        return Err("paired process episodes used different agent artifacts or arguments".to_owned());
+        return Err(
+            "paired process episodes used different agent artifacts or arguments".to_owned(),
+        );
     }
 
     let report = PairedProcessSmokeReport {
