@@ -161,6 +161,12 @@ Compare:
 Do not implement another general scheduler or probe selector in this lane. Use #8286 for experimental actions, #5476/#5478/#8721 for VoC and #11012 for generic fixed-versus-adaptive orchestration.
 
 ## 5. Version-space and utility discipline
+### Exact truth versus behavioral support
+
+Report exact generating-parameter membership separately from observational representation. For the current numeric microcosm, behavioral representation is defined narrowly by equality of output signatures over every length-4 intervention sequence in the finite input alphabet {-1,0,1} (81 sequences). This makes the gain-4 / identity-sensor versus gain-2 / double-sensor equivalence test executable and deterministic.
+
+The finite signature check is a bounded equivalence oracle for that declared world and horizon, not proof that two functions agree for all real inputs, arbitrary lengths, unrepresented state histories or other domains. Longer-horizon and continuous-domain equivalence require a separate proof, symbolic normalization, interval/SMT checks or held-out intervention coverage as appropriate. Report exact parameter membership, bounded behavioral representation and structural-family identification as three separate outcomes.
+
 
 A finite grammar can have many syntactic parameterizations of one functional mechanism. Scoring and experiment selection must operate on the correct target level:
 
