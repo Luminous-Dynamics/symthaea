@@ -26,9 +26,16 @@ NotYetEffectiveAtTarget; it must not be described as a realized current fact.
   before the decision frontier.
 
 The implementation rejects future-known evidence, identity mismatches, impossible retrieval
-ordering, wrong rights profiles, denied rights and malformed revision ancestry. It retains
+ordering, wrong rights profiles, denied rights and malformed revision ancestry. Superseding
+versions must have a strictly later known-at instant than their predecessors. It retains
 older versions while identifying which admitted version supersedes them at the chosen
 frontier. It counts unique provenance-family identifiers rather than documents; that count is not proof that the underlying sources are actually independent.
+
+`Disposition::Pass` means only that the supplied version passes the declared temporal,
+identity, rights and proof-input checks. It does not mean the fact is true, relevant to the
+requested period, independently corroborated, or sufficient to support an analytical claim.
+Inspect `ValidityState` and reason codes separately; claim support and source-family
+independence belong to higher-level verifiers.
 
 ## Timestamp precision
 
