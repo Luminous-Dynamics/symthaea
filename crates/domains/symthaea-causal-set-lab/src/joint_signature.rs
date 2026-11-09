@@ -195,7 +195,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn 1p1_signature_contains_profile_and_scaled_chain_without_duplicate_fraction() {
+    fn one_plus_one_signature_contains_profile_and_scaled_chain_without_duplicate_fraction() {
         let causet = CausalSet2D::sprinkle_fixed_cardinality(0x51A7, 256, 2.0).unwrap();
         let signature = JointCausalSetSignature::from_causal_set_1p1(&causet, 8).unwrap();
 
