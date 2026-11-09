@@ -585,4 +585,26 @@ mod tests {
     fn trailing_json_data_is_rejected() {
         assert!(parse_unique_json(br#"{"a":1} {}"#, "policy run").is_err());
     }
+
+    #[test]
+    fn always_abstain_control_has_zero_coverage_despite_perfect_readiness_claims() {
+        let (agent, grader) = agent_and_grader();
+        let submission = json!({
+            "schema_version":"0.1.0",
+            "dataset_id":"rea-proof-obligation-acquisition",
+            "policy_id":"always-abstain-control-v0",
+            "cases":agent["cases"].as_array().unwrap().iter().map(|case| json!({
+                "case_id":case["case_id"],
+                "selected_experiment_id":"abstain",
+                "claimed_ready_before_action":false
+            })).collect::<Vec<_>>()
+        });
+        let report = score_policy_submission(&agent, &grader, &submission).unwrap();
+        assert_eq!(report["coverage_rate"], 0.0);
+        assert_eq!(report["abstained_count"], 18);
+        assert_eq!(report["readiness_claim_accuracy"], 1.0);
+        assert_eq!(report["false_ready_count"], 0);
+        assert_eq!(report["abstention_when_safe_obligation_update_available_count"], 17);
+    }
+
 }
