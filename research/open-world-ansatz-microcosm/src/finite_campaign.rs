@@ -143,11 +143,7 @@ impl ArmAggregate {
         }
     }
 
-    fn record(
-        &mut self,
-        score: &EvaluatorScore,
-        work: crate::strategies::ProbeScoringWork,
-    ) {
+    fn record(&mut self, score: &EvaluatorScore, work: crate::strategies::ProbeScoringWork) {
         self.episodes += 1;
         self.exact_version_space_matches += bool_count(score.set_score.exact_version_space_match);
         self.exact_structure_set_matches +=
@@ -390,12 +386,11 @@ impl PairedArmContrast {
         self.a2_minus_a0_probe_actions += a2.probe_count as i64 - a0.probe_count as i64;
         self.a0_legal_probe_actions_scored += pair.a0_probe_work.legal_actions_scored;
         self.a2_legal_probe_actions_scored += pair.a2_probe_work.legal_actions_scored;
-        self.a2_minus_a0_legal_probe_actions_scored += pair.a2_probe_work.legal_actions_scored as i64
-            - pair.a0_probe_work.legal_actions_scored as i64;
-        self.a0_model_prediction_evaluations +=
-            pair.a0_probe_work.model_prediction_evaluations;
-        self.a2_model_prediction_evaluations +=
-            pair.a2_probe_work.model_prediction_evaluations;
+        self.a2_minus_a0_legal_probe_actions_scored +=
+            pair.a2_probe_work.legal_actions_scored as i64
+                - pair.a0_probe_work.legal_actions_scored as i64;
+        self.a0_model_prediction_evaluations += pair.a0_probe_work.model_prediction_evaluations;
+        self.a2_model_prediction_evaluations += pair.a2_probe_work.model_prediction_evaluations;
         self.a2_minus_a0_model_prediction_evaluations +=
             pair.a2_probe_work.model_prediction_evaluations as i64
                 - pair.a0_probe_work.model_prediction_evaluations as i64;
@@ -723,10 +718,8 @@ mod tests {
             sensor: numeric::SensorMap::Identity,
         });
         let policy = policies()[4];
-        let (a0, work_a0) =
-            run_arm(truth, CampaignArm::A0, policy, 6, "paired-smoke-a0").unwrap();
-        let (a2, work_a2) =
-            run_arm(truth, CampaignArm::A2, policy, 6, "paired-smoke-a2").unwrap();
+        let (a0, work_a0) = run_arm(truth, CampaignArm::A0, policy, 6, "paired-smoke-a0").unwrap();
+        let (a2, work_a2) = run_arm(truth, CampaignArm::A2, policy, 6, "paired-smoke-a2").unwrap();
 
         assert!(a0.generating_model_in_version_space);
         assert!(a2.generating_model_in_version_space);
@@ -790,7 +783,10 @@ mod tests {
             observed_evidence_count: 1,
             probe_count: 1,
         };
-        aggregate.record(&false_unique, crate::strategies::ProbeScoringWork::default());
+        aggregate.record(
+            &false_unique,
+            crate::strategies::ProbeScoringWork::default(),
+        );
 
         let missed = EvaluatorScore {
             structure_score: StructureScore {
@@ -803,7 +799,10 @@ mod tests {
             },
             ..false_unique.clone()
         };
-        aggregate.record(&missed, crate::strategies::ProbeScoringWork::default());
+        aggregate.record(
+            &missed,
+            crate::strategies::ProbeScoringWork::default(),
+        );
 
         let correct = EvaluatorScore {
             structure_score: StructureScore {
@@ -816,7 +815,10 @@ mod tests {
             },
             ..false_unique
         };
-        aggregate.record(&correct, crate::strategies::ProbeScoringWork::default());
+        aggregate.record(
+            &correct,
+            crate::strategies::ProbeScoringWork::default(),
+        );
 
         // The claimed parameterized-model set has two members in all
         // three fixtures. Structural singleton claims are scored separately.
