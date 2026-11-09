@@ -1,0 +1,48 @@
+name: Vocal causal-control evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-control-eval/**"
+      - ".github/workflows/vocal-control-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  control-evaluation-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_CONTROL_EVAL_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format standalone evaluator
+        run: cargo +1.96.0 fmt --manifest-path tools/vocal-control-eval/Cargo.toml -- --check
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-control-eval/Cargo.toml
+
+      - name: Test causal intervention and provenance contract
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-control-eval/Cargo.toml
+
+      - name: Confirm exact source revision
+        run: test "$(git rev-parse HEAD)" = "$VOCAL_CONTROL_EVAL_REVISION"
