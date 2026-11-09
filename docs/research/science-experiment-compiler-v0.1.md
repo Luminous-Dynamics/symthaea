@@ -32,6 +32,28 @@ The review makes a point that is central to this workstream: three popular desig
 
 This measures expected uncertainty reduction about a discrete model label under the declared prior and predictive distributions.
 
+### A.1 Measurement availability and missingness
+
+Each candidate declares a measurement availability probability `q_e` in [0,1].
+The initial decision model makes one explicit simplifying assumption: a
+missing measurement is uninformative about model identity. Under that
+assumption,
+
+    I_expected(M; outcome | e) = q_e * I(M; Y | usable observation, e)
+
+    E[H(M | outcome, e)] = H(M) - q_e * I(M; Y | usable observation, e)
+
+The implementation retains conditional EIG, availability-adjusted EIG and
+expected posterior entropy separately for every prior scenario. Candidate
+ranking by cost uses availability-adjusted EIG per cost; a zero-availability
+candidate remains visible with its conditional EIG but has zero expected
+information.
+
+This scalar multiplier is not a general missing-data model. Occlusion,
+non-detection, sensor-health state, radar cross-section and visibility may
+themselves carry information. Such outcomes must be included explicitly in a
+future predictive likelihood rather than treated as uninformative dropout.
+
 ### B. Expected predictive discrepancy
 
 For a data-generating model i and alternative j, an example is:
@@ -140,6 +162,15 @@ It reports equal-weight named-model accuracy, prior-weighted named-model accurac
 
 The harness is capped at one million total draws and requires a fully comparable, calibrated scalar Gaussian experiment. It does not simulate fitting model parameters, non-Gaussian/vector/correlated measurements or physical observations. Its accuracy is conditional on the provided synthetic generator family and frozen classifier; it is not an estimate of real-world theory truth.
 
+The recovery simulator uses the same `availability_probability` as the EIG
+scorer. A draw with no usable observation enters the confusion matrix's
+abstention column, remains in the named-model accuracy/coverage denominator,
+and increments a separate unavailable-observation count for that generator.
+Recovery metrics are therefore end-to-end under the declared availability
+model rather than conditionally assuming every sensor read succeeds. The v0.1
+assumption still treats non-detection as uninformative; if non-detection has a
+physical likelihood, the outcome model must be extended.
+
 The executable `model_recovery_reference` is now registered in the science-evidence crate and run by the CTGP workflow. It complements rather than replaces EIG and KL.
 
 ## 6. Benchmark matrix
@@ -218,7 +249,9 @@ No headline composite metric may hide failed comparability, false confident sele
 
 ## 8. Prospective qualification gates
 
-- Identical predictions yield zero pairwise predictive discrepancy and zero EIG within numerical tolerance.
+- Identical predictions yield zero pairwise predictive discrepancy and zero conditional / availability-adjusted EIG within numerical tolerance.
+- Availability probability is finite and in [0,1]; q=0 preserves prior entropy, q=1 recovers conditional EIG, and intermediate q scales expected EIG.
+- Missing observations are retained as abstentions in end-to-end recovery; they are not discarded from the denominator.
 - The analytic Gaussian special cases match independent high-precision references.
 - Quadrature reports coarse/refined discrepancy, convergence and failure states.
 - EIG, expected KL and model-recovery are never conflated.
