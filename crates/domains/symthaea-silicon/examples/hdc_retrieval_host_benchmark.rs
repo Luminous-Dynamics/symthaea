@@ -177,10 +177,10 @@ fn run() -> Result<(), String> {
     // Warm-up runs are intentionally not part of the measured population.
     for _ in 0..config.warmup {
         for query in &queries {
-            let _ = retrieve_top1(&store, &query.vector);
+            std::hint::black_box(retrieve_top1(&store, &query.vector));
         }
-        let _ = retrieve_batch_store_major(&store, &queries)?;
-        let _ = retrieve_batch_store_major_tiled(&store, &queries, 8)?;
+        std::hint::black_box(retrieve_batch_store_major(&store, &queries)?);
+        std::hint::black_box(retrieve_batch_store_major_tiled(&store, &queries, 8)?);
     }
 
     // A single canonical query-major output vector is the exact parity oracle
@@ -330,26 +330,26 @@ fn run() -> Result<(), String> {
         samples.sort_unstable();
         let arm_scope = format!("complete prebuilt query-batch scan using {arm_name}; canonical BinaryHV::hamming_distance; excludes query/store construction and serialization");
         metrics.push(metric(
-            &format!("{arm_name}_batch_latency_p50"),
+            "latency_p50",
             percentile(&samples, 0.50) as f64,
             "ns",
             "measured",
             &arm_scope,
             samples.len(),
-            "nearest-rank percentile over whole-batch observations",
+            &format!("whole-batch nearest-rank p50 for {arm_name}"),
         ));
         metrics.push(metric(
-            &format!("{arm_name}_batch_latency_p95"),
+            "latency_p95",
             percentile(&samples, 0.95) as f64,
             "ns",
             "measured",
             &arm_scope,
             samples.len(),
-            "nearest-rank percentile over whole-batch observations; exploratory at low sample counts",
+            &format!("whole-batch nearest-rank p95 for {arm_name}; exploratory at low sample counts"),
         ));
         if samples.len() >= 1_000 {
             metrics.push(metric(
-                &format!("{arm_name}_batch_latency_p99"),
+                "latency_p99",
                 percentile(&samples, 0.99) as f64,
                 "ns",
                 "measured",
@@ -362,7 +362,7 @@ fn run() -> Result<(), String> {
         let qps = (config.batch_size * samples.len()) as f64
             / (total_ns as f64 / 1_000_000_000.0);
         metrics.push(metric(
-            &format!("{arm_name}_throughput"),
+            "throughput",
             qps,
             "queries/s",
             "measured",
@@ -371,20 +371,20 @@ fn run() -> Result<(), String> {
             "query count divided by summed batch elapsed time; excludes warm-up",
         ));
         metrics.push(metric(
-            &format!("{arm_name}_parity_mismatches"),
+            "other",
             scan_order_parity_mismatches[arm_index] as f64,
             "count",
             "derived",
-            "number of individual query results that differ from query-major (including length mismatches)",
+            &format!("individual result parity mismatches versus query-major for {arm_name}"),
             samples.len(),
-            "exact tuple equality on (top1 id, Hamming distance)",
+            "exact tuple equality on (top1 ID, Hamming distance)",
         ));
         metrics.push(metric(
-            &format!("{arm_name}_oracle_mismatches"),
+            "other",
             scan_order_oracle_mismatches[arm_index] as f64,
             "count",
             "derived",
-            "number of top1 IDs that differ from the frozen expected target IDs",
+            &format!("top-1 oracle mismatches for {arm_name}"),
             samples.len(),
             "exact ID equality against expected_results.json",
         ));
@@ -399,8 +399,15 @@ fn run() -> Result<(), String> {
         "No malformed hardware frames are applicable to this host-only retrieval run; malformed_frames_accepted is null, not a tested zero.".to_owned(),
         "Command stdout/stderr hashes are not captured by this in-process example; preserve external runner logs with any qualification package.".to_owned(),
     ];
-    let status = if mismatches > 0 {
-        limitations.push("At least one known-target query did not return its declared target as top-1.".to_owned());
+    let scan_order_failed = scan_order_parity_mismatches.iter().any(|count| *count > 0)
+        || scan_order_oracle_mismatches.iter().any(|count| *count > 0);
+    let status = if mismatches > 0 || scan_order_failed {
+        if mismatches > 0 {
+            limitations.push("At least one query-major known-target query did not return its declared target as top-1.".to_owned());
+        }
+        if scan_order_failed {
+            limitations.push("At least one scan-order arm disagreed with query-major or the frozen target oracle.".to_owned());
+        }
         "fail"
     } else {
         "incomplete"
@@ -426,7 +433,7 @@ fn run() -> Result<(), String> {
             "tie_break_policy": "lowest stable vector-store index wins equal Hamming distance",
             "task_quality_metric": "synthetic target top-1 accuracy",
             "task_quality_value": (measured_queries.saturating_sub(mismatches) as f64) / measured_queries as f64,
-            "task_quality_floor": "1.0"
+            "task_quality_floor": 1.0
         },
         "profile": {
             "profile_id": "canonical-rust-binaryhv-host-scan",
