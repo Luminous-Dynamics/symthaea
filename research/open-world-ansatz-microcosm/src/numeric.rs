@@ -577,7 +577,10 @@ pub enum NumericError {
 impl fmt::Display for NumericError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidGain => write!(f, "gain must be within the world-generator range 1..={MAX_WORLD_GAIN}"),
+            Self::InvalidGain => write!(
+                f,
+                "gain must be within the world-generator range 1..={MAX_WORLD_GAIN}"
+            ),
             Self::InvalidParameterBinding => write!(
                 f,
                 "direct models have no decay or initial state; leaky-memory models require both"
@@ -809,12 +812,14 @@ mod tests {
         let log = world.run(&[1]).unwrap();
         assert_eq!(log.measurements, vec![7]);
         assert!(!candidate_models(StructureAccess::Withheld).contains(&out_of_catalogue));
-        assert!(ModelHypothesis {
-            gain: MAX_WORLD_GAIN + 1,
-            ..direct_truth()
-        }
-        .validate()
-        .is_err());
+        assert!(
+            ModelHypothesis {
+                gain: MAX_WORLD_GAIN + 1,
+                ..direct_truth()
+            }
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]
