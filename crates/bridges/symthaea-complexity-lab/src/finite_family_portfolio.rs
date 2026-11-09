@@ -2887,6 +2887,12 @@ pub struct VerifiedPolicyRegretThresholdCover {
     pub discount: CheckedRational,
     pub max_portfolio_size: usize,
     pub optimal_threshold: CheckedRational,
+    /// Immediately preceding exact threshold candidate; None means the
+    /// optimum is the smallest possible candidate.
+    pub previous_threshold_candidate: Option<CheckedRational>,
+    /// True only when the previous candidate was excluded by exact
+    /// monotone feasibility search (or no previous candidate exists).
+    pub predecessor_infeasible: bool,
     pub selected_profile_group_indices: Vec<usize>,
     pub selected_policy_indices: Vec<usize>,
     /// One selected profile group that covers each model at the exact threshold.
@@ -3088,6 +3094,8 @@ fn policy_regret_threshold_cover_sha256(
     discount: CheckedRational,
     max_portfolio_size: usize,
     optimal_threshold: CheckedRational,
+    previous_threshold_candidate: Option<CheckedRational>,
+    predecessor_infeasible: bool,
     selected_profile_group_indices: &[usize],
     selected_policy_indices: &[usize],
     model_covering_profile_group_indices: &[usize],
@@ -3108,6 +3116,14 @@ fn policy_regret_threshold_cover_sha256(
     hash_rational(&mut hasher, discount);
     hasher.update((max_portfolio_size as u64).to_le_bytes());
     hash_rational(&mut hasher, optimal_threshold);
+    match previous_threshold_candidate {
+        Some(previous) => {
+            hasher.update([1u8]);
+            hash_rational(&mut hasher, previous);
+        }
+        None => hasher.update([0u8]),
+    }
+    hasher.update([u8::from(predecessor_infeasible)]);
     for indices in [
         selected_profile_group_indices,
         selected_policy_indices,
@@ -3221,7 +3237,7 @@ pub fn solve_exact_policy_regret_threshold_cover(
     let result_bytes = models.checked_mul(
         std::mem::size_of::<usize>() + std::mem::size_of::<CheckedRational>(),
     ).and_then(|value| value.checked_add(max_portfolio_size.checked_mul(2 * std::mem::size_of::<usize>())?))
-        .and_then(|value| value.checked_add(2 * std::mem::size_of::<Vec<usize>>()))
+        .and_then(|value| value.checked_add(4 * std::mem::size_of::<Vec<usize>>()))
         .and_then(|value| value.checked_add(std::mem::size_of::<VerifiedPolicyRegretThresholdCover>()))
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     let output_bytes = coverage_bytes
@@ -3467,6 +3483,14 @@ pub fn solve_exact_policy_regret_threshold_cover(
 
     let selected_profile_group_indices = selected_profile_group_indices
         .ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
+    let previous_threshold_candidate = if low > 0 {
+        Some(thresholds[low - 1])
+    } else {
+        None
+    };
+    // Binary search maintains: all candidates below low were tested and
+    // proved infeasible. When low == 0 there is no smaller candidate.
+    let predecessor_infeasible = true;
     let mut selected_policy_indices = Vec::new();
     selected_policy_indices.try_reserve_exact(selected_profile_group_indices.len()).map_err(|_| {
         PolicyPortfolioError::AllocationFailed {
@@ -3542,6 +3566,8 @@ pub fn solve_exact_policy_regret_threshold_cover(
         source.discount,
         max_portfolio_size,
         optimal_threshold,
+        previous_threshold_candidate,
+        predecessor_infeasible,
         &selected_profile_group_indices,
         &selected_policy_indices,
         &model_covering_profile_group_indices,
@@ -3562,6 +3588,8 @@ pub fn solve_exact_policy_regret_threshold_cover(
         discount: source.discount,
         max_portfolio_size,
         optimal_threshold,
+        previous_threshold_candidate,
+        predecessor_infeasible,
         selected_profile_group_indices,
         selected_policy_indices,
         model_covering_profile_group_indices,
@@ -3584,6 +3612,8 @@ pub fn solve_exact_policy_regret_threshold_cover(
         result.discount,
         result.max_portfolio_size,
         result.optimal_threshold,
+        result.previous_threshold_candidate,
+        result.predecessor_infeasible,
         &result.selected_profile_group_indices,
         &result.selected_policy_indices,
         &result.model_covering_profile_group_indices,
