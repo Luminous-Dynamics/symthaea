@@ -1,0 +1,19 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
+[package]
+name = "rea-behavior-observation-check"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde_json = "=1.0.150"
+jsonschema = { version = "=0.60.2", default-features = false }
+base64 = "=0.22.1"
+sha2 = "=0.10.9"
