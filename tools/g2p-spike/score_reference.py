@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 STRESS_MARKERS = {"ˈ", "ˌ"}
-PUNCTUATION = {",", ".", ";", ":", "!", "?", "'", '"', "(", ")", "[", "]", "—", "–"}
+PUNCTUATION = {",", ".", ";", ":", "!", "?", "'", '"', "(", ")", "[", "]", "—", "–", "“", "”", "‘", "’", "…", "«", "»", "¿", "¡"}
 
 
 def parse_debug_list(raw: str, *, expected_nested: bool = False) -> list[Any]:
@@ -67,19 +67,46 @@ def split_piper_words(raw: str | list[str]) -> list[list[str]]:
 
 
 def normalize_ipa(tokens: list[str]) -> list[str]:
-    """Flatten token boundaries while preserving IPA code points and length."""
-    phones: list[str] = []
+    """Flatten token boundaries into Unicode code points; do not merge phones."""
+    codepoints: list[str] = []
     for token in tokens:
         if token.isspace() or token in PUNCTUATION or token in STRESS_MARKERS:
             continue
-        if token == "ː":
-            if phones:
-                phones[-1] += "ː"
-            else:
-                phones.append("ː")
-            continue
-        phones.extend(list(token))
-    return phones
+        codepoints.extend(list(token))
+    return codepoints
+
+
+def split_normalized_piper_words(raw_json: str) -> list[list[str]]:
+    """Read the loss-preserving Rust word view; punctuation remains separate."""
+    try:
+        payload = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid normalized Piper hypothesis JSON") from exc
+    if not isinstance(payload, dict) or not isinstance(payload.get("words"), list):
+        raise ValueError("normalized Piper hypothesis must contain a words array")
+
+    words: list[list[str]] = []
+    for expected_index, word in enumerate(payload["words"]):
+        if not isinstance(word, dict) or word.get("word_index") != expected_index:
+            raise ValueError("normalized Piper word indices must be contiguous and zero-based")
+        raw_tokens = word.get("ipa_character_tokens")
+        raw_ipa = word.get("raw_ipa")
+        if (
+            not isinstance(raw_tokens, list)
+            or not all(isinstance(token, str) for token in raw_tokens)
+            or not isinstance(raw_ipa, str)
+        ):
+            raise ValueError(f"normalized Piper word {expected_index} has malformed IPA fields")
+        if "".join(raw_tokens) != raw_ipa:
+            raise ValueError(
+                f"normalized Piper word {expected_index} raw_ipa disagrees with its character tokens"
+            )
+        if len(word.get("character_prosody", [])) != len(raw_tokens):
+            raise ValueError(
+                f"normalized Piper word {expected_index} character/prosody arrays are misaligned"
+            )
+        words.append(raw_tokens)
+    return words
 
 
 def edit_distance(reference: list[str], hypothesis: list[str]) -> int:
@@ -181,14 +208,19 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
     candidate_rows: dict[str, dict[str, list[list[str]]]] = {}
     with candidate_tsv.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
-        required = {"case_id", "piper_ipa_tokens", "muse_word_ipa_tokens"}
+        required = {
+            "case_id",
+            "piper_ipa_tokens",
+            "normalized_word_hypotheses_json",
+            "muse_word_ipa_tokens",
+        }
         if not required.issubset(reader.fieldnames or set()):
             raise ValueError(f"candidate TSV must contain columns: {sorted(required)}")
         for row in reader:
             case_id = row["case_id"]
             if case_id in candidate_rows:
                 raise ValueError(f"duplicate candidate case_id {case_id!r}")
-            piper_words = split_piper_words(row["piper_ipa_tokens"])
+            piper_words = split_normalized_piper_words(row["normalized_word_hypotheses_json"])
             muse_words = parse_debug_list(row["muse_word_ipa_tokens"], expected_nested=True)
             candidate_rows[case_id] = {
                 "piper": piper_words,
@@ -284,7 +316,10 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
         ],
         "method": {
             "unit": "Unicode code point after IPA token-boundary flattening; not canonical phoneme tokens",
-            "stress_markers": "excluded from codepoint edit rate; score stress separately in a future annotation release",
+            "stress_markers": "excluded from codepoint edit rate; raw marker offsets and parallel A1/A2/A3 entries remain in normalized candidate JSON for separate review",
+            "punctuation": "removed from IPA words and retained as separate raw-token evidence with word/character offsets; empty word slots are preserved",
+            "piper_word_source": "normalized_word_hypotheses_json, not reparsed Rust Debug tokens",
+            "codepoint_unit": "all IPA Unicode code points, including length marks, are compared individually; no diacritic/affricate/diphthong segmentation is inferred",
             "multiple_reference_variants": "minimum edit distance among explicitly accepted variants",
             "pending_rows": "excluded from metrics but retained as positional placeholders so later lexical words cannot shift",
             "oov": "non-empty returned IPA codepoint sequence on a reviewed OOV reference is reported as a non-empty-guess rate; this does not imply the G2P engine exposes an OOV classifier",
