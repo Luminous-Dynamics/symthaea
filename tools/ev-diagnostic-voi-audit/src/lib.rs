@@ -214,8 +214,8 @@ fn close_to_one(value: f64) -> bool {
 }
 
 fn schema_validator(schema_bytes: &[u8]) -> Result<Validator, String> {
-    let schema: Value = serde_json::from_slice(schema_bytes)
-        .map_err(|error| format!("schema JSON: {error}"))?;
+    let schema: Value =
+        serde_json::from_slice(schema_bytes).map_err(|error| format!("schema JSON: {error}"))?;
     if schema.get("$schema").and_then(Value::as_str)
         != Some("https://json-schema.org/draft/2020-12/schema")
     {
@@ -256,13 +256,19 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
     let mut prior_sum = 0.0;
     for state in &scenario.states {
         if !nonempty(&state.state_id) || !state_ids.insert(state.state_id.clone()) {
-            errors.push(format!("state identity is empty or duplicated: {}", state.state_id));
+            errors.push(format!(
+                "state identity is empty or duplicated: {}",
+                state.state_id
+            ));
         }
         if !state.prior_probability.is_finite()
             || state.prior_probability < 0.0
             || state.prior_probability > 1.0
         {
-            errors.push(format!("state {} has invalid prior probability", state.state_id));
+            errors.push(format!(
+                "state {} has invalid prior probability",
+                state.state_id
+            ));
         }
         prior_sum += state.prior_probability;
     }
@@ -273,25 +279,43 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
     let mut action_ids = BTreeSet::new();
     for action in &scenario.actions {
         if !nonempty(&action.action_id) || !action_ids.insert(action.action_id.clone()) {
-            errors.push(format!("action identity is empty or duplicated: {}", action.action_id));
+            errors.push(format!(
+                "action identity is empty or duplicated: {}",
+                action.action_id
+            ));
         }
-        if !matches!(action.gate_status.as_str(), "satisfied" | "blocked" | "unknown") {
-            errors.push(format!("action {} has unknown gate status", action.action_id));
+        if !matches!(
+            action.gate_status.as_str(),
+            "satisfied" | "blocked" | "unknown"
+        ) {
+            errors.push(format!(
+                "action {} has unknown gate status",
+                action.action_id
+            ));
         }
         let mut seen = BTreeSet::new();
         for loss in &action.losses {
             if !seen.insert(loss.state_id.clone()) {
-                errors.push(format!("action {} repeats state loss {}", action.action_id, loss.state_id));
+                errors.push(format!(
+                    "action {} repeats state loss {}",
+                    action.action_id, loss.state_id
+                ));
             }
             if !state_ids.contains(&loss.state_id)
                 || !loss.loss_units.is_finite()
                 || loss.loss_units < 0.0
             {
-                errors.push(format!("action {} has invalid state loss", action.action_id));
+                errors.push(format!(
+                    "action {} has invalid state loss",
+                    action.action_id
+                ));
             }
         }
         if seen != state_ids {
-            errors.push(format!("action {} must declare exactly one loss per state", action.action_id));
+            errors.push(format!(
+                "action {} must declare exactly one loss per state",
+                action.action_id
+            ));
         }
     }
     if scenario.actions.is_empty() {
@@ -301,7 +325,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
     let mut test_ids = BTreeSet::new();
     for test in &scenario.tests {
         if !nonempty(&test.test_id) || !test_ids.insert(test.test_id.clone()) {
-            errors.push(format!("test identity is empty or duplicated: {}", test.test_id));
+            errors.push(format!(
+                "test identity is empty or duplicated: {}",
+                test.test_id
+            ));
         }
         if !nonempty(&test.protocol_ref)
             || !nonempty(&test.equipment_ref)
@@ -309,13 +336,19 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
             || !is_digest(&test.equipment_digest)
             || !is_digest(&test.calibration_digest)
         {
-            errors.push(format!("test {} has invalid protocol/equipment/calibration identity", test.test_id));
+            errors.push(format!(
+                "test {} has invalid protocol/equipment/calibration identity",
+                test.test_id
+            ));
         }
         if !matches!(
             test.interpretation_status.as_str(),
             "qualified_for_domain" | "unqualified" | "unknown"
         ) {
-            errors.push(format!("test {} has invalid interpretation status", test.test_id));
+            errors.push(format!(
+                "test {} has invalid interpretation status",
+                test.test_id
+            ));
         }
         if !test.cost.test_cost_units.is_finite()
             || test.cost.test_cost_units < 0.0
@@ -328,7 +361,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
             )
             || !is_digest(&test.cost.evidence_digest)
         {
-            errors.push(format!("test {} has invalid or untraceable cost", test.test_id));
+            errors.push(format!(
+                "test {} has invalid or untraceable cost",
+                test.test_id
+            ));
         }
         let app = &test.applicability;
         if app.supported_chemistries.is_empty()
@@ -341,7 +377,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
             || app.maximum_soc_fraction > 1.0
             || app.minimum_soc_fraction > app.maximum_soc_fraction
         {
-            errors.push(format!("test {} has invalid applicability domain", test.test_id));
+            errors.push(format!(
+                "test {} has invalid applicability domain",
+                test.test_id
+            ));
         }
         for status in [
             test.preconditions.safety_review.as_str(),
@@ -351,7 +390,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
             test.preconditions.authority_approved.as_str(),
         ] {
             if !matches!(status, "satisfied" | "missing" | "unknown") {
-                errors.push(format!("test {} has unknown precondition status", test.test_id));
+                errors.push(format!(
+                    "test {} has unknown precondition status",
+                    test.test_id
+                ));
             }
         }
 
@@ -360,7 +402,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
             state_ids.iter().map(|id| (id.clone(), 0.0)).collect();
         for outcome in &test.outcomes {
             if !nonempty(&outcome.outcome_id) || !outcome_ids.insert(outcome.outcome_id.clone()) {
-                errors.push(format!("test {} has empty or duplicate outcome identity", test.test_id));
+                errors.push(format!(
+                    "test {} has empty or duplicate outcome identity",
+                    test.test_id
+                ));
             }
             let mut likelihood_state_ids = BTreeSet::new();
             for likelihood in &outcome.likelihoods {
@@ -370,19 +415,26 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
                     || likelihood.probability < 0.0
                     || likelihood.probability > 1.0
                 {
-                    errors.push(format!("test {} outcome {} has invalid likelihood entry", test.test_id, outcome.outcome_id));
+                    errors.push(format!(
+                        "test {} outcome {} has invalid likelihood entry",
+                        test.test_id, outcome.outcome_id
+                    ));
                 } else if let Some(sum) = probability_sums.get_mut(&likelihood.state_id) {
                     *sum += likelihood.probability;
                 }
             }
             if likelihood_state_ids != state_ids {
-                errors.push(format!("test {} outcome {} must cover exactly every state", test.test_id, outcome.outcome_id));
+                errors.push(format!(
+                    "test {} outcome {} must cover exactly every state",
+                    test.test_id, outcome.outcome_id
+                ));
             }
         }
-        if test.outcomes.len() < 2
-            || probability_sums.values().any(|sum| !close_to_one(*sum))
-        {
-            errors.push(format!("test {} outcome likelihoods must sum to one for every state", test.test_id));
+        if test.outcomes.len() < 2 || probability_sums.values().any(|sum| !close_to_one(*sum)) {
+            errors.push(format!(
+                "test {} outcome likelihoods must sum to one for every state",
+                test.test_id
+            ));
         }
     }
     errors
@@ -401,11 +453,19 @@ fn sorted_actions(scenario: &Scenario) -> Vec<&Action> {
 }
 
 fn loss_map(action: &Action) -> BTreeMap<&str, f64> {
-    action.losses.iter().map(|loss| (loss.state_id.as_str(), loss.loss_units)).collect()
+    action
+        .losses
+        .iter()
+        .map(|loss| (loss.state_id.as_str(), loss.loss_units))
+        .collect()
 }
 
 fn state_probabilities(scenario: &Scenario) -> BTreeMap<String, f64> {
-    scenario.states.iter().map(|state| (state.state_id.clone(), state.prior_probability)).collect()
+    scenario
+        .states
+        .iter()
+        .map(|state| (state.state_id.clone(), state.prior_probability))
+        .collect()
 }
 
 fn admissible_actions(scenario: &Scenario) -> Vec<&Action> {
@@ -419,7 +479,9 @@ fn expected_loss(action: &Action, probabilities: &BTreeMap<String, f64>) -> f64 
     let losses = loss_map(action);
     probabilities
         .iter()
-        .map(|(state, probability)| probability * losses.get(state.as_str()).copied().unwrap_or(f64::INFINITY))
+        .map(|(state, probability)| {
+            probability * losses.get(state.as_str()).copied().unwrap_or(f64::INFINITY)
+        })
         .sum()
 }
 
@@ -429,7 +491,12 @@ fn best_action(
 ) -> Option<(String, f64)> {
     actions
         .iter()
-        .map(|action| (action.action_id.clone(), expected_loss(action, probabilities)))
+        .map(|action| {
+            (
+                action.action_id.clone(),
+                expected_loss(action, probabilities),
+            )
+        })
         .min_by(|left, right| {
             left.1
                 .total_cmp(&right.1)
@@ -437,10 +504,7 @@ fn best_action(
         })
 }
 
-fn clairvoyant_loss(
-    actions: &[&Action],
-    probabilities: &BTreeMap<String, f64>,
-) -> f64 {
+fn clairvoyant_loss(actions: &[&Action], probabilities: &BTreeMap<String, f64>) -> f64 {
     let states: Vec<String> = probabilities.keys().cloned().collect();
     states
         .iter()
@@ -490,7 +554,11 @@ fn precondition_reasons(test: &DiagnosticTest) -> Vec<String> {
 
 fn eligibility_reasons(test: &DiagnosticTest, context: &Context) -> Vec<String> {
     let mut reasons = precondition_reasons(test);
-    if !test.applicability.supported_chemistries.contains(&context.chemistry) {
+    if !test
+        .applicability
+        .supported_chemistries
+        .contains(&context.chemistry)
+    {
         reasons.push("chemistry_out_of_domain".to_owned());
     }
     if context.temperature_c < test.applicability.minimum_temperature_c
@@ -568,9 +636,8 @@ fn evaluate_test(
     } else {
         None
     };
-    let net_value = gross_evsi.map(|value| {
-        value - test.cost.test_cost_units - test.cost.downtime_cost_units
-    });
+    let net_value =
+        gross_evsi.map(|value| value - test.cost.test_cost_units - test.cost.downtime_cost_units);
 
     TestEvaluation {
         test_id: test.test_id.clone(),
@@ -586,7 +653,10 @@ fn evaluate_test(
     }
 }
 
-fn choose_test<'a>(tests: &'a [TestEvaluation], value: fn(&'a TestEvaluation) -> f64) -> Option<&'a TestEvaluation> {
+fn choose_test<'a>(
+    tests: &'a [TestEvaluation],
+    value: fn(&'a TestEvaluation) -> f64,
+) -> Option<&'a TestEvaluation> {
     tests
         .iter()
         .filter(|test| test.eligible)
@@ -607,7 +677,9 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioDecision {
         Some(clairvoyant_loss(&actions, &prior))
     };
     let prior_loss = current.as_ref().map(|(_, loss)| *loss);
-    let no_test_regret = prior_loss.zip(oracle).map(|(loss, lower)| (loss - lower).max(0.0));
+    let no_test_regret = prior_loss
+        .zip(oracle)
+        .map(|(loss, lower)| (loss - lower).max(0.0));
 
     let mut tests: Vec<&DiagnosticTest> = scenario.tests.iter().collect();
     tests.sort_by(|a, b| a.test_id.cmp(&b.test_id));
@@ -635,9 +707,13 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioDecision {
     };
 
     let best_info = choose_test(&evaluations, |test| test.expected_information_gain_nats);
-    let best_gross = choose_test(&evaluations, |test| test.gross_evsi.unwrap_or(f64::NEG_INFINITY));
-    let selected = choose_test(&evaluations, |test| test.net_value_units.unwrap_or(f64::NEG_INFINITY))
-        .filter(|test| test.net_value_units.unwrap_or(f64::NEG_INFINITY) > EPSILON);
+    let best_gross = choose_test(&evaluations, |test| {
+        test.gross_evsi.unwrap_or(f64::NEG_INFINITY)
+    });
+    let selected = choose_test(&evaluations, |test| {
+        test.net_value_units.unwrap_or(f64::NEG_INFINITY)
+    })
+    .filter(|test| test.net_value_units.unwrap_or(f64::NEG_INFINITY) > EPSILON);
 
     let (status, selected_id) = if current.is_none() {
         ("abstain", None)
@@ -651,10 +727,12 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioDecision {
         .as_ref()
         .and_then(|id| evaluations.iter().find(|test| &test.test_id == id));
     let expected_post = selected_test.and_then(|test| test.expected_post_test_loss);
-    let expected_post_regret = expected_post
-        .zip(oracle)
-        .map(|(loss, lower)| (loss - lower).max(0.0)
-            + selected_test.map(|test| test.test_cost_units + test.downtime_cost_units).unwrap_or(0.0));
+    let expected_post_regret = expected_post.zip(oracle).map(|(loss, lower)| {
+        (loss - lower).max(0.0)
+            + selected_test
+                .map(|test| test.test_cost_units + test.downtime_cost_units)
+                .unwrap_or(0.0)
+    });
 
     ScenarioDecision {
         scenario_id: scenario.scenario_id.clone(),
@@ -695,7 +773,10 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
     cases.sort_by(|left, right| left.case_id.cmp(&right.case_id));
     for case in cases {
         if !nonempty(&case.case_id) || !seen_case_ids.insert(case.case_id.clone()) {
-            return Err(format!("case identity is empty or duplicated: {}", case.case_id));
+            return Err(format!(
+                "case identity is empty or duplicated: {}",
+                case.case_id
+            ));
         }
         if !matches!(
             case.expected_status.as_str(),
@@ -732,7 +813,10 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
             ));
         }
         if case.expected_status == "reject" {
-            return Err(format!("negative case {} was unexpectedly accepted", case.case_id));
+            return Err(format!(
+                "negative case {} was unexpectedly accepted",
+                case.case_id
+            ));
         }
 
         let decision = evaluate_scenario(&scenario);
@@ -821,7 +905,10 @@ mod tests {
             .iter()
             .find(|case| case.scenario_id == "synthetic-diagnostic-positive-evsi")
             .expect("positive EVSI case");
-        assert_eq!(case.selected_test_id.as_deref(), Some("capacity_reference_test"));
+        assert_eq!(
+            case.selected_test_id.as_deref(),
+            Some("capacity_reference_test")
+        );
         assert!(case.selected_test_net_value_units.unwrap_or(0.0) > 0.0);
         assert!(
             case.expected_post_test_regret.unwrap_or(f64::INFINITY)
