@@ -101,6 +101,10 @@ pub struct SequentialStepReceipt {
     pub result_manifest_digest: String,
     /// Digest of the complete signed verifier-attestation envelope.
     pub verifier_receipt_digest: String,
+    /// Open-world adequacy precondition bound into the signed verifier claims.
+    pub precondition_gate_digest: String,
+    /// Anytime-valid paired-loss report bound into the signed verifier claims.
+    pub statistical_verification_report_digest: String,
     pub previous_step_receipt_digest: Option<String>,
     pub cumulative_l2_path_after: f64,
     pub cumulative_parameter_change_events_after: usize,
@@ -206,7 +210,7 @@ pub fn sequential_verifier_attestation_message(
         SequentialWeightProgramError::InvalidDigest("verifier claims serialization")
     })?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-sequential-verifier-attestation-v1\0");
+    hasher.update(b"symthaea-sequential-verifier-attestation-v2\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(*hasher.finalize().as_bytes())
@@ -417,7 +421,7 @@ pub fn accept_verified_sequential_candidate(
     }
     validate_digest(candidate_native_model_digest)?;
     let claims = &attestation.claims;
-    if claims.format_version != 1 {
+    if claims.format_version != 2 {
         return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
             "format_version",
         ));
@@ -563,7 +567,7 @@ pub fn accept_verified_sequential_candidate(
         return Err(SequentialWeightProgramError::VerifierRejectedCandidate);
     }
     let verifier_receipt_digest =
-        hash_value(b"symthaea-sequential-verifier-envelope-v1\0", attestation)?;
+        hash_value(b"symthaea-sequential-verifier-envelope-v2\0", attestation)?;
     if candidate_native_model_digest == session.latest_candidate_model_digest {
         return Err(SequentialWeightProgramError::InvalidCandidateNativeDigest);
     }
@@ -596,7 +600,7 @@ pub fn accept_verified_sequential_candidate(
         .push(prepared.batch.evidence_batch_digest.clone());
 
     let mut receipt = SequentialStepReceipt {
-        format_version: 1,
+        format_version: 2,
         session_id: session.session_id.clone(),
         batch_index: prepared.batch.batch_index,
         template_digest: session.template_digest.clone(),
@@ -610,6 +614,10 @@ pub fn accept_verified_sequential_candidate(
         verification_protocol_digest: claims.verification_protocol_digest.clone(),
         result_manifest_digest: claims.result_manifest_digest.clone(),
         verifier_receipt_digest,
+        precondition_gate_digest: claims.precondition_gate_digest.clone(),
+        statistical_verification_report_digest: claims
+            .statistical_verification_report_digest
+            .clone(),
         previous_step_receipt_digest: session.previous_step_receipt_digest.clone(),
         cumulative_l2_path_after: cumulative_l2_path,
         cumulative_parameter_change_events_after: cumulative_parameter_change_events,
@@ -727,7 +735,7 @@ fn step_receipt_digest(
 ) -> Result<String, SequentialWeightProgramError> {
     let mut unsigned = receipt.clone();
     unsigned.step_receipt_digest.clear();
-    hash_value(b"symthaea-sequential-step-receipt-v1\0", &unsigned)
+    hash_value(b"symthaea-sequential-step-receipt-v2\0", &unsigned)
 }
 
 fn hash_value<T: Serialize>(
@@ -825,7 +833,7 @@ mod tests {
         signing_key: &SigningKey,
     ) -> SignedSequentialVerifierAttestation {
         let claims = SequentialVerifierAttestationClaims {
-            format_version: 1,
+            format_version: 2,
             verifier_id: "independent-test-verifier".into(),
             verification_protocol_digest: digest('8'),
             result_manifest_digest: digest('7'),
@@ -980,6 +988,8 @@ mod tests {
         );
         assert_eq!(receipt.verification_protocol_digest, digest('8'));
         assert_eq!(receipt.result_manifest_digest, digest('7'));
+        assert_eq!(receipt.precondition_gate_digest, digest('5'));
+        assert!(validate_digest(&receipt.statistical_verification_report_digest).is_ok());
         assert_eq!(advanced.next_batch_index, 1);
         assert_eq!(advanced.latest_candidate_model_digest, digest('9'));
         assert_eq!(receipt.parent_candidate_model_digest, base.model_digest);
