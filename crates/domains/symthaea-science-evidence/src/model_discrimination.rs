@@ -1982,7 +1982,7 @@ mod tests {
             let mut density = 0.0;
             for model in 0..2 {
                 if joints[model] > 0.0 {
-                    density += joints[model] * (densities[model] / mixture).ln();
+                    density += joints[model] * (densities[model] * q_bar / mixture).ln();
                 }
             }
             let weight = if index == 0 || index == intervals {
