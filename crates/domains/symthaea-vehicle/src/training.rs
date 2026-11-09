@@ -427,7 +427,13 @@ impl VehicleTrainer {
             if pd_weight > 0.01 {
                 let pd_cmd = match task {
                     VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap, follow_oracle_target.as_ref())
+                        pd_cruise_with_follow(
+                            &state,
+                            drive_target,
+                            road_heading,
+                            target_gap,
+                            follow_oracle_target.as_ref(),
+                        )
                     }
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
                 };
@@ -506,7 +512,13 @@ impl VehicleTrainer {
             if step % self.config.train_every == 0 {
                 let target = match task {
                     VehicleTask::Follow { target_gap } => {
-                        pd_cruise_with_follow(&state, drive_target, road_heading, target_gap, follow_oracle_target.as_ref())
+                        pd_cruise_with_follow(
+                            &state,
+                            drive_target,
+                            road_heading,
+                            target_gap,
+                            follow_oracle_target.as_ref(),
+                        )
                     }
                     _ => pd_cruise_baseline_with_road(&state, drive_target, road_heading),
                 };
