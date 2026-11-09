@@ -1147,6 +1147,153 @@ mod tests {
     }
 
     #[test]
+    fn quantized_coordinate_rounding_is_outward_at_boundaries_and_random_values() {
+        let edge_values = [
+            -1.0,
+            -0.999_999_94,
+            -0.75,
+            -0.5,
+            -0.125,
+            -f32::from_bits(1),
+            0.0,
+            f32::from_bits(1),
+            0.125,
+            0.5,
+            0.75,
+            0.999_999_94,
+            1.0,
+        ];
+        for value in edge_values {
+            let lower = decode_lower_coordinate(quantize_lower_coordinate(value));
+            let upper = decode_upper_coordinate(quantize_upper_coordinate(value));
+            assert!(
+                lower <= value,
+                "lower quantized endpoint {lower} exceeds {value}"
+            );
+            assert!(
+                upper >= value,
+                "upper quantized endpoint {upper} falls below {value}"
+            );
+            assert!((-1.0..=1.0).contains(&lower));
+            assert!((-1.0..=1.0).contains(&upper));
+        }
+
+        let mut state = 0xD1CE_BA5Eu32;
+        for _ in 0..100_000 {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            let unit = (state >> 8) as f32 / (u32::MAX >> 8) as f32;
+            let value = unit * 2.0 - 1.0;
+            let lower = decode_lower_coordinate(quantize_lower_coordinate(value));
+            let upper = decode_upper_coordinate(quantize_upper_coordinate(value));
+            assert!(lower <= value);
+            assert!(upper >= value);
+        }
+    }
+
+    #[test]
+    fn quantized_box_ball_synopsis_has_midpoint_storage_and_contains_members() {
+        const DIM: usize = 1024;
+        let query = ContinuousHV::from_vec(
+            (0..DIM)
+                .map(|index| ((index as f32) * 0.021).cos() * 0.7)
+                .collect(),
+        );
+        let members: Vec<(String, ContinuousHV)> = (0..20)
+            .map(|member_index| {
+                let vector = ContinuousHV::from_vec(
+                    (0..DIM)
+                        .map(|index| {
+                            let base = ((index as f32) * 0.013).sin() * 0.65;
+                            let perturbation =
+                                (member_index as f32 - 9.5) * 0.0003
+                                    * ((index as f32) * 0.031).cos();
+                            (base + perturbation).clamp(-1.0, 1.0)
+                        })
+                        .collect(),
+                );
+                (format!("quantized-{member_index:02}"), vector)
+            })
+            .collect();
+
+        let full = ContinuousHVGroupEnvelope::from_original_members(51, 8, &members).unwrap();
+        let quantized = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            51,
+            8,
+            &members,
+            GroupEnvelopeMode::QuantizedBoxAndBall,
+        )
+        .unwrap();
+        let ball = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            51,
+            8,
+            &members,
+            GroupEnvelopeMode::BallOnly,
+        )
+        .unwrap();
+
+        assert_eq!(
+            full.numeric_synopsis_bytes(),
+            12 * DIM * 4 + 4
+        );
+        assert_eq!(
+            quantized.numeric_synopsis_bytes(),
+            8 * DIM + 4
+        );
+        assert_eq!(
+            ball.numeric_synopsis_bytes(),
+            4 * DIM + 4
+        );
+        assert_eq!(
+            full.numeric_synopsis_bytes() - quantized.numeric_synopsis_bytes(),
+            4 * DIM * 4
+        );
+
+        let quantized_interval = quantized
+            .score_interval_for_snapshot(
+                &query,
+                51,
+                8,
+                quantized.member_set_digest(),
+                quantized.content_digest(),
+            )
+            .unwrap();
+        let full_interval = full
+            .score_interval_for_snapshot(
+                &query,
+                51,
+                8,
+                full.member_set_digest(),
+                full.content_digest(),
+            )
+            .unwrap();
+        let ball_interval = ball
+            .score_interval_for_snapshot(
+                &query,
+                51,
+                8,
+                ball.member_set_digest(),
+                ball.content_digest(),
+            )
+            .unwrap();
+
+        for (id, member) in &members {
+            let exact = query.similarity_full_resolution(member);
+            assert!(full_interval.contains(exact), "full profile missed {id}");
+            assert!(
+                quantized_interval.contains(exact),
+                "quantized profile missed {id}: {exact} not in [{}, {}]",
+                quantized_interval.lower,
+                quantized_interval.upper
+            );
+            assert!(ball_interval.contains(exact), "ball profile missed {id}");
+        }
+        assert_ne!(full.content_digest(), quantized.content_digest());
+        assert_ne!(quantized.content_digest(), ball.content_digest());
+    }
+
+    #[test]
     fn ball_only_synopsis_reduces_numeric_metadata_and_preserves_exact_enclosure() {
         const DIM: usize = 257;
         let query = ContinuousHV::from_vec(
