@@ -30,7 +30,7 @@ This approach is motivated by ethnomusicological accounts of:
 - time-line patterns, polyrhythm and lead-drum narratives as distinct but interacting practices (Agawu);
 - cyclic cross-rhythm in which interwoven figures create tension while retaining a shared underlying pulse (Arom).
 
-The code in this tranche implements only the exact timing substrate and two pairwise constraints. It deliberately does not infer role names, cultural meaning, groove quality, or genre authenticity.
+The code in this tranche implements the exact timing substrate and three explicit pairwise relationship types. It deliberately does not infer role names, cultural meaning, groove quality, or genre authenticity.
 
 ### 2.1 Current executable contract
 
@@ -47,6 +47,7 @@ The new `ensemble_groove` module provides:
 The two supported relationship constraints are deliberately small:
 1. `NoCoincidentAttacks` — an exact non-overlap requirement where the arrangement contract calls for it.
 2. `MinimumCircularSeparation` — a lower bound on the circular distance between attacks in two layers.
+3. `CallResponseWithinWindow` — a directed requirement that each caller-layer attack receive a responder-layer attack within a declared circular delay window, with a minimum coverage threshold in integer basis points.
 
 Intentional unisons remain valid unless the author explicitly forbids them. The analyzer must never treat “no collision” as a universal property of African music or ensemble music in general.
 
@@ -54,6 +55,7 @@ Intentional unisons remain valid unless the author explicitly forbids them. The 
 
 It does not:
 - generate notes or audio;
+- model cue-conditioned section-state transitions beyond the directed timing/coverage contract;
 - map a named genre to a pattern;
 - classify a recording;
 - infer authentic percussion or guitar roles from a genre name;
