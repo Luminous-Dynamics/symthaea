@@ -21,13 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     let coordinates = [0.0, 15.0, 0.5, 0.25];
     let steps_m = [
-        2.0e-2_f64,
-        1.0e-2,
-        5.0e-3,
-        2.5e-3,
-        1.25e-3,
-        6.25e-4,
-        3.125e-4,
+        2.0e-2_f64, 1.0e-2, 5.0e-3, 2.5e-3, 1.25e-3, 6.25e-4, 3.125e-4,
     ];
 
     println!("Symthaea GravCraft independent ADM constraint sweep");
@@ -63,8 +57,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    println!("The ADM Hamiltonian and momentum residuals are independent projections to compare against the 4D Einstein-implied source.");
-    println!("Both routes use finite differences in this prototype; agreement under step refinement is necessary but not sufficient for a continuum solution.");
-    println!("No result here establishes a realizable stress-energy source, global energy conditions, or propulsion.");
+    println!(
+        "The ADM Hamiltonian and momentum residuals are independent projections to compare against the 4D Einstein-implied source."
+    );
+    println!(
+        "Both routes use finite differences in this prototype; agreement under step refinement is necessary but not sufficient for a continuum solution."
+    );
+    println!(
+        "No result here establishes a realizable stress-energy source, global energy conditions, or propulsion."
+    );
     Ok(())
 }
