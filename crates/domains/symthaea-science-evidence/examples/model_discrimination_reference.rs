@@ -44,6 +44,7 @@ fn experiment(
     id: &str,
     observable: &str,
     cost: f64,
+    availability_probability: f64,
     measurement_sigma: f64,
     predictions: Vec<GaussianModelPrediction>,
 ) -> CandidateExperiment {
@@ -56,6 +57,7 @@ fn experiment(
         measurement_sigma: Some(measurement_sigma),
         noise_calibration: NoiseCalibrationStatus::SyntheticKnownAnswer,
         calibration_reference: Some("synthetic://noise-calibration/v1".to_string()),
+        availability_probability,
         cost,
         exclusive_group: None,
         predictions,
@@ -87,6 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "low-cost-separation",
             "synthetic-observable-1",
             0.6,
+            0.95,
             0.20,
             vec![
                 quantitative_prediction("synthetic-model-a", 0.0, 0.04),
@@ -98,6 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "high-cost-high-precision",
             "synthetic-observable-2",
             3.0,
+            0.55,
             0.07,
             vec![
                 quantitative_prediction("synthetic-model-a", 0.0, 0.03),
@@ -109,6 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "partial-prediction-control",
             "synthetic-observable-3",
             0.2,
+            0.80,
             0.15,
             vec![
                 quantitative_prediction("synthetic-model-a", 0.0, 0.05),
@@ -131,7 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("model_count={}", report.model_ids.len());
     println!("prior_scenarios={}", report.prior_scenario_ids.join(";"));
     println!(
-        "experiment,status,worst_case_eig_nats,mean_eig_nats,worst_eig_per_cost,mean_eig_per_cost"
+        "experiment,availability,status,conditional_worst_eig,conditional_mean_eig,adjusted_worst_eig,adjusted_mean_eig,adjusted_worst_eig_per_cost,adjusted_mean_eig_per_cost"
     );
 
     for score in &report.experiments {
@@ -145,22 +150,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             } => "QUADRATURE_NOT_CONVERGED",
         };
         println!(
-            "{},{},{:.9},{:.9},{:.9},{:.9}",
+            "{},{:.3},{},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9}",
             score.experiment_id,
+            score.availability_probability,
             status,
             score.worst_case_model_identity_eig_nats.unwrap_or(f64::NAN),
             score
                 .weighted_mean_model_identity_eig_nats
+                .unwrap_or(f64::NAN),
+            score
+                .availability_adjusted_worst_case_model_identity_eig_nats
+                .unwrap_or(f64::NAN),
+            score
+                .availability_adjusted_weighted_mean_model_identity_eig_nats
                 .unwrap_or(f64::NAN),
             score.worst_case_eig_per_cost.unwrap_or(f64::NAN),
             score.weighted_mean_eig_per_cost.unwrap_or(f64::NAN),
         );
         for scenario in &score.prior_scenario_scores {
             println!(
-                "prior_scenario={},experiment={},eig_nats={:.9},quadrature_error_nats={:.3e},entropy_bound={:.9}",
+                "prior_scenario={},experiment={},conditional_eig_nats={:.9},availability_adjusted_eig_nats={:.9},expected_posterior_entropy_nats={:.9},quadrature_error_nats={:.3e},prior_entropy_nats={:.9}",
                 scenario.scenario_id,
                 score.experiment_id,
                 scenario.refined_eig_nats,
+                scenario.availability_adjusted_eig_nats,
+                scenario.expected_posterior_entropy_nats,
                 scenario.quadrature_error_nats,
                 scenario.prior_entropy_nats,
             );
