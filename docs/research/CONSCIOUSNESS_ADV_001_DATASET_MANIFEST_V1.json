@@ -1,0 +1,119 @@
+{
+  "schema_version": "luminous.consciousness.public_dataset_manifest.v1",
+  "audit_date": "2026-10-29",
+  "qualification": "metadata_audited_files_not_downloaded",
+  "study": {
+    "title": "Adversarial testing of global neuronal workspace and integrated information theories of consciousness",
+    "doi": "10.1038/s41586-025-08888-1",
+    "published_on": "2025-04-30",
+    "source_url": "https://doi.org/10.1038/s41586-025-08888-1",
+    "preregistration_url": "https://osf.io/92tbg/",
+    "data_license_as_stated_in_article": "CC BY 4.0",
+    "analysis_code_url": "https://github.com/Cogitate-consortium/cogitate-msp1",
+    "analysis_code_license": "MIT",
+    "task_code_url": "https://github.com/Cogitate-consortium/cogitate-experiment-code",
+    "task_code_license": "MIT"
+  },
+  "access": {
+    "data_bundle_url": "https://www.arc-cogitate.com/data-bundles",
+    "xnat_url": "https://cogitate-data.ae.mpg.de/",
+    "terms_url": "https://www.arc-cogitate.com/terms-conditions",
+    "terms_acceptance_required": true,
+    "gdpr_requirements_acceptance_required": true,
+    "terms_reviewed_for_specific_permissions": false
+  },
+  "published_sample_counts": {
+    "article_analysis": {
+      "total": 256,
+      "fmri": 120,
+      "meeg": 102,
+      "ieeg": 34,
+      "source_url": "https://doi.org/10.1038/s41586-025-08888-1"
+    },
+    "data_release_overview": {
+      "total": 256,
+      "fmri": 118,
+      "meeg": 100,
+      "ieeg": 38,
+      "source_url": "https://cogitate-consortium.github.io/cogitate-data/"
+    },
+    "reconciliation_status": "unresolved_modality_counts_differ_despite_same_total"
+  },
+  "bundles": [
+    {
+      "experiment": 1,
+      "modality": "meeg",
+      "format": "raw",
+      "doi": "10.17617/1.WQA3-WK71",
+      "sample_size_gb": 29,
+      "full_size_gb": 740,
+      "license": "CC BY 4.0",
+      "downloaded": false,
+      "sha256": null
+    },
+    {
+      "experiment": 1,
+      "modality": "meeg",
+      "format": "BIDS",
+      "doi": "10.17617/1.NZWP-7J89",
+      "sample_size_gb": 28,
+      "full_size_gb": 700,
+      "license": "CC BY 4.0",
+      "downloaded": false,
+      "sha256": null
+    },
+    {
+      "experiment": 1,
+      "modality": "ieeg",
+      "format": "raw",
+      "doi": "10.17617/1.CQYN-9A87",
+      "sample_size_gb": 13,
+      "full_size_gb": 77,
+      "license": "CC BY 4.0",
+      "downloaded": false,
+      "sha256": null
+    },
+    {
+      "experiment": 1,
+      "modality": "ieeg",
+      "format": "BIDS",
+      "doi": "10.17617/1.6QPG-GZ82",
+      "sample_size_gb": 16,
+      "full_size_gb": 98,
+      "license": "CC BY 4.0",
+      "downloaded": false,
+      "sha256": null
+    },
+    {
+      "experiment": 1,
+      "modality": "fmri",
+      "format": "raw",
+      "doi": "10.17617/1.DHJJ-ER02",
+      "sample_size_gb": 9,
+      "full_size_gb": 538,
+      "license": "CC BY 4.0",
+      "downloaded": false,
+      "sha256": null
+    },
+    {
+      "experiment": 1,
+      "modality": "fmri",
+      "format": "BIDS",
+      "doi": "10.17617/1.8AX5-T263",
+      "sample_size_gb": 9,
+      "full_size_gb": 261,
+      "license": "CC BY 4.0",
+      "downloaded": false,
+      "sha256": null
+    }
+  ],
+  "first_path": {
+    "modality": "fmri",
+    "format": "BIDS",
+    "sample_bundle_use": "plumbing_smoke_test_only",
+    "sample_bundle_size_gb": 9,
+    "full_bundle_size_gb": 261,
+    "confirmatory_claim_allowed_on_sample_bundle": false,
+    "first_confirmatory_analysis": "One preregistered fMRI prediction, with exact contrast/window/ROI copied from the preregistration before opening confirmatory outputs."
+  }
+}
