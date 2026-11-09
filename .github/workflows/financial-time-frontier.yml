@@ -25,6 +25,8 @@ jobs:
         with:
           components: rustfmt
       - name: Check formatting
-        run: cargo fmt --manifest-path benchmarks/financial-time-frontier/Cargo.toml -- --check
+        working-directory: benchmarks/financial-time-frontier
+        run: cargo fmt -- --check
       - name: Run unit and adversarial tests
-        run: cargo test --manifest-path benchmarks/financial-time-frontier/Cargo.toml
+        working-directory: benchmarks/financial-time-frontier
+        run: cargo test
