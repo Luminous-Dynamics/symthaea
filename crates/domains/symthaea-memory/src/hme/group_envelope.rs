@@ -399,8 +399,9 @@ fn quantize_upper_coordinate(value: f32) -> u16 {
 }
 
 fn decode_lower_coordinate(value: u16) -> f32 {
-    let exact = (2.0 * value as f64) / 65_535.0 - 1.0;
-    let outward = next_down_f64(exact).max(-1.0);
+    let numerator = 2.0 * value as f64;
+    let ratio = next_down_f64(numerator / 65_535.0);
+    let outward = next_down_f64(ratio - 1.0).max(-1.0);
     let rounded = outward as f32;
     if (rounded as f64) > outward {
         next_down_f32(rounded).max(-1.0)
@@ -410,8 +411,9 @@ fn decode_lower_coordinate(value: u16) -> f32 {
 }
 
 fn decode_upper_coordinate(value: u16) -> f32 {
-    let exact = (2.0 * value as f64) / 65_535.0 - 1.0;
-    let outward = next_up_f64(exact).min(1.0);
+    let numerator = 2.0 * value as f64;
+    let ratio = next_up_f64(numerator / 65_535.0);
+    let outward = next_up_f64(ratio - 1.0).min(1.0);
     let rounded = outward as f32;
     if (rounded as f64) < outward {
         next_up_f32(rounded).min(1.0)
