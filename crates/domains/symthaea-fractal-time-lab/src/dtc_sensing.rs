@@ -382,10 +382,7 @@ pub fn evaluate_dtc_probe_sensing(
     let quantum_effective_amplitude_fisher =
         effective_amplitude_information_with_phase_nuisance(quantum_fisher_matrix);
     let phase_time_offset_conversion = if config.probe_frequency_cycles_per_drive_period > 0.0 {
-        Some(
-            1.0 / (2.0 * std::f64::consts::PI
-                * config.probe_frequency_cycles_per_drive_period),
-        )
+        Some(1.0 / (2.0 * std::f64::consts::PI * config.probe_frequency_cycles_per_drive_period))
     } else {
         None
     };
@@ -400,8 +397,10 @@ pub fn evaluate_dtc_probe_sensing(
     };
     let classical_fisher_within_quantum_bound =
         fisher <= quantum_fisher + quantum_fisher.max(1.0) * 1.0e-3;
-    let joint_classical_fisher_within_quantum_bound =
-        classical_fisher_matrix_within_quantum_bound(classical_fisher_matrix, quantum_fisher_matrix);
+    let joint_classical_fisher_within_quantum_bound = classical_fisher_matrix_within_quantum_bound(
+        classical_fisher_matrix,
+        quantum_fisher_matrix,
+    );
     let norm_error = (nominal_model.norm_squared() - 1.0).abs();
 
     if !fisher_per_period.is_finite()
@@ -429,8 +428,7 @@ pub fn evaluate_dtc_probe_sensing(
         quantum_fisher_matrix_per_shot: quantum_fisher_matrix,
         classical_effective_amplitude_fisher_with_phase_nuisance:
             classical_effective_amplitude_fisher,
-        quantum_effective_amplitude_fisher_with_phase_nuisance:
-            quantum_effective_amplitude_fisher,
+        quantum_effective_amplitude_fisher_with_phase_nuisance: quantum_effective_amplitude_fisher,
         phase_time_offset_drive_periods_per_radian: phase_time_offset_conversion,
         classical_joint_crlb_covariance_per_shot: classical_joint_covariance,
         quantum_joint_crlb_covariance_per_shot: quantum_joint_covariance,
@@ -586,7 +584,10 @@ fn pure_state_quantum_fisher_matrix(
         return Err(DtcProbeError::InvalidStateVector);
     }
 
-    let nominal_norm = nominal.iter().map(|amplitude| amplitude.norm_sqr()).sum::<f64>();
+    let nominal_norm = nominal
+        .iter()
+        .map(|amplitude| amplitude.norm_sqr())
+        .sum::<f64>();
     if !nominal_norm.is_finite() || (nominal_norm - 1.0).abs() > 1.0e-8 {
         return Err(DtcProbeError::InvalidStateVector);
     }
@@ -626,8 +627,8 @@ fn pure_state_quantum_fisher_matrix(
     let mut information = [[0.0; 2]; 2];
     for left in 0..2 {
         for right in 0..2 {
-            let projected = derivative_norm[left][right]
-                - (overlaps[left].conj() * overlaps[right]).re;
+            let projected =
+                derivative_norm[left][right] - (overlaps[left].conj() * overlaps[right]).re;
             information[left][right] = 4.0 * projected;
             if !information[left][right].is_finite() {
                 return Err(DtcProbeError::NonFiniteFisherInformation);
@@ -638,7 +639,13 @@ fn pure_state_quantum_fisher_matrix(
     // Symmetrize only the roundoff-level asymmetry implied by the analytic
     // expression. A material asymmetry would indicate an implementation bug.
     let asymmetry = (information[0][1] - information[1][0]).abs();
-    if asymmetry > 1.0e-8 * information[0][0].abs().max(information[1][1].abs()).max(1.0) {
+    if asymmetry
+        > 1.0e-8
+            * information[0][0]
+                .abs()
+                .max(information[1][1].abs())
+                .max(1.0)
+    {
         return Err(DtcProbeError::NonFiniteFisherInformation);
     }
     let cross = 0.5 * (information[0][1] + information[1][0]);
@@ -701,8 +708,7 @@ fn total_z_classical_fisher_matrix(
         }
         for left in 0..2 {
             for right in 0..2 {
-                information[left][right] +=
-                    derivatives[left] * derivatives[right] / probability;
+                information[left][right] += derivatives[left] * derivatives[right] / probability;
             }
         }
     }
@@ -722,9 +728,7 @@ fn total_z_classical_fisher_matrix(
 /// nuisance. If phase has no information and no amplitude/phase coupling,
 /// phase is irrelevant to this amplitude readout and the known-phase value is
 /// retained. Otherwise the singular nuisance case returns None.
-fn effective_amplitude_information_with_phase_nuisance(
-    information: [[f64; 2]; 2],
-) -> Option<f64> {
+fn effective_amplitude_information_with_phase_nuisance(information: [[f64; 2]; 2]) -> Option<f64> {
     let amplitude = information[0][0];
     let cross = information[0][1];
     let phase = information[1][1];
@@ -905,17 +909,11 @@ mod tests {
         assert!(difference[0][0] >= -1.0e-6);
         assert!(difference[1][1] >= -1.0e-6);
         assert!(
-            difference[0][0] * difference[1][1]
-                - difference[0][1] * difference[1][0]
-                >= -1.0e-5
+            difference[0][0] * difference[1][1] - difference[0][1] * difference[1][0] >= -1.0e-5
         );
         assert!(report.joint_classical_fisher_within_quantum_bound);
-        assert!(
-            (report.classical_fisher_information_per_shot - classical[0][0]).abs() < 1.0e-12
-        );
-        assert!(
-            (report.quantum_fisher_information_per_shot - quantum[0][0]).abs() < 1.0e-12
-        );
+        assert!((report.classical_fisher_information_per_shot - classical[0][0]).abs() < 1.0e-12);
+        assert!((report.quantum_fisher_information_per_shot - quantum[0][0]).abs() < 1.0e-12);
     }
 
     #[test]
@@ -935,7 +933,11 @@ mod tests {
         zero_frequency.probe_frequency_cycles_per_drive_period = 0.0;
         let report = evaluate_dtc_probe_sensing(&zero_frequency).unwrap();
         assert_eq!(report.phase_time_offset_drive_periods_per_radian, None);
-        assert!(report.classical_effective_amplitude_fisher_with_phase_nuisance.is_some());
+        assert!(
+            report
+                .classical_effective_amplitude_fisher_with_phase_nuisance
+                .is_some()
+        );
     }
 
     #[test]
