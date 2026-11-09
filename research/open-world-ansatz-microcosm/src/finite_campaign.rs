@@ -790,7 +790,7 @@ mod tests {
             observed_evidence_count: 1,
             probe_count: 1,
         };
-        aggregate.record(&false_unique);
+        aggregate.record(&false_unique, crate::strategies::ProbeScoringWork::default());
 
         let missed = EvaluatorScore {
             structure_score: StructureScore {
@@ -803,7 +803,7 @@ mod tests {
             },
             ..false_unique.clone()
         };
-        aggregate.record(&missed);
+        aggregate.record(&missed, crate::strategies::ProbeScoringWork::default());
 
         let correct = EvaluatorScore {
             structure_score: StructureScore {
@@ -816,7 +816,7 @@ mod tests {
             },
             ..false_unique
         };
-        aggregate.record(&correct);
+        aggregate.record(&correct, crate::strategies::ProbeScoringWork::default());
 
         // The claimed parameterized-model set has two members in all
         // three fixtures. Structural singleton claims are scored separately.
