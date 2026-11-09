@@ -1,0 +1,777 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-behavior-observation-profile-v0.schema.json",
+  "title": "REA black-box behavior observation sidecar profile v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "status",
+    "source_policy",
+    "claim_scope",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "profile_id": {
+      "const": "rea.behavior-observation-profile.v0"
+    },
+    "status": {
+      "const": "design_fixture_only"
+    },
+    "source_policy": {
+      "const": "original_synthetic_capture_data_only"
+    },
+    "claim_scope": {
+      "const": "exact_invocation_and_environment_only"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidenceId": {
+      "type": "string",
+      "pattern": "^ev_[a-f0-9]{64}$"
+    },
+    "captureState": {
+      "enum": [
+        "complete",
+        "partial",
+        "unavailable",
+        "not_applicable"
+      ]
+    },
+    "byteCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/captureState"
+        },
+        "bytes_base64": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194304
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "complete",
+                  "partial"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "bytes_base64",
+              "sha256",
+              "byte_length"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unavailable"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "bytes_base64"
+                  ]
+                },
+                {
+                  "required": [
+                    "sha256"
+                  ]
+                },
+                {
+                  "required": [
+                    "byte_length"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "bytes_base64"
+                  ]
+                },
+                {
+                  "required": [
+                    "sha256"
+                  ]
+                },
+                {
+                  "required": [
+                    "byte_length"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "argvCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bytes_base64",
+        "sha256",
+        "byte_length"
+      ],
+      "properties": {
+        "bytes_base64": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16384
+        }
+      }
+    },
+    "environmentVariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "state"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+        },
+        "state": {
+          "enum": [
+            "captured",
+            "redacted",
+            "absent"
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/byteCapture"
+        },
+        "value_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "captured"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "value"
+            ],
+            "properties": {
+              "value": {
+                "properties": {
+                  "state": {
+                    "const": "complete"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "redacted"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "value_sha256",
+              "reason"
+            ],
+            "not": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "absent"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "value"
+                  ]
+                },
+                {
+                  "required": [
+                    "value_sha256"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "filesystemEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "change",
+        "before_sha256",
+        "after_sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "change": {
+          "enum": [
+            "created",
+            "modified",
+            "deleted"
+          ]
+        },
+        "before_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "after_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "filesystemCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "entries"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/filesystemEntry"
+          },
+          "maxItems": 4096
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unavailable"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "entries": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "partial"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ]
+    },
+    "observationAssertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion_id",
+        "predicate",
+        "capture_ref",
+        "observed_value"
+      ],
+      "properties": {
+        "assertion_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{2,63}$"
+        },
+        "predicate": {
+          "enum": [
+            "stdout_sha256",
+            "stderr_sha256",
+            "exit_code",
+            "signal",
+            "filesystem_diff_empty",
+            "filesystem_path_present"
+          ]
+        },
+        "capture_ref": {
+          "enum": [
+            "stdout",
+            "stderr",
+            "termination",
+            "filesystem"
+          ]
+        },
+        "observed_value": {
+          "type": [
+            "string",
+            "integer",
+            "boolean"
+          ]
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "claim_scope",
+        "target",
+        "evidence_binding",
+        "runner",
+        "invocation",
+        "result",
+        "assertions"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^REA-OBS-[0-9]{3}$"
+        },
+        "claim_scope": {
+          "const": "exact_invocation_and_environment_only"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject_sha256",
+            "executable_sha256",
+            "platform",
+            "architecture"
+          ],
+          "properties": {
+            "subject_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "executable_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "platform": {
+              "type": "string",
+              "minLength": 2
+            },
+            "architecture": {
+              "type": "string",
+              "minLength": 2
+            }
+          }
+        },
+        "evidence_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evidence_id",
+            "evidence_raw_sha256",
+            "subject_sha256",
+            "admission_state"
+          ],
+          "properties": {
+            "evidence_id": {
+              "$ref": "#/$defs/evidenceId"
+            },
+            "evidence_raw_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "subject_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "admission_state": {
+              "const": "unverified_reference"
+            }
+          }
+        },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile_sha256",
+            "os_release",
+            "architecture",
+            "locale",
+            "timezone",
+            "isolation",
+            "network"
+          ],
+          "properties": {
+            "profile_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "os_release": {
+              "type": "string",
+              "minLength": 2
+            },
+            "architecture": {
+              "type": "string",
+              "minLength": 2
+            },
+            "locale": {
+              "type": "string",
+              "minLength": 2
+            },
+            "timezone": {
+              "type": "string",
+              "minLength": 1
+            },
+            "isolation": {
+              "enum": [
+                "process",
+                "container",
+                "virtual_machine"
+              ]
+            },
+            "network": {
+              "enum": [
+                "disabled",
+                "allowlisted",
+                "unrestricted",
+                "unknown"
+              ]
+            }
+          }
+        },
+        "invocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "argv",
+            "stdin",
+            "working_directory",
+            "environment",
+            "timeout_ms"
+          ],
+          "properties": {
+            "argv": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "items": {
+                "$ref": "#/$defs/argvCapture"
+              }
+            },
+            "stdin": {
+              "$ref": "#/$defs/byteCapture"
+            },
+            "working_directory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "environment": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/environmentVariable"
+              },
+              "maxItems": 256
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400000
+            }
+          }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "started_at",
+            "ended_at",
+            "termination",
+            "stdout",
+            "stderr",
+            "filesystem"
+          ],
+          "properties": {
+            "started_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "ended_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "termination": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "exit",
+                    "signal",
+                    "timeout",
+                    "launch_error"
+                  ]
+                },
+                "exit_code": {
+                  "type": "integer",
+                  "minimum": -255,
+                  "maximum": 255
+                },
+                "signal": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 255
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 3
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "exit"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "exit_code"
+                    ],
+                    "not": {
+                      "required": [
+                        "signal"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "signal"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "signal"
+                    ],
+                    "not": {
+                      "required": [
+                        "exit_code"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "timeout",
+                          "launch_error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "reason"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "exit_code"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "signal"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "stdout": {
+              "$ref": "#/$defs/byteCapture"
+            },
+            "stderr": {
+              "$ref": "#/$defs/byteCapture"
+            },
+            "filesystem": {
+              "$ref": "#/$defs/filesystemCapture"
+            }
+          }
+        },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observationAssertion"
+          },
+          "maxItems": 256
+        }
+      }
+    }
+  }
+}
