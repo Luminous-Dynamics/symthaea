@@ -20,6 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::group_envelope::{
     ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
+    continuous_hv_query_digest,
 };
 
 use symthaea_core::hdc::continuous_hv_interval::{
@@ -180,6 +181,7 @@ pub struct GroupScoreIntervalRecord {
     identity: GroupScoreIntervalIdentity,
     member_ids: Vec<String>,
     member_payload_digests: Vec<[u8; 32]>,
+    query_digest: [u8; 32],
     member_count: usize,
     interval: ContinuousHVScoreInterval,
 }
@@ -243,6 +245,7 @@ impl GroupScoreIntervalRecord {
             },
             member_ids: envelope.member_ids().to_vec(),
             member_payload_digests: envelope.member_payload_digests().to_vec(),
+            query_digest: continuous_hv_query_digest(query),
             member_count,
             interval,
         })
@@ -281,6 +284,12 @@ pub struct GroupIntervalCoverageCounts {
     pub covered_records: usize,
     /// Number of group intervals supplied.
     pub interval_groups: usize,
+    /// Expected manifest generation for all groups in this query.
+    pub expected_manifest_generation: u64,
+    /// Expected eligibility generation for all groups in this query.
+    pub expected_eligibility_generation: u64,
+    /// Digest of the exact query vector used to produce every group interval.
+    pub query_digest: [u8; 32],
     /// Number of unopened groups without an admissible aggregate interval.
     pub unbounded_unopened_groups: usize,
 }
@@ -295,6 +304,12 @@ pub struct GroupIntervalCoverageCounts {
 pub struct GroupIntervalSelectionPlan {
     /// kth-largest weighted lower endpoint over the complete eligible corpus.
     pub threshold: f32,
+    /// Manifest generation pinned by this plan.
+    pub manifest_generation: u64,
+    /// Eligibility generation pinned by this plan.
+    pub eligibility_generation: u64,
+    /// Exact query vector identity used for all interval calculations.
+    pub query_digest: [u8; 32],
     /// Snapshot-bound group identities whose members must be visited or refined.
     pub refinement_groups: Vec<GroupScoreIntervalIdentity>,
     /// Snapshot-bound groups proven unable to contain a member in the exact top-k.
@@ -438,6 +453,7 @@ impl VerifiedMemberResidualCertificate {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroupMemberScoreIntervalRecord {
     group_identity: GroupScoreIntervalIdentity,
+    query_digest: [u8; 32],
     record: ScoreIntervalRecord<String>,
 }
 
@@ -500,6 +516,7 @@ impl GroupMemberScoreIntervalRecord {
         .map_err(GroupMemberScoreIntervalBuildError::ScoreInterval)?;
         Ok(Self {
             group_identity: group.identity,
+            query_digest: continuous_hv_query_digest(query),
             record,
         })
     }
@@ -568,6 +585,7 @@ impl GroupMemberScoreIntervalRecord {
         }
         Ok(Self {
             group_identity: group.identity,
+            query_digest: continuous_hv_query_digest(query),
             record: ScoreIntervalRecord {
                 id: certificate.member_id.clone(),
                 interval,
@@ -718,6 +736,16 @@ pub enum GroupIntervalSelectionError {
         /// Group index with inconsistent metadata.
         group_index: usize,
     },
+    /// One interval was built under a different snapshot generation.
+    SnapshotGenerationMismatch {
+        /// Group index that disagreed with the pinned generation.
+        group_index: usize,
+    },
+    /// One interval was calculated for a different query vector.
+    QueryDigestMismatch {
+        /// Group index that disagreed with the pinned query.
+        group_index: usize,
+    },
     /// Summing group member counts overflowed usize.
     MemberCountOverflow,
 }
@@ -759,6 +787,12 @@ impl std::fmt::Display for GroupIntervalSelectionError {
             ),
             Self::InvalidGroupMembership { group_index } => {
                 write!(f, "group {group_index} has inconsistent member metadata")
+            }
+            Self::SnapshotGenerationMismatch { group_index } => {
+                write!(f, "group {group_index} belongs to another manifest or eligibility generation")
+            }
+            Self::QueryDigestMismatch { group_index } => {
+                write!(f, "group {group_index} was scored for another query vector")
             }
             Self::MemberCountOverflow => write!(f, "group member count overflow"),
         }
@@ -967,6 +1001,14 @@ pub fn select_group_refinement_set(
         {
             return Err(GroupIntervalSelectionError::InvalidGroupMembership { group_index });
         }
+        if group.identity.manifest_generation != coverage.expected_manifest_generation
+            || group.identity.eligibility_generation != coverage.expected_eligibility_generation
+        {
+            return Err(GroupIntervalSelectionError::SnapshotGenerationMismatch { group_index });
+        }
+        if group.query_digest != coverage.query_digest {
+            return Err(GroupIntervalSelectionError::QueryDigestMismatch { group_index });
+        }
         if !group.interval.is_well_formed() {
             return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
         }
@@ -1063,6 +1105,9 @@ pub fn select_group_refinement_set(
 
     Ok(GroupIntervalSelectionPlan {
         threshold,
+        manifest_generation: coverage.expected_manifest_generation,
+        eligibility_generation: coverage.expected_eligibility_generation,
+        query_digest: coverage.query_digest,
         refinement_groups,
         excluded_groups,
         refinement_record_count,
@@ -1114,6 +1159,11 @@ pub fn select_hierarchical_refinement_set(
     > = BTreeMap::new();
 
     for member in member_records {
+        if member.query_digest != group_plan.query_digest {
+            return Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup {
+                group_identity: member.group_identity,
+            });
+        }
         let Some(group) = selected_groups.get(&member.group_identity).copied() else {
             return Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup {
                 group_identity: member.group_identity,
@@ -1306,6 +1356,7 @@ mod tests {
             },
             member_ids,
             member_payload_digests,
+            query_digest: [0x51u8; 32],
             member_count,
             interval: ContinuousHVScoreInterval { lower, upper },
         }
@@ -1315,10 +1366,14 @@ mod tests {
         groups: &[GroupScoreIntervalRecord],
     ) -> GroupIntervalCoverageCounts {
         let members = groups.iter().map(|group| group.member_count).sum();
+        let first = groups.first().expect("synthetic coverage requires a group");
         GroupIntervalCoverageCounts {
             eligible_records: members,
             covered_records: members,
             interval_groups: groups.len(),
+            expected_manifest_generation: first.identity.manifest_generation,
+            expected_eligibility_generation: first.identity.eligibility_generation,
+            query_digest: first.query_digest,
             unbounded_unopened_groups: 0,
         }
     }
