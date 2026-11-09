@@ -501,6 +501,91 @@ pub fn validate_profile_bytes(bytes: &[u8]) -> Result<Value, ObservationError> {
     }))
 }
 
+
+fn validate_behavioral_spec(
+    profile: &Value,
+    observations: &std::collections::BTreeMap<String, &Value>,
+) -> Result<(), ObservationError> {
+    let spec = profile.get("behavioral_spec").ok_or_else(|| {
+        ObservationError("behavioral_spec is required".to_owned())
+    })?;
+    let clauses = spec.get("clauses").and_then(Value::as_array).ok_or_else(|| {
+        ObservationError("behavioral_spec.clauses must be an array".to_owned())
+    })?;
+    let mut clause_ids = BTreeSet::new();
+
+    for clause in clauses {
+        let clause_id = get_str(clause, "clause_id", "behavioral_clause")?;
+        if !clause_ids.insert(clause_id.to_owned()) {
+            return Err(ObservationError(format!(
+                "duplicate behavioral clause ID {clause_id}"
+            )));
+        }
+        let status = get_str(clause, "support_status", clause_id)?;
+        let scope = clause.get("scope").ok_or_else(|| {
+            ObservationError(format!("{clause_id}.scope missing"))
+        })?;
+        let scope_kind = get_str(scope, "kind", clause_id)?;
+
+        match status {
+            "observed_exact_invocation" => {
+                if scope_kind != "exact_invocation" {
+                    return Err(ObservationError(format!(
+                        "{clause_id}: observed clause must have exact_invocation scope"
+                    )));
+                }
+                let observation_id = get_str(scope, "observation_id", clause_id)?;
+                let assertion_id = get_str(scope, "assertion_id", clause_id)?;
+                let observation = observations.get(observation_id).ok_or_else(|| {
+                    ObservationError(format!(
+                        "{clause_id} references unknown observation {observation_id}"
+                    ))
+                })?;
+                let assertions = observation
+                    .get("assertions")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| {
+                        ObservationError(format!(
+                            "{observation_id}.assertions must be an array"
+                        ))
+                    })?;
+                if !assertions.iter().any(|assertion| {
+                    assertion.get("assertion_id").and_then(Value::as_str)
+                        == Some(assertion_id)
+                }) {
+                    return Err(ObservationError(format!(
+                        "{clause_id} references unknown assertion {assertion_id} in {observation_id}"
+                    )));
+                }
+            }
+            "untested" => {
+                if scope_kind != "bounded_input_class"
+                    || scope.get("observation_id").is_some()
+                    || scope.get("assertion_id").is_some()
+                    || scope.get("input_class").and_then(Value::as_str).is_none()
+                    || scope.get("falsification_condition").and_then(Value::as_str).is_none()
+                {
+                    return Err(ObservationError(format!(
+                        "{clause_id}: untested input-class rule must remain explicitly untested, bounded and falsifiable"
+                    )));
+                }
+            }
+            other => {
+                return Err(ObservationError(format!(
+                    "{clause_id} has unsupported support status {other}"
+                )));
+            }
+        }
+
+        if clause.get("limitations").and_then(Value::as_array).is_none_or(Vec::is_empty) {
+            return Err(ObservationError(format!(
+                "{clause_id} must retain at least one limitation"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn validate_profile(value: &Value) -> Result<(), ObservationError> {
     if get_str(value, "status", "profile")? != "design_fixture_only"
         || get_str(value, "source_policy", "profile")? != "original_synthetic_capture_data_only"
@@ -514,13 +599,16 @@ pub fn validate_profile(value: &Value) -> Result<(), ObservationError> {
         ObservationError("observations must be an array".into())
     })?;
     let mut ids = BTreeSet::new();
+    let mut observations_by_id = std::collections::BTreeMap::new();
     for observation in observations {
         let id = get_str(observation, "observation_id", "observation")?;
         if !ids.insert(id.to_owned()) {
             return Err(ObservationError(format!("duplicate observation_id {id}")));
         }
         validate_observation(observation)?;
+        observations_by_id.insert(id.to_owned(), observation);
     }
+    validate_behavioral_spec(value, &observations_by_id)?;
     Ok(())
 }
 
@@ -692,6 +780,49 @@ mod tests {
         value["observations"][2]["assertions"] = serde_json::json!([
             {"assertion_id":"stdout_exact","predicate":"stdout_sha256","capture_ref":"stdout","observed_value":"2725aea2d2dea736fbe38e41ecb518f6098cb68ac77362c5e34faafb356567c5"}
         ]);
+        assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn observed_behavior_clause_must_reference_real_observation_and_assertion() {
+        let mut value = fixture();
+        value["behavioral_spec"]["clauses"][0]["scope"]["assertion_id"] =
+            Value::String("missing_assertion".into());
+        assert!(validate_profile(&value).is_err());
+
+        let mut value = fixture();
+        value["behavioral_spec"]["clauses"][0]["scope"]["observation_id"] =
+            Value::String("REA-OBS-999".into());
+        assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn single_observation_cannot_be_promoted_to_bounded_input_class_rule() {
+        let mut value = fixture();
+        value["behavioral_spec"]["clauses"][0]["support_status"] =
+            Value::String("untested".into());
+        value["behavioral_spec"]["clauses"][0]["scope"]["kind"] =
+            Value::String("bounded_input_class".into());
+        value["behavioral_spec"]["clauses"][0]["scope"]["input_class"] =
+            Value::String("all possible inputs".into());
+        value["behavioral_spec"]["clauses"][0]["scope"]["falsification_condition"] =
+            Value::String("one counterexample".into());
+        assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn untested_bounded_rule_must_not_claim_an_observation() {
+        let mut value = fixture();
+        value["behavioral_spec"]["clauses"][2]["scope"]["observation_id"] =
+            Value::String("REA-OBS-001".into());
+        assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn duplicate_behavior_clause_ids_are_rejected() {
+        let mut value = fixture();
+        value["behavioral_spec"]["clauses"][1]["clause_id"] =
+            value["behavioral_spec"]["clauses"][0]["clause_id"].clone();
         assert!(validate_profile(&value).is_err());
     }
 
