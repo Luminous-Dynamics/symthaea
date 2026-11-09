@@ -710,15 +710,25 @@ pub fn rank_detection_aware_model_discriminating_experiments(
         }
 
         let measurement_sigma = experiment.measurement_sigma.expect("comparability gate");
-        let normal_predictions: Vec<(f64, f64)> = experiment
+        // Prediction rows are keyed by model ID, not by caller-supplied vector
+        // position. Canonicalize to the hypothesis order before pairing them
+        // with the prior and detection probabilities.
+        let prediction_by_model: BTreeMap<&str, (f64, f64)> = experiment
             .predictions
             .iter()
             .map(|prediction| {
                 (
-                    prediction.predictive_mean.expect("comparability gate"),
-                    prediction.predictive_sigma.expect("comparability gate"),
+                    prediction.model_id.as_str(),
+                    (
+                        prediction.predictive_mean.expect("comparability gate"),
+                        prediction.predictive_sigma.expect("comparability gate"),
+                    ),
                 )
             })
+            .collect();
+        let normal_predictions: Vec<(f64, f64)> = hypotheses
+            .iter()
+            .map(|hypothesis| prediction_by_model[hypothesis.model_id.as_str()])
             .collect();
         let detection_probabilities: Vec<f64> = hypotheses
             .iter()
@@ -2004,6 +2014,60 @@ mod tests {
             } else {
                 assert!(scenario.conditional_detected_value_eig_nats.unwrap() > 0.0);
             }
+        }
+    }
+
+    #[test]
+    fn prediction_and_detection_row_permutations_preserve_detection_aware_eig() {
+        let hypotheses = vec![
+            hypothesis("model-a", b'a'),
+            hypothesis("model-b", b'b'),
+            hypothesis("model-c", b'c'),
+        ];
+        let predictions = vec![
+            prediction("model-a", Some(-0.8), Some(0.1)),
+            prediction("model-b", Some(0.1), Some(0.2)),
+            prediction("model-c", Some(1.3), Some(0.15)),
+        ];
+        let detection_rows = vec![
+            detection_prediction("model-a", 0.85),
+            detection_prediction("model-b", 0.45),
+            detection_prediction("model-c", 0.10),
+        ];
+        let first = detection_candidate(
+            "first-order",
+            0.9,
+            predictions.clone(),
+            detection_rows.clone(),
+        );
+        let second = detection_candidate(
+            "permuted-order",
+            0.9,
+            vec![predictions[2].clone(), predictions[0].clone(), predictions[1].clone()],
+            vec![
+                detection_rows[1].clone(),
+                detection_rows[2].clone(),
+                detection_rows[0].clone(),
+            ],
+        );
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[first, second],
+            &config(vec![equal_prior(), ModelPriorScenario {
+                scenario_id: "skewed".to_string(),
+                scenario_weight: 1.0,
+                probabilities: vec![4.0, 1.0, 1.0],
+            }], 256),
+        )
+        .unwrap();
+        let first = report.experiments.iter().find(|score| score.experiment_id == "first-order").unwrap();
+        let second = report.experiments.iter().find(|score| score.experiment_id == "permuted-order").unwrap();
+        assert_eq!(first.status, ExperimentDiscriminationStatus::Scored);
+        assert_eq!(second.status, ExperimentDiscriminationStatus::Scored);
+        for (left, right) in first.prior_scenario_scores.iter().zip(&second.prior_scenario_scores) {
+            assert!((left.detection_indicator_eig_nats - right.detection_indicator_eig_nats).abs() < 1.0e-12);
+            assert!((left.total_eig_given_execution_nats - right.total_eig_given_execution_nats).abs() < 1.0e-10);
+            assert!((left.availability_adjusted_total_eig_nats - right.availability_adjusted_total_eig_nats).abs() < 1.0e-10);
         }
     }
 
