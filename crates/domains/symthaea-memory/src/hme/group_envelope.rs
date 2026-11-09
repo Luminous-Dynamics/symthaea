@@ -27,6 +27,7 @@ use symthaea_core::hdc::ContinuousHV;
 /// Domain separator for deterministic group-envelope content identities.
 const GROUP_ENVELOPE_DOMAIN: &[u8] = b"hme_continuous_hv_group_envelope_v2";
 const MEMBER_PAYLOAD_DOMAIN: &[u8] = b"hme_continuous_hv_member_payload_v1";
+const QUERY_DOMAIN: &[u8] = b"hme_continuous_hv_query_v1";
 
 /// Immutable coordinate envelope for one homogeneous ContinuousHV group.
 #[derive(Debug, Clone, PartialEq)]
@@ -149,6 +150,17 @@ impl std::fmt::Display for GroupEnvelopeError {
 }
 
 impl std::error::Error for GroupEnvelopeError {}
+
+/// Compute a domain-separated identity for an exact canonical query vector.
+pub fn continuous_hv_query_digest(query: &ContinuousHV) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(QUERY_DOMAIN);
+    hasher.update(&(query.values.len() as u64).to_le_bytes());
+    for value in &query.values {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+    *hasher.finalize().as_bytes()
+}
 
 /// Compute a content digest for one stable-ID/ContinuousHV payload pair.
 ///
