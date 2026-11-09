@@ -1281,6 +1281,139 @@ mod tests {
     }
 
     #[test]
+    fn nuisance_only_measurement_can_improve_target_when_prior_couples_them() {
+        let scenarios = vec![DesignScenario {
+            scenario_id: "correlated-target-clock-prior".to_string(),
+            target_parameter_count: 1,
+            weight: 1.0,
+            prior_precision: vec![vec![2.0, 0.5], vec![0.5, 1.0]],
+        }];
+        let options = vec![option(
+            "clock-only-calibration",
+            1.0,
+            None,
+            vec![vec![vec![0.0, 1.0]]],
+        )];
+        let scores = evaluate_selection(
+            &scenarios,
+            &options,
+            &[0],
+            &[1.0, 1.0],
+            2,
+        )
+        .unwrap();
+
+        // Prior target marginal precision is 2 - 0.5^2/1 = 1.75.
+        // After measuring only the nuisance parameter it becomes
+        // 2 - 0.5^2/2 = 1.875, so target information legitimately improves.
+        let expected_target_gain = (1.875_f64 / 1.75).ln();
+        assert!(
+            (scores[0].information_gain_nats - expected_target_gain).abs() < 1.0e-12
+        );
+        assert!(scores[0].joint_information_gain_nats > scores[0].information_gain_nats);
+    }
+
+    #[test]
+    fn shared_clock_state_prevents_false_independent_sensor_information_gain() {
+        let shared_clock_scenarios = vec![DesignScenario {
+            scenario_id: "two-sensors-one-shared-clock".to_string(),
+            target_parameter_count: 1,
+            weight: 1.0,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        }];
+        let shared_clock_options = vec![
+            option("sensor-a", 1.0, None, vec![vec![vec![1.0, 1.0]]]),
+            option("sensor-b", 1.0, None, vec![vec![vec![1.0, 1.0]]]),
+        ];
+        let shared_clock = evaluate_selection(
+            &shared_clock_scenarios,
+            &shared_clock_options,
+            &[0, 1],
+            &[1.0, 1.0],
+            2,
+        )
+        .unwrap();
+
+        // Deliberately misspecified alternative: each sensor is assigned an
+        // independent clock-offset nuisance instead of the one shared clock.
+        let independent_clock_scenarios = vec![DesignScenario {
+            scenario_id: "two-sensors-two-independent-clocks".to_string(),
+            target_parameter_count: 1,
+            weight: 1.0,
+            prior_precision: vec![
+                vec![1.0, 0.0, 0.0],
+                vec![0.0, 1.0, 0.0],
+                vec![0.0, 0.0, 1.0],
+            ],
+        }];
+        let independent_clock_options = vec![
+            option("sensor-a", 1.0, None, vec![vec![vec![1.0, 1.0, 0.0]]]),
+            option("sensor-b", 1.0, None, vec![vec![vec![1.0, 0.0, 1.0]]]),
+        ];
+        let independent_clocks = evaluate_selection(
+            &independent_clock_scenarios,
+            &independent_clock_options,
+            &[0, 1],
+            &[1.0, 1.0, 1.0],
+            3,
+        )
+        .unwrap();
+
+        let shared_expected = (5.0_f64 / 3.0).ln();
+        let independent_expected = 2.0_f64.ln();
+        assert!(
+            (shared_clock[0].information_gain_nats - shared_expected).abs() < 1.0e-12
+        );
+        assert!(
+            (independent_clocks[0].information_gain_nats - independent_expected).abs()
+                < 1.0e-12
+        );
+        assert!(
+            independent_clocks[0].information_gain_nats
+                > shared_clock[0].information_gain_nats
+        );
+    }
+
+    #[test]
+    fn random_spd_blocks_satisfy_schur_determinant_identity() {
+        // Construct lower-triangular factors with a deterministic sequence,
+        // form Lambda = L L^T, then verify det(Schur) = det(Lambda) / det(C).
+        for trial in 1..=64 {
+            let mut lower = vec![vec![0.0; 4]; 4];
+            for row in 0..4 {
+                for column in 0..=row {
+                    lower[row][column] = if row == column {
+                        1.0 + ((trial * (row + 3) + column * 7) % 11) as f64 / 5.0
+                    } else {
+                        (((trial * (row + 5) + column * 13) % 17) as f64 - 8.0) / 23.0
+                    };
+                }
+            }
+            let mut precision = vec![vec![0.0; 4]; 4];
+            for row in 0..4 {
+                for column in 0..4 {
+                    precision[row][column] = (0..4)
+                        .map(|index| lower[row][index] * lower[column][index])
+                        .sum();
+                }
+            }
+
+            let full_logdet = cholesky_log_determinant(&precision).unwrap();
+            let nuisance = vec![
+                vec![precision[2][2], precision[2][3]],
+                vec![precision[3][2], precision[3][3]],
+            ];
+            let nuisance_logdet = cholesky_log_determinant(&nuisance).unwrap();
+            let target_schur_logdet =
+                marginal_target_log_determinant(&precision, 2).unwrap();
+            assert!(
+                (target_schur_logdet - (full_logdet - nuisance_logdet)).abs() < 1.0e-10,
+                "trial={trial}"
+            );
+        }
+    }
+
+    #[test]
     fn exhaustive_oracle_rejects_large_candidate_sets() {
         let scenarios = vec![scenario("single", 1.0)];
         let options = (0..21)
