@@ -42,8 +42,11 @@ pub struct RawProsodyInfo {
 pub struct PunctuationEvidence {
     /// Position in the original Piper token array.
     pub raw_token_index: usize,
-    /// Number of lexical words completed before this punctuation token.
-    pub after_word_count: usize,
+    /// Zero-based lexical word slot containing or following this punctuation.
+    pub word_index: usize,
+    /// Number of reconstructed IPA Unicode characters preceding this token
+    /// within that word. Punctuation does not consume an IPA character index.
+    pub after_ipa_character_index: usize,
     pub token: String,
 }
 
@@ -156,9 +159,6 @@ pub fn normalize_piper_english(
                       current_tokens: &mut Vec<String>,
                       current_prosody: &mut Vec<Option<RawProsodyInfo>>,
                       stress_evidence: &mut Vec<StressEvidence>| {
-        if current_tokens.is_empty() {
-            return;
-        }
         let raw_ipa = current_tokens.concat();
         words.push(RawWordHypothesis {
             word_index: words.len(),
@@ -219,18 +219,12 @@ pub fn normalize_piper_english(
                         pending_stress.as_ref().unwrap().0
                     ));
                 }
-                flush_word(
-                    &mut words,
-                    &mut current_tokens,
-                    &mut current_prosody,
-                    &mut stress_evidence,
-                );
                 punctuation.push(PunctuationEvidence {
                     raw_token_index,
-                    after_word_count: words.len(),
+                    word_index: words.len(),
+                    after_ipa_character_index: raw_position,
                     token: token.clone(),
                 });
-                raw_position = 0;
             }
             _ => {
                 if let Some((marker_index, kind, marker_info)) = pending_stress.take() {
@@ -392,6 +386,14 @@ mod tests {
                 .map(|item| item.token.as_str())
                 .collect::<Vec<_>>(),
             vec!["“", ",", "!", "”"]
+        );
+        assert_eq!(
+            normalized
+                .punctuation
+                .iter()
+                .map(|item| (item.word_index, item.after_ipa_character_index))
+                .collect::<Vec<_>>(),
+            vec![(0, 0), (0, 5), (1, 5), (1, 5)]
         );
         assert_eq!(normalized.raw_tokens, tokens);
         assert_eq!(normalized.raw_prosody.len(), tokens.len());
