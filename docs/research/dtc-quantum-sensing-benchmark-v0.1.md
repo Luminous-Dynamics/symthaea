@@ -171,6 +171,43 @@ Thresholds must be frozen after pilot and null-distribution analysis, before qua
 10. Tensor-network comparison with bond-dimension/truncation convergence.
 11. Published-data bridge when provenance and raw data are genuinely available.
 
+
+## Joint amplitude–phase metrology and clock-offset nuisance — 2026-11-09
+
+The initial finite-Floquet sensor calculation treated the probe's initial phase as known and estimated only the amplitude derivative. That is a conditional metrology problem. A field sensor with clock offset or unknown signal phase must instead treat phase/time as a nuisance parameter.
+
+The new child workstream [DTC-CLOCK-001 #11261](https://github.com/Luminous-Dynamics/symthaea/issues/11261) adds a local two-parameter model:
+
+`theta = [A, phi]`
+
+where A is the dimensionless sampled probe-kick amplitude and phi is the initial phase at the first probe midpoint. At known probe frequency f, phase uncertainty is locally equivalent to a clock offset in drive-period units:
+
+`delta_t = -delta_phi / (2 pi f)`
+
+The conversion is undefined at f=0; this is a deliberate phase-nonidentifiable control.
+
+The implementation now runs matched nominal, +/-amplitude and +/-phase state-vector trajectories. It reports:
+- the 2x2 classical FI matrix for the exact N+1 total-down-spin readout outcomes;
+- the 2x2 pure-state QFIM for the same amplitude/phase parameterization;
+- amplitude information after eliminating phase as a nuisance using the Schur complement;
+- joint local CRLB covariance matrices when the parameter pair is identifiable;
+- the phase-to-clock-offset conversion in drive periods per radian;
+- a positive-semidefinite matrix comparison of CFI against QFIM, separate from the existing scalar diagonal check.
+
+The known-phase scalar values remain available as the amplitude diagonal, but must be described as conditional. Do not use them as the amplitude sensitivity bound when phase is unknown. A singular joint matrix must not be hidden by falling back to the known-phase result.
+
+A March 9, 2026 Physical Review A paper derives two-parameter QFI and Cramér–Rao bounds for generic quantum sensors while treating time as an uncertain nuisance parameter (DOI: 10.1103/nn67-9tph). This is a metrology-method comparator, not evidence about DTC sensors specifically. It reinforces the need to include clock uncertainty in the sensing model rather than assuming perfect timing.
+
+An independent small-system Python reference for one representative six-spin configuration (J=0.5, pulse angle pi+0.08, 96 periods, amplitude 0.04, f=0.25 cycles/period, phase 0) gives:
+- known-phase classical amplitude FI approximately 2.44e-2 per shot;
+- joint classical nuisance-adjusted amplitude FI approximately 1.29e-4 per shot;
+- known-phase pure-state QFI approximately 8.96e-1 per shot;
+- joint pure-state nuisance-adjusted amplitude QFI approximately 8.83e-1 per shot.
+
+This is one finite-system synthetic setting, not a universal ratio, experiment reproduction or sensitivity result. It illustrates that the actual collective readout and phase nuisance can change the inferential value substantially; the QFI remains an upper bound, not achieved information.
+
+Acceptance requires independent analytic QFIM/CFI oracles, PSD checks, finite-difference convergence, phase-origin invariance, a zero-frequency control, and a matched known-phase versus unknown-phase comparison. The full experiment budget still needs preparation, readout, reset, dead time, time jitter, calibration drift and a conventional Ramsey/lock-in baseline before any sensitivity comparison.
+
 ## Claim ceiling
 
 A numerical pass validates only a declared model and estimator. It does not reproduce the diamond experiment, show that Symthaea has achieved a physical DTC sensor, exceed current experimental sensitivity, or connect temporal order to UAP propulsion. A valid negative result is that no information advantage survives matched resources and noise.
