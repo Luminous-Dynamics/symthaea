@@ -18,11 +18,24 @@ const MAX_TASKS: u32 = 128;
 
 const NIX_BASE32: &str = "0123456789abcdfghijklmnpqrsvwxyz";
 
+/// Fixed descriptors expected by the trusted launcher and Bubblewrap plan.
+pub const SECCOMP_FD: i32 = 3;
+/// Pre-seccomp staging barrier. EOF is NOT a deny signal in Bubblewrap; the
+/// post-seccomp gate descriptor is the actual admission boundary.
+pub const PRE_SECCOMP_BLOCK_FD: i32 = 4;
+/// Bubblewrap JSON-lines child PID/namespace and exit-status channel.
+pub const JSON_STATUS_FD: i32 = 5;
+/// One-shot trusted gate channel. The gate must reject EOF and malformed tokens.
+pub const GATE_CONTROL_FD: i32 = 6;
+/// Held by Bubblewrap's monitor for the sandbox lifetime; not inherited by gate.
+pub const SANDBOX_SYNC_FD: i32 = 7;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SandboxPlanError {
     InvalidPath(&'static str),
     InvalidStorePath(String),
     CandidateNotInClosure,
+    GateNotInClosure,
     EmptyClosure,
     TooManyClosureEntries,
     DuplicateClosureEntry(String),
@@ -30,6 +43,7 @@ pub enum SandboxPlanError {
     InvalidLimit(&'static str),
     InvalidSeccompDescriptor,
     InvalidBubblewrapPath,
+    InvalidGatePath,
 }
 
 impl fmt::Display for SandboxPlanError {
@@ -39,6 +53,9 @@ impl fmt::Display for SandboxPlanError {
             Self::InvalidStorePath(path) => write!(f, "invalid Nix store entry: {path}"),
             Self::CandidateNotInClosure => {
                 write!(f, "candidate executable is not inside a pinned runtime closure entry")
+            }
+            Self::GateNotInClosure => {
+                write!(f, "trusted gate executable is not inside a pinned runtime closure entry")
             }
             Self::EmptyClosure => write!(f, "runtime closure must not be empty"),
             Self::TooManyClosureEntries => write!(f, "runtime closure exceeds the entry limit"),
@@ -52,6 +69,9 @@ impl fmt::Display for SandboxPlanError {
             }
             Self::InvalidBubblewrapPath => {
                 write!(f, "Bubblewrap executable must be an absolute pinned Nix store path")
+            }
+            Self::InvalidGatePath => {
+                write!(f, "trusted gate executable must be an absolute pinned Nix store path")
             }
         }
     }
@@ -70,6 +90,10 @@ pub struct RuntimeClosureEntry {
 pub struct CandidateSandboxSpec {
     pub candidate_executable: String,
     pub candidate_sha256: [u8; 32],
+    /// Trusted, pinned gate helper. Bubblewrap must execute this helper first;
+    /// it must not execute candidate code until it receives the exact release token.
+    pub gate_executable: String,
+    pub gate_sha256: [u8; 32],
     pub runtime_closure: Vec<RuntimeClosureEntry>,
     pub bubblewrap_executable: String,
     pub bubblewrap_sha256: [u8; 32],
@@ -91,6 +115,7 @@ pub struct CandidateSandboxPlan {
     pub bubblewrap_arguments: Vec<String>,
     pub systemd_run_arguments: Vec<String>,
     pub candidate_executable: String,
+    pub gate_executable: String,
     pub runtime_closure_sha256: [u8; 32],
     pub plan_sha256: [u8; 32],
 }
@@ -146,13 +171,16 @@ fn validate_spec(spec: &CandidateSandboxSpec) -> Result<Vec<RuntimeClosureEntry>
     if spec.candidate_sha256 == [0; 32] {
         return Err(SandboxPlanError::ZeroDigest("candidate"));
     }
+    if spec.gate_sha256 == [0; 32] {
+        return Err(SandboxPlanError::ZeroDigest("trusted gate"));
+    }
     if spec.bubblewrap_sha256 == [0; 32] {
         return Err(SandboxPlanError::ZeroDigest("Bubblewrap"));
     }
     if spec.seccomp_sha256 == [0; 32] {
         return Err(SandboxPlanError::ZeroDigest("seccomp"));
     }
-    if spec.seccomp_fd != 3 {
+    if spec.seccomp_fd != SECCOMP_FD {
         return Err(SandboxPlanError::InvalidSeccompDescriptor);
     }
     if candidate_store_root(&spec.candidate_executable).is_none() {
@@ -160,6 +188,9 @@ fn validate_spec(spec: &CandidateSandboxSpec) -> Result<Vec<RuntimeClosureEntry>
     }
     if candidate_store_root(&spec.bubblewrap_executable).is_none() {
         return Err(SandboxPlanError::InvalidBubblewrapPath);
+    }
+    if candidate_store_root(&spec.gate_executable).is_none() {
+        return Err(SandboxPlanError::InvalidGatePath);
     }
     if spec.runtime_closure.is_empty() {
         return Err(SandboxPlanError::EmptyClosure);
@@ -191,10 +222,13 @@ fn validate_spec(spec: &CandidateSandboxSpec) -> Result<Vec<RuntimeClosureEntry>
 
     let candidate_root = candidate_store_root(&spec.candidate_executable)
         .ok_or(SandboxPlanError::InvalidPath("candidate_executable"))?;
+    let gate_root = candidate_store_root(&spec.gate_executable)
+        .ok_or(SandboxPlanError::InvalidGatePath)?;
     let mut closure = spec.runtime_closure.clone();
     closure.sort_by(|left, right| left.store_path.cmp(&right.store_path));
     let mut previous: Option<&str> = None;
     let mut contains_candidate = false;
+    let mut contains_gate = false;
     for entry in &closure {
         if nix_store_entry_name(&entry.store_path).is_none() {
             return Err(SandboxPlanError::InvalidStorePath(entry.store_path.clone()));
@@ -209,9 +243,15 @@ fn validate_spec(spec: &CandidateSandboxSpec) -> Result<Vec<RuntimeClosureEntry>
         if entry.store_path == candidate_root {
             contains_candidate = true;
         }
+        if entry.store_path == gate_root {
+            contains_gate = true;
+        }
     }
     if !contains_candidate {
         return Err(SandboxPlanError::CandidateNotInClosure);
+    }
+    if !contains_gate {
+        return Err(SandboxPlanError::GateNotInClosure);
     }
     Ok(closure)
 }
@@ -224,6 +264,15 @@ fn closure_digest(entries: &[RuntimeClosureEntry]) -> [u8; 32] {
         hasher.bytes(&entry.artifact_sha256);
     }
     hasher.finish()
+}
+
+fn hex_digest(digest: &[u8; 32]) -> String {
+    let mut value = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut value, "{byte:02x}");
+    }
+    value
 }
 
 fn build_bubblewrap_arguments(
@@ -281,10 +330,25 @@ fn build_bubblewrap_arguments(
         "--setenv".into(),
         "LC_ALL".into(),
         "C".into(),
+        // Bubblewrap 0.11.x: block-fd is only a staging barrier. Its current
+        // implementation ignores the read result, so EOF permits setup to continue.
+        // The trusted gate on fd 6 is the hard admission boundary and must deny EOF.
+        "--block-fd".into(),
+        PRE_SECCOMP_BLOCK_FD.to_string(),
+        "--json-status-fd".into(),
+        JSON_STATUS_FD.to_string(),
+        "--sync-fd".into(),
+        SANDBOX_SYNC_FD.to_string(),
         "--seccomp".into(),
-        spec.seccomp_fd.to_string(),
+        SECCOMP_FD.to_string(),
         "--".into(),
+        spec.gate_executable.clone(),
+        "--gate-control-fd".into(),
+        GATE_CONTROL_FD.to_string(),
+        "--candidate-executable".into(),
         spec.candidate_executable.clone(),
+        "--candidate-sha256".into(),
+        hex_digest(&spec.candidate_sha256),
     ]);
     args
 }
@@ -296,7 +360,10 @@ fn build_systemd_run_arguments(
     let mut args = vec![
         "--user".into(),
         "--scope".into(),
-        "--pipe".into(),
+        // Scope mode runs as a child of systemd-run and inherits the launcher's
+        // environment/stdio. The trusted launcher must sanitize all unrelated
+        // descriptors and explicitly preserve only the planned fd 3-7 contract
+        // across fork/exec; --pipe is unnecessary for scope mode.
         format!("--property=MemoryMax={}", spec.memory_max_bytes),
         "--property=MemorySwapMax=0".into(),
         format!("--property=CPUQuota={}%", spec.cpu_quota_percent),
@@ -313,9 +380,12 @@ fn build_systemd_run_arguments(
 
 /// Validate the requested profile and create deterministic, exact argv vectors.
 ///
-/// The caller must separately verify executable/store tree digests, ensure
-/// seccomp_fd is inherited as fd 3, launch under the system manager, verify
-/// actual namespaces and cgroup limits, and enforce wall/stdio limits.
+/// The caller must separately verify executable/store tree digests, inherit
+/// only the planned fds 3-7 across systemd-run's exec, launch under the system
+/// manager, parse Bubblewrap JSON status, and verify live namespaces/cgroup
+/// state. Bubblewrap's pre-seccomp block-fd is staging only; the pinned gate
+/// helper on fd 6 must deny EOF/malformed release and run before the candidate.
+/// This plan is not a qualified execution boundary.
 pub fn build_candidate_sandbox_plan(
     spec: &CandidateSandboxSpec,
 ) -> Result<CandidateSandboxPlan, SandboxPlanError> {
@@ -327,6 +397,8 @@ pub fn build_candidate_sandbox_plan(
     let mut hasher = CanonicalHasher::new(b"symthaea.temporal.candidate-sandbox-plan.v1");
     hasher.bytes(spec.candidate_executable.as_bytes());
     hasher.bytes(&spec.candidate_sha256);
+    hasher.bytes(spec.gate_executable.as_bytes());
+    hasher.bytes(&spec.gate_sha256);
     hasher.bytes(spec.bubblewrap_executable.as_bytes());
     hasher.bytes(&spec.bubblewrap_sha256);
     hasher.bytes(&spec.seccomp_sha256);
@@ -351,6 +423,7 @@ pub fn build_candidate_sandbox_plan(
         bubblewrap_arguments: bwrap_args,
         systemd_run_arguments: systemd_args,
         candidate_executable: spec.candidate_executable.clone(),
+        gate_executable: spec.gate_executable.clone(),
         runtime_closure_sha256: closure_sha256,
         plan_sha256: hasher.finish(),
     })
@@ -367,9 +440,12 @@ mod tests {
     fn spec() -> CandidateSandboxSpec {
         let candidate_store = store_path("candidate", '0');
         let bwrap_store = store_path("bubblewrap", '1');
+        let gate_store = store_path("trusted-gate", '3');
         CandidateSandboxSpec {
             candidate_executable: format!("{candidate_store}/bin/edge-candidate"),
             candidate_sha256: [1; 32],
+            gate_executable: format!("{gate_store}/bin/edge-candidate-gate"),
+            gate_sha256: [7; 32],
             runtime_closure: vec![
                 RuntimeClosureEntry {
                     store_path: store_path("libc", '2'),
@@ -378,6 +454,10 @@ mod tests {
                 RuntimeClosureEntry {
                     store_path: candidate_store,
                     artifact_sha256: [3; 32],
+                },
+                RuntimeClosureEntry {
+                    store_path: gate_store,
+                    artifact_sha256: [8; 32],
                 },
                 RuntimeClosureEntry {
                     store_path: bwrap_store.clone(),
@@ -421,7 +501,7 @@ mod tests {
         let bind_count = plan.bubblewrap_arguments.iter()
             .filter(|arg| arg.as_str() == "--ro-bind")
             .count();
-        assert_eq!(bind_count, 3);
+        assert_eq!(bind_count, 4);
         for (index, argument) in plan.bubblewrap_arguments.iter().enumerate() {
             if argument == "--ro-bind" {
                 assert_ne!(plan.bubblewrap_arguments[index + 1], "/nix/store");
@@ -438,10 +518,10 @@ mod tests {
     }
 
     #[test]
-    fn scope_mode_uses_pipe_without_invalid_wait_or_service_only_properties() {
+    fn scope_mode_uses_inherited_stdio_without_pipe_or_wait_flags() {
         let plan = build_candidate_sandbox_plan(&spec()).unwrap();
         assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--scope"));
-        assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--pipe"));
+        assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == "--pipe"));
         assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == "--wait"));
         for service_only in [
             "--property=NoNewPrivileges=yes",
@@ -451,6 +531,79 @@ mod tests {
         ] {
             assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == service_only));
         }
+    }
+
+    #[test]
+    fn bubblewrap_runs_the_trusted_gate_not_candidate_directly() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        let separator = plan.bubblewrap_arguments.iter().position(|arg| arg == "--").unwrap();
+        assert_eq!(plan.bubblewrap_arguments[separator + 1], spec().gate_executable);
+        assert_ne!(plan.bubblewrap_arguments[separator + 1], spec().candidate_executable);
+        let candidate_arg = plan.bubblewrap_arguments.iter()
+            .position(|arg| arg == "--candidate-executable")
+            .unwrap();
+        assert_eq!(plan.bubblewrap_arguments[candidate_arg + 1], spec().candidate_executable);
+    }
+
+    #[test]
+    fn bubblewrap_plan_pins_all_gate_and_status_descriptors() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        for (flag, descriptor) in [
+            ("--seccomp", "3"),
+            ("--block-fd", "4"),
+            ("--json-status-fd", "5"),
+            ("--sync-fd", "7"),
+            ("--gate-control-fd", "6"),
+        ] {
+            let index = plan.bubblewrap_arguments.iter().position(|arg| arg == flag).unwrap();
+            assert_eq!(plan.bubblewrap_arguments[index + 1], descriptor, "{flag}");
+        }
+    }
+
+    #[test]
+    fn bubblewrap_staging_barrier_precedes_seccomp_and_is_not_the_gate() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        let block = plan.bubblewrap_arguments.iter().position(|arg| arg == "--block-fd").unwrap();
+        let seccomp = plan.bubblewrap_arguments.iter().position(|arg| arg == "--seccomp").unwrap();
+        let gate = plan.bubblewrap_arguments.iter().position(|arg| arg == "--gate-control-fd").unwrap();
+        assert!(block < seccomp);
+        assert!(seccomp < gate);
+        assert_eq!(plan.bubblewrap_arguments[block + 1], PRE_SECCOMP_BLOCK_FD.to_string());
+        assert_eq!(plan.bubblewrap_arguments[gate + 1], GATE_CONTROL_FD.to_string());
+    }
+
+    #[test]
+    fn candidate_digest_is_bound_into_gate_argv_and_plan_commitment() {
+        let first = build_candidate_sandbox_plan(&spec()).unwrap();
+        let digest = hex_digest(&spec().candidate_sha256);
+        let digest_index = first.bubblewrap_arguments.iter()
+            .position(|arg| arg == "--candidate-sha256")
+            .unwrap();
+        assert_eq!(first.bubblewrap_arguments[digest_index + 1], digest);
+
+        let mut changed = spec();
+        changed.candidate_sha256[0] ^= 0xff;
+        let second = build_candidate_sandbox_plan(&changed).unwrap();
+        assert_ne!(first.plan_sha256, second.plan_sha256);
+    }
+
+    #[test]
+    fn trusted_gate_must_be_in_the_exact_pinned_runtime_closure() {
+        let mut invalid = spec();
+        invalid.runtime_closure.retain(|entry| !entry.store_path.contains("trusted-gate"));
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::GateNotInClosure
+        );
+    }
+
+    #[test]
+    fn changing_the_gate_artifact_changes_the_plan_commitment() {
+        let first = build_candidate_sandbox_plan(&spec()).unwrap();
+        let mut changed = spec();
+        changed.gate_sha256[0] ^= 0xff;
+        let second = build_candidate_sandbox_plan(&changed).unwrap();
+        assert_ne!(first.plan_sha256, second.plan_sha256);
     }
 
     #[test]
