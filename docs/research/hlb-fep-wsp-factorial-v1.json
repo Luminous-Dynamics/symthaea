@@ -745,7 +745,8 @@
         "calibration_sample_count",
         "calibrated_tv_radius",
         "ambiguity_radius_confidence",
-        "fixed_vs_calibrated_radius_selection_disagreement"
+        "fixed_vs_calibrated_radius_selection_disagreement",
+        "log_domain_alpha_threshold"
       ],
       "negative_controls": [
         "well_specified_family",
@@ -1622,7 +1623,8 @@
     "The open-world benchmark result must be marked synthetic-known-truth-only and bind its exact source SHA; it must not be presented as a live ActiveInferenceAgent, field, or SOTA result.",
     "The anytime e-process significance parameter must satisfy the strict open interval 0 < alpha < 1; zero, one, out-of-range, NaN, and infinite values fail closed.",
     "A calibrated TV ambiguity radius must be computed from an independent IID calibration sample using a declared confidence parameter and explicit finite-sample bound; calibration observations may not be reused as evaluation outcomes.",
-    "The categorical Hoeffding/union-bound radius must report category count, sample count, empirical distribution, per-coordinate bound, alpha, confidence level, and derived TV radius; it must not be described as valid under temporal dependence or calibration/deployment shift."
+    "The categorical Hoeffding/union-bound radius must report category count, sample count, empirical distribution, per-coordinate bound, alpha, confidence level, and derived TV radius; it must not be described as valid under temporal dependence or calibration/deployment shift.",
+    "Sequential e-process thresholds and categorical TV calibration bounds must be calculated in the log domain so valid subnormal alpha values cannot cause reciprocal overflow; strict alpha bounds remain 0 < alpha < 1."
   ],
   "research_references": [
     {
