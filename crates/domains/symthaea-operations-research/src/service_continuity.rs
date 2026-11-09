@@ -492,7 +492,7 @@ fn release_accepted(
         .collect();
     let repair_started = task_evidence.iter()
         .filter(|event| event.kind == EventKind::RepairStarted)
-        .map(|event| event.at_seconds).min();
+        .map(|event| event.at_seconds).max();
     let Some(repair_started) = repair_started else { return false; };
     let repair_completed = task_evidence.iter()
         .filter(|event| event.kind == EventKind::RepairCompleted)
@@ -521,7 +521,7 @@ fn release_accepted(
     let spare_arrival_before_repair = task_evidence.iter()
         .filter(|event| event.kind == EventKind::SpareArrived)
         .map(|event| event.at_seconds)
-        .any(|arrival| arrival < repair);
+        .any(|arrival| arrival < repair_started);
     let spare_matches = match task.spare_state {
         SpareState::NotRequired => task.spare_component_revision_digest.is_none(),
         SpareState::CompatibleOnboard => task.spare_component_revision_digest.as_deref()
@@ -837,7 +837,7 @@ mod tests {
 
     #[test]
     fn case_wide_safety_gate_applies_across_services_at_each_release_time() {
-        let mut input = case(vec![
+        let mut events = vec![
             event("water_failure", 10, EventKind::ComponentFailure, 0.0),
             task_event_for(TASK_ID, "water_failure", "water_start", 20,
                 EventKind::RepairStarted, 0.0, REV_A),
@@ -849,8 +849,44 @@ mod tests {
                 EventKind::ConfigurationUpdated, 0.0, REV_A),
             task_event_for(TASK_ID, "water_failure", "water_release", 50,
                 EventKind::AuthorizedRelease, 80.0, REV_A),
-            event("global_safety_gate", 80, EventKind::SafetyGateFailed, 0.0),
-        ], vec![task_for(TASK_ID, "water_failure")], 100);
+            event("global_safety_gate", 60, EventKind::SafetyGateFailed, 0.0),
+        ];
+        let mut electrical_fault = event(
+            "electrical_fault", 12, EventKind::ComponentFailure, 0.0,
+        );
+        electrical_fault.service_id = "electrical_distribution".into();
+        electrical_fault.component_id = "dc_controller".into();
+        events.push(electrical_fault);
+
+        for (id, tick, kind, rate) in [
+            ("electrical_start", 25, EventKind::RepairStarted, 0.0),
+            ("electrical_repair", 35, EventKind::RepairCompleted, 0.0),
+            ("electrical_test", 45, EventKind::PostTestPassed, 0.0),
+            ("electrical_config", 55, EventKind::ConfigurationUpdated, 0.0),
+            ("electrical_release", 70, EventKind::AuthorizedRelease, 5.0),
+        ] {
+            let mut event = task_event_for(
+                "electrical_task",
+                "electrical_fault",
+                id,
+                tick,
+                kind,
+                rate,
+                REV_A,
+            );
+            event.service_id = "electrical_distribution".into();
+            event.component_id = "dc_controller".into();
+            events.push(event);
+        }
+
+        let mut electrical_task = task_for("electrical_task", "electrical_fault");
+        electrical_task.service_id = "electrical_distribution".into();
+        electrical_task.component_id = "dc_controller".into();
+        let mut input = case(
+            events,
+            vec![task_for(TASK_ID, "water_failure"), electrical_task],
+            100,
+        );
         input.services.push(ServiceContract {
             service_id: "electrical_distribution".into(),
             unit: "kW".into(),
@@ -858,15 +894,15 @@ mod tests {
             nominal_rate: 5.0,
             initial_rate: 5.0,
         });
-        let mut gate = input.events.pop().unwrap();
-        gate.service_id = "water".into();
-        input.events.push(gate);
 
         let out = evaluate_service_continuity(&input).unwrap();
         assert_eq!(out.disposition, ContinuityDisposition::UnsafeNotAuthorized);
+        // Water release predates the global gate and remains historically accepted.
         assert_eq!(out.services[0].accepted_restoration_seconds, Some(50));
         assert_eq!(out.services[0].restoration_episodes[0].accepted_restoration_seconds, Some(50));
+        // Electrical release follows the global gate, despite its log living in another service.
         assert_eq!(out.services[1].accepted_restoration_seconds, None);
+        assert_eq!(out.services[1].restoration_episodes[0].disposition, RestorationEpisodeDisposition::Open);
     }
 
     #[test]
