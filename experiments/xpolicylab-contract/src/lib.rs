@@ -27,7 +27,10 @@ pub enum ContractError {
     EmptyExpectedField(ContextField),
     DuplicateExpectedEnvironment(u32),
     ZeroActionDimension(String),
-    EnvironmentCountMismatch { expected: usize, actual: usize },
+    EnvironmentCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     EnvironmentOrderMismatch {
         position: usize,
         expected: u32,
@@ -38,10 +41,23 @@ pub enum ContractError {
     PolicyServerInstanceMismatch,
     SchemaVersionMismatch,
     ActionSpaceMismatch,
-    ChunkIndexMismatch { env_idx: u32, expected: u64, actual: u64 },
-    EmptyActionChunk { env_idx: u32 },
-    ActionChunkTooLarge { env_idx: u32, maximum: usize, actual: usize },
-    ChannelSetMismatch { env_idx: u32, step_index: usize },
+    ChunkIndexMismatch {
+        env_idx: u32,
+        expected: u64,
+        actual: u64,
+    },
+    EmptyActionChunk {
+        env_idx: u32,
+    },
+    ActionChunkTooLarge {
+        env_idx: u32,
+        maximum: usize,
+        actual: usize,
+    },
+    ChannelSetMismatch {
+        env_idx: u32,
+        step_index: usize,
+    },
     ChannelDimensionMismatch {
         env_idx: u32,
         step_index: usize,
@@ -193,10 +209,7 @@ pub fn validate_action_response(
 
         for (step_index, step) in actual_chunk.steps.iter().enumerate() {
             if step.channels.len() != expected.channel_dimensions.len()
-                || step
-                    .channels
-                    .keys()
-                    .ne(expected.channel_dimensions.keys())
+                || step.channels.keys().ne(expected.channel_dimensions.keys())
             {
                 return Err(ContractError::ChannelSetMismatch {
                     env_idx: expected_env.env_idx,
@@ -369,10 +382,7 @@ mod tests {
 
     #[test]
     fn accepts_one_complete_ordered_action_chunk_per_environment() {
-        assert_eq!(
-            validate_action_response(&expected(), &response()),
-            Ok(())
-        );
+        assert_eq!(validate_action_response(&expected(), &response()), Ok(()));
     }
 
     #[test]
@@ -565,10 +575,7 @@ mod tests {
             Err(ContractError::PolicyServerRestarted)
         );
         assert_eq!(
-            validate_policy_call(
-                &expected(),
-                PolicyCallResult::Response(&response())
-            ),
+            validate_policy_call(&expected(), PolicyCallResult::Response(&response())),
             Ok(())
         );
     }
