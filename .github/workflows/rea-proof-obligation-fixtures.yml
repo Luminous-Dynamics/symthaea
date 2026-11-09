@@ -12,6 +12,7 @@ on:
       - "docs/research/rea-proof-obligation-acquisition-grader-v0.json"
       - "docs/research/rea-proof-obligation-policy-run-v0.schema.json"
       - "examples/rea-proof-obligation-policy-run-v0.cost-only.synthetic.json"
+      - "examples/rea-proof-obligation-policy-run-v0.always-abstain.synthetic.json"
       - "tools/rea-proof-obligation-fixture-check/**"
       - ".github/workflows/rea-proof-obligation-fixtures.yml"
   workflow_dispatch:
@@ -86,6 +87,24 @@ jobs:
         with:
           name: rea-proof-obligation-policy-score-synthetic
           path: artifacts/rea-proof-obligation-policy-score.synthetic.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Score always-abstain synthetic control
+        run: |
+          cargo run --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --locked --bin rea-proof-obligation-score -- \
+            docs/research/rea-proof-obligation-acquisition-agent-view-v0.json \
+            docs/research/rea-proof-obligation-acquisition-grader-v0.json \
+            examples/rea-proof-obligation-policy-run-v0.always-abstain.synthetic.json \
+            > artifacts/rea-proof-obligation-policy-score.always-abstain.synthetic.json
+          test -s artifacts/rea-proof-obligation-policy-score.always-abstain.synthetic.json
+
+      - name: Archive always-abstain score report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-proof-obligation-policy-score-always-abstain
+          path: artifacts/rea-proof-obligation-policy-score.always-abstain.synthetic.json
           if-no-files-found: warn
           retention-days: 7
 
