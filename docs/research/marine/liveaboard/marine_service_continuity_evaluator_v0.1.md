@@ -120,3 +120,30 @@ A later comparison must use permissioned, anonymized records and map each system
 Match fault definitions, sensor coverage, vessel/system boundary, component revision, crew/parts assumptions, operating regime, evidence quality and observation horizon. Include all faults and unsuccessful or censored episodes; do not cherry-pick only detected anomalies or successful interventions. A vendor that does not expose an event or evidence field is scored as unavailable/unknown for that metric, not assigned a zero or presumed failure.
 
 No comparative result can be inferred from public marketing pages. No superiority claim is permitted until both sides are evaluated on the same adjudicated episodes under equivalent information and operational constraints.
+
+
+## Fault-episode and task-order extension — 2026-11-09
+
+The Rust evaluator now requires each fault-trigger event (`ComponentFailure`, `ServiceUnavailable`, `CommonDependencyFailure`) to carry a stable `fault_episode_id`. A maintenance task binds to exactly one episode. V0 constrains one episode to one service/component identity and one task; a repeated fault after an accepted release must use a new episode ID. Multiple raw fault records may share one episode ID only when service and component identity match.
+
+The per-service report exposes `restoration_episodes`; each entry preserves:
+- episode identity and component;
+- first observed fault time;
+- repair start, spare arrival, repair completion, post-test pass and configuration-update milestones;
+- accepted restoration time and episode-specific TASR;
+- rejected release-attempt count;
+- Restored or Open disposition.
+
+An episode remains Open when no release passes the complete contract. A later episode cannot overwrite the earlier episode's accepted restoration or TASR.
+
+The accepted-restoration chain now requires:
+1. A repair-start event after the episode fault.
+2. A repair-completion event after the latest repair start.
+3. A passing post-test after repair completion and no later failed test.
+4. Configuration update after the passing test.
+5. For a spare that arrives later, compatible spare arrival before the first repair start. A spare that arrives after repair begins cannot retroactively qualify the repair.
+6. Matching episode, task, service, component and exact target revision; approved procedure, qualified personnel, all declared required tests and authorized release.
+
+Case-wide safety-gate observations are checked against every service release using the event-time prefix. A later gate changes the current case disposition but cannot rewrite an earlier accepted release. The current V0 input still represents a global gate as an event record attached to a service identity; a future typed top-level global-gate collection should remove that representational compromise.
+
+These are typed accounting and event-order semantics. The episode ID is supplied by the caller; this module does not infer root cause, correlate multi-component incidents or prove that a supplied episode assignment is physically correct. Common-cause attribution and multi-component incident groups require a separately qualified owner contract.
