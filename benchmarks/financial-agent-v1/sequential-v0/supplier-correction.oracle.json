@@ -189,11 +189,16 @@
         {
           "claim": "This outcome proves there was no buyer financial impact.",
           "disposition": "not_established"
+        },
+        {
+          "claim": "The 14-business-day inventory snapshot is still the buyer's current inventory coverage at F5.",
+          "disposition": "stale_snapshot_valid_until_2026_10_05T08_00Z_not_current_at_F5"
         }
       ],
       "required_unknowns": [
         "any later quality/acceptance outcome",
-        "other supplier or production constraints"
+        "other supplier or production constraints",
+        "current inventory coverage after 2026-10-05T08:00:00Z"
       ],
       "snapshot_invariants": [
         "F0–F4 remain byte-identical.",
