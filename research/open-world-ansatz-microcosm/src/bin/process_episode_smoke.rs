@@ -27,6 +27,7 @@ struct PairedProcessSmokeReport {
     a2: ProcessEpisodeReceipt,
     out_of_catalogue: ProcessEpisodeReceipt,
     equivalent_out_of_catalogue: ProcessEpisodeReceipt,
+    structural_out_of_catalogue: ProcessEpisodeReceipt,
     limitations: Vec<String>,
 }
 
@@ -139,6 +140,33 @@ fn run_equivalent_open_support_arm(
         .map_err(|error| format!("equivalent open-support process episode failed: {error}"))
 }
 
+fn run_structural_shift_arm(
+    executable: &Path,
+    strategy: &str,
+) -> Result<ProcessEpisodeReceipt, String> {
+    let truth = ModelHypothesis {
+        mechanism: Mechanism::DirectResponse,
+        gain: 2,
+        decay: None,
+        initial_state: None,
+        sensor: SensorMap::Identity,
+    };
+    let episode = BlindEpisode::new_numeric_structural_shift(
+        "process-f2-quadratic-response-shift",
+        truth,
+        1,
+        6,
+    )
+    .map_err(|error| format!("cannot create F2 structural-shift episode: {error}"))?;
+    let config = ProcessAgentConfig::new(executable)
+        .with_args(child_args(strategy))
+        .with_working_directory(std::env::temp_dir());
+    let agent = ProcessAgent::spawn(config)
+        .map_err(|error| format!("cannot start F2 child agent: {error}"))?;
+    run_process_episode(episode, agent, "structural_out_of_catalogue")
+        .map_err(|error| format!("F2 structural-shift process episode failed: {error}"))
+}
+
 fn run() -> Result<(), String> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let (executable, strategy) = parse_args(&args)?;
@@ -168,6 +196,7 @@ fn run() -> Result<(), String> {
     )?;
     let out_of_catalogue = run_open_support_arm(&executable, &strategy)?;
     let equivalent_out_of_catalogue = run_equivalent_open_support_arm(&executable, &strategy)?;
+    let structural_out_of_catalogue = run_structural_shift_arm(&executable, &strategy)?;
 
     for (label, score) in [("a0", &a0.evaluator_score), ("a2", &a2.evaluator_score)] {
         if !score.generating_model_in_version_space
@@ -270,16 +299,76 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    if a0.agent.executable_sha256 != a2.agent.executable_sha256
-        || a0.agent.executable_sha256 != out_of_catalogue.agent.executable_sha256
-        || a0.agent.executable_sha256 != equivalent_out_of_catalogue.agent.executable_sha256
-        || a0.agent.arguments != a2.agent.arguments
-        || a0.agent.arguments != out_of_catalogue.agent.arguments
-        || a0.agent.arguments != equivalent_out_of_catalogue.agent.arguments
-    {
+    let same_process_artifact = [
+        &a0.agent,
+        &a2.agent,
+        &out_of_catalogue.agent,
+        &equivalent_out_of_catalogue.agent,
+        &structural_out_of_catalogue.agent,
+    ]
+    .iter()
+    .all(|identity| {
+        identity.executable_sha256 == a0.agent.executable_sha256
+            && identity.arguments == a0.agent.arguments
+    });
+    if !same_process_artifact {
         return Err(
             "paired process episodes used different agent artifacts or arguments".to_owned(),
         );
+    }
+
+    if structural_out_of_catalogue
+        .evaluator_score
+        .generating_model_in_version_space
+        || structural_out_of_catalogue
+            .evaluator_score
+            .generating_truth_behaviorally_represented
+        || structural_out_of_catalogue
+            .evaluator_score
+            .set_score
+            .oracle_model_count
+            != 0
+        || structural_out_of_catalogue
+            .evaluator_score
+            .set_score
+            .claimed_model_count
+            != 0
+        || !structural_out_of_catalogue
+            .evaluator_score
+            .set_score
+            .exact_version_space_match
+        || !structural_out_of_catalogue.evaluator_score.decision_correct
+        || !structural_out_of_catalogue
+            .evaluator_score
+            .evidence_references_valid
+        || structural_out_of_catalogue.evaluator_score.probe_count > 6
+    {
+        return Err(format!(
+            "F2 structural-support control failed: exact_truth={}, behavioral_representation={}, oracle_models={}, claimed_models={}, exact_set={}, decision_correct={}, evidence_refs={}, probes={}",
+            structural_out_of_catalogue
+                .evaluator_score
+                .generating_model_in_version_space,
+            structural_out_of_catalogue
+                .evaluator_score
+                .generating_truth_behaviorally_represented,
+            structural_out_of_catalogue
+                .evaluator_score
+                .set_score
+                .oracle_model_count,
+            structural_out_of_catalogue
+                .evaluator_score
+                .set_score
+                .claimed_model_count,
+            structural_out_of_catalogue
+                .evaluator_score
+                .set_score
+                .exact_version_space_match,
+            structural_out_of_catalogue.evaluator_score.decision_correct,
+            structural_out_of_catalogue
+                .evaluator_score
+                .evidence_references_valid,
+            structural_out_of_catalogue.evaluator_score.probe_count
+        ));
     }
 
     let report = PairedProcessSmokeReport {
@@ -292,6 +381,7 @@ fn run() -> Result<(), String> {
         a2,
         out_of_catalogue,
         equivalent_out_of_catalogue,
+        structural_out_of_catalogue,
         limitations: vec![
             "The policy is open_world_agent's finite baseline, not the learned Symthaea research policy.".to_owned(),
             "A0 and A2 share generating model, empty starting evidence, policy arguments and action budget; their adaptive traces may diverge.".to_owned(),
@@ -299,7 +389,8 @@ fn run() -> Result<(), String> {
             "The parent/child process boundary is not an OS sandbox; filesystem and network access remain available unless an external isolator restricts them.".to_owned(),
             "The third episode is a truly unsupported open-support control: gain 7 is not behaviorally represented by any candidate, so correct behavior is an exact empty version space and no-compatible-model disposition.".to_owned(),
             "The fourth episode is parameter-OOD but behaviorally represented: gain 4 with an identity sensor is equivalent to candidate gain 2 with a double sensor; exact parameter membership is false, behavioral representation is true, and the correct claim is the singleton equivalent candidate.".to_owned(),
-            "This four-episode smoke test verifies wire/process/evidence binding, support-omission rejection and behavioral-equivalence acceptance, not agent performance or scientific discovery.".to_owned(),
+            "The fifth episode is a structural-support shift: direct response includes an evaluator-only quadratic input term that is absent from every candidate equation. The correct outcome is an empty version space, no behavioral-support claim and NoCompatibleModel.".to_owned(),
+            "This five-episode smoke test verifies wire/process/evidence binding, parameter and structural support-omission handling, and behavioral-equivalence acceptance; it does not measure agent performance or establish scientific discovery.".to_owned(),
         ],
     };
 
