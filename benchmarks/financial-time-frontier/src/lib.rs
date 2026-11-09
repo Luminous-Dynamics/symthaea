@@ -288,8 +288,8 @@ pub struct EvidenceEvaluation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BundleEvaluation {
     pub evidence: Vec<EvidenceEvaluation>,
-    /// Unique provenance families among admissible evidence, not number of documents.
-    pub independent_source_families: usize,
+    /// Count of unique provenance-family identifiers among admitted evidence. This is not proof of source independence.
+    pub distinct_provenance_families: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -558,7 +558,7 @@ pub fn evaluate_bundle(
         evaluation.superseded_by.sort();
     }
 
-    let independent_source_families = records
+    let distinct_provenance_families = records
         .iter()
         .filter(|record| passing.contains(&record.evidence_id))
         .map(|record| record.provenance_family_id.as_str())
@@ -566,7 +566,7 @@ pub fn evaluate_bundle(
         .len();
 
     evaluations.sort_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
-    Ok(BundleEvaluation { evidence: evaluations, independent_source_families })
+    Ok(BundleEvaluation { evidence: evaluations, distinct_provenance_families })
 }
 
 #[cfg(test)]
@@ -705,7 +705,7 @@ mod tests {
         second.revision_group_id = "revision-group:mirror-copy".into();
         let bundle = evaluate_bundle(&[first, second], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"))
             .expect("valid mirror records");
-        assert_eq!(bundle.independent_source_families, 1);
+        assert_eq!(bundle.distinct_provenance_families, 1);
     }
 
     #[test]
