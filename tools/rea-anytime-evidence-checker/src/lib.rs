@@ -486,7 +486,7 @@ pub fn validate_cross_corpus(agent: &Value, grader: &Value) -> Result<()> {
                     if !is_action_eligible(action, budget)? {
                         return Err(fail(format!("checkpoint selects ineligible action {action_id}")));
                     }
-                    if get(checkpoint, &["claim_id"])?.is_null() == false {
+                    if !get(checkpoint, &["claim_id"])?.is_null() {
                         return Err(fail("continue checkpoint must not declare a terminal claim"));
                     }
                 }
