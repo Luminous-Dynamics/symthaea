@@ -40,7 +40,23 @@
           "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "verifier_id": "fixture-only-not-a-verifier",
           "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          "binding_sha256": "853c3887fed538c3fdb3b44757c06b8898dbfed2d2142d089f349fbe496cb4cb",
+          "binding": {
+            "evidence_id": "ev.synthetic.supplier-status.0001",
+            "source_id": "synthetic-source.supplier-status.v1",
+            "source_record_id": "SYN-REC-SUPPLIER-0001",
+            "source_version_id": "SYN-REC-SUPPLIER-0001-v1",
+            "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "principal_id": "principal:synthetic-public-research",
+            "rights_profile_id": "rights:synthetic-dev",
+            "binding_type": "availability",
+            "domain": "luminous.financial.availability-proof-binding.v1",
+            "binding_version": "1",
+            "precision": "exact_instant",
+            "known_at": "2026-09-30T09:15:00Z",
+            "interval": null,
+            "retrieved_at": "2026-09-30T09:15:00Z"
+          }
         }
       },
       "retrieved_at": "2026-09-30T09:15:00Z",
@@ -58,7 +74,22 @@
           "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "verifier_id": "fixture-only-not-a-verifier",
           "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          "binding_sha256": "8149f4b0d5b2a98a6acd9bef85db077029ffa61d7798cd0bf0b357c29961f2cb",
+          "binding": {
+            "evidence_id": "ev.synthetic.supplier-status.0001",
+            "source_id": "synthetic-source.supplier-status.v1",
+            "source_record_id": "SYN-REC-SUPPLIER-0001",
+            "source_version_id": "SYN-REC-SUPPLIER-0001-v1",
+            "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "principal_id": "principal:synthetic-public-research",
+            "rights_profile_id": "rights:synthetic-dev",
+            "binding_type": "rights",
+            "domain": "luminous.financial.rights-proof-binding.v1",
+            "binding_version": "1",
+            "disposition": "authorized",
+            "valid_from": "2026-01-01T00:00:00Z",
+            "valid_until": null
+          }
         }
       },
       "provenance": {
@@ -115,7 +146,23 @@
           "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "verifier_id": "fixture-only-not-a-verifier",
           "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          "binding_sha256": "f0badf8cbb0304efc7542f0f44a84b2f2fdd6dcb0a6a1f4ed2f0edd8e079f422",
+          "binding": {
+            "evidence_id": "ev.synthetic.energy-index.0001",
+            "source_id": "synthetic-source.energy-index.v1",
+            "source_record_id": "SYN-REC-ENERGY-0001",
+            "source_version_id": "SYN-REC-ENERGY-0001-v1",
+            "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "principal_id": "principal:synthetic-public-research",
+            "rights_profile_id": "rights:synthetic-dev",
+            "binding_type": "availability",
+            "domain": "luminous.financial.availability-proof-binding.v1",
+            "binding_version": "1",
+            "precision": "exact_instant",
+            "known_at": "2026-09-30T10:10:00Z",
+            "interval": null,
+            "retrieved_at": "2026-09-30T10:10:00Z"
+          }
         }
       },
       "retrieved_at": "2026-09-30T10:10:00Z",
@@ -133,7 +180,22 @@
           "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "verifier_id": "fixture-only-not-a-verifier",
           "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          "binding_sha256": "ceaf1f99df792ac42cbff9138ee5d27d9c057d6110f187d01ab9edd24bf7952f",
+          "binding": {
+            "evidence_id": "ev.synthetic.energy-index.0001",
+            "source_id": "synthetic-source.energy-index.v1",
+            "source_record_id": "SYN-REC-ENERGY-0001",
+            "source_version_id": "SYN-REC-ENERGY-0001-v1",
+            "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "principal_id": "principal:synthetic-public-research",
+            "rights_profile_id": "rights:synthetic-dev",
+            "binding_type": "rights",
+            "domain": "luminous.financial.rights-proof-binding.v1",
+            "binding_version": "1",
+            "disposition": "authorized",
+            "valid_from": "2026-01-01T00:00:00Z",
+            "valid_until": null
+          }
         }
       },
       "provenance": {
