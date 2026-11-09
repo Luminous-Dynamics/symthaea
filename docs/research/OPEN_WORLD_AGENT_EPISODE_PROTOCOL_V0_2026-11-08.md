@@ -72,6 +72,14 @@ The protocol module covers the boolean hidden-lag world, numeric direct/leaky-me
 - matched A0 structure validation;
 - full-factorial interaction episodes and evaluator scoring.
 
+## Open-support evaluation mode
+
+The default Boolean, numeric and two-input constructors are **closed-candidate-grammar** episodes. If the evaluator's independent version-space filter omits the generating truth, post-submission scoring fails with `GeneratingTruthMissingFromOracle`; a verifier or candidate-catalogue omission must not masquerade as a valid empty version space.
+
+The evaluator-only `BlindEpisode::new_numeric_open_support` constructor is a distinct F1 parameter-support control. It permits a valid world-generator gain in 1..=16 while the agent-facing candidate grammar remains {1, 2, 3}. The agent sees the ordinary numeric task contract and receives no OOD flag. When the response is incompatible with all declared candidates, the exact empty version space and `NoCompatibleModel` disposition can be scored as correct; the evaluator separately records `generating_model_in_version_space = false`.
+
+Do not use the open-support constructor for the closed-grammar finite census. It is a bounded parameter-support extrapolation control, not proof of structural-family discovery. Unknown structures, measurement shifts, regime shifts and stochastic discrepancies require separate evaluator truth generators and held-out tests under #11197.
+
 ## Parent-runner / child-agent transport
 
 The library module `process` implements a JSONL process bridge around the same blind protocol. The trusted parent owns the `BlindEpisode` and evaluator score. It starts a child with cleared inherited environment, explicit arguments and an explicit working directory. The child receives one serialized public `AgentView` frame and returns one `AgentAction` frame for each action.
