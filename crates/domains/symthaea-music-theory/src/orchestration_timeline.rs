@@ -88,6 +88,8 @@ pub struct OrchestrationTimelineV1 {
 pub enum OrchestrationTimelineIssueCodeV1 {
     InvalidSchema,
     InvalidScoreDigest,
+    InvalidExpectedScoreDigest,
+    ScoreDigestMismatch,
     EmptyScore,
     MissingPartIdentity,
     ResourceLimitExceeded,
@@ -269,6 +271,7 @@ pub fn validate_orchestration_timeline(
     score: &Score,
     plan: &OrchestrationTimelineV1,
     instruments: &[InstrumentCapabilityV1],
+    expected_score_sha256: &str,
 ) -> OrchestrationTimelineReportV1 {
     let part_count = score.parts().len();
     let mut report = OrchestrationTimelineReportV1::new(part_count, plan.segments.len());
@@ -282,13 +285,33 @@ pub fn validate_orchestration_timeline(
             "timeline schema identifier is not supported",
         );
     }
-    if !valid_sha256_hex(&plan.score_sha256) {
+    let plan_digest_valid = valid_sha256_hex(&plan.score_sha256);
+    if !plan_digest_valid {
         report.push(
             OrchestrationTimelineIssueCodeV1::InvalidScoreDigest,
             None,
             None,
             None,
-            "score_sha256 must be 64 lowercase hexadecimal characters",
+            "plan score_sha256 must be 64 lowercase hexadecimal characters",
+        );
+    }
+    let expected_digest_valid = valid_sha256_hex(expected_score_sha256);
+    if !expected_digest_valid {
+        report.push(
+            OrchestrationTimelineIssueCodeV1::InvalidExpectedScoreDigest,
+            None,
+            None,
+            None,
+            "expected score digest must be supplied by the trusted score-demand/provenance layer and be 64 lowercase hexadecimal characters",
+        );
+    }
+    if plan_digest_valid && expected_digest_valid && plan.score_sha256 != expected_score_sha256 {
+        report.push(
+            OrchestrationTimelineIssueCodeV1::ScoreDigestMismatch,
+            None,
+            None,
+            None,
+            "orchestration timeline is bound to a different symbolic score digest",
         );
     }
     if score.notes.is_empty() {
@@ -702,6 +725,15 @@ pub fn validate_orchestration_timeline(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn validate_fixture(
+        score: &Score,
+        plan: &OrchestrationTimelineV1,
+        instruments: &[InstrumentCapabilityV1],
+    ) -> OrchestrationTimelineReportV1 {
+        validate_orchestration_timeline(score, plan, instruments, &plan.score_sha256)
+    }
+
     use crate::harmony::Key;
     use crate::orchestration::{InstrumentKindV1, SoundingRangeV1};
     use crate::pitch::{Pitch, PitchClass};
@@ -779,7 +811,7 @@ mod tests {
 
     #[test]
     fn accepts_a_persistent_part_transferred_from_cello_to_horn() {
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &base_score(),
             &base_plan(),
             &base_instruments(),
@@ -794,7 +826,7 @@ mod tests {
     fn rejects_a_change_of_instrument_without_an_explicit_handoff() {
         let mut plan = base_plan();
         plan.segments[1].handoff = None;
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &base_score(),
             &plan,
             &base_instruments(),
@@ -809,7 +841,7 @@ mod tests {
         let mut score = Score::new(Key::major(PitchClass::C), 96.0, 4);
         score.push(note(1, 48, 0, 3, VoiceRole::Melody));
         score.push(note(1, 60, 3, 1, VoiceRole::Melody));
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &score,
             &base_plan(),
             &base_instruments(),
@@ -827,7 +859,7 @@ mod tests {
             from_segment_id: "cello-opening".into(),
             kind: HandoffKindV1::Reattack,
         });
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &base_score(),
             &plan,
             &base_instruments(),
@@ -867,7 +899,7 @@ mod tests {
                 },
             ],
         };
-        let report = validate_orchestration_timeline(&score, &plan, &[piano]);
+        let report = validate_fixture(&score, &plan, &[piano]);
         assert!(report.issues.iter().any(|issue| {
             issue.code == OrchestrationTimelineIssueCodeV1::PolyphonyExceeded
         }));
@@ -875,7 +907,7 @@ mod tests {
 
     #[test]
     fn allows_abutting_notes_at_a_handoff_boundary() {
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &base_score(),
             &base_plan(),
             &base_instruments(),
@@ -889,7 +921,7 @@ mod tests {
     fn rejects_unassigned_part_identity() {
         let mut score = base_score();
         score.notes[0].part = PartId::UNASSIGNED;
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &score,
             &base_plan(),
             &base_instruments(),
@@ -903,7 +935,7 @@ mod tests {
     fn rejects_out_of_range_notes_for_the_time_local_instrument() {
         let mut score = base_score();
         score.notes[1].pitch = Pitch::from_midi(90);
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &score,
             &base_plan(),
             &base_instruments(),
@@ -925,7 +957,7 @@ mod tests {
             musical_function: "unreferenced-line".into(),
             handoff: None,
         });
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &base_score(),
             &plan,
             &base_instruments(),
@@ -936,10 +968,40 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_timeline_bound_to_a_different_score_digest() {
+        let score = base_score();
+        let plan = base_plan();
+        let report = validate_orchestration_timeline(
+            &score,
+            &plan,
+            &base_instruments(),
+            &"b".repeat(64),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == OrchestrationTimelineIssueCodeV1::ScoreDigestMismatch
+        }));
+    }
+
+    #[test]
+    fn rejects_a_malformed_expected_score_digest() {
+        let score = base_score();
+        let plan = base_plan();
+        let report = validate_orchestration_timeline(
+            &score,
+            &plan,
+            &base_instruments(),
+            "not-a-digest",
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == OrchestrationTimelineIssueCodeV1::InvalidExpectedScoreDigest
+        }));
+    }
+
+    #[test]
     fn rejects_non_canonical_or_malformed_score_digest() {
         let mut plan = base_plan();
         plan.score_sha256 = "not-a-digest".into();
-        let report = validate_orchestration_timeline(
+        let report = validate_fixture(
             &base_score(),
             &plan,
             &base_instruments(),
