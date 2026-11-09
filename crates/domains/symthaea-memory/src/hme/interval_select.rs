@@ -1603,6 +1603,152 @@ mod tests {
     }
 
     #[test]
+    fn generated_hierarchical_refinement_matches_full_exact_top_k() {
+        let mut state = 0xC0FF_EE11u32;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+
+        for case_index in 0..256usize {
+            let dimension = 8usize;
+            let group_count = 2 + (next() as usize % 7);
+            let top_k = 1 + (next() as usize % 12);
+            let mut member_vectors: Vec<Vec<(String, ContinuousHV)>> =
+                Vec::with_capacity(group_count);
+            let mut reconstructed: Vec<Vec<(String, ContinuousHV, ContinuousHV)>> =
+                Vec::with_capacity(group_count);
+            let mut total_members = 0usize;
+
+            for group_index in 0..group_count {
+                let member_count = 1 + (next() as usize % 5);
+                let mut group_members = Vec::with_capacity(member_count);
+                let mut group_reconstructions = Vec::with_capacity(member_count);
+                for member_index in 0..member_count {
+                    let id = format!("case-{case_index:04}-g{group_index:02}-m{member_index:02}");
+                    let original = ContinuousHV::from_vec(
+                        (0..dimension)
+                            .map(|_| ((next() % 1801) as f32 / 1000.0) - 0.9)
+                            .collect(),
+                    );
+                    let reconstruction = ContinuousHV::from_vec(
+                        original
+                            .values
+                            .iter()
+                            .enumerate()
+                            .map(|(index, value)| {
+                                let signed = if (index + member_index + group_index) % 2 == 0 {
+                                    1.0
+                                } else {
+                                    -1.0
+                                };
+                                (*value + signed * 0.0002).clamp(-1.0, 1.0)
+                            })
+                            .collect(),
+                    );
+                    group_members.push((id.clone(), original.clone()));
+                    group_reconstructions.push((id, original, reconstruction));
+                }
+                total_members += member_count;
+                member_vectors.push(group_members);
+                reconstructed.push(group_reconstructions);
+            }
+
+            let query = ContinuousHV::from_vec(
+                (0..dimension)
+                    .map(|_| ((next() % 1801) as f32 / 1000.0) - 0.9)
+                    .collect(),
+            );
+            let envelopes: Vec<ContinuousHVGroupEnvelope> = member_vectors
+                .iter()
+                .map(|members| {
+                    ContinuousHVGroupEnvelope::from_original_members(
+                        100 + case_index as u64,
+                        20 + case_index as u64,
+                        members,
+                    )
+                    .unwrap()
+                })
+                .collect();
+            let groups: Vec<GroupScoreIntervalRecord> = envelopes
+                .iter()
+                .map(|envelope| build_group_record(envelope, &query))
+                .collect();
+            let coverage = complete_group_coverage(&groups);
+            let group_plan = select_group_refinement_set(
+                &groups,
+                top_k.min(total_members),
+                coverage,
+            )
+            .unwrap();
+            let selected: BTreeSet<GroupScoreIntervalIdentity> =
+                group_plan.refinement_groups.iter().copied().collect();
+
+            let transform_digest = [case_index as u8; 32];
+            let mut member_records = Vec::with_capacity(group_plan.refinement_record_count);
+            for (group_index, members) in reconstructed.iter().enumerate() {
+                if !selected.contains(&groups[group_index].identity) {
+                    continue;
+                }
+                for (id, original, reconstruction) in members {
+                    let receipt = VerifiedMemberResidualCertificate::verify_at_ingest(
+                        &groups[group_index],
+                        id.clone(),
+                        original,
+                        reconstruction,
+                        0.01,
+                        transform_digest,
+                    )
+                    .unwrap();
+                    member_records.push(
+                        GroupMemberScoreIntervalRecord::from_verified_certificate(
+                            &groups[group_index],
+                            &query,
+                            reconstruction,
+                            &receipt,
+                            transform_digest,
+                        )
+                        .unwrap(),
+                    );
+                }
+            }
+
+            let k = top_k.min(total_members);
+            let plan = select_hierarchical_refinement_set(
+                &groups,
+                &member_records,
+                k,
+                coverage,
+            )
+            .unwrap();
+
+            let full_scores: Vec<ExactScoreRecord<String>> = member_vectors
+                .iter()
+                .flatten()
+                .map(|(id, vector)| ExactScoreRecord {
+                    id: id.clone(),
+                    score: query.similarity_full_resolution(vector),
+                })
+                .collect();
+            let expected = stable_exact_top_k(&full_scores, k).unwrap();
+            let selected_records: BTreeSet<String> =
+                plan.member_plan.refinement_ids.iter().cloned().collect();
+            let refined_scores: Vec<ExactScoreRecord<String>> = full_scores
+                .iter()
+                .filter(|record| selected_records.contains(&record.id))
+                .cloned()
+                .collect();
+            let actual = stable_exact_top_k(&refined_scores, k).unwrap();
+            assert_eq!(
+                actual, expected,
+                "hierarchical selector false-pruned in generated case {case_index}"
+            );
+        }
+    }
+
+    #[test]
     fn hierarchical_selection_rejects_missing_member_intervals_and_foreign_groups() {
         let query = ContinuousHV::from_vec(vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         let high_members = vec![
