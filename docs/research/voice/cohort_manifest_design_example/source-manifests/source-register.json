@@ -2,9 +2,49 @@
   "schema_version": "1.0.0",
   "cohort_id": "synthetic-cohort-design-example-v0.2",
   "records": [
-    {"record_id":"pilot-a","source_family_id":"source-pilot","source_audio_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","dataset_id":"SYNTHETIC-ORIGINAL","dataset_revision":"synthetic-v1","config":"synthetic","split":"PILOT","source_item_ref":"synthetic://pilot-a","rights_evidence_ref":"synthetic://no-human-data"},
-    {"record_id":"pilot-b","source_family_id":"source-pilot","source_audio_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","dataset_id":"SYNTHETIC-ORIGINAL","dataset_revision":"synthetic-v1","config":"synthetic","split":"PILOT","source_item_ref":"synthetic://pilot-b","rights_evidence_ref":"synthetic://no-human-data"},
-    {"record_id":"pref-a","source_family_id":"source-pref","source_audio_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","dataset_id":"SYNTHETIC-ORIGINAL","dataset_revision":"synthetic-v1","config":"synthetic","split":"PREFERENCE_TRAINING","source_item_ref":"synthetic://pref-a","rights_evidence_ref":"synthetic://no-human-data"},
-    {"record_id":"pref-b","source_family_id":"source-pref","source_audio_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","dataset_id":"SYNTHETIC-ORIGINAL","dataset_revision":"synthetic-v1","config":"synthetic","split":"PREFERENCE_TRAINING","source_item_ref":"synthetic://pref-b","rights_evidence_ref":"synthetic://no-human-data"}
+    {
+      "record_id": "pilot-a",
+      "source_family_id": "source-pilot",
+      "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dataset_id": "SYNTHETIC-ORIGINAL",
+      "dataset_revision": "synthetic-v1",
+      "config": "synthetic",
+      "split": "PILOT",
+      "source_item_ref": "synthetic://pilot-a",
+      "rights_evidence_ref": "synthetic://no-human-data"
+    },
+    {
+      "record_id": "pilot-b",
+      "source_family_id": "source-pilot",
+      "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dataset_id": "SYNTHETIC-ORIGINAL",
+      "dataset_revision": "synthetic-v1",
+      "config": "synthetic",
+      "split": "PILOT",
+      "source_item_ref": "synthetic://pilot-b",
+      "rights_evidence_ref": "synthetic://no-human-data"
+    },
+    {
+      "record_id": "pref-a",
+      "source_family_id": "source-pref",
+      "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dataset_id": "SYNTHETIC-ORIGINAL",
+      "dataset_revision": "synthetic-v1",
+      "config": "synthetic",
+      "split": "PREFERENCE_TRAINING",
+      "source_item_ref": "synthetic://pref-a",
+      "rights_evidence_ref": "synthetic://no-human-data"
+    },
+    {
+      "record_id": "pref-b",
+      "source_family_id": "source-pref",
+      "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dataset_id": "SYNTHETIC-ORIGINAL",
+      "dataset_revision": "synthetic-v1",
+      "config": "synthetic",
+      "split": "PREFERENCE_TRAINING",
+      "source_item_ref": "synthetic://pref-b",
+      "rights_evidence_ref": "synthetic://no-human-data"
+    }
   ]
 }
