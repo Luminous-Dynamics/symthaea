@@ -165,7 +165,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         for scenario in &score.prior_scenario_scores {
             println!(
-                "scenario={},experiment={},prior_entropy={:.9},p_detect={:.9},I_model_detection={:.9},I_value_given_detection={},I_total_given_execution={:.9},EIG_after_execution={:.9},expected_posterior_entropy={:.9},quadrature_error={:.3e}",
+                "scenario={},experiment={},prior_entropy={:.9},p_detect={:.9},I_model_detection={:.9},I_value_given_detection={},I_total_given_execution={:.9},EIG_after_execution={:.9},expected_posterior_entropy={:.9},conditional_quadrature_error={:.3e},operational_error_bound={:.3e}",
                 scenario.scenario_id,
                 score.experiment_id,
                 scenario.prior_entropy_nats,
@@ -179,6 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 scenario.availability_adjusted_total_eig_nats,
                 scenario.expected_posterior_entropy_nats,
                 scenario.quadrature_error_nats,
+                scenario.operational_quadrature_error_bound_nats,
             );
         }
     }
