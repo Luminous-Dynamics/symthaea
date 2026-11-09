@@ -47,5 +47,5 @@ jobs:
             --corpus fixtures/ev_battery/observation_batches_v0_1.json \
             > "$RUNNER_TEMP/ev-battery-observation-report.json"
           sha256sum "$RUNNER_TEMP/ev-battery-observation-report.json"
-          jq -e '.case_count == 17 and .expected_accept_count == 5 and .expected_reject_count == 12' \
+          jq -e '.case_count == 18 and .expected_accept_count == 5 and .expected_reject_count == 13' \
             "$RUNNER_TEMP/ev-battery-observation-report.json"
