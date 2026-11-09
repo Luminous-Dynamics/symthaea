@@ -45,6 +45,14 @@ The companion JSON Schema defines:
 - evaluator-truth availability, delivery tick and source IDs;
 - Follow target availability, source role, age, frame and disposition.
 
+Every trial also binds a controller digest and a paired-case identity. Paired reports have one baseline and one intervention with the same episode, scenario, actor policy, controller, observation tick and action-commit tick. The supported paired interventions are:
+
+- `oracle_sidecar_mutation` on masked-observation Arm B: simulator-oracle evidence changes while policy-input and raw-student-action digests remain identical.
+- `raw_v2x_mutation` on Arm E: the remote claim changes while the local tracked Follow target remains byte-identical.
+- `post_commit_shadow_teacher` on Arm C: an evaluator/reference-only teacher is added after action commitment without changing the executed-action digest.
+
+Standalone trials use `paired_role=standalone`, a null paired-case ID and `intervention_kind=none`.
+
 The canonical fixture intentionally has `benchmark_status=specification_only` and `trials=[]`. It is not a campaign result.
 
 ## 5. Semantic validation requirements
