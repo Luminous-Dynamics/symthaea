@@ -450,7 +450,8 @@ pub fn worst_case_distribution_within_tv(
     let mut recipient_index = 0;
     let mut remaining_budget = radius;
     while remaining_budget > PROBABILITY_TOLERANCE {
-        while donor_index < donors.len() && worst_case[donors[donor_index]] <= PROBABILITY_TOLERANCE {
+        while donor_index < donors.len() && worst_case[donors[donor_index]] <= PROBABILITY_TOLERANCE
+        {
             donor_index += 1;
         }
         while recipient_index < recipients.len()
