@@ -12,7 +12,10 @@ use std::collections::VecDeque;
 
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
-use crate::types::{MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road};
+use crate::types::{
+    MeshSignal, SimulatorOracleFollowTarget, VehicleCommand, VehicleState,
+    pd_cruise_baseline_with_road,
+};
 
 /// Configuration for a swarm simulation.
 #[derive(Debug, Clone)]
@@ -31,6 +34,13 @@ pub struct SwarmConfig {
     pub mesh_latency: f64,
     /// Confidence decay rate per meter of distance.
     pub confidence_decay_per_meter: f64,
+    /// Maximum lateral difference from ego's road projection for a simulator lead (m).
+    /// This is a synthetic single-lane curriculum parameter, not a perception threshold.
+    pub follow_lateral_tolerance_m: f64,
+    /// Maximum along-road range for the Follow teacher (m).
+    pub follow_max_range_m: f64,
+    /// Maximum age of an oracle actor snapshot relative to the ego observation (s).
+    pub follow_target_max_age_s: f64,
 }
 
 impl SwarmConfig {
@@ -43,6 +53,9 @@ impl SwarmConfig {
             target_speed: 13.4,
             mesh_latency: 0.01,
             confidence_decay_per_meter: 0.005,
+            follow_lateral_tolerance_m: 1.8,
+            follow_max_range_m: 200.0,
+            follow_target_max_age_s: 0.02,
         }
     }
 
@@ -55,6 +68,9 @@ impl SwarmConfig {
             target_speed: 13.4,
             mesh_latency: 0.01,
             confidence_decay_per_meter: 0.005,
+            follow_lateral_tolerance_m: 1.8,
+            follow_max_range_m: 200.0,
+            follow_target_max_age_s: 0.02,
         }
     }
 }
@@ -159,7 +175,11 @@ impl SwarmSimulator {
         // Record this step's broadcasts and drop frames nobody can still
         // receive (older than the latency window, plus one frame of slack).
         self.sim_time += dt;
-        let prune_before = self.sim_time - self.config.mesh_latency - 2.0 * dt;
+        let history_horizon = self
+            .config
+            .mesh_latency
+            .max(self.config.follow_target_max_age_s);
+        let prune_before = self.sim_time - history_horizon - 2.0 * dt;
         for peer in &mut self.peers {
             peer.history
                 .push_back((self.sim_time, peer.sim.state().clone()));
@@ -185,6 +205,94 @@ impl SwarmSimulator {
         for peer in &mut self.peers {
             peer.is_braking = false;
         }
+    }
+
+    /// Select the nearest same-road lead actor from simulator truth at or before the
+    /// ego observation time. This bypasses the delayed mesh channel and is available
+    /// only to the simulation training/benchmark teacher; it is not a deployable
+    /// perception or V2X interface.
+    pub fn nearest_simulator_truth_follow_target(
+        &self,
+        ego_state: &VehicleState,
+    ) -> Option<SimulatorOracleFollowTarget> {
+        if !ego_state.timestamp.is_finite() {
+            return None;
+        }
+
+        let ego_projection = self
+            .config
+            .road
+            .project(ego_state.position_x, ego_state.position_y);
+        let road = &self.config.road;
+        let mut best: Option<SimulatorOracleFollowTarget> = None;
+
+        for peer in &self.peers {
+            let Some((snapshot_time_s, peer_state)) = peer
+                .history
+                .iter()
+                .rev()
+                .find(|(time_s, _)| *time_s <= ego_state.timestamp + 1e-9)
+            else {
+                continue;
+            };
+
+            let age_s = ego_state.timestamp - snapshot_time_s;
+            if !age_s.is_finite()
+                || age_s < -1e-9
+                || age_s > self.config.follow_target_max_age_s + 1e-9
+            {
+                continue;
+            }
+
+            let peer_projection = road.project(peer_state.position_x, peer_state.position_y);
+            let lateral_delta =
+                (peer_projection.lateral_offset - ego_projection.lateral_offset).abs();
+            if lateral_delta > self.config.follow_lateral_tolerance_m {
+                continue;
+            }
+
+            let dx = peer_state.position_x - ego_state.position_x;
+            let dy = peer_state.position_y - ego_state.position_y;
+            let local_forward = dx * ego_projection.road_heading.cos()
+                + dy * ego_projection.road_heading.sin();
+            if !local_forward.is_finite() || local_forward <= 0.0 {
+                continue;
+            }
+
+            let raw_gap = peer_projection.s - ego_projection.s;
+            let gap_m = if road.closed && road.total_length > 0.0 {
+                raw_gap.rem_euclid(road.total_length)
+            } else {
+                raw_gap
+            };
+            if !gap_m.is_finite()
+                || gap_m <= 0.0
+                || gap_m > self.config.follow_max_range_m
+            {
+                continue;
+            }
+
+            let ego_speed_along_road =
+                ego_state.speed * (ego_state.heading - ego_projection.road_heading).cos();
+            let peer_speed_along_road =
+                peer_state.speed * (peer_state.heading - peer_projection.road_heading).cos();
+            let candidate = SimulatorOracleFollowTarget {
+                actor_id: peer.id,
+                gap_m,
+                relative_speed_mps: peer_speed_along_road - ego_speed_along_road,
+                snapshot_time_s: *snapshot_time_s,
+                max_age_s: self.config.follow_target_max_age_s,
+            };
+            if !candidate.is_current_at(ego_state.timestamp) {
+                continue;
+            }
+
+            if best.is_none_or(|current| candidate.gap_m < current.gap_m) {
+                best = Some(candidate);
+            }
+        }
+
+        best
     }
 
     /// Compute mesh signals from all peers relative to the ego vehicle.
