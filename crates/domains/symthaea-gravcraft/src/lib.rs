@@ -31,6 +31,7 @@
 //! - Orange (0.1-0.3): flat metric only, drift
 //! - Red (< 0.1): emergency metric neutralization
 
+pub mod adm_constraints;
 pub mod adm_reference;
 pub mod amplifier;
 pub mod controller;
@@ -41,6 +42,7 @@ pub mod equivalence_principle;
 pub mod simulator;
 pub mod types;
 
+pub use adm_constraints::*;
 pub use adm_reference::*;
 pub use amplifier::*;
 pub use controller::*;
