@@ -167,36 +167,6 @@ Preserve failed hypotheses, null results, counterexamples and failed transfers i
 
 This is where Symthaea can plausibly differentiate: the research policy discovers and validates; the existing typed physics representation carries semantics; a deterministic compiler turns validated knowledge into bounded reusable execution; and the blind evaluator tests transfer. None of these stages may certify itself.
 
-### 1.11 From one-shot researcher to discover–compile–transfer
-
-A promising hybrid architecture is to treat a confirmed scientific result as a **versioned executable knowledge object**, not a paragraph in long-term memory. The pipeline is:
-
-`explore → propose typed model → design discriminating experiment → independently qualify → compile a bounded executable capsule → transfer-test → promote or quarantine`.
-
-The canonical source must remain #6879/#6880 ScientificModel / PhysicsIR. A compiled capsule is a derived artifact, never a second equation AST or physical ontology. Bind the canonical model digest, assumptions, units, domain of validity, measurement model, parameter ranges, solver/runtime profile, test corpus, counterexamples, uncertainty contract, codegen version and qualification receipt. Keep the code generator deterministic and restricted to a tested expression subset; unsupported features must fail closed rather than silently approximate.
-
-This is a third evaluation arm alongside cold-start generalist and precompiled specialist:
-
-1. **Cold-start generalist:** method and model construction begins only after the task is presented.
-2. **Compiled specialist:** task-specific executable knowledge is prepared before task presentation; publish all human and automated setup costs and data access.
-3. **Discover–compile–transfer hybrid:** the system discovers a method on a source task, compiles it only after independent qualification, then receives fresh related and unrelated tasks without seeing their answer keys. It must decide whether to reuse, adapt, or reject the capsule.
-
-Measure first-use and amortized performance separately. For (K) tasks, report total setup cost (C_{setup}), total discovery cost, per-task execution cost (c_i), verification cost and human intervention. A simple break-even diagnostic is (K^* = C_{setup}/(c_{baseline}-c_{compiled})) when compiled execution is cheaper and quality remains non-inferior. It is not enough to show a low runtime after excluding solver construction.
-
-Promotion gates:
-- deterministic compiler/codegen and model/artifact digests;
-- independent differential tests against the canonical model on known and boundary inputs;
-- units, domain, singularity, stability and unsupported-operation checks;
-- exact behavior on source confirmation tests and declared uncertainty coverage;
-- successful positive transfer to held-out related parameterizations/coordinate systems;
-- explicit rejection or safe abstention on unrelated, shifted or out-of-domain tasks;
-- no support for a model claim merely because the compiled program fits the observed points.
-
-Preserve failed hypotheses, null results, counterexamples and failed transfers in the knowledge capsule's ancestry. A library containing only successful programs creates severe survivorship bias. Track retrieval/selection regret and the false-reuse rate, not just the number of reusable programs.
-
-This is where Symthaea can plausibly differentiate: the research policy discovers and validates; the existing typed physics representation carries semantics; a deterministic compiler turns validated knowledge into bounded reusable execution; and the blind evaluator tests transfer. None of these stages may certify itself.
-
-
 Correct answers can come from memorized priors or elimination strategies rather than supplied observations. Introduce paired evidence interventions:
 - **intact:** original evidence;
 - **withdrawn:** remove the evidence needed to support the claimed conclusion;
