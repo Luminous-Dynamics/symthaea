@@ -1,0 +1,45 @@
+name: Vocal control response evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-control-eval/**"
+      - ".github/workflows/vocal-control-response-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-control-response-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_CONTROL_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format the standalone evaluator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-control-eval/Cargo.toml
+
+      - name: Test exact control-response scorer
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-control-eval/Cargo.toml
+
+      - name: Verify lockfile remains unchanged
+        run: git diff --exit-code -- tools/vocal-control-eval/Cargo.lock
