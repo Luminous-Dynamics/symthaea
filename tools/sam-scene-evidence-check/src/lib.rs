@@ -922,9 +922,7 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
 
 fn longitudinal_sigma_upper_bound(uncertainty: Option<&Value>) -> Option<f64> {
     let uncertainty = uncertainty?;
-    if uncertainty.get("representation").and_then(Value::as_str)
-        != Some("diagonal_covariance")
-    {
+    if uncertainty.get("representation").and_then(Value::as_str) != Some("diagonal_covariance") {
         return None;
     }
     let state_order = uncertainty.get("state_order")?.as_array()?;
@@ -999,8 +997,8 @@ fn validate_simulator_truth_actor_states(
         }
         let Some(source) = source_records.get(source_ref) else {
             errors.push(format!(
-                    "{prefix}: unknown simulator-oracle source {source_ref}"
-                ));
+                "{prefix}: unknown simulator-oracle source {source_ref}"
+            ));
             continue;
         };
         if source.get("source_role").and_then(Value::as_str) != Some("simulator_oracle") {
@@ -1335,9 +1333,14 @@ fn validate_follow_target_context(
         .and_then(|state| state.get("velocity_mps"))
         .and_then(Value::as_array);
 
-    let (target_position, target_velocity, target_frame, target_scenario, target_tick, target_uncertainty) = if profile
-        == "simulation_benchmark"
-    {
+    let (
+        target_position,
+        target_velocity,
+        target_frame,
+        target_scenario,
+        target_tick,
+        target_uncertainty,
+    ) = if profile == "simulation_benchmark" {
         let actor = snapshot
             .get("simulator_truth_actor_states")
             .and_then(Value::as_array)
@@ -1380,8 +1383,7 @@ fn validate_follow_target_context(
                 != context.get("actor_id").and_then(Value::as_str)
             {
                 errors.push(
-                    "follow_target_context: actor_id must match the linked track_lineage_id"
-                        .into(),
+                    "follow_target_context: actor_id must match the linked track_lineage_id".into(),
                 );
             }
             let refs: BTreeSet<&str> = object
@@ -1455,9 +1457,8 @@ fn validate_follow_target_context(
     }
 
     if matches!(profile, "local_perception" | "deployment") {
-        let ego_sigma = longitudinal_sigma_upper_bound(
-            ego_state.and_then(|state| state.get("uncertainty")),
-        );
+        let ego_sigma =
+            longitudinal_sigma_upper_bound(ego_state.and_then(|state| state.get("uncertainty")));
         let target_sigma = longitudinal_sigma_upper_bound(target_uncertainty);
         match (ego_sigma, target_sigma, uncertainty) {
             (Some(ego_sigma), Some(target_sigma), Some(reported_bound)) => {
