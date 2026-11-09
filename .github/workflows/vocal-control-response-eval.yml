@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/vocal-control-eval/**"
+      - "docs/research/VOCAL_CONTROL_RESPONSE_BENCHMARK_2026-11-09.md"
       - ".github/workflows/vocal-control-response-eval.yml"
   workflow_dispatch:
 
