@@ -10,25 +10,65 @@ pub const NUM_ACTUATORS: usize = 3;
 
 /// Explicit simulation-oracle target used by the Follow curriculum.
 ///
-/// Produced only by SwarmSimulator from a time-aligned simulator snapshot.
-/// It is not a local perception observation or a V2X claim, and must never
-/// be populated from the legacy mesh aggregate fields.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+/// This capability-bearing value is intentionally not serializable or
+/// deserializable, and its fields are private. Only the in-crate simulator
+/// selector may construct it. It is not a local perception observation or
+/// a V2X claim, and must never be populated from legacy mesh aggregates.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SimulatorOracleFollowTarget {
-    /// Stable actor identifier within the synthetic swarm scenario.
-    pub actor_id: u64,
-    /// Positive along-road distance from ego to the lead actor (m).
-    pub gap_m: f64,
-    /// Lead actor longitudinal speed minus ego longitudinal speed (m/s).
-    /// Negative means ego is closing on the lead actor.
-    pub relative_speed_mps: f64,
-    /// Simulation time of the actor snapshot used to produce this target (s).
-    pub snapshot_time_s: f64,
-    /// Maximum allowed age of the source snapshot for this training step (s).
-    pub max_age_s: f64,
+    actor_id: u64,
+    gap_m: f64,
+    relative_speed_mps: f64,
+    snapshot_time_s: f64,
+    max_age_s: f64,
 }
 
 impl SimulatorOracleFollowTarget {
+    /// Construct an oracle capability inside the vehicle simulation crate.
+    ///
+    /// This is crate-private so external callers cannot mint simulator-truth
+    /// evidence by struct construction or serde deserialization.
+    pub(crate) const fn from_simulator_snapshot(
+        actor_id: u64,
+        gap_m: f64,
+        relative_speed_mps: f64,
+        snapshot_time_s: f64,
+        max_age_s: f64,
+    ) -> Self {
+        Self {
+            actor_id,
+            gap_m,
+            relative_speed_mps,
+            snapshot_time_s,
+            max_age_s,
+        }
+    }
+
+    /// Stable actor identifier within the synthetic swarm scenario.
+    pub fn actor_id(&self) -> u64 {
+        self.actor_id
+    }
+
+    /// Positive along-road distance from ego to the lead actor (m).
+    pub fn gap_m(&self) -> f64 {
+        self.gap_m
+    }
+
+    /// Lead actor longitudinal speed minus ego longitudinal speed (m/s).
+    pub fn relative_speed_mps(&self) -> f64 {
+        self.relative_speed_mps
+    }
+
+    /// Simulation time of the actor snapshot used to produce this target (s).
+    pub fn snapshot_time_s(&self) -> f64 {
+        self.snapshot_time_s
+    }
+
+    /// Maximum allowed age of the source snapshot for this training step (s).
+    pub fn max_age_s(&self) -> f64 {
+        self.max_age_s
+    }
+
     /// Whether this oracle snapshot is finite, forward-facing and current at now_s.
     pub fn is_current_at(&self, now_s: f64) -> bool {
         self.gap_m.is_finite()
@@ -760,8 +800,8 @@ pub fn pd_cruise_with_follow(
 
     // Gap term responds to headway error; relative-speed term anticipates closing
     // or opening motion instead of reacting only to a distance snapshot.
-    let gap_error = target.gap_m - target_gap;
-    let speed_cmd = (target_speed + gap_error * 0.3 + target.relative_speed_mps * 0.5)
+    let gap_error = target.gap_m() - target_gap;
+    let speed_cmd = (target_speed + gap_error * 0.3 + target.relative_speed_mps() * 0.5)
         .clamp(0.0, target_speed * 1.2);
 
     pd_cruise_baseline_with_road(state, speed_cmd, road_heading)
