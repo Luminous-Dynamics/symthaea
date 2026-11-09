@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::path::{Component, Path};
+use std::path::Path;
 
 use super::digest::CanonicalHasher;
 
@@ -125,10 +125,13 @@ fn safe_control_group_path(value: &str) -> bool {
         return false;
     }
 
-    Path::new(value)
-        .components()
-        .skip(1)
-        .all(|component| matches!(component, Component::Normal(_)))
+    let mut segments = value.split('/');
+    if segments.next() != Some("") {
+        return false;
+    }
+    segments.all(|segment| {
+        !segment.is_empty() && segment != "." && segment != ".."
+    })
 }
 
 fn decode_mountinfo_path(value: &str) -> Result<String, CgroupV2Error> {
@@ -314,22 +317,16 @@ fn parse_key_value_lines(
     Ok(output)
 }
 
-fn contains_controller(value: &str, expected: &str, enabled: bool) -> bool {
-    value.split_whitespace().any(|token| {
-        if enabled {
-            token.strip_prefix('+') == Some(expected)
-        } else {
-            token == expected
-        }
-    })
+fn contains_controller(value: &str, expected: &str) -> bool {
+    value.split_whitespace().any(|token| token == expected)
 }
 
 fn verify_parent_controllers(snapshot: &CgroupV2Snapshot) -> Result<(), CgroupV2Error> {
     for controller in REQUIRED_CONTROLLERS {
-        if !contains_controller(&snapshot.parent_controllers, controller, false) {
+        if !contains_controller(&snapshot.parent_controllers, controller) {
             return Err(CgroupV2Error::MissingController(controller));
         }
-        if !contains_controller(&snapshot.parent_subtree_control, controller, true) {
+        if !contains_controller(&snapshot.parent_subtree_control, controller) {
             return Err(CgroupV2Error::ControllerNotEnabled(controller));
         }
     }
@@ -488,7 +485,7 @@ mod tests {
         CgroupV2Snapshot {
             control_group: expected().control_group,
             parent_controllers: "cpu io memory pids".into(),
-            parent_subtree_control: "+cpu +memory +pids".into(),
+            parent_subtree_control: "cpu memory pids".into(),
             memory_max: "134217728".into(),
             memory_swap_max: "0".into(),
             cpu_max: "100000 100000".into(),
@@ -585,7 +582,7 @@ mod tests {
             Err(CgroupV2Error::MissingController("pids"))
         );
         observed = snapshot();
-        observed.parent_subtree_control = "+cpu +memory".into();
+        observed.parent_subtree_control = "cpu memory".into();
         assert_eq!(
             verify_cgroup_v2_snapshot(&expected(), &observed),
             Err(CgroupV2Error::ControllerNotEnabled("pids"))
