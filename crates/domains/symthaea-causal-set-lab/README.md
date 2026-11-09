@@ -103,6 +103,41 @@ This is a curved-measure kinematics prototype. It does not yet implement a
 causal-set d'Alembertian, link propagator, AdS boundary conditions, or a
 continuum-limit analysis. See [CAUSAL-CURVED-001](../../../../issues/11053).
 
+## Finite-size Bayesian dimension inference (new research prototype)
+
+The `bayesian_dimension` module calibrates the distribution of the
+Myrheim–Meyer ordering fraction at a fixed event count N using independent
+whole-causet Monte Carlo sprinklings in flat Minkowski Alexandrov intervals.
+It estimates
+
+    p(D | r, N) ∝ p(r | D, N, calibration corpus) p(D)
+
+with a Gaussian kernel density estimate over the calibrated ordering fractions.
+Because each calibration draw is a complete causal set, the empirical
+likelihood retains the dependence among pairwise causal-relation indicators;
+it does not pretend the `choose(N,2)` pairs are iid Bernoulli samples.
+
+The result reports per-dimension likelihoods, posterior probabilities,
+calibration mean/SD, KDE bandwidth, nearest-sample support distance, posterior
+mean dimension, (P(D\le3)), and a 95% discrete credible set. If the observed
+ordering fraction lies outside the declared support for every positive-prior
+dimension, it returns `OutsideCalibrationSupport` without normalizing a
+posterior.
+
+Run the synthetic held-out reference:
+
+    cargo run --locked -p symthaea-causal-set-lab --example bayesian_dimension_reference
+
+The current calibration family is restricted to fixed-cardinality Poisson
+sprinklings of flat Minkowski Alexandrov intervals in spacetime dimensions
+2, 3 and 4. Calibration and qualification seeds are disjoint. It is not a
+general likelihood for curved spacetime, non-Poisson sprinklings, non-manifold
+causets or quantum causal sets. A KDE posterior is conditional on the
+calibration corpus, bandwidth rule and prior; it is not a measurement of
+fundamental spacetime dimension.
+
+Research specification: [CAUSAL-DIM-BAYES-001](../../../../issues/11191).
+
 ## Epistemic boundary
 
 This is a kinematics, finite-set action-bracket and estimator testbed. It
