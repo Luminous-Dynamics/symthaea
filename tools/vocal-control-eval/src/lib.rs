@@ -153,7 +153,7 @@ impl ControlCase {
             return Err("at least one target region is required".into());
         }
         if self.locality_required && self.protected_regions.is_empty() {
-            return Err("locality-required cases need at least one protected region".into());
+            return Err("locality-required cases need at least one of the protected regions".into());
         }
 
         let dimensions: BTreeSet<_> = self.required_dimensions.iter().copied().collect();
