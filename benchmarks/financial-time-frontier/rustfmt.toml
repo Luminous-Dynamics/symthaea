@@ -1,2 +1,8 @@
 max_width = 180
 use_small_heuristics = "Off"
+fn_call_width = 60
+chain_width = 60
+array_width = 60
+struct_lit_width = 180
+struct_variant_width = 180
+single_line_if_else_max_width = 60
