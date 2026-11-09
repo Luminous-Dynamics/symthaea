@@ -16,9 +16,15 @@ pub struct Timestamp {
 }
 
 impl Timestamp {
-    pub const fn unix_seconds(self) -> i64 { self.unix_seconds }
-    pub const fn nanoseconds(self) -> u32 { self.nanoseconds }
-    pub fn parse_rfc3339(input: &str) -> Result<Self, TimestampError> { input.parse() }
+    pub const fn unix_seconds(self) -> i64 {
+        self.unix_seconds
+    }
+    pub const fn nanoseconds(self) -> u32 {
+        self.nanoseconds
+    }
+    pub fn parse_rfc3339(input: &str) -> Result<Self, TimestampError> {
+        input.parse()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,10 +43,10 @@ impl std::error::Error for TimestampError {}
 fn digits(input: &[u8], start: usize, len: usize) -> Option<u32> {
     let end = start.checked_add(len)?;
     let slice = input.get(start..end)?;
-    if !slice.iter().all(u8::is_ascii_digit) { return None; }
-    slice.iter().try_fold(0u32, |value, byte| {
-        value.checked_mul(10)?.checked_add(u32::from(*byte - b'0'))
-    })
+    if !slice.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    slice.iter().try_fold(0u32, |value, byte| value.checked_mul(10)?.checked_add(u32::from(*byte - b'0')))
 }
 
 fn leap_year(year: u32) -> bool {
@@ -104,13 +110,14 @@ impl FromStr for Timestamp {
         if bytes.get(index) == Some(&b'.') {
             index += 1;
             let fraction_start = index;
-            while bytes.get(index).is_some_and(u8::is_ascii_digit) { index += 1; }
+            while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+                index += 1;
+            }
             let fraction_len = index - fraction_start;
             if !(1..=9).contains(&fraction_len) {
                 return Err(fail("fractional seconds must contain 1 to 9 digits"));
             }
-            let fraction = digits(bytes, fraction_start, fraction_len)
-                .ok_or_else(|| fail("invalid fractional seconds"))?;
+            let fraction = digits(bytes, fraction_start, fraction_len).ok_or_else(|| fail("invalid fractional seconds"))?;
             nanoseconds = fraction * 10u32.pow((9 - fraction_len) as u32);
         }
 
@@ -120,10 +127,8 @@ impl FromStr for Timestamp {
                 if index + 6 != bytes.len() || bytes.get(index + 3) != Some(&b':') {
                     return Err(fail("offset must use ±HH:MM"));
                 }
-                let offset_hour = digits(bytes, index + 1, 2)
-                    .ok_or_else(|| fail("invalid offset hour"))?;
-                let offset_minute = digits(bytes, index + 4, 2)
-                    .ok_or_else(|| fail("invalid offset minute"))?;
+                let offset_hour = digits(bytes, index + 1, 2).ok_or_else(|| fail("invalid offset hour"))?;
+                let offset_minute = digits(bytes, index + 4, 2).ok_or_else(|| fail("invalid offset minute"))?;
                 if offset_hour > 23 || offset_minute > 59 {
                     return Err(fail("UTC offset is out of range"));
                 }
@@ -134,13 +139,13 @@ impl FromStr for Timestamp {
         };
 
         let days = days_from_civil(i64::from(year), month, day);
-        let local_seconds = days.checked_mul(86_400)
+        let local_seconds = days
+            .checked_mul(86_400)
             .and_then(|v| v.checked_add(i64::from(hour) * 3_600))
             .and_then(|v| v.checked_add(i64::from(minute) * 60))
             .and_then(|v| v.checked_add(i64::from(second)))
             .ok_or_else(|| fail("timestamp arithmetic overflow"))?;
-        let unix_seconds = local_seconds.checked_sub(offset_sign * offset_seconds)
-            .ok_or_else(|| fail("UTC offset arithmetic overflow"))?;
+        let unix_seconds = local_seconds.checked_sub(offset_sign * offset_seconds).ok_or_else(|| fail("UTC offset arithmetic overflow"))?;
 
         Ok(Self { unix_seconds, nanoseconds })
     }
@@ -155,7 +160,11 @@ pub enum EvaluationMode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RightsDisposition { Authorized, NotAuthorized, Unknown }
+pub enum RightsDisposition {
+    Authorized,
+    NotAuthorized,
+    Unknown,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AvailabilityProofKind {
@@ -172,13 +181,7 @@ pub enum AvailabilityProofKind {
 /// must use Unverifiable in v0.1; never coerce them to midnight or invent a release time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AvailabilityProof {
-    Verified {
-        proof_ref: String,
-        kind: AvailabilityProofKind,
-        evidence_id: String,
-        principal_id: String,
-        available_at: Timestamp,
-    },
+    Verified { proof_ref: String, kind: AvailabilityProofKind, evidence_id: String, principal_id: String, available_at: Timestamp },
     Missing,
     Unverifiable,
 }
@@ -219,7 +222,11 @@ pub struct EvaluationContext {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Disposition { Pass, Fail, Indeterminate }
+pub enum Disposition {
+    Pass,
+    Fail,
+    Indeterminate,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ValidityState {
@@ -309,11 +316,7 @@ impl fmt::Display for BundleError {
 }
 impl std::error::Error for BundleError {}
 
-fn evaluate_validity(
-    record: &EvidenceVersion,
-    target: Option<Timestamp>,
-    reasons: &mut Vec<ReasonCode>,
-) -> (ValidityState, bool) {
+fn evaluate_validity(record: &EvidenceVersion, target: Option<Timestamp>, reasons: &mut Vec<ReasonCode>) -> (ValidityState, bool) {
     if let (Some(start), Some(end)) = (record.valid_from, record.valid_until) {
         if end <= start {
             reasons.push(ReasonCode::InvalidValidityInterval);
@@ -383,17 +386,8 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
         indeterminate = true;
     }
     match &record.availability_proof {
-        AvailabilityProof::Verified {
-            proof_ref,
-            evidence_id,
-            principal_id,
-            available_at,
-            ..
-        } => {
-            if proof_ref.trim().is_empty()
-                || evidence_id != &record.evidence_id
-                || principal_id != &context.principal_id
-            {
+        AvailabilityProof::Verified { proof_ref, evidence_id, principal_id, available_at, .. } => {
+            if proof_ref.trim().is_empty() || evidence_id != &record.evidence_id || principal_id != &context.principal_id {
                 reasons.push(ReasonCode::AvailabilityProofIdentityMismatch);
                 failed = true;
             }
@@ -421,17 +415,19 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
             reasons.push(ReasonCode::FutureKnownEvidence);
             failed = true;
         }
-        if context.mode == EvaluationMode::ProspectiveStreaming
-            && record.retrieved_at > context.decision_frontier
-        {
+        if context.mode == EvaluationMode::ProspectiveStreaming && record.retrieved_at > context.decision_frontier {
             reasons.push(ReasonCode::LateIngestion);
             failed = true;
         }
     }
 
     let (validity, invalid_interval) = evaluate_validity(record, context.target_time, &mut reasons);
-    if invalid_interval { failed = true; }
-    if context.target_time.is_none() { indeterminate = true; }
+    if invalid_interval {
+        failed = true;
+    }
+    if context.target_time.is_none() {
+        indeterminate = true;
+    }
     let disposition = if failed {
         Disposition::Fail
     } else if indeterminate {
@@ -442,85 +438,55 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
     reasons.sort();
     reasons.dedup();
 
-    EvidenceEvaluation {
-        evidence_id: record.evidence_id.clone(),
-        disposition,
-        validity,
-        reasons,
-        superseded_by: Vec::new(),
-    }
+    EvidenceEvaluation { evidence_id: record.evidence_id.clone(), disposition, validity, reasons, superseded_by: Vec::new() }
 }
 
-fn is_superseded_by(
-    candidate: &EvidenceVersion,
-    ancestor_id: &str,
-    by_id: &str,
-    records: &BTreeMap<&str, &EvidenceVersion>,
-    visited: &mut BTreeSet<String>,
-) -> bool {
-    if !visited.insert(by_id.to_owned()) { return false; }
-    let Some(by_record) = records.get(by_id) else { return false; };
-    if by_record.supersedes.iter().any(|id| id == ancestor_id) { return true; }
+fn is_superseded_by(candidate: &EvidenceVersion, ancestor_id: &str, by_id: &str, records: &BTreeMap<&str, &EvidenceVersion>, visited: &mut BTreeSet<String>) -> bool {
+    if !visited.insert(by_id.to_owned()) {
+        return false;
+    }
+    let Some(by_record) = records.get(by_id) else {
+        return false;
+    };
+    if by_record.supersedes.iter().any(|id| id == ancestor_id) {
+        return true;
+    }
     by_record.supersedes.iter().any(|id| {
-        records.get(id.as_str()).is_some_and(|parent| {
-            parent.revision_group_id == candidate.revision_group_id
-                && is_superseded_by(candidate, ancestor_id, id, records, visited)
-        })
+        records.get(id.as_str()).is_some_and(|parent| parent.revision_group_id == candidate.revision_group_id && is_superseded_by(candidate, ancestor_id, id, records, visited))
     })
 }
 
 /// Validate revision ancestry and evaluate a bundle. All versions remain in the output;
 /// an admissible later revision only marks the earlier version as superseded at this frontier.
-pub fn evaluate_bundle(
-    records: &[EvidenceVersion],
-    context: &EvaluationContext,
-) -> Result<BundleEvaluation, BundleError> {
+pub fn evaluate_bundle(records: &[EvidenceVersion], context: &EvaluationContext) -> Result<BundleEvaluation, BundleError> {
     let mut by_id = BTreeMap::new();
     for record in records {
-        if record.evidence_id.trim().is_empty()
-            || by_id.insert(record.evidence_id.as_str(), record).is_some()
-        {
-            return Err(BundleError {
-                reason: "evidence IDs must be non-empty and unique",
-                evidence_id: Some(record.evidence_id.clone()),
-            });
+        if record.evidence_id.trim().is_empty() || by_id.insert(record.evidence_id.as_str(), record).is_some() {
+            return Err(BundleError { reason: "evidence IDs must be non-empty and unique", evidence_id: Some(record.evidence_id.clone()) });
         }
     }
 
     for record in records {
         for parent_id in &record.supersedes {
             let Some(parent) = by_id.get(parent_id.as_str()) else {
-                return Err(BundleError {
-                    reason: "revision ancestry references an unknown evidence ID",
-                    evidence_id: Some(record.evidence_id.clone()),
-                });
+                return Err(BundleError { reason: "revision ancestry references an unknown evidence ID", evidence_id: Some(record.evidence_id.clone()) });
             };
             if parent.evidence_id == record.evidence_id
                 || parent.source_id != record.source_id
                 || parent.source_record_id != record.source_record_id
                 || parent.revision_group_id != record.revision_group_id
             {
-                return Err(BundleError {
-                    reason: "revision ancestry crosses source identity or contains a self-edge",
-                    evidence_id: Some(record.evidence_id.clone()),
-                });
+                return Err(BundleError { reason: "revision ancestry crosses source identity or contains a self-edge", evidence_id: Some(record.evidence_id.clone()) });
             }
             if let (Some(parent_known_at), Some(revision_known_at)) = (parent.known_at, record.known_at) {
                 if revision_known_at <= parent_known_at {
-                    return Err(BundleError {
-                        reason: "superseding version must become available strictly after its predecessor",
-                        evidence_id: Some(record.evidence_id.clone()),
-                    });
+                    return Err(BundleError { reason: "superseding version must become available strictly after its predecessor", evidence_id: Some(record.evidence_id.clone()) });
                 }
             }
         }
     }
 
-    fn visit<'a>(
-        id: &'a str,
-        records: &BTreeMap<&'a str, &'a EvidenceVersion>,
-        state: &mut BTreeMap<&'a str, u8>,
-    ) -> bool {
+    fn visit<'a>(id: &'a str, records: &BTreeMap<&'a str, &'a EvidenceVersion>, state: &mut BTreeMap<&'a str, u8>) -> bool {
         match state.get(id).copied().unwrap_or(0) {
             1 => return false,
             2 => return true,
@@ -529,7 +495,9 @@ pub fn evaluate_bundle(
         state.insert(id, 1);
         if let Some(record) = records.get(id) {
             for parent in &record.supersedes {
-                if !visit(parent, records, state) { return false; }
+                if !visit(parent, records, state) {
+                    return false;
+                }
             }
         }
         state.insert(id, 2);
@@ -538,28 +506,24 @@ pub fn evaluate_bundle(
     let mut graph_state = BTreeMap::new();
     for id in by_id.keys() {
         if !visit(id, &by_id, &mut graph_state) {
-            return Err(BundleError {
-                reason: "revision ancestry contains a cycle",
-                evidence_id: Some((*id).to_owned()),
-            });
+            return Err(BundleError { reason: "revision ancestry contains a cycle", evidence_id: Some((*id).to_owned()) });
         }
     }
 
-    let mut evaluations: Vec<_> = records
-        .iter()
-        .map(|record| evaluate_evidence(record, context))
-        .collect();
-    let passing: BTreeSet<String> = evaluations
-        .iter()
-        .filter(|item| item.disposition == Disposition::Pass)
-        .map(|item| item.evidence_id.clone())
-        .collect();
+    let mut evaluations: Vec<_> = records.iter().map(|record| evaluate_evidence(record, context)).collect();
+    let passing: BTreeSet<String> = evaluations.iter().filter(|item| item.disposition == Disposition::Pass).map(|item| item.evidence_id.clone()).collect();
 
     for evaluation in &mut evaluations {
-        if evaluation.disposition != Disposition::Pass { continue; }
-        let Some(record) = by_id.get(evaluation.evidence_id.as_str()) else { continue; };
+        if evaluation.disposition != Disposition::Pass {
+            continue;
+        }
+        let Some(record) = by_id.get(evaluation.evidence_id.as_str()) else {
+            continue;
+        };
         for other_id in &passing {
-            if other_id == &evaluation.evidence_id { continue; }
+            if other_id == &evaluation.evidence_id {
+                continue;
+            }
             let mut visited = BTreeSet::new();
             if is_superseded_by(record, &evaluation.evidence_id, other_id, &by_id, &mut visited) {
                 evaluation.superseded_by.push(other_id.clone());
@@ -568,12 +532,8 @@ pub fn evaluate_bundle(
         evaluation.superseded_by.sort();
     }
 
-    let distinct_provenance_families = records
-        .iter()
-        .filter(|record| passing.contains(&record.evidence_id))
-        .map(|record| record.provenance_family_id.as_str())
-        .collect::<BTreeSet<_>>()
-        .len();
+    let distinct_provenance_families =
+        records.iter().filter(|record| passing.contains(&record.evidence_id)).map(|record| record.provenance_family_id.as_str()).collect::<BTreeSet<_>>().len();
 
     evaluations.sort_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
     Ok(BundleEvaluation { evidence: evaluations, distinct_provenance_families })
@@ -629,14 +589,7 @@ mod tests {
 
     #[test]
     fn malformed_and_ambiguous_timestamps_reject() {
-        for value in [
-            "2026-02-30T00:00:00Z",
-            "2026-11-09T24:00:00Z",
-            "2026-11-09T10:00:60Z",
-            "2026-11-09T10:00:00",
-            "2026-11-09T10:00:00.1234567890Z",
-            "2026-11-09 10:00:00Z",
-        ] {
+        for value in ["2026-02-30T00:00:00Z", "2026-11-09T24:00:00Z", "2026-11-09T10:00:60Z", "2026-11-09T10:00:00", "2026-11-09T10:00:00.1234567890Z", "2026-11-09 10:00:00Z"] {
             assert!(Timestamp::parse_rfc3339(value).is_err(), "{value}");
         }
     }
@@ -690,16 +643,14 @@ mod tests {
         let mut v2 = evidence("evidence:restatement", "2026-11-10T09:00:00Z", "2026-11-10T09:05:00Z");
         v2.supersedes = vec!["evidence:original".into()];
 
-        let historical = evaluate_bundle(&[v1.clone(), v2.clone()], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"))
-            .expect("valid version chain");
+        let historical = evaluate_bundle(&[v1.clone(), v2.clone()], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).expect("valid version chain");
         let original = historical.evidence.iter().find(|item| item.evidence_id == "evidence:original").unwrap();
         let restatement = historical.evidence.iter().find(|item| item.evidence_id == "evidence:restatement").unwrap();
         assert_eq!(original.disposition, Disposition::Pass);
         assert!(original.superseded_by.is_empty());
         assert_eq!(restatement.disposition, Disposition::Fail);
 
-        let later = evaluate_bundle(&[v1, v2], &context(EvaluationMode::HistoricalReconstruction, "2026-11-11T12:00:00Z"))
-            .expect("valid version chain");
+        let later = evaluate_bundle(&[v1, v2], &context(EvaluationMode::HistoricalReconstruction, "2026-11-11T12:00:00Z")).expect("valid version chain");
         let original = later.evidence.iter().find(|item| item.evidence_id == "evidence:original").unwrap();
         assert_eq!(original.disposition, Disposition::Pass);
         assert_eq!(original.superseded_by, vec!["evidence:restatement".to_owned()]);
@@ -713,8 +664,7 @@ mod tests {
         second.provenance_family_id = "family:upstream-filing".into();
         second.source_record_id = "mirror:copy-b".into();
         second.revision_group_id = "revision-group:mirror-copy".into();
-        let bundle = evaluate_bundle(&[first, second], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"))
-            .expect("valid mirror records");
+        let bundle = evaluate_bundle(&[first, second], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).expect("valid mirror records");
         assert_eq!(bundle.distinct_provenance_families, 1);
     }
 
@@ -742,7 +692,6 @@ mod tests {
         }
         assert_eq!(evaluate_evidence(&unknown, &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).disposition, Disposition::Indeterminate);
     }
-
 
     #[test]
     fn empty_principal_fails_and_missing_target_time_is_indeterminate() {
@@ -780,23 +729,16 @@ mod tests {
         assert_eq!(result.disposition, Disposition::Pass);
     }
 
-
     #[test]
     fn revision_availability_must_follow_the_superseded_version() {
         let first = evidence("evidence:revision-v1", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
         let mut same_time = evidence("evidence:revision-v2", "2026-11-08T09:00:00Z", "2026-11-08T09:06:00Z");
         same_time.supersedes = vec![first.evidence_id.clone()];
-        assert!(evaluate_bundle(
-            &[first.clone(), same_time],
-            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")
-        ).is_err());
+        assert!(evaluate_bundle(&[first.clone(), same_time], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).is_err());
 
         let mut backwards = evidence("evidence:revision-v3", "2026-11-08T08:59:00Z", "2026-11-08T09:06:00Z");
         backwards.supersedes = vec![first.evidence_id.clone()];
-        assert!(evaluate_bundle(
-            &[first, backwards],
-            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")
-        ).is_err());
+        assert!(evaluate_bundle(&[first, backwards], &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).is_err());
     }
 
     #[test]
