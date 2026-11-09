@@ -163,6 +163,5 @@
       "split": "PREFERENCE_TRAINING",
       "purpose": "PREFERENCE_TRAINING"
     }
-  ],
-  "notes": "Synthetic schema example only. No real audio, participant records, permissions, model outputs, or qualification is represented."
+  ]
 }
