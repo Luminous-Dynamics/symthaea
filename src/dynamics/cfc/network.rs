@@ -91,6 +91,177 @@ impl CfCNetworkConfig {
     }
 }
 
+/// Validation failure when restoring a CfC network's flat parameter vector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CfCWeightLoadError {
+    /// The supplied vector does not exactly match the network's parameter count.
+    LengthMismatch { expected: usize, actual: usize },
+    /// A named parameter group does not exist in this network's manifest.
+    UnknownParameterGroup { name: String },
+    /// A replacement group does not exactly match the declared group length.
+    GroupLengthMismatch { name: String, expected: usize, actual: usize },
+    /// A manifest range does not fit within the serialized parameter vector.
+    ManifestRangeOutOfBounds { name: String },
+    /// The proposal was generated against a different model revision.
+    StaleModelFingerprint { expected: String, actual: String },
+    /// Fingerprinting failed before the edit could be checked.
+    FingerprintFailed { reason: String },
+    /// A batch attempted to edit the same parameter group more than once.
+    DuplicateParameterGroup { name: String },
+    /// A parameter contains NaN or infinity.
+    NonFiniteValue { index: usize },
+    /// A time constant is below the numerical stability floor.
+    TimeConstantBelowMinimum { cell_index: usize, neuron_index: usize },
+    /// A destination ndarray does not expose contiguous storage.
+    NonContiguousParameter { parameter: String },
+    /// Computing the expected parameter count overflowed usize.
+    ParameterCountOverflow,
+}
+
+impl std::fmt::Display for CfCWeightLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LengthMismatch { expected, actual } => {
+                write!(f, "CfC weight count mismatch: expected {expected}, received {actual}")
+            }
+            Self::UnknownParameterGroup { name } => {
+                write!(f, "unknown CfC parameter group: {name}")
+            }
+            Self::GroupLengthMismatch { name, expected, actual } => write!(
+                f,
+                "CfC parameter group {name} length mismatch: expected {expected}, received {actual}"
+            ),
+            Self::ManifestRangeOutOfBounds { name } => {
+                write!(f, "CfC parameter group {name} is outside the serialized weight vector")
+            },
+            Self::StaleModelFingerprint { expected, actual } => write!(
+                f,
+                "stale CfC edit proposal: expected model {expected}, current model is {actual}"
+            ),
+            Self::FingerprintFailed { reason } => {
+                write!(f, "could not fingerprint CfC model before edit: {reason}")
+            }
+            Self::DuplicateParameterGroup { name } => {
+                write!(f, "CfC edit batch targets parameter group more than once: {name}")
+            }
+            Self::NonFiniteValue { index } => {
+                write!(f, "CfC weight at flat index {index} is not finite")
+            }
+            Self::TimeConstantBelowMinimum { cell_index, neuron_index } => write!(
+                f,
+                "CfC tau at cell {cell_index}, neuron {neuron_index} is below MIN_TAU"
+            ),
+            Self::NonContiguousParameter { parameter } => {
+                write!(f, "CfC parameter array {parameter} is non-contiguous")
+            }
+            Self::ParameterCountOverflow => write!(f, "CfC weight count overflow"),
+        }
+    }
+}
+
+impl std::error::Error for CfCWeightLoadError {}
+
+/// Content-addressed identity for one CfC network instance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CfCNetworkFingerprint {
+    /// Fingerprint schema version.
+    pub format_version: u32,
+    /// Hash of serialized architecture configuration and parameter manifest.
+    pub architecture_digest: String,
+    /// Hash of the versioned parameter manifest alone.
+    pub manifest_digest: String,
+    /// Hash of the exact serialized parameter values (little-endian f32 bytes).
+    pub parameter_digest: String,
+    /// Hash binding architecture, manifest, and parameter values together.
+    pub model_digest: String,
+}
+
+/// Semantic role of one contiguous group in a CfC network's serialized parameter vector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CfCParameterRole {
+    InputProjection,
+    RecurrentProjection,
+    HiddenBias,
+    TimeConstant,
+    BackboneWeight { layer: usize },
+    BackboneBias { layer: usize },
+    OutputProjection,
+    OutputBias,
+}
+
+/// Stable typed identity for one serialized CfC parameter group.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CfCParameterGroupId {
+    CellInputProjection { cell: usize },
+    CellRecurrentProjection { cell: usize },
+    CellHiddenBias { cell: usize },
+    CellTimeConstant { cell: usize },
+    CellBackboneWeight { cell: usize, layer: usize },
+    CellBackboneBias { cell: usize, layer: usize },
+    OutputProjection,
+    OutputBias,
+}
+
+/// One named parameter group in the exact flat order used by CfCNetwork::get_weights().
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CfCParameterGroup {
+    /// Stable typed identity suitable for edit APIs and matching.
+    pub id: CfCParameterGroupId,
+    /// Stable dotted path, for example "cells.0.w_h" or "output_bias".
+    pub name: String,
+    /// Mathematical / architectural role of this group.
+    pub role: CfCParameterRole,
+    /// Tensor shape in row-major storage order.
+    pub shape: Vec<usize>,
+    /// Start index in the flat vector returned by get_weights().
+    pub offset: usize,
+    /// Number of scalar parameters in this group.
+    pub len: usize,
+}
+
+/// One owned replacement in a transactional CfC parameter-edit batch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CfCParameterGroupReplacement {
+    /// Typed identity of the group to replace.
+    pub id: CfCParameterGroupId,
+    /// Complete replacement values in the group's declared flat order.
+    pub values: Vec<f32>,
+}
+
+/// Versioned, architecture-aware description of a CfCNetwork parameter vector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CfCParameterManifest {
+    /// Increment when the serialized group ordering or schema changes.
+    pub format_version: u32,
+    /// Total number of scalar values in get_weights().
+    pub total_parameters: usize,
+    /// Groups in exact serialization order, with contiguous offsets.
+    pub groups: Vec<CfCParameterGroup>,
+}
+
+fn append_parameter_group(
+    groups: &mut Vec<CfCParameterGroup>,
+    offset: &mut usize,
+    id: CfCParameterGroupId,
+    name: String,
+    role: CfCParameterRole,
+    shape: Vec<usize>,
+    len: usize,
+) {
+    let next_offset = (*offset)
+        .checked_add(len)
+        .expect("CfC parameter manifest length overflow");
+    groups.push(CfCParameterGroup {
+        id,
+        name,
+        role,
+        shape,
+        offset: *offset,
+        len,
+    });
+    *offset = next_offset;
+}
+
 /// A complete CfC neural network
 #[derive(Debug, Clone)]
 pub struct CfCNetwork {
@@ -1055,6 +1226,238 @@ impl CfCNetwork {
     // Weight serialization for async training (background thread weight swap)
     // =========================================================================
 
+    /// Compute content-addressed fingerprints for architecture, manifest, and weights.
+    ///
+    /// Parameter values are hashed as little-endian IEEE-754 f32 bytes, making the
+    /// value digest independent of host endianness. The architecture digest binds
+    /// the serialized network configuration to the versioned manifest. The model
+    /// digest binds all three identities and is the precondition to use for an edit.
+    pub fn fingerprint(&self) -> Result<CfCNetworkFingerprint, String> {
+        let manifest = self.parameter_manifest();
+        let manifest_bytes = bincode::serialize(&manifest)
+            .map_err(|error| format!("failed to serialize CfC parameter manifest: {error}"))?;
+        let config_bytes = bincode::serialize(&self.config)
+            .map_err(|error| format!("failed to serialize CfC network config: {error}"))?;
+
+        let manifest_digest = blake3::hash(&manifest_bytes).to_hex().to_string();
+
+        let mut architecture_hasher = blake3::Hasher::new();
+        architecture_hasher.update(b"symthaea-cfc-architecture-v1\0");
+        architecture_hasher.update(&config_bytes);
+        architecture_hasher.update(&manifest_bytes);
+        let architecture_digest = architecture_hasher.finalize().to_hex().to_string();
+
+        let mut parameter_hasher = blake3::Hasher::new();
+        for value in self.get_weights() {
+            parameter_hasher.update(&value.to_le_bytes());
+        }
+        let parameter_digest = parameter_hasher.finalize().to_hex().to_string();
+
+        let mut model_hasher = blake3::Hasher::new();
+        model_hasher.update(b"symthaea-cfc-model-v1\0");
+        model_hasher.update(architecture_digest.as_bytes());
+        model_hasher.update(manifest_digest.as_bytes());
+        model_hasher.update(parameter_digest.as_bytes());
+
+        Ok(CfCNetworkFingerprint {
+            format_version: 1,
+            architecture_digest,
+            manifest_digest,
+            parameter_digest,
+            model_digest: model_hasher.finalize().to_hex().to_string(),
+        })
+    }
+
+    /// Describe the named parameter groups in the exact order returned by get_weights().
+    ///
+    /// The manifest intentionally describes only the learnable serialized vector.
+    /// Reserved per-cell fields that are not included by get_weights() are not
+    /// represented here. Offsets are stable for a fixed network architecture and
+    /// configuration, but consumers must bind them to a model fingerprint.
+    pub fn parameter_manifest(&self) -> CfCParameterManifest {
+        let mut groups = Vec::new();
+        let mut offset = 0usize;
+
+        for (cell_index, cell) in self.cells.iter().enumerate() {
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                CfCParameterGroupId::CellInputProjection { cell: cell_index },
+                format!("cells.{cell_index}.w_in"),
+                CfCParameterRole::InputProjection,
+                cell.w_in.shape().to_vec(),
+                cell.w_in.len(),
+            );
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                CfCParameterGroupId::CellRecurrentProjection { cell: cell_index },
+                format!("cells.{cell_index}.w_h"),
+                CfCParameterRole::RecurrentProjection,
+                cell.w_h.shape().to_vec(),
+                cell.w_h.len(),
+            );
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                CfCParameterGroupId::CellHiddenBias { cell: cell_index },
+                format!("cells.{cell_index}.b_h"),
+                CfCParameterRole::HiddenBias,
+                cell.b_h.shape().to_vec(),
+                cell.b_h.len(),
+            );
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                CfCParameterGroupId::CellTimeConstant { cell: cell_index },
+                format!("cells.{cell_index}.tau"),
+                CfCParameterRole::TimeConstant,
+                cell.tau.shape().to_vec(),
+                cell.tau.len(),
+            );
+
+            for (layer, tensor) in cell.backbone_weights.iter().enumerate() {
+                append_parameter_group(
+                    &mut groups,
+                    &mut offset,
+                    CfCParameterGroupId::CellBackboneWeight {
+                        cell: cell_index,
+                        layer,
+                    },
+                    format!("cells.{cell_index}.backbone_weights.{layer}"),
+                    CfCParameterRole::BackboneWeight { layer },
+                    tensor.shape().to_vec(),
+                    tensor.len(),
+                );
+            }
+            for (layer, tensor) in cell.backbone_biases.iter().enumerate() {
+                append_parameter_group(
+                    &mut groups,
+                    &mut offset,
+                    CfCParameterGroupId::CellBackboneBias {
+                        cell: cell_index,
+                        layer,
+                    },
+                    format!("cells.{cell_index}.backbone_biases.{layer}"),
+                    CfCParameterRole::BackboneBias { layer },
+                    tensor.shape().to_vec(),
+                    tensor.len(),
+                );
+            }
+        }
+
+        append_parameter_group(
+            &mut groups,
+            &mut offset,
+            CfCParameterGroupId::OutputProjection,
+            "output_weights".to_string(),
+            CfCParameterRole::OutputProjection,
+            self.output_weights.shape().to_vec(),
+            self.output_weights.len(),
+        );
+        append_parameter_group(
+            &mut groups,
+            &mut offset,
+            CfCParameterGroupId::OutputBias,
+            "output_bias".to_string(),
+            CfCParameterRole::OutputBias,
+            self.output_bias.shape().to_vec(),
+            self.output_bias.len(),
+        );
+
+        CfCParameterManifest {
+            format_version: 1,
+            total_parameters: offset,
+            groups,
+        }
+    }
+
+    /// Apply multiple named parameter-group replacements transactionally.
+    ///
+    /// The expected model digest is a hard precondition. All target groups,
+    /// duplicate IDs, exact lengths, and ranges are validated against one
+    /// manifest before the candidate is passed to try_set_weights(). The live
+    /// network is changed only once, after the complete batch validates.
+    pub fn try_apply_parameter_group_replacements(
+        &mut self,
+        expected_model_digest: &str,
+        edits: &[CfCParameterGroupReplacement],
+    ) -> Result<(), CfCWeightLoadError> {
+        let actual_model_digest = self
+            .fingerprint()
+            .map_err(|reason| CfCWeightLoadError::FingerprintFailed { reason })?
+            .model_digest;
+
+        if actual_model_digest != expected_model_digest {
+            return Err(CfCWeightLoadError::StaleModelFingerprint {
+                expected: expected_model_digest.to_string(),
+                actual: actual_model_digest,
+            });
+        }
+
+        if edits.is_empty() {
+            return Ok(());
+        }
+
+        let manifest = self.parameter_manifest();
+        let mut candidate = self.get_weights();
+        let mut seen = std::collections::HashSet::with_capacity(edits.len());
+
+        for edit in edits {
+            if !seen.insert(edit.id.clone()) {
+                return Err(CfCWeightLoadError::DuplicateParameterGroup {
+                    name: format!("{:?}", edit.id),
+                });
+            }
+
+            let group = manifest
+                .groups
+                .iter()
+                .find(|group| &group.id == &edit.id)
+                .ok_or_else(|| CfCWeightLoadError::UnknownParameterGroup {
+                    name: format!("{:?}", edit.id),
+                })?;
+
+            if edit.values.len() != group.len {
+                return Err(CfCWeightLoadError::GroupLengthMismatch {
+                    name: group.name.clone(),
+                    expected: group.len,
+                    actual: edit.values.len(),
+                });
+            }
+
+            let end = group
+                .offset
+                .checked_add(group.len)
+                .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+            let target = candidate
+                .get_mut(group.offset..end)
+                .ok_or_else(|| CfCWeightLoadError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            target.copy_from_slice(&edit.values);
+        }
+
+        self.try_set_weights(&candidate)
+    }
+
+    /// Replace one typed parameter group against an exact base-model fingerprint.
+    ///
+    /// Use this method for external/editor-generated proposals so a stale proposal
+    /// cannot silently overwrite newer training updates.
+    pub fn try_replace_parameter_group(
+        &mut self,
+        expected_model_digest: &str,
+        id: &CfCParameterGroupId,
+        values: &[f32],
+    ) -> Result<(), CfCWeightLoadError> {
+        let edit = CfCParameterGroupReplacement {
+            id: id.clone(),
+            values: values.to_vec(),
+        };
+        self.try_apply_parameter_group_replacements(expected_model_digest, &[edit])
+    }
+
     /// Extract all learnable weights into a flat `Vec<f32>`.
     pub fn get_weights(&self) -> Vec<f32> {
         let mut buf = Vec::new();
@@ -1076,61 +1479,199 @@ impl CfCNetwork {
     }
 
     /// Restore learnable weights from a flat slice produced by [`Self::get_weights`].
+    ///
+    /// This compatibility wrapper validates the complete payload before mutating
+    /// the network. New callers that need to handle untrusted or externally
+    /// generated weight vectors should use [`Self::try_set_weights`] instead.
     pub fn set_weights(&mut self, weights: &[f32]) {
-        let mut pos = 0;
+        self.try_set_weights(weights)
+            .expect("invalid CfC network weight payload");
+    }
+
+    /// Validate and apply a complete weight vector without partial mutation.
+    ///
+    /// Validation is performed before the first write:
+    /// - exact parameter count (short and overlong payloads are rejected);
+    /// - all values are finite;
+    /// - all time constants are at least [`MIN_TAU`];
+    /// - every destination array has a contiguous backing slice.
+    ///
+    /// The flat ordering is exactly the ordering emitted by [`Self::get_weights`].
+    /// The existing infallible [`Self::set_weights`] method remains available for
+    /// compatibility, but this method is the required boundary for proposed,
+    /// loaded, federated, or otherwise untrusted parameter edits.
+    pub fn try_set_weights(&mut self, weights: &[f32]) -> Result<(), CfCWeightLoadError> {
+        let mut expected = self
+            .output_weights
+            .len()
+            .checked_add(self.output_bias.len())
+            .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+
+        for cell in &self.cells {
+            for count in [
+                cell.w_in.len(),
+                cell.w_h.len(),
+                cell.b_h.len(),
+                cell.tau.len(),
+            ] {
+                expected = expected
+                    .checked_add(count)
+                    .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+            }
+            for tensor in &cell.backbone_weights {
+                expected = expected
+                    .checked_add(tensor.len())
+                    .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+            }
+            for tensor in &cell.backbone_biases {
+                expected = expected
+                    .checked_add(tensor.len())
+                    .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+            }
+        }
+
+        if weights.len() != expected {
+            return Err(CfCWeightLoadError::LengthMismatch {
+                expected,
+                actual: weights.len(),
+            });
+        }
+
+        if let Some((index, _value)) = weights
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            return Err(CfCWeightLoadError::NonFiniteValue { index });
+        }
+
+        // Check temporal constants using the same flat layout as get_weights().
+        // This is still a read-only pass; no live parameter is changed here.
+        let mut offset = 0usize;
+        for (cell_index, cell) in self.cells.iter().enumerate() {
+            offset += cell.w_in.len() + cell.w_h.len() + cell.b_h.len();
+            for (neuron_index, tau) in weights[offset..offset + cell.tau.len()]
+                .iter()
+                .copied()
+                .enumerate()
+            {
+                if tau < MIN_TAU {
+                    return Err(CfCWeightLoadError::TimeConstantBelowMinimum {
+                        cell_index,
+                        neuron_index,
+                    });
+                }
+            }
+            offset += cell.tau.len();
+            for tensor in &cell.backbone_weights {
+                offset += tensor.len();
+            }
+            for tensor in &cell.backbone_biases {
+                offset += tensor.len();
+            }
+        }
+
+        // Preflight all destination slices. Owned ndarray fields are normally
+        // contiguous, but validate the complete destination layout before writes
+        // so this boundary remains safe if storage changes in a future refactor.
+        for (cell_index, cell) in self.cells.iter().enumerate() {
+            if cell.w_in.as_slice().is_none()
+                || cell.w_h.as_slice().is_none()
+                || cell.b_h.as_slice().is_none()
+                || cell.tau.as_slice().is_none()
+            {
+                return Err(CfCWeightLoadError::NonContiguousParameter {
+                    parameter: format!("cell {cell_index}"),
+                });
+            }
+            for (tensor_index, tensor) in cell.backbone_weights.iter().enumerate() {
+                if tensor.as_slice().is_none() {
+                    return Err(CfCWeightLoadError::NonContiguousParameter {
+                        parameter: format!("cell {cell_index} backbone weight {tensor_index}"),
+                    });
+                }
+            }
+            for (tensor_index, tensor) in cell.backbone_biases.iter().enumerate() {
+                if tensor.as_slice().is_none() {
+                    return Err(CfCWeightLoadError::NonContiguousParameter {
+                        parameter: format!("cell {cell_index} backbone bias {tensor_index}"),
+                    });
+                }
+            }
+        }
+        if self.output_weights.as_slice().is_none() || self.output_bias.as_slice().is_none() {
+            return Err(CfCWeightLoadError::NonContiguousParameter {
+                parameter: "output projection".to_string(),
+            });
+        }
+
+        // All error conditions are checked above. The following copies therefore
+        // cannot fail for malformed input and preserve all-or-nothing semantics.
+        let mut pos = 0usize;
         for cell in &mut self.cells {
             let n = cell.w_in.len();
             cell.w_in
                 .as_slice_mut()
-                .expect("w_in array not contiguous")
+                .expect("preflighted w_in array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
+
             let n = cell.w_h.len();
             cell.w_h
                 .as_slice_mut()
-                .expect("w_h array not contiguous")
+                .expect("preflighted w_h array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
+
             let n = cell.b_h.len();
             cell.b_h
                 .as_slice_mut()
-                .expect("b_h array not contiguous")
+                .expect("preflighted b_h array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
+
             let n = cell.tau.len();
             cell.tau
                 .as_slice_mut()
-                .expect("tau array not contiguous")
+                .expect("preflighted tau array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
-            for bw in &mut cell.backbone_weights {
-                let n = bw.len();
-                bw.as_slice_mut()
-                    .expect("backbone_weight array not contiguous")
+
+            for tensor in &mut cell.backbone_weights {
+                let n = tensor.len();
+                tensor
+                    .as_slice_mut()
+                    .expect("preflighted backbone weight array")
                     .copy_from_slice(&weights[pos..pos + n]);
                 pos += n;
             }
-            for bb in &mut cell.backbone_biases {
-                let n = bb.len();
-                bb.as_slice_mut()
-                    .expect("backbone_bias array not contiguous")
+            for tensor in &mut cell.backbone_biases {
+                let n = tensor.len();
+                tensor
+                    .as_slice_mut()
+                    .expect("preflighted backbone bias array")
                     .copy_from_slice(&weights[pos..pos + n]);
                 pos += n;
             }
         }
+
         let n = self.output_weights.len();
         self.output_weights
             .as_slice_mut()
-            .expect("output_weights array not contiguous")
+            .expect("preflighted output_weights array")
             .copy_from_slice(&weights[pos..pos + n]);
         pos += n;
+
         let n = self.output_bias.len();
         self.output_bias
             .as_slice_mut()
-            .expect("output_bias array not contiguous")
+            .expect("preflighted output_bias array")
             .copy_from_slice(&weights[pos..pos + n]);
         pos += n;
-        assert_eq!(pos, weights.len(), "weight count mismatch");
+
+        debug_assert_eq!(pos, weights.len(), "validated CfC weight count");
+        Ok(())
     }
 
     // =========================================================================
@@ -1523,7 +2064,234 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-    // 14. get_weights() and set_weights() round-trip
+    // 14. parameter_manifest() describes get_weights() serialization
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_parameter_manifest_matches_flat_weight_layout() {
+        let net = CfCNetwork::new(small_config());
+        let manifest = net.parameter_manifest();
+        let weights = net.get_weights();
+
+        assert_eq!(manifest.format_version, 1);
+        assert_eq!(manifest.total_parameters, weights.len());
+
+        let mut expected_offset = 0usize;
+        for group in &manifest.groups {
+            assert_eq!(group.offset, expected_offset, "gap before {}", group.name);
+            assert_eq!(
+                group.shape.iter().copied().product::<usize>(),
+                group.len,
+                "shape/length mismatch for {}",
+                group.name
+            );
+            expected_offset += group.len;
+        }
+        assert_eq!(expected_offset, weights.len());
+        assert_eq!(manifest.groups.first().unwrap().name, "cells.0.w_in");
+        assert_eq!(
+            manifest.groups.last().unwrap().name,
+            "output_bias"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 15. named parameter-group replacement is bounded and validated
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_typed_parameter_group_replacement_changes_only_target_group() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap()
+            .clone();
+        let replacement = vec![0.25; group.len];
+        let expected_digest = net.fingerprint().unwrap().model_digest;
+
+        assert!(net
+            .try_replace_parameter_group(&expected_digest, &group.id, &replacement)
+            .is_ok());
+
+        let after = net.get_weights();
+        assert_eq!(
+            &after[group.offset..group.offset + group.len],
+            replacement.as_slice()
+        );
+        for index in 0..before.len() {
+            if !(group.offset..group.offset + group.len).contains(&index) {
+                assert_eq!(after[index], before[index], "unexpected change at {index}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_typed_parameter_group_replacement_rejects_unknown_or_wrong_length() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let expected_digest = net.fingerprint().unwrap().model_digest;
+        assert!(matches!(
+            net.try_replace_parameter_group(&expected_digest, &CfCParameterGroupId::CellRecurrentProjection { cell: 999 }, &[]),
+            Err(CfCWeightLoadError::UnknownParameterGroup { .. })
+        ));
+
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.w_h")
+            .unwrap();
+        assert!(matches!(
+            net.try_replace_parameter_group(&expected_digest, &group.id, &[]),
+            Err(CfCWeightLoadError::GroupLengthMismatch { .. })
+        ));
+        assert_eq!(net.get_weights(), before);
+    }
+
+    // ---------------------------------------------------------------
+    // 15. model-digest preconditions and transactional edit batches
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_parameter_edit_rejects_stale_model_fingerprint() {
+        let mut net = CfCNetwork::new(small_config());
+        let stale_digest = net.fingerprint().unwrap().model_digest;
+        let before = net.get_weights();
+        let mut changed = before.clone();
+        changed[0] += 0.1;
+        net.try_set_weights(&changed).unwrap();
+        let current = net.get_weights();
+
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap();
+        let result = net.try_replace_parameter_group(
+            &stale_digest,
+            &group.id,
+            &vec![0.0; group.len],
+        );
+
+        assert!(matches!(
+            result,
+            Err(CfCWeightLoadError::StaleModelFingerprint { .. })
+        ));
+        assert_eq!(net.get_weights(), current);
+    }
+
+    #[test]
+    fn test_parameter_edit_batch_rejects_duplicate_groups_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let digest = net.fingerprint().unwrap().model_digest;
+        let before = net.get_weights();
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap();
+        let edit = CfCParameterGroupReplacement {
+            id: group.id.clone(),
+            values: vec![0.0; group.len],
+        };
+
+        let result = net.try_apply_parameter_group_replacements(
+            &digest,
+            &[edit.clone(), edit],
+        );
+        assert!(matches!(
+            result,
+            Err(CfCWeightLoadError::DuplicateParameterGroup { .. })
+        ));
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_parameter_edit_batch_applies_multiple_groups_atomically() {
+        let mut net = CfCNetwork::new(small_config());
+        let digest = net.fingerprint().unwrap().model_digest;
+        let before = net.get_weights();
+        let manifest = net.parameter_manifest();
+        let bias = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap();
+        let output_bias = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "output_bias")
+            .unwrap();
+        let edits = [
+            CfCParameterGroupReplacement {
+                id: bias.id.clone(),
+                values: vec![0.125; bias.len],
+            },
+            CfCParameterGroupReplacement {
+                id: output_bias.id.clone(),
+                values: vec![-0.25; output_bias.len],
+            },
+        ];
+
+        assert!(net
+            .try_apply_parameter_group_replacements(&digest, &edits)
+            .is_ok());
+
+        let after = net.get_weights();
+        for edit in &edits {
+            let group = manifest.groups.iter().find(|group| &group.id == &edit.id).unwrap();
+            assert_eq!(
+                &after[group.offset..group.offset + group.len],
+                edit.values.as_slice()
+            );
+        }
+        for index in 0..before.len() {
+            let edited = edits.iter().any(|edit| {
+                let group = manifest.groups.iter().find(|group| group.id == edit.id).unwrap();
+                (group.offset..group.offset + group.len).contains(&index)
+            });
+            if !edited {
+                assert_eq!(after[index], before[index], "unexpected change at {index}");
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 15. fingerprint binds architecture and exact parameter values
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_fingerprint_separates_architecture_and_parameter_identity() {
+        let mut original = CfCNetwork::new(small_config());
+        let original_fingerprint = original.fingerprint().unwrap();
+        let weights = original.get_weights();
+        let mut changed_weights = weights.clone();
+        changed_weights[0] += 0.125;
+        original.try_set_weights(&changed_weights).unwrap();
+        let changed_fingerprint = original.fingerprint().unwrap();
+
+        assert_eq!(
+            original_fingerprint.architecture_digest,
+            changed_fingerprint.architecture_digest
+        );
+        assert_eq!(
+            original_fingerprint.manifest_digest,
+            changed_fingerprint.manifest_digest
+        );
+        assert_ne!(
+            original_fingerprint.parameter_digest,
+            changed_fingerprint.parameter_digest
+        );
+        assert_ne!(
+            original_fingerprint.model_digest,
+            changed_fingerprint.model_digest
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 15. get_weights() and set_weights() round-trip
     // ---------------------------------------------------------------
     #[test]
     fn test_weights_round_trip() {
@@ -1567,5 +2335,56 @@ mod tests {
                 b
             );
         }
+    }
+
+    // ---------------------------------------------------------------
+    // 16. try_set_weights() rejects malformed payloads transactionally
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_try_set_weights_rejects_wrong_length_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+
+        assert!(net.try_set_weights(&before[..before.len() - 1]).is_err());
+        assert_eq!(net.get_weights(), before);
+
+        let mut overlong = before.clone();
+        overlong.push(0.0);
+        assert!(net.try_set_weights(&overlong).is_err());
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_try_set_weights_rejects_non_finite_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let mut malformed = before.clone();
+        malformed[0] = f32::NAN;
+
+        assert!(net.try_set_weights(&malformed).is_err());
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_try_set_weights_rejects_invalid_tau_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let first_tau = net.cells[0].w_in.len()
+            + net.cells[0].w_h.len()
+            + net.cells[0].b_h.len();
+        let mut malformed = before.clone();
+        malformed[first_tau] = 0.0;
+
+        assert!(net.try_set_weights(&malformed).is_err());
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_try_set_weights_accepts_valid_round_trip() {
+        let mut net = CfCNetwork::new(small_config());
+        let weights = net.get_weights();
+
+        assert!(net.try_set_weights(&weights).is_ok());
+        assert_eq!(net.get_weights(), weights);
     }
 }

@@ -283,6 +283,25 @@ impl HumanoidController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
+        // Backpropagate through the output projection using the weights that
+        // generated the current prediction. The hidden gradient must be formed
+        // before the optimizer mutates this projection.
+        let mut d_bottleneck = vec![0.0f32; BOTTLENECK_DIM];
+        for (row, &dr) in self
+            .output_weights
+            .chunks_exact(BOTTLENECK_DIM)
+            .zip(d_raw.iter())
+        {
+            for (db, &w) in d_bottleneck.iter_mut().zip(row.iter()) {
+                *db += dr * w;
+            }
+        }
+
+        for j in 0..BOTTLENECK_DIM {
+            let tanh_deriv = 1.0 - bottleneck_activated[j] * bottleneck_activated[j];
+            d_bottleneck[j] *= tanh_deriv * 3.0;
+        }
+
         const WEIGHT_DECAY: f32 = 1e-5;
         let decay = 1.0 - WEIGHT_DECAY;
         for w in self.output_weights.iter_mut() {
@@ -302,22 +321,6 @@ impl HumanoidController {
         }
 
         let dim = HDC_DIMENSION;
-        let mut d_bottleneck = vec![0.0f32; BOTTLENECK_DIM];
-        for (row, &dr) in self
-            .output_weights
-            .chunks_exact(BOTTLENECK_DIM)
-            .zip(d_raw.iter())
-        {
-            for (db, &w) in d_bottleneck.iter_mut().zip(row.iter()) {
-                *db += dr * w;
-            }
-        }
-
-        for j in 0..BOTTLENECK_DIM {
-            let tanh_deriv = 1.0 - bottleneck_activated[j] * bottleneck_activated[j];
-            d_bottleneck[j] *= tanh_deriv * 3.0;
-        }
-
         let mut grad_hv_values = vec![0.0f32; dim];
         for (j, proj) in self.bottleneck_projections.iter().enumerate() {
             let proj_values = proj.as_slice();
