@@ -14,6 +14,7 @@ use super::digest::CanonicalHasher;
 
 const REQUIRED_CONTROLLERS: [&str; 3] = ["cpu", "memory", "pids"];
 const MAX_CGROUP_CONTROL_FILE_BYTES: u64 = 64 * 1024;
+const MAX_SYSTEMD_SHOW_BYTES: usize = 16 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CgroupV2Error {
@@ -360,6 +361,9 @@ fn parse_systemd_u64(
 pub fn parse_systemd_scope_properties(
     output: &str,
 ) -> Result<SystemdScopeProperties, CgroupV2Error> {
+    if output.len() > MAX_SYSTEMD_SHOW_BYTES {
+        return Err(CgroupV2Error::SystemdPropertyParse);
+    }
     let mut fields = std::collections::BTreeMap::<String, String>::new();
     for line in output.lines() {
         if line.is_empty() {
@@ -409,7 +413,10 @@ pub fn verify_systemd_scope_properties(
     observed: &SystemdScopeProperties,
 ) -> Result<(), CgroupV2Error> {
     if expected.unit_name.is_empty()
+        || expected.unit_name.contains('/')
+        || expected.unit_name.contains('\\0')
         || !expected.unit_name.ends_with(".scope")
+        || expected.control_group.rsplit('/').next() != Some(expected.unit_name.as_str())
         || expected.memory_max_bytes == 0
         || expected.memory_swap_max_bytes != 0
         || !(1..=1_600).contains(&expected.cpu_quota_percent)
@@ -739,6 +746,26 @@ mod tests {
         assert_eq!(
             verify_systemd_scope_properties(&expected_policy, &observed),
             Err(CgroupV2Error::SystemdScopeNotActive)
+        );
+    }
+
+    #[test]
+    fn systemd_scope_policy_binds_unit_id_to_control_group_basename() {
+        let mut policy = expected_systemd();
+        policy.unit_name = "another.scope".into();
+        let observed = parse_systemd_scope_properties(&systemd_show_output()).unwrap();
+        assert_eq!(
+            verify_systemd_scope_properties(&policy, &observed),
+            Err(CgroupV2Error::InvalidExpectedLimit("systemd_scope_properties"))
+        );
+    }
+
+    #[test]
+    fn systemd_show_response_is_bounded() {
+        let oversized = "x".repeat(MAX_SYSTEMD_SHOW_BYTES + 1);
+        assert_eq!(
+            parse_systemd_scope_properties(&oversized),
+            Err(CgroupV2Error::SystemdPropertyParse)
         );
     }
 
