@@ -44,58 +44,21 @@ impl LiquidHolocell {
         self
     }
 
-    /// Perform 'Holographic Dilation' - scale dimensionality.
+    /// Change the HDC resolution using the canonical ContinuousHV dilation operator.
     ///
-    /// Scaling is performed using a fractal folding/unfolding technique
-    /// that preserves semantic alignment across different resolutions.
+    /// Upsampling is a redundant embedding, not an increase in independent
+    /// information capacity. Downsampling folds the permuted chunks back into
+    /// their original coordinate alignment before averaging. Keeping this
+    /// operation delegated to ContinuousHV::dilate avoids a second, subtly
+    /// different implementation of the holographic transform.
     pub fn dilate(&mut self, target: HdcDimensionality) {
-        let current_dim = self.dimensionality.dimension();
         let target_dim = target.dimension();
-
-        if current_dim == target_dim {
+        if self.state.dim() == target_dim {
+            self.dimensionality = target;
             return;
         }
 
-        if target_dim > current_dim {
-            // UPSAMPLING (Unfolding)
-            // We expand the vector by tiling it with permutations.
-            // This maintains the original semantic signal while
-            // providing more orthogonal space for new associations.
-            let mut new_values = Vec::with_capacity(target_dim);
-            let mut current_vec = self.state.clone();
-
-            while new_values.len() < target_dim {
-                let chunk_size = current_vec.values.len().min(target_dim - new_values.len());
-                new_values.extend_from_slice(&current_vec.values[..chunk_size]);
-                // Permute for the next chunk to avoid trivial repetition
-                current_vec = current_vec.permute(1);
-            }
-            self.state = ContinuousHV::from_vec(new_values);
-        } else {
-            // DOWNSAMPLING (Folding)
-            // We fold the vector back by bundling its constituent segments.
-            // This is a lossy operation that compresses the semantic signal
-            // back into the 6W baseline dimensionality.
-            let chunks: Vec<Vec<f32>> = self
-                .state
-                .values
-                .chunks(target_dim)
-                .map(|c| c.to_vec())
-                .collect();
-
-            let mut folded = vec![0.0f32; target_dim];
-            let n = chunks.len() as f32;
-
-            for chunk in chunks {
-                for (i, &val) in chunk.iter().enumerate() {
-                    if i < target_dim {
-                        folded[i] += val / n;
-                    }
-                }
-            }
-            self.state = ContinuousHV::from_vec(folded);
-        }
-
+        self.state = self.state.dilate(target_dim);
         self.dimensionality = target;
     }
 
@@ -168,17 +131,26 @@ mod tests {
         cell.dilate(HdcDimensionality::Ultra);
         assert_eq!(cell.state.dim(), 65_536);
 
-        // Semantic check: original 16K segment should be preserved in the first chunk
-        // (Wait, my impl uses tiling with permutation, so segment 0 is identical)
+        // The first chunk is the original representation.
+        let original = ContinuousHV::random(16_384, 42);
+        assert_eq!(&cell.state.values[..16_384], &original.values);
     }
 
     #[test]
     fn test_holocell_dilation_downsampling() {
         let mut cell = LiquidHolocell::new(42);
-        cell.dilate(HdcDimensionality::Ultra);
+        let original = cell.state.clone();
 
+        cell.dilate(HdcDimensionality::Ultra);
+        assert_eq!(cell.state.dim(), 65_536);
         cell.dilate(HdcDimensionality::Standard);
+
         assert_eq!(cell.state.dim(), 16_384);
+        assert_eq!(
+            cell.state.values,
+            original.values,
+            "upsample/downsample must undo the permutation before folding"
+        );
     }
 
     #[test]

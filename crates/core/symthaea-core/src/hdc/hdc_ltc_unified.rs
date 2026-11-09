@@ -255,6 +255,124 @@ pub struct HdcLtcUnifiedNeuron {
     update_count: u64,
 }
 
+/// Typed identity for a trainable hypervector parameter group in an HDC-LTC neuron.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HdcLtcParameterGroupId {
+    WeightHdc,
+    InputMask,
+    TauModulator,
+    GateWeight,
+    GateBias,
+}
+
+/// Mathematical role of one trainable HDC-LTC hypervector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HdcLtcParameterRole {
+    StateBinding,
+    InputBinding,
+    TemporalModulation,
+    GateDirection,
+    GateOffset,
+}
+
+/// One trainable hypervector group in the stable flattened parameter layout.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcLtcParameterGroup {
+    pub id: HdcLtcParameterGroupId,
+    pub name: String,
+    pub role: HdcLtcParameterRole,
+    pub shape: Vec<usize>,
+    pub offset: usize,
+    pub len: usize,
+    /// The norm bound enforced by the HDC-LTC parameter update contract.
+    pub max_norm: f32,
+}
+
+/// Architecture-aware manifest for the five trainable HDC-LTC parameter vectors.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcLtcParameterManifest {
+    pub format_version: u32,
+    pub dimension: usize,
+    pub total_parameters: usize,
+    pub groups: Vec<HdcLtcParameterGroup>,
+}
+
+/// Content-addressed identity for one HDC-LTC neuron parameterization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcLtcParameterFingerprint {
+    pub format_version: u32,
+    pub architecture_digest: String,
+    pub manifest_digest: String,
+    pub parameter_digest: String,
+    pub model_digest: String,
+}
+
+/// One replacement in a digest-bound HDC-LTC parameter edit batch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcLtcParameterGroupReplacement {
+    pub id: HdcLtcParameterGroupId,
+    pub values: Vec<f32>,
+}
+
+/// Validation failure when applying a HDC-LTC parameter edit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HdcLtcParameterError {
+    LengthMismatch { expected: usize, actual: usize },
+    DestinationLengthMismatch { name: String, expected: usize, actual: usize },
+    NonFiniteValue { index: usize },
+    GroupNormExceeded { name: String, max_norm_micros: u64 },
+    UnknownParameterGroup { name: String },
+    GroupLengthMismatch { name: String, expected: usize, actual: usize },
+    ManifestRangeOutOfBounds { name: String },
+    StaleModelFingerprint { expected: String, actual: String },
+    DuplicateParameterGroup { name: String },
+    FingerprintSerialization { reason: String },
+}
+
+impl std::fmt::Display for HdcLtcParameterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LengthMismatch { expected, actual } => {
+                write!(f, "HDC-LTC parameter count mismatch: expected {expected}, received {actual}")
+            }
+            Self::DestinationLengthMismatch { name, expected, actual } => write!(
+                f,
+                "HDC-LTC destination group {name} has length {actual}, expected {expected}"
+            ),
+            Self::NonFiniteValue { index } => {
+                write!(f, "HDC-LTC parameter at flat index {index} is not finite")
+            }
+            Self::GroupNormExceeded { name, max_norm_micros } => write!(
+                f,
+                "HDC-LTC parameter group {name} exceeds its norm limit {:.6}",
+                *max_norm_micros as f32 / 1_000_000.0
+            ),
+            Self::UnknownParameterGroup { name } => {
+                write!(f, "unknown HDC-LTC parameter group: {name}")
+            }
+            Self::GroupLengthMismatch { name, expected, actual } => write!(
+                f,
+                "HDC-LTC parameter group {name} length mismatch: expected {expected}, received {actual}"
+            ),
+            Self::ManifestRangeOutOfBounds { name } => {
+                write!(f, "HDC-LTC parameter group {name} is outside the flat parameter vector")
+            }
+            Self::StaleModelFingerprint { expected, actual } => write!(
+                f,
+                "stale HDC-LTC edit proposal: expected model {expected}, current model is {actual}"
+            ),
+            Self::DuplicateParameterGroup { name } => {
+                write!(f, "HDC-LTC edit batch targets group more than once: {name}")
+            }
+            Self::FingerprintSerialization { reason } => {
+                write!(f, "could not serialize HDC-LTC fingerprint input: {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for HdcLtcParameterError {}
+
 /// Fast rational approximation of `tanh(x)` that auto-vectorizes on AVX2.
 ///
 /// Uses `tanh(x) ≈ x * (27 + x²) / (27 + 9x²)` for |x| < 4.97.
@@ -670,8 +788,11 @@ impl HdcLtcUnifiedNeuron {
     fn compute_tau(&self, input: &ContinuousHV) -> f32 {
         let state_norm = self.state.norm();
 
-        // Input-dependent adjustment via similarity with tau_modulator
-        let input_adjustment = input.similarity(&self.tau_modulator);
+        // Use the full-resolution cosine here. ContinuousHV::similarity may
+        // honor the process-wide selective-scan stride in non-SIMD builds;
+        // a training-time gate/tau must not silently change its derivative
+        // when an unrelated subsystem changes that global stride.
+        let input_adjustment = cosine_similarity_full(input, &self.tau_modulator);
 
         // τ = τ₀ × (1 + backbone × ||x||) × (1 + 0.2 × input_adjustment)
         let tau = self.config.tau_base
@@ -710,7 +831,11 @@ impl HdcLtcUnifiedNeuron {
         }
 
         let denom = (bundle_norm_sq * gw_norm_sq).sqrt();
-        let sim = if denom < 1e-10 { 0.0 } else { dot / denom };
+        let sim = if denom < 1e-10 {
+            0.0
+        } else {
+            (dot / denom).clamp(-1.0, 1.0)
+        };
         let gate_activation = sim + bias_sum * inv_dim;
 
         // Sigmoid gating with steepness control
@@ -1152,6 +1277,283 @@ impl HdcLtcUnifiedNeuron {
     // ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /// Describe the five trainable hypervector groups in their stable flat order.
+    ///
+    /// The recurrent state, momentum vectors, running statistics, and evolution
+    /// clock are deliberately excluded: they are state/optimizer metadata, not
+    /// trainable parameter groups. Each learned vector is constrained to norm ≤ 2.
+    pub fn parameter_manifest(&self) -> HdcLtcParameterManifest {
+        let dim = self.config.dimension;
+        let definitions = [
+            (
+                HdcLtcParameterGroupId::WeightHdc,
+                "weight_hv",
+                HdcLtcParameterRole::StateBinding,
+            ),
+            (
+                HdcLtcParameterGroupId::InputMask,
+                "input_mask",
+                HdcLtcParameterRole::InputBinding,
+            ),
+            (
+                HdcLtcParameterGroupId::TauModulator,
+                "tau_modulator",
+                HdcLtcParameterRole::TemporalModulation,
+            ),
+            (
+                HdcLtcParameterGroupId::GateWeight,
+                "gate_weight",
+                HdcLtcParameterRole::GateDirection,
+            ),
+            (
+                HdcLtcParameterGroupId::GateBias,
+                "gate_bias",
+                HdcLtcParameterRole::GateOffset,
+            ),
+        ];
+
+        let groups = definitions
+            .into_iter()
+            .enumerate()
+            .map(|(index, (id, name, role))| HdcLtcParameterGroup {
+                id,
+                name: name.to_string(),
+                role,
+                shape: vec![dim],
+                offset: index * dim,
+                len: dim,
+                max_norm: 2.0,
+            })
+            .collect();
+
+        HdcLtcParameterManifest {
+            format_version: 1,
+            dimension: dim,
+            total_parameters: 5 * dim,
+            groups,
+        }
+    }
+
+    /// Serialize trainable hypervectors in exactly the order declared by the manifest.
+    pub fn parameter_values(&self) -> Vec<f32> {
+        let mut values = Vec::with_capacity(5 * self.config.dimension);
+        values.extend_from_slice(&self.weight_hv.values);
+        values.extend_from_slice(&self.input_mask.values);
+        values.extend_from_slice(&self.tau_modulator.values);
+        values.extend_from_slice(&self.gate_weight.values);
+        values.extend_from_slice(&self.gate_bias.values);
+        values
+    }
+
+    /// Compute architecture, manifest, parameter, and combined model digests.
+    ///
+    /// Parameter values are hashed as little-endian IEEE-754 f32 bytes. JSON
+    /// serialization is used only for the versioned config and manifest, whose
+    /// struct field order is stable for a given schema version.
+    pub fn parameter_fingerprint(
+        &self,
+    ) -> Result<HdcLtcParameterFingerprint, HdcLtcParameterError> {
+        let manifest = self.parameter_manifest();
+        let config_bytes = serde_json::to_vec(&self.config).map_err(|error| {
+            HdcLtcParameterError::FingerprintSerialization {
+                reason: error.to_string(),
+            }
+        })?;
+        let manifest_bytes = serde_json::to_vec(&manifest).map_err(|error| {
+            HdcLtcParameterError::FingerprintSerialization {
+                reason: error.to_string(),
+            }
+        })?;
+
+        let manifest_digest = blake3::hash(&manifest_bytes).to_hex().to_string();
+
+        let mut architecture_hasher = blake3::Hasher::new();
+        architecture_hasher.update(b"symthaea-hdc-ltc-architecture-v1\0");
+        architecture_hasher.update(&config_bytes);
+        architecture_hasher.update(&manifest_bytes);
+        let architecture_digest = architecture_hasher.finalize().to_hex().to_string();
+
+        let mut parameter_hasher = blake3::Hasher::new();
+        for value in self.parameter_values() {
+            parameter_hasher.update(&value.to_le_bytes());
+        }
+        let parameter_digest = parameter_hasher.finalize().to_hex().to_string();
+
+        let mut model_hasher = blake3::Hasher::new();
+        model_hasher.update(b"symthaea-hdc-ltc-model-v1\0");
+        model_hasher.update(architecture_digest.as_bytes());
+        model_hasher.update(manifest_digest.as_bytes());
+        model_hasher.update(parameter_digest.as_bytes());
+
+        Ok(HdcLtcParameterFingerprint {
+            format_version: 1,
+            architecture_digest,
+            manifest_digest,
+            parameter_digest,
+            model_digest: model_hasher.finalize().to_hex().to_string(),
+        })
+    }
+
+    /// Validate and replace the complete trainable parameter vector transactionally.
+    ///
+    /// Exact length, finite values, and the norm bound of every typed group are
+    /// checked before any live value is changed. Successful replacements reset
+    /// momentum so optimizer history from the previous parameterization cannot
+    /// contaminate the newly installed candidate.
+    pub fn try_set_parameter_values(
+        &mut self,
+        values: &[f32],
+    ) -> Result<(), HdcLtcParameterError> {
+        let manifest = self.parameter_manifest();
+        if values.len() != manifest.total_parameters {
+            return Err(HdcLtcParameterError::LengthMismatch {
+                expected: manifest.total_parameters,
+                actual: values.len(),
+            });
+        }
+        if let Some((index, _)) = values
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            return Err(HdcLtcParameterError::NonFiniteValue { index });
+        }
+
+        for group in &manifest.groups {
+            let end = group
+                .offset
+                .checked_add(group.len)
+                .ok_or(HdcLtcParameterError::LengthMismatch {
+                    expected: manifest.total_parameters,
+                    actual: values.len(),
+                })?;
+            let slice = values
+                .get(group.offset..end)
+                .ok_or_else(|| HdcLtcParameterError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            let norm = slice.iter().map(|value| value * value).sum::<f32>().sqrt();
+            if !norm.is_finite() || norm > group.max_norm {
+                return Err(HdcLtcParameterError::GroupNormExceeded {
+                    name: group.name.clone(),
+                    max_norm_micros: (group.max_norm * 1_000_000.0) as u64,
+                });
+            }
+        }
+
+        let dim = self.config.dimension;
+        for (name, actual) in [
+            ("weight_hv", self.weight_hv.values.len()),
+            ("input_mask", self.input_mask.values.len()),
+            ("tau_modulator", self.tau_modulator.values.len()),
+            ("gate_weight", self.gate_weight.values.len()),
+            ("gate_bias", self.gate_bias.values.len()),
+        ] {
+            if actual != dim {
+                return Err(HdcLtcParameterError::DestinationLengthMismatch {
+                    name: name.to_string(),
+                    expected: dim,
+                    actual,
+                });
+            }
+        }
+
+        let mut offset = 0usize;
+        self.weight_hv.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.input_mask.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.tau_modulator.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.gate_weight.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.gate_bias.values.copy_from_slice(&values[offset..offset + dim]);
+
+        self.reset_momentum();
+        Ok(())
+    }
+
+    /// Apply typed parameter-group replacements against an exact model digest.
+    ///
+    /// All IDs, duplicate targets, lengths, and ranges are checked before the
+    /// candidate vector is passed to the full invariant validator. The live
+    /// neuron is mutated only once after the entire edit batch is valid.
+    pub fn try_apply_parameter_group_replacements(
+        &mut self,
+        expected_model_digest: &str,
+        edits: &[HdcLtcParameterGroupReplacement],
+    ) -> Result<(), HdcLtcParameterError> {
+        let actual_model_digest = self
+            .parameter_fingerprint()?
+            .model_digest;
+        if actual_model_digest != expected_model_digest {
+            return Err(HdcLtcParameterError::StaleModelFingerprint {
+                expected: expected_model_digest.to_string(),
+                actual: actual_model_digest,
+            });
+        }
+        if edits.is_empty() {
+            return Ok(());
+        }
+
+        let manifest = self.parameter_manifest();
+        let mut candidate = self.parameter_values();
+        let mut seen = std::collections::HashSet::with_capacity(edits.len());
+
+        for edit in edits {
+            if !seen.insert(edit.id.clone()) {
+                return Err(HdcLtcParameterError::DuplicateParameterGroup {
+                    name: format!("{:?}", edit.id),
+                });
+            }
+            let group = manifest
+                .groups
+                .iter()
+                .find(|group| &group.id == &edit.id)
+                .ok_or_else(|| HdcLtcParameterError::UnknownParameterGroup {
+                    name: format!("{:?}", edit.id),
+                })?;
+            if edit.values.len() != group.len {
+                return Err(HdcLtcParameterError::GroupLengthMismatch {
+                    name: group.name.clone(),
+                    expected: group.len,
+                    actual: edit.values.len(),
+                });
+            }
+            let end = group
+                .offset
+                .checked_add(group.len)
+                .ok_or_else(|| HdcLtcParameterError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            let target = candidate
+                .get_mut(group.offset..end)
+                .ok_or_else(|| HdcLtcParameterError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            target.copy_from_slice(&edit.values);
+        }
+
+        self.try_set_parameter_values(&candidate)
+    }
+
+    /// Replace one typed HDC-LTC group against an exact model fingerprint.
+    pub fn try_replace_parameter_group(
+        &mut self,
+        expected_model_digest: &str,
+        id: &HdcLtcParameterGroupId,
+        values: &[f32],
+    ) -> Result<(), HdcLtcParameterError> {
+        self.try_apply_parameter_group_replacements(
+            expected_model_digest,
+            &[HdcLtcParameterGroupReplacement {
+                id: id.clone(),
+                values: values.to_vec(),
+            }],
+        )
+    }
+
     /// Get current state
     pub fn state(&self) -> &ContinuousHV {
         &self.state
@@ -1472,17 +1874,12 @@ impl HdcLtcUnifiedNeuron {
     // BACKPROPAGATION THROUGH TIME (BPTT)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Compute analytical BPTT gradients for a single closed-form step.
+    /// Compute analytical gradients for the actual closed-form transition.
     ///
-    /// Re-runs the forward pass internally, then backpropagates through:
-    /// ```text
-    /// x' = σ × x_∞ + (1-σ) × x       // interpolation
-    /// x_∞ = f(W⊗x + U⊗u)             // equilibrium
-    /// σ = 1 - exp(-dt/τ)              // gating from tau
-    /// τ = τ₀ × (1 + β×||x||) × (1 + 0.2×sim(u, τ_mod))
-    /// ```
-    ///
-    /// Since HDC binding is element-wise multiply, ∂(A⊗B)/∂A = B element-wise.
+    /// This differentiates the same equilibrium, Fourier term, state/input tau,
+    /// sigmoid gate, and interpolation used by evolve_closed_form(). It is a
+    /// one-transition gradient; sequence-level BPTT still requires callers to
+    /// propagate d_state through stored/recomputed temporal states.
     pub fn backward(
         &self,
         input: &ContinuousHV,
@@ -1491,75 +1888,152 @@ impl HdcLtcUnifiedNeuron {
     ) -> HdcLtcGradients {
         let dim = self.config.dimension;
 
-        // --- Forward recomputation ---
-        // Pre-activation: z = W⊗x + U⊗u (bundled)
+        // Recompute the exact pre-activation used by compute_equilibrium(),
+        // including the optional Fourier forcing term.
         let wx = self.weight_hv.bind(&self.state);
         let uu = self.input_mask.bind(input);
-        let z = ContinuousHV::bundle(&[&wx, &uu]);
-
-        // Equilibrium: x_∞ = f(z)
+        let fourier = self.compute_fourier_basis();
+        let n_terms = if fourier.is_some() { 3.0 } else { 2.0 };
+        let z = if let Some(ref fourier_hv) = fourier {
+            ContinuousHV::bundle(&[&wx, &uu, fourier_hv])
+        } else {
+            ContinuousHV::bundle(&[&wx, &uu])
+        };
         let x_inf = self.config.activation.apply(&z);
 
-        // Tau and sigma
-        let tau = self.compute_tau(input);
-        let decay = (-dt / tau).exp();
-        let sigma = 1.0 - decay;
+        // Match compute_tau(), retaining the raw value to account for the
+        // derivative of its clamp.
+        let state_norm = self.state.norm();
+        let input_tau_sim = cosine_similarity_full(input, &self.tau_modulator);
+        let tau_raw = self.config.tau_base
+            * (1.0 + self.config.backbone_tau * state_norm)
+            * (1.0 + 0.2 * input_tau_sim);
+        let tau = tau_raw.clamp(0.01, 10.0);
+        let tau_is_unclamped = tau_raw > 0.01 && tau_raw < 10.0;
 
-        // New state: x' = σ × x_∞ + (1-σ) × x
+        // Match compute_gating(): cosine(bundle(state,input), gate_weight)
+        // plus mean gate bias, passed through a sigmoid.
+        let gate_bundle = self.state.add(input).scale(0.5);
+        let (gate_similarity, d_sim_d_bundle, d_sim_d_gate) =
+            cosine_similarity_with_gradients(&gate_bundle, &self.gate_weight);
+        let bias_mean = self.gate_bias.values.iter().sum::<f32>() / dim as f32;
+        let gate_activation = gate_similarity + bias_mean;
+        let sigma_base = 1.0
+            / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
+
+        let decay = (-dt / tau).exp();
+        let sigma_raw = 1.0 - decay * (1.0 - sigma_base);
+        let sigma = sigma_raw.clamp(0.0, 1.0);
+        let sigma_is_unclamped = sigma_raw > 0.0 && sigma_raw < 1.0;
+
         let new_state = x_inf.scale(sigma).add(&self.state.scale(1.0 - sigma));
 
-        // --- Backward pass ---
-        // dL/dx' = 2(x' - target) / dim   (MSE gradient)
-        let dh = new_state.subtract(target).scale(2.0 / dim as f32);
+        // apply_state_bounds() performs radial projection only when the
+        // post-update state norm exceeds five. Backpropagate through that
+        // projection instead of pretending it did not happen.
+        let mut dh = new_state.subtract(target).scale(2.0 / dim as f32);
+        let new_norm = new_state.norm();
+        if new_norm > 5.0 {
+            let projection = dh.dot(&new_state) / (new_norm * new_norm);
+            let projected: Vec<f32> = dh
+                .values
+                .iter()
+                .zip(new_state.values.iter())
+                .map(|(&g, &y)| (5.0 / new_norm) * (g - projection * y))
+                .collect();
+            dh = ContinuousHV::from_values(projected);
+        }
 
-        // Through interpolation: dL/dx_∞ = dL/dx' × σ  (element-wise scale)
-        let dx_inf = dh.scale(sigma);
-
-        // Through activation: dL/dz = dL/dx_∞ ⊙ f'(z)
-        // We need element-wise: dx_inf[i] * activation.derivative(z[i])
-        let activation = self.config.activation;
-        let dz_values: Vec<f32> = dx_inf
-            .values
-            .iter()
-            .zip(z.values.iter())
-            .map(|(&di, &zi)| di * activation.derivative(zi))
-            .collect();
-        let dz = ContinuousHV::from_values(dz_values);
-
-        // Bundle = (wx + uu) / n, so ∂bundle/∂wx = 1/n element-wise.
-        // We absorb the 1/n into the learning rate (standard practice) and pass
-        // the full gradient through for stronger signal.
-
-        // Weight gradients via binding chain rule:
-        // W⊗x is element-wise multiply, so ∂(W⊗x)/∂W = x
-        let dw = dz.bind(&self.state);
-
-        // dL/dU = dz ⊙ u
-        let du = dz.bind(input);
-
-        // Tau gradient (scalar):
-        // dσ/dτ = -dt/τ² × exp(-dt/τ)  (since σ = 1 - exp(-dt/τ))
-        // dL/dτ = Σ_i dh_i × (x_∞_i - x_i) × dσ/dτ
-        //       = Σ_i dh_i × (x_inf_i - state_i) × (-dt/τ²) × exp(-dt/τ)
+        // Scalar sensitivity of the loss to sigma.
         let diff = x_inf.subtract(&self.state);
-        let dtau_scalar: f32 = dh
+        let d_loss_d_sigma = dh
             .values
             .iter()
             .zip(diff.values.iter())
-            .map(|(&dhi, &di)| dhi * di)
-            .sum::<f32>()
-            * (-dt / (tau * tau))
-            * decay;
+            .map(|(&g, &d)| g * d)
+            .sum::<f32>();
 
-        // Gradient w.r.t. the actual input vector (for inter-layer BPTT):
-        // U⊗u is element-wise multiply, so ∂(U⊗u)/∂u = U
-        let d_input = dz.bind(&self.input_mask);
+        // d sigma / d gate_activation and d sigma / d tau for
+        // sigma = 1 - exp(-dt/tau) * (1 - sigmoid(k * gate_activation)).
+        let d_sigma_d_gate = if sigma_is_unclamped {
+            decay * sigma_base * (1.0 - sigma_base) * self.config.gating_steepness
+        } else {
+            0.0
+        };
+        let d_sigma_d_tau = if sigma_is_unclamped && tau_is_unclamped {
+            -decay * (1.0 - sigma_base) * dt / (tau * tau)
+        } else {
+            0.0
+        };
+        let d_loss_d_gate_activation = d_loss_d_sigma * d_sigma_d_gate;
+        let d_loss_d_tau = d_loss_d_sigma * d_sigma_d_tau;
+
+        // Through interpolation and activation into the equilibrium.
+        let activation = self.config.activation;
+        let dz_values: Vec<f32> = dh
+            .values
+            .iter()
+            .zip(z.values.iter())
+            .map(|(&g, &zi)| {
+                g * sigma * activation.derivative(zi) / n_terms
+            })
+            .collect();
+        let dz = ContinuousHV::from_values(dz_values);
+
+        // Direct equilibrium gradients.
+        let dw = dz.bind(&self.state);
+        let du = dz.bind(input);
+        let mut d_state = dh.scale(1.0 - sigma).add(&dz.bind(&self.weight_hv));
+        let mut d_input = dz.bind(&self.input_mask);
+
+        // Gate gradients. The cosine derivatives are full-resolution and use
+        // exactly the same vector pair as the forward gate.
+        let d_gate_weight = d_sim_d_gate.scale(d_loss_d_gate_activation);
+        let d_gate_bias = ContinuousHV::from_values(vec![
+            d_loss_d_gate_activation / dim as f32;
+            dim
+        ]);
+        let gate_state_input_gradient =
+            d_sim_d_bundle.scale(0.5 * d_loss_d_gate_activation);
+        d_state = d_state.add(&gate_state_input_gradient);
+        d_input = d_input.add(&gate_state_input_gradient);
+
+        // Tau-modulator gradients. tau depends on both state norm and the
+        // cosine between input and tau_modulator. The clamp has zero derivative
+        // outside its active interval.
+        let (tau_similarity, d_tau_sim_d_input, d_tau_sim_d_modulator) =
+            cosine_similarity_with_gradients(input, &self.tau_modulator);
+        let d_tau_d_similarity = if tau_is_unclamped {
+            self.config.tau_base
+                * (1.0 + self.config.backbone_tau * state_norm)
+                * 0.2
+        } else {
+            0.0
+        };
+        let d_tau_modulator = d_tau_sim_d_modulator
+            .scale(d_loss_d_tau * d_tau_d_similarity);
+        d_input = d_input.add(
+            &d_tau_sim_d_input.scale(d_loss_d_tau * d_tau_d_similarity),
+        );
+
+        if tau_is_unclamped && state_norm > 1e-10 {
+            let d_tau_d_state_norm = self.config.tau_base
+                * self.config.backbone_tau
+                * (1.0 + 0.2 * tau_similarity);
+            d_state = d_state.add(
+                &self.state.normalize().scale(d_loss_d_tau * d_tau_d_state_norm),
+            );
+        }
 
         HdcLtcGradients {
             dw,
             du,
-            dtau_scalar,
+            dtau_scalar: d_loss_d_tau,
+            d_tau_modulator,
+            d_gate_weight,
+            d_gate_bias,
             d_input,
+            d_state,
         }
     }
 
@@ -1600,22 +2074,24 @@ impl HdcLtcUnifiedNeuron {
             .scale(decay_factor)
             .add(&self.input_momentum);
 
-        // Tau modulator update (project scalar gradient onto tau_modulator direction)
-        if grads.dtau_scalar.abs() > 1e-10 {
-            self.tau_modulator = self.tau_modulator.add(
-                &self
-                    .tau_modulator
-                    .normalize()
-                    .scale(-lr * grads.dtau_scalar),
-            );
-        }
+        // Apply the vector-valued tau and gate gradients. These groups were
+        // part of the forward computation but were previously omitted from
+        // the BPTT optimizer.
+        self.tau_modulator = self.tau_modulator.add(&grads.d_tau_modulator.scale(-lr));
+        self.gate_weight = self.gate_weight.add(&grads.d_gate_weight.scale(-lr));
+        self.gate_bias = self.gate_bias.add(&grads.d_gate_bias.scale(-lr));
 
-        // Norm clip to 2.0
-        if self.weight_hv.norm() > 2.0 {
-            self.weight_hv = self.weight_hv.normalize().scale(2.0);
-        }
-        if self.input_mask.norm() > 2.0 {
-            self.input_mask = self.input_mask.normalize().scale(2.0);
+        // Keep all learned hypervector parameter groups bounded.
+        for parameter in [
+            &mut self.weight_hv,
+            &mut self.input_mask,
+            &mut self.tau_modulator,
+            &mut self.gate_weight,
+            &mut self.gate_bias,
+        ] {
+            if parameter.norm() > 2.0 {
+                *parameter = parameter.normalize().scale(2.0);
+            }
         }
     }
 
@@ -1702,18 +2178,97 @@ impl HdcLtcUnifiedNeuron {
     }
 }
 
+/// Full-resolution cosine similarity used by differentiable HDC-LTC gates.
+fn cosine_similarity_full(a: &ContinuousHV, b: &ContinuousHV) -> f32 {
+    debug_assert_eq!(a.values.len(), b.values.len());
+    let mut dot = 0.0f32;
+    let mut norm_a_sq = 0.0f32;
+    let mut norm_b_sq = 0.0f32;
+    for (&av, &bv) in a.values.iter().zip(b.values.iter()) {
+        dot += av * bv;
+        norm_a_sq += av * av;
+        norm_b_sq += bv * bv;
+    }
+    let denominator = (norm_a_sq * norm_b_sq).sqrt();
+    if denominator < 1e-10 {
+        0.0
+    } else {
+        (dot / denominator).clamp(-1.0, 1.0)
+    }
+}
+
+/// Cosine plus exact full-resolution gradients with respect to both operands.
+/// The zero-norm branch matches the forward gate's zero-similarity convention.
+fn cosine_similarity_with_gradients(
+    a: &ContinuousHV,
+    b: &ContinuousHV,
+) -> (f32, ContinuousHV, ContinuousHV) {
+    debug_assert_eq!(a.values.len(), b.values.len());
+    let mut dot = 0.0f32;
+    let mut norm_a_sq = 0.0f32;
+    let mut norm_b_sq = 0.0f32;
+    for (&av, &bv) in a.values.iter().zip(b.values.iter()) {
+        dot += av * bv;
+        norm_a_sq += av * av;
+        norm_b_sq += bv * bv;
+    }
+
+    let norm_a = norm_a_sq.sqrt();
+    let norm_b = norm_b_sq.sqrt();
+    let denominator = norm_a * norm_b;
+    if denominator < 1e-10 {
+        let zeros = ContinuousHV::zero(a.values.len());
+        return (0.0, zeros.clone(), zeros);
+    }
+
+    let raw_similarity = dot / denominator;
+    let similarity = raw_similarity.clamp(-1.0, 1.0);
+    // ContinuousHV::similarity clamps cosine to [-1, 1]. The clamp's
+    // derivative is zero outside its active interval.
+    if raw_similarity <= -1.0 || raw_similarity >= 1.0 {
+        let zeros = ContinuousHV::zero(a.values.len());
+        return (similarity, zeros.clone(), zeros);
+    }
+    let grad_a = a
+        .values
+        .iter()
+        .zip(b.values.iter())
+        .map(|(&av, &bv)| bv / denominator - similarity * av / norm_a_sq)
+        .collect();
+    let grad_b = a
+        .values
+        .iter()
+        .zip(b.values.iter())
+        .map(|(&av, &bv)| av / denominator - similarity * bv / norm_b_sq)
+        .collect();
+
+    (
+        similarity,
+        ContinuousHV::from_values(grad_a),
+        ContinuousHV::from_values(grad_b),
+    )
+}
+
 /// Gradients computed by BPTT `backward()` for a single closed-form step.
 #[derive(Debug, Clone)]
 pub struct HdcLtcGradients {
-    /// Gradient for `weight_hv`
+    /// Gradient for `weight_hv`.
     pub dw: ContinuousHV,
-    /// Gradient for `input_mask`
+    /// Gradient for `input_mask`.
     pub du: ContinuousHV,
-    /// Scalar gradient for tau (applied to `tau_modulator`)
+    /// Scalar dL/dtau diagnostic, retained for telemetry and compatibility.
     pub dtau_scalar: f32,
-    /// Gradient w.r.t. the input vector (for inter-layer backpropagation).
-    /// Represents ∂L/∂u, allowing proper gradient flow to the previous layer.
+    /// Vector gradient for the state-dependent tau modulator.
+    pub d_tau_modulator: ContinuousHV,
+    /// Gradient for the learned sigmoid gate vector.
+    pub d_gate_weight: ContinuousHV,
+    /// Gradient for the learned gate-bias vector.
+    pub d_gate_bias: ContinuousHV,
+    /// Gradient with respect to the transition input.
     pub d_input: ContinuousHV,
+    /// Gradient with respect to the pre-transition state; required to build
+    /// a true temporal adjoint across multiple transitions.
+    pub d_state: ContinuousHV,
 }
 
 /// Statistics for unified neuron
@@ -2830,6 +3385,545 @@ mod tests {
             "State should remain bounded after 100 steps, got {}",
             norm
         );
+    }
+
+    fn one_step_mse(
+        mut neuron: HdcLtcUnifiedNeuron,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        dt: f32,
+    ) -> f32 {
+        neuron.evolve_closed_form(dt, input);
+        neuron
+            .state()
+            .values
+            .iter()
+            .zip(target.values.iter())
+            .map(|(&actual, &expected)| (actual - expected).powi(2))
+            .sum::<f32>()
+            / target.dim() as f32
+    }
+
+    fn central_difference_parameter<F>(
+        neuron: &HdcLtcUnifiedNeuron,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        dt: f32,
+        epsilon: f32,
+        perturb: F,
+    ) -> f32
+    where
+        F: Fn(&mut HdcLtcUnifiedNeuron, f32),
+    {
+        let mut plus = neuron.clone();
+        perturb(&mut plus, epsilon);
+        let mut minus = neuron.clone();
+        perturb(&mut minus, -epsilon);
+        (one_step_mse(plus, input, target, dt)
+            - one_step_mse(minus, input, target, dt))
+            / (2.0 * epsilon)
+    }
+
+    fn assert_finite_difference_close(name: &str, analytic: f32, numerical: f32) {
+        assert!(
+            analytic.is_finite() && numerical.is_finite(),
+            "{name}: non-finite gradient, analytic={analytic}, numerical={numerical}"
+        );
+        let scale = analytic.abs().max(numerical.abs()).max(1e-4);
+        let relative_error = (analytic - numerical).abs() / scale;
+        assert!(
+            relative_error < 1e-2,
+            "{name}: analytic={analytic:.8e}, numerical={numerical:.8e}, relative error={relative_error:.3e}"
+        );
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_manifest_matches_flat_layout() {
+        let neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let manifest = neuron.parameter_manifest();
+        let values = neuron.parameter_values();
+
+        assert_eq!(manifest.format_version, 1);
+        assert_eq!(manifest.dimension, 64);
+        assert_eq!(manifest.total_parameters, values.len());
+        assert_eq!(manifest.groups.len(), 5);
+
+        let expected_names = [
+            "weight_hv",
+            "input_mask",
+            "tau_modulator",
+            "gate_weight",
+            "gate_bias",
+        ];
+        let mut expected_offset = 0usize;
+        for (group, expected_name) in manifest.groups.iter().zip(expected_names) {
+            assert_eq!(group.name, expected_name);
+            assert_eq!(group.offset, expected_offset);
+            assert_eq!(group.shape, vec![64]);
+            assert_eq!(group.len, 64);
+            assert_eq!(group.max_norm, 2.0);
+            expected_offset += group.len;
+        }
+        assert_eq!(expected_offset, values.len());
+    }
+
+    #[test]
+    fn test_hdc_ltc_fingerprint_binds_parameters_and_architecture() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let original = neuron.parameter_fingerprint().unwrap();
+        let mut values = neuron.parameter_values();
+        values[3] += 0.05;
+        neuron.try_set_parameter_values(&values).unwrap();
+        let changed = neuron.parameter_fingerprint().unwrap();
+
+        assert_eq!(original.architecture_digest, changed.architecture_digest);
+        assert_eq!(original.manifest_digest, changed.manifest_digest);
+        assert_ne!(original.parameter_digest, changed.parameter_digest);
+        assert_ne!(original.model_digest, changed.model_digest);
+    }
+
+    #[test]
+    fn test_hdc_ltc_typed_group_edit_is_bounded_and_digest_bound() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let before = neuron.parameter_values();
+        let manifest = neuron.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::GateWeight)
+            .unwrap()
+            .clone();
+        let replacement = vec![0.1; group.len];
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+
+        neuron
+            .try_replace_parameter_group(&digest, &group.id, &replacement)
+            .unwrap();
+
+        let after = neuron.parameter_values();
+        assert_eq!(
+            &after[group.offset..group.offset + group.len],
+            replacement.as_slice()
+        );
+        for index in 0..before.len() {
+            if !(group.offset..group.offset + group.len).contains(&index) {
+                assert_eq!(after[index], before[index], "unexpected parameter change at {index}");
+            }
+        }
+
+        let current = neuron.parameter_values();
+        assert!(matches!(
+            neuron.try_replace_parameter_group(
+                &digest,
+                &HdcLtcParameterGroupId::InputMask,
+                &vec![0.0; 64],
+            ),
+            Err(HdcLtcParameterError::StaleModelFingerprint { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), current);
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_batch_rejects_invalid_payloads_without_mutation() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        let before = neuron.parameter_values();
+
+        let manifest = neuron.parameter_manifest();
+        let gate = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::GateWeight)
+            .unwrap();
+
+        let duplicate = HdcLtcParameterGroupReplacement {
+            id: gate.id.clone(),
+            values: vec![0.0; gate.len],
+        };
+        assert!(matches!(
+            neuron.try_apply_parameter_group_replacements(
+                &digest,
+                &[duplicate.clone(), duplicate]
+            ),
+            Err(HdcLtcParameterError::DuplicateParameterGroup { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+
+        let mut non_finite = before.clone();
+        non_finite[0] = f32::NAN;
+        assert!(matches!(
+            neuron.try_set_parameter_values(&non_finite),
+            Err(HdcLtcParameterError::NonFiniteValue { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+
+        let too_large = vec![1.0; 64];
+        assert!(matches!(
+            neuron.try_replace_parameter_group(&digest, &gate.id, &too_large),
+            Err(HdcLtcParameterError::GroupNormExceeded { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_set_rejects_short_vector_without_mutation() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let before = neuron.parameter_values();
+        let short = &before[..before.len() - 1];
+
+        assert!(matches!(
+            neuron.try_set_parameter_values(short),
+            Err(HdcLtcParameterError::LengthMismatch { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        assert!(matches!(
+            neuron.try_replace_parameter_group(
+                &digest,
+                &HdcLtcParameterGroupId::GateWeight,
+                &[],
+            ),
+            Err(HdcLtcParameterError::GroupLengthMismatch { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_batch_rejects_late_invalid_group_atomically() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let before = neuron.parameter_values();
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        let edits = [
+            HdcLtcParameterGroupReplacement {
+                id: HdcLtcParameterGroupId::InputMask,
+                values: vec![0.1; 64],
+            },
+            HdcLtcParameterGroupReplacement {
+                id: HdcLtcParameterGroupId::GateWeight,
+                values: vec![1.0; 64],
+            },
+        ];
+
+        assert!(matches!(
+            neuron.try_apply_parameter_group_replacements(&digest, &edits),
+            Err(HdcLtcParameterError::GroupNormExceeded { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+    }
+
+    #[test]
+    fn test_hdc_ltc_optimizer_updates_gate_and_tau_parameter_groups() {
+        const DIM: usize = 64;
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: DIM,
+                tau_base: 0.25,
+                backbone_tau: 0.3,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let state = neuron
+            .gate_weight_ref()
+            .scale(0.2)
+            .add(&ContinuousHV::random(DIM, 32).scale(0.05));
+        let input = neuron
+            .tau_modulator_ref()
+            .scale(0.3)
+            .add(&ContinuousHV::random(DIM, 33).scale(0.1));
+        neuron.set_state(state);
+        let target = ContinuousHV::random(DIM, 34).scale(0.1);
+
+        let before = neuron.parameter_values();
+        let gradients = neuron.backward(&input, &target, 0.13);
+        neuron.apply_gradients_no_decay(&gradients, 0.01);
+        let after = neuron.parameter_values();
+        let manifest = neuron.parameter_manifest();
+
+        for group in &manifest.groups {
+            let old = &before[group.offset..group.offset + group.len];
+            let new = &after[group.offset..group.offset + group.len];
+            let change = old
+                .iter()
+                .zip(new.iter())
+                .map(|(a, b)| (a - b).abs())
+                .sum::<f32>();
+            assert!(
+                change > 0.0,
+                "optimizer should update parameter group {}",
+                group.name
+            );
+            let norm = new.iter().map(|value| value * value).sum::<f32>().sqrt();
+            assert!(
+                norm <= group.max_norm + 1e-5,
+                "parameter group {} exceeded norm bound: {}",
+                group.name,
+                norm
+            );
+        }
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_batch_applies_multiple_groups_atomically() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let manifest = neuron.parameter_manifest();
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        let before = neuron.parameter_values();
+
+        let weight = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::WeightHdc)
+            .unwrap();
+        let gate_bias = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::GateBias)
+            .unwrap();
+        let edits = [
+            HdcLtcParameterGroupReplacement {
+                id: weight.id.clone(),
+                values: vec![0.1; weight.len],
+            },
+            HdcLtcParameterGroupReplacement {
+                id: gate_bias.id.clone(),
+                values: vec![-0.1; gate_bias.len],
+            },
+        ];
+
+        neuron
+            .try_apply_parameter_group_replacements(&digest, &edits)
+            .unwrap();
+        let after = neuron.parameter_values();
+
+        for edit in &edits {
+            let group = manifest.groups.iter().find(|group| &group.id == &edit.id).unwrap();
+            assert_eq!(
+                &after[group.offset..group.offset + group.len],
+                edit.values.as_slice()
+            );
+        }
+        for index in 0..before.len() {
+            let edited = edits.iter().any(|edit| {
+                let group = manifest.groups.iter().find(|group| &group.id == &edit.id).unwrap();
+                (group.offset..group.offset + group.len).contains(&index)
+            });
+            if !edited {
+                assert_eq!(after[index], before[index], "unexpected parameter change at {index}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_backward_matches_forward_finite_differences_with_and_without_fourier() {
+        const DIM: usize = 64;
+        const DT: f32 = 0.13;
+        const EPSILON: f32 = 1e-2;
+
+        for fourier_frequencies in [Vec::new(), vec![0.7, 1.3]] {
+            let config = UnifiedConfig {
+                dimension: DIM,
+                tau_base: 0.25,
+                backbone_tau: 0.3,
+                gating_steepness: 1.2,
+                fourier_frequencies,
+                fourier_amplitude: 0.08,
+                ..UnifiedConfig::default()
+            };
+            let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+            // Give the two global scalar gates nontrivial, well-conditioned
+            // cosine signals so their vector gradients are meaningfully tested.
+            let initial_state = neuron
+                .gate_weight_ref()
+                .scale(0.2)
+                .add(&ContinuousHV::random(DIM, 12).scale(0.05));
+            let input = neuron
+                .tau_modulator_ref()
+                .scale(0.3)
+                .add(&ContinuousHV::random(DIM, 13).scale(0.1));
+            neuron.set_state(initial_state);
+            neuron.set_evolution_clock(0.37, 0);
+
+
+            let target = ContinuousHV::random(DIM, 14).scale(0.1);
+            let gradients = neuron.backward(&input, &target, DT);
+
+            // Each finite difference perturbs one parameter in an isolated
+            // clone, then measures the exact public forward transition.
+            let index = 3;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.weight_hv.values[index] += delta,
+            );
+            assert_finite_difference_close("weight_hv", gradients.dw.values[index], numerical);
+
+            let index = 5;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.input_mask.values[index] += delta,
+            );
+            assert_finite_difference_close("input_mask", gradients.du.values[index], numerical);
+
+            let index = 7;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.tau_modulator.values[index] += delta,
+            );
+            assert_finite_difference_close(
+                "tau_modulator",
+                gradients.d_tau_modulator.values[index],
+                numerical,
+            );
+
+            let index = 9;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.gate_weight.values[index] += delta,
+            );
+            assert_finite_difference_close(
+                "gate_weight",
+                gradients.d_gate_weight.values[index],
+                numerical,
+            );
+
+            let index = 11;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.gate_bias.values[index] += delta,
+            );
+            assert_finite_difference_close(
+                "gate_bias",
+                gradients.d_gate_bias.values[index],
+                numerical,
+            );
+
+            let index = 13;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.state.values[index] += delta,
+            );
+            assert_finite_difference_close("state", gradients.d_state.values[index], numerical);
+
+            let mut plus_input = input.clone();
+            plus_input.values[15] += EPSILON;
+            let mut minus_input = input.clone();
+            minus_input.values[15] -= EPSILON;
+            let numerical = (one_step_mse(neuron.clone(), &plus_input, &target, DT)
+                - one_step_mse(neuron.clone(), &minus_input, &target, DT))
+                / (2.0 * EPSILON);
+            assert_finite_difference_close(
+                "input",
+                gradients.d_input.values[15],
+                numerical,
+            );
+        }
+    }
+
+    #[test]
+    fn test_backward_matches_radial_state_bound_projection() {
+        const DIM: usize = 64;
+        const DT: f32 = 0.13;
+        const EPSILON: f32 = 1e-2;
+
+        let config = UnifiedConfig {
+            dimension: DIM,
+            tau_base: 0.25,
+            backbone_tau: 0.3,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron.set_state(ContinuousHV::random(DIM, 22).scale(3.0));
+        neuron.set_evolution_clock(0.0, 0);
+
+        let input = ContinuousHV::random(DIM, 23).scale(0.2);
+        let target = ContinuousHV::random(DIM, 24).scale(0.1);
+        let gradients = neuron.backward(&input, &target, DT);
+
+        let mut evolved = neuron.clone();
+        evolved.evolve_closed_form(DT, &input);
+        assert!(
+            (evolved.state().norm() - 5.0).abs() < 1e-4,
+            "test must exercise radial state projection, got norm={}",
+            evolved.state().norm()
+        );
+
+        let index = 17;
+        let numerical = central_difference_parameter(
+            &neuron,
+            &input,
+            &target,
+            DT,
+            EPSILON,
+            |candidate, delta| candidate.state.values[index] += delta,
+        );
+        assert_finite_difference_close("state_bound_projection", gradients.d_state.values[index], numerical);
     }
 
     #[test]
