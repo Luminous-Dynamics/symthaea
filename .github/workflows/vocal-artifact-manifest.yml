@@ -1,0 +1,76 @@
+name: Vocal artifact manifest
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-artifact-manifest/**"
+      - ".github/workflows/vocal-artifact-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  content-addressed-artifact-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_ARTIFACT_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/vocal-artifact-manifest/Cargo.toml --check
+
+      - name: Test exact frozen dependency graph
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-artifact-manifest/Cargo.toml
+
+      - name: Build exact frozen binary
+        run: cargo +1.96.0 build --locked --release --manifest-path tools/vocal-artifact-manifest/Cargo.toml
+
+      - name: Verify content mutation negative control
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/artifacts/nested" "$tmp/evidence"
+          printf 'weights-a' > "$tmp/artifacts/nested/model.onnx"
+          printf '{}' > "$tmp/artifacts/config.json"
+          bin="tools/vocal-artifact-manifest/target/release/vocal-artifact-manifest"
+          "$bin" --create "$tmp/artifacts" "$tmp/evidence/manifest.json"
+          "$bin" --verify "$tmp/artifacts" "$tmp/evidence/manifest.json"
+          printf 'weights-b' > "$tmp/artifacts/nested/model.onnx"
+          if "$bin" --verify "$tmp/artifacts" "$tmp/evidence/manifest.json"; then
+            echo "verification unexpectedly accepted modified model bytes" >&2
+            exit 1
+          fi
+
+      - name: Confirm tool lockfile did not change
+        run: git diff --exit-code -- tools/vocal-artifact-manifest/Cargo.lock
+
+      - name: Record exact revision
+        run: printf '%s\n' "$VOCAL_ARTIFACT_REVISION" > vocal-artifact-manifest.revision
+
+      - name: Upload deterministic test receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocal-artifact-manifest-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: vocal-artifact-manifest.revision
+          if-no-files-found: error
