@@ -14,8 +14,8 @@ pub struct VocalQualityMetrics {
     pub p95_pitch_error_cents: f32,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
-    /// Score-independent 40-1200 Hz autocorrelation cross-check. Diagnostic
-    /// only until calibrated on human-sung reference recordings.
+    /// Score-independent 40-1200 Hz autocorrelation cross-check. It is a
+    /// separate diagnostic and does not reuse the score-conditioned search.
     pub score_independent_pitch_median_error_cents: f32,
     pub score_independent_pitch_p95_error_cents: f32,
     pub score_independent_pitch_valid_fraction: f32,
@@ -257,7 +257,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     // A high-confidence score-prior disagreement blocks the objective gate
     // even when the constrained tracker itself reports a reassuring pitch.
     let objective_pass = pitch_tracking_pass
-        && pitch_prior_mismatch_frames == 0
+        && score_independent_pitch_audit_pass != Some(false)
         && transition_pitch_pass
         && timing_pass
         && physical_stability_pass
