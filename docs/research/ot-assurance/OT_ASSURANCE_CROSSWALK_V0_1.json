@@ -1,0 +1,274 @@
+{
+  "schema": "luminous.ot_assurance_crosswalk.v0.1",
+  "status": "research_crosswalk_not_conformity_assessment",
+  "review_date": "2026-11-07",
+  "sources": [
+    {
+      "id": "NIST-SP-800-82R3",
+      "title": "Guide to Operational Technology Security",
+      "publisher": "NIST",
+      "revision": "Revision 3",
+      "publication_date": "2023-09",
+      "status": "final_current_reference",
+      "url": "https://csrc.nist.gov/pubs/sp/800/82/r3/final"
+    },
+    {
+      "id": "NIST-SP-800-82R4-IPD",
+      "title": "Guide to Operational Technology Security",
+      "publisher": "NIST",
+      "revision": "Revision 4 Initial Public Draft",
+      "publication_date": "2026-09-21",
+      "comment_deadline": "2026-11-30",
+      "status": "draft_not_final",
+      "url": "https://csrc.nist.gov/pubs/sp/800/82/r4/ipd"
+    },
+    {
+      "id": "NIST-CSF-2.0",
+      "title": "The NIST Cybersecurity Framework",
+      "publisher": "NIST",
+      "revision": "2.0",
+      "publication_date": "2024-02-26",
+      "status": "final",
+      "url": "https://doi.org/10.6028/NIST.CSWP.29"
+    },
+    {
+      "id": "ISA-IEC-62443",
+      "title": "ISA/IEC 62443 Series of Standards",
+      "publisher": "ISA / IEC",
+      "revision": "series_profile",
+      "status": "framework_level_mapping_only",
+      "url": "https://www.isa.org/standards-and-publications/isa-standards/isa-iec-62443-series-of-standards"
+    }
+  ],
+  "claim_ceiling": "framework_function_and_stakeholder_crosswalk_only",
+  "non_equivalences": [
+    [
+      "network_reachability",
+      "engineering_authority"
+    ],
+    [
+      "controller_acknowledgement",
+      "physical_effect"
+    ],
+    [
+      "historian_value",
+      "trusted_process_truth"
+    ],
+    [
+      "cyber_containment",
+      "process_safe_containment"
+    ],
+    [
+      "simulated_response",
+      "field_qualified_response"
+    ],
+    [
+      "asset_unavailable",
+      "hazard_removed"
+    ],
+    [
+      "model_confidence",
+      "permission_to_act"
+    ]
+  ],
+  "functions": [
+    {
+      "id": "GOVERN",
+      "nist_csf_2_function": "Govern",
+      "ot_concern": "risk_ownership_and_safety_decision_rights",
+      "luminous_owners": [
+        "Mycelix",
+        "Symthaea"
+      ],
+      "evidence_required": [
+        "named_owner",
+        "risk_profile",
+        "process_safety_authority",
+        "approved_operating_envelope",
+        "policy_revision"
+      ]
+    },
+    {
+      "id": "IDENTIFY",
+      "nist_csf_2_function": "Identify",
+      "ot_concern": "asset_and_process_context",
+      "luminous_owners": [
+        "Sol-Atlas",
+        "Symthaea"
+      ],
+      "evidence_required": [
+        "device_identity",
+        "firmware_or_logic_revision",
+        "physical_role",
+        "dependency_graph",
+        "source_freshness",
+        "inventory_coverage"
+      ]
+    },
+    {
+      "id": "PROTECT",
+      "nist_csf_2_function": "Protect",
+      "ot_concern": "access_segmentation_and_change_protection",
+      "luminous_owners": [
+        "Mycelix",
+        "Symthaea"
+      ],
+      "evidence_required": [
+        "zone_conduit_boundary",
+        "remote_access_scope",
+        "change_record",
+        "authenticated_source",
+        "approved_maintenance_window"
+      ]
+    },
+    {
+      "id": "DETECT",
+      "nist_csf_2_function": "Detect",
+      "ot_concern": "monitoring_and_cyber_physical_reconciliation",
+      "luminous_owners": [
+        "Symthaea",
+        "Sol-Atlas"
+      ],
+      "evidence_required": [
+        "raw_observation_lineage",
+        "sensor_health",
+        "source_dependencies",
+        "clock_quality",
+        "independent_process_evidence"
+      ]
+    },
+    {
+      "id": "RESPOND",
+      "nist_csf_2_function": "Respond",
+      "ot_concern": "process_safe_containment_and_incident_handling",
+      "luminous_owners": [
+        "Symthaea",
+        "Mycelix"
+      ],
+      "evidence_required": [
+        "process_state",
+        "hazard_constraints",
+        "operator_approval",
+        "reversible_options",
+        "denial_or_abstention"
+      ]
+    },
+    {
+      "id": "RECOVER",
+      "nist_csf_2_function": "Recover",
+      "ot_concern": "restore_and_requalify_safe_service",
+      "luminous_owners": [
+        "Symtropy",
+        "Mycelix",
+        "Sol-Atlas"
+      ],
+      "evidence_required": [
+        "restored_configuration",
+        "independent_process_measurements",
+        "safety_system_availability",
+        "stable_service_window",
+        "operator_acceptance"
+      ]
+    }
+  ],
+  "industry_baselines": [
+    "asset_owner_operator_runbook",
+    "source_health_aware_rules_only",
+    "established_ot_monitoring_and_engineering_toolchain",
+    "symthaea_assisted_evidence_triage"
+  ],
+  "metrics": [
+    "asset_inventory_coverage",
+    "stale_unknown_asset_rate",
+    "source_provenance_completeness",
+    "clock_fault_detection",
+    "cyber_physical_contradiction_recall",
+    "false_alerts_per_asset_day",
+    "recall_at_fixed_false_alert_budget",
+    "probability_calibration_on_held_out_site_time",
+    "abstention_risk_versus_coverage",
+    "common_mode_source_failure_sensitivity",
+    "human_review_time",
+    "process_safety_constraint_violations",
+    "unauthorized_authority_transitions",
+    "time_to_independently_verified_stable_recovery"
+  ],
+  "proposed_gates": {
+    "crosswalk_row_coverage": 1,
+    "controller_ack_promoted_to_physical_truth": 0,
+    "recommendation_promoted_to_device_authority": 0,
+    "synthetic_process_safety_constraint_violations": 0,
+    "automatic_escalation_on_degraded_sensor_or_comms": 0,
+    "simulation_claimed_as_field_qualification": 0
+  },
+  "sector_applicability": [
+    "building_automation_and_control",
+    "water_and_wastewater",
+    "food_and_agriculture",
+    "freight_rail",
+    "maritime",
+    "industrial_iot_and_cloud_convergence"
+  ],
+  "industry_vendor_baselines": [
+    {
+      "id": "CLAROTY",
+      "product": "Claroty Platform",
+      "capabilities": [
+        "CPS asset inventory",
+        "exposure management",
+        "network protection",
+        "secure access",
+        "threat detection"
+      ],
+      "source": "https://claroty.com/platform"
+    },
+    {
+      "id": "NOZOMI",
+      "product": "Nozomi Networks Platform / Guardian",
+      "capabilities": [
+        "OT/IoT asset discovery",
+        "passive network monitoring",
+        "vulnerability assessment",
+        "anomaly detection",
+        "OT threat intelligence"
+      ],
+      "source": "https://www.nozominetworks.com/platform"
+    },
+    {
+      "id": "DRAGOS",
+      "product": "Dragos Platform / OT Watch",
+      "capabilities": [
+        "OT asset visibility",
+        "exposure management",
+        "network monitoring",
+        "OT threat intelligence",
+        "managed threat hunting and analyst triage"
+      ],
+      "source": "https://www.dragos.com/cybersecurity-platform/exposure-management/"
+    }
+  ],
+  "build_buy_bridge": {
+    "buy_or_bridge": [
+      "qualified_passive_OT_sensors",
+      "protocol_decoders",
+      "asset_inventory",
+      "vendor_threat_intelligence"
+    ],
+    "build": [
+      "evidence_lineage_and_source_dependency",
+      "cyber_physical_state_separation",
+      "process_safety_precedence",
+      "authority_non_laundering",
+      "uncertainty_and_abstention",
+      "cross_domain_service_impact",
+      "independently_verified_recovery"
+    ],
+    "do_not_rebuild": [
+      "plant_protocol_stacks",
+      "vendor_device_libraries",
+      "safety_PLCS",
+      "historians",
+      "OT_command_control_plane"
+    ]
+  }
+}
