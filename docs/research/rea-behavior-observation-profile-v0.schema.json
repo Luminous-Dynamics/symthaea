@@ -10,7 +10,8 @@
     "status",
     "source_policy",
     "claim_scope",
-    "observations"
+    "observations",
+    "behavioral_spec"
   ],
   "properties": {
     "schema_version": {
@@ -35,6 +36,9 @@
       "items": {
         "$ref": "#/$defs/observation"
       }
+    },
+    "behavioral_spec": {
+      "$ref": "#/$defs/behavioralSpec"
     }
   },
   "$defs": {
@@ -772,6 +776,183 @@
           "maxItems": 256
         }
       }
+    },
+    "behavioralSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spec_id",
+        "clauses"
+      ],
+      "properties": {
+        "spec_id": {
+          "type": "string",
+          "pattern": "^REA-SPEC-[0-9]{3}$"
+        },
+        "clauses": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/behavioralClause"
+          }
+        }
+      }
+    },
+    "behavioralClause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clause_id",
+        "statement",
+        "support_status",
+        "scope",
+        "limitations"
+      ],
+      "properties": {
+        "clause_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{2,63}$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 1024
+        },
+        "support_status": {
+          "enum": [
+            "observed_exact_invocation",
+            "untested"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "exact_invocation",
+                "bounded_input_class"
+              ]
+            },
+            "observation_id": {
+              "type": "string",
+              "pattern": "^REA-OBS-[0-9]{3}$"
+            },
+            "assertion_id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{2,63}$"
+            },
+            "input_class": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 512
+            },
+            "falsification_condition": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 512
+            }
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "support_status": {
+                "const": "observed_exact_invocation"
+              }
+            },
+            "required": [
+              "support_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scope": {
+                "required": [
+                  "kind",
+                  "observation_id",
+                  "assertion_id"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "exact_invocation"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "input_class"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "falsification_condition"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "support_status": {
+                "const": "untested"
+              }
+            },
+            "required": [
+              "support_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scope": {
+                "required": [
+                  "kind",
+                  "input_class",
+                  "falsification_condition"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "bounded_input_class"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "observation_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "assertion_id"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
