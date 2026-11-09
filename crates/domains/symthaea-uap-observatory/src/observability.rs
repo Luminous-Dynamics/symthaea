@@ -150,10 +150,11 @@ impl ObservabilityReport {
 /// must whiten them using the declared measurement covariance before calling
 /// this function. Parameter scales must be finite and strictly positive.
 ///
-/// The implementation forms `J_scaled^T * J_scaled` and diagonalizes that
-/// symmetric Gram matrix with Jacobi rotations. This dependency-free kernel is
-/// intended for small calibration/state blocks (at most 64 parameters), not as
-/// a replacement for a high-performance SVD or rank-revealing QR package.
+/// The implementation applies a one-sided Jacobi SVD directly to the
+/// scaled Jacobian, avoiding the condition-number squaring caused by explicitly
+/// forming `J_scaled^T * J_scaled`. This dependency-free kernel is intended for
+/// small calibration/state blocks (at most 64 parameters), not as a replacement
+/// for a high-performance SVD or rank-revealing QR package.
 pub fn analyze_jacobian(
     jacobian: &[Vec<f64>],
     parameter_scales: &[f64],
