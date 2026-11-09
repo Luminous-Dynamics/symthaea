@@ -1177,8 +1177,8 @@
             "subject_ref": "pack:ev-ref-01:pack-a",
             "value": 356.4,
             "unit": "V",
-            "sampled_at": "2026-09-01T10:00:00Z",
-            "received_at": "2026-11-01T10:00:01Z",
+            "sampled_at": "2027-02-01T10:00:00Z",
+            "received_at": "2027-02-01T10:00:01Z",
             "monotonic_sequence": 1001,
             "calibration_ref": "cal:voltage-01:r4",
             "quality": {
