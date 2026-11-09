@@ -168,7 +168,6 @@ pub enum MaxQbfError {
 struct BlockingEncoding {
     problem: CnfProblem,
     prefix: ValidatedQuantifierPrefix,
-    blocker_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -321,7 +320,6 @@ fn build_blocking_encoding(
     Ok(BlockingEncoding {
         problem: CnfProblem { variables, clauses },
         prefix: augmented_prefix,
-        blocker_names,
     })
 }
 
@@ -358,7 +356,7 @@ fn dynamic_program_blocker_costs(
 
     let mut costs = Vec::with_capacity(dag.nodes.len());
     for node in &dag.nodes {
-        let cost = match node.kind {
+        let cost = match &node.kind {
             QbfGameDagNodeKind::TrueTerminal => Some(0),
             QbfGameDagNodeKind::FalseTerminal => None,
             QbfGameDagNodeKind::ExistsDecision {
@@ -366,13 +364,15 @@ fn dynamic_program_blocker_costs(
                 low_child,
                 high_child,
             } => {
-                let low = *costs
-                    .get(low_child)
+                let low = costs
+                    .get(*low_child)
+                    .copied()
                     .ok_or(MaxQbfError::DynamicProgrammingInfeasible)?;
-                let high = *costs
-                    .get(high_child)
+                let high = costs
+                    .get(*high_child)
+                    .copied()
                     .ok_or(MaxQbfError::DynamicProgrammingInfeasible)?;
-                if variable < blocker_count {
+                if *variable < blocker_count {
                     min_finite(low, add_blocker_cost(high)?)
                 } else {
                     min_finite(low, high)
@@ -383,11 +383,13 @@ fn dynamic_program_blocker_costs(
                 high_child,
                 ..
             } => {
-                let low = *costs
-                    .get(low_child)
+                let low = costs
+                    .get(*low_child)
+                    .copied()
                     .ok_or(MaxQbfError::DynamicProgrammingInfeasible)?;
-                let high = *costs
-                    .get(high_child)
+                let high = costs
+                    .get(*high_child)
+                    .copied()
                     .ok_or(MaxQbfError::DynamicProgrammingInfeasible)?;
                 match (low, high) {
                     (Some(low), Some(high)) => Some(low.max(high)),
@@ -413,7 +415,7 @@ fn recover_blocker_assignment(
             .nodes
             .get(current)
             .ok_or(MaxQbfError::DynamicProgrammingInfeasible)?;
-        match node.kind {
+        match &node.kind {
             QbfGameDagNodeKind::TrueTerminal => break,
             QbfGameDagNodeKind::FalseTerminal => {
                 return Err(MaxQbfError::DynamicProgrammingInfeasible);
@@ -422,9 +424,9 @@ fn recover_blocker_assignment(
                 variable,
                 low_child,
                 high_child,
-            } if variable == expected_variable => {
-                let low_cost = costs.get(low_child).copied().flatten();
-                let high_cost = add_blocker_cost(costs.get(high_child).copied().flatten())?;
+            } if *variable == expected_variable => {
+                let low_cost = costs.get(*low_child).copied().flatten();
+                let high_cost = add_blocker_cost(costs.get(*high_child).copied().flatten())?;
                 let choose_high = match (low_cost, high_cost) {
                     (Some(low), Some(high)) => high < low,
                     (Some(_), None) => false,
@@ -432,7 +434,11 @@ fn recover_blocker_assignment(
                     (None, None) => return Err(MaxQbfError::DynamicProgrammingInfeasible),
                 };
                 blocker_assignment[expected_variable] = choose_high;
-                current = if choose_high { high_child } else { low_child };
+                current = if choose_high {
+                    *high_child
+                } else {
+                    *low_child
+                };
             }
             _ => return Err(MaxQbfError::DynamicProgrammingInfeasible),
         }
@@ -595,7 +601,10 @@ fn preflight_direct_oracle(
         .and_then(|value| value.checked_sub(1))
         .ok_or(MaxQbfError::DirectOracleAccountingOverflow)?;
 
-    let worst_nodes = subset_masks
+    let direct_calls = subset_masks
+        .checked_add(1)
+        .ok_or(MaxQbfError::DirectOracleAccountingOverflow)?;
+    let worst_nodes = direct_calls
         .checked_mul(full_tree_nodes)
         .ok_or(MaxQbfError::DirectOracleAccountingOverflow)?;
     if worst_nodes > budget.max_direct_game_node_visits {
@@ -605,7 +614,7 @@ fn preflight_direct_oracle(
         });
     }
 
-    let worst_matrix = subset_masks
+    let worst_matrix = direct_calls
         .checked_mul(matrix_rows)
         .ok_or(MaxQbfError::DirectOracleAccountingOverflow)?;
     if worst_matrix > budget.max_direct_matrix_evaluations {
@@ -811,12 +820,6 @@ pub fn verify_maxqbf_evidence(
 
     let selected_mask = clause_subset_mask(&canonical_retained)?;
     let mut direct_stats = DirectOracleStats::default();
-    let source_mask = checked_power_of_two(clause_count)?
-        .checked_sub(1)
-        .ok_or(MaxQbfError::ResourceAccountingOverflow)?;
-    if direct_qbf_value(problem, prefix, source_mask, &mut direct_stats, budget)? {
-        return Err(MaxQbfError::SourceQbfMustBeFalse { actual: true });
-    }
     if !direct_qbf_value(problem, prefix, selected_mask, &mut direct_stats, budget)? {
         return Err(MaxQbfError::SelectedClauseSubsetIsFalse);
     }
@@ -830,6 +833,9 @@ pub fn verify_maxqbf_evidence(
         }
         let value = direct_qbf_value(problem, prefix, mask, &mut direct_stats, budget)?;
         if value {
+            if mask == checked_power_of_two(clause_count)?.saturating_sub(1) {
+                return Err(MaxQbfError::SourceQbfMustBeFalse { actual: true });
+            }
             let counterexample_clause_indices = (0..clause_count)
                 .filter(|index| ((mask >> index) & 1) != 0)
                 .collect();
