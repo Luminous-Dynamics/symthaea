@@ -1,0 +1,45 @@
+name: EV diagnostic value-of-information audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_DIAGNOSTIC_VOI_V0_1.md"
+      - "schemas/transport/ev_diagnostic_voi_scenario_v0_1.schema.json"
+      - "fixtures/ev_battery/diagnostic_voi_scenarios_v0_1.json"
+      - "tools/ev-diagnostic-voi-audit/**"
+      - ".github/workflows/ev-diagnostic-voi-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-diagnostic-voi-audit/Cargo.toml -- --check
+
+      - name: Run VOI and mutation tests
+        run: cargo test --manifest-path tools/ev-diagnostic-voi-audit/Cargo.toml
+
+      - name: Audit frozen synthetic scenarios
+        run: |
+          cargo run --manifest-path tools/ev-diagnostic-voi-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_diagnostic_voi_scenario_v0_1.schema.json \
+            --corpus fixtures/ev_battery/diagnostic_voi_scenarios_v0_1.json \
+            > "$RUNNER_TEMP/ev-diagnostic-voi-report.json"
+          jq -e '
+            .scenario_count == 4 and
+            .selected_test_count == 1 and
+            .no_test_count == 2 and
+            .abstain_count == 1 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-diagnostic-voi-report.json"
