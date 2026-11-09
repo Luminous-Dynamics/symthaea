@@ -1157,6 +1157,90 @@ mod tests {
     }
 
     #[test]
+    fn confirmatory_manifest_is_canonical_and_rejects_duplicate_or_empty_ids() {
+        let forward = ConfirmatoryEpisodeManifest::new(vec![
+            "episode-b".into(),
+            "episode-a".into(),
+        ])
+        .expect("canonical manifest");
+        let reverse = ConfirmatoryEpisodeManifest::new(vec![
+            "episode-a".into(),
+            "episode-b".into(),
+        ])
+        .expect("equivalent canonical manifest");
+        assert_eq!(forward.episode_ids, vec!["episode-a", "episode-b"]);
+        assert_eq!(forward.manifest_digest, reverse.manifest_digest);
+        assert!(matches!(
+            ConfirmatoryEpisodeManifest::new(Vec::new()),
+            Err(SequentialWeightVerificationError::EmptyConfirmatoryEpisodeManifest)
+        ));
+        assert!(matches!(
+            ConfirmatoryEpisodeManifest::new(vec!["duplicate".into(), "duplicate".into()]),
+            Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "duplicate episode identifiers"
+            ))
+        ));
+        assert!(matches!(
+            ConfirmatoryEpisodeManifest::new(vec![" ".into()]),
+            Err(SequentialWeightVerificationError::EmptyEpisodeId)
+        ));
+    }
+
+    #[test]
+    fn candidate_observation_must_belong_to_its_frozen_manifest() {
+        let mut campaign = campaign(0.1, 10);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
+        assert!(matches!(
+            verifier.observe(observation_for_shard('e', 0, 0.8, 0.4)),
+            Err(SequentialWeightVerificationError::EpisodeNotInConfirmatoryManifest)
+        ));
+        assert_eq!(verifier.report().expect("unchanged report").observation_count, 0);
+    }
+
+    #[test]
+    fn distinct_shard_digests_cannot_reuse_overlapping_episode_ids() {
+        let mut campaign = campaign(0.1, 10);
+        let _first = candidate(&mut campaign, 'b', 'd');
+        let overlapping_manifest = manifest_for_shard(&campaign, 'd');
+
+        assert!(matches!(
+            campaign.start_candidate(
+                digest('a'),
+                digest('c'),
+                digest('e'),
+                overlapping_manifest,
+                digest('e'),
+            ),
+            Err(SequentialWeightVerificationError::ConfirmatoryEpisodeOverlap)
+        ));
+        assert_eq!(campaign.next_candidate_index(), 2);
+        assert_eq!(campaign.used_confirmatory_shard_count(), 1);
+        assert_eq!(campaign.used_confirmatory_episode_id_count(), 10);
+    }
+
+    #[test]
+    fn restored_campaign_preserves_episode_reservations_across_different_shard_digests() {
+        let mut campaign = campaign(0.1, 10);
+        let _first = candidate(&mut campaign, 'b', 'd');
+        let snapshot = campaign.snapshot().expect("snapshot");
+        let mut restored =
+            SequentialWeightVerificationCampaign::from_snapshot(snapshot).expect("restore");
+        assert!(matches!(
+            restored.start_candidate(
+                digest('a'),
+                digest('c'),
+                digest('e'),
+                manifest_for_shard(&restored, 'd'),
+                digest('e'),
+            ),
+            Err(SequentialWeightVerificationError::ConfirmatoryEpisodeOverlap)
+        ));
+        assert_eq!(restored.next_candidate_index(), 2);
+        assert_eq!(restored.used_confirmatory_shard_count(), 1);
+        assert_eq!(restored.used_confirmatory_episode_id_count(), 10);
+    }
+
+    #[test]
     fn strong_paired_improvement_is_established_with_anytime_valid_bounds() {
         let mut campaign = campaign(0.05, 2_000);
         let mut verifier = candidate(&mut campaign, 'b', 'd');
@@ -1458,6 +1542,18 @@ mod tests {
         assert!(matches!(
             SequentialWeightVerification::from_checkpoint(altered_observation),
             Err(SequentialWeightVerificationError::VerifierCheckpointDigestMismatch)
+        ));
+
+        let mut altered_manifest = checkpoint.clone();
+        altered_manifest.confirmatory_episode_manifest.episode_ids[0] =
+            "tampered-episode-id".into();
+        altered_manifest.checkpoint_digest =
+            verifier_checkpoint_digest(&altered_manifest).expect("recompute checkpoint digest");
+        assert!(matches!(
+            SequentialWeightVerification::from_checkpoint(altered_manifest),
+            Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "manifest digest mismatch"
+            ))
         ));
 
         let mut altered_claim = checkpoint;
