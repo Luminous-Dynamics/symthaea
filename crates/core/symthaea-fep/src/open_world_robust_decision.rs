@@ -715,12 +715,16 @@ pub fn evaluate_prequential_e_process(
         log_e_value_by_observation.push(log_e_value);
     }
 
+    let normalized_weight_sum = alternatives
+        .iter()
+        .map(|alternative| alternative.prior_weight)
+        .sum::<f64>();
     let components = alternatives
         .iter()
         .zip(log_likelihood_ratios)
         .map(|(alternative, log_likelihood_ratio)| AlternativeEProcessComponent {
             id: alternative.id.clone(),
-            prior_weight: alternative.prior_weight,
+            prior_weight: alternative.prior_weight / normalized_weight_sum,
             log_likelihood_ratio,
         })
         .collect();
@@ -738,11 +742,15 @@ fn mixture_log_e_value(
     alternatives: &[PrequentialAlternativeModel],
     log_likelihood_ratios: &[Option<f64>],
 ) -> Option<f64> {
+    let weight_sum = alternatives
+        .iter()
+        .map(|alternative| alternative.prior_weight)
+        .sum::<f64>();
     let terms = alternatives
         .iter()
         .zip(log_likelihood_ratios)
         .filter_map(|(alternative, log_ratio)| {
-            log_ratio.map(|value| alternative.prior_weight.ln() + value)
+            log_ratio.map(|value| (alternative.prior_weight / weight_sum).ln() + value)
         })
         .collect::<Vec<_>>();
     let maximum = terms.iter().copied().reduce(f64::max)?;
