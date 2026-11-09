@@ -1,0 +1,47 @@
+# Financial Time Frontier v0.1
+
+A small, dependency-free Rust reference kernel for a shared information-frontier contract
+used by financial research and quantitative evaluation.
+
+## Semantics
+
+- Valid time answers when the represented fact applies.
+- Published time answers when a source published a version, if public publication exists.
+- Known/available time answers when the exact version became available to the evaluated
+  principal under the declared rights profile.
+- Retrieved time answers when this evaluation environment ingested the bytes.
+- Decision frontier is the inclusive upper bound for information admission.
+
+Validity intervals use the half-open convention [valid_from, valid_until). A known but
+future-effective commitment can be admitted as information while being explicitly labelled
+NotYetEffectiveAtTarget; it must not be described as a realized current fact.
+
+## Evaluation modes
+
+- HistoricalReconstruction: later retrieval is permitted only when a versioned archive,
+  release record or equivalent evidence proves the exact version's historical availability
+  for the evaluated principal and rights profile. Missing or unverifiable proof is
+  Indeterminate.
+- ProspectiveStreaming: both source availability and actual local retrieval must be at or
+  before the decision frontier.
+
+The implementation rejects future-known evidence, identity mismatches, impossible retrieval
+ordering, wrong rights profiles, denied rights and malformed revision ancestry. It retains
+older versions while identifying which admitted version supersedes them at the chosen
+frontier. It counts unique provenance families rather than documents.
+
+## Trust boundary
+
+The crate does not retrieve or authenticate source material, verify signatures, validate a
+source publisher, check licence text, verify artifact bytes, or establish that a source
+supports a financial claim. The caller must independently establish availability and rights
+proofs and must use the existing content-addressed artifact verifier for exact-byte integrity.
+This crate only applies deterministic temporal and revision rules to those already-qualified
+inputs. Its output is not legal advice, investment advice, a market-data entitlement, or a
+trading authorization.
+
+## Run
+
+From this directory, run cargo fmt --check and cargo test.
+
+No external Rust crates are required.
