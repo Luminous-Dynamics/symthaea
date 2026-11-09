@@ -81,7 +81,12 @@ pub struct ServiceEvaluation {
     pub repair_started_seconds: Option<u64>, pub spare_arrived_seconds: Option<u64>,
     pub repair_completed_seconds: Option<u64>, pub post_test_passed_seconds: Option<u64>,
     pub configuration_updated_seconds: Option<u64>,
-    pub accepted_restoration_seconds: Option<u64>, pub tasr_seconds: Option<u64>,
+    /// Earliest accepted restoration across this service's observation window.
+    /// Use restoration_episodes for the complete repeated-fault history.
+    pub accepted_restoration_seconds: Option<u64>,
+    /// Compatibility summary from the first observed fault to the first accepted release.
+    /// Episode-specific TASR values are reported in restoration_episodes.
+    pub tasr_seconds: Option<u64>,
     pub rejected_release_attempts: u32,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
