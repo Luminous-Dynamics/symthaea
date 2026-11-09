@@ -463,6 +463,10 @@ mod tests {
             "scenario_id":"scenario-crossing-001",
             "actor_policy_id":"actor-policy-synthetic-01",
             "arm_id":"C",
+            "controller_digest":digest('8'),
+            "paired_case_id":null,
+            "paired_role":"standalone",
+            "intervention_kind":"none",
             "action_observation_tick":100,
             "action_commit_tick":110,
             "observation":{
@@ -493,6 +497,63 @@ mod tests {
         t
     }
 
+    fn campaign_report(trials: Vec<Value>) -> Value {
+        serde_json::json!({
+            "schema_id":"luminous.sam.follow-privilege-benchmark",
+            "schema_version":"0.1.0",
+            "benchmark_status":"campaign_incomplete",
+            "claim_ceiling":"synthetic_only",
+            "benchmark":fixture()["benchmark"].clone(),
+            "trials":trials
+        })
+    }
+
+    fn set_pair_identity(
+        trial: &mut Value,
+        pair_id: &str,
+        role: &str,
+        intervention: &str,
+    ) {
+        trial["paired_case_id"] = Value::String(pair_id.to_owned());
+        trial["paired_role"] = Value::String(role.to_owned());
+        trial["intervention_kind"] = Value::String(intervention.to_owned());
+    }
+
+    fn make_arm_b_trial() -> Value {
+        let mut trial = valid_arm_c_trial();
+        trial["arm_id"] = Value::String("B".into());
+        trial["observation"]["profile_id"] =
+            Value::String("simulation_20d_peer_channels_masked".into());
+        trial["observation"]["sources"][0]["policy_visible"] = Value::Bool(false);
+        trial
+    }
+
+    fn make_arm_e_trial() -> Value {
+        let mut trial = valid_arm_c_trial();
+        trial["arm_id"] = Value::String("E".into());
+        trial["observation"]["profile_id"] =
+            Value::String("local_sensor_plus_remote_advisory".into());
+        trial["observation"]["sources"] = serde_json::json!([
+            {
+                "source_id":"local-track-1","source_role":"local_sensor_observation","policy_visible":true,
+                "observed_tick":99,"received_tick":100,"evidence_ref":"local-track-evidence-01"
+            },
+            {
+                "source_id":"v2x-claim-1","source_role":"remote_cooperative_claim","policy_visible":true,
+                "observed_tick":98,"received_tick":100,"evidence_ref":"remote-claim-version-01"
+            },
+            {
+                "source_id":"evaluator-truth-1","source_role":"simulator_oracle","policy_visible":false,
+                "observed_tick":99,"received_tick":120,"evidence_ref":"post-commit-evaluator-truth"
+            }
+        ]);
+        trial["follow_target"] = serde_json::json!({
+            "available":true,"source_role":"local_sensor_observation","target_id":"local-track-1",
+            "age_ms":1.0,"frame_id":"road-local-01","status":"current"
+        });
+        trial
+    }
+
     #[test]
     fn specification_fixture_is_valid_and_contains_no_trials() {
         let f = fixture();
@@ -503,14 +564,8 @@ mod tests {
 
     #[test]
     fn accepts_arm_c_with_simulated_inputs_and_post_commit_truth() {
-        validate_values(&schema(), &serde_json::json!({
-            "schema_id":"luminous.sam.follow-privilege-benchmark",
-            "schema_version":"0.1.0",
-            "benchmark_status":"campaign_incomplete",
-            "claim_ceiling":"synthetic_only",
-            "benchmark":fixture()["benchmark"].clone(),
-            "trials":[valid_arm_c_trial()]
-        })).expect("valid Arm C trial");
+        validate_values(&schema(), &campaign_report(vec![valid_arm_c_trial()]))
+            .expect("valid Arm C trial");
     }
 
     #[test]
@@ -575,6 +630,132 @@ mod tests {
         let mut trial = valid_arm_c_trial();
         trial["observation"]["profile_id"] = Value::String("local_sensor_only".into());
         let report = serde_json::json!({"schema_id":"luminous.sam.follow-privilege-benchmark","schema_version":"0.1.0","benchmark_status":"campaign_incomplete","claim_ceiling":"synthetic_only","benchmark":fixture()["benchmark"].clone(),"trials":[trial]});
+        assert!(validate_values(&schema(), &report).is_err());
+    }
+
+    #[test]
+    fn accepts_masked_oracle_sidecar_pair_without_student_input_or_action_change() {
+        let mut baseline = make_arm_b_trial();
+        set_pair_identity(&mut baseline, "pair-oracle-01", "baseline", "none");
+        let mut intervention = baseline.clone();
+        intervention["trial_id"] = Value::String("trial-b-intervention".into());
+        set_pair_identity(
+            &mut intervention,
+            "pair-oracle-01",
+            "intervention",
+            "oracle_sidecar_mutation",
+        );
+        intervention["observation"]["sources"][0]["evidence_ref"] =
+            Value::String("sim-truth-tick-99-mutated".into());
+        validate_values(&schema(), &campaign_report(vec![baseline, intervention]))
+            .expect("masked oracle sidecar must not change student input or action");
+    }
+
+    #[test]
+    fn rejects_masked_oracle_sidecar_pair_when_student_action_changes() {
+        let mut baseline = make_arm_b_trial();
+        set_pair_identity(&mut baseline, "pair-oracle-02", "baseline", "none");
+        let mut intervention = baseline.clone();
+        intervention["trial_id"] = Value::String("trial-b-intervention-02".into());
+        set_pair_identity(
+            &mut intervention,
+            "pair-oracle-02",
+            "intervention",
+            "oracle_sidecar_mutation",
+        );
+        intervention["observation"]["sources"][0]["evidence_ref"] =
+            Value::String("sim-truth-tick-99-mutated".into());
+        intervention["actions"]["student_raw_action_digest"] =
+            Value::String(digest('g'));
+        let report = campaign_report(vec![baseline, intervention]);
+        assert!(validate_values(&schema(), &report).is_err());
+    }
+
+    #[test]
+    fn accepts_v2x_claim_mutation_when_local_follow_target_is_unchanged() {
+        let mut baseline = make_arm_e_trial();
+        set_pair_identity(&mut baseline, "pair-v2x-01", "baseline", "none");
+        let mut intervention = baseline.clone();
+        intervention["trial_id"] = Value::String("trial-e-intervention".into());
+        set_pair_identity(
+            &mut intervention,
+            "pair-v2x-01",
+            "intervention",
+            "raw_v2x_mutation",
+        );
+        intervention["observation"]["sources"][1]["evidence_ref"] =
+            Value::String("remote-claim-version-02".into());
+        intervention["observation"]["policy_input_digest"] =
+            Value::String(digest('9'));
+        validate_values(&schema(), &campaign_report(vec![baseline, intervention]))
+            .expect("V2X mutation must preserve local track identity/evidence");
+    }
+
+    #[test]
+    fn rejects_v2x_claim_mutation_when_local_follow_target_changes() {
+        let mut baseline = make_arm_e_trial();
+        set_pair_identity(&mut baseline, "pair-v2x-02", "baseline", "none");
+        let mut intervention = baseline.clone();
+        intervention["trial_id"] = Value::String("trial-e-intervention-02".into());
+        set_pair_identity(
+            &mut intervention,
+            "pair-v2x-02",
+            "intervention",
+            "raw_v2x_mutation",
+        );
+        intervention["observation"]["sources"][1]["evidence_ref"] =
+            Value::String("remote-claim-version-02".into());
+        intervention["follow_target"]["target_id"] = Value::String("v2x-claim-1".into());
+        let report = campaign_report(vec![baseline, intervention]);
+        assert!(validate_values(&schema(), &report).is_err());
+    }
+
+    #[test]
+    fn accepts_post_commit_shadow_teacher_when_executed_action_is_unchanged() {
+        let mut baseline = valid_arm_c_trial();
+        set_pair_identity(&mut baseline, "pair-shadow-01", "baseline", "none");
+        baseline["teacher"] = serde_json::json!({
+            "action_computed":false,"action_digest":null,"blended":false,"blend_coefficient":0.0,
+            "supervised":false,"evaluation_only":false,"reference_only":false
+        });
+        let mut intervention = baseline.clone();
+        intervention["trial_id"] = Value::String("trial-shadow-intervention".into());
+        set_pair_identity(
+            &mut intervention,
+            "pair-shadow-01",
+            "intervention",
+            "post_commit_shadow_teacher",
+        );
+        intervention["teacher"] = serde_json::json!({
+            "action_computed":true,"action_digest":digest('b'),"blended":false,"blend_coefficient":0.0,
+            "supervised":false,"evaluation_only":true,"reference_only":true
+        });
+        validate_values(&schema(), &campaign_report(vec![baseline, intervention]))
+            .expect("post-commit shadow teacher must not affect executed action");
+    }
+
+    #[test]
+    fn rejects_post_commit_shadow_teacher_that_changes_executed_action() {
+        let mut baseline = valid_arm_c_trial();
+        set_pair_identity(&mut baseline, "pair-shadow-02", "baseline", "none");
+        baseline["teacher"] = serde_json::json!({
+            "action_computed":false,"action_digest":null,"blended":false,"blend_coefficient":0.0,
+            "supervised":false,"evaluation_only":false,"reference_only":false
+        });
+        let mut intervention = baseline.clone();
+        intervention["trial_id"] = Value::String("trial-shadow-intervention-02".into());
+        set_pair_identity(
+            &mut intervention,
+            "pair-shadow-02",
+            "intervention",
+            "post_commit_shadow_teacher",
+        );
+        intervention["teacher"] = serde_json::json!({
+            "action_computed":true,"action_digest":digest('b'),"blended":false,"blend_coefficient":0.0,
+            "supervised":false,"evaluation_only":true,"reference_only":true
+        });
+        intervention["actions"]["executed_action_digest"] = Value::String(digest('7'));
+        let report = campaign_report(vec![baseline, intervention]);
         assert!(validate_values(&schema(), &report).is_err());
     }
 
