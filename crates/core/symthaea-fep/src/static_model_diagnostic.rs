@@ -28,6 +28,25 @@ pub enum StaticDiagnosticDecision {
     Refute,
 }
 
+/// Declared feasibility state for an externally supplied diagnostic action.
+/// STOP is an internal policy option and does not require an external receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StaticDiagnosticFeasibilityStatus {
+    Feasible,
+    Disallowed,
+    Inaccessible,
+    NotAssessed,
+}
+
+/// Exact action feasibility evidence. The digest must bind the action's
+/// protocol and eligibility decision; a status label alone is not evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StaticDiagnosticActionEligibility {
+    pub action_id: String,
+    pub status: StaticDiagnosticFeasibilityStatus,
+    pub feasibility_receipt_sha256: String,
+}
+
 /// One fixed model vertex and its complete two-stage categorical kernels.
 ///
 /// Tensor dimensions:
@@ -55,6 +74,9 @@ pub struct StaticModelDiagnosticProblem {
     pub model_vertices: Vec<StaticDiagnosticModelVertex>,
     pub root_action_id: String,
     pub root_action_cost: f64,
+    /// Every externally selectable action must have an explicit feasibility
+    /// state and a digest-bound feasibility receipt before policy search.
+    pub action_eligibility: Vec<StaticDiagnosticActionEligibility>,
     pub first_stage_history_ids: Vec<String>,
     pub second_stage_action_ids_by_history: Vec<Vec<String>>,
     pub second_stage_action_costs_by_history: Vec<Vec<f64>>,
@@ -208,6 +230,8 @@ pub enum StaticModelDiagnosticError {
     ProbabilityMassNotNormalized { location: String, sum: f64 },
     #[error("invalid action menu/costs for history {0}")]
     InvalidActionMenu(String),
+    #[error("action is missing a valid feasible receipt: {0}")]
+    InvalidActionEligibility(String),
     #[error("STOP must have zero cost and deterministically emit the STOP outcome")]
     InvalidStopContract,
     #[error("root/branch costs are invalid")]
@@ -576,6 +600,23 @@ pub fn symmetric_calibration_fixture() -> StaticModelDiagnosticProblem {
         model_vertices: vertices,
         root_action_id: "CALIBRATE".to_owned(),
         root_action_cost: 1.0,
+        action_eligibility: vec![
+            StaticDiagnosticActionEligibility {
+                action_id: "CALIBRATE".to_owned(),
+                status: StaticDiagnosticFeasibilityStatus::Feasible,
+                feasibility_receipt_sha256: "c".repeat(64),
+            },
+            StaticDiagnosticActionEligibility {
+                action_id: "ACTION-A".to_owned(),
+                status: StaticDiagnosticFeasibilityStatus::Feasible,
+                feasibility_receipt_sha256: "d".repeat(64),
+            },
+            StaticDiagnosticActionEligibility {
+                action_id: "ACTION-B".to_owned(),
+                status: StaticDiagnosticFeasibilityStatus::Feasible,
+                feasibility_receipt_sha256: "e".repeat(64),
+            },
+        ],
         first_stage_history_ids: histories,
         second_stage_action_ids_by_history: actions_by_history,
         second_stage_action_costs_by_history: vec![vec![0.0, 1.0, 3.0], vec![0.0, 3.0, 1.0]],
@@ -675,6 +716,44 @@ fn validate_problem(
         || !(0.0..=1.0).contains(&problem.certificate_maximum_robust_risk)
     {
         return Err(StaticModelDiagnosticError::InvalidCertificateThreshold);
+    }
+
+    validate_ids(
+        &problem
+            .action_eligibility
+            .iter()
+            .map(|action| action.action_id.clone())
+            .collect::<Vec<_>>(),
+        "action eligibility",
+    )?;
+    let eligibility = problem
+        .action_eligibility
+        .iter()
+        .map(|action| (action.action_id.as_str(), action))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut referenced_actions = std::collections::BTreeSet::new();
+    referenced_actions.insert(problem.root_action_id.as_str());
+    for menu in &problem.second_stage_action_ids_by_history {
+        for action_id in menu.iter().filter(|id| id.as_str() != STOP_ACTION_ID) {
+            referenced_actions.insert(action_id.as_str());
+        }
+    }
+    for action_id in &problem.one_shot_action_ids {
+        referenced_actions.insert(action_id.as_str());
+    }
+    for action_id in referenced_actions {
+        let Some(action) = eligibility.get(action_id) else {
+            return Err(StaticModelDiagnosticError::InvalidActionEligibility(
+                action_id.to_owned(),
+            ));
+        };
+        if action.status != StaticDiagnosticFeasibilityStatus::Feasible
+            || !is_lower_hex(&action.feasibility_receipt_sha256, 64)
+        {
+            return Err(StaticModelDiagnosticError::InvalidActionEligibility(
+                action_id.to_owned(),
+            ));
+        }
     }
 
     let stop_outcome_index = problem
@@ -1403,6 +1482,31 @@ mod tests {
                 ("QUERY_FALSE".to_owned(), 0.0)
             ]
         );
+    }
+
+    #[test]
+    fn infeasible_or_unreceipted_actions_never_enter_policy_search() {
+        let mut problem = symmetric_calibration_fixture();
+        problem.action_eligibility[2].status = StaticDiagnosticFeasibilityStatus::Disallowed;
+        assert!(matches!(
+            evaluate_static_model_diagnostic_problem(
+                &problem,
+                StaticModelDiagnosticConfig::default(),
+                &"d".repeat(40),
+            ),
+            Err(StaticModelDiagnosticError::InvalidActionEligibility(id)) if id == "ACTION-B"
+        ));
+
+        let mut missing_receipt = symmetric_calibration_fixture();
+        missing_receipt.action_eligibility[1].feasibility_receipt_sha256 = "bad".to_owned();
+        assert!(matches!(
+            evaluate_static_model_diagnostic_problem(
+                &missing_receipt,
+                StaticModelDiagnosticConfig::default(),
+                &"e".repeat(40),
+            ),
+            Err(StaticModelDiagnosticError::InvalidActionEligibility(id)) if id == "ACTION-A"
+        ));
     }
 
     #[test]
