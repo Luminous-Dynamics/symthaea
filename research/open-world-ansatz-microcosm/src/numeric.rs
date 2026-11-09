@@ -10,7 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub const INPUT_LEVELS: [i64; 3] = [-1, 0, 1];
-/// Closed candidate-grammar gains; this is deliberately narrower than the world generator.\npub const GAIN_VALUES: [i64; 3] = [1, 2, 3];\n/// Maximum gain accepted by the reference world generator, including out-of-catalogue controls.\npub const MAX_WORLD_GAIN: i64 = 16;
+/// Closed candidate-grammar gains; this is deliberately narrower than the world generator.
+pub const GAIN_VALUES: [i64; 3] = [1, 2, 3];
+/// Maximum gain accepted by the reference world generator, including out-of-catalogue controls.
+pub const MAX_WORLD_GAIN: i64 = 16;
 pub const DECAY_VALUES: [i64; 3] = [0, 1, 2];
 pub const INITIAL_STATES: [i64; 3] = [-1, 0, 1];
 pub const MAX_ORACLE_HORIZON: usize = 6;
