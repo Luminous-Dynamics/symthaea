@@ -80,3 +80,14 @@ The Choro pilot now has a deterministic source-data-free harness for metric dire
 The Choro pilot now lists four individual score records as metadata-only candidates instead of assuming the 295-piece non-commercial corpus is commercially usable. The candidates include a score page labeled Public Domain, contemporary composer-published scores labeled CC BY 4.0, and a possible Samba boundary/control example. Every item is still marked `candidate_not_rights_cleared`; no PDF or score content was downloaded or transcribed. Per-work licensing, territorial rights, and representativeness must be checked before any use. See `CHORO_SOURCE_INTAKE_V1.json`.
 
 The intake record also separates rights signals for the older 295-piece reference corpus: the paper states non-commercial availability, the Zenodo v1.1 metadata says “Other (Open)” without defining a license, and the linked GitHub repository carries a CC BY-NC-SA 4.0 license file. The vague archive label is not treated as commercial permission.
+
+## Southern African profile research pack (v1)
+
+The eight Southern African research-only catalog entries now have a source-grounded research pack and machine-readable intake manifest:
+
+- [Research pack](SOUTHERN_AFRICAN_GENRE_RESEARCH_PACK_V1.md)
+- [Structured research manifest](southern-african-genre-research-v1.json)
+
+The pack separates observations from candidate discriminators, open questions and attributes that must not be inferred. It does not add composer routes or promote any entry. It also flags two taxonomy decisions for review: the `SouthernAfricanUrbanFolkDance` constellation name is too narrow for the current mixture of choral, guitar-song, dance and electronic-pop practices; and “Township Jazz” needs a historically scoped naming decision. These concerns are recorded without changing enum names or stable catalog IDs.
+
+**Integration note:** the separate 37-route style-completion branch assigns Mazurka catalog ID 153, while this 160-entry proposal reserves ID 153 for Kwaito. These branches cannot be combined as-is. If the 160-entry proposal is accepted as the taxonomy authority, the integration should preserve IDs 153–160 for these eight entries and assign Mazurka a new ID after the existing range (161), with the corresponding catalog/tests updated in the route branch. No stable ID is being silently renumbered here.
