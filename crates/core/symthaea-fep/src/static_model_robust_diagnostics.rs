@@ -160,14 +160,17 @@ pub fn solve_two_stage_static_model_fixture() -> StaticModelRobustFixtureResult 
     let mut static_optimal_policy = None;
     let mut rectangular_optimal_policy = None;
 
-    for action_after_cal_a in 0..ACTION_COUNT {
-        for action_after_cal_b in 0..ACTION_COUNT {
-            for decision_mask in 0..(1_u8 << (MODEL_VERTEX_COUNT * BINARY_OUTCOME_COUNT)) {
-                let policy = TwoStageDiagnosticPolicy {
-                    second_action_by_calibration: [
-                        ObservationModelVertex::from_index(action_after_cal_a),
-                        ObservationModelVertex::from_index(action_after_cal_b),
-                    ],
+    // Prefer the calibration-aligned action mapping as the canonical tie
+    // break, then enumerate the remaining action mappings deterministically.
+    for [action_after_cal_a, action_after_cal_b] in
+        [[0, 1], [0, 0], [1, 0], [1, 1]]
+    {
+        for decision_mask in 0..(1_u8 << (MODEL_VERTEX_COUNT * BINARY_OUTCOME_COUNT)) {
+            let policy = TwoStageDiagnosticPolicy {
+                second_action_by_calibration: [
+                    ObservationModelVertex::from_index(action_after_cal_a),
+                    ObservationModelVertex::from_index(action_after_cal_b),
+                ],
                     terminal_decision_by_history: [
                         [
                             (decision_mask & 0b0001) != 0,
@@ -191,11 +194,10 @@ pub fn solve_two_stage_static_model_fixture() -> StaticModelRobustFixtureResult 
                     static_optimal_policy = Some(policy);
                 }
 
-                let rectangular_risk = rectangular_model_policy_risk(&policy);
-                if rectangular_risk < best_rectangular_risk {
-                    best_rectangular_risk = rectangular_risk;
-                    rectangular_optimal_policy = Some(policy);
-                }
+            let rectangular_risk = rectangular_model_policy_risk(&policy);
+            if rectangular_risk < best_rectangular_risk {
+                best_rectangular_risk = rectangular_risk;
+                rectangular_optimal_policy = Some(policy);
             }
         }
     }
