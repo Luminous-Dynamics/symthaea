@@ -231,6 +231,7 @@ pub enum ValidityState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReasonCode {
     EmptyIdentity,
+    InvalidEvaluationContext,
     RightsProfileMismatch,
     RightsDenied,
     RightsUnknown,
@@ -253,6 +254,7 @@ impl ReasonCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::EmptyIdentity => "EMPTY_IDENTITY",
+            Self::InvalidEvaluationContext => "INVALID_EVALUATION_CONTEXT",
             Self::RightsProfileMismatch => "RIGHTS_PROFILE_MISMATCH",
             Self::RightsDenied => "RIGHTS_DENIED",
             Self::RightsUnknown => "RIGHTS_UNKNOWN",
@@ -344,6 +346,11 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
     let mut failed = false;
     let mut indeterminate = false;
 
+    if context.principal_id.trim().is_empty() || context.rights_profile_id.trim().is_empty() {
+        reasons.push(ReasonCode::InvalidEvaluationContext);
+        failed = true;
+    }
+
     if record.evidence_id.trim().is_empty()
         || record.source_id.trim().is_empty()
         || record.source_record_id.trim().is_empty()
@@ -422,6 +429,7 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
 
     let (validity, invalid_interval) = evaluate_validity(record, context.target_time, &mut reasons);
     if invalid_interval { failed = true; }
+    if context.target_time.is_none() { indeterminate = true; }
     let disposition = if failed {
         Disposition::Fail
     } else if indeterminate {
@@ -723,6 +731,43 @@ mod tests {
             *proof_ref = "proof:rights-unknown".into();
         }
         assert_eq!(evaluate_evidence(&unknown, &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).disposition, Disposition::Indeterminate);
+    }
+
+
+    #[test]
+    fn empty_principal_fails_and_missing_target_time_is_indeterminate() {
+        let record = evidence("evidence:context-test", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        let mut empty_principal = context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z");
+        empty_principal.principal_id.clear();
+        let failed = evaluate_evidence(&record, &empty_principal);
+        assert_eq!(failed.disposition, Disposition::Fail);
+        assert!(failed.reasons.contains(&ReasonCode::InvalidEvaluationContext));
+
+        let mut missing_target = context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z");
+        missing_target.target_time = None;
+        let unresolved = evaluate_evidence(&record, &missing_target);
+        assert_eq!(unresolved.disposition, Disposition::Indeterminate);
+        assert!(unresolved.reasons.contains(&ReasonCode::TargetTimeNotProvided));
+    }
+
+    #[test]
+    fn exact_frontier_is_inclusive_and_valid_until_is_exclusive() {
+        let mut record = evidence("evidence:boundary", "2026-11-09T12:00:00Z", "2026-11-09T12:00:00Z");
+        record.valid_until = Some(ts("2026-11-09T00:00:00Z"));
+        let mut ctx = context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z");
+        ctx.target_time = Some(ts("2026-11-09T00:00:00Z"));
+        let result = evaluate_evidence(&record, &ctx);
+        assert_eq!(result.disposition, Disposition::Pass);
+        assert_eq!(result.validity, ValidityState::ExpiredAtTarget);
+        assert!(!result.reasons.contains(&ReasonCode::FutureKnownEvidence));
+    }
+
+    #[test]
+    fn actor_scoped_availability_is_not_overridden_by_publication_time() {
+        let mut record = evidence("evidence:embargo-access", "2026-11-08T08:00:00Z", "2026-11-08T08:05:00Z");
+        record.published_at = Some(ts("2026-11-10T08:00:00Z"));
+        let result = evaluate_evidence(&record, &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"));
+        assert_eq!(result.disposition, Disposition::Pass);
     }
 
     #[test]
