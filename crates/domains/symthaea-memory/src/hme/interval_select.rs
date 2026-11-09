@@ -310,6 +310,7 @@ pub struct GroupPartitionCoverageReceipt {
     manifest_generation: u64,
     eligibility_generation: u64,
     eligible_records: usize,
+    eligible_member_set_digest: [u8; 32],
     group_count: usize,
     partition_digest: [u8; 32],
 }
@@ -353,6 +354,15 @@ pub enum GroupPartitionReceiptError {
     },
     /// Adding group member counts overflowed usize.
     MemberCountOverflow,
+    /// Supplied groups do not cover the authoritative eligible-record count.
+    EligiblePopulationCountMismatch {
+        /// Expected records from the pinned manifest/eligibility snapshot.
+        expected: usize,
+        /// Actual records across the supplied envelopes.
+        actual: usize,
+    },
+    /// Supplied group rosters do not match the authoritative eligible-member digest.
+    EligibleMemberSetDigestMismatch,
     /// Query group directory does not match this receipt.
     ReceiptMismatch,
 }
@@ -383,6 +393,13 @@ impl std::fmt::Display for GroupPartitionReceiptError {
                 write!(f, "group {group_index} belongs to another snapshot")
             }
             Self::MemberCountOverflow => write!(f, "group partition member count overflow"),
+            Self::EligiblePopulationCountMismatch { expected, actual } => write!(
+                f,
+                "eligible population count mismatch: expected={expected}, supplied={actual}"
+            ),
+            Self::EligibleMemberSetDigestMismatch => {
+                write!(f, "group rosters do not match authoritative eligible-member digest")
+            }
             Self::ReceiptMismatch => write!(f, "group directory does not match its partition receipt"),
         }
     }
@@ -397,6 +414,8 @@ impl GroupPartitionCoverageReceipt {
     /// and computes a deterministic receipt over sorted group identities.
     pub fn from_group_envelopes(
         envelopes: &[ContinuousHVGroupEnvelope],
+        expected_eligible_records: usize,
+        expected_eligible_member_set_digest: [u8; 32],
     ) -> Result<Self, GroupPartitionReceiptError> {
         let first = envelopes.first().ok_or(GroupPartitionReceiptError::EmptyPartition)?;
         let manifest_generation = first.manifest_generation();
@@ -404,6 +423,7 @@ impl GroupPartitionCoverageReceipt {
         let mut member_count = 0usize;
         let mut first_group_by_member: BTreeMap<&str, usize> = BTreeMap::new();
         let mut first_group_by_digest: BTreeMap<[u8; 32], usize> = BTreeMap::new();
+        let mut all_member_ids = Vec::new();
         let mut group_identities = Vec::with_capacity(envelopes.len());
 
         for (group_index, envelope) in envelopes.iter().enumerate() {
@@ -442,6 +462,7 @@ impl GroupPartitionCoverageReceipt {
                     });
                 }
                 first_group_by_member.insert(member_id.as_str(), group_index);
+                all_member_ids.push(member_id.clone());
             }
             member_count = member_count
                 .checked_add(member_ids.len())
@@ -453,12 +474,25 @@ impl GroupPartitionCoverageReceipt {
             ));
         }
 
+        if member_count != expected_eligible_records {
+            return Err(GroupPartitionReceiptError::EligiblePopulationCountMismatch {
+                expected: expected_eligible_records,
+                actual: member_count,
+            });
+        }
+        let actual_member_set_digest = member_id_set_digest(&all_member_ids)
+            .map_err(|_| GroupPartitionReceiptError::EligibleMemberSetDigestMismatch)?;
+        if actual_member_set_digest != expected_eligible_member_set_digest {
+            return Err(GroupPartitionReceiptError::EligibleMemberSetDigestMismatch);
+        }
+
         group_identities.sort_by_key(|entry| (entry.0, entry.1));
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"hme_group_partition_coverage_receipt_v1");
         hasher.update(&manifest_generation.to_le_bytes());
         hasher.update(&eligibility_generation.to_le_bytes());
         hasher.update(&(member_count as u64).to_le_bytes());
+        hasher.update(&actual_member_set_digest);
         hasher.update(&(group_identities.len() as u64).to_le_bytes());
         for (member_set_digest, content_digest, members) in group_identities {
             hasher.update(&member_set_digest);
@@ -470,6 +504,7 @@ impl GroupPartitionCoverageReceipt {
             manifest_generation,
             eligibility_generation,
             eligible_records: member_count,
+            eligible_member_set_digest: actual_member_set_digest,
             group_count: envelopes.len(),
             partition_digest: *hasher.finalize().as_bytes(),
         })
@@ -518,6 +553,7 @@ impl GroupPartitionCoverageReceipt {
         hasher.update(&self.manifest_generation.to_le_bytes());
         hasher.update(&self.eligibility_generation.to_le_bytes());
         hasher.update(&(member_count as u64).to_le_bytes());
+        hasher.update(&self.eligible_member_set_digest);
         hasher.update(&(identities.len() as u64).to_le_bytes());
         for (member_set_digest, content_digest, members) in identities {
             hasher.update(&member_set_digest);
@@ -543,6 +579,11 @@ impl GroupPartitionCoverageReceipt {
     /// Total eligible member count covered by the partition.
     pub fn eligible_records(&self) -> usize {
         self.eligible_records
+    }
+
+    /// Authoritative eligible-member-set digest matched at build time.
+    pub fn eligible_member_set_digest(&self) -> [u8; 32] {
+        self.eligible_member_set_digest
     }
 
     /// Number of groups covered by this partition.
