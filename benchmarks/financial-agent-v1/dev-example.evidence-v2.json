@@ -1,0 +1,159 @@
+{
+  "schema_version": "luminous.financial-research-evidence-manifest.v2",
+  "principal_id": "principal:synthetic-public-research",
+  "rights_profile_id": "rights:synthetic-dev",
+  "evaluation_mode": "development_only",
+  "decision_frontier": "2026-10-01T12:00:00Z",
+  "artifacts": [
+    {
+      "schema_version": "luminous.financial-research-evidence.v2",
+      "evidence_id": "ev.synthetic.supplier-status.0001",
+      "source_id": "synthetic-source.supplier-status.v1",
+      "source_record_id": "SYN-REC-SUPPLIER-0001",
+      "revision_group_id": "revision:SYN-REC-SUPPLIER-0001",
+      "subject_refs": [
+        "SYN-BUYER-01",
+        "SYN-SUPPLIER-01"
+      ],
+      "evidence_kind": "supply_chain_observation",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "media_type": "application/json",
+      "published_at": "2026-09-30T09:00:00Z",
+      "valid_from": "2026-09-30T09:00:00Z",
+      "valid_until": null,
+      "temporal": {
+        "event_time_basis": "period",
+        "observation_period_start": "2026-09-30T09:00:00Z",
+        "observation_period_end": null,
+        "validity_interval_convention": "half_open"
+      },
+      "availability": {
+        "precision": "exact_instant",
+        "principal_id": "principal:synthetic-public-research",
+        "known_at": "2026-09-30T09:15:00Z",
+        "interval": null,
+        "proof": {
+          "state": "synthetic_fixture_only",
+          "artifact_ref": "fixture-only://proof/ev.synthetic.supplier-status.0001",
+          "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "verification_receipt_ref": "fixture-only://receipt/ev.synthetic.supplier-status.0001",
+          "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "verifier_id": "fixture-only-not-a-verifier",
+          "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "retrieved_at": "2026-09-30T09:15:00Z",
+      "rights_authorization": {
+        "principal_id": "principal:synthetic-public-research",
+        "rights_profile_id": "rights:synthetic-dev",
+        "disposition": "authorized",
+        "valid_from": "2026-01-01T00:00:00Z",
+        "valid_until": null,
+        "proof": {
+          "state": "synthetic_fixture_only",
+          "artifact_ref": "fixture-only://proof/ev.synthetic.supplier-status.0001",
+          "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "verification_receipt_ref": "fixture-only://receipt/ev.synthetic.supplier-status.0001",
+          "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "verifier_id": "fixture-only-not-a-verifier",
+          "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "provenance": {
+        "family_id": "synthetic-source.supplier-status.v1",
+        "lineage_ref": "fixture-only://provenance/synthetic-source.supplier-status.v1"
+      },
+      "revision": {
+        "supersedes_evidence_ids": []
+      },
+      "access_class": "public",
+      "payload_ref": "inline:/artifacts/ev.synthetic.supplier-status.0001/metadata/synthetic_record",
+      "qualification": "synthetic_development_only",
+      "metadata": {
+        "observation_type": "supplier_status",
+        "supplier_id": "SYN-SUPPLIER-01",
+        "status": "shipment_schedule_disrupted",
+        "buyer_purchase_share": "unknown",
+        "buyer_inventory_buffer": "unknown"
+      }
+    },
+    {
+      "schema_version": "luminous.financial-research-evidence.v2",
+      "evidence_id": "ev.synthetic.energy-index.0001",
+      "source_id": "synthetic-source.energy-index.v1",
+      "source_record_id": "SYN-REC-ENERGY-0001",
+      "revision_group_id": "revision:SYN-REC-ENERGY-0001",
+      "subject_refs": [
+        "SYN-ENERGY-STRESS-INDEX",
+        "SYN-BUYER-01"
+      ],
+      "evidence_kind": "macro_series",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "media_type": "application/json",
+      "published_at": "2026-09-30T10:00:00Z",
+      "valid_from": "2026-09-01T00:00:00Z",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "temporal": {
+        "event_time_basis": "period",
+        "observation_period_start": "2026-09-01T00:00:00Z",
+        "observation_period_end": "2026-10-01T00:00:00Z",
+        "validity_interval_convention": "half_open"
+      },
+      "availability": {
+        "precision": "exact_instant",
+        "principal_id": "principal:synthetic-public-research",
+        "known_at": "2026-09-30T10:10:00Z",
+        "interval": null,
+        "proof": {
+          "state": "synthetic_fixture_only",
+          "artifact_ref": "fixture-only://proof/ev.synthetic.energy-index.0001",
+          "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "verification_receipt_ref": "fixture-only://receipt/ev.synthetic.energy-index.0001",
+          "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "verifier_id": "fixture-only-not-a-verifier",
+          "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "retrieved_at": "2026-09-30T10:10:00Z",
+      "rights_authorization": {
+        "principal_id": "principal:synthetic-public-research",
+        "rights_profile_id": "rights:synthetic-dev",
+        "disposition": "authorized",
+        "valid_from": "2026-01-01T00:00:00Z",
+        "valid_until": null,
+        "proof": {
+          "state": "synthetic_fixture_only",
+          "artifact_ref": "fixture-only://proof/ev.synthetic.energy-index.0001",
+          "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "verification_receipt_ref": "fixture-only://receipt/ev.synthetic.energy-index.0001",
+          "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "verifier_id": "fixture-only-not-a-verifier",
+          "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "provenance": {
+        "family_id": "synthetic-source.energy-index.v1",
+        "lineage_ref": "fixture-only://provenance/synthetic-source.energy-index.v1"
+      },
+      "revision": {
+        "supersedes_evidence_ids": []
+      },
+      "access_class": "public",
+      "payload_ref": "inline:/artifacts/ev.synthetic.energy-index.0001/metadata/synthetic_record",
+      "qualification": "synthetic_development_only",
+      "metadata": {
+        "series_id": "SYN-ENERGY-STRESS-INDEX",
+        "value": "124",
+        "unit": "index_points",
+        "period": "2026-09",
+        "buyer_energy_tariff": "unknown"
+      }
+    }
+  ],
+  "qualification": "synthetic_development_only",
+  "manifest_artifact_ref": "fixture-only://manifest/dev-supplier-energy-v2"
+}
