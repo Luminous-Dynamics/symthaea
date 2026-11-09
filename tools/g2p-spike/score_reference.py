@@ -16,11 +16,56 @@ import argparse
 import ast
 import csv
 import json
+import string
 from pathlib import Path
 from typing import Any
 
 STRESS_MARKERS = {"ˈ", "ˌ"}
-PUNCTUATION = {",", ".", ";", ":", "!", "?", "'", '"', "(", ")", "[", "]", "—", "–", "“", "”", "‘", "’", "…", "«", "»", "¿", "¡"}
+PUNCTUATION = set(string.punctuation) | {
+    "—", "–", "“", "”", "‘", "’", "…", "«", "»", "¿", "¡"
+}
+
+
+def is_punctuation_token(token: str) -> bool:
+    return bool(token) and all(
+        character in string.punctuation
+        or character in {"—", "–", "“", "”", "‘", "’", "…", "«", "»", "¿", "¡"}
+        for character in token
+    )
+
+
+def expected_punctuation_events(raw_tokens: list[str]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    word_index = 0
+    character_index = 0
+    pending_stress = False
+    for raw_token_index, token in enumerate(raw_tokens):
+        if token == " ":
+            if pending_stress:
+                raise ValueError("raw IPA stream has a stress marker before a word separator")
+            word_index += 1
+            character_index = 0
+        elif token in STRESS_MARKERS:
+            if pending_stress:
+                raise ValueError("raw IPA stream has consecutive stress markers")
+            pending_stress = True
+        elif is_punctuation_token(token):
+            if pending_stress:
+                raise ValueError("raw IPA stream has a stress marker before punctuation")
+            events.append(
+                {
+                    "raw_token_index": raw_token_index,
+                    "word_index": word_index,
+                    "after_ipa_character_index": character_index,
+                    "token": token,
+                }
+            )
+        else:
+            pending_stress = False
+            character_index += len(token)
+    if pending_stress:
+        raise ValueError("raw IPA stream ends with a dangling stress marker")
+    return events
 
 
 def parse_debug_list(raw: str, *, expected_nested: bool = False) -> list[Any]:
@@ -57,7 +102,7 @@ def split_piper_words(raw: str | list[str]) -> list[list[str]]:
             # shift every later reference word and corrupt the comparison.
             words.append(current)
             current = []
-        elif token in PUNCTUATION or token in STRESS_MARKERS:
+        elif is_punctuation_token(token) or token in STRESS_MARKERS:
             continue
         else:
             current.append(token)
@@ -70,7 +115,7 @@ def normalize_ipa(tokens: list[str]) -> list[str]:
     """Flatten token boundaries into Unicode code points; do not merge phones."""
     codepoints: list[str] = []
     for token in tokens:
-        if token.isspace() or token in PUNCTUATION or token in STRESS_MARKERS:
+        if token.isspace() or is_punctuation_token(token) or token in STRESS_MARKERS:
             continue
         codepoints.extend(list(token))
     return codepoints
@@ -98,6 +143,9 @@ def split_normalized_piper_words(
         raise ValueError("normalized Piper raw token/prosody arrays are misaligned")
     if raw_tokens is not None and provider_tokens != raw_tokens:
         raise ValueError("normalized Piper raw token stream differs from the TSV source stream")
+    expected_punctuation = expected_punctuation_events(provider_tokens)
+    if payload.get("punctuation") != expected_punctuation:
+        raise ValueError("normalized Piper punctuation offsets do not reconstruct the raw token stream")
     expected_word_slots = split_piper_words(provider_tokens)
 
     words: list[list[str]] = []
