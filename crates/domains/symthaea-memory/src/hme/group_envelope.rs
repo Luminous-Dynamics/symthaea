@@ -16,6 +16,7 @@
 //! it is not a substitute for verifying the extrema against those payloads.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use symthaea_core::hdc::continuous_hv_interval::{
     ContinuousHVIntervalError, ContinuousHVScoreInterval, ResidualCertificateError,
@@ -35,8 +36,8 @@ pub struct ContinuousHVGroupEnvelope {
     manifest_generation: u64,
     eligibility_generation: u64,
     dimension: usize,
-    member_ids: Vec<String>,
-    member_payload_digests: Vec<[u8; 32]>,
+    member_ids: Arc<[String]>,
+    member_payload_digests: Arc<[[u8; 32]]>,
     member_set_digest: [u8; 32],
     content_digest: [u8; 32],
     coordinate_minima: Vec<f32>,
@@ -391,8 +392,8 @@ impl ContinuousHVGroupEnvelope {
             manifest_generation,
             eligibility_generation,
             dimension,
-            member_ids,
-            member_payload_digests,
+            member_ids: Arc::from(member_ids),
+            member_payload_digests: Arc::from(member_payload_digests),
             member_set_digest,
             content_digest: *hasher.finalize().as_bytes(),
             coordinate_minima,
@@ -417,9 +418,20 @@ impl ContinuousHVGroupEnvelope {
         &self.member_ids
     }
 
+    /// Shared immutable member roster for query plans; cloning this handle does
+    /// not clone the full stable-ID list.
+    pub(crate) fn member_ids_shared(&self) -> Arc<[String]> {
+        Arc::clone(&self.member_ids)
+    }
+
     /// Per-member payload digests aligned with member_ids() order.
     pub fn member_payload_digests(&self) -> &[[u8; 32]] {
         &self.member_payload_digests
+    }
+
+    /// Shared immutable payload-digest roster aligned with member_ids().
+    pub(crate) fn member_payload_digests_shared(&self) -> Arc<[[u8; 32]]> {
+        Arc::clone(&self.member_payload_digests)
     }
 
     /// Digest of the original payload associated with one stable member ID.
