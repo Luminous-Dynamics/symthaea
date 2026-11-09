@@ -1532,7 +1532,15 @@
           "exploration_noise": false,
           "controller_output_projection_must_remain_unchanged": true,
           "shadow_teacher": "optional telemetry-only reference; teacher_action_evaluation_only=true and teacher_action_reference_only=true; never blended or supervised",
-          "simulator_oracle": "may be retained for outcome/reward scoring; must not influence the policy"
+          "simulator_oracle": "may be retained for outcome/reward scoring; must not influence the policy",
+          "gradient_updates": false,
+          "replay_updates": false,
+          "trainable_controller_parameters_mutate": false,
+          "output_projection_immutability_test": true,
+          "recurrent_hidden_state_evolution": true,
+          "periodic_state_normalization": true,
+          "fep_state_dependent_tau_modulation": true,
+          "interpretation": "No teacher-driven or gradient-based parameter updates; recurrent state and declared FEP runtime modulation remain active inference-time behavior."
         }
       },
       "metrics": [
@@ -1558,7 +1566,9 @@
         "teacher_free_eval_controller_weight_delta_zero",
         "teacher_free_eval_executed_vs_blended_command_delta",
         "telemetry_csv_column_arity",
-        "teacher_action_reference_only_steps"
+        "teacher_action_reference_only_steps",
+        "fep_tau_modulation_active_steps",
+        "state_normalization_active_steps"
       ],
       "source_status": "implementation_in_review_not_yet_executed",
       "rights_status": "synthetic_simulator_only",
@@ -1566,7 +1576,7 @@
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
         "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
         "source_branch": "research/sam-follow-oracle-evidence-v0-1",
-        "latest_inspected_commit": "c0610c3363239851a12a586643c41467750917a3",
+        "latest_inspected_commit": "0d55939b00789ebf04d608c081d4a95ed5215acb",
         "csv_header_columns": 37,
         "csv_format_placeholders": 37,
         "structural_source_check": "passed_during_authoring",
@@ -1580,7 +1590,8 @@
         "The evaluation path still uses the bicycle-model simulator and existing simulated state vector; it does not establish a camera/LiDAR/radar-only perception result.",
         "Exact-head CI and tests for the latest implementation are not yet confirmed; authored tests and source audit are not counted as passes.",
         "This internal synthetic training/evaluation crucible is not an external leaderboard result or road-safety measure.",
-        "Episode CSV currently has 37 named columns; a regression checks every emitted row has the same width as its header. This is an authored test and source-authoring check, not yet an executed Rust pass."
+        "Episode CSV currently has 37 named columns; a regression checks every emitted row has the same width as its header. This is an authored test and source-authoring check, not yet an executed Rust pass.",
+        "Frozen evaluation does not freeze recurrent hidden state or FEP time-constant modulation: these inference-time dynamics remain active. The tested immutability property is output-projection equality and absence of BPTT/replay update calls, not static hidden state."
       ],
       "sources": [
         "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
