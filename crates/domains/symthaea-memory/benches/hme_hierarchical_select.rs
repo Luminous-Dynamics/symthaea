@@ -536,6 +536,10 @@ fn run() -> Result<(), String> {
     println!("group_interval_build_ns={group_record_build_ns}");
     println!("member_residual_certificate_build_ns={certificate_build_ns}");
     println!("known_group_metadata_bytes={}", metadata_estimate.known_metadata_bytes);
+    println!("numeric_synopsis_bytes_total={}", metadata_estimate.numeric_synopsis_bytes);
+    println!("numeric_synopsis_bytes_per_group={}", metadata_estimate.numeric_bytes_per_group);
+    println!("member_payload_digest_bytes={}", metadata_estimate.member_payload_digest_bytes);
+    println!("stable_member_id_utf8_bytes={}", metadata_estimate.stable_member_id_bytes);
     println!("box_ball_numeric_bytes_per_group={full_numeric_per_group}");
     println!("ball_only_numeric_bytes_per_group={ball_numeric_per_group}");
     println!("reconstruction_representation=unpacked_f32_quantization_grid_1_over_1024");
