@@ -607,7 +607,7 @@ pub fn evaluate_prequential_e_process(
     alternatives: &[PrequentialAlternativeModel],
     alpha: f64,
 ) -> Result<PrequentialEProcessReport, PrequentialEProcessError> {
-    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
         return Err(PrequentialEProcessError::InvalidAlpha);
     }
     if alternatives.is_empty() {
@@ -1011,6 +1011,25 @@ mod tests {
             .expect("valid sequential e-process");
         assert_eq!(report.crossed_at_observation, Some(6));
         assert!(report.log_e_value.unwrap() >= report.log_e_threshold);
+    }
+
+    #[test]
+    fn prequential_e_process_requires_strictly_positive_alpha_below_one() {
+        let observations = vec![PrequentialCategoricalObservation {
+            predicted_outcome_probabilities: vec![0.5, 0.5],
+            observed_outcome_index: 0,
+        }];
+        let alternative = PrequentialAlternativeModel {
+            id: "other".into(),
+            prior_weight: 1.0,
+            predicted_outcome_probabilities: vec![vec![0.5, 0.5]],
+        };
+        for alpha in [0.0, 1.0, -0.1, 1.1, f64::NAN] {
+            assert!(matches!(
+                evaluate_prequential_e_process(&observations, &[alternative.clone()], alpha),
+                Err(PrequentialEProcessError::InvalidAlpha)
+            ));
+        }
     }
 
     #[test]
