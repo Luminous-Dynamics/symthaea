@@ -16,7 +16,6 @@ const FIXTURE: &str =
     include_str!("../../../docs/research/rea-behavior-observation-profile-v0.synthetic.json");
 const MAX_PROFILE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
-const MAX_PROFILE_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservationError(pub String);
