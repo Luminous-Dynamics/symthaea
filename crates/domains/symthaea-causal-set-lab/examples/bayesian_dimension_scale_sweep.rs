@@ -64,7 +64,11 @@ impl Aggregate {
         let predicted_map = posterior
             .dimensions
             .iter()
-            .filter_map(|entry| entry.posterior_probability.map(|p| (entry.spacetime_dimension, p)))
+            .filter_map(|entry| {
+                entry
+                    .posterior_probability
+                    .map(|p| (entry.spacetime_dimension, p))
+            })
             .max_by(|left, right| left.1.total_cmp(&right.1))
             .map(|entry| entry.0);
         if predicted_map == Some(true_dimension) {
@@ -136,10 +140,12 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let z2 = z * z;
     let denominator = 1.0 + z2 / n;
     let center = (observed + z2 / (2.0 * n)) / denominator;
-    let half_width = z
-        * (observed * (1.0 - observed) / n + z2 / (4.0 * n * n)).sqrt()
-        / denominator;
-    ((center - half_width).max(0.0), (center + half_width).min(1.0))
+    let half_width =
+        z * (observed * (1.0 - observed) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
+    (
+        (center - half_width).max(0.0),
+        (center + half_width).min(1.0),
+    )
 }
 
 fn prior(probabilities: [f64; 3]) -> [DimensionPrior; 3] {
@@ -165,11 +171,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     const QUALIFICATION_BASE_SEED: u64 = 0x51A7_2026;
 
     println!("Symthaea finite-size Bayesian dimension scale sweep");
-    println!("epistemic_status=WHOLE_SPRINKLING_MINKOWSKI_KDE_CALIBRATED_NOT_PHYSICAL_DIMENSION_REDUCTION_EVIDENCE");
+    println!(
+        "epistemic_status=WHOLE_SPRINKLING_MINKOWSKI_KDE_CALIBRATED_NOT_PHYSICAL_DIMENSION_REDUCTION_EVIDENCE"
+    );
     println!("likelihood=empirical_KDE_of_ordering_fraction_not_iid_pair_Bernoulli");
     println!("calibration_unit=one_complete_fixed_cardinality_sprinkling");
     println!("calibration_and_qualification=disjoint_deterministic_seed_manifests");
-    println!("event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,wilson95_coverage_low,wilson95_coverage_high,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support");
+    println!(
+        "event_count,truth_dimension,prior_family,calibration_replicates,qualification_replicates,calibration_fraction,outside_support_count,credible_set_95_coverage_given_support,wilson95_coverage_low,wilson95_coverage_high,map_accuracy_given_support,mean_true_posterior_given_support,mean_log_loss_given_support,mean_brier_given_support,false_p_dim_le_3_count_d4,p95_p_dim_le_3_given_support"
+    );
     
     for (size_index, event_count) in EVENT_COUNTS.iter().copied().enumerate() {
         let calibration_replicates = CALIBRATION_REPLICATES[size_index];
@@ -224,8 +234,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("interpretation=false_dimension_reduction_count_counts_cases_where_true_D4_has_p_D_le_3_at_least_0.95");
-    println!("non_claims=scale_dependent_quantum_dimension,curved_or_non_Poisson_manifolds,thermodynamic_limit,physical_quantum_gravity");
-    println!("next_gate=posterior_coverage_and_out_of_family_abstention_across_event_counts_and_window_scales");
+    println!(
+        "interpretation=false_dimension_reduction_count_counts_cases_where_true_D4_has_p_D_le_3_at_least_0.95"
+    );
+    println!(
+        "non_claims=scale_dependent_quantum_dimension,curved_or_non_Poisson_manifolds,thermodynamic_limit,physical_quantum_gravity"
+    );
+    println!(
+        "next_gate=posterior_coverage_and_out_of_family_abstention_across_event_counts_and_window_scales"
+    );
     Ok(())
 }
