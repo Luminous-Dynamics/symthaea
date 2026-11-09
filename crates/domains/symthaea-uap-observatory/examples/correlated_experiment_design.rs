@@ -3,18 +3,22 @@
 
 use std::error::Error;
 use symthaea_uap_observatory::{
-    BudgetedDesignConfig, CorrelatedDesignScenario, CorrelatedExperimentOption,
-    DesignScenario, ExperimentOption, exhaustive_correlated_budgeted_design,
-    greedy_budgeted_design, greedy_correlated_budgeted_design,
+    BudgetedDesignConfig, CorrelatedDesignScenario, CorrelatedExperimentOption, DesignScenario,
+    ExperimentOption, exhaustive_correlated_budgeted_design, greedy_budgeted_design,
+    greedy_correlated_budgeted_design,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Symthaea selected-set correlated observation design reference");
-    println!("epistemic_status=SYNTHETIC_GAUSSIAN_COMMON_MODE_CONTROL_NOT_FIELD_COVARIANCE_VALIDATION");
+    println!(
+        "epistemic_status=SYNTHETIC_GAUSSIAN_COMMON_MODE_CONTROL_NOT_FIELD_COVARIANCE_VALIDATION"
+    );
     println!("model=two_sensors_measure_one_scalar_target");
     println!("prior_precision=1.0");
     println!("jacobian_rows=1.0,1.0");
-    println!("common_mode_correlation_rho,correlated_target_eig_nats,independent_assumption_target_eig_nats,correlated_selected_cost,correlated_fisher_information");
+    println!(
+        "common_mode_correlation_rho,correlated_target_eig_nats,independent_assumption_target_eig_nats,correlated_selected_cost,correlated_fisher_information"
+    );
 
     let parameter_scales = vec![1.0];
     let config = BudgetedDesignConfig {
@@ -42,11 +46,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             jacobian_rows_by_scenario: vec![vec![vec![1.0]]],
         },
     ];
-    let independent = greedy_budgeted_design(
-        &independent_scenarios,
-        &independent_options,
-        &config,
-    )?;
+    let independent =
+        greedy_budgeted_design(&independent_scenarios, &independent_options, &config)?;
 
     for rho in [0.0_f64, 0.5, 0.9, 0.99] {
         let correlated_scenarios = vec![CorrelatedDesignScenario {
@@ -63,11 +64,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             exclusive_group: None,
             observation_indices_by_scenario: vec![vec![0, 1]],
         }];
-        let correlated = greedy_correlated_budgeted_design(
-            &correlated_scenarios,
-            &correlated_options,
-            &config,
-        )?;
+        let correlated =
+            greedy_correlated_budgeted_design(&correlated_scenarios, &correlated_options, &config)?;
         let exact = exhaustive_correlated_budgeted_design(
             &correlated_scenarios,
             &correlated_options,
@@ -76,12 +74,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let expected_information = (1.0 + 2.0 / (1.0 + rho)).ln();
         let correlated_fisher_information = 2.0 / (1.0 + rho);
 
+        assert!((correlated.expected_information_gain_nats - expected_information).abs() < 1.0e-10);
         assert!(
-            (correlated.expected_information_gain_nats - expected_information).abs() < 1.0e-10
-        );
-        assert!(
-            (correlated.expected_information_gain_nats
-                - exact.expected_information_gain_nats)
+            (correlated.expected_information_gain_nats - exact.expected_information_gain_nats)
                 .abs()
                 < 1.0e-12
         );
