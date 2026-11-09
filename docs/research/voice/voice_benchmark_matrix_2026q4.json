@@ -1148,6 +1148,26 @@
         "differential_abstention"
       ],
       "note": "Eight synthetic pair-level vectors. Independent JS recomputation of all defined pair numerators/denominators/rates matched after correcting the one-pair denominator for false invariance. No Rust execution or real-audio evaluation."
+    },
+    {
+      "id": "evidence_span_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/evidence_span_golden_v0.1.json",
+      "schema_path": "docs/research/voice/evidence_span_golden_v0.1.schema.json",
+      "cases": 9,
+      "linked_issue": 11218,
+      "linked_pr": 11220,
+      "metrics": [
+        "claim_id_precision",
+        "claim_id_recall",
+        "reference_claim_evidence_coverage",
+        "citation_sample_precision",
+        "reference_sample_recall",
+        "claim_conditioned_sample_iou",
+        "unsupported_predicted_claim_rate",
+        "unsupported_citation_sample_rate"
+      ],
+      "note": "Nine synthetic cases plus three rejected controls. A separately written JS recomputation matched all declared counts, denominators and rates. This checks arithmetic/fixture consistency only; Rust tests, JSON Schema meta-validation, audio or model execution are not claimed."
     }
   ]
 }
