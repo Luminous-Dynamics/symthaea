@@ -252,6 +252,7 @@
         "baseline_record_id",
         "variant_record_id",
         "counterfactual_pair_manifest_sha256",
+        "counterfactual_pair_manifest_path",
         "split",
         "purpose"
       ],
@@ -281,10 +282,16 @@
         },
         "counterfactual_pair_manifest_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "counterfactual_pair_manifest_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))(?!.*\\\\).+$",
+          "description": "Safe relative path from the cohort manifest directory to the exact SHA-256-pinned pair-manifest JSON artifact."
         }
       },
       "additionalProperties": false
     }
   },
-  "$comment": "Cross-record split disjointness, rights authorization, consent, pair membership, manifest digests, and conditional reviewer gates are enforced by symthaea_stt::cohort_manifest::validate_cohort_manifest; JSON Schema validation alone is not cohort admission."
+  "$comment": "Cross-record split disjointness, rights authorization, consent, pair membership, manifest digests, and conditional reviewer gates are enforced by symthaea_stt::cohort_manifest::validate_cohort_manifest; JSON Schema validation alone is not cohort admission. The optional CLI artifact-verification stage reads each relative pair-manifest path, checks that it stays inside the manifest directory after symlink resolution, verifies pair/trial IDs, and recomputes SHA-256 over the exact bytes."
 }
