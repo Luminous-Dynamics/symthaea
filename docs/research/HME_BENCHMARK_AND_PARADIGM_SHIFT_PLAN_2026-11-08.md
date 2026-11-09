@@ -811,7 +811,8 @@ The harness:
 - materializes member intervals only for surviving groups;
 - performs hierarchical selection and exact-reranks the final payload set;
 - checks every run against the full canonical score/top-k oracle;
-- reports p50/p95/p99 timing, build cost, selector cost, logical exact-payload reads and metadata estimates.
+- separately times the full-scan baseline and the end-to-end two-stage path;
+- reports p50/p95/p99 for full scan, end-to-end hierarchy, each selector/materialization stage, build costs, logical exact-payload reads and metadata estimates. The two-stage latency timer stops before the full-scan baseline begins.
 
 The reconstruction remains an unpacked f32 grid simulation. This is not a production compression format, not a physical disk-I/O benchmark, and not a substitute for #10917 segment/page telemetry. It emits physical_io_measured=false by design. The benchmark has been authored and registered but was not executed in this environment because cargo/rustc are unavailable.
 
