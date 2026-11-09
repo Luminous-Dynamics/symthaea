@@ -16,7 +16,7 @@
 use super::theory_prediction::{
     MeasurementNoiseModel, NoiseCalibrationStatus, OTHER_UNRESOLVED_MODEL_ID, PredictionDisposition,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 /// Upper bound for the discrete model set in the scalar reference kernel.
