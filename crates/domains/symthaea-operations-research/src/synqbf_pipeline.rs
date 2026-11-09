@@ -8,17 +8,15 @@
 //! It does not introduce a new proof calculus or make the artifact
 //! self-authenticating: replay always requires the original QDIMACS source.
 
-use super::qdimacs::{
-    QdimacsError, QdimacsParseBudget, QdimacsSourceStats, parse_qdimacs,
-};
+use super::qdimacs::{QdimacsError, QdimacsParseBudget, QdimacsSourceStats, parse_qdimacs};
 use super::quantified_game_dag::{
-    QbfGameDagBuildReport, QbfGameDagBudget, QbfGameDagError, build_qbf_game_proof_dag,
+    QbfGameDagBudget, QbfGameDagBuildReport, QbfGameDagError, build_qbf_game_proof_dag,
 };
 use super::quantified_game_values::extract_game_value_profile_from_dag;
 use super::synqbf::{SynQbfError, SynQbfVerificationReport};
 use super::synqbf_artifact::{
-    SynQbfArtifactBudget, SynQbfArtifactError, VerifiedSynQbfArtifact,
-    encode_synqbf_proof, verify_synqbf_artifact,
+    SynQbfArtifactBudget, SynQbfArtifactError, VerifiedSynQbfArtifact, encode_synqbf_proof,
+    verify_synqbf_artifact,
 };
 use super::synqbf_construction::{
     SynQbfConstructionBudget, SynQbfConstructionError, SynQbfConstructionReport,
@@ -93,8 +91,8 @@ pub fn build_portable_synqbf_artifact(
     qdimacs_source: &str,
     budget: SynQbfPipelineBudget,
 ) -> Result<BuiltSynQbfArtifact, SynQbfPipelineError> {
-    let parsed = parse_qdimacs(qdimacs_source, budget.qdimacs)
-        .map_err(SynQbfPipelineError::Qdimacs)?;
+    let parsed =
+        parse_qdimacs(qdimacs_source, budget.qdimacs).map_err(SynQbfPipelineError::Qdimacs)?;
     let (dag, dag_report) =
         build_qbf_game_proof_dag(&parsed.problem, &parsed.prefix, budget.game_dag)
             .map_err(SynQbfPipelineError::GameDag)?;
@@ -107,9 +105,7 @@ pub fn build_portable_synqbf_artifact(
         budget.construction.game_values,
     )
     .map_err(|error| {
-        SynQbfPipelineError::Construction(
-            SynQbfConstructionError::GameValueProfile(error),
-        )
+        SynQbfPipelineError::Construction(SynQbfConstructionError::GameValueProfile(error))
     })?;
 
     let constructed = construct_synqbf_from_game_value_profile(
@@ -188,8 +184,8 @@ pub fn replay_portable_synqbf_artifact(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::qdimacs::QdimacsParseBudget;
+    use super::*;
 
     fn budget() -> SynQbfPipelineBudget {
         SynQbfPipelineBudget {
@@ -230,8 +226,7 @@ mod tests {
         assert_eq!(first.bytes, second.bytes);
         assert_eq!(first.report, second.report);
 
-        let replayed =
-            replay_portable_synqbf_artifact(source, &first.bytes, budget()).unwrap();
+        let replayed = replay_portable_synqbf_artifact(source, &first.bytes, budget()).unwrap();
         assert_eq!(replayed.source, first.report.source);
         assert_eq!(
             replayed.verified.verification,
