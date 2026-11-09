@@ -8,16 +8,17 @@ pub mod interval_select;
 
 pub use group_envelope::{
     ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
-    member_id_set_digest,
+    continuous_hv_query_digest, member_id_set_digest,
 };
 pub use interval_select::{
     ExactScoreRecord, GroupIntervalCoverageCounts, GroupIntervalSelectionError,
     GroupIntervalSelectionPlan, GroupMemberScoreIntervalBuildError,
     GroupMemberScoreIntervalRecord, GroupScoreIntervalBuildError,
-    GroupScoreIntervalIdentity, GroupScoreIntervalRecord, HierarchicalIntervalSelectionError,
-    HierarchicalIntervalSelectionPlan, IntervalCoverageCounts, IntervalSelectionError,
-    IntervalSelectionPlan, ScoreIntervalBuildError, ScoreIntervalRecord,
+    GroupScoreIntervalIdentity, GroupScoreIntervalRecord,
+    HierarchicalIntervalSelectionError, HierarchicalIntervalSelectionPlan,
+    IntervalCoverageCounts, IntervalSelectionError, IntervalSelectionPlan,
+    ScoreIntervalBuildError, ScoreIntervalRecord,
     VerifiedMemberResidualCertificate, VerifiedMemberResidualError,
-    select_group_refinement_set, select_hierarchical_refinement_set, select_refinement_set,
-    stable_exact_top_k,
+    select_group_refinement_set, select_hierarchical_refinement_set,
+    select_refinement_set, stable_exact_top_k,
 };
