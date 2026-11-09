@@ -1218,8 +1218,7 @@ mod tests {
     #[test]
     fn test_pd_follow_rejects_stale_or_future_oracle_target() {
         let state = VehicleState::cruising(13.4);
-        let stale =
-            SimulatorOracleFollowTarget::from_simulator_snapshot(1, 10.0, -2.0, -1.0, 0.05);
+        let stale = SimulatorOracleFollowTarget::from_simulator_snapshot(1, 10.0, -2.0, -1.0, 0.05);
         let future = SimulatorOracleFollowTarget::from_simulator_snapshot(
             1,
             10.0,
