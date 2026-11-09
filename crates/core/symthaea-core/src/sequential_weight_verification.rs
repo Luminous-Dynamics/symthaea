@@ -40,6 +40,8 @@ pub struct WeightVerificationBinding {
     pub evaluation_protocol_digest: String,
     /// Digest of the fresh, candidate-specific confirmatory data shard.
     pub confirmatory_shard_digest: String,
+    /// Digest of the canonical sorted episode-ID manifest reserved by this campaign.
+    pub confirmatory_episode_manifest_digest: String,
     /// Digest of the open-world/model-adequacy precondition report.
     pub precondition_gate_digest: String,
 }
@@ -66,6 +68,115 @@ pub struct PairedLossObservation {
     pub baseline_loss: f64,
     /// Candidate loss on the same episode, normalized to [0, 1].
     pub candidate_loss: f64,
+}
+
+/// Canonical identity manifest for a confirmatory episode shard.
+///
+/// Episode IDs are sorted, unique, non-empty, and bound with a domain-separated
+/// BLAKE3 digest. The manifest identifies which episodes may be consumed by a
+/// candidate; the separate shard digest must still bind the actual immutable
+/// episode payloads and their source provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfirmatoryEpisodeManifest {
+    pub format_version: u32,
+    pub episode_ids: Vec<String>,
+    pub manifest_digest: String,
+}
+
+impl ConfirmatoryEpisodeManifest {
+    /// Construct a canonical manifest from episode identifiers.
+    pub fn new(
+        mut episode_ids: Vec<String>,
+    ) -> Result<Self, SequentialWeightVerificationError> {
+        if episode_ids.is_empty() {
+            return Err(SequentialWeightVerificationError::EmptyConfirmatoryEpisodeManifest);
+        }
+        if episode_ids.iter().any(|episode_id| episode_id.trim().is_empty()) {
+            return Err(SequentialWeightVerificationError::EmptyEpisodeId);
+        }
+        episode_ids.sort();
+        if episode_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "duplicate episode identifiers",
+            ));
+        }
+        let mut manifest = Self {
+            format_version: 1,
+            episode_ids,
+            manifest_digest: String::new(),
+        };
+        manifest.manifest_digest = confirmatory_episode_manifest_digest(&manifest)?;
+        Ok(manifest)
+    }
+
+    pub fn episode_count(&self) -> usize {
+        self.episode_ids.len()
+    }
+
+    fn contains(&self, episode_id: &str) -> bool {
+        self.episode_ids
+            .binary_search_by(|candidate| candidate.as_str().cmp(episode_id))
+            .is_ok()
+    }
+}
+
+/// Digest a canonical manifest. Sorting and uniqueness are validated by callers.
+fn confirmatory_episode_manifest_digest(
+    manifest: &ConfirmatoryEpisodeManifest,
+) -> Result<String, SequentialWeightVerificationError> {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-confirmatory-episode-manifest-v1\0");
+    hasher.update(&manifest.format_version.to_le_bytes());
+    hasher.update(&(manifest.episode_ids.len() as u64).to_le_bytes());
+    for episode_id in &manifest.episode_ids {
+        let bytes = episode_id.as_bytes();
+        hasher.update(&(bytes.len() as u64).to_le_bytes());
+        hasher.update(bytes);
+    }
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+/// Stable campaign-registry digest for one episode identity.
+fn confirmatory_episode_id_digest(episode_id: &str) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-confirmatory-episode-id-v1\0");
+    hasher.update(&(episode_id.len() as u64).to_le_bytes());
+    hasher.update(episode_id.as_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn validate_confirmatory_episode_manifest(
+    manifest: &ConfirmatoryEpisodeManifest,
+) -> Result<(), SequentialWeightVerificationError> {
+    if manifest.format_version != 1 {
+        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+            "unsupported format version",
+        ));
+    }
+    if manifest.episode_ids.is_empty()
+        || manifest.episode_ids.iter().any(|episode_id| episode_id.trim().is_empty())
+    {
+        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+            "empty manifest or episode identifier",
+        ));
+    }
+    if manifest
+        .episode_ids
+        .windows(2)
+        .any(|pair| pair[0] >= pair[1])
+    {
+        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+            "episode identifiers are not strictly sorted and unique",
+        ));
+    }
+    validate_hex_digest(&manifest.manifest_digest, "confirmatory_episode_manifest_digest")?;
+    let expected = confirmatory_episode_manifest_digest(manifest)?;
+    if expected != manifest.manifest_digest {
+        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+            "manifest digest mismatch",
+        ));
+    }
+    Ok(())
 }
 
 /// State of a candidate's anytime-valid comparison.
@@ -119,6 +230,7 @@ pub struct SequentialWeightVerificationCheckpoint {
     pub format_version: u32,
     pub binding: WeightVerificationBinding,
     pub config: SequentialWeightVerificationConfig,
+    pub confirmatory_episode_manifest: ConfirmatoryEpisodeManifest,
     pub observations: Vec<PairedLossObservation>,
     pub report_digest: String,
     pub checkpoint_digest: String,
@@ -129,6 +241,7 @@ struct VerifierCheckpointDigestClaims<'a> {
     format_version: u32,
     binding: &'a WeightVerificationBinding,
     config: SequentialWeightVerificationConfig,
+    confirmatory_episode_manifest: &'a ConfirmatoryEpisodeManifest,
     observations: &'a [PairedLossObservation],
     report_digest: &'a str,
 }
@@ -140,6 +253,7 @@ fn verifier_checkpoint_digest(
         format_version: checkpoint.format_version,
         binding: &checkpoint.binding,
         config: checkpoint.config,
+        confirmatory_episode_manifest: &checkpoint.confirmatory_episode_manifest,
         observations: &checkpoint.observations,
         report_digest: &checkpoint.report_digest,
     };
@@ -173,6 +287,16 @@ pub enum SequentialWeightVerificationError {
     ObservationBudgetExhausted,
     #[error("candidate evaluation is already terminal")]
     AlreadyTerminal,
+    #[error("confirmatory data shard has already been assigned in this campaign")]
+    ConfirmatoryShardAlreadyUsed,
+    #[error("confirmatory episode manifest is empty or invalid: {0}")]
+    InvalidConfirmatoryEpisodeManifest(&'static str),
+    #[error("confirmatory episode manifest must contain at least {expected} IDs, got {actual}")]
+    ConfirmatoryManifestTooSmall { expected: usize, actual: usize },
+    #[error("one or more confirmatory episode IDs have already been reserved by this campaign")]
+    ConfirmatoryEpisodeOverlap,
+    #[error("episode ID is not part of this candidate's confirmatory manifest")]
+    EpisodeNotInConfirmatoryManifest,
     #[error("confirmatory data shard has already been assigned in this campaign")]
     ConfirmatoryShardAlreadyUsed,
     #[error("candidate model digest has already been evaluated in this campaign")]
@@ -218,6 +342,7 @@ pub struct SequentialWeightVerificationCampaignSnapshot {
     pub next_candidate_index: u64,
     pub used_candidate_digests: Vec<String>,
     pub used_confirmatory_shard_digests: Vec<String>,
+    pub used_confirmatory_episode_id_digests: Vec<String>,
     pub snapshot_digest: String,
 }
 
@@ -229,6 +354,7 @@ struct CampaignSnapshotDigestClaims<'a> {
     next_candidate_index: u64,
     used_candidate_digests: &'a [String],
     used_confirmatory_shard_digests: &'a [String],
+    used_confirmatory_episode_id_digests: &'a [String],
 }
 
 fn campaign_snapshot_digest(
@@ -241,6 +367,7 @@ fn campaign_snapshot_digest(
         next_candidate_index: snapshot.next_candidate_index,
         used_candidate_digests: &snapshot.used_candidate_digests,
         used_confirmatory_shard_digests: &snapshot.used_confirmatory_shard_digests,
+        used_confirmatory_episode_id_digests: &snapshot.used_confirmatory_episode_id_digests,
     };
     let encoded = serde_json::to_vec(&claims)
         .map_err(|_| SequentialWeightVerificationError::CampaignSnapshotSerialization)?;
