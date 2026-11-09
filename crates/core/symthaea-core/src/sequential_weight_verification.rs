@@ -137,6 +137,12 @@ pub enum SequentialWeightVerificationError {
     CandidateIndexExhausted,
     #[error("failed to serialize sequential verification report")]
     ReportSerialization,
+    #[error("statistical report has not established the required benefit")]
+    ReportNotQualified,
+    #[error("statistical report field failed independent recomputation: {0}")]
+    ReportFieldMismatch(&'static str),
+    #[error("statistical report digest does not match its claims")]
+    ReportDigestMismatch,
 }
 
 /// Campaign ledger that fixes alpha and the evaluation protocol across candidate edits.
@@ -388,6 +394,91 @@ impl SequentialWeightVerification {
             status,
         })
     }
+}
+
+/// Independently recompute the statistical claims and digest for a qualified report.
+///
+/// This validates the confidence-sequence arithmetic and report integrity. It
+/// does not reproduce the raw episode stream; the independent verifier must
+/// still obtain the fresh confirmatory shard and recompute its ordered loss
+/// digest before signing acceptance.
+pub fn validate_qualified_report(
+    report: &SequentialWeightVerificationReport,
+) -> Result<(), SequentialWeightVerificationError> {
+    validate_binding(&report.binding)?;
+    validate_config(report.config)?;
+    validate_hex_digest(&report.observation_digest, "observation_digest")?;
+    validate_hex_digest(&report.report_digest, "report_digest")?;
+
+    if report.status != SequentialWeightVerificationStatus::BenefitEstablished
+        || report.observation_count < report.config.minimum_observations
+        || report.observation_count > report.config.maximum_observations
+        || report.lower_confidence_bound <= report.config.minimum_improvement
+    {
+        return Err(SequentialWeightVerificationError::ReportNotQualified);
+    }
+    if !report.mean_improvement.is_finite()
+        || !(-1.0..=1.0).contains(&report.mean_improvement)
+    {
+        return Err(SequentialWeightVerificationError::ReportFieldMismatch(
+            "mean_improvement",
+        ));
+    }
+
+    let n = report.observation_count as f64;
+    let candidate = report.binding.candidate_index as f64;
+    let alpha_at_look = report.config.campaign_alpha
+        / (candidate * (candidate + 1.0) * n * (n + 1.0));
+    let log_tail_ratio = std::f64::consts::LN_2 - report.config.campaign_alpha.ln()
+        + candidate.ln()
+        + (candidate + 1.0).ln()
+        + n.ln()
+        + (n + 1.0).ln()
+        + 1e-12;
+    let confidence_radius = (2.0 * log_tail_ratio / n).sqrt();
+    let lower = (report.mean_improvement - confidence_radius).max(-1.0);
+    let upper = (report.mean_improvement + confidence_radius).min(1.0);
+
+    for (field, actual, expected) in [
+        ("alpha_at_look", report.alpha_at_look, alpha_at_look),
+        (
+            "confidence_radius",
+            report.confidence_radius,
+            confidence_radius,
+        ),
+        ("lower_confidence_bound", report.lower_confidence_bound, lower),
+        ("upper_confidence_bound", report.upper_confidence_bound, upper),
+    ] {
+        if !actual.is_finite() || actual.to_bits() != expected.to_bits() {
+            return Err(SequentialWeightVerificationError::ReportFieldMismatch(
+                field,
+            ));
+        }
+    }
+
+    let claims = ReportDigestClaims {
+        binding: &report.binding,
+        config: report.config,
+        observation_count: report.observation_count,
+        mean_improvement: report.mean_improvement,
+        lower_confidence_bound: report.lower_confidence_bound,
+        upper_confidence_bound: report.upper_confidence_bound,
+        confidence_radius: report.confidence_radius,
+        alpha_at_look: report.alpha_at_look,
+        observation_digest: &report.observation_digest,
+        status: report.status,
+    };
+    let encoded = serde_json::to_vec(&claims)
+        .map_err(|_| SequentialWeightVerificationError::ReportSerialization)?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-weight-verification-report-v1\0");
+    hasher.update(&(encoded.len() as u64).to_le_bytes());
+    hasher.update(&encoded);
+    let expected_digest = hasher.finalize().to_hex().to_string();
+    if expected_digest != report.report_digest {
+        return Err(SequentialWeightVerificationError::ReportDigestMismatch);
+    }
+    Ok(())
 }
 
 #[derive(Serialize)]
