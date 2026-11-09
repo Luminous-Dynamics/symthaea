@@ -268,3 +268,83 @@ The decisive result could be: commercial systems win on one-shot audio preferenc
 7. Conduct blind musician and listener evaluations; publish failures, confidence intervals, per-style results and source/asset digests.
 
 **Current claim boundary:** the code is a new symbolic analysis primitive with authored synthetic tests. The six tradition profiles remain research hypotheses. No authentic recordings, licensed corpora, genre-specific composer routes, renderer qualifications, listener studies or SOTA wins are claimed.
+
+## 2.3 Directed cue and response state machine
+
+The new `ensemble_cues` module models a cue protocol as a finite-state transition system:
+
+`current_state + (cue_type, source_layer) -> target_state + (response_layer, response_action)`
+
+An authored sequence records cue events, realized state changes and response actions. The verifier checks:
+
+- the cue is valid for the current state and declared source layer;
+- the expected state change occurs within a declared latency bound;
+- the designated response layer performs the required action inside its delay window;
+- cues are processed in deterministic chronological order;
+- a failed state change does not silently advance the state machine.
+
+This is a reusable cue protocol, not a Juju template. A profile may later define instrument-led, verbal, gesture-derived or hybrid cue vocabularies, but those vocabularies and their meanings require source and practitioner review. The current implementation verifies declared cue/action traces; it does not infer body gestures or cues from audio/video.
+
+### Juju-specific implication
+
+Olusakin's 2014 fieldwork-based study distinguishes instrumental, verbal and non-verbal forms of directing in Juju performance. Its examples include lead-guitar and talking-drum signals that request changes in dynamics, interludes, accompaniment, pauses and endings. It also notes that leadership and directing practice varies between bands. This supports an event-conditioned transition model, not one universal master-drummer controller. [Olusakin, 2014, DOI: 10.5897/JMD2014.0027](https://doi.org/10.5897/JMD2014.0027).
+
+## 2.4 Inter-onset space and rhythmic pressure
+
+The new `groove_space` module measures circular inter-onset gaps per layer over the same complete supercycle. It reports:
+
+- sorted inter-onset gap lengths;
+- shortest and longest gaps;
+- exact mean-gap ratio (horizon / unique attacks);
+- count of gaps above a caller-selected threshold;
+- fraction of the supercycle covered by those long gaps, in basis points.
+
+The name is intentionally **inter-onset space**, not acoustic silence. The current event representation has attacks but not note durations, release envelopes, reverberation or sample tails. A long inter-onset gap can contain sustained bass or a pad; it is therefore not proof of audible silence. A future rendered-audio track must combine event timing with duration/envelope and signal measurements before making an acoustic-silence claim.
+
+### Gqom-specific implication
+
+Eaby-Lomas's historical analysis describes Gqom's rhythmic beat as foregrounded over harmony and melody, a raw/dark production character, a slow-burn structure, and later transformations of those features. This supports testing sparsity, inter-onset gaps and long-range pressure as candidate measurements, but not declaring a specific gap distribution canonical for all Gqom. [Eaby-Lomas, “Historicising gqom as a post-kwaito phenomenon”](https://doi.org/10.2989/18121004.2021.2020964).
+
+## 2.5 Added synthetic gates
+
+The new cue and space modules add deterministic synthetic tests for:
+
+- ordered cue → state → response chains;
+- missing or delayed responses;
+- wrong state changes and state-machine non-advancement;
+- deterministic cue ordering under array permutation;
+- duplicate cue-transition keys;
+- sparse-vs-dense inter-onset profiles;
+- circular gap conservation across the entire supercycle;
+- single-event cycles and explicit empty/rest layers.
+
+These tests qualify the mechanics only. They do not qualify any named musical tradition.
+
+## 5.1 Adversarial control and preservation matrix
+
+Style controls should be tested under interventions, not one at a time only. The proposed confirmatory matrix is:
+
+| Intervention | Target behavior | Protected properties / negative controls |
+|---|---|---|
+| Add or alter a leader cue | Expected state transition and response | Non-target layers remain unchanged outside declared response window |
+| Remove the required response | Response coverage fails | A state change alone must not pass the whole cue contract |
+| Add rhythmic attacks to a sparse layer | Density and gap profile change | Cycle ownership and unrelated layer phase remain stable |
+| Shift all layer phases by one common offset | Relative layer relationships remain identical | Pairwise coincidence, circular separation and gap statistics are invariant |
+| Change one layer's cycle length | Joint LCM and phase pattern update | Unchanged layers keep their own cycle/event definition |
+| Break a long gap deliberately | Long-gap coverage decreases | Unrelated layer metrics remain unchanged |
+| Reorder events and JSON records | Same canonical result after sorting | No dependence on serialization order |
+| Remove a required source/consent/annotation record | Evidence admission fails | No fallback to genre-name assumptions or public URL availability |
+
+For the composer path, every intervention should be run through the actual production composer with fixed seeds and exact source/artifact digests. Synthetic inputs are appropriate for oracle validation; style-specific fixtures require separately sourced evidence.
+
+## 6.1 Updated industry comparison snapshot (9 November 2026)
+
+Artificial Analysis's current AA-Music-Instrumental v1.1 page reports a blind-pairwise-preference Elo ranking. Its visible snapshot lists Suno v6 at 1148 ± 22 (2,208 samples), Suno v6-mini at 1114 ± 21, Mureka V9.5 at 1084 ± 21, and Lyria 3 Pro at 1080 ± 21. This is a preference leaderboard, not a score for structural control, cultural specificity, editability or source provenance. [AA Music Instrumental leaderboard](https://artificialanalysis.ai/music/leaderboard/instrumental?tab=leaderboard).
+
+The June 2026 *Artificial Intelligence Review* survey covers symbolic, audio and multimodal generation, including interactive/co-creative settings, and discusses distinct models, datasets and objective metrics. It reinforces that commercial audio preference and controlled symbolic capability are separate evaluation targets. [Duan, Yu & Briot (2026)](https://doi.org/10.1007/s10462-026-11582-x).
+
+## 7.1 New research references
+
+12. Oluniyi Michael Olusakin. “Origin and development of 'Directing' in juju music performance.” *Journal of Music and Dance*, 2014. [https://doi.org/10.5897/JMD2014.0027](https://doi.org/10.5897/JMD2014.0027).
+13. Dion Malcolm Eaby-Lomas. “Historicising gqom as a post-kwaito phenomenon.” *Journal of the Musical Arts in Africa*, 2021. [https://doi.org/10.2989/18121004.2021.2020964](https://doi.org/10.2989/18121004.2021.2020964).
+14. Wei Duan, Yi Yu & Jean-Pierre Briot. “Recent advances in music generation: methods, evaluation, and challenges.” *Artificial Intelligence Review*, 2026. [https://doi.org/10.1007/s10462-026-11582-x](https://doi.org/10.1007/s10462-026-11582-x).
