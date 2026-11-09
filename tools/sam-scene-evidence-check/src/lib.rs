@@ -1473,7 +1473,11 @@ mod tests {
     #[test]
     fn rejects_follow_target_past_declared_maximum_age() {
         let (schema, mut fixture) = load_fixture();
+        let stale_tick = Value::from(11_000_000_000u64);
         fixture["snapshot"]["follow_target_context"]["max_age_ns"] = Value::from(1u64);
+        fixture["snapshot"]["follow_target_context"]["observation_tick_ns"] =
+            stale_tick.clone();
+        fixture["snapshot"]["sources"][3]["acquisition_tick_ns"] = stale_tick;
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
