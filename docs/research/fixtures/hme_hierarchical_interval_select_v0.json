@@ -1,0 +1,202 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-HIERARCHICAL-INTERVAL-SELECT-2026-11-09",
+  "status": "synthetic_algorithm_contract_not_runtime_or_benchmark_result",
+  "algorithm": "weighted_group_then_member_intervals_v1",
+  "score_contract": "continuous_hv_cosine_full_f32_group8_v1",
+  "snapshot": {
+    "manifest_generation": 73,
+    "eligibility_generation": 19,
+    "principal_scope": "fixture-principal-A",
+    "policy_generation": 8,
+    "all_groups_same_snapshot": true,
+    "group_membership_disjoint": true,
+    "complete_eligible_group_coverage": true
+  },
+  "query": {
+    "query_id": "query-1",
+    "dimension": 8,
+    "top_k": 2,
+    "exact_oracle": "canonical_full_resolution_continuous_hv_f32",
+    "exact_top_k_ids": [
+      "a-01",
+      "a-02"
+    ]
+  },
+  "groups": [
+    {
+      "group_id": "group-A",
+      "member_ids": [
+        "a-01",
+        "a-02",
+        "a-03"
+      ],
+      "member_count": 3,
+      "score_interval": {
+        "lower": 0.8,
+        "upper": 0.99
+      },
+      "expected_stage_1": "refine_group"
+    },
+    {
+      "group_id": "group-B",
+      "member_ids": [
+        "b-01",
+        "b-02",
+        "b-03",
+        "b-04"
+      ],
+      "member_count": 4,
+      "score_interval": {
+        "lower": 0.2,
+        "upper": 0.6
+      },
+      "expected_stage_1": "exclude_group"
+    },
+    {
+      "group_id": "group-C",
+      "member_ids": [
+        "c-01",
+        "c-02",
+        "c-03",
+        "c-04"
+      ],
+      "member_count": 4,
+      "score_interval": {
+        "lower": -0.6,
+        "upper": 0
+      },
+      "expected_stage_1": "exclude_group"
+    }
+  ],
+  "stage_1": {
+    "weighted_lower_multiset": [
+      {
+        "score_lower": 0.8,
+        "multiplicity": 3
+      },
+      {
+        "score_lower": 0.2,
+        "multiplicity": 4
+      },
+      {
+        "score_lower": -0.6,
+        "multiplicity": 4
+      }
+    ],
+    "kth_lower_threshold": 0.8,
+    "refinement_groups": [
+      "group-A"
+    ],
+    "excluded_groups": [
+      "group-B",
+      "group-C"
+    ],
+    "refinement_records": 3,
+    "excluded_records": 8
+  },
+  "surviving_group_members": [
+    {
+      "member_id": "a-01",
+      "original_payload_digest": "fixture-digest-a01",
+      "reconstruction_digest": "fixture-reconstruction-a01",
+      "transform_profile_digest": "fixture-transform-v1",
+      "residual_l2_upper": 0.005,
+      "canonical_score_interval": {
+        "lower": 0.95,
+        "upper": 0.98
+      },
+      "expected_stage_2": "refine_member",
+      "illustrative_exact_score": 0.97
+    },
+    {
+      "member_id": "a-02",
+      "original_payload_digest": "fixture-digest-a02",
+      "reconstruction_digest": "fixture-reconstruction-a02",
+      "transform_profile_digest": "fixture-transform-v1",
+      "residual_l2_upper": 0.006,
+      "canonical_score_interval": {
+        "lower": 0.9,
+        "upper": 0.96
+      },
+      "expected_stage_2": "refine_member",
+      "illustrative_exact_score": 0.93
+    },
+    {
+      "member_id": "a-03",
+      "original_payload_digest": "fixture-digest-a03",
+      "reconstruction_digest": "fixture-reconstruction-a03",
+      "transform_profile_digest": "fixture-transform-v1",
+      "residual_l2_upper": 0.008,
+      "canonical_score_interval": {
+        "lower": 0.1,
+        "upper": 0.85
+      },
+      "expected_stage_2": "exclude_member",
+      "illustrative_exact_score": 0.82
+    }
+  ],
+  "stage_2": {
+    "intersect_member_intervals_with_group_interval": true,
+    "effective_member_intervals": [
+      {
+        "member_id": "a-01",
+        "lower": 0.95,
+        "upper": 0.98
+      },
+      {
+        "member_id": "a-02",
+        "lower": 0.9,
+        "upper": 0.96
+      },
+      {
+        "member_id": "a-03",
+        "lower": 0.8,
+        "upper": 0.85
+      }
+    ],
+    "kth_lower_threshold": 0.9,
+    "refinement_member_ids": [
+      "a-01",
+      "a-02"
+    ],
+    "excluded_member_ids": [
+      "a-03"
+    ],
+    "final_exact_payload_reads": 2,
+    "exact_rerank_result": [
+      "a-01",
+      "a-02"
+    ]
+  },
+  "logical_traffic_accounting": {
+    "eligible_records": 11,
+    "group_synopses_scanned": 3,
+    "member_interval_records_scanned": 3,
+    "original_vector_payloads_read": 2,
+    "full_scan_original_payload_reads": 11,
+    "original_payload_reads_avoided": 9,
+    "payload_read_reduction_percent": 81.8181818182,
+    "qualification": "fixture arithmetic only; must not be reported as measured HME I/O savings"
+  },
+  "required_negative_controls": [
+    "mixed manifest generations",
+    "mixed eligibility generations",
+    "overlapping member IDs across groups",
+    "group member count differs from member manifest length",
+    "member payload digest does not match original vector",
+    "reconstruction digest differs from admitted receipt",
+    "transform profile digest mismatch",
+    "missing member interval within a retained group",
+    "member interval disjoint from parent group interval",
+    "stale policy generation after group envelope admission",
+    "unbounded unopened group without synopsis"
+  ],
+  "nonclaims": [
+    "Fixture does not contain real cryptographic hashes.",
+    "Fixture does not implement persistence or reopen authentication for residual receipts.",
+    "Fixture does not prove physical I/O savings or throughput improvement.",
+    "Fixture does not promote spherical-cap canonical-f32 intervals into the selector.",
+    "Fixture is not a public benchmark score."
+  ]
+}
