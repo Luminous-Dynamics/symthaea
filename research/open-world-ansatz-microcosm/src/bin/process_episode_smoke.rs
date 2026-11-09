@@ -26,6 +26,7 @@ struct PairedProcessSmokeReport {
     a0: ProcessEpisodeReceipt,
     a2: ProcessEpisodeReceipt,
     out_of_catalogue: ProcessEpisodeReceipt,
+    equivalent_out_of_catalogue: ProcessEpisodeReceipt,
     limitations: Vec<String>,
 }
 
@@ -111,6 +112,33 @@ fn run_open_support_arm(
         .map_err(|error| format!("open-support process episode failed: {error}"))
 }
 
+fn run_equivalent_open_support_arm(
+    executable: &Path,
+    strategy: &str,
+) -> Result<ProcessEpisodeReceipt, String> {
+    let truth = ModelHypothesis {
+        mechanism: Mechanism::DirectResponse,
+        gain: 4,
+        decay: None,
+        initial_state: None,
+        sensor: SensorMap::Identity,
+    };
+    let episode = BlindEpisode::new_numeric_open_support(
+        "process-open-support-equivalent-parameterization",
+        truth,
+        StructureAccess::NumericWithheld,
+        6,
+    )
+    .map_err(|error| format!("cannot create equivalent open-support episode: {error}"))?;
+    let config = ProcessAgentConfig::new(executable)
+        .with_args(child_args(strategy))
+        .with_working_directory(std::env::temp_dir());
+    let agent = ProcessAgent::spawn(config)
+        .map_err(|error| format!("cannot start equivalent open-support child agent: {error}"))?;
+    run_process_episode(episode, agent, "equivalent_out_of_catalogue")
+        .map_err(|error| format!("equivalent open-support process episode failed: {error}"))
+}
+
 fn run() -> Result<(), String> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let (executable, strategy) = parse_args(&args)?;
@@ -139,6 +167,8 @@ fn run() -> Result<(), String> {
         truth,
     )?;
     let out_of_catalogue = run_open_support_arm(&executable, &strategy)?;
+    let equivalent_out_of_catalogue =
+        run_equivalent_open_support_arm(&executable, &strategy)?;
 
     for (label, score) in [("a0", &a0.evaluator_score), ("a2", &a2.evaluator_score)] {
         if !score.generating_model_in_version_space
@@ -191,10 +221,52 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    if a0.agent.executable_sha256 != a2.agent.executable_sha256
-        || a0.agent.arguments != a2.agent.arguments
+    if equivalent_out_of_catalogue.evaluator_score.generating_model_in_version_space
+        || !equivalent_out_of_catalogue
+            .evaluator_score
+            .generating_truth_behaviorally_represented
+        || equivalent_out_of_catalogue
+            .evaluator_score
+            .set_score
+            .oracle_model_count
+            != 1
+        || equivalent_out_of_catalogue
+            .evaluator_score
+            .set_score
+            .claimed_model_count
+            != 1
+        || !equivalent_out_of_catalogue
+            .evaluator_score
+            .set_score
+            .exact_version_space_match
+        || !equivalent_out_of_catalogue.evaluator_score.decision_correct
+        || !equivalent_out_of_catalogue
+            .evaluator_score
+            .evidence_references_valid
+        || equivalent_out_of_catalogue.evaluator_score.probe_count > 6
     {
-        return Err("A0/A2 used different agent artifacts or arguments".to_owned());
+        return Err(format!(
+            "equivalent out-of-catalogue control failed: exact_truth={}, behavioral_representation={}, oracle_models={}, exact_set={}, decision_correct={}, evidence_refs={}, probes={}",
+            equivalent_out_of_catalogue.evaluator_score.generating_model_in_version_space,
+            equivalent_out_of_catalogue
+                .evaluator_score
+                .generating_truth_behaviorally_represented,
+            equivalent_out_of_catalogue.evaluator_score.set_score.oracle_model_count,
+            equivalent_out_of_catalogue.evaluator_score.set_score.exact_version_space_match,
+            equivalent_out_of_catalogue.evaluator_score.decision_correct,
+            equivalent_out_of_catalogue.evaluator_score.evidence_references_valid,
+            equivalent_out_of_catalogue.evaluator_score.probe_count
+        ));
+    }
+
+    if a0.agent.executable_sha256 != a2.agent.executable_sha256
+        || a0.agent.executable_sha256 != out_of_catalogue.agent.executable_sha256
+        || a0.agent.executable_sha256 != equivalent_out_of_catalogue.agent.executable_sha256
+        || a0.agent.arguments != a2.agent.arguments
+        || a0.agent.arguments != out_of_catalogue.agent.arguments
+        || a0.agent.arguments != equivalent_out_of_catalogue.agent.arguments
+    {
+        return Err("paired process episodes used different agent artifacts or arguments".to_owned());
     }
 
     let report = PairedProcessSmokeReport {
@@ -206,13 +278,15 @@ fn run() -> Result<(), String> {
         a0,
         a2,
         out_of_catalogue,
+        equivalent_out_of_catalogue,
         limitations: vec![
             "The policy is open_world_agent's finite baseline, not the learned Symthaea research policy.".to_owned(),
             "A0 and A2 share generating model, empty starting evidence, policy arguments and action budget; their adaptive traces may diverge.".to_owned(),
             "The child receives no generating truth, evaluator score or truth-bearing command-line argument.".to_owned(),
             "The parent/child process boundary is not an OS sandbox; filesystem and network access remain available unless an external isolator restricts them.".to_owned(),
-            "The third episode is an evaluator-designated open-support control: truth is outside the finite gain catalogue, so correct behavior is an exact empty version space and no-compatible-model disposition.".to_owned(),
-            "This three-episode smoke test verifies wire/process/evidence binding and one support-omission negative control, not agent performance or scientific discovery.".to_owned(),
+            "The third episode is a truly unsupported open-support control: gain 7 is not behaviorally represented by any candidate, so correct behavior is an exact empty version space and no-compatible-model disposition.".to_owned(),
+            "The fourth episode is parameter-OOD but behaviorally represented: gain 4 with an identity sensor is equivalent to candidate gain 2 with a double sensor; exact parameter membership is false, behavioral representation is true, and the correct claim is the singleton equivalent candidate.".to_owned(),
+            "This four-episode smoke test verifies wire/process/evidence binding, support-omission rejection and behavioral-equivalence acceptance, not agent performance or scientific discovery.".to_owned(),
         ],
     };
 
