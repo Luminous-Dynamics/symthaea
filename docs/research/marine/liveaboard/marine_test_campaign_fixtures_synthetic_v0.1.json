@@ -1,0 +1,1008 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "LOS18_MULTI_DOMAIN_CAMPAIGN_SYNTH_V0_1",
+  "status": "synthetic_contract_fixtures_not_physical_acquisition",
+  "explicit_warning": "All sensor identities, ranges, sample rates, bandwidths, clocks, offsets, uncertainties and digests are synthetic placeholders. They are not specifications or recommended instrument settings.",
+  "campaigns": [
+    {
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_physical_acquisition",
+      "protocol": {
+        "rob_exp_protocol_ref": "ROB-EXP:SYNTHETIC-MARINE-PROTOCOL",
+        "protocol_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "protocol_frozen_before_run": true
+      },
+      "test_article": {
+        "physical_article_ref": "ROB-REALIZE:SYNTHETIC-LOS18-TEST-ARTICLE",
+        "identity_strength": "fixture_session_bound",
+        "design_revision": "LOS18-SYNTHETIC-DESIGN-0",
+        "installation_generation": 0,
+        "subsystem_configuration_ref": "synthetic:subsystem",
+        "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_BENCH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "run": {
+        "run_ref": "ROB-EXP-RUN:SYNTH",
+        "start_monotonic_ns": 1000000000,
+        "end_monotonic_ns": 2000000000,
+        "run_disposition": "synthetic_fixture",
+        "deviations": [],
+        "abort_events": [],
+        "missing_sample_count": 0,
+        "duplicate_sample_count": 0,
+        "reordered_sample_count": 0,
+        "saturated_sample_count": 0
+      },
+      "raw_bundle": {
+        "observation_bundle_ref": "SE-OBS-BUNDLE:SYNTH",
+        "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "acquisition_class": "synthetic",
+        "parser_normalizer_ref": "ROB-INSTR-NORMALIZER:SYNTH",
+        "retention_policy_ref": "synthetic:retention-policy"
+      },
+      "analysis": {
+        "analysis_profile_ref": "synthetic:analysis-profile",
+        "sampling_adequacy_review_ref": "synthetic:review",
+        "uncertainty_budget_ref": "synthetic:uncertainty-budget",
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
+      },
+      "claim_limitations": [
+        "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
+        "No equipment operation or actuation authority is conveyed.",
+        "Instrument ranges, sampling values, calibration refs and uncertainty numbers are synthetic fixture data."
+      ],
+      "campaign_id": "ro_full_system_synthetic",
+      "subsystem": "ro_watermaker",
+      "channels": [
+        {
+          "channel_id": "feed_flow",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:feed_flow",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:volume_flow",
+          "unit_ref": "SE-SEM-UNIT:L_per_min",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:feed_flow",
+          "range_min": 0,
+          "range_max": 50,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 5,
+            "analogue_bandwidth_hz": 1,
+            "required_claim_bandwidth_hz": 0.2,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:feed_flow",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:feed_flow",
+            "epoch_ref": "EXEC-ID-EPOCH:feed_flow",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:feed_flow",
+            "uncertainty_profile_ref": "synthetic:uncertainty:feed_flow"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:feed_flow",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:feed_flow",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:feed_flow",
+            "normalizer_ref": "ROB-INSTR-NORM:feed_flow",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "permeate_flow",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:permeate_flow",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:volume_flow",
+          "unit_ref": "SE-SEM-UNIT:L_per_min",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:permeate_flow",
+          "range_min": 0,
+          "range_max": 30,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 5,
+            "analogue_bandwidth_hz": 1,
+            "required_claim_bandwidth_hz": 0.2,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:permeate_flow",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:permeate_flow",
+            "epoch_ref": "EXEC-ID-EPOCH:permeate_flow",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:permeate_flow",
+            "uncertainty_profile_ref": "synthetic:uncertainty:permeate_flow"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:permeate_flow",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:permeate_flow",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:permeate_flow",
+            "normalizer_ref": "ROB-INSTR-NORM:permeate_flow",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "concentrate_flow",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:concentrate_flow",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:volume_flow",
+          "unit_ref": "SE-SEM-UNIT:L_per_min",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:concentrate_flow",
+          "range_min": 0,
+          "range_max": 50,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 5,
+            "analogue_bandwidth_hz": 1,
+            "required_claim_bandwidth_hz": 0.2,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:concentrate_flow",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:concentrate_flow",
+            "epoch_ref": "EXEC-ID-EPOCH:concentrate_flow",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:concentrate_flow",
+            "uncertainty_profile_ref": "synthetic:uncertainty:concentrate_flow"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:concentrate_flow",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:concentrate_flow",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:concentrate_flow",
+            "normalizer_ref": "ROB-INSTR-NORM:concentrate_flow",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "feed_conductivity",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:feed_conductivity",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:electrical_conductivity",
+          "unit_ref": "SE-SEM-UNIT:mS_per_cm",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:feed_conductivity",
+          "range_min": 0,
+          "range_max": 80,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 2,
+            "analogue_bandwidth_hz": 0.5,
+            "required_claim_bandwidth_hz": 0.1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:feed_conductivity",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:feed_conductivity",
+            "epoch_ref": "EXEC-ID-EPOCH:feed_conductivity",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:feed_conductivity",
+            "uncertainty_profile_ref": "synthetic:uncertainty:feed_conductivity"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:feed_conductivity",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:feed_conductivity",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:feed_conductivity",
+            "normalizer_ref": "ROB-INSTR-NORM:feed_conductivity",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "product_conductivity",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:product_conductivity",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:electrical_conductivity",
+          "unit_ref": "SE-SEM-UNIT:uS_per_cm",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:product_conductivity",
+          "range_min": 0,
+          "range_max": 2000,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 2,
+            "analogue_bandwidth_hz": 0.5,
+            "required_claim_bandwidth_hz": 0.1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:product_conductivity",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:product_conductivity",
+            "epoch_ref": "EXEC-ID-EPOCH:product_conductivity",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:product_conductivity",
+            "uncertainty_profile_ref": "synthetic:uncertainty:product_conductivity"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:product_conductivity",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:product_conductivity",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:product_conductivity",
+            "normalizer_ref": "ROB-INSTR-NORM:product_conductivity",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "whole_system_power",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:whole_system_power",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:electrical_power",
+          "unit_ref": "SE-SEM-UNIT:W",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:whole_system_power",
+          "range_min": 0,
+          "range_max": 5000,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 10,
+            "analogue_bandwidth_hz": 2,
+            "required_claim_bandwidth_hz": 1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:whole_system_power",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 2
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:whole_system_power",
+            "epoch_ref": "EXEC-ID-EPOCH:whole_system_power",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:whole_system_power",
+            "uncertainty_profile_ref": "synthetic:uncertainty:whole_system_power"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:whole_system_power",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:whole_system_power",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:whole_system_power",
+            "normalizer_ref": "ROB-INSTR-NORM:whole_system_power",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "expected_admission": "synthetic_only_no_physical_admission"
+    },
+    {
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_physical_acquisition",
+      "protocol": {
+        "rob_exp_protocol_ref": "ROB-EXP:SYNTHETIC-MARINE-PROTOCOL",
+        "protocol_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "protocol_frozen_before_run": true
+      },
+      "test_article": {
+        "physical_article_ref": "ROB-REALIZE:SYNTHETIC-LOS18-TEST-ARTICLE",
+        "identity_strength": "fixture_session_bound",
+        "design_revision": "LOS18-SYNTHETIC-DESIGN-0",
+        "installation_generation": 0,
+        "subsystem_configuration_ref": "synthetic:subsystem",
+        "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_BENCH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "run": {
+        "run_ref": "ROB-EXP-RUN:SYNTH",
+        "start_monotonic_ns": 1000000000,
+        "end_monotonic_ns": 2000000000,
+        "run_disposition": "synthetic_fixture",
+        "deviations": [],
+        "abort_events": [],
+        "missing_sample_count": 0,
+        "duplicate_sample_count": 0,
+        "reordered_sample_count": 0,
+        "saturated_sample_count": 0
+      },
+      "raw_bundle": {
+        "observation_bundle_ref": "SE-OBS-BUNDLE:SYNTH",
+        "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "acquisition_class": "synthetic",
+        "parser_normalizer_ref": "ROB-INSTR-NORMALIZER:SYNTH",
+        "retention_policy_ref": "synthetic:retention-policy"
+      },
+      "analysis": {
+        "analysis_profile_ref": "synthetic:analysis-profile",
+        "sampling_adequacy_review_ref": null,
+        "uncertainty_budget_ref": "synthetic:uncertainty-budget",
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
+      },
+      "claim_limitations": [
+        "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
+        "No equipment operation or actuation authority is conveyed.",
+        "Instrument ranges, sampling values, calibration refs and uncertainty numbers are synthetic fixture data."
+      ],
+      "campaign_id": "electrical_transient_missing_bandwidth_review",
+      "subsystem": "electrical_transient",
+      "channels": [
+        {
+          "channel_id": "dc_bus_voltage",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:dc_bus_voltage",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:electric_potential",
+          "unit_ref": "SE-SEM-UNIT:V",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:dc_bus_voltage",
+          "range_min": 0,
+          "range_max": 1000,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 100000,
+            "analogue_bandwidth_hz": 20000,
+            "required_claim_bandwidth_hz": 10000,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:dc_bus_voltage",
+            "sampling_adequacy_review_ref": null,
+            "minimum_required_sample_rate_hz": 250000
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:dc_bus_voltage",
+            "epoch_ref": "EXEC-ID-EPOCH:dc_bus_voltage",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:dc_bus_voltage",
+            "uncertainty_profile_ref": "synthetic:uncertainty:dc_bus_voltage"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:dc_bus_voltage",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:dc_bus_voltage",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:dc_bus_voltage",
+            "normalizer_ref": "ROB-INSTR-NORM:dc_bus_voltage",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "dc_bus_current",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:dc_bus_current",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:electric_current",
+          "unit_ref": "SE-SEM-UNIT:A",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:dc_bus_current",
+          "range_min": -500,
+          "range_max": 500,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 100000,
+            "analogue_bandwidth_hz": 20000,
+            "required_claim_bandwidth_hz": 10000,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:dc_bus_current",
+            "sampling_adequacy_review_ref": null,
+            "minimum_required_sample_rate_hz": 20000
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:dc_bus_current",
+            "epoch_ref": "EXEC-ID-EPOCH:dc_bus_current",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:dc_bus_current",
+            "uncertainty_profile_ref": "synthetic:uncertainty:dc_bus_current"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:dc_bus_current",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:dc_bus_current",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:dc_bus_current",
+            "normalizer_ref": "ROB-INSTR-NORM:dc_bus_current",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "expected_admission": "not_admissible_missing_bandwidth_review"
+    },
+    {
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_physical_acquisition",
+      "protocol": {
+        "rob_exp_protocol_ref": "ROB-EXP:SYNTHETIC-MARINE-PROTOCOL",
+        "protocol_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "protocol_frozen_before_run": true
+      },
+      "test_article": {
+        "physical_article_ref": "ROB-REALIZE:SYNTHETIC-LOS18-TEST-ARTICLE",
+        "identity_strength": "fixture_session_bound",
+        "design_revision": "LOS18-SYNTHETIC-DESIGN-0",
+        "installation_generation": 0,
+        "subsystem_configuration_ref": "synthetic:subsystem",
+        "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_BENCH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "run": {
+        "run_ref": "ROB-EXP-RUN:SYNTH",
+        "start_monotonic_ns": 1000000000,
+        "end_monotonic_ns": 2000000000,
+        "run_disposition": "synthetic_fixture",
+        "deviations": [],
+        "abort_events": [],
+        "missing_sample_count": 0,
+        "duplicate_sample_count": 0,
+        "reordered_sample_count": 0,
+        "saturated_sample_count": 0
+      },
+      "raw_bundle": {
+        "observation_bundle_ref": "SE-OBS-BUNDLE:SYNTH",
+        "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "acquisition_class": "synthetic",
+        "parser_normalizer_ref": "ROB-INSTR-NORMALIZER:SYNTH",
+        "retention_policy_ref": "synthetic:retention-policy"
+      },
+      "analysis": {
+        "analysis_profile_ref": "synthetic:analysis-profile",
+        "sampling_adequacy_review_ref": "synthetic:review",
+        "uncertainty_budget_ref": "synthetic:uncertainty-budget",
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
+      },
+      "claim_limitations": [
+        "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
+        "No equipment operation or actuation authority is conveyed.",
+        "Instrument ranges, sampling values, calibration refs and uncertainty numbers are synthetic fixture data."
+      ],
+      "campaign_id": "thermal_stale_calibration",
+      "subsystem": "thermal_habitat",
+      "channels": [
+        {
+          "channel_id": "battery_case_temp",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:battery_case_temp",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:temperature",
+          "unit_ref": "SE-SEM-UNIT:degC",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:battery_case_temp",
+          "range_min": -20,
+          "range_max": 100,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 2,
+            "analogue_bandwidth_hz": 0.5,
+            "required_claim_bandwidth_hz": 0.1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:battery_case_temp",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:battery_case_temp",
+            "epoch_ref": "EXEC-ID-EPOCH:battery_case_temp",
+            "currentness": "stale",
+            "qualification_ref": null,
+            "uncertainty_profile_ref": "synthetic:uncertainty:battery_case_temp"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:battery_case_temp",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:battery_case_temp",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:battery_case_temp",
+            "normalizer_ref": "ROB-INSTR-NORM:battery_case_temp",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "machinery_space_temp",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:machinery_space_temp",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:temperature",
+          "unit_ref": "SE-SEM-UNIT:degC",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:machinery_space_temp",
+          "range_min": -10,
+          "range_max": 80,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 2,
+            "analogue_bandwidth_hz": 0.5,
+            "required_claim_bandwidth_hz": 0.1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:machinery_space_temp",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:machinery_space_temp",
+            "epoch_ref": "EXEC-ID-EPOCH:machinery_space_temp",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:machinery_space_temp",
+            "uncertainty_profile_ref": "synthetic:uncertainty:machinery_space_temp"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:machinery_space_temp",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:machinery_space_temp",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:machinery_space_temp",
+            "normalizer_ref": "ROB-INSTR-NORM:machinery_space_temp",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "expected_admission": "not_admissible_stale_calibration"
+    },
+    {
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_physical_acquisition",
+      "protocol": {
+        "rob_exp_protocol_ref": "ROB-EXP:SYNTHETIC-MARINE-PROTOCOL",
+        "protocol_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "protocol_frozen_before_run": true
+      },
+      "test_article": {
+        "physical_article_ref": "ROB-REALIZE:SYNTHETIC-LOS18-TEST-ARTICLE",
+        "identity_strength": "fixture_session_bound",
+        "design_revision": "LOS18-SYNTHETIC-DESIGN-0",
+        "installation_generation": 0,
+        "subsystem_configuration_ref": "synthetic:subsystem",
+        "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_BENCH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "run": {
+        "run_ref": "ROB-EXP-RUN:SYNTH",
+        "start_monotonic_ns": 1000000000,
+        "end_monotonic_ns": 2000000000,
+        "run_disposition": "synthetic_fixture",
+        "deviations": [],
+        "abort_events": [],
+        "missing_sample_count": 0,
+        "duplicate_sample_count": 0,
+        "reordered_sample_count": 0,
+        "saturated_sample_count": 0
+      },
+      "raw_bundle": {
+        "observation_bundle_ref": "SE-OBS-BUNDLE:SYNTH",
+        "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "acquisition_class": "synthetic",
+        "parser_normalizer_ref": "ROB-INSTR-NORMALIZER:SYNTH",
+        "retention_policy_ref": "synthetic:retention-policy"
+      },
+      "analysis": {
+        "analysis_profile_ref": "synthetic:analysis-profile",
+        "sampling_adequacy_review_ref": "synthetic:review",
+        "uncertainty_budget_ref": null,
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
+      },
+      "claim_limitations": [
+        "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
+        "No equipment operation or actuation authority is conveyed.",
+        "Instrument ranges, sampling values, calibration refs and uncertainty numbers are synthetic fixture data."
+      ],
+      "campaign_id": "serviceability_clock_alignment_unknown",
+      "subsystem": "serviceability_mockup",
+      "channels": [
+        {
+          "channel_id": "task_event_marker",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:task_event_marker",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:time",
+          "unit_ref": "SE-SEM-UNIT:ns",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:task_event_marker",
+          "range_min": 0,
+          "range_max": 1000000000000,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 10,
+            "analogue_bandwidth_hz": 5,
+            "required_claim_bandwidth_hz": 1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:task_event_marker",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 2
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:task_event_marker",
+            "epoch_ref": "EXEC-ID-EPOCH:task_event_marker",
+            "currentness": "not_required_for_claim",
+            "qualification_ref": null,
+            "uncertainty_profile_ref": "synthetic:uncertainty:task_event_marker"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:task_event_marker",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "host_monotonic_only",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 50000
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:task_event_marker",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:task_event_marker",
+            "normalizer_ref": "ROB-INSTR-NORM:task_event_marker",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "clearance_measurement",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:clearance_measurement",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:length",
+          "unit_ref": "SE-SEM-UNIT:mm",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:clearance_measurement",
+          "range_min": 0,
+          "range_max": 2000,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 1,
+            "analogue_bandwidth_hz": 0.2,
+            "required_claim_bandwidth_hz": 0.05,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:clearance_measurement",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:clearance_measurement",
+            "epoch_ref": "EXEC-ID-EPOCH:clearance_measurement",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:clearance_measurement",
+            "uncertainty_profile_ref": "synthetic:uncertainty:clearance_measurement"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:clearance_measurement",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:clearance_measurement",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:clearance_measurement",
+            "normalizer_ref": "ROB-INSTR-NORM:clearance_measurement",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "expected_admission": "indeterminate_clock_alignment"
+    },
+    {
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_physical_acquisition",
+      "protocol": {
+        "rob_exp_protocol_ref": "ROB-EXP:SYNTHETIC-MARINE-PROTOCOL",
+        "protocol_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "protocol_frozen_before_run": true
+      },
+      "test_article": {
+        "physical_article_ref": "ROB-REALIZE:SYNTHETIC-LOS18-TEST-ARTICLE",
+        "identity_strength": "fixture_session_bound",
+        "design_revision": "LOS18-SYNTHETIC-DESIGN-0",
+        "installation_generation": 0,
+        "subsystem_configuration_ref": "synthetic:different-configuration",
+        "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_BENCH_SYNTH_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "run": {
+        "run_ref": "ROB-EXP-RUN:SYNTH",
+        "start_monotonic_ns": 1000000000,
+        "end_monotonic_ns": 2000000000,
+        "run_disposition": "synthetic_fixture",
+        "deviations": [],
+        "abort_events": [],
+        "missing_sample_count": 0,
+        "duplicate_sample_count": 0,
+        "reordered_sample_count": 0,
+        "saturated_sample_count": 0
+      },
+      "raw_bundle": {
+        "observation_bundle_ref": "SE-OBS-BUNDLE:SYNTH",
+        "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "acquisition_class": "synthetic",
+        "parser_normalizer_ref": "ROB-INSTR-NORMALIZER:SYNTH",
+        "retention_policy_ref": "synthetic:retention-policy"
+      },
+      "analysis": {
+        "analysis_profile_ref": "synthetic:analysis-profile",
+        "sampling_adequacy_review_ref": "synthetic:review",
+        "uncertainty_budget_ref": "synthetic:uncertainty-budget",
+        "review_authority_ref": "synthetic:review-authority",
+        "max_sync_uncertainty_us": 1000
+      },
+      "claim_limitations": [
+        "Synthetic campaign fixture only; no physical measurement or equipment qualification is established.",
+        "No equipment operation or actuation authority is conveyed.",
+        "Instrument ranges, sampling values, calibration refs and uncertainty numbers are synthetic fixture data."
+      ],
+      "campaign_id": "mixed_configuration_must_not_join",
+      "subsystem": "integrated_reference",
+      "channels": [
+        {
+          "channel_id": "watermaker_power",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:watermaker_power",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:electrical_power",
+          "unit_ref": "SE-SEM-UNIT:W",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:watermaker_power",
+          "range_min": 0,
+          "range_max": 5000,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 10,
+            "analogue_bandwidth_hz": 2,
+            "required_claim_bandwidth_hz": 1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:watermaker_power",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 2
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:watermaker_power",
+            "epoch_ref": "EXEC-ID-EPOCH:watermaker_power",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:watermaker_power",
+            "uncertainty_profile_ref": "synthetic:uncertainty:watermaker_power"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:watermaker_power",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:watermaker_power",
+            "raw_artifact_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:watermaker_power",
+            "normalizer_ref": "ROB-INSTR-NORM:watermaker_power",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "channel_id": "battery_case_temp",
+          "instrument_endpoint_ref": "ROB-INSTR-ENDPOINT:battery_case_temp",
+          "identity_strength": "fixture_bound",
+          "instrument_revision": "synthetic-instrument-profile-v0",
+          "quantity_kind_ref": "SE-SEM:temperature",
+          "unit_ref": "SE-SEM-UNIT:degC",
+          "frame_or_location_ref": "synthetic:frame:bench",
+          "mount_transform_ref": "synthetic:mount:battery_case_temp",
+          "range_min": -20,
+          "range_max": 100,
+          "resolution": 0.001,
+          "saturation_behavior": "explicit_flag",
+          "sampling": {
+            "sample_rate_hz": 2,
+            "analogue_bandwidth_hz": 0.5,
+            "required_claim_bandwidth_hz": 0.1,
+            "sensor_response_lag_ms": 1,
+            "anti_alias_profile_ref": "synthetic:anti-alias:battery_case_temp",
+            "sampling_adequacy_review_ref": "synthetic:sampling-adequacy-reviewed",
+            "minimum_required_sample_rate_hz": 1
+          },
+          "calibration": {
+            "calibration_id_ref": "EXEC-ID-CAL:battery_case_temp",
+            "epoch_ref": "EXEC-ID-EPOCH:battery_case_temp",
+            "currentness": "current",
+            "qualification_ref": "synthetic:cal-qualification:battery_case_temp",
+            "uncertainty_profile_ref": "synthetic:uncertainty:battery_case_temp"
+          },
+          "clock": {
+            "source_clock_ref": "synthetic:source-clock:battery_case_temp",
+            "daq_clock_ref": "synthetic:daq-clock",
+            "receive_clock_ref": "synthetic:host-monotonic",
+            "sync_method": "ptp",
+            "offset_us": 3,
+            "drift_ppm": 1,
+            "jitter_us": 2,
+            "sync_uncertainty_us": 25
+          },
+          "observation": {
+            "observation_ref": "SE-OBS:other-article-temp",
+            "raw_artifact_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+            "parser_decoder_ref": "ROB-INSTR-DECODER:battery_case_temp",
+            "normalizer_ref": "ROB-INSTR-NORM:battery_case_temp",
+            "derived_parent_refs": [],
+            "sample_integrity": "complete"
+          },
+          "evidence_class": "synthetic",
+          "as_built_configuration_digest": "8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ],
+      "expected_admission": "not_admissible_mixed_configuration"
+    }
+  ]
+}

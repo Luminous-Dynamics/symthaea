@@ -1,0 +1,619 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-campaign-binding:v0.1",
+  "title": "Marine campaign binding profile v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "status",
+    "protocol",
+    "test_article",
+    "mission_binding",
+    "subsystem",
+    "channels",
+    "run",
+    "raw_bundle",
+    "analysis",
+    "expected_admission",
+    "claim_limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_fixture_not_physical_acquisition"
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rob_exp_protocol_ref",
+        "protocol_digest",
+        "protocol_frozen_before_run"
+      ],
+      "properties": {
+        "rob_exp_protocol_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "protocol_frozen_before_run": {
+          "type": "boolean"
+        }
+      }
+    },
+    "test_article": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_article_ref",
+        "identity_strength",
+        "design_revision",
+        "as_built_configuration_digest",
+        "installation_generation",
+        "subsystem_configuration_ref"
+      ],
+      "properties": {
+        "physical_article_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_strength": {
+          "enum": [
+            "logical_only",
+            "marked_serial",
+            "fixture_session_bound",
+            "cryptographically_bound_tag",
+            "unknown"
+          ]
+        },
+        "design_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "as_built_configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "installation_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subsystem_configuration_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mission_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "subsystem": {
+      "enum": [
+        "ro_watermaker",
+        "electrical_transient",
+        "thermal_habitat",
+        "serviceability_mockup",
+        "integrated_reference",
+        "other"
+      ]
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/channel"
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_ref",
+        "start_monotonic_ns",
+        "end_monotonic_ns",
+        "run_disposition",
+        "deviations",
+        "abort_events",
+        "missing_sample_count",
+        "duplicate_sample_count",
+        "reordered_sample_count",
+        "saturated_sample_count"
+      ],
+      "properties": {
+        "run_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "run_disposition": {
+          "enum": [
+            "synthetic_fixture",
+            "completed",
+            "aborted_safety",
+            "aborted_operator",
+            "instrumentation_failure",
+            "protocol_deviation",
+            "infrastructure_failure",
+            "inconclusive"
+          ]
+        },
+        "deviations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "abort_events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reordered_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "saturated_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "raw_bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_bundle_ref",
+        "raw_artifact_digest",
+        "acquisition_class",
+        "parser_normalizer_ref",
+        "retention_policy_ref"
+      ],
+      "properties": {
+        "observation_bundle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_artifact_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "acquisition_class": {
+          "enum": [
+            "synthetic",
+            "measured_physical",
+            "replay",
+            "simulation",
+            "hil",
+            "phil"
+          ]
+        },
+        "parser_normalizer_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retention_policy_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_profile_ref",
+        "sampling_adequacy_review_ref",
+        "uncertainty_budget_ref",
+        "review_authority_ref",
+        "max_sync_uncertainty_us"
+      ],
+      "properties": {
+        "analysis_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampling_adequacy_review_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uncertainty_budget_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review_authority_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_sync_uncertainty_us": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "expected_admission": {
+      "enum": [
+        "synthetic_only_no_physical_admission",
+        "not_admissible_missing_bandwidth_review",
+        "not_admissible_stale_calibration",
+        "indeterminate_clock_alignment",
+        "not_admissible_mixed_configuration"
+      ]
+    },
+    "claim_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_id",
+        "instrument_endpoint_ref",
+        "identity_strength",
+        "instrument_revision",
+        "quantity_kind_ref",
+        "unit_ref",
+        "frame_or_location_ref",
+        "mount_transform_ref",
+        "range_min",
+        "range_max",
+        "resolution",
+        "saturation_behavior",
+        "sampling",
+        "calibration",
+        "clock",
+        "observation",
+        "evidence_class",
+        "as_built_configuration_digest"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_endpoint_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_strength": {
+          "enum": [
+            "physical_serial",
+            "attested_device",
+            "fixture_bound",
+            "logical_only",
+            "unknown"
+          ]
+        },
+        "instrument_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_kind_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame_or_location_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mount_transform_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "range_min": {
+          "type": "number"
+        },
+        "range_max": {
+          "type": "number"
+        },
+        "resolution": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "saturation_behavior": {
+          "enum": [
+            "explicit_flag",
+            "raw_clip_detectable",
+            "unknown"
+          ]
+        },
+        "sampling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sample_rate_hz",
+            "analogue_bandwidth_hz",
+            "required_claim_bandwidth_hz",
+            "sensor_response_lag_ms",
+            "anti_alias_profile_ref",
+            "sampling_adequacy_review_ref",
+            "minimum_required_sample_rate_hz"
+          ],
+          "properties": {
+            "sample_rate_hz": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "analogue_bandwidth_hz": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "required_claim_bandwidth_hz": {
+              "type": "number",
+              "minimum": 0
+            },
+            "sensor_response_lag_ms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "anti_alias_profile_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sampling_adequacy_review_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "minimum_required_sample_rate_hz": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "calibration_id_ref",
+            "epoch_ref",
+            "currentness",
+            "qualification_ref",
+            "uncertainty_profile_ref"
+          ],
+          "properties": {
+            "calibration_id_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "epoch_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currentness": {
+              "enum": [
+                "current",
+                "stale",
+                "unknown",
+                "not_required_for_claim",
+                "not_applicable"
+              ]
+            },
+            "qualification_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "uncertainty_profile_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "clock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_clock_ref",
+            "daq_clock_ref",
+            "receive_clock_ref",
+            "sync_method",
+            "offset_us",
+            "drift_ppm",
+            "jitter_us",
+            "sync_uncertainty_us"
+          ],
+          "properties": {
+            "source_clock_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "daq_clock_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "receive_clock_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sync_method": {
+              "enum": [
+                "ptp",
+                "gps_pps",
+                "shared_hardware_trigger",
+                "calibrated_clock_map",
+                "host_monotonic_only",
+                "unknown"
+              ]
+            },
+            "offset_us": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "drift_ppm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "jitter_us": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "sync_uncertainty_us": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observation_ref",
+            "raw_artifact_digest",
+            "parser_decoder_ref",
+            "normalizer_ref",
+            "derived_parent_refs",
+            "sample_integrity"
+          ],
+          "properties": {
+            "observation_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "raw_artifact_digest": {
+              "$ref": "#/$defs/sha256"
+            },
+            "parser_decoder_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "normalizer_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "derived_parent_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sample_integrity": {
+              "enum": [
+                "complete",
+                "gaps_reported",
+                "duplicates_reported",
+                "reordered_reported",
+                "saturated_reported",
+                "unknown"
+              ]
+            }
+          }
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "manufacturer_estimate",
+            "engineering_estimate",
+            "measured",
+            "replayed",
+            "simulated",
+            "hil",
+            "phil"
+          ]
+        },
+        "as_built_configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
