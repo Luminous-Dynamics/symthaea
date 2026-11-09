@@ -883,3 +883,15 @@ The scorer parses bounded input JSON with duplicate-key and trailing-data reject
 The next implementation boundary is a two-stage environment transcript: the evaluator supplies an independently generated observation after action selection; the agent then receives that observation and updates its claim. Only an exact observation receipt bound to the artifact/session/source and passed through the existing REA Evidence verifier may alter obligation status. The benchmark scorer must not treat a model-supplied outcome token as a verified observation.
 
 The canonical benchmark run receipt remains owned by [#10314](https://github.com/Luminous-Dynamics/symthaea/pull/10314). The policy scorer does not introduce a competing receipt schema; receipt integration waits for the canonical receipt PR and the hidden evaluator interface.
+
+
+### Baseline-control extension — November 9, 2026
+
+Two public synthetic policy submissions are now scored by the exact-head workflow:
+
+1. **Cheapest eligible**: chooses the lowest-cost action satisfying the v0 authorization, reversibility, destructiveness and impact gates.
+2. **Always abstain**: selects no experiment but makes the correct pre-action readiness assertion from the current fixture state.
+
+The second control prevents the evaluation from rewarding conservative refusal alone. On the 18-case development corpus, the reference checker identifies 17 cases where at least one safe candidate has a possible admissible mandatory-obligation transition; one case is intentionally unobservable and should abstain. The exact Rust workflow will report the always-abstain control's coverage, false-ready count and abstention-with-safe-update count independently.
+
+These are deterministic fixture properties, not model performance results. A candidate effect can represent a useful negative observation or contradiction, so the metric records a potentially changeable obligation rather than assuming that every state transition is positive progress.
