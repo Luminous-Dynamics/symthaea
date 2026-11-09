@@ -321,6 +321,19 @@ jobs:
             cat joint-causal-set-signature.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run held-out joint causal-set dimension posterior pilot
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example joint_dimension_posterior_pilot | tee joint-dimension-posterior-pilot.csv
+          grep -q 'claim_boundary=finite_simulation_pilot' joint-dimension-posterior-pilot.csv
+          grep -q 'joint_mean_log_loss=' joint-dimension-posterior-pilot.csv
+          {
+            echo '## Held-out whole-sprinkling joint dimension posterior pilot'
+            cat joint-dimension-posterior-pilot.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
