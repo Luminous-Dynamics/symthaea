@@ -40,7 +40,11 @@ fn run() -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(&args.manifest)?;
     let manifest: CohortManifest = serde_json::from_slice(&bytes)?;
     let summary = validate_cohort_manifest(&manifest)?;
-    let manifest_directory = args.manifest.parent().unwrap_or_else(|| Path::new("."));
+    let manifest_directory = args
+        .manifest
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let verified_pair_artifacts =
         verify_counterfactual_pair_manifest_artifacts(&manifest, manifest_directory)?;
 
