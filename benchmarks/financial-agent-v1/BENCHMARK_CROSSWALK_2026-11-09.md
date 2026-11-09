@@ -6,6 +6,8 @@ This document extends the first benchmark map in [SYM-FIN-EVAL-002 #11233](https
 
 | Benchmark | Primary construct | Size / design reported by source | What it adds here |
 |---|---|---|---|
+| [Stanford/industry Finance Agent v1.1](https://www.vals.ai/benchmarks/finance_agent) | 537 entry-level financial-analyst questions; 2026 AI Index reports a 63.33% leading score and 50.62% at the low end of its displayed cohort | End-to-end entry-level analyst research, retrieval, market research and financial projections | Exact benchmark version, harness, model snapshot and date must match before numeric comparison; a published leader is not a universal competence or human-parity claim |
+| [FORCE-Bench](https://arxiv.org/abs/2607.19409) | 251 expert-annotated enterprise-finance queries across three workflows | Financial obligations/ERP research, financial-entity performance research and business briefs; eight rubric dimensions | Enterprise workflow and operational constraints are valuable; ERP data semantics differ from public-company research and synthetic scenarios |
 | [AgenticFinBench](https://arxiv.org/abs/2611.04813) | Real-world agentic financial research requests; claim-level evidence audit | 230 tasks; 8 categories; 2 languages; 4 complexity levels | Realistic finance research, source grounding, independent claim audit and harness sensitivity |
 | [FinTrace](https://arxiv.org/abs/2604.10015) | Financial tool-use trajectories | 800 expert-annotated trajectories across 34 task categories; 9 metrics; 8,196 training preference trajectories | Tool/action correctness, process quality, execution efficiency and final-output quality |
 | [ICBCBench](https://arxiv.org/abs/2606.17458) | Financial deep research and long-form analyst reports | Industry collaboration reported as 50+ experts across 40+ organizations; objective and subjective tracks | Industry-facing report tasks, expert alignment, citation consistency and source quality |
@@ -30,6 +32,12 @@ Published counts and scores are statements from the referenced papers/projects. 
 - **Accounting ledger / journal / financial statements:** Mycelix [FIN-ACC-BENCH-001 #5782](https://github.com/Luminous-Dynamics/mycelix/issues/5782); do not duplicate its ledger or independent accounting oracle.
 - **Audit workpapers / engagement analysis:** FinancialAuditBench; keep it separate from general company research and journal correctness.
 - **Strategy performance / portfolio outcomes / market frictions:** SYM-QUANT-EVAL-001 (#11234), not #11233.
+
+## 2a. Evaluator reliability is a competitive dimension
+
+[Better Deck or Different Judge? (30 September 2026)](https://arxiv.org/abs/2609.39958) studied an agentic corporate/investment-banking presentation harness and five judges. In its reported comparison, judges scored the complete system 20.4–33.6 points above the same model prompted directly, while the margin against direct Opus generation ranged from -4.7 to +0.8; repeat grading also changed scores on unchanged decks. This is a study-specific result, not proof that agentic systems do not help. It does show that judge calibration, repeatability and ranking stability are necessary before interpreting score gains as system gains.
+
+The Stanford [AI Index Report 2026](https://hai.stanford.edu/ai-index/2026-ai-index-report) reports 537 questions in Finance Agent v1.1, with its displayed cohort ranging from 50.62% to 63.33%. Treat these as version-specific task scores, not financial-professional competence. Our external baseline table should pin the exact version and use it as a reference point, not mix it with ProFinR, FORCE-Bench or other scales.
 
 ## 3. Industry comparators
 
