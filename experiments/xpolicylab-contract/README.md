@@ -14,6 +14,16 @@ At the inspected XPolicyLab source revision (`6baccd57ff958570d0db1588370289ee36
 
 The XPolicyLab README also states that a request timeout is fatal for the trial because the server may still be processing, and a server-process restart loses model-side state. The validator encodes those as explicit non-success outcomes.
 
+The separate `call_lifecycle` module models the documented policy-RPC lifecycle:
+- an exact same-ID/same-payload reconnect replay is represented as a replay of the same request, not a new model invocation;
+- a cached response for the same exact request can be returned idempotently;
+- reusing a request ID with a different RPC kind or payload is rejected;
+- an ambiguous timeout aborts the episode's policy trial and late responses cannot be used;
+- a policy-server process restart aborts the current episode because model-side state was lost;
+- request count is bounded.
+
+This is an in-memory policy-call fixture, not the Symtropy controller/ticket ledger. It does not persist replay state across process restart and does not authenticate transport messages.
+
 ## Contract boundary
 
 The adapter supplies the Luminous correlation envelope around the native policy output:
