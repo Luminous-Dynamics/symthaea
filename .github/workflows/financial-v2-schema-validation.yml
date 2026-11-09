@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "benchmarks/financial-agent-v1/evidence-v2.schema.json"
+      - "benchmarks/financial-agent-v1/evidence-proof-binding-v1.schema.json"
       - "benchmarks/financial-agent-v1/evidence-manifest-v2.schema.json"
       - "benchmarks/financial-agent-v1/dev-example.evidence-v2.json"
       - "benchmarks/quant-strategy-v1/observation-manifest-v2.schema.json"
@@ -15,6 +16,7 @@ on:
       - main
     paths:
       - "benchmarks/financial-agent-v1/evidence-v2.schema.json"
+      - "benchmarks/financial-agent-v1/evidence-proof-binding-v1.schema.json"
       - "benchmarks/financial-agent-v1/evidence-manifest-v2.schema.json"
       - "benchmarks/financial-agent-v1/dev-example.evidence-v2.json"
       - "benchmarks/quant-strategy-v1/observation-manifest-v2.schema.json"
