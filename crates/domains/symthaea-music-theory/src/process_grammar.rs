@@ -13,6 +13,12 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use crate::spec::{Attitude, CompositionSpec};
 
+// The evolving motif, repeating clock/pulse, and tonic bass are separate
+// persistent parts. Their roles are not used to reconstruct their identities.
+const PROCESS_MELODY: PartId = PartId(0);
+const PROCESS_PULSE: PartId = PartId(1);
+const PROCESS_BASS: PartId = PartId(2);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessTrajectoryKind {
@@ -102,7 +108,7 @@ pub fn realize_additive_process(
         for (index, event) in cell.notes.iter().take(prefix_len).enumerate() {
             let duration = event.duration;
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: PROCESS_MELODY,
                 pitch: scale.degree_pitch(event.degree.unwrap(), 5),
                 onset,
                 duration,
@@ -131,7 +137,7 @@ pub fn realize_additive_process(
             Duration::eighth()
         };
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: PROCESS_PULSE,
             pitch: scale.degree_pitch([1, 5, 8, 5][pulse_index % 4], 4),
             onset: pulse,
             duration,
@@ -152,7 +158,7 @@ pub fn realize_additive_process(
             bar
         };
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: PROCESS_BASS,
             pitch: scale.degree_pitch(1, 2),
             onset: bass_onset,
             duration,
@@ -210,6 +216,23 @@ mod tests {
                 .all(|note| note.emphasis != Emphasis::Cadential)
         );
         assert!(realized.score.melody_is_monophonic());
+    }
+
+    #[test]
+    fn melody_pulse_and_bass_keep_distinct_stable_part_identities() {
+        let realized =
+            realize_additive_process(&MusicalIntent::default(), &Style::Minimalism.spec());
+        assert!(realized.score.has_part_identity());
+        assert_eq!(
+            realized.score.parts(),
+            vec![PROCESS_MELODY, PROCESS_PULSE, PROCESS_BASS]
+        );
+        assert!(realized.score.notes.iter().all(|note| match note.role {
+            VoiceRole::Melody => note.part == PROCESS_MELODY,
+            VoiceRole::Harmony => note.part == PROCESS_PULSE,
+            VoiceRole::Bass => note.part == PROCESS_BASS,
+            VoiceRole::CounterMelody => false,
+        }));
     }
 
     #[test]
