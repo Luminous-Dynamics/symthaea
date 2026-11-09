@@ -18,6 +18,14 @@ The validator uses a small in-memory schema registry. The quant schema's relativ
 
 The \`jsonschema\` dependency is pinned to 0.49.8 and configured for Draft 2020-12. \`format\` validation is explicitly enabled; JSON Schema treats format behavior as configurable, so a parser-only check is insufficient.
 
+## Proof-binding integrity
+
+The evidence-v2 schema now references `evidence-proof-binding-v1.schema.json`. Availability and rights use distinct domain-separated binding preimages. The validator checks that every bound identity, version, content digest, principal, rights profile, availability field or entitlement field matches the enclosing evidence record, then recomputes `binding_sha256`.
+
+The v1 binding preimage is restricted to ASCII strings, nested objects and null values (no numbers or arrays). With `serde_json`'s default sorted object map and no `preserve_order` feature, its compact UTF-8 serialization is the constrained RFC 8785 JCS form used for the SHA-256 preimage. The validator includes property-order invariance and digest-mutation tests. Do not broaden the binding schema to numbers, arrays, or non-ASCII data without adopting and testing a full JCS implementation.
+
+This verifies only the declared binding digest and field equality. It does not authenticate the referenced source proof, entitlement document or verifier receipt; those remain part of the trusted Mycelix verification path.
+
 ## Current qualification boundary
 
 The only committed examples are \`synthetic_development_only\`. Their \`synthetic_fixture_only\` proof markers are intentionally not accepted for historical confirmation or prospective shadow. This validator does not authenticate the artifacts, signatures, licences, availability receipts or verifier receipts represented by those references. It does not create \`AvailabilityProof::Verified\` or \`RightsProof::Verified\` values. That remains the responsibility of the trusted Mycelix/provenance adapter in #11264.
