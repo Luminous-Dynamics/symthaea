@@ -141,6 +141,13 @@ Use source-specific adapters and preserve release, query, retrieval time, covera
 
 Begin with a single narrow workflow: **explain a company risk event caused by an evidenced supplier/energy/shipping disruption**. Every causal link remains a hypothesis until supported by data and appropriate identification.
 
+## 10a. Digest and manifest closure
+
+- The task's `evidence_manifest_sha256` is SHA-256 over the exact UTF-8 bytes of the referenced evidence-manifest file, including its line endings; do not normalize before hashing.
+- Each structured JSON payload's `content_sha256` is SHA-256 over RFC 8785 JSON Canonicalization Scheme bytes. Text/binary payloads use exact source bytes. The canonicalization profile/version must be pinned by the implementation.
+- Inline synthetic fixture payloads are canonicalized from the `metadata.synthetic_record` object. The `payload_ref` JSON Pointer must resolve to that object.
+- The task's `evidence_ids` must equal the unique artifact-ID set in the evidence manifest. Duplicate artifact IDs or dangling task references reject the manifest.
+
 ## 11. Runner-free implementation sequence
 
 1. Freeze this protocol and strict task/evidence manifest schemas.
