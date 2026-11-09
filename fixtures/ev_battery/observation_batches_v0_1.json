@@ -1,0 +1,1651 @@
+{
+  "corpus_version": "ev-battery-observation-corpus/0.1",
+  "status": "synthetic_contract_fixtures_only",
+  "cases": [
+    {
+      "case_id": "positive-pack-sensor-stream",
+      "expectation": "accept",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-batch-001",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Pack-level direct observations with exact configuration, calibration and clock lineage."
+    },
+    {
+      "case_id": "positive-module-sensor-stream",
+      "expectation": "accept",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-batch-002",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "module",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          },
+          {
+            "resolution": "module",
+            "subject_ref": "module:pack-a:01"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:module-temp-01:r1",
+            "sensor_ref": "sensor:module-temp-01",
+            "revision": "r1",
+            "digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-003",
+            "sensor_ref": "sensor:module-temp-01",
+            "channel": "temperature",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "module",
+            "subject_ref": "module:pack-a:01",
+            "value": 29.4,
+            "unit": "Cel",
+            "sampled_at": "2026-11-01T10:00:02Z",
+            "received_at": "2026-11-01T10:00:03Z",
+            "monotonic_sequence": 1,
+            "calibration_ref": "cal:module-temp-01:r1",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Module-level observation is accepted only because module identity is explicitly in the inventory and the asset declares module resolution."
+    },
+    {
+      "case_id": "positive-quarantined-stale-observation",
+      "expectation": "accept",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-batch-003",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T09:00:00Z",
+            "received_at": "2026-11-01T10:00:00Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "suspect",
+              "flags": [
+                "stale",
+                "transport_delay"
+              ]
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Stale evidence is retained but withheld from usable direct observations."
+    },
+    {
+      "case_id": "positive-measurement-versus-bms-estimate",
+      "expectation": "accept",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-batch-004",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-003",
+            "sensor_ref": "sensor:bms-estimate-01",
+            "channel": "soc",
+            "measurement_class": "bms_reported_value",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 0.83,
+            "unit": "1",
+            "sampled_at": "2026-11-01T10:00:02Z",
+            "received_at": "2026-11-01T10:00:03Z",
+            "monotonic_sequence": 1,
+            "calibration_ref": null,
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "A valid-shaped BMS estimate remains a BMS-reported value and is never counted as direct sensor evidence."
+    },
+    {
+      "case_id": "positive-explicit-unavailable-reading",
+      "expectation": "accept",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-batch-005",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-003",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": null,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:02Z",
+            "received_at": "2026-11-01T10:00:03Z",
+            "monotonic_sequence": 1002,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "unavailable",
+              "flags": [
+                "missing_value"
+              ]
+            }
+          }
+        ]
+      },
+      "rationale": "Missing data is represented as unavailable/null with a reason, never as zero."
+    },
+    {
+      "case_id": "negative-wrong-pack-identity",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-001",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:other-vehicle:pack-b",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "The observed subject is not present in the exact batch scope inventory."
+    },
+    {
+      "case_id": "negative-unsupported-cell-resolution",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-002",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          },
+          {
+            "resolution": "cell",
+            "subject_ref": "cell:pack-a:01"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "cell",
+            "subject_ref": "cell:pack-a:01",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Cell-level claims are rejected when the declared maximum observation resolution is pack-level."
+    },
+    {
+      "case_id": "negative-unit-mismatch",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-003",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "mV",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Current channel cannot silently carry a voltage unit."
+    },
+    {
+      "case_id": "negative-duplicate-observation-id",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-004",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Observation identities must be unique within the batch."
+    },
+    {
+      "case_id": "negative-out-of-order-stream",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-005",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "V",
+            "sampled_at": "2026-11-01T09:59:59Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 999,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "A valid observation cannot reverse monotonic sequence or sample-time order within a sensor/channel/subject stream."
+    },
+    {
+      "case_id": "negative-stale-labelled-valid",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-006",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T08:00:00Z",
+            "received_at": "2026-11-01T10:00:00Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "A delay beyond the batch policy cannot be labelled valid."
+    },
+    {
+      "case_id": "negative-unknown-calibration",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-007",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:unknown",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Direct sensor observations must bind an exact calibration registered in the same batch."
+    },
+    {
+      "case_id": "negative-expired-calibration-labelled-valid",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-008",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-09-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "A sample outside its calibration validity interval cannot be marked valid."
+    },
+    {
+      "case_id": "negative-clock-skew-labelled-valid",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-009",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:05:00Z",
+            "received_at": "2026-11-01T10:00:00Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Sample time cannot materially exceed receive time under the declared clock uncertainty."
+    },
+    {
+      "case_id": "negative-missing-imputed-as-zero",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-010",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 0,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "unavailable",
+              "flags": [
+                "missing_value"
+              ]
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Unavailable readings must use null and never a numeric zero placeholder."
+    },
+    {
+      "case_id": "negative-suspect-without-reason",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-011",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "suspect",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Every quarantined observation requires an explicit reason flag."
+    },
+    {
+      "case_id": "negative-valid-with-fault-flag",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-012",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": "cal:voltage-01:r4",
+            "quality": {
+              "state": "valid",
+              "flags": [
+                "sensor_fault"
+              ]
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "A reading with quality flags cannot be classified as valid."
+    },
+    {
+      "case_id": "negative-direct-observation-without-calibration",
+      "expectation": "reject",
+      "batch": {
+        "schema_version": "ev-battery-observation-batch/0.1",
+        "batch_id": "evb-neg-013",
+        "asset": {
+          "vehicle_ref": "vehicle:ev-ref-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack:ev-ref-01:pack-a",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bms_hardware_revision": "bms-hw-r1",
+          "bms_firmware_revision": "bms-fw-1.2.0",
+          "chemistry": "lfp",
+          "max_observable_resolution": "pack",
+          "current_sign_convention": "positive_discharge"
+        },
+        "clock": {
+          "clock_ref": "clock:logger-01",
+          "time_uncertainty_ms": 25,
+          "max_transport_delay_ms": 10000
+        },
+        "scope_inventory": [
+          {
+            "resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a"
+          }
+        ],
+        "calibrations": [
+          {
+            "calibration_ref": "cal:voltage-01:r4",
+            "sensor_ref": "sensor:voltage-01",
+            "revision": "r4",
+            "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          },
+          {
+            "calibration_ref": "cal:current-01:r2",
+            "sensor_ref": "sensor:current-01",
+            "revision": "r2",
+            "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "valid_from": "2026-10-01T00:00:00Z",
+            "valid_until": "2027-01-01T00:00:00Z"
+          }
+        ],
+        "observations": [
+          {
+            "observation_id": "obs-001",
+            "sensor_ref": "sensor:voltage-01",
+            "channel": "voltage",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 356.4,
+            "unit": "V",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 1001,
+            "calibration_ref": null,
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          },
+          {
+            "observation_id": "obs-002",
+            "sensor_ref": "sensor:current-01",
+            "channel": "current",
+            "measurement_class": "direct_sensor_observation",
+            "subject_resolution": "pack",
+            "subject_ref": "pack:ev-ref-01:pack-a",
+            "value": 18.2,
+            "unit": "A",
+            "sampled_at": "2026-11-01T10:00:00Z",
+            "received_at": "2026-11-01T10:00:01Z",
+            "monotonic_sequence": 2001,
+            "calibration_ref": "cal:current-01:r2",
+            "quality": {
+              "state": "valid",
+              "flags": []
+            }
+          }
+        ]
+      },
+      "rationale": "Direct observations require calibration lineage."
+    }
+  ]
+}
