@@ -1014,8 +1014,8 @@
       ],
       "protocol": {
         "kind": "systematic_benchmark_survey",
-        "benchmark_count": 102,
-        "final_snapshot": "2026-09-15"
+        "benchmark_count": 130,
+        "final_snapshot": "2026-11-09"
       },
       "metrics": [
         "protocol_coverage",
@@ -1026,10 +1026,12 @@
       "rights_status": "source_terms_to_check",
       "snapshot": {
         "closed_loop_benchmarks": 13,
-        "downstream_outcome_benchmarks": 14
+        "downstream_outcome_benchmarks": 14,
+        "web_snapshot_date": "2026-11-09"
       },
       "caveats": [
-        "Survey-specific coding counts, not a universal census."
+        "Survey-specific coding counts, not a universal census.",
+        "The live survey page now displays 130 coded representative benchmark entries; category counts overlap and this is not an exhaustive census of all autonomy benchmarks."
       ],
       "sources": [
         "https://world-model-benchmarks.github.io/"
@@ -1464,14 +1466,18 @@
     },
     {
       "id": "sam-follow-oracle-observation-separation-v0.1",
-      "name": "SAM Follow Oracle / Observation-Domain Separation v0.1",
+      "name": "SAM Follow Oracle / Student-Teacher Privilege Separation v0.2",
       "category": "synthetic_training_information_privilege",
       "capability_target": [
         "simulator_truth_source_separation",
         "observation_time_alignment",
         "same_road_lead_selection",
         "fail_closed_target_freshness",
-        "privileged_teacher_vs_observed_input_distinction"
+        "privileged_teacher_vs_observed_input_distinction",
+        "teacher_blend_vs_supervision_separation",
+        "student_teacher_action_gap_measurement",
+        "frozen_policy_teacher_free_evaluation",
+        "evaluator_only_shadow_teacher"
       ],
       "protocol": {
         "kind": "synthetic_action_teacher_and_target_admission",
@@ -1491,7 +1497,41 @@
           "delayed_mesh_aggregate",
           "local_tracked_object_observation",
           "remote_cooperative_v2x_claim"
-        ]
+        ],
+        "training_information_flow": {
+          "student_input": "existing simulated 20D VehicleState",
+          "privileged_teacher_target": "typed SimulatorOracleFollowTarget may be consumed by PD teacher",
+          "teacher_uses": [
+            "action_blending_when_pd_weight_positive",
+            "BPTT_supervision_on_train_every_steps"
+          ],
+          "explicit_flags": [
+            "teacher_action_used_for_blend",
+            "teacher_action_used_for_supervision",
+            "teacher_action_evaluation_only",
+            "follow_oracle_used_for_policy"
+          ]
+        },
+        "action_trace": [
+          "student_raw_proposal",
+          "teacher_target",
+          "post_blend_pre_exploration",
+          "executed_simulator_command"
+        ],
+        "action_difference_metric": "mean absolute delta across steering/throttle/brake, named student_teacher_action_delta_l1",
+        "frozen_evaluation": {
+          "api": [
+            "VehicleTrainer::run_evaluation_episode_with_sim",
+            "VehicleTrainer::run_evaluation_episode"
+          ],
+          "teacher_action_blend_weight": 0,
+          "bptt_updates": false,
+          "replay_buffer_updates": false,
+          "exploration_noise": false,
+          "controller_output_projection_must_remain_unchanged": true,
+          "shadow_teacher": "optional telemetry-only reference; teacher_action_evaluation_only=true; never blended or supervised",
+          "simulator_oracle": "may be retained for outcome/reward scoring; must not influence the policy"
+        }
       },
       "metrics": [
         "valid_target_availability_fraction",
@@ -1505,22 +1545,38 @@
         "relative_speed_residual_mps",
         "teacher_action_delta",
         "no_target_fallback_fraction",
-        "selector_latency_us_p50_p95_p99"
+        "selector_latency_us_p50_p95_p99",
+        "student_teacher_action_delta_l1",
+        "teacher_action_used_for_blend_steps",
+        "teacher_action_used_for_supervision_steps",
+        "teacher_action_evaluation_only_steps",
+        "teacher_free_eval_teacher_blend_count_zero",
+        "teacher_free_eval_bptt_update_count_zero",
+        "teacher_free_eval_replay_update_count_zero",
+        "teacher_free_eval_controller_weight_delta_zero",
+        "teacher_free_eval_executed_vs_blended_command_delta",
+        "telemetry_csv_column_arity"
       ],
       "source_status": "implementation_in_review_not_yet_executed",
       "rights_status": "synthetic_simulator_only",
       "current_artifacts": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
         "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
-        "source_branch": "research/sam-follow-oracle-evidence-v0-1"
+        "source_branch": "research/sam-follow-oracle-evidence-v0-1",
+        "latest_inspected_commit": "a0958fa4f78228b8b6cbcf71c6189f9191d83764",
+        "csv_header_columns": 36,
+        "csv_format_placeholders": 36,
+        "structural_source_check": "passed_during_authoring",
+        "rust_tests_status": "authored_not_yet_confirmed_by_current_exact_head_ci"
       },
       "caveats": [
-        "Simulator-oracle teacher input is privileged; the learned student still observes the existing simulated 20D vector, which currently includes synthetic mesh-derived peer channels.",
-        "This does not create a local perception adapter or make the mesh values equivalent to local sensor tracks.",
-        "A local-perception comparison must consume a tracked-object hypothesis admitted by SAM scene evidence contract #11109.",
-        "Remote V2X claims are not local tracks and do not gain control authority.",
-        "Exact PR CI and performance results have not yet been recorded; authored tests are not passes.",
-        "This internal conformance experiment is not an external benchmark result or road-safety measure."
+        "The student still consumes the existing simulated 20D VehicleState, including synthetic mesh-derived peer channels; this is not local sensor-only input.",
+        "A zero PD action blend in curriculum Phase 4 does not mean teacher-free learning: BPTT supervision may still consume the teacher on train_every steps.",
+        "Frozen evaluation removes the explicit PD/oracle teacher from blending, BPTT supervision, replay updates and exploration noise; it can compute a shadow teacher only for evaluator telemetry.",
+        "Simulator truth may remain available to score outcomes, but the student policy must not consume the explicit Follow oracle target.",
+        "The evaluation path still uses the bicycle-model simulator and existing simulated state vector; it does not establish a camera/LiDAR/radar-only perception result.",
+        "Exact-head CI and tests for the latest implementation are not yet confirmed; authored tests and source audit are not counted as passes.",
+        "This internal synthetic training/evaluation crucible is not an external leaderboard result or road-safety measure."
       ],
       "sources": [
         "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
