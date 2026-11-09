@@ -1516,6 +1516,66 @@ mod tests {
     }
 
     #[test]
+    fn test_follow_without_swarm_reports_unavailable_oracle_steps() {
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config);
+        let metrics = trainer.train();
+        let episode = &metrics[0];
+
+        assert_eq!(episode.follow_oracle_available_steps, 0);
+        assert_eq!(
+            episode.follow_oracle_unavailable_steps,
+            episode.total_steps
+        );
+        assert!(episode.telemetry.iter().all(|row| {
+            !row.follow_oracle_available
+                && row.follow_oracle_actor_id.is_none()
+                && row.follow_oracle_gap_m.is_none()
+                && row.follow_oracle_snapshot_age_s.is_none()
+        }));
+    }
+
+    #[test]
+    fn test_follow_with_swarm_reports_aligned_oracle_availability() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer =
+            VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let metrics = trainer.train();
+        let episode = &metrics[0];
+
+        assert_eq!(
+            episode.follow_oracle_available_steps + episode.follow_oracle_unavailable_steps,
+            episode.total_steps
+        );
+        assert!(
+            episode.follow_oracle_available_steps > 0,
+            "The swarm clock must align with the primed ego timestamp"
+        );
+        assert!(episode.telemetry.iter().any(|row| {
+            row.follow_oracle_available
+                && row.follow_oracle_actor_id.is_some()
+                && row.follow_oracle_gap_m.is_some()
+                && row.follow_oracle_snapshot_age_s.is_some()
+        }));
+    }
+
+    #[test]
     fn test_follow_training_completes() {
         use crate::swarm::SwarmConfig;
 
