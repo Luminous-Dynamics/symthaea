@@ -443,10 +443,10 @@ mod tests {
             .nearest_simulator_truth_follow_target(&ego)
             .expect("same-road lead should be available from simulator truth");
 
-        assert_eq!(target.actor_id, 1);
-        assert!((target.gap_m - 30.0).abs() < 1e-6);
-        assert!((target.relative_speed_mps).abs() < 1e-6);
-        assert_eq!(target.snapshot_time_s, ego.timestamp);
+        assert_eq!(target.actor_id(), 1);
+        assert!((target.gap_m() - 30.0).abs() < 1e-6);
+        assert!((target.relative_speed_mps()).abs() < 1e-6);
+        assert_eq!(target.snapshot_time_s(), ego.timestamp);
         assert!(target.is_current_at(ego.timestamp));
     }
 
@@ -459,8 +459,8 @@ mod tests {
         let target = swarm
             .nearest_simulator_truth_follow_target(&ego)
             .expect("initial simulator snapshot should remain available");
-        assert_eq!(target.snapshot_time_s, 0.0);
-        assert!(target.snapshot_time_s <= ego.timestamp);
+        assert_eq!(target.snapshot_time_s(), 0.0);
+        assert!(target.snapshot_time_s() <= ego.timestamp);
     }
 
     #[test]
@@ -487,7 +487,7 @@ mod tests {
         let target = swarm
             .nearest_simulator_truth_follow_target(&ego)
             .expect("lead actor should be available");
-        assert!((target.relative_speed_mps - (10.0 - 13.4)).abs() < 1e-6);
+        assert!((target.relative_speed_mps() - (10.0 - 13.4)).abs() < 1e-6);
     }
 
     #[test]
@@ -500,7 +500,7 @@ mod tests {
         let target = swarm
             .nearest_simulator_truth_follow_target(&ego)
             .expect("aligned non-zero clock origin should yield a current target");
-        assert_eq!(target.snapshot_time_s, start_time_s);
+        assert_eq!(target.snapshot_time_s(), start_time_s);
         assert_eq!(swarm.peers[0].sim.state().timestamp, start_time_s);
         assert!(target.is_current_at(ego.timestamp));
     }
@@ -516,8 +516,8 @@ mod tests {
         let target = swarm
             .nearest_simulator_truth_follow_target(&ego)
             .expect("the exact pre-step snapshot should remain available");
-        assert_eq!(target.snapshot_time_s, start_time_s);
-        assert!(target.snapshot_time_s <= ego.timestamp);
+        assert_eq!(target.snapshot_time_s(), start_time_s);
+        assert!(target.snapshot_time_s() <= ego.timestamp);
     }
 
     #[test]
