@@ -321,8 +321,7 @@ pub fn evaluate_option_preservation(
 
     let mut parent_actions = Vec::with_capacity(parent_action_ids.len());
     for parent_action_id in parent_action_ids {
-        let mut expected_by_class: BTreeMap<String, Vec<&ExpectedSuccessorCell>> =
-            BTreeMap::new();
+        let mut expected_by_class: BTreeMap<String, Vec<&ExpectedSuccessorCell>> = BTreeMap::new();
         for expected in input
             .expected_cells
             .iter()
@@ -336,8 +335,9 @@ pub fn evaluate_option_preservation(
 
         let mut observation_classes = Vec::with_capacity(expected_by_class.len());
         for (observation_class_id, expected_cells) in expected_by_class {
-            let observation_receipt =
-                expected_cells[0].observation_equivalence_receipt_digest.clone();
+            let observation_receipt = expected_cells[0]
+                .observation_equivalence_receipt_digest
+                .clone();
             let mut observed_cells = Vec::new();
             let mut missing_cell_count = 0usize;
             let mut missing_action_outcome_count = 0usize;
@@ -356,8 +356,7 @@ pub fn evaluate_option_preservation(
                 }
             }
 
-            let class_complete =
-                missing_cell_count == 0 && missing_action_outcome_count == 0;
+            let class_complete = missing_cell_count == 0 && missing_action_outcome_count == 0;
             let class_status = if evidence_gate_status == EvidenceGateStatus::NotQualified {
                 ObservationClassStatus::NotQualified
             } else if evidence_gate_status == EvidenceGateStatus::Incomplete || !class_complete {
@@ -470,9 +469,9 @@ pub fn evaluate_option_preservation(
         };
 
         let all_classes_have_bounds = !observation_classes.is_empty()
-            && observation_classes
-                .iter()
-                .all(|class| class.robust_option_width.is_some() && class.possible_option_width.is_some());
+            && observation_classes.iter().all(|class| {
+                class.robust_option_width.is_some() && class.possible_option_width.is_some()
+            });
         let minimum_robust_option_width = all_classes_have_bounds.then(|| {
             observation_classes
                 .iter()
@@ -487,16 +486,16 @@ pub fn evaluate_option_preservation(
                 .min()
                 .unwrap_or(0)
         });
-        let total_clairvoyance_gap = !observation_classes.is_empty()
+        let total_clairvoyance_gap = (!observation_classes.is_empty()
             && observation_classes
                 .iter()
-                .all(|class| class.clairvoyance_gap.is_some())
-            .then(|| {
-                observation_classes
-                    .iter()
-                    .filter_map(|class| class.clairvoyance_gap)
-                    .sum()
-            });
+                .all(|class| class.clairvoyance_gap.is_some()))
+        .then(|| {
+            observation_classes
+                .iter()
+                .filter_map(|class| class.clairvoyance_gap)
+                .sum()
+        });
 
         parent_actions.push(ParentActionReport {
             parent_action_id,
@@ -524,8 +523,16 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
     require_non_empty(errors, "contract_version", &input.contract_version);
     require_non_empty(errors, "decision_id", &input.decision_id);
     require_non_empty(errors, "scenario_digest", &input.scenario_digest);
-    require_non_empty(errors, "initial_context_digest", &input.initial_context_digest);
-    require_non_empty(errors, "current_action_set_digest", &input.current_action_set_digest);
+    require_non_empty(
+        errors,
+        "initial_context_digest",
+        &input.initial_context_digest,
+    );
+    require_non_empty(
+        errors,
+        "current_action_set_digest",
+        &input.current_action_set_digest,
+    );
     require_non_empty(
         errors,
         "continuation_action_set_digest",
@@ -536,7 +543,11 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
         "expected_cell_manifest_digest",
         &input.expected_cell_manifest_digest,
     );
-    require_non_empty(errors, "evaluator_profile_digest", &input.evaluator_profile_digest);
+    require_non_empty(
+        errors,
+        "evaluator_profile_digest",
+        &input.evaluator_profile_digest,
+    );
 
     if input.current_action_ids.is_empty() {
         errors.push("current_action_ids must not be empty".into());
@@ -548,7 +559,11 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
         errors.push("expected_cells must not be empty".into());
     }
 
-    let current_ids: BTreeSet<&str> = input.current_action_ids.iter().map(String::as_str).collect();
+    let current_ids: BTreeSet<&str> = input
+        .current_action_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
     if current_ids.len() != input.current_action_ids.len() {
         errors.push("current_action_ids contains duplicates".into());
     }
@@ -565,7 +580,11 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
         errors.push("continuation_action_ids contains duplicates".into());
     }
     for (index, action_id) in input.continuation_action_ids.iter().enumerate() {
-        require_non_empty(errors, &format!("continuation_action_ids[{index}]"), action_id);
+        require_non_empty(
+            errors,
+            &format!("continuation_action_ids[{index}]"),
+            action_id,
+        );
     }
 
     validate_admission(
@@ -591,10 +610,13 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
 
     let mut expected_by_key = BTreeSet::new();
     let mut observation_receipts: BTreeMap<(String, String), String> = BTreeMap::new();
-    let mut observation_classes_by_receipt: BTreeMap<(String, String), String> =
-        BTreeMap::new();
+    let mut observation_classes_by_receipt: BTreeMap<(String, String), String> = BTreeMap::new();
     for (index, expected) in input.expected_cells.iter().enumerate() {
-        validate_cell_key(errors, &format!("expected_cells[{index}].key"), &expected.key);
+        validate_cell_key(
+            errors,
+            &format!("expected_cells[{index}].key"),
+            &expected.key,
+        );
         require_non_empty(
             errors,
             &format!("expected_cells[{index}].observation_equivalence_receipt_digest"),
@@ -738,13 +760,21 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
 }
 
 fn validate_cell_key(errors: &mut Vec<String>, label: &str, key: &SuccessorCellKey) {
-    require_non_empty(errors, &format!("{label}.parent_action_id"), &key.parent_action_id);
+    require_non_empty(
+        errors,
+        &format!("{label}.parent_action_id"),
+        &key.parent_action_id,
+    );
     require_non_empty(
         errors,
         &format!("{label}.observation_class_id"),
         &key.observation_class_id,
     );
-    require_non_empty(errors, &format!("{label}.hidden_state_id"), &key.hidden_state_id);
+    require_non_empty(
+        errors,
+        &format!("{label}.hidden_state_id"),
+        &key.hidden_state_id,
+    );
     require_non_empty(errors, &format!("{label}.reference_id"), &key.reference_id);
 }
 
@@ -753,8 +783,7 @@ fn validate_admission(errors: &mut Vec<String>, label: &str, admission: &Evidenc
         EvidenceAdmission::Qualified { receipt_digest } => {
             require_non_empty(errors, &format!("{label}.receipt_digest"), receipt_digest);
         }
-        EvidenceAdmission::Unqualified { reason_id }
-        | EvidenceAdmission::Unknown { reason_id } => {
+        EvidenceAdmission::Unqualified { reason_id } | EvidenceAdmission::Unknown { reason_id } => {
             require_non_empty(errors, &format!("{label}.reason_id"), reason_id);
         }
     }
@@ -1091,7 +1120,10 @@ mod tests {
         };
 
         let report = evaluate_option_preservation(&measurement).expect("valid but unqualified");
-        assert_eq!(report.evidence_gate_status, EvidenceGateStatus::NotQualified);
+        assert_eq!(
+            report.evidence_gate_status,
+            EvidenceGateStatus::NotQualified
+        );
         assert_eq!(
             report.parent_actions[0].status,
             ParentActionStatus::NotQualified
