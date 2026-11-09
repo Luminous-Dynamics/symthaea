@@ -10,6 +10,7 @@ on:
       - "docs/research/rea-proof-obligation-acquisition-agent-view-v0.json"
       - "docs/research/rea-proof-obligation-acquisition-grader-v0.schema.json"
       - "docs/research/rea-proof-obligation-acquisition-grader-v0.json"
+      - "docs/research/rea-proof-obligation-policy-run-v0.schema.json"
       - "tools/rea-proof-obligation-fixture-check/**"
       - ".github/workflows/rea-proof-obligation-fixtures.yml"
   workflow_dispatch:
