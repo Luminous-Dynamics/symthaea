@@ -140,9 +140,9 @@
         "calibration_profile_id": "synthetic-local-lidar-cal-v1",
         "extrinsic_profile_id": "synthetic-local-lidar-extrinsics-v1",
         "reference_frame_id": "road-local-01",
-        "evidence_kind": "measurement",
-        "currentness": "current",
-        "source_role": "local_sensor_observation"
+        "evidence_kind": "synthetic_observation",
+        "currentness": "current_for_fixture",
+        "source_role": "synthetic_sensor_observation"
       }
     ],
     "ego_state": {
