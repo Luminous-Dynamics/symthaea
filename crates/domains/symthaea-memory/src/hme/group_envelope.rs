@@ -1106,6 +1106,14 @@ mod tests {
             GroupEnvelopeMode::BoxAndBall,
         )
         .unwrap();
+        let quantized = estimate_group_envelope_memory(
+            262_144,
+            1_000_000,
+            64,
+            24,
+            GroupEnvelopeMode::QuantizedBoxAndBall,
+        )
+        .unwrap();
         let ball = estimate_group_envelope_memory(
             262_144,
             1_000_000,
@@ -1116,14 +1124,21 @@ mod tests {
         .unwrap();
         assert_eq!(full.group_count, 15_625);
         assert_eq!(full.numeric_bytes_per_group, 12 * 262_144 + 4);
+        assert_eq!(quantized.numeric_bytes_per_group, 8 * 262_144 + 4);
         assert_eq!(ball.numeric_bytes_per_group, 4 * 262_144 + 4);
         assert_eq!(full.member_payload_digest_bytes, 32_000_000);
+        assert_eq!(quantized.member_payload_digest_bytes, 32_000_000);
         assert_eq!(ball.member_payload_digest_bytes, 32_000_000);
         assert_eq!(
-            full.numeric_synopsis_bytes - ball.numeric_synopsis_bytes,
-            8 * 262_144 * 15_625
+            full.numeric_synopsis_bytes - quantized.numeric_synopsis_bytes,
+            4 * 262_144 * 15_625
         );
-        assert!(full.known_metadata_bytes > ball.known_metadata_bytes);
+        assert_eq!(
+            quantized.numeric_synopsis_bytes - ball.numeric_synopsis_bytes,
+            4 * 262_144 * 15_625
+        );
+        assert!(full.known_metadata_bytes > quantized.known_metadata_bytes);
+        assert!(quantized.known_metadata_bytes > ball.known_metadata_bytes);
         assert!(matches!(
             estimate_group_envelope_memory(
                 0,
