@@ -80,7 +80,11 @@ The evaluator now reports both `generating_model_in_version_space` (exact parame
 
 The evaluator-only `BlindEpisode::new_numeric_open_support` constructor is a distinct F1 parameter-support control. It permits a valid world-generator gain in 1..=16 while the agent-facing candidate grammar remains {1, 2, 3}. The agent sees the ordinary numeric task contract and receives no OOD flag. When the response is incompatible with all declared candidates, the exact empty version space and `NoCompatibleModel` disposition can be scored as correct; the evaluator separately records `generating_model_in_version_space = false`.
 
-Do not use the open-support constructor for the closed-grammar finite census. It is a bounded parameter-support extrapolation control, not proof of structural-family discovery. Unknown structures, measurement shifts, regime shifts and stochastic discrepancies require separate evaluator truth generators and held-out tests under #11197.
+Do not use the open-support constructor for the closed-grammar finite census. It is a bounded parameter-support extrapolation control, not proof of structural-family discovery.
+
+A separate evaluator-only `BlindEpisode::new_numeric_structural_shift` constructor now adds a bounded nonzero quadratic response term (q u^2) to an otherwise direct-response world while keeping the public candidate catalogue unchanged. The current test uses gain 2 and q=1, producing [-1, 0, 3] for inputs [-1, 0, 1]. The independent evaluator signature includes that extra term and compares it against the original complete candidate grammar. The correct claim is the exact empty version space with `NoCompatibleModel`; there is no behaviorally equivalent legal candidate. The constructor rejects q=0 and non-direct-response bases.
+
+This is a deliberately small **F2 structural-support fixture**, not open-ended grammar discovery or model repair. It does not yet test arbitrary missing terms, latent variables, interactions outside the candidate language, changes in measurement process, dynamic regimes or stochastic discrepancies. F3–F5 remain future evaluator generators under #11197.
 
 ## Parent-runner / child-agent transport
 
