@@ -544,6 +544,13 @@ fn run() -> Result<(), String> {
     };
     let full_numeric_per_group = cfg.dimension * 12 + 4;
     let ball_numeric_per_group = cfg.dimension * 4 + 4;
+    let full_scan_p50_ns = percentile_ns(&full_scan_samples, 50);
+    let two_stage_p50_ns = percentile_ns(&end_to_end_samples, 50);
+    let full_scan_to_two_stage_p50_ratio = if two_stage_p50_ns == 0 {
+        0.0
+    } else {
+        full_scan_p50_ns as f64 / two_stage_p50_ns as f64
+    };
 
     println!("schema_version=hme_hierarchical_select_bench_v1");
     println!("records={}", cfg.records);
@@ -594,6 +601,8 @@ fn run() -> Result<(), String> {
     println!("two_stage_end_to_end_p95_ns={}", percentile_ns(&end_to_end_samples, 95));
     println!("two_stage_end_to_end_p99_ns={}", percentile_ns(&end_to_end_samples, 99));
     println!("full_scan_p50_ns={}", percentile_ns(&full_scan_samples, 50));
+    println!("full_scan_to_two_stage_cpu_p50_ratio={full_scan_to_two_stage_p50_ratio:.4}");
+    println!("ratio_interpretation=greater_than_1_means_two_stage_cpu_path_faster_in_this_in_memory_synthetic_harness_only");
     println!("full_scan_p95_ns={}", percentile_ns(&full_scan_samples, 95));
     println!("full_scan_p99_ns={}", percentile_ns(&full_scan_samples, 99));
     println!("dataset_generation_ns={dataset_build_ns}");
