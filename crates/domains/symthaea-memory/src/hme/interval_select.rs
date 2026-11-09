@@ -184,6 +184,7 @@ pub struct GroupScoreIntervalRecord {
     member_ids: Arc<[String]>,
     member_payload_digests: Arc<[[u8; 32]]>,
     query_digest: [u8; 32],
+    scope_binding: HmeEligibilityScopeBinding,
     member_count: usize,
     interval: ContinuousHVScoreInterval,
 }
@@ -221,6 +222,7 @@ impl GroupScoreIntervalRecord {
         expected_eligibility_generation: u64,
         expected_member_set_digest: [u8; 32],
         expected_content_digest: [u8; 32],
+        scope_binding: HmeEligibilityScopeBinding,
     ) -> Result<Self, GroupScoreIntervalBuildError> {
         let member_count = envelope.member_ids().len();
         if member_count == 0 {
@@ -248,6 +250,7 @@ impl GroupScoreIntervalRecord {
             member_ids: envelope.member_ids_shared(),
             member_payload_digests: envelope.member_payload_digests_shared(),
             query_digest: continuous_hv_query_digest(query),
+            scope_binding,
             member_count,
             interval,
         })
@@ -261,6 +264,11 @@ impl GroupScoreIntervalRecord {
     /// Stable member IDs covered by this envelope, sorted ascending.
     pub fn member_ids(&self) -> &[String] {
         &self.member_ids
+    }
+
+    /// Eligibility scope/policy/source-ledger/bitemporal binding for this interval.
+    pub fn scope_binding(&self) -> HmeEligibilityScopeBinding {
+        self.scope_binding
     }
 
     /// Number of eligible records represented by this interval.
@@ -1097,6 +1105,11 @@ pub enum GroupIntervalSelectionError {
         /// Group index that disagreed with the pinned query.
         group_index: usize,
     },
+    /// One group interval was derived under another eligibility policy/scope.
+    EligibilityScopeMismatch {
+        /// Group index that disagreed with the pinned eligibility binding.
+        group_index: usize,
+    },
     /// The supplied partition receipt does not match the group directory.
     PartitionReceipt(GroupPartitionReceiptError),
     /// Summing group member counts overflowed usize.
@@ -1146,6 +1159,9 @@ impl std::fmt::Display for GroupIntervalSelectionError {
             }
             Self::QueryDigestMismatch { group_index } => {
                 write!(f, "group {group_index} was scored for another query vector")
+            }
+            Self::EligibilityScopeMismatch { group_index } => {
+                write!(f, "group {group_index} was built under another eligibility scope")
             }
             Self::PartitionReceipt(error) => write!(f, "group partition receipt rejected: {error}"),
             Self::MemberCountOverflow => write!(f, "group member count overflow"),
@@ -1412,6 +1428,9 @@ fn select_group_refinement_set_impl(
         }
         if group.query_digest != coverage.query_digest {
             return Err(GroupIntervalSelectionError::QueryDigestMismatch { group_index });
+        }
+        if group.scope_binding != coverage.scope_binding {
+            return Err(GroupIntervalSelectionError::EligibilityScopeMismatch { group_index });
         }
         if !group.interval.is_well_formed() {
             return Err(GroupIntervalSelectionError::InvalidInterval { group_index });
