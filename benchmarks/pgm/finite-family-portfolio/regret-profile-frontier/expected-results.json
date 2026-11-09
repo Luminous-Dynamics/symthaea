@@ -1,0 +1,86 @@
+{
+  "schema": "symthaea.pgm.finite-family-portfolio.regret-profile-frontier.v1",
+  "status": "independently-reconstructed-oracle-values-rust-not-executed",
+  "fixture": "one-model-three-action-duplicate-and-dominated-profile",
+  "family_sha256": "4b004bccbec0e45c3fbaf42b29e5303811aa0085ce61014df274ceb6dab067d2",
+  "policy_manifest_sha256": "e67f143996c874cfe911594b7ad4205ba4ee5852767e87380c9c68f55aeb935c",
+  "policy_values_sha256": "f78dfbd81c56209d3f6c444c5b6b59c7eb473432ea5f60d8f9ef5f6afae5768e",
+  "model_optimal_values": [
+    "3"
+  ],
+  "policy_values_by_index": [
+    [
+      "3",
+      "3",
+      "1"
+    ]
+  ],
+  "regret_profiles_by_policy_index": [
+    [
+      "0"
+    ],
+    [
+      "0"
+    ],
+    [
+      "2"
+    ]
+  ],
+  "profile_groups": [
+    {
+      "group_index": 0,
+      "representative_policy_index": 0,
+      "equivalent_policy_indices": [
+        0,
+        1
+      ],
+      "regret_profile": [
+        "0"
+      ]
+    },
+    {
+      "group_index": 1,
+      "representative_policy_index": 2,
+      "equivalent_policy_indices": [
+        2
+      ],
+      "regret_profile": [
+        "2"
+      ]
+    }
+  ],
+  "frontier_profile_group_indices": [
+    0
+  ],
+  "dominance_witnesses": [
+    {
+      "dominated_profile_group_index": 1,
+      "dominator_profile_group_index": 0
+    }
+  ],
+  "profile_component_comparisons_upper_bound": 9,
+  "profile_frontier_certificate_sha256": "05fd42a60adf45e9b6496be260a1dd8ecb524033f7fe60a4549e030c225dbbac",
+  "additional_specialist_fixture": {
+    "profiles": [
+      [
+        "0",
+        "1"
+      ],
+      [
+        "1",
+        "0"
+      ]
+    ],
+    "frontier_indices": [
+      0,
+      1
+    ],
+    "k1_minimax_regret": "1",
+    "k2_minimax_regret": "0"
+  },
+  "qualification": {
+    "exact_arithmetic": "CheckedRational",
+    "rust_tests_compiled": false,
+    "rust_tests_executed": false
+  }
+}

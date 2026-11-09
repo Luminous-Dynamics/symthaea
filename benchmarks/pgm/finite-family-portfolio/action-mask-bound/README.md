@@ -327,9 +327,12 @@ already beaten the randomized-policy, polytopic RMDP results.
   information gain per unit cost, while maintaining a safety envelope and
   never deploying a policy whose certificate does not cover the current
   credible model set.
-- **Regret-profile geometry:** cache exact per-model policy profiles, remove
-  dominated policies, quotient identical profiles, and use profile-space
-  bounds to prune portfolios without repeatedly replaying all policies.
+- **Regret-profile geometry:** [the exact profile quotient / Pareto frontier
+  track](../regret-profile-frontier/README.md) now groups identical checked-
+  rational regret vectors, preserves original policy indices, and provides
+  strict componentwise-dominance witnesses. The next step is to use these
+  profiles in threshold set-cover / branch-and-price without weakening the
+  exact optimum.
 - **One-run policy-budget frontier:** reuse cluster and partition certificates
   across k instead of rerunning from scratch for every budget; report the
   full (policy count, regret) Pareto frontier.
@@ -352,4 +355,7 @@ they are not yet resumable, distributed or anytime gap-reporting. The policy
 space cardinality must still fit in usize for the current canonical policy
 index manifest. Continuous rational polytopes, randomized policies, online
 model inference, partially observable models, risk constraints and
-incremental Pareto-frontier reuse remain separate work.
+incremental Pareto-frontier reuse and online model inference remain separate
+work. The new profile analysis is an exact post-processing layer over the
+fully evaluated finite policy table; it is not yet integrated into the outer
+partition B&B's runtime path.
