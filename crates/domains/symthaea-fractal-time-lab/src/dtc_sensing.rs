@@ -775,8 +775,14 @@ fn classical_fisher_matrix_within_quantum_bound(
     minimum_eigenvalue >= -1.0e-5 * scale
 }
 
+/// Maximum permitted condition number for a joint 2x2 Fisher matrix.
+/// Larger values are reported as weakly identifiable rather than inverted.
+pub const MAX_JOINT_FISHER_CONDITION_NUMBER: f64 = 1.0e10;
+
 /// Invert a symmetric 2x2 Fisher matrix when both parameters are jointly
-/// identifiable. The returned covariance is a per-shot local CRLB.
+/// identifiable. The returned covariance is a per-shot local CRLB. The
+/// condition-number gate prevents finite-difference residue in a rank-one
+/// amplitude/phase model from masquerading as a valid joint covariance.
 fn invert_fisher_matrix_2x2(information: [[f64; 2]; 2]) -> Option<[[f64; 2]; 2]> {
     let a = information[0][0];
     let b = 0.5 * (information[0][1] + information[1][0]);
@@ -785,10 +791,23 @@ fn invert_fisher_matrix_2x2(information: [[f64; 2]; 2]) -> Option<[[f64; 2]; 2]>
         return None;
     }
     let determinant = a * d - b * b;
-    let scale = (a * d).abs().max(b * b).max(f64::MIN_POSITIVE);
-    if !determinant.is_finite() || determinant <= 1.0e-12 * scale {
+    if !determinant.is_finite() || determinant <= 0.0 {
         return None;
     }
+
+    let largest_eigenvalue = 0.5 * (a + d + (a - d).hypot(2.0 * b));
+    if !largest_eigenvalue.is_finite() || largest_eigenvalue <= 0.0 {
+        return None;
+    }
+    // For a positive-definite 2x2 matrix, lambda_min = det/lambda_max.
+    // This avoids subtracting nearly equal eigenvalues near rank deficiency.
+    let condition_number = largest_eigenvalue * largest_eigenvalue / determinant;
+    if !condition_number.is_finite()
+        || condition_number > MAX_JOINT_FISHER_CONDITION_NUMBER
+    {
+        return None;
+    }
+
     let covariance = [
         [d / determinant, -b / determinant],
         [-b / determinant, a / determinant],
@@ -878,6 +897,39 @@ mod tests {
                 .is_finite()
         );
         assert!(report.norm_error < 1.0e-10);
+    }
+
+    #[test]
+    fn phase_origin_shift_equals_a_corresponding_clock_epoch_shift() {
+        let frequency = 0.25;
+        let original_phase = 0.31;
+        let epoch_shift_drive_periods = 0.37;
+        let shifted_phase = original_phase
+            - 2.0 * std::f64::consts::PI * frequency * epoch_shift_drive_periods;
+
+        let mut original = build_model(&config()).unwrap();
+        original
+            .stroboscopic_magnetization_with_uniform_ac_probe(
+                config().periods,
+                config().probe_amplitude,
+                frequency,
+                original_phase,
+            )
+            .unwrap();
+
+        let mut shifted = build_model(&config()).unwrap();
+        shifted
+            .stroboscopic_magnetization_with_uniform_ac_probe(
+                config().periods,
+                config().probe_amplitude,
+                frequency,
+                shifted_phase,
+            )
+            .unwrap();
+
+        for (left, right) in original.amplitudes().iter().zip(shifted.amplitudes()) {
+            assert!((*left - *right).norm() < 1.0e-12);
+        }
     }
 
     #[test]
