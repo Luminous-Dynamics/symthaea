@@ -96,6 +96,7 @@ pub enum OrchestrationTimelineIssueCodeV1 {
     InvalidPartId,
     InvalidInstrumentId,
     MissingInstrument,
+    UnknownScorePart,
     InvalidInstrumentProfile,
     InvalidSegmentTime,
     EmptySegment,
@@ -361,6 +362,7 @@ pub fn validate_orchestration_timeline(
         }
     }
 
+    let score_part_ids: BTreeSet<u16> = score.parts().into_iter().map(|part| part.0).collect();
     let mut seen_segment_ids = BTreeSet::<String>::new();
     let mut valid_segments = Vec::<ValidSegment<'_>>::new();
     let mut segments_by_part = BTreeMap::<u16, Vec<usize>>::new();
@@ -391,6 +393,14 @@ pub fn validate_orchestration_timeline(
                 Some(&segment.id),
                 None,
                 "u16::MAX is the reserved unassigned PartId",
+            );
+        } else if !score_part_ids.contains(&segment.part_id) {
+            report.push(
+                OrchestrationTimelineIssueCodeV1::UnknownScorePart,
+                Some(segment.part_id),
+                Some(&segment.id),
+                None,
+                "segment references a PartId that has no notes in the supplied score",
             );
         }
         if segment.instrument_id.trim().is_empty() {
@@ -468,9 +478,7 @@ pub fn validate_orchestration_timeline(
             let previous = &valid_segments[pair[0]];
             let current = &valid_segments[pair[1]];
 
-            if previous.end.strictly_before(current.start) == false
-                && previous.end.compare(current.start) != Ordering::Equal
-            {
+            if previous.end.compare(current.start) == Ordering::Greater {
                 report.push(
                     OrchestrationTimelineIssueCodeV1::OverlappingPartAssignments,
                     Some(*part_id),
