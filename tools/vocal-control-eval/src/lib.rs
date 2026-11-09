@@ -599,6 +599,201 @@ pub fn evaluate_suite(suite: &ControlSuite) -> Result<ControlSuiteReport, String
 }
 
 
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoOpRun {
+    pub receipt: RenderReceipt,
+    pub measurements: BTreeMap<String, BTreeMap<FeatureDimension, f64>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoOpCalibration {
+    pub schema_version: u32,
+    pub calibration_id: String,
+    pub minimum_replicates: usize,
+    pub required_dimensions: Vec<FeatureDimension>,
+    /// Minimum tolerance based on each extractor's measurement resolution.
+    pub resolution_floors: BTreeMap<FeatureDimension, f64>,
+    pub regions: Vec<String>,
+    pub runs: Vec<NoOpRun>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FeatureCalibration {
+    pub resolution_floor: f64,
+    pub worst_region_p95_pairwise_delta: f64,
+    pub maximum_pairwise_delta: f64,
+    pub recommended_tolerance: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NoOpCalibrationReport {
+    pub schema_version: u32,
+    pub calibration_id: String,
+    pub replicate_count: usize,
+    pub region_count: usize,
+    pub pairwise_comparisons_per_region: usize,
+    pub features: BTreeMap<FeatureDimension, FeatureCalibration>,
+    pub source_revision: String,
+    pub backend_id: String,
+    pub model_artifact_digest: String,
+    pub voice_id: String,
+    pub invariant_task_digest: String,
+    pub performance_digest: String,
+}
+
+impl NoOpCalibration {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != CASE_SCHEMA_VERSION {
+            return Err(format!("unsupported no-op calibration schema version {}", self.schema_version));
+        }
+        if self.calibration_id.trim().is_empty() {
+            return Err("calibration_id must not be empty".into());
+        }
+        if self.minimum_replicates < 5 {
+            return Err("no-op calibration requires at least five independent seeds".into());
+        }
+        if self.runs.len() < self.minimum_replicates {
+            return Err(format!(
+                "calibration has {} runs but requires {}",
+                self.runs.len(), self.minimum_replicates
+            ));
+        }
+        let dimensions: BTreeSet<_> = self.required_dimensions.iter().copied().collect();
+        if dimensions.is_empty() || dimensions.len() != self.required_dimensions.len() {
+            return Err("calibration dimensions must be non-empty and unique".into());
+        }
+        let floors: BTreeSet<_> = self.resolution_floors.keys().copied().collect();
+        if floors != dimensions {
+            return Err("resolution floors must cover exactly the required dimensions".into());
+        }
+        for (dimension, floor) in &self.resolution_floors {
+            if !floor.is_finite() || *floor <= 0.0 {
+                return Err(format!("resolution floor for {} must be finite and positive", dimension.label()));
+            }
+        }
+        let region_set: BTreeSet<&str> = self.regions.iter().map(String::as_str).collect();
+        if self.regions.is_empty()
+            || region_set.len() != self.regions.len()
+            || region_set.iter().any(|region| region.trim().is_empty())
+        {
+            return Err("calibration regions must be non-empty and unique".into());
+        }
+
+        let first = &self.runs[0].receipt;
+        validate_receipt(first, "calibration first run")?;
+        let mut seeds = BTreeSet::new();
+        for (run_index, run) in self.runs.iter().enumerate() {
+            validate_receipt(&run.receipt, &format!("calibration run {run_index}"))?;
+            if !seeds.insert(run.receipt.seed) {
+                return Err(format!("calibration run {run_index} reuses a random seed"));
+            }
+            let same_fixed_inputs = run.receipt.source_revision == first.source_revision
+                && run.receipt.backend_id == first.backend_id
+                && run.receipt.model_artifact_digest == first.model_artifact_digest
+                && run.receipt.voice_id == first.voice_id
+                && run.receipt.invariant_task_digest == first.invariant_task_digest
+                && run.receipt.performance_digest == first.performance_digest
+                && run.receipt.sample_rate_hz == first.sample_rate_hz;
+            if !same_fixed_inputs {
+                return Err(format!(
+                    "calibration run {run_index} changed code, backend/model, voice, task, performance or sample rate"
+                ));
+            }
+
+            let measured_regions: BTreeSet<&str> =
+                run.measurements.keys().map(String::as_str).collect();
+            if measured_regions != region_set {
+                return Err(format!(
+                    "calibration run {run_index} does not contain exactly the declared regions"
+                ));
+            }
+            for (region_id, features) in &run.measurements {
+                let measured_dimensions: BTreeSet<_> = features.keys().copied().collect();
+                if measured_dimensions != dimensions {
+                    return Err(format!(
+                        "calibration run {run_index}, region {region_id:?} is missing required dimensions"
+                    ));
+                }
+                for (dimension, value) in features {
+                    if !value.is_finite() {
+                        return Err(format!(
+                            "calibration run {run_index}, region {region_id:?} has non-finite {}",
+                            dimension.label()
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Derive conservative no-op tolerances from repeated renders of the same
+/// performance with independent seeds. The 95th-percentile pairwise absolute
+/// drift is computed per region and the worst region is retained per feature.
+/// An explicit resolution floor prevents zero tolerances on quantized features.
+pub fn calibrate_noop(calibration: &NoOpCalibration) -> Result<NoOpCalibrationReport, String> {
+    calibration.validate()?;
+    let first = &calibration.runs[0].receipt;
+    let pair_count = calibration.runs.len() * (calibration.runs.len() - 1) / 2;
+    let mut features = BTreeMap::new();
+
+    for dimension in &calibration.required_dimensions {
+        let mut worst_region_p95 = 0.0f64;
+        let mut maximum_pairwise_delta = 0.0f64;
+        for region in &calibration.regions {
+            let values: Vec<f64> = calibration.runs.iter()
+                .map(|run| run.measurements[region][dimension])
+                .collect();
+            let mut pairwise = Vec::with_capacity(pair_count);
+            for left in 0..values.len() {
+                for right in (left + 1)..values.len() {
+                    let delta = (values[left] - values[right]).abs();
+                    if !delta.is_finite() {
+                        return Err(format!(
+                            "no-op pairwise delta overflowed for region {region:?}, feature {}",
+                            dimension.label()
+                        ));
+                    }
+                    maximum_pairwise_delta = maximum_pairwise_delta.max(delta);
+                    pairwise.push(delta);
+                }
+            }
+            pairwise.sort_by(f64::total_cmp);
+            let rank = (0.95 * pairwise.len() as f64).ceil() as usize;
+            let p95 = pairwise[rank.saturating_sub(1).min(pairwise.len() - 1)];
+            worst_region_p95 = worst_region_p95.max(p95);
+        }
+        let resolution_floor = calibration.resolution_floors[dimension];
+        let recommended_tolerance = worst_region_p95.max(resolution_floor);
+        features.insert(*dimension, FeatureCalibration {
+            resolution_floor,
+            worst_region_p95_pairwise_delta: worst_region_p95,
+            maximum_pairwise_delta,
+            recommended_tolerance,
+        });
+    }
+
+    Ok(NoOpCalibrationReport {
+        schema_version: CASE_SCHEMA_VERSION,
+        calibration_id: calibration.calibration_id.clone(),
+        replicate_count: calibration.runs.len(),
+        region_count: calibration.regions.len(),
+        pairwise_comparisons_per_region: pair_count,
+        features,
+        source_revision: first.source_revision.clone(),
+        backend_id: first.backend_id.clone(),
+        model_artifact_digest: first.model_artifact_digest.clone(),
+        voice_id: first.voice_id.clone(),
+        invariant_task_digest: first.invariant_task_digest.clone(),
+        performance_digest: first.performance_digest.clone(),
+    })
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -839,6 +1034,79 @@ mod tests {
         let report = evaluate_suite(&suite).unwrap();
         assert_eq!(report.qualification, Qualification::Failed);
         assert!(report.failures.iter().any(|failure| failure.contains("95% response-ratio CI")));
+    }
+
+    fn noop_calibration() -> NoOpCalibration {
+        let values = [0.10, 0.11, 0.09, 0.10, 0.12];
+        let runs = values.iter().enumerate().map(|(index, value)| {
+            let mut receipt = receipt('d', 'e');
+            receipt.seed = 200 + index as u64;
+            receipt.performance_digest = digest('d');
+            receipt.audio_digest = digest(char::from_digit(index as u32 + 1, 16).unwrap());
+            NoOpRun {
+                receipt,
+                measurements: BTreeMap::from([
+                    ("phrase-1".into(), BTreeMap::from([
+                        (FeatureDimension::BreathinessIndex, *value),
+                        (FeatureDimension::VibratoDepthCents, 16.0),
+                    ])),
+                    ("phrase-2".into(), BTreeMap::from([
+                        (FeatureDimension::BreathinessIndex, *value + 0.01),
+                        (FeatureDimension::VibratoDepthCents, 18.0),
+                    ])),
+                ]),
+            }
+        }).collect();
+        NoOpCalibration {
+            schema_version: CASE_SCHEMA_VERSION,
+            calibration_id: "noop-calibration-fixture".into(),
+            minimum_replicates: 5,
+            required_dimensions: vec![
+                FeatureDimension::BreathinessIndex,
+                FeatureDimension::VibratoDepthCents,
+            ],
+            resolution_floors: BTreeMap::from([
+                (FeatureDimension::BreathinessIndex, 0.005),
+                (FeatureDimension::VibratoDepthCents, 0.25),
+            ]),
+            regions: vec!["phrase-1".into(), "phrase-2".into()],
+            runs,
+        }
+    }
+
+    #[test]
+    fn no_op_calibration_derives_repeatability_tolerances() {
+        let report = calibrate_noop(&noop_calibration()).unwrap();
+        assert_eq!(report.replicate_count, 5);
+        assert_eq!(report.pairwise_comparisons_per_region, 10);
+        let breathiness = &report.features[&FeatureDimension::BreathinessIndex];
+        assert!(breathiness.recommended_tolerance >= breathiness.worst_region_p95_pairwise_delta);
+        assert!(breathiness.recommended_tolerance >= 0.005);
+        let vibrato = &report.features[&FeatureDimension::VibratoDepthCents];
+        assert_eq!(vibrato.recommended_tolerance, 0.25);
+    }
+
+    #[test]
+    fn no_op_calibration_rejects_reused_seed_or_changed_performance() {
+        let mut duplicate_seed = noop_calibration();
+        duplicate_seed.runs[1].receipt.seed = duplicate_seed.runs[0].receipt.seed;
+        assert!(calibrate_noop(&duplicate_seed).unwrap_err().contains("reuses a random seed"));
+
+        let mut changed_performance = noop_calibration();
+        changed_performance.runs[1].receipt.performance_digest = digest('f');
+        assert!(calibrate_noop(&changed_performance).unwrap_err().contains("changed code"));
+    }
+
+    #[test]
+    fn no_op_calibration_rejects_missing_features_and_too_few_repeats() {
+        let mut missing = noop_calibration();
+        missing.runs[0].measurements.get_mut("phrase-1").unwrap()
+            .remove(&FeatureDimension::BreathinessIndex);
+        assert!(calibrate_noop(&missing).unwrap_err().contains("missing required dimensions"));
+
+        let mut too_few = noop_calibration();
+        too_few.runs.truncate(4);
+        assert!(calibrate_noop(&too_few).unwrap_err().contains("requires 5"));
     }
 
     #[test]
