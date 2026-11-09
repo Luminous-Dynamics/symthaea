@@ -1503,6 +1503,36 @@ mod tests {
     }
 
     #[test]
+    fn coordinate_extrema_accessors_reflect_the_selected_storage_mode() {
+        let members = vec![
+            ("a".to_owned(), hv(&[0.7, 0.1, -0.2, 0.9, 0.3, -0.1, 0.4, 0.8])),
+            ("b".to_owned(), hv(&[0.6, 0.2, -0.1, 0.8, 0.4, -0.2, 0.3, 0.7])),
+        ];
+        let exact_box = ContinuousHVGroupEnvelope::from_original_members(9, 3, &members).unwrap();
+        let quantized = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            9,
+            3,
+            &members,
+            GroupEnvelopeMode::QuantizedBoxAndBall,
+        )
+        .unwrap();
+        let ball = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            9,
+            3,
+            &members,
+            GroupEnvelopeMode::BallOnly,
+        )
+        .unwrap();
+
+        assert_eq!(exact_box.coordinate_minima().unwrap().len(), 8);
+        assert_eq!(exact_box.coordinate_maxima().unwrap().len(), 8);
+        assert!(quantized.coordinate_minima().is_none());
+        assert!(quantized.coordinate_maxima().is_none());
+        assert!(ball.coordinate_minima().is_none());
+        assert!(ball.coordinate_maxima().is_none());
+    }
+
+    #[test]
     fn high_dimensional_group_envelope_contains_every_original_score() {
         let dimension = 16_384usize;
         let base: Vec<f32> = (0..dimension)
