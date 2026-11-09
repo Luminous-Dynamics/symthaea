@@ -1033,7 +1033,8 @@
         "target_reference_kind": {
           "enum": [
             "simulator_truth_actor",
-            "tracked_object_hypothesis"
+            "tracked_object_hypothesis",
+            null
           ]
         },
         "target_reference_id": {
