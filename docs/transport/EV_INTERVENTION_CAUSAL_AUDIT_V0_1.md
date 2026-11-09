@@ -13,7 +13,7 @@ For matched pair i:
 
 `DiD_i = d[(Y_{T,post}-Y_{T,pre})-(Y_{C,post}-Y_{C,pre})]`
 
-where d=+1 for higher-is-better metrics and d=-1 for lower-is-better metrics. The scenario effect is the unweighted mean of the matched-pair effects. The naive treated-only pre/post change is reported separately to expose regression-to-the-mean and common-trend traps.
+where d=+1 for higher-is-better metrics and d=-1 for lower-is-better metrics. Before estimating the post-period effect, v0.1 compares one pre-intervention trend interval for each matched set and abstains when the treated/comparator trend gap exceeds the scenario's declared tolerance. This is a negative-control screen, not proof of parallel trends. If the screen passes, the scenario effect is the unweighted mean of the matched-pair effects. The naive treated-only pre/post change is reported separately to expose regression-to-the-mean and common-trend traps.
 
 ## Hard evidence gates
 
@@ -28,11 +28,12 @@ where d=+1 for higher-is-better metrics and d=-1 for lower-is-better metrics. Th
 
 ## Frozen synthetic corpus
 
-Six cases exercise:
+Seven cases exercise:
 - a positive difference-in-differences effect (+7 kWh);
 - a regression-to-the-mean negative control with a +4.5 kWh naive treated-only change but zero DiD effect;
 - a harmful intervention (-5 kWh);
 - a censored follow-up that must force ABSTAIN while retaining the censored unit identity;
+- a pre-trend mismatch that must force ABSTAIN before a treatment effect is reported;
 - a work-order-only control that must be rejected;
 - protocol drift that must be rejected.
 
@@ -40,7 +41,7 @@ The fixture's expected effects are known-truth synthetic labels, not empirical p
 
 ## v0.1 boundaries
 
-This prototype does not estimate confidence intervals, adjust for covariates, perform propensity weighting, fit interrupted time series, account for staggered treatment, model recurrent failures, estimate survival effects, or diagnose unmeasured confounding. It does not establish parallel trends, no interference, exchangeability, treatment consistency or absence of concurrent changes. The matching-profile digest is an evidence binding, not proof that the matching design is statistically adequate.
+This prototype does not prove parallel trends: its single pre-period comparison is only a screen. It does not estimate confidence intervals, adjust for covariates, perform propensity weighting, fit interrupted time series, account for staggered treatment, model recurrent failures, estimate survival effects, or diagnose unmeasured confounding. It does not establish parallel trends, no interference, exchangeability, treatment consistency or absence of concurrent changes. The matching-profile digest is an evidence binding, not proof that the matching design is statistically adequate.
 
 No physical benefit, battery-life extension, cost saving, safety improvement, service recommendation, warranty conclusion, BMS authority or automotive qualification follows from this synthetic audit. A recommendation, work order, verified completion, and independently measured outcome remain distinct states.
 
