@@ -41,6 +41,12 @@ pub enum CgroupV2Error {
     OomGroupNotEnabled,
     CandidateNotInScope { pid: u32 },
     ScopeNotPopulated,
+    SystemdPropertyParse,
+    MissingSystemdProperty(&'static str),
+    DuplicateSystemdProperty(&'static str),
+    InvalidSystemdProperty(&'static str),
+    SystemdPropertyMismatch(&'static str),
+    SystemdScopeNotActive,
     InvalidExpectedLimit(&'static str),
 }
 
@@ -69,6 +75,12 @@ impl fmt::Display for CgroupV2Error {
             Self::OomGroupNotEnabled => write!(f, "memory.oom.group is not enabled"),
             Self::CandidateNotInScope { pid } => write!(f, "candidate PID {pid} is not a member of the expected scope cgroup"),
             Self::ScopeNotPopulated => write!(f, "candidate scope cgroup is not populated"),
+            Self::SystemdPropertyParse => write!(f, "systemd show output is not valid KEY=VALUE data"),
+            Self::MissingSystemdProperty(name) => write!(f, "systemd show output is missing required property {name}"),
+            Self::DuplicateSystemdProperty(name) => write!(f, "systemd show output repeats property {name}"),
+            Self::InvalidSystemdProperty(name) => write!(f, "systemd show property {name} has an invalid value"),
+            Self::SystemdPropertyMismatch(name) => write!(f, "systemd show property {name} does not match the requested scope policy"),
+            Self::SystemdScopeNotActive => write!(f, "systemd scope is not active/running"),
             Self::InvalidExpectedLimit(name) => write!(f, "invalid expected cgroup limit: {name}"),
         }
     }
@@ -85,6 +97,33 @@ pub struct ExpectedCgroupV2Limits {
     pub memory_max_bytes: u64,
     pub cpu_quota_percent: u32,
     pub tasks_max: u32,
+}
+
+/// Expected properties returned by the trusted systemd manager for one transient scope.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExpectedSystemdScopeProperties {
+    pub unit_name: String,
+    pub control_group: String,
+    pub memory_max_bytes: u64,
+    pub memory_swap_max_bytes: u64,
+    pub cpu_quota_percent: u32,
+    pub tasks_max: u32,
+    pub runtime_max_usec: u64,
+}
+
+/// Parsed, normalized fields from a bounded `systemctl show` KEY=VALUE response.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SystemdScopeProperties {
+    pub unit_name: String,
+    pub active_state: String,
+    pub sub_state: String,
+    pub control_group: String,
+    pub memory_max_bytes: u64,
+    pub memory_swap_max_bytes: u64,
+    pub cpu_quota_per_sec_usec: u64,
+    pub tasks_max: u64,
+    pub runtime_max_usec: u64,
+    pub oom_policy: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -291,6 +330,127 @@ pub fn read_cgroup_v2_snapshot(
         cgroup_procs: read_control_file(&canonical_scope.join("cgroup.procs"))?,
         cgroup_events: read_control_file(&canonical_scope.join("cgroup.events"))?,
     })
+}
+
+fn required_systemd_property<'a>(
+    properties: &'a std::collections::BTreeMap<String, String>,
+    name: &'static str,
+) -> Result<&'a str, CgroupV2Error> {
+    properties
+        .get(name)
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or(CgroupV2Error::MissingSystemdProperty(name))
+}
+
+fn parse_systemd_u64(
+    properties: &std::collections::BTreeMap<String, String>,
+    name: &'static str,
+) -> Result<u64, CgroupV2Error> {
+    required_systemd_property(properties, name)?
+        .parse::<u64>()
+        .map_err(|_| CgroupV2Error::InvalidSystemdProperty(name))
+}
+
+/// Parse the exact `KEY=VALUE` response selected by the trusted caller.
+///
+/// Query only the listed properties with `systemctl show --property=...`.
+/// Unknown keys are ignored for forward compatibility, while duplicate keys,
+/// missing required keys, empty values and nonnumeric limit fields fail closed.
+pub fn parse_systemd_scope_properties(
+    output: &str,
+) -> Result<SystemdScopeProperties, CgroupV2Error> {
+    let mut fields = std::collections::BTreeMap::<String, String>::new();
+    for line in output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let (key, value) = line
+            .split_once('=')
+            .ok_or(CgroupV2Error::SystemdPropertyParse)?;
+        if key.is_empty() || value.contains('\0') {
+            return Err(CgroupV2Error::SystemdPropertyParse);
+        }
+        if fields.insert(key.to_string(), value.to_string()).is_some() {
+            return Err(CgroupV2Error::DuplicateSystemdProperty(match key {
+                "Id" => "Id",
+                "ActiveState" => "ActiveState",
+                "SubState" => "SubState",
+                "ControlGroup" => "ControlGroup",
+                "MemoryMax" => "MemoryMax",
+                "MemorySwapMax" => "MemorySwapMax",
+                "CPUQuotaPerSecUSec" => "CPUQuotaPerSecUSec",
+                "TasksMax" => "TasksMax",
+                "RuntimeMaxUSec" => "RuntimeMaxUSec",
+                "OOMPolicy" => "OOMPolicy",
+                _ => "unknown",
+            }));
+        }
+    }
+
+    Ok(SystemdScopeProperties {
+        unit_name: required_systemd_property(&fields, "Id")?.to_string(),
+        active_state: required_systemd_property(&fields, "ActiveState")?.to_string(),
+        sub_state: required_systemd_property(&fields, "SubState")?.to_string(),
+        control_group: required_systemd_property(&fields, "ControlGroup")?.to_string(),
+        memory_max_bytes: parse_systemd_u64(&fields, "MemoryMax")?,
+        memory_swap_max_bytes: parse_systemd_u64(&fields, "MemorySwapMax")?,
+        cpu_quota_per_sec_usec: parse_systemd_u64(&fields, "CPUQuotaPerSecUSec")?,
+        tasks_max: parse_systemd_u64(&fields, "TasksMax")?,
+        runtime_max_usec: parse_systemd_u64(&fields, "RuntimeMaxUSec")?,
+        oom_policy: required_systemd_property(&fields, "OOMPolicy")?.to_string(),
+    })
+}
+
+/// Require the systemd manager's view of the scope to match the requested
+/// policy before reading the actual kernel cgroup controls.
+pub fn verify_systemd_scope_properties(
+    expected: &ExpectedSystemdScopeProperties,
+    observed: &SystemdScopeProperties,
+) -> Result<(), CgroupV2Error> {
+    if expected.unit_name.is_empty()
+        || !expected.unit_name.ends_with(".scope")
+        || expected.memory_max_bytes == 0
+        || expected.memory_swap_max_bytes != 0
+        || !(1..=1_600).contains(&expected.cpu_quota_percent)
+        || expected.tasks_max == 0
+        || expected.runtime_max_usec == 0
+        || !safe_control_group_path(&expected.control_group)
+    {
+        return Err(CgroupV2Error::InvalidExpectedLimit("systemd_scope_properties"));
+    }
+
+    if observed.active_state != "active" || observed.sub_state != "running" {
+        return Err(CgroupV2Error::SystemdScopeNotActive);
+    }
+    if observed.unit_name != expected.unit_name {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("Id"));
+    }
+    if observed.control_group != expected.control_group {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("ControlGroup"));
+    }
+    if observed.memory_max_bytes != expected.memory_max_bytes {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("MemoryMax"));
+    }
+    if observed.memory_swap_max_bytes != expected.memory_swap_max_bytes {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("MemorySwapMax"));
+    }
+    let expected_cpu_usec = u64::from(expected.cpu_quota_percent)
+        .checked_mul(10_000)
+        .ok_or(CgroupV2Error::InvalidExpectedLimit("cpu_quota_percent"))?;
+    if observed.cpu_quota_per_sec_usec != expected_cpu_usec {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("CPUQuotaPerSecUSec"));
+    }
+    if observed.tasks_max != u64::from(expected.tasks_max) {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("TasksMax"));
+    }
+    if observed.runtime_max_usec != expected.runtime_max_usec {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("RuntimeMaxUSec"));
+    }
+    if observed.oom_policy != "kill" {
+        return Err(CgroupV2Error::SystemdPropertyMismatch("OOMPolicy"));
+    }
+    Ok(())
 }
 
 fn parse_single_u64(value: &str, name: &'static str) -> Result<u64, CgroupV2Error> {
@@ -523,6 +683,84 @@ mod tests {
             cgroup_procs: "420\n421\n".into(),
             cgroup_events: "populated 1\nfrozen 0\n".into(),
         }
+    }
+
+    fn systemd_show_output() -> String {
+        format!(
+            "Id=ceb-candidate-test.scope\nActiveState=active\nSubState=running\nControlGroup={}\nMemoryMax=134217728\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1000000\nTasksMax=16\nRuntimeMaxUSec=30000000\nOOMPolicy=kill\n",
+            expected().control_group
+        )
+    }
+
+    fn expected_systemd() -> ExpectedSystemdScopeProperties {
+        ExpectedSystemdScopeProperties {
+            unit_name: "ceb-candidate-test.scope".into(),
+            control_group: expected().control_group,
+            memory_max_bytes: 128 * 1024 * 1024,
+            memory_swap_max_bytes: 0,
+            cpu_quota_percent: 100,
+            tasks_max: 16,
+            runtime_max_usec: 30_000_000,
+        }
+    }
+
+    #[test]
+    fn systemd_properties_match_the_cgroup_policy() {
+        let observed = parse_systemd_scope_properties(&systemd_show_output()).unwrap();
+        assert_eq!(verify_systemd_scope_properties(&expected_systemd(), &observed), Ok(()));
+    }
+
+    #[test]
+    fn systemd_properties_reject_unit_scope_and_resource_drift() {
+        let expected_policy = expected_systemd();
+        let mut observed = parse_systemd_scope_properties(&systemd_show_output()).unwrap();
+        observed.unit_name = "other.scope".into();
+        assert_eq!(
+            verify_systemd_scope_properties(&expected_policy, &observed),
+            Err(CgroupV2Error::SystemdPropertyMismatch("Id"))
+        );
+
+        observed = parse_systemd_scope_properties(&systemd_show_output()).unwrap();
+        observed.control_group = "/user.slice/other.scope".into();
+        assert_eq!(
+            verify_systemd_scope_properties(&expected_policy, &observed),
+            Err(CgroupV2Error::SystemdPropertyMismatch("ControlGroup"))
+        );
+
+        observed = parse_systemd_scope_properties(&systemd_show_output()).unwrap();
+        observed.cpu_quota_per_sec_usec = 500_000;
+        assert_eq!(
+            verify_systemd_scope_properties(&expected_policy, &observed),
+            Err(CgroupV2Error::SystemdPropertyMismatch("CPUQuotaPerSecUSec"))
+        );
+
+        observed = parse_systemd_scope_properties(&systemd_show_output()).unwrap();
+        observed.active_state = "inactive".into();
+        assert_eq!(
+            verify_systemd_scope_properties(&expected_policy, &observed),
+            Err(CgroupV2Error::SystemdScopeNotActive)
+        );
+    }
+
+    #[test]
+    fn systemd_show_rejects_duplicate_missing_and_infinite_properties() {
+        let duplicate = format!("{}Id=other.scope\n", systemd_show_output());
+        assert_eq!(
+            parse_systemd_scope_properties(&duplicate),
+            Err(CgroupV2Error::DuplicateSystemdProperty("Id"))
+        );
+
+        let missing = systemd_show_output().replace("OOMPolicy=kill\n", "");
+        assert_eq!(
+            parse_systemd_scope_properties(&missing),
+            Err(CgroupV2Error::MissingSystemdProperty("OOMPolicy"))
+        );
+
+        let infinite = systemd_show_output().replace("MemoryMax=134217728", "MemoryMax=infinity");
+        assert_eq!(
+            parse_systemd_scope_properties(&infinite),
+            Err(CgroupV2Error::InvalidSystemdProperty("MemoryMax"))
+        );
     }
 
     #[test]
