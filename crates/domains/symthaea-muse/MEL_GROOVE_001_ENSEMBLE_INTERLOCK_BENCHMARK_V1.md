@@ -305,6 +305,23 @@ The name is intentionally **inter-onset space**, not acoustic silence. The curre
 
 Eaby-Lomas's historical analysis describes Gqom's rhythmic beat as foregrounded over harmony and melody, a raw/dark production character, a slow-burn structure, and later transformations of those features. This supports testing sparsity, inter-onset gaps and long-range pressure as candidate measurements, but not declaring a specific gap distribution canonical for all Gqom. [Eaby-Lomas, “Historicising gqom as a post-kwaito phenomenon”](https://doi.org/10.2989/18121004.2021.2020964).
 
+## 2.6 Offline executable known-answer harness
+
+The crate now includes `examples/ensemble_groove_contract_benchmark.rs`, a deterministic offline harness covering four synthetic conditions:
+
+1. unequal-cycle interlock with a valid no-collision/separation contract;
+2. a planted collision negative control;
+3. sparse versus dense circular inter-onset-gap profiles;
+4. a complete cue/state/response chain and a missing-response negative control.
+
+Run it with:
+
+```sh
+cargo run -p symthaea-music-theory --example ensemble_groove_contract_benchmark
+```
+
+The harness exits with an error if a known-answer assertion fails and emits a JSON report labelled `synthetic_known_answer_mechanics_only`. It has no source recording inputs and must not be interpreted as genre recognition, audio-quality, listener-preference or authenticity evidence.
+
 ## 2.5 Added synthetic gates
 
 The new cue and space modules add deterministic synthetic tests for:
