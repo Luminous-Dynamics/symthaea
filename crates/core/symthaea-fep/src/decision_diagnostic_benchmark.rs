@@ -91,16 +91,24 @@ pub struct DiagnosticPolicyContrast {
     pub task_loss_difference_ci95: Option<[f64; 2]>,
     /// Distribution-free paired Hoeffding interval; paired task loss lies in [-1, 1].
     pub task_loss_difference_hoeffding_ci95: Option<[f64; 2]>,
+    /// Simultaneous family-wise 95% Hoeffding interval, Bonferroni-adjusted across all contrasts and outcomes.
+    pub task_loss_difference_familywise_ci95: Option<[f64; 2]>,
     pub mean_decision_regret_difference: f64,
     /// Descriptive paired normal-approximation interval for decision regret.
     pub decision_regret_difference_ci95: Option<[f64; 2]>,
     /// Distribution-free paired Hoeffding interval; paired regret lies in [-1, 1].
     pub decision_regret_difference_hoeffding_ci95: Option<[f64; 2]>,
+    /// Simultaneous family-wise 95% Hoeffding interval for decision regret.
+    pub decision_regret_difference_familywise_ci95: Option<[f64; 2]>,
     pub mean_total_cost_difference: f64,
     /// Descriptive paired normal-approximation interval for total cost.
     pub total_cost_difference_ci95: Option<[f64; 2]>,
     /// Distribution-free paired Hoeffding interval using the scenario's known cost bound.
     pub total_cost_difference_hoeffding_ci95: Option<[f64; 2]>,
+    /// Simultaneous family-wise 95% Hoeffding interval for total cost.
+    pub total_cost_difference_familywise_ci95: Option<[f64; 2]>,
+    /// Number of simultaneous claims in the Bonferroni family.
+    pub familywise_comparison_count: usize,
     pub confidence_interval_method: String,
 }
 
@@ -469,12 +477,19 @@ fn paired_policy_contrast(
         paired_mean_ci95(&regret_differences);
     let (mean_total_cost_difference, total_cost_difference_ci95) =
         paired_mean_ci95(&cost_differences);
+    let familywise_alpha = 0.05 / 12.0; // 4 reference policies × 3 co-reported outcomes.
     let task_loss_difference_hoeffding_ci95 =
-        paired_hoeffding_ci95(&task_loss_differences, 1.0);
+        paired_hoeffding_ci95(&task_loss_differences, 1.0, 0.05);
+    let task_loss_difference_familywise_ci95 =
+        paired_hoeffding_ci95(&task_loss_differences, 1.0, familywise_alpha);
     let decision_regret_difference_hoeffding_ci95 =
-        paired_hoeffding_ci95(&regret_differences, 1.0);
+        paired_hoeffding_ci95(&regret_differences, 1.0, 0.05);
+    let decision_regret_difference_familywise_ci95 =
+        paired_hoeffding_ci95(&regret_differences, 1.0, familywise_alpha);
     let total_cost_difference_hoeffding_ci95 =
-        paired_hoeffding_ci95(&cost_differences, total_cost_absolute_bound);
+        paired_hoeffding_ci95(&cost_differences, total_cost_absolute_bound, 0.05);
+    let total_cost_difference_familywise_ci95 =
+        paired_hoeffding_ci95(&cost_differences, total_cost_absolute_bound, familywise_alpha);
 
     Ok(DiagnosticPolicyContrast {
         reference_policy,
@@ -483,14 +498,19 @@ fn paired_policy_contrast(
         mean_task_loss_difference,
         task_loss_difference_ci95,
         task_loss_difference_hoeffding_ci95,
+        task_loss_difference_familywise_ci95,
         mean_decision_regret_difference,
         decision_regret_difference_ci95,
         decision_regret_difference_hoeffding_ci95,
+        decision_regret_difference_familywise_ci95,
         mean_total_cost_difference,
         total_cost_difference_ci95,
         total_cost_difference_hoeffding_ci95,
+        total_cost_difference_familywise_ci95,
+        familywise_comparison_count: 12,
         confidence_interval_method:
-            "paired_normal_descriptive_plus_95pct_hoeffding_distribution_free".to_owned(),
+            "paired_normal_descriptive_plus_95pct_hoeffding_and_95pct_bonferroni_12_family"
+                .to_owned(),
     })
 }
 
@@ -524,8 +544,14 @@ fn paired_mean_ci95(values: &[f64]) -> (f64, Option<[f64; 2]>) {
 fn paired_hoeffding_ci95(
     values: &[f64],
     absolute_bound: f64,
+    alpha: f64,
 ) -> Option<[f64; 2]> {
-    if values.is_empty() || !absolute_bound.is_finite() || absolute_bound <= 0.0 {
+    if values.is_empty()
+        || !absolute_bound.is_finite()
+        || absolute_bound <= 0.0
+        || !alpha.is_finite()
+        || !(0.0..1.0).contains(&alpha)
+    {
         return None;
     }
     if values.iter().any(|value| !value.is_finite() || value.abs() > absolute_bound) {
@@ -533,7 +559,7 @@ fn paired_hoeffding_ci95(
     }
     let count = values.len() as f64;
     let mean = values.iter().sum::<f64>() / count;
-    let radius = absolute_bound * (2.0 * (2.0_f64 / 0.05).ln() / count).sqrt();
+    let radius = absolute_bound * (2.0 * (2.0_f64 / alpha).ln() / count).sqrt();
     Some([
         (mean - radius).max(-absolute_bound),
         (mean + radius).min(absolute_bound),
@@ -791,16 +817,25 @@ mod tests {
     fn paired_hoeffding_interval_is_finite_sample_and_shrinks_with_more_episodes() {
         let small = vec![-0.2, -0.1, 0.0, 0.1];
         let large = small.repeat(100);
-        let small_interval = paired_hoeffding_ci95(&small, 1.0).expect("small interval");
-        let large_interval = paired_hoeffding_ci95(&large, 1.0).expect("large interval");
+        let small_interval =
+            paired_hoeffding_ci95(&small, 1.0, 0.05).expect("small interval");
+        let large_interval =
+            paired_hoeffding_ci95(&large, 1.0, 0.05).expect("large interval");
+        let familywise_interval =
+            paired_hoeffding_ci95(&large, 1.0, 0.05 / 12.0).expect("family-wise interval");
         assert!(small_interval[0] <= 0.0 && small_interval[1] >= 0.0);
         assert!(large_interval[0] <= 0.0 && large_interval[1] >= 0.0);
         let small_width = small_interval[1] - small_interval[0];
         let large_width = large_interval[1] - large_interval[0];
         assert!(large_width < small_width);
-        assert!(paired_hoeffding_ci95(&[], 1.0).is_none());
-        assert!(paired_hoeffding_ci95(&[1.1], 1.0).is_none());
-        assert!(paired_hoeffding_ci95(&[0.0], f64::NAN).is_none());
+        assert!(familywise_interval[0] <= 0.0 && familywise_interval[1] >= 0.0);
+        assert!(
+            familywise_interval[1] - familywise_interval[0] >= large_width
+        );
+        assert!(paired_hoeffding_ci95(&[], 1.0, 0.05).is_none());
+        assert!(paired_hoeffding_ci95(&[1.1], 1.0, 0.05).is_none());
+        assert!(paired_hoeffding_ci95(&[0.0], f64::NAN, 0.05).is_none());
+        assert!(paired_hoeffding_ci95(&[0.0], 1.0, 0.0).is_none());
     }
 
     #[test]
