@@ -94,6 +94,10 @@ path = "src/bin/train_rls.rs"
 name = "train-ltc-supervised"
 path = "src/bin/train_ltc_supervised.rs"
 
+[[bin]]
+name = "stt-cohort-validate"
+path = "src/bin/cohort_validate.rs"
+
 [dependencies]
 # Symthaea core — HdcLtcUnifiedNeuron, ContinuousHV, GenesisSeed
 symthaea-core = { path = "../symthaea-core", default-features = false }
