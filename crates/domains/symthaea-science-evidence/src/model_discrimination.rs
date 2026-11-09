@@ -1956,6 +1956,10 @@ mod tests {
         let q_bar = prior[0] * detection[0] + prior[1] * detection[1];
         let mut direct = 0.0;
         for index in 0..2 {
+            let p_detect = prior[index] * detection[index];
+            if p_detect > 0.0 && q_bar > 0.0 {
+                direct += p_detect * (detection[index] / q_bar).ln();
+            }
             let p_miss = prior[index] * (1.0 - detection[index]);
             if p_miss > 0.0 && q_bar < 1.0 {
                 direct += p_miss * ((1.0 - detection[index]) / (1.0 - q_bar)).ln();
