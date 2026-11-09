@@ -424,3 +424,173 @@ The actual effective compiler flags and runtime floating-point mode still need t
 - Rust f32 square root: https://doc.rust-lang.org/std/primitive.f32.html
 - Rust f64 square root: https://doc.rust-lang.org/std/primitive.f64.html
 - LLVM floating-point contraction semantics: https://llvm.org/docs/LangRef.html#fast-math-flags
+
+
+## 14. Hierarchical group-to-member selection and build-time partition receipts (2026-11-09)
+
+The source now has a two-stage query path:
+
+- select_group_refinement_set_with_partition_receipt
+- select_hierarchical_refinement_set_with_partition_receipt
+- GroupPartitionCoverageReceipt
+- VerifiedMemberResidualCertificate
+- GroupScoreIntervalIdentity
+
+The group interval is weighted by member count. For group g with m_g eligible members and conservative interval [L_g,U_g], define:
+
+\[
+\theta_G = \operatorname{kthLargest}\left(\bigcup_g
+\underbrace{\{L_g,\ldots,L_g\}}_{m_g\text{ copies}}\right).
+\]
+
+At least k records have exact scores at least theta_G. Therefore any group with U_g < theta_G cannot contain a top-k record and can be excluded. Equality remains.
+
+For the surviving groups, obtain each member interval [L_i,U_i] and intersect it with its parent group interval:
+
+\[
+L'_i=\max(L_i,L_g),\qquad U'_i=\min(U_i,U_g).
+\]
+
+If the intersection is empty, fail closed. Then run the existing per-record global selector over all surviving groups. Since the first-stage threshold guarantees at least k members with lower bounds at least theta_G, the second-stage threshold cannot decrease below theta_G. Exact reranking of the final surviving member set is therefore sufficient for the whole eligible corpus, assuming the parent group bounds and member bounds are valid.
+
+### Query-time completeness without an O(N) partition scan
+
+A performance contradiction was caught in review: checking that group member IDs do not overlap inside every query would itself scan O(N) IDs, defeating the metadata-first optimization. The source now distinguishes two paths:
+
+- select_group_refinement_set: defensive path; it scans the member rosters and validates disjointness on every call.
+- select_group_refinement_set_with_partition_receipt: fast path; it verifies a build-time receipt against O(G) group identities/counts/generations/query digests and does not walk every member ID.
+
+GroupPartitionCoverageReceipt::from_group_envelopes pays the full membership scan once at segment-build time. It requires both:
+- the authoritative eligible-record count from the pinned manifest/eligibility snapshot;
+- the authoritative digest of that exact eligible member-ID set.
+
+It verifies each group's roster digest, cross-group disjointness, a single manifest/eligibility generation, the aggregate eligible population and a deterministic digest over the group directory. The query path then checks the group records against this receipt in O(G). GroupScoreIntervalRecord also shares immutable member rosters and payload-digest rosters through Arc, avoiding a full member-ID vector clone when query plans are built.
+
+The receipt is still an in-memory prototype. It is not signed, serialized or authenticated on reopen. #10917 remains the owner of immutable segment serialization, checksums, manifest binding and reopen qualification. Do not use the fast path after process restart until the segment owner authenticates the stored receipt and the exact manifest generations.
+
+Every group score interval is now bound to a digest of the exact query vector; groups scored for different queries cannot be mixed. The selection plan also carries the manifest generation, eligibility generation and query digest.
+
+### New property-test coverage authored
+
+The Rust source now includes:
+- a 256-case generated hierarchical selector property test, varying group count, group sizes, vector contents, top-k and reconstruction perturbations;
+- comparison of final hierarchical reranking against the full original-payload exact top-k oracle;
+- build-time rejection of overlapping group membership;
+- receipt rejection for wrong eligible count or wrong eligible-member-set digest;
+- equivalence of receipt-backed and defensive group selection;
+- rejection of modified group content identity against the receipt;
+- existing negative controls for missing member metadata, unexpected groups, stale query digest and generation mismatch.
+
+These Rust tests are authored but not executed: the current environment has no Rust toolchain. No test pass is claimed.
+
+### Frozen diagnostic fixture
+
+docs/research/fixtures/hme_hierarchical_interval_select_v0.json records a synthetic 11-record example: 3 group synopses, one surviving group, 3 member intervals and 2 final exact payload reads. Its nominal 81.8% payload-read reduction is fixture arithmetic only, not measured HME I/O.
+
+The fixture now needs the authoritative eligible-member-set digest supplied by the real manifest owner; its symbolic digests remain clearly marked as non-cryptographic placeholders.
+
+### Correctness and performance interpretation
+
+This design changes where the exhaustive work happens:
+- once per immutable segment/eligibility snapshot: verify disjoint membership, authoritative eligible population and per-group payload rosters;
+- per query: scan group synopses (O(G));
+- only for surviving groups: scan member interval metadata and compact reconstructions;
+- only for the final member refinement set: read original ContinuousHV payloads and run the canonical full-resolution scorer.
+
+The fast path does not make an incomplete candidate list exact. It is authorized only when the receipt is derived from the manifest's complete eligible-member count and member-set digest. Group membership must also be uniform with respect to principal/policy/valid-time/known-time/forgetting scope; a single group cannot mix records with different eligibility states.
+
+## 15. New 2026 agent-memory benchmark diagnostics
+
+The current frontier contains several benchmarks that expose separate failure modes. They should be added as independent tracks, not blended into a single score.
+
+### COLLABMEM — collaborative sharing, access and provenance
+
+COLLABMEM fixes the trace, target role, answerer, judge and gold event in a matched memory-only harness. It includes 58 hand-authored scenarios (1,118 probes), a 174-scenario scaled split (3,359 probes), adversarial/compositional sets and six transactive-memory competencies. The paper reports a 69.6% non-Oracle average for TMS-GRAPH++; that is an author-reported system score, not an HME comparison.
+
+HME diagnostic mapping:
+- sharing/routing correctness by target role;
+- unauthorized payload pre-read and unauthorized emission;
+- provenance and writer attribution;
+- authority/conflict resolution;
+- retention and scope isolation.
+
+This is particularly important when HME serves multi-party or role-specialized agents: global vector similarity must never override visibility or authority boundaries.
+
+### TAME / Trust-Memevo — memory evolution must not degrade trustworthiness
+
+TAME introduces Trust-Memevo to measure memory misevolution: trustworthiness can decline during benign task evolution even when utility or task success improves. Its executor/evaluator split is a useful competitor and diagnostic baseline.
+
+Add long-horizon evolution runs with fixed task suites and repeated benign memory writes. Measure:
+- safety-policy regression relative to the pre-evolution checkpoint;
+- unsupported claims, unsafe tool/action use and privacy violations introduced by memory;
+- harmful-memory propagation and recovery after correction/retraction;
+- utility gained per unit of trustworthiness lost;
+- whether an evaluator catches negative experience before it is consolidated or generalized.
+
+Hard target: zero regressions on explicit safety/privacy invariants. Report capability drift and safety drift separately; do not hide a safety decline behind aggregate task improvement.
+
+### TimlMemBench — governed activation, scope and restraint
+
+TimlMemBench uses reviewed raw sessions and source-anchored memory assets. The released package describes 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. It contrasts canonical-pool QA with raw-native ingestion and governed-use evaluation.
+
+This fills an HME gap between retrieval and answer correctness:
+- did the system capture the right thing from raw sessions?
+- was it still valid and in scope at query time?
+- should it be activated for this request, or left unused?
+- can the answer recover provenance?
+- does the system exercise restraint when memory is revoked, irrelevant or outside scope?
+
+Track activation precision/recall, provenance recovery, scope leakage, false activation and restraint/abstention separately.
+
+### MEMOBench — process-level memory operations for robotics
+
+MEMOBench contains 30 history-dependent manipulation tasks, 1,500 expert demonstrations and 4,200 executable checkpoint instances from 84 templates. It labels Storage, Update and Compression checkpoints and separates memory fidelity measures from task success. The reported strongest memory-augmented baseline reaches 31.9% average success; this is a benchmark-reported baseline, not an HME result.
+
+Use this as a later embodied/robotics track:
+- memory storage fidelity at checkpoints;
+- correct state update and invalidation;
+- compression retention of action-critical facts;
+- memory contribution isolated from policy/control improvements;
+- held-out goal/task composition and long-horizon action success.
+
+### MEMORA-Bench — multimodal experience formation and planning
+
+MEMORA-Bench contributes a 45-hour egocentric-video suite, separating retrospective memory faithfulness from prospective memory-grounded planning. Preserve observation timestamps, object identity/state and temporal-action evidence; compare against no-memory, flat-text and graph baselines under frozen perception and planning models.
+
+Do not confuse MEMORA (embodied action memory) with Memora (personalized agent-memory benchmark/FAMA).
+
+### Updated benchmark scorecard
+
+| Track | Near-term bar | Stretch target |
+|---|---|---|
+| Exact HME top-k | 100% exact ID agreement; zero false prunes | Same at 1M+ records and 16K–256K dimensions |
+| Fast group selector | Receipt verification O(G); no per-member roster walk on fast path | Metadata work ≤10% of per-record baseline on homogeneous workloads |
+| Cold payload I/O | Measure physical block reads; do not infer from candidate counts | ≥50% cold payload bytes avoided at p50 and ≥20% at p95 with exact output |
+| Lifecycle / deletion | 100% fixture correctness; zero stale emission/resurrection | Maintain under compaction, restart, replay and policy change |
+| COLLABMEM / TimlMemBench | Zero unauthorized read/emission; publish per-competency scores | Outperform matched public baselines on provenance, scope and restraint |
+| TAME / Trust-Memevo | Zero hard safety/privacy invariant regressions | Positive utility gain with no measured trustworthiness decline |
+| MEMOBench / MEMORA-Bench | Memory-only ablations with fixed perception/control | Improved OOD memory-faithful planning and process metrics |
+
+The ≤10% metadata-work target is a proposed HME project target, not an established industry threshold. The cold-payload target is also prospective; it can only be reported after physical I/O measurement against the exact full-scan oracle.
+
+## 16. Research frontier comparison update (2026-11-09)
+
+The newest useful comparisons are not all vector-search benchmarks:
+
+- PQR-Search challenges average-recall ANN with a per-query probability guarantee under insertions/deletions. HME's deterministic exact mode is a different guarantee class; HME's approximate mode should report a per-query recall distribution, not average Recall@K alone.
+- VectorDBBench added hosted VIBE datasets and 1M/10M/100M dataset profiles in its September 2026 release. This provides a useful system workload source, while HME must separately publish native high-dimensional profiles.
+- Agent Memory Leaderboard offers textual, coding and multimodal tracks with participant-hosted Add/Search APIs. Its official page still places Cycle 2 official publication in mid-November 2026. As of 9 November, do not describe Cycle 2 as an official published ranking; prepare an API-compatible system only after local correctness/governance qualification.
+- COLLABMEM, TAME, TimlMemBench and MEMOBench expose routing, memory evolution, governed activation and process-level update/compression failures that answer-only benchmarks hide.
+
+The winning HME story should not be "another database with high QPS." It should be a reproducible point on a Pareto frontier: exactness/guarantee class, p99 latency, cold bytes, metadata bytes, update/compaction cost, memory quality, governance and lifecycle integrity. Publish the complete trade-off surface.
+
+### References added
+
+- COLLABMEM, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.1194/
+- TAME, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.2100/
+- TAME / Trust-Memevo preprint: https://arxiv.org/abs/2602.03224
+- MEMOBench, Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.333/
+- MEMORA-Bench: https://aclanthology.org/2026.findings-emnlp.1211/
+- Agent Memory Leaderboard Cycle 2: https://agentmemories.ai/evaluation
+- VectorDBBench September 2026 VIBE dataset update: https://github.com/zilliztech/VectorDBBench
+- PQR-Search: https://arxiv.org/abs/2611.07579
