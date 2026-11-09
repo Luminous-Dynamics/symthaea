@@ -1144,13 +1144,13 @@ mod tests {
     #[test]
     fn test_pd_follow_slows_for_close_oracle_target() {
         let state = VehicleState::cruising(13.4);
-        let target = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 15.0,
-            relative_speed_mps: 0.0,
-            snapshot_time_s: state.timestamp,
-            max_age_s: 0.05,
-        };
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            15.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
         let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&target));
         let baseline = pd_cruise_baseline(&state, 13.4);
         assert!(
@@ -1164,13 +1164,13 @@ mod tests {
     #[test]
     fn test_pd_follow_speeds_for_far_oracle_target() {
         let state = VehicleState::cruising(10.0);
-        let target = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 60.0,
-            relative_speed_mps: 0.0,
-            snapshot_time_s: state.timestamp,
-            max_age_s: 0.05,
-        };
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            60.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
         let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&target));
         let baseline = pd_cruise_baseline_with_road(&state, 13.4, 0.0);
         assert!(
@@ -1184,17 +1184,20 @@ mod tests {
     #[test]
     fn test_pd_follow_uses_relative_speed_to_anticipate_closing() {
         let state = VehicleState::cruising(13.4);
-        let closing = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 30.0,
-            relative_speed_mps: -3.0,
-            snapshot_time_s: state.timestamp,
-            max_age_s: 0.05,
-        };
-        let opening = SimulatorOracleFollowTarget {
-            relative_speed_mps: 3.0,
-            ..closing
-        };
+        let closing = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            30.0,
+            -3.0,
+            state.timestamp,
+            0.05,
+        );
+        let opening = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            30.0,
+            3.0,
+            state.timestamp,
+            0.05,
+        );
         let close_cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&closing));
         let open_cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&opening));
         assert!(
@@ -1215,17 +1218,15 @@ mod tests {
     #[test]
     fn test_pd_follow_rejects_stale_or_future_oracle_target() {
         let state = VehicleState::cruising(13.4);
-        let stale = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 10.0,
-            relative_speed_mps: -2.0,
-            snapshot_time_s: -1.0,
-            max_age_s: 0.05,
-        };
-        let future = SimulatorOracleFollowTarget {
-            snapshot_time_s: state.timestamp + 1.0,
-            ..stale
-        };
+        let stale =
+            SimulatorOracleFollowTarget::from_simulator_snapshot(1, 10.0, -2.0, -1.0, 0.05);
+        let future = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            10.0,
+            -2.0,
+            state.timestamp + 1.0,
+            0.05,
+        );
         assert_eq!(
             pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&stale)),
             pd_cruise_baseline(&state, 13.4)
