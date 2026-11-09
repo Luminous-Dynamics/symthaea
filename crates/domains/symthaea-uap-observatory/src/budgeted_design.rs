@@ -715,11 +715,12 @@ fn evaluate_selection(
 
         let posterior_joint_logdet = cholesky_log_determinant(&information)
             .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
-        let prior_joint_logdet = cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
-            BudgetedDesignError::PriorNotPositiveDefinite {
-                scenario_id: scenario.scenario_id.clone(),
-            }
-        })?;
+        let prior_joint_logdet =
+            cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
+                BudgetedDesignError::PriorNotPositiveDefinite {
+                    scenario_id: scenario.scenario_id.clone(),
+                }
+            })?;
         let posterior_target_logdet =
             marginal_target_log_determinant(&information, scenario.target_parameter_count)
                 .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
@@ -1178,14 +1179,7 @@ mod tests {
             option("measure-x", 1.0, None, vec![vec![vec![1.0, 0.0]]]),
             option("measure-y", 1.0, None, vec![vec![vec![0.0, 2.0]]]),
         ];
-        let scores = evaluate_selection(
-            &scenarios,
-            &options,
-            &[0, 1],
-            &[1.0, 1.0],
-            2,
-        )
-        .unwrap();
+        let scores = evaluate_selection(&scenarios, &options, &[0, 1], &[1.0, 1.0], 2).unwrap();
 
         assert!(
             (scores[0].information_gain_nats - scores[0].joint_information_gain_nats).abs()
@@ -1211,14 +1205,7 @@ mod tests {
         // Evaluate the action explicitly: a target-only optimizer should not
         // select it when its target marginal gain is zero, but the report must
         // still show that nuisance information was acquired.
-        let scores = evaluate_selection(
-            &scenarios,
-            &options,
-            &[0],
-            &[1.0, 1.0],
-            2,
-        )
-        .unwrap();
+        let scores = evaluate_selection(&scenarios, &options, &[0], &[1.0, 1.0], 2).unwrap();
 
         assert!(scores[0].information_gain_nats.abs() < 1.0e-12);
         assert!((scores[0].joint_information_gain_nats - 2.0_f64.ln()).abs() < 1.0e-12);
@@ -1239,23 +1226,16 @@ mod tests {
                 None,
                 vec![vec![vec![1.0, 1.0]]],
             ),
-            option(
-                "clock-calibration",
-                1.0,
-                None,
-                vec![vec![vec![0.0, 1.0]]],
-            ),
+            option("clock-calibration", 1.0, None, vec![vec![vec![0.0, 1.0]]]),
         ];
-        let bearing_only =
-            evaluate_selection(&scenarios, &options, &[0], &[1.0, 1.0], 2).unwrap();
+        let bearing_only = evaluate_selection(&scenarios, &options, &[0], &[1.0, 1.0], 2).unwrap();
         let bearing_and_calibration =
             evaluate_selection(&scenarios, &options, &[0, 1], &[1.0, 1.0], 2).unwrap();
 
         let expected_bearing_target_gain = 1.5_f64.ln();
         let expected_combined_target_gain = (5.0_f64 / 3.0).ln();
         assert!(
-            (bearing_only[0].information_gain_nats - expected_bearing_target_gain).abs()
-                < 1.0e-12
+            (bearing_only[0].information_gain_nats - expected_bearing_target_gain).abs() < 1.0e-12
         );
         assert!(
             (bearing_and_calibration[0].information_gain_nats - expected_combined_target_gain)
@@ -1292,12 +1272,7 @@ mod tests {
     fn invalid_target_parameter_partition_fails_closed() {
         let mut scenarios = vec![scenario("bad-target-partition", 1.0)];
         scenarios[0].target_parameter_count = 0;
-        let options = vec![option(
-            "measure",
-            1.0,
-            None,
-            vec![vec![vec![1.0, 0.0]]],
-        )];
+        let options = vec![option("measure", 1.0, None, vec![vec![vec![1.0, 0.0]]])];
 
         assert!(matches!(
             greedy_budgeted_design(&scenarios, &options, &config(1.0)),
