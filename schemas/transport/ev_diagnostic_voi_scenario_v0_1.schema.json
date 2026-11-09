@@ -11,7 +11,9 @@
     "context",
     "states",
     "actions",
-    "tests"
+    "tests",
+    "asset",
+    "evidence"
   ],
   "properties": {
     "scenario_version": {
@@ -145,7 +147,10 @@
           "cost",
           "applicability",
           "preconditions",
-          "outcomes"
+          "outcomes",
+          "vehicle_configuration_digest",
+          "pack_configuration_digest",
+          "calibration_ref"
         ],
         "properties": {
           "test_id": {
@@ -187,7 +192,8 @@
               "downtime_cost_units",
               "cost_unit_ref",
               "evidence_class",
-              "evidence_digest"
+              "evidence_digest",
+              "source_ref"
             ],
             "properties": {
               "test_cost_units": {
@@ -211,6 +217,10 @@
               "evidence_digest": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
+              },
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
               }
             }
           },
@@ -347,7 +357,95 @@
                 }
               }
             }
+          },
+          "vehicle_configuration_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "pack_configuration_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_ref": {
+            "type": "string",
+            "minLength": 1
           }
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "vehicle_configuration_digest",
+        "pack_ref",
+        "pack_configuration_digest"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_batch_ref",
+        "observation_batch_digest",
+        "pack_capability_profile_ref",
+        "pack_capability_profile_digest",
+        "prior_model_ref",
+        "prior_model_digest",
+        "decision_loss_model_ref",
+        "decision_loss_model_digest"
+      ],
+      "properties": {
+        "observation_batch_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_batch_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pack_capability_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_capability_profile_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "prior_model_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_model_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "decision_loss_model_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_loss_model_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     }
