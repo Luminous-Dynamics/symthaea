@@ -143,6 +143,60 @@ pub enum SequentialWeightVerificationError {
     ReportFieldMismatch(&'static str),
     #[error("statistical report digest does not match its claims")]
     ReportDigestMismatch,
+    #[error("unsupported campaign snapshot version {0}")]
+    UnsupportedCampaignSnapshotVersion(u32),
+    #[error("campaign snapshot ledger is malformed or inconsistent")]
+    InvalidCampaignSnapshotLedger,
+    #[error("campaign snapshot digest does not match its contents")]
+    CampaignSnapshotDigestMismatch,
+    #[error("failed to serialize campaign snapshot")]
+    CampaignSnapshotSerialization,
+}
+
+/// Deterministic, integrity-digested checkpoint of a sequential repair campaign.
+///
+/// The digest detects accidental or partial checkpoint corruption. It is not a
+/// signature or trust anchor; persistent storage must authenticate the checkpoint
+/// and the independent verifier must still validate signed candidate receipts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialWeightVerificationCampaignSnapshot {
+    pub format_version: u32,
+    pub config: SequentialWeightVerificationConfig,
+    pub evaluation_protocol_digest: String,
+    pub next_candidate_index: u64,
+    pub used_candidate_digests: Vec<String>,
+    pub used_confirmatory_shard_digests: Vec<String>,
+    pub snapshot_digest: String,
+}
+
+#[derive(Serialize)]
+struct CampaignSnapshotDigestClaims<'a> {
+    format_version: u32,
+    config: SequentialWeightVerificationConfig,
+    evaluation_protocol_digest: &'a str,
+    next_candidate_index: u64,
+    used_candidate_digests: &'a [String],
+    used_confirmatory_shard_digests: &'a [String],
+}
+
+fn campaign_snapshot_digest(
+    snapshot: &SequentialWeightVerificationCampaignSnapshot,
+) -> Result<String, SequentialWeightVerificationError> {
+    let claims = CampaignSnapshotDigestClaims {
+        format_version: snapshot.format_version,
+        config: snapshot.config,
+        evaluation_protocol_digest: &snapshot.evaluation_protocol_digest,
+        next_candidate_index: snapshot.next_candidate_index,
+        used_candidate_digests: &snapshot.used_candidate_digests,
+        used_confirmatory_shard_digests: &snapshot.used_confirmatory_shard_digests,
+    };
+    let encoded = serde_json::to_vec(&claims)
+        .map_err(|_| SequentialWeightVerificationError::CampaignSnapshotSerialization)?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-weight-verification-campaign-snapshot-v1\0");
+    hasher.update(&(encoded.len() as u64).to_le_bytes());
+    hasher.update(&encoded);
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 /// Campaign ledger that fixes alpha and the evaluation protocol across candidate edits.
@@ -214,6 +268,85 @@ impl SequentialWeightVerificationCampaign {
     /// Return the number of confirmatory shards reserved by this campaign.
     pub fn used_confirmatory_shard_count(&self) -> usize {
         self.used_confirmatory_shards.len()
+    }
+
+    /// Create a deterministic checkpoint suitable for durable storage.
+    pub fn snapshot(
+        &self,
+    ) -> Result<SequentialWeightVerificationCampaignSnapshot, SequentialWeightVerificationError> {
+        let mut snapshot = SequentialWeightVerificationCampaignSnapshot {
+            format_version: 1,
+            config: self.config,
+            evaluation_protocol_digest: self.evaluation_protocol_digest.clone(),
+            next_candidate_index: self.next_candidate_index,
+            used_candidate_digests: self.used_candidate_digests.iter().cloned().collect(),
+            used_confirmatory_shard_digests: self.used_confirmatory_shards.iter().cloned().collect(),
+            snapshot_digest: String::new(),
+        };
+        snapshot.snapshot_digest = campaign_snapshot_digest(&snapshot)?;
+        Ok(snapshot)
+    }
+
+    /// Restore a campaign without resetting its alpha spend or no-reuse ledger.
+    ///
+    /// A valid digest guarantees content consistency only. Authenticate the
+    /// checkpoint through the storage/trust layer before accepting it as state.
+    pub fn from_snapshot(
+        snapshot: SequentialWeightVerificationCampaignSnapshot,
+    ) -> Result<Self, SequentialWeightVerificationError> {
+        if snapshot.format_version != 1 {
+            return Err(
+                SequentialWeightVerificationError::UnsupportedCampaignSnapshotVersion(
+                    snapshot.format_version,
+                ),
+            );
+        }
+        validate_config(snapshot.config)?;
+        validate_hex_digest(
+            &snapshot.evaluation_protocol_digest,
+            "evaluation_protocol_digest",
+        )?;
+        validate_hex_digest(&snapshot.snapshot_digest, "campaign_snapshot_digest")?;
+        if snapshot.next_candidate_index == 0 {
+            return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+        }
+
+        let expected_count = snapshot.next_candidate_index - 1;
+        let candidate_count = u64::try_from(snapshot.used_candidate_digests.len())
+            .map_err(|_| SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
+        let shard_count = u64::try_from(snapshot.used_confirmatory_shard_digests.len())
+            .map_err(|_| SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)?;
+        if candidate_count != expected_count || shard_count != expected_count {
+            return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+        }
+
+        let mut used_candidate_digests = BTreeSet::new();
+        for digest in &snapshot.used_candidate_digests {
+            validate_hex_digest(digest, "candidate_model_digest")?;
+            if !used_candidate_digests.insert(digest.clone()) {
+                return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+            }
+        }
+        let mut used_confirmatory_shards = BTreeSet::new();
+        for digest in &snapshot.used_confirmatory_shard_digests {
+            validate_hex_digest(digest, "confirmatory_shard_digest")?;
+            if !used_confirmatory_shards.insert(digest.clone()) {
+                return Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger);
+            }
+        }
+
+        let expected_digest = campaign_snapshot_digest(&snapshot)?;
+        if expected_digest != snapshot.snapshot_digest {
+            return Err(SequentialWeightVerificationError::CampaignSnapshotDigestMismatch);
+        }
+
+        Ok(Self {
+            config: snapshot.config,
+            evaluation_protocol_digest: snapshot.evaluation_protocol_digest,
+            next_candidate_index: snapshot.next_candidate_index,
+            used_candidate_digests,
+            used_confirmatory_shards,
+        })
     }
 }
 
@@ -703,6 +836,59 @@ mod tests {
         ));
         assert_eq!(campaign.next_candidate_index(), 2);
         assert_eq!(campaign.used_confirmatory_shard_count(), 1);
+    }
+
+    #[test]
+    fn campaign_snapshot_restore_preserves_alpha_ordinal_and_no_reuse_ledger() {
+        let mut campaign = campaign(0.1, 100);
+        let _first = candidate(&mut campaign, 'b', 'd');
+        let _second = candidate(&mut campaign, 'c', 'e');
+        let snapshot = campaign.snapshot().expect("campaign snapshot");
+        let encoded = serde_json::to_vec(&snapshot).expect("serialize checkpoint");
+        let decoded: SequentialWeightVerificationCampaignSnapshot =
+            serde_json::from_slice(&encoded).expect("deserialize checkpoint");
+        let mut restored =
+            SequentialWeightVerificationCampaign::from_snapshot(decoded.clone())
+                .expect("restore checkpoint");
+
+        assert_eq!(restored.next_candidate_index(), 3);
+        assert_eq!(restored.used_confirmatory_shard_count(), 2);
+        assert_eq!(
+            restored.snapshot().expect("repeat snapshot").snapshot_digest,
+            snapshot.snapshot_digest
+        );
+        assert!(matches!(
+            restored.start_candidate(digest('a'), digest('b'), digest('f'), digest('e')),
+            Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
+        ));
+        assert!(matches!(
+            restored.start_candidate(digest('a'), digest('f'), digest('d'), digest('e')),
+            Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
+        ));
+
+        let next = candidate(&mut restored, 'f', '1');
+        assert_eq!(next.binding.candidate_index, 3);
+    }
+
+    #[test]
+    fn campaign_snapshot_rejects_corrupt_digest_and_inconsistent_ledger() {
+        let mut campaign = campaign(0.1, 100);
+        let _first = candidate(&mut campaign, 'b', 'd');
+        let snapshot = campaign.snapshot().expect("campaign snapshot");
+
+        let mut corrupt_digest = snapshot.clone();
+        corrupt_digest.snapshot_digest = "e".repeat(64);
+        assert!(matches!(
+            SequentialWeightVerificationCampaign::from_snapshot(corrupt_digest),
+            Err(SequentialWeightVerificationError::CampaignSnapshotDigestMismatch)
+        ));
+
+        let mut corrupt_ledger = snapshot;
+        corrupt_ledger.next_candidate_index = 3;
+        assert!(matches!(
+            SequentialWeightVerificationCampaign::from_snapshot(corrupt_ledger),
+            Err(SequentialWeightVerificationError::InvalidCampaignSnapshotLedger)
+        ));
     }
 
     #[test]
