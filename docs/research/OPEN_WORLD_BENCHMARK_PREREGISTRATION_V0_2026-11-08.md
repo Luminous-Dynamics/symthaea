@@ -65,7 +65,13 @@ For project-level research tasks with an official B1–B4 contract, add a separa
 
 This factor is **not** the A0/A2 structure-access treatment. A0/A2 changes disclosure of the true structural family in a synthetic world; B1–B4 changes methodological instruction. Do not relabel one as the other. Where a task supports both, preregister a factorial design and keep the cells separately identifiable; otherwise run B1–B4 as a standalone adapter over the task owner's official harness.
 
-The ASI-Bench paper reports 60 project-level tasks across 11 domains and an aggregate mean decline from 50.91 at B1 to 29.10 at B2 and 26.62 at B3 over 18 Agent×Model configurations. Its current supplied leaderboard snapshot ranks GPT-5.6 Sol/Codex Ultra at 55.84 overall; the snapshot's adopted round counts vary by configuration. These are reference values, not directly comparable Symthaea results until the task revision, runner, rounds, model/harness, resource limits and scorer are matched.
+ASI-Bench has two distinct reference snapshots. The paper reports 18 Agent×Model configurations with B1/B2/B3/B4 means 50.91/29.10/26.62/26.99 and strongest B3 row 51.60. The current supplied leaderboard lists 25 configurations, means 54.92/33.11/30.58/30.74 and overall leading row 55.84; two results are single-run and the board does not supply a scored task-set ID. The current board also says the published evaluation used no external tools. Do not merge these snapshots or infer task-level uncertainty from the macro means.
+
+An additional specialist-system report must be treated separately: Unizen AI states that it locally scored 79.86 across the public 60-task ASI-Bench set using task-specific analytic/first-principles code prepared in advance, and did not submit the private seed42 set for official scoring. This is a vendor-reported, non-official local result, not a directly matched cold-start research-agent result. It motivates two preregistered tracks rather than one:
+- **Cold-start generalist:** artifact/policy frozen before the task family is revealed; no per-task code or task-specific tuning after task presentation.
+- **Compiled specialist:** task-specific solver/code is allowed, but count and publish the task-knowledge source, precomputation/build time, human engineering time, per-task tuning and artifact size/complexity.
+
+For both tracks, seal task variants/seeds and charge all setup work to a separate inclusive budget. A solver created after seeing the exact public task is not a cold-start discovery success. Compare B1–B4 under a pinned task revision, runner, task set, rounds, model/harness, access and scorer.
 
 Prospective Symthaea gates for an exact B1–B4 adapter:
 - improve B3 against a frozen same-model/harness incumbent by a preregistered margin, without relying on greater total resources;
@@ -74,7 +80,7 @@ Prospective Symthaea gates for an exact B1–B4 adapter:
 - publish each level's valid-artifact rate and cost, not only the overall mean;
 - keep refusal, timeout, invalid artifact and failed verifier attempts in the denominator.
 
-Terminal-Bench Science is an adjacent execution/reliability track, not a scientific-law score. The vendor's Nov 5, 2026 table lists 70 tasks, an eight-hour cap, 62.86% for GPT-6 Astra, 52.86% for GPT-6.1 Sol and 47.14% for Claude Opus 5.5, with costs from $3.44 to $20.80 per task among these leading rows. Treat these as a changing vendor snapshot. A Symthaea comparison requires the same task/verifier revision, harness, task access, timeout, attempt count and cost accounting.
+Terminal-Bench Science is an adjacent execution/reliability track, not a scientific-law score. Its task-owner 0.1 announcement describes 70 tasks and three independent trials/task; subsequent boards differ by agent/harness and evaluation snapshot. Vals' Nov 5, 2026 Mini-SWE-agent board lists 62.86% for GPT-6 Astra, 52.86% for GPT-6.1 Sol and 47.14% for Opus 5.5; Snorkel's board lists Codex/GPT-6 Astra 68.1% ±3.2 and Claude Code/Opus 5.5 63.3% ±3.3. The task owner's roadmap said 0.2 and 1.0 releases were in preparation after submission close. Treat those scores as distinct snapshots, not one leaderboard. Pin the task release, verifier revision, harness, model, timeout, attempt count and cost accounting before comparison.
 
 ## 3B. Law validity, candidate selection and evidence grounding
 
@@ -331,4 +337,4 @@ This lane owns the matched benchmark experiment and thin adapter only. It does n
 - Evidence-grounded scientific evaluation: https://arxiv.org/abs/2610.04915
 - Semantic Calibration for long-form scientific QA: https://aclanthology.org/2026.uncertainlp-main.11/
 - ASI-Bench: https://arxiv.org/abs/2608.17271 ; leaderboard: https://asibench.apexin.ai/leaderboard/ ; prompt guidance FAQ: https://asibench.apexin.ai/faq/
-- Terminal-Bench Science: https://vals-ai.com/benchmarks/terminal-bench-science
+- Terminal-Bench Science: https://www.terminal-bench-science.ai/announcement ; Vals AI current board: https://vals-ai.com/benchmarks/terminal-bench-science ; Snorkel board: https://snorkel.ai/leaderboard/terminal-bench-science/
