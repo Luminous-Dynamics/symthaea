@@ -1218,6 +1218,55 @@
         "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_WOD-E2E_Waymo_Open_Dataset_for_End-to-End_Driving_in_Challenging_Long-tail_CVPR_2026_paper.html",
         "https://www.sota2.com/research/sota/autonomous-driving-planning-on-wod-e2e"
       ]
+    },
+    {
+      "id": "wod-e2e-driving-challenge-board-2026",
+      "name": "WOD-E2E Driving Challenge leaderboard view — separate SOTA2 task display",
+      "category": "open_loop_e2e_driving_leaderboard_view",
+      "capability_target": [
+        "end_to_end_trajectory_prediction",
+        "expert_rater_preference_alignment"
+      ],
+      "protocol": {
+        "kind": "secondary_leaderboard_view_protocol_unresolved",
+        "dataset_family": "Waymo Open Dataset E2E",
+        "view_title": "End-to-End Driving on Waymo E2E Driving Challenge",
+        "exact_split": "not established from the secondary page",
+        "evaluator_revision": "not established from the secondary page",
+        "submission_protocol": "not established from the secondary page"
+      },
+      "metrics": [
+        "RFS_Overall",
+        "ADE_5s",
+        "ADE_3s"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_observed_date": "2026-11-09",
+        "page_last_updated_relative": "about five months ago",
+        "top_displayed_method": "OpenEMMA (Qwen backbone, 2026.05)",
+        "RFS_Overall": 6.3162,
+        "ADE_5s_m": 4.1078,
+        "ADE_3s_m": 1.8663,
+        "comparison_entry": {
+          "name": "Waymo Baseline",
+          "RFS_Overall": 7.5281,
+          "ADE_5s_m": 3.0182,
+          "ADE_3s_m": 1.32
+        }
+      },
+      "caveats": [
+        "This is a separate SOTA2 page from the WOD-E2E long-tail planning leaderboard; do not compare its scores directly to DriveMA-4B RFS 8.079 on the other page.",
+        "Exact official split, evaluation labels, evaluator revision, checkpoint and submission protocol are not established by the secondary page snapshot.",
+        "Do not infer missing RFS Spotlight or other fields; missing metrics are not zero.",
+        "A secondary leaderboard display is not an official independent reproduction and does not establish closed-loop safety or real-world generalization."
+      ],
+      "sources": [
+        "https://www.sota2.com/research/sota/end-to-end-driving-on-waymo-e2e-driving-challenge-leaderboard",
+        "https://waymo.com/open/challenges/"
+      ]
     }
   ],
   "prospective_targets": {
@@ -1247,7 +1296,8 @@
     "nuPlan-R is a reciprocal reactive loop at the planner/actor layer, but interaction-selected top-k agents receive diffusion rollouts while remaining agents follow log replay; distinguish this from all-agent reciprocal re-planning and from physical vehicle validation.",
     "World-model benchmark-landscape counts are cross-domain taxonomy data, not driving-only counts; preserve target-specific denominators and distinguish closed-loop protocol from downstream outcome metrics.",
     "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result.",
-    "WOD-E2E is an open-loop expert-preference / long-tail trajectory benchmark; RFS is not a closed-loop safety or counterfactual outcome metric."
+    "WOD-E2E is an open-loop expert-preference / long-tail trajectory benchmark; RFS is not a closed-loop safety or counterfactual outcome metric.",
+    "Different secondary leaderboard pages for WOD-E2E are distinct benchmark views until exact split, label, evaluator and submission protocols are proven identical; never compare scores across those views directly."
   ],
   "system_references": [
     {
