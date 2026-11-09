@@ -608,6 +608,14 @@ mod tests {
         }
     }
 
+    fn prior_two() -> ModelPriorScenario {
+        ModelPriorScenario {
+            scenario_id: "equal-two-models".to_string(),
+            scenario_weight: 1.0,
+            probabilities: vec![1.0, 1.0],
+        }
+    }
+
     #[test]
     fn unavailable_trials_remain_in_denominator_as_explicit_abstentions() {
         let hypotheses = vec![hypothesis("a", b'a'), hypothesis("b", b'b')];
@@ -631,7 +639,7 @@ mod tests {
             },
         ];
         let report =
-            evaluate_model_recovery(&hypotheses, &candidate, &prior(), &generators, 64, 123, 0.8)
+            evaluate_model_recovery(&hypotheses, &candidate, &prior_two(), &generators, 64, 123, 0.8)
                 .unwrap();
 
         assert_eq!(report.availability_probability, 0.0);
@@ -664,7 +672,7 @@ mod tests {
             },
         ];
         let report =
-            evaluate_model_recovery(&hypotheses, &candidate, &prior(), &generators, 32, 456, 0.8)
+            evaluate_model_recovery(&hypotheses, &candidate, &prior_two(), &generators, 32, 456, 0.8)
                 .unwrap();
 
         assert_eq!(report.availability_probability, 1.0);
