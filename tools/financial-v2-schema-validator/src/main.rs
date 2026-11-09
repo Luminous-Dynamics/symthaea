@@ -165,6 +165,24 @@ fn validate_evidence_semantics(
             evidence["evidence_id"]
         ));
     }
+    if required_string(rights, "/disposition")? != "authorized" {
+        return Err(format!(
+            "evidence {} does not have an authorized rights disposition",
+            evidence["evidence_id"]
+        ));
+    }
+
+    let frontier = parse_time(decision_frontier, "decision_frontier")?;
+    if let Some(start) = rights.get("valid_from").and_then(Value::as_str) {
+        if frontier < parse_time(start, "rights_authorization.valid_from")? {
+            return Err("rights entitlement is not yet valid at the decision frontier".to_owned());
+        }
+    }
+    if let Some(end) = rights.get("valid_until").and_then(Value::as_str) {
+        if frontier >= parse_time(end, "rights_authorization.valid_until")? {
+            return Err("rights entitlement is expired at the decision frontier".to_owned());
+        }
+    }
 
     let availability_proof = availability
         .get("proof")
@@ -239,7 +257,10 @@ fn validate_evidence_semantics(
                     return Err("availability interval is wholly after decision frontier".to_owned());
                 }
             }
-            let time_basis = required_string(interval_as_value(interval), "/time_basis")?;
+            let time_basis = interval
+                .get("time_basis")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "interval time_basis is missing".to_owned())?;
             if time_basis == "source_calendar_converted_with_declared_timezone"
                 && interval.get("source_timezone").and_then(Value::as_str).is_none()
             {
@@ -263,15 +284,6 @@ fn validate_evidence_semantics(
     }
 
     Ok(())
-}
-
-fn interval_as_value<'a>(
-    interval: &'a serde_json::Map<String, Value>,
-) -> &'a Value {
-    // This helper is intentionally not used to fabricate a new JSON value. It is replaced
-    // below by direct map access; the function only keeps error messages centralized.
-    let _ = interval;
-    unreachable!("map values are inspected directly")
 }
 
 fn validate_research_manifest(
@@ -307,7 +319,12 @@ fn validate_research_manifest(
         return Err("research manifest must contain at least one artifact".to_owned());
     }
 
+    let mut seen_evidence_ids = std::collections::BTreeSet::new();
     for evidence in artifacts {
+        let evidence_id = required_string(evidence, "/evidence_id")?;
+        if !seen_evidence_ids.insert(evidence_id.to_owned()) {
+            return Err(format!("duplicate evidence_id {evidence_id} in research manifest"));
+        }
         validate_instance(evidence_schema, resources, evidence, "research evidence artifact")?;
         validate_evidence_semantics(
             evidence,
@@ -468,6 +485,71 @@ mod tests {
             "rights:synthetic-dev",
             "historical_confirmation",
             "2026-10-01T12:00:00Z",
+        )
+        .is_err());
+    }
+
+
+    #[test]
+    fn rights_entitlement_must_be_valid_at_the_decision_frontier() {
+        let root = fixture_root();
+        let mut evidence = load_json(&root, RESEARCH_EXAMPLE_PATH).unwrap()["artifacts"][0].clone();
+        evidence["rights_authorization"]["valid_until"] =
+            Value::String("2026-10-01T12:00:00Z".to_owned());
+        assert!(validate_evidence_semantics(
+            &evidence,
+            "principal:synthetic-public-research",
+            "rights:synthetic-dev",
+            "synthetic_development_only",
+            "2026-10-01T12:00:00Z",
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn interval_straddling_a_qualified_frontier_is_rejected() {
+        let root = fixture_root();
+        let mut evidence = load_json(&root, RESEARCH_EXAMPLE_PATH).unwrap()["artifacts"][0].clone();
+        evidence["qualification"] = Value::String("historical_confirmation".to_owned());
+        evidence["availability"]["precision"] = Value::String("bounded_interval".to_owned());
+        evidence["availability"]["known_at"] = Value::Null;
+        evidence["availability"]["interval"] = serde_json::json!({
+            "earliest_possible_at": "2026-10-01T11:00:00Z",
+            "latest_possible_at": "2026-10-01T13:00:00Z",
+            "bounds": "inclusive",
+            "time_basis": "utc_instants"
+        });
+        evidence["availability"]["proof"]["state"] = Value::String("verified".to_owned());
+        evidence["rights_authorization"]["proof"]["state"] = Value::String("verified".to_owned());
+        assert!(validate_evidence_semantics(
+            &evidence,
+            "principal:synthetic-public-research",
+            "rights:synthetic-dev",
+            "historical_confirmation",
+            "2026-10-01T12:00:00Z",
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn source_calendar_availability_requires_an_explicit_timezone() {
+        let root = fixture_root();
+        let mut evidence = load_json(&root, RESEARCH_EXAMPLE_PATH).unwrap()["artifacts"][0].clone();
+        evidence["availability"]["precision"] = Value::String("bounded_interval".to_owned());
+        evidence["availability"]["known_at"] = Value::Null;
+        evidence["availability"]["interval"] = serde_json::json!({
+            "earliest_possible_at": "2026-09-30T00:00:00Z",
+            "latest_possible_at": "2026-10-01T00:00:00Z",
+            "bounds": "inclusive",
+            "time_basis": "source_calendar_converted_with_declared_timezone",
+            "source_date": "2026-09-30"
+        });
+        assert!(validate_evidence_semantics(
+            &evidence,
+            "principal:synthetic-public-research",
+            "rights:synthetic-dev",
+            "synthetic_development_only",
+            "2026-10-02T12:00:00Z",
         )
         .is_err());
     }
