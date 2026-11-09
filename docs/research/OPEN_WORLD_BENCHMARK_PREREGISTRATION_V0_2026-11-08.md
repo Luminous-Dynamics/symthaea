@@ -133,6 +133,29 @@ The initial F1a control is the gain-7 numeric world: the world generator accepts
 
 Required controls: an in-grammar case that must not be rejected; an out-of-catalogue case that must not be forced into a nearest singleton; an evaluator bug/omitted-truth closed-support case that must fail; and a shifted observation that could also arise from sensor or stochastic discrepancies. Detection and subsequent repair are separate outcomes.
 
+## 3D. Reusable executable knowledge: cold-start, specialist and hybrid
+
+ASI-Bench and related project suites expose a distinction between discovering a method and executing a method prepared in advance. Preregister three separate arms:
+
+- **Cold-start generalist:** all method selection and model construction begins after task disclosure. No task-specific prebuilt source, task-specific parameter tables or post-disclosure manual tuning.
+- **Compiled specialist:** allow a task-specific program prepared before task disclosure. Record the complete task-knowledge provenance, data/paper access, human and automated engineering time, candidate-generation/tuning budget, compilation and test cost, code size and maintenance cost. Separate public-task development from sealed-task evaluation.
+- **Discover–compile–transfer hybrid:** let the researcher discover and validate a method on a source task, compile a bounded reusable capsule from the canonical ScientificModel / PhysicsIR, then freeze the capsule and test it on unseen related and unrelated tasks.
+
+The hybrid is the most ambitious proposed paradigm, but its result is only meaningful if it passes an independent source confirmation before the compiler sees a promotion signal, then passes a disjoint transfer suite. The compiler may not add a second physical ontology, solver IR or evidence authority. Each capsule binds canonical model digest, assumptions, units, validity domain, measurements, parameter range, solver profile, compiler version, test corpus digest, counterexamples, uncertainty/calibration, source-task receipt and prior failed/rejected transfer attempts.
+
+Metrics for all three:
+- correctness / verifier pass, scientific validity and false-claim rates;
+- source-task discovery quality and cost separately from compiled target execution;
+- complete setup, human engineering, tuning, build, validation, execution and maintenance cost;
+- first-use cost, amortized cost at K = 1/5/20/100 tasks and measured break-even K;
+- held-out related transfer gain, unrelated negative-transfer rate and false-reuse rate;
+- selection regret (best qualified capsule vs chosen capsule), support/coverage and abstention;
+- codegen reproducibility, model-to-program differential correctness and applicability-envelope violations.
+
+A compiled solver does not count as cold-start discovery merely because it is invoked as an autonomous agent. A solver with excellent fit on one task but no independent confirmation or transfer evidence remains task-specific, not a reusable scientific capability.
+
+The simple amortization diagnostic (K^* = C_{setup}/(c_{baseline}-c_{compiled})) applies only when (c_{baseline}>c_{compiled}) and quality/integrity guardrails are non-inferior. Report total actual costs too; do not extrapolate break-even from a single chosen utilization rate.
+
 ## 4. Matched experimental arms
 
 ### 4.1 Structure-access treatment
@@ -244,6 +267,8 @@ The exact tiny-world oracle may enumerate future branches only for its declared 
 - claim-to-evidence trace completeness and independent-verdict reproducibility;
 - all failures, timeouts, refusals, missing outputs and invalid attempts;
 - model/token/tool costs, experiment costs, wall time, compute, memory, energy (only where actually measured), and human review time.
+- deterministic algorithmic search-work counters (candidate evaluations, legal actions scored, solver calls) where the implementation can count them exactly; never relabel these counters as FLOPs, CPU seconds or total compute.
+- specialist setup/compilation/engineering cost, amortized execution cost, break-even K, capsule retrieval/selection regret and false-reuse rate.
 
 A critical leakage event, false unique claim on a known non-identifiable task, or invalid confirmation is a **non-compensatory failure**. It cannot be averaged away by a higher prediction score.
 
@@ -278,6 +303,8 @@ These are **aspirational targets** for a matched reproduction, not claims that S
 | FrontierPhysics | 56 tasks, 42 physicists, nine domains; best reported tested setup passes 46/168 rollouts (Pass@1 27.4%) under verifier plus expert-blocker evaluation. | Pass@1 ≥35% on the same task/rubric release, with all critical verifier and expert-blocker criteria satisfied and task-clustered uncertainty reported. |
 | WorldTest / AutumnBench | 43 environments / 129 queries; reported human performance materially exceeds tested frontier models. | Match or exceed the strongest published model per query family first; then close the human gap. Do not pool query families or use one average as the sole target. |
 | FIRE-Bench / Scientist World | Reproduction of verifiable published findings is a separate construct from novel law discovery; Scientist World's initial release reports 1,000 executable paper-derived environments. | Reproduce a preregistered subset at or above the strongest matched baseline before any innovation lift is counted. Publish per-finding results, including failed reproductions. |
+| ASI-Bench | Paper snapshot (18 configurations): B1/B2/B3/B4 means 50.91/29.10/26.62/26.99. Current supplied board (25 rows): 54.92/33.11/30.58/30.74; two rows are single-run, task-set ID unavailable. | Improve B3 under matched release/harness/cost, preserve B1, and maintain B4≈B3 for verified non-essential distractors. Keep cold-start, specialist and hybrid tracks separate. |
+| Terminal-Bench Science | 70 tasks / five domains; current boards differ by harness. Vals Mini-SWE-agent: GPT-6 Astra 62.86%, GPT-6.1 Sol 52.86%, Opus 5.5 47.14%; Snorkel board: Codex/GPT-6 Astra 68.1%±3.2, Claude Code/Opus 5.5 63.3%±3.3. | Do not pool board snapshots. Pin task release, verifier, model/harness, attempts and resource cap; report cost and human rework separately. |
 
 Do not pursue these stretch values at the expense of evidence validity, selective prediction, or cost. Beating a weak or incompatible baseline is not beating SOTA.
 
