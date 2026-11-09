@@ -53,6 +53,7 @@ pub enum QualificationReason {
     ConfigurationMismatch,
     QuantityUnitMismatch,
     ObservationNotYetAvailable,
+    EvidenceNotYetValid,
     OutsideEvidenceValidity,
     QuantityBelowMinimum,
     MissingQualityPredicate(String),
@@ -307,9 +308,9 @@ pub fn evaluate_service_quality(
     if observation.observed_at_seconds > decision_time_seconds {
         reasons.push(QualificationReason::ObservationNotYetAvailable);
     }
-    if decision_time_seconds < observation.valid_from_seconds
-        || decision_time_seconds >= observation.valid_until_seconds.unwrap_or(u64::MAX)
-    {
+    if decision_time_seconds < observation.valid_from_seconds {
+        reasons.push(QualificationReason::EvidenceNotYetValid);
+    } else if decision_time_seconds >= observation.valid_until_seconds.unwrap_or(u64::MAX) {
         reasons.push(QualificationReason::OutsideEvidenceValidity);
     }
     if observation.quantity_rate < contract.minimum_rate {
@@ -531,6 +532,24 @@ mod tests {
         let report = evaluate_service_quality(&contract(), &input, 50).unwrap();
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
         assert!(report.reasons.contains(&QualificationReason::ObservationNotYetAvailable));
+    }
+
+    #[test]
+    fn future_validity_interval_is_unknown_not_invalid() {
+        let mut input = observation();
+        input.valid_from_seconds = 60;
+        let report = evaluate_service_quality(&contract(), &input, 50).unwrap();
+        assert_eq!(report.disposition, QualificationDisposition::Unknown);
+        assert!(report.reasons.contains(&QualificationReason::EvidenceNotYetValid));
+    }
+
+    #[test]
+    fn calibration_expiry_is_exclusive() {
+        let mut input = observation();
+        input.calibration_valid_until_seconds = Some(50);
+        let report = evaluate_service_quality(&contract(), &input, 50).unwrap();
+        assert_eq!(report.disposition, QualificationDisposition::InvalidEvidence);
+        assert!(report.reasons.contains(&QualificationReason::CalibrationExpired));
     }
 
     #[test]
