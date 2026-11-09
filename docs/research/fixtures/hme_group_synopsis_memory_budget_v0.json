@@ -29,7 +29,8 @@
     {
       "name": "QuantizedBoxAndBall",
       "bytesPerDimension": 8,
-      "formula": "centroid f32 + minima u16 + maxima u16"
+      "formula": "centroid f32 + minima u16 + maxima u16",
+      "status": "experimental_outward_quantized_selector_gated"
     },
     {
       "name": "BallOnly",
@@ -1191,6 +1192,21 @@
     "No runtime RSS, allocator, page cache or physical I/O data is represented.",
     "No group pruning rate or query latency is inferred from this fixture.",
     "Quantized extrema are a research implementation and have not been Rust-test executed.",
-    "The 24-byte average ID assumption is illustrative, not a measured corpus property."
+    "The 24-byte average ID assumption is illustrative, not a measured corpus property.",
+    "The independent JavaScript IEEE-754 model is not Rust execution, a formal proof, or cross-target compiler qualification.",
+    "The allocation-free callback source kernel is authored but unexecuted because cargo/rustc are unavailable."
+  ],
+  "queryDecode": {
+    "method": "similarity_interval_full_resolution_for_component_bounds_with",
+    "allocationBehavior": "zero dimension-sized temporary vectors; decode u16 endpoints by index during interval reduction",
+    "invocationRule": "one callback evaluation per component for valid inputs",
+    "selectorAdmission": "blocked until HME-SYNOPSIS-CODEC-001 qualification and explicit promotion",
+    "coreKernelCommit": "d21f55c7c17c0fb112ceacca842ef092c4b4846e"
+  },
+  "qualificationGates": [
+    "selector API rejects QuantizedBoxAndBall before promotion",
+    "callback component kernel matches slice kernel for equivalent bounds",
+    "no per-group decoded f32 buffer allocation",
+    "compile and execute Rust tests under pinned and release/LTO profiles"
   ]
 }
