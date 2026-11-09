@@ -17,6 +17,10 @@ use crate::weight_space_program::{
     ValidatedWeightCandidate, WeightModelSnapshot, WeightProgram, WeightProgramError,
     WeightProgramOperation,
 };
+use crate::sequential_weight_verification::{
+    validate_qualified_report, SequentialWeightVerificationError,
+    SequentialWeightVerificationReport,
+};
 
 /// Reusable edit program and its cumulative session budgets.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,9 +130,64 @@ pub struct SequentialVerifierAttestationClaims {
     pub observation_manifest_digest: String,
     pub program_digest: String,
     pub candidate_snapshot_digest: String,
+    /// Open-world/model-adequacy report digest that permitted detached evaluation.
+    pub precondition_gate_digest: String,
+    /// Qualified anytime-valid paired-loss report digest.
+    pub statistical_verification_report_digest: String,
     /// False is a signed rejection. A verifier must never sign true before all
     /// required tests and negative controls have completed.
     pub accepted: bool,
+}
+
+/// Digest binding obtained only by validating a qualified statistical report.
+///
+/// Fields are private so callers cannot manufacture a binding from arbitrary
+/// digest strings; use [`bind_sequential_verification_evidence`] instead.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SequentialVerifierEvidenceBinding {
+    precondition_gate_digest: String,
+    statistical_verification_report_digest: String,
+}
+
+impl SequentialVerifierEvidenceBinding {
+    /// Open-world gate digest that preceded detached candidate evaluation.
+    pub fn precondition_gate_digest(&self) -> &str {
+        &self.precondition_gate_digest
+    }
+
+    /// Digest of the independently qualified sequential statistical report.
+    pub fn statistical_verification_report_digest(&self) -> &str {
+        &self.statistical_verification_report_digest
+    }
+}
+
+/// Validate and bind a statistical report to the exact sequential edit candidate.
+///
+/// The report must establish the preregistered improvement, pass its own
+/// confidence-sequence/digest recomputation, and refer to the session's current
+/// baseline and supplied native candidate digest.
+pub fn bind_sequential_verification_evidence(
+    session: &SequentialEditSession,
+    candidate_native_model_digest: &str,
+    report: &SequentialWeightVerificationReport,
+) -> Result<SequentialVerifierEvidenceBinding, SequentialWeightProgramError> {
+    validate_qualified_report(report)?;
+    validate_digest(candidate_native_model_digest)?;
+    if report.binding.baseline_model_digest != session.latest_candidate_model_digest {
+        return Err(SequentialWeightProgramError::StatisticalEvidenceMismatch(
+            "baseline_model_digest",
+        ));
+    }
+    if report.binding.candidate_model_digest != candidate_native_model_digest {
+        return Err(SequentialWeightProgramError::StatisticalEvidenceMismatch(
+            "candidate_model_digest",
+        ));
+    }
+    validate_digest(&report.binding.precondition_gate_digest)?;
+    Ok(SequentialVerifierEvidenceBinding {
+        precondition_gate_digest: report.binding.precondition_gate_digest.clone(),
+        statistical_verification_report_digest: report.report_digest.clone(),
+    })
 }
 
 /// Ed25519-signed verifier claims. The private signing key remains outside this crate.
@@ -199,6 +258,10 @@ pub enum SequentialWeightProgramError {
     InvalidVerifierSignature,
     #[error("verifier attestation field does not match the prepared candidate: {0}")]
     VerifierAttestationMismatch(&'static str),
+    #[error("statistical verification evidence is not bound to this candidate: {0}")]
+    StatisticalEvidenceMismatch(&'static str),
+    #[error(transparent)]
+    StatisticalVerification(#[from] SequentialWeightVerificationError),
     #[error("cumulative L2 edit path exceeds the session budget")]
     CumulativeL2BudgetExceeded,
     #[error("cumulative parameter-change events exceed the session budget")]
@@ -317,6 +380,7 @@ pub fn accept_verified_sequential_candidate(
     template: &SequentialWeightProgramTemplate,
     prepared: &PreparedSequentialCandidate,
     candidate_native_model_digest: &str,
+    evidence_binding: &SequentialVerifierEvidenceBinding,
     attestation: &SignedSequentialVerifierAttestation,
     pinned_verifier_key: &VerifyingKey,
 ) -> Result<(SequentialEditSession, SequentialStepReceipt), SequentialWeightProgramError> {
@@ -393,6 +457,14 @@ pub fn accept_verified_sequential_candidate(
             "candidate_snapshot_digest",
             claims.candidate_snapshot_digest.as_str(),
         ),
+        (
+            "precondition_gate_digest",
+            claims.precondition_gate_digest.as_str(),
+        ),
+        (
+            "statistical_verification_report_digest",
+            claims.statistical_verification_report_digest.as_str(),
+        ),
     ] {
         validate_digest(value)?;
         if value.is_empty() {
@@ -463,6 +535,16 @@ pub fn accept_verified_sequential_candidate(
                 .receipt
                 .candidate_snapshot_digest
                 .as_str(),
+        ),
+        (
+            "precondition_gate_digest",
+            claims.precondition_gate_digest.as_str(),
+            evidence_binding.precondition_gate_digest(),
+        ),
+        (
+            "statistical_verification_report_digest",
+            claims.statistical_verification_report_digest.as_str(),
+            evidence_binding.statistical_verification_report_digest(),
         ),
     ] {
         if actual != expected {
