@@ -257,5 +257,51 @@
       },
       "assertions": []
     }
-  ]
+  ],
+  "behavioral_spec": {
+    "spec_id": "REA-SPEC-001",
+    "clauses": [
+      {
+        "clause_id": "printf_stdout_exact",
+        "statement": "For the exact invocation captured by REA-OBS-001, stdout has the recorded SHA-256 digest.",
+        "support_status": "observed_exact_invocation",
+        "scope": {
+          "kind": "exact_invocation",
+          "observation_id": "REA-OBS-001",
+          "assertion_id": "stdout_matches"
+        },
+        "limitations": [
+          "This statement applies only to the recorded argv, stdin, working directory, environment and runner profile.",
+          "The referenced REA Evidence admission remains unverified in v0."
+        ]
+      },
+      {
+        "clause_id": "parse_error_exit_exact",
+        "statement": "For the exact invocation captured by REA-OBS-002, the process terminates with exit code 2.",
+        "support_status": "observed_exact_invocation",
+        "scope": {
+          "kind": "exact_invocation",
+          "observation_id": "REA-OBS-002",
+          "assertion_id": "error_exit_two"
+        },
+        "limitations": [
+          "This is one malformed-input example and does not establish behavior for other invalid inputs."
+        ]
+      },
+      {
+        "clause_id": "invalid_json_general_rule",
+        "statement": "The program rejects every syntactically invalid JSON input with a nonzero exit status.",
+        "support_status": "untested",
+        "scope": {
+          "kind": "bounded_input_class",
+          "input_class": "All syntactically invalid JSON byte sequences within the declared input-size limit.",
+          "falsification_condition": "A single invalid JSON input that exits zero or is accepted as valid falsifies this rule."
+        },
+        "limitations": [
+          "Only one malformed JSON example is present in this synthetic fixture.",
+          "No exhaustive invalid-input corpus or original executable execution is supplied."
+        ]
+      }
+    ]
+  }
 }
