@@ -484,6 +484,7 @@ pub fn validate_cohort_manifest(
     }
 
     let mut pair_ids = HashSet::with_capacity(manifest.pairs.len());
+    let mut pair_manifest_paths = HashSet::with_capacity(manifest.pairs.len());
     let mut used_records = HashSet::with_capacity(manifest.pairs.len() * 2);
     let mut preference_pair_count = 0;
     let mut development_pair_count = 0;
@@ -507,6 +508,11 @@ pub fn validate_cohort_manifest(
             &pair.counterfactual_pair_manifest_sha256,
         )?;
         validate_relative_artifact_path(&pair.counterfactual_pair_manifest_path)?;
+        if !pair_manifest_paths.insert(pair.counterfactual_pair_manifest_path.as_str()) {
+            return Err(CohortAdmissionError::DuplicatePairManifestPath(
+                pair.counterfactual_pair_manifest_path.clone(),
+            ));
+        }
         let expected_split = pair.purpose.required_split();
         if pair.split != expected_split {
             return Err(CohortAdmissionError::PairPurposeSplitMismatch(
@@ -824,7 +830,7 @@ mod tests {
                     baseline_record_id: "pilot-a".into(),
                     variant_record_id: "pilot-b".into(),
                     counterfactual_pair_manifest_sha256: A.into(),
-                    counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
+                    counterfactual_pair_manifest_path: "pair-manifests/pilot-pair.json".into(),
                     split: CohortSplit::Pilot,
                     purpose: PairPurpose::PilotEvaluation,
                 },
@@ -833,7 +839,7 @@ mod tests {
                     baseline_record_id: "pref-a".into(),
                     variant_record_id: "pref-b".into(),
                     counterfactual_pair_manifest_sha256: A.into(),
-                    counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
+                    counterfactual_pair_manifest_path: "pair-manifests/pref-pair.json".into(),
                     split: CohortSplit::PreferenceTraining,
                     purpose: PairPurpose::PreferenceTraining,
                 },
@@ -973,7 +979,7 @@ mod tests {
             baseline_record_id: "confirm-a".into(),
             variant_record_id: "confirm-b".into(),
             counterfactual_pair_manifest_sha256: A.into(),
-            counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
+            counterfactual_pair_manifest_path: "pair-manifests/confirm-pair.json".into(),
             split: CohortSplit::Confirmatory,
             purpose: PairPurpose::ConfirmatoryEvaluation,
         });
@@ -1037,7 +1043,7 @@ mod tests {
             baseline_record_id: "pilot-a".into(),
             variant_record_id: "pilot-b".into(),
             counterfactual_pair_manifest_sha256: A.into(),
-            counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
+            counterfactual_pair_manifest_path: "pair-manifests/pilot-pair-2.json".into(),
             split: CohortSplit::Pilot,
             purpose: PairPurpose::PilotEvaluation,
         });
