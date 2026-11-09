@@ -444,17 +444,7 @@
     {
       "episode_id": "REA-STOP-008",
       "world_state_oracle": "cause_unknown_budget_exhausted",
-      "events": [
-        {
-          "event_id": "008-e1",
-          "trigger_kind": "observed_action",
-          "action_id": "read_only_log_review",
-          "outcome": "incomplete",
-          "obligation_updates": [],
-          "duty_updates": [],
-          "invalidated_evidence_ids": []
-        }
-      ],
+      "events": [],
       "checkpoints": [
         {
           "after_event_index": 0,
