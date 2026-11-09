@@ -153,9 +153,15 @@ jobs:
               (.missed_identifiable_structure.a0_only + .missed_identifiable_structure.a2_only + .missed_identifiable_structure.both_true + .missed_identifiable_structure.neither) == .pair_count and
               (.safe_abstention.a0_only + .safe_abstention.a2_only + .safe_abstention.both_true + .safe_abstention.neither) == .pair_count and
               (.unnecessary_abstention.a0_only + .unnecessary_abstention.a2_only + .unnecessary_abstention.both_true + .unnecessary_abstention.neither) == .pair_count and
-              .a2_minus_a0_probe_actions == (.a2_probe_actions - .a0_probe_actions)
+              .a2_minus_a0_probe_actions == (.a2_probe_actions - .a0_probe_actions) and
+              .a2_minus_a0_legal_probe_actions_scored == (.a2_legal_probe_actions_scored - .a0_legal_probe_actions_scored) and
+              .a2_minus_a0_model_prediction_evaluations == (.a2_model_prediction_evaluations - .a0_model_prediction_evaluations)
             ) and
             all(.pair_records[];
+              (.a0_probe_work.legal_actions_scored >= 0) and
+              (.a2_probe_work.legal_actions_scored >= 0) and
+              (.a0_probe_work.model_prediction_evaluations >= 0) and
+              (.a2_probe_work.model_prediction_evaluations >= 0) and
               .a0.generating_model_in_version_space and
               .a2.generating_model_in_version_space and
               .a0.set_score.exact_version_space_match and
