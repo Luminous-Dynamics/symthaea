@@ -3,6 +3,8 @@
 //! This crate validates the authored research corpus. It does not adjudicate
 //! the world-state oracle, execute experiments, or evaluate a planning policy.
 
+pub mod score;
+
 use jsonschema::draft202012;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
