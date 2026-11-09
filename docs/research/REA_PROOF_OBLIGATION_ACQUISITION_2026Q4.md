@@ -850,3 +850,36 @@ Proposed release targets, not achieved results:
 - All task scores, evidence metrics, cost and coverage remain separately visible; no single composite leaderboard number.
 
 This positioning lets REA compare fairly with SRE-Bench and AgentRE-Bench while pursuing a distinct capability: not merely recovering program behavior, but establishing which exact conclusions are warranted by the observed binary, tool execution, environment, lineage and scope.
+
+
+## 10. Executable one-step policy scorer v0 — November 9, 2026
+
+The development fixture now includes a policy submission schema and a deterministic Rust CLI:
+
+- Schema: `docs/research/rea-proof-obligation-policy-run-v0.schema.json`.
+- Example: `examples/rea-proof-obligation-policy-run-v0.cost-only.synthetic.json`.
+- Implementation: `tools/rea-proof-obligation-fixture-check/src/score.rs` and `src/main.rs`.
+- Command:
+  ```bash
+  cargo run --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --bin rea-proof-obligation-score -- \
+    docs/research/rea-proof-obligation-acquisition-agent-view-v0.json \
+    docs/research/rea-proof-obligation-acquisition-grader-v0.json \
+    policy-run.json
+  ```
+
+The policy-run contract records one selected experiment (or `abstain`) and one pre-action readiness assertion per case. The scorer reports:
+- selected/abstained coverage;
+- invalid and unsafe selections under explicit authorization, reversibility, destructiveness and target-impact gates;
+- false-ready and false-not-ready pre-action claims against the current mandatory obligation states;
+- potential mandatory-obligation changes available from the selected action, based on the synthetic grader mapping;
+- abstention when a safe action has a possible admissible obligation transition;
+- relative acquisition cost; and
+- exact agreement with the non-adjudicated synthetic design-reference choice.
+
+The scorer parses bounded input JSON with duplicate-key and trailing-data rejection, validates the submission against Draft 2020-12, and emits a machine-readable report explicitly marked `official_benchmark_score=false`.
+
+**Important scope limit:** this is a one-step policy proposal scorer over public synthetic development fixtures. It does not execute the selected experiment, verify a real observation, establish post-action readiness, or estimate world-state truth. The "design-reference agreement" metric is not accuracy or human-adjudicated policy quality. The grader fixture is public and therefore not hidden or contamination-resistant.
+
+The next implementation boundary is a two-stage environment transcript: the evaluator supplies an independently generated observation after action selection; the agent then receives that observation and updates its claim. Only an exact observation receipt bound to the artifact/session/source and passed through the existing REA Evidence verifier may alter obligation status. The benchmark scorer must not treat a model-supplied outcome token as a verified observation.
+
+The canonical benchmark run receipt remains owned by [#10314](https://github.com/Luminous-Dynamics/symthaea/pull/10314). The policy scorer does not introduce a competing receipt schema; receipt integration waits for the canonical receipt PR and the hidden evaluator interface.
