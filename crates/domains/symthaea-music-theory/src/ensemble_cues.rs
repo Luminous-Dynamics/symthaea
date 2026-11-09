@@ -379,7 +379,8 @@ pub fn verify_ensemble_cues(
             .iter()
             .find(|event| event.cue_id == cue.id);
         let observed_to_state = state_change.map(|event| event.to_state.clone());
-        let state_change_latency = state_change.map(|event| event.onset_tick - cue.onset_tick);
+        let state_change_latency =
+            state_change.and_then(|event| event.onset_tick.checked_sub(cue.onset_tick));
         let state_change_ok = state_change.is_some_and(|event| {
             event.to_state == rule.to_state
                 && event.onset_tick >= cue.onset_tick
@@ -711,6 +712,16 @@ mod tests {
         let report = verify_ensemble_cues(&graph(), &input).unwrap();
         assert!(!report.results[0].passed);
         assert!(!report.results[0].response_found);
+    }
+
+    #[test]
+    fn state_change_before_cue_is_a_failed_transition_not_time_underflow() {
+        let mut input = sequence();
+        input.state_changes[0].onset_tick = 12;
+        let report = verify_ensemble_cues(&graph(), &input).unwrap();
+        assert!(!report.results[0].passed);
+        assert_eq!(report.results[0].state_change_latency_ticks, None);
+        assert_eq!(report.final_state, "full");
     }
 
     #[test]
