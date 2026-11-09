@@ -243,6 +243,19 @@ jobs:
             cat dtc-frequency-locking.csv
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run finite-Floquet AC probe Fisher-information sweep
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-fractal-time-lab --example dtc_ac_probe_sweep | tee dtc-ac-probe-sweep.csv
+          grep -q 'SMALL_CLOSED_SYSTEM_SAMPLED_PROBE_NOT_DIAMOND_SENSOR_REPRODUCTION' dtc-ac-probe-sweep.csv
+          grep -q 'information_metric=classical_Fisher_information_from_exact_total_Z_distribution' dtc-ac-probe-sweep.csv
+          {
+            echo '## Finite-Floquet AC probe sensing and classical Fisher information'
+            cat dtc-ac-probe-sweep.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run curved 1+1D conformal-FRW causal-set sweep
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
