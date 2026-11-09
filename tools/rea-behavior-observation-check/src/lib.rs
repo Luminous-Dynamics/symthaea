@@ -492,10 +492,21 @@ pub fn validate_profile_bytes(bytes: &[u8]) -> Result<Value, ObservationError> {
     }
     validate_profile(&profile)?;
     let count = profile["observations"].as_array().map_or(0, Vec::len);
+    let clauses = profile["behavioral_spec"]["clauses"].as_array();
+    let observed_exact_clause_count = clauses.map_or(0, |items| {
+        items.iter().filter(|item| {
+            item["support_status"].as_str() == Some("observed_exact_invocation")
+        }).count()
+    });
+    let untested_clause_count = clauses.map_or(0, |items| {
+        items.iter().filter(|item| item["support_status"].as_str() == Some("untested")).count()
+    });
     Ok(serde_json::json!({
         "schema":"luminous.rea.behavior-observation-validation-report.v0",
         "status":"capture_valid_evidence_admission_unverified",
         "observation_count":count,
+        "observed_exact_clause_count":observed_exact_clause_count,
+        "untested_clause_count":untested_clause_count,
         "evidence_admission":"unverified_reference",
         "claim_ceiling":"Captured byte integrity and sidecar consistency only; referenced REA Evidence, producer, runner and real execution are not authenticated."
     }))
