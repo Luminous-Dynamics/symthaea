@@ -32,7 +32,27 @@
         "aggregate eligible-member-set digest"
       ],
       "query_time_verification": "O(group_count): verify group IDs/content digests/counts/generations/query digest; do not walk member ID rosters",
-      "persisted_authentication": "not implemented; requires immutable segment/manifest binding on reopen"
+      "persisted_authentication": "not implemented; requires immutable segment/manifest binding on reopen",
+      "scope_binding": {
+        "principal_scope_digest": "fixture-principal-scope-digest",
+        "policy_digest": "fixture-policy-digest",
+        "policy_generation": 6,
+        "source_ledger_generation": 91,
+        "bitemporal_query_digest": "fixture-valid-at-known-at-digest",
+        "authority_owner_issue": 11003,
+        "provenance": "symbolic test values only; production values must be issued by the authoritative eligibility owner"
+      },
+      "scope_binding_is_hashed": true,
+      "query_time_compare": "GroupScoreIntervalRecord.scope_binding == GroupIntervalCoverageCounts.scope_binding == authenticated receipt scope_binding"
+    },
+    "eligibility_scope_binding": {
+      "principal_scope_digest": "fixture-principal-scope-digest",
+      "policy_digest": "fixture-policy-digest",
+      "policy_generation": 6,
+      "source_ledger_generation": 91,
+      "bitemporal_query_digest": "fixture-valid-at-known-at-digest",
+      "authority_owner_issue": 11003,
+      "provenance": "symbolic test values only; production values must be issued by the authoritative eligibility owner"
     }
   },
   "query": {
@@ -223,7 +243,12 @@
     "partition receipt supplied with an eligible member-set digest from another manifest",
     "authoritative eligible-record count differs from group roster total",
     "receipt reused after manifest or eligibility generation change",
-    "receipt does not authenticate after segment reopen"
+    "receipt does not authenticate after segment reopen",
+    "principal or namespace scope digest differs from receipt",
+    "policy digest differs while member set is unchanged",
+    "policy generation differs while member set is unchanged",
+    "source-ledger generation differs while member set is unchanged",
+    "valid_at or known_at digest differs while member set is unchanged"
   ],
   "nonclaims": [
     "Fixture does not contain real cryptographic hashes.",
@@ -232,6 +257,7 @@
     "Fixture does not promote spherical-cap canonical-f32 intervals into the selector.",
     "Fixture is not a public benchmark score.",
     "The fixture does not implement manifest-signature or segment-checksum authentication for the partition receipt.",
-    "The fixture does not demonstrate measured O(G) query CPU/cache behavior."
+    "The fixture does not demonstrate measured O(G) query CPU/cache behavior.",
+    "HME scope binding is a consistency commitment, not an authorization decision or proof that the policy is correct."
   ]
 }
