@@ -9,8 +9,11 @@
 //! or prove that a source annotation is correct.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fs;
+use std::path::{Component, Path};
 
 /// Current serialized cohort manifest schema revision.
 pub const COHORT_MANIFEST_SCHEMA_VERSION: &str = "0.1.0";
@@ -161,8 +164,10 @@ pub struct CohortPair {
     pub baseline_record_id: String,
     /// Variant record.
     pub variant_record_id: String,
-    /// SHA-256 of the exact #11157 counterfactual pair manifest.
+    /// SHA-256 of the exact #11157 counterfactual pair manifest bytes.
     pub counterfactual_pair_manifest_sha256: String,
+    /// Safe path relative to the cohort manifest directory for the pinned artifact.
+    pub counterfactual_pair_manifest_path: String,
     /// Split containing both records.
     pub split: CohortSplit,
     /// Whether this pair is for preference training or evaluation.
@@ -212,6 +217,13 @@ pub enum CohortAdmissionError {
     EvidenceStageRequiresPairType(CohortEvidenceState),
     DuplicateLanguageTag(String),
     InvalidDigest(&'static str, String),
+    InvalidPairManifestPath(String),
+    DuplicatePairManifestPath(String),
+    ArtifactIo { path: String, reason: String },
+    InvalidPairManifestJson(String),
+    PairManifestContentMismatch(String),
+    PairManifestPathEscapesRoot(String),
+    PairManifestDigestMismatch { pair_id: String, expected: String, actual: String },
     MissingDerivedAudioManifest(String),
     DerivativeProcessingNotAuthorized(String),
     BenchmarkEvaluationNotAuthorized(String),
@@ -494,6 +506,7 @@ pub fn validate_cohort_manifest(
             "counterfactual_pair_manifest_sha256",
             &pair.counterfactual_pair_manifest_sha256,
         )?;
+        validate_relative_artifact_path(&pair.counterfactual_pair_manifest_path)?;
         let expected_split = pair.purpose.required_split();
         if pair.split != expected_split {
             return Err(CohortAdmissionError::PairPurposeSplitMismatch(
@@ -601,6 +614,84 @@ pub fn require_external_processing_authorization(
 /// Record and pair input order does not affect the digest. Struct field order
 /// and schema version do; changing the manifest contract therefore changes
 /// the digest intentionally.
+pub fn verify_counterfactual_pair_manifest_artifacts(
+    manifest: &CohortManifest,
+    manifest_directory: &Path,
+) -> Result<usize, CohortAdmissionError> {
+    let root = fs::canonicalize(manifest_directory).map_err(|error| {
+        CohortAdmissionError::ArtifactIo {
+            path: manifest_directory.display().to_string(),
+            reason: error.to_string(),
+        }
+    })?;
+    let mut seen_paths = HashSet::with_capacity(manifest.pairs.len());
+
+    for pair in &manifest.pairs {
+        validate_relative_artifact_path(&pair.counterfactual_pair_manifest_path)?;
+        if !seen_paths.insert(pair.counterfactual_pair_manifest_path.as_str()) {
+            return Err(CohortAdmissionError::DuplicatePairManifestPath(
+                pair.counterfactual_pair_manifest_path.clone(),
+            ));
+        }
+        let joined = root.join(&pair.counterfactual_pair_manifest_path);
+        let canonical = fs::canonicalize(&joined).map_err(|error| {
+            CohortAdmissionError::ArtifactIo {
+                path: joined.display().to_string(),
+                reason: error.to_string(),
+            }
+        })?;
+        if !canonical.starts_with(&root) {
+            return Err(CohortAdmissionError::PairManifestPathEscapesRoot(
+                pair.counterfactual_pair_manifest_path.clone(),
+            ));
+        }
+        let bytes = fs::read(&canonical).map_err(|error| {
+            CohortAdmissionError::ArtifactIo {
+                path: canonical.display().to_string(),
+                reason: error.to_string(),
+            }
+        })?;
+        let json: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| {
+            CohortAdmissionError::InvalidPairManifestJson(pair.pair_id.clone())
+        })?;
+        let content_matches = json.get("pair_id").and_then(serde_json::Value::as_str)
+            == Some(pair.pair_id.as_str())
+            && json.get("baseline_trial_id").and_then(serde_json::Value::as_str)
+                == Some(pair.baseline_record_id.as_str())
+            && json.get("variant_trial_id").and_then(serde_json::Value::as_str)
+                == Some(pair.variant_record_id.as_str());
+        if !content_matches {
+            return Err(CohortAdmissionError::PairManifestContentMismatch(
+                pair.pair_id.clone(),
+            ));
+        }
+        let actual = format!("{:x}", Sha256::digest(&bytes));
+        if !actual.eq_ignore_ascii_case(&pair.counterfactual_pair_manifest_sha256) {
+            return Err(CohortAdmissionError::PairManifestDigestMismatch {
+                pair_id: pair.pair_id.clone(),
+                expected: pair.counterfactual_pair_manifest_sha256.clone(),
+                actual,
+            });
+        }
+    }
+
+    Ok(manifest.pairs.len())
+}
+
+/// Reject absolute, traversing, empty, or cross-platform path spellings.
+fn validate_relative_artifact_path(value: &str) -> Result<(), CohortAdmissionError> {
+    let path = Path::new(value);
+    if value.trim().is_empty()
+        || value.contains('\\')
+        || value.contains(':')
+        || path.is_absolute()
+        || path.components().any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(CohortAdmissionError::InvalidPairManifestPath(value.to_string()));
+    }
+    Ok(())
+}
+
 pub fn canonical_cohort_manifest_digest(
     manifest: &CohortManifest,
 ) -> Result<String, CohortAdmissionError> {
@@ -733,6 +824,7 @@ mod tests {
                     baseline_record_id: "pilot-a".into(),
                     variant_record_id: "pilot-b".into(),
                     counterfactual_pair_manifest_sha256: A.into(),
+                    counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
                     split: CohortSplit::Pilot,
                     purpose: PairPurpose::PilotEvaluation,
                 },
@@ -741,6 +833,7 @@ mod tests {
                     baseline_record_id: "pref-a".into(),
                     variant_record_id: "pref-b".into(),
                     counterfactual_pair_manifest_sha256: A.into(),
+                    counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
                     split: CohortSplit::PreferenceTraining,
                     purpose: PairPurpose::PreferenceTraining,
                 },
@@ -880,6 +973,7 @@ mod tests {
             baseline_record_id: "confirm-a".into(),
             variant_record_id: "confirm-b".into(),
             counterfactual_pair_manifest_sha256: A.into(),
+            counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
             split: CohortSplit::Confirmatory,
             purpose: PairPurpose::ConfirmatoryEvaluation,
         });
@@ -904,6 +998,7 @@ mod tests {
             baseline_record_id: "confirm-a".into(),
             variant_record_id: "confirm-b".into(),
             counterfactual_pair_manifest_sha256: A.into(),
+            counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
             split: CohortSplit::Confirmatory,
             purpose: PairPurpose::ConfirmatoryEvaluation,
         });
@@ -942,6 +1037,7 @@ mod tests {
             baseline_record_id: "pilot-a".into(),
             variant_record_id: "pilot-b".into(),
             counterfactual_pair_manifest_sha256: A.into(),
+            counterfactual_pair_manifest_path: "pair-manifests/example.json".into(),
             split: CohortSplit::Pilot,
             purpose: PairPurpose::PilotEvaluation,
         });
@@ -1027,6 +1123,98 @@ mod tests {
         let mut manifest = fixture();
         manifest.records[1].evaluation_audio_sha256 = A.to_ascii_uppercase();
         assert!(validate_cohort_manifest(&manifest).is_ok());
+    }
+
+    #[test]
+    fn rejects_pair_manifest_path_traversal() {
+        let mut manifest = fixture();
+        manifest.pairs[0].counterfactual_pair_manifest_path = "../outside.json".into();
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::InvalidPairManifestPath(_))
+        ));
+    }
+
+    #[test]
+    fn verifies_pair_manifest_file_digest_and_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let dir = temp.path().join("pair-manifests");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut manifest = fixture();
+        for pair in &mut manifest.pairs {
+            let bytes = format!(
+                "{{\"pair_id\":\"{}\",\"baseline_trial_id\":\"{}\",\"variant_trial_id\":\"{}\"}}",
+                pair.pair_id, pair.baseline_record_id, pair.variant_record_id
+            );
+            let path = dir.join(format!("{}.json", pair.pair_id));
+            std::fs::write(&path, bytes.as_bytes()).unwrap();
+            pair.counterfactual_pair_manifest_sha256 =
+                format!("{:x}", Sha256::digest(bytes.as_bytes()));
+            pair.counterfactual_pair_manifest_path =
+                format!("pair-manifests/{}.json", pair.pair_id);
+        }
+        assert_eq!(
+            verify_counterfactual_pair_manifest_artifacts(&manifest, temp.path()).unwrap(),
+            2
+        );
+    }
+
+    #[test]
+    fn rejects_pair_manifest_digest_mismatch() {
+        let temp = tempfile::tempdir().unwrap();
+        let dir = temp.path().join("pair-manifests");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut manifest = fixture();
+        let bytes = br#"{"pair_id":"pilot-pair","baseline_trial_id":"pilot-a","variant_trial_id":"pilot-b"}"#;
+        std::fs::write(dir.join("pilot-pair.json"), bytes).unwrap();
+        manifest.pairs[0].counterfactual_pair_manifest_path = "pair-manifests/pilot-pair.json".into();
+        manifest.pairs[0].counterfactual_pair_manifest_sha256 = A.into();
+        assert!(matches!(
+            verify_counterfactual_pair_manifest_artifacts(&manifest, temp.path()),
+            Err(CohortAdmissionError::PairManifestDigestMismatch { .. })
+                | Err(CohortAdmissionError::ArtifactIo { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_pair_manifest_content_id_mismatch() {
+        let temp = tempfile::tempdir().unwrap();
+        let dir = temp.path().join("pair-manifests");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut manifest = fixture();
+        let bytes = br#"{"pair_id":"wrong","baseline_trial_id":"pilot-a","variant_trial_id":"pilot-b"}"#;
+        std::fs::write(dir.join("pilot-pair.json"), bytes).unwrap();
+        manifest.pairs[0].counterfactual_pair_manifest_path = "pair-manifests/pilot-pair.json".into();
+        manifest.pairs[0].counterfactual_pair_manifest_sha256 =
+            format!("{:x}", Sha256::digest(bytes));
+        assert!(matches!(
+            verify_counterfactual_pair_manifest_artifacts(&manifest, temp.path()),
+            Err(CohortAdmissionError::PairManifestContentMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_pair_manifest_path_symlink_escape() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let temp = tempfile::tempdir().unwrap();
+            let outside = tempfile::tempdir().unwrap();
+            let dir = temp.path().join("pair-manifests");
+            std::fs::create_dir_all(&dir).unwrap();
+            let external = outside.path().join("outside.json");
+            std::fs::write(
+                &external,
+                br#"{"pair_id":"pilot-pair","baseline_trial_id":"pilot-a","variant_trial_id":"pilot-b"}"#,
+            ).unwrap();
+            symlink(&external, dir.join("pilot-pair.json")).unwrap();
+            let mut manifest = fixture();
+            manifest.pairs[0].counterfactual_pair_manifest_path = "pair-manifests/pilot-pair.json".into();
+            assert!(matches!(
+                verify_counterfactual_pair_manifest_artifacts(&manifest, temp.path()),
+                Err(CohortAdmissionError::PairManifestPathEscapesRoot(_))
+            ));
+        }
     }
 
     #[test]
