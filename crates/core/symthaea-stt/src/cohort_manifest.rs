@@ -15,6 +15,18 @@ use std::fmt;
 /// Current serialized cohort manifest schema revision.
 pub const COHORT_MANIFEST_SCHEMA_VERSION: &str = "0.1.0";
 
+/// Declared evidence stage of a cohort. This is metadata, not independent proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CohortEvidenceState {
+    /// Synthetic fixtures only; never report as real-audio performance.
+    SyntheticOnly,
+    /// Real-audio pilot; exploratory and not confirmatory.
+    Pilot,
+    /// Confirmatory real-audio cohort, subject to all admission and review gates.
+    Confirmatory,
+}
+
 /// Data split for one pseudonymous utterance record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -163,6 +175,8 @@ pub struct CohortManifest {
     pub schema_version: String,
     /// Stable cohort identifier.
     pub cohort_id: String,
+    /// Evidence stage declared by the data steward; not proof of real-audio validity.
+    pub evidence_state: CohortEvidenceState,
     /// Records in the frozen cohort.
     pub records: Vec<CohortRecord>,
     /// Pair definitions. Pair IDs may occur only once across all purposes.
@@ -193,6 +207,7 @@ pub enum CohortAdmissionError {
     EmptyIdentifier(&'static str),
     DuplicateRecordId(String),
     DuplicatePairId(String),
+    EvidenceStageRequiresPairType(CohortEvidenceState),
     DuplicateLanguageTag(String),
     InvalidDigest(&'static str, String),
     MissingDerivedAudioManifest(String),
@@ -524,12 +539,27 @@ pub fn validate_cohort_manifest(
 
     for record in &manifest.records {
         if let Some(pair_id) = record.pair_id.as_deref() {
-            if !pair_ids.contains(pair_id) {
+            if !pair_ids.contains(pair_id) || !used_records.contains(record.record_id.as_str()) {
                 return Err(CohortAdmissionError::OrphanPairRecord(
                     record.record_id.clone(),
                 ));
             }
         }
+    }
+
+    match manifest.evidence_state {
+        CohortEvidenceState::SyntheticOnly => {}
+        CohortEvidenceState::Pilot if pilot_pair_count == 0 => {
+            return Err(CohortAdmissionError::EvidenceStageRequiresPairType(
+                CohortEvidenceState::Pilot,
+            ));
+        }
+        CohortEvidenceState::Confirmatory if confirmatory_pair_count == 0 => {
+            return Err(CohortAdmissionError::EvidenceStageRequiresPairType(
+                CohortEvidenceState::Confirmatory,
+            ));
+        }
+        _ => {}
     }
 
     Ok(CohortValidationSummary {
@@ -680,6 +710,7 @@ mod tests {
         CohortManifest {
             schema_version: COHORT_MANIFEST_SCHEMA_VERSION.into(),
             cohort_id: "synthetic-cohort-v0".into(),
+            evidence_state: CohortEvidenceState::SyntheticOnly,
             records: vec![
                 record("pilot-a", "pilot-pair", "source-pilot", "speaker-pilot", "session-pilot",
                     "utterance-pilot", CohortSplit::Pilot, A, A),
@@ -707,6 +738,18 @@ mod tests {
                 },
             ],
         }
+    }
+
+    #[test]
+    fn evidence_stage_must_have_matching_pair_type() {
+        let mut manifest = fixture();
+        manifest.evidence_state = CohortEvidenceState::Confirmatory;
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::EvidenceStageRequiresPairType(
+                CohortEvidenceState::Confirmatory
+            ))
+        ));
     }
 
     #[test]
