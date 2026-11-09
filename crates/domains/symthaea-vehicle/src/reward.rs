@@ -255,7 +255,10 @@ mod tests {
             max_age_s: 0.05,
         };
         let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
-        assert!((reward - 1.0).abs() < 1e-6, "At target gap should be 1.0: {reward}");
+        assert!(
+            (reward - 1.0).abs() < 1e-6,
+            "At target gap should be 1.0: {reward}"
+        );
     }
 
     #[test]
