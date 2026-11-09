@@ -1324,6 +1324,8 @@ mod tests {
             )
             .unwrap();
 
+        assert!(quantized_interval.lower <= full_interval.lower);
+        assert!(quantized_interval.upper >= full_interval.upper);
         for (id, member) in &members {
             let exact = query.similarity_full_resolution(member);
             assert!(full_interval.contains(exact), "full profile missed {id}");
