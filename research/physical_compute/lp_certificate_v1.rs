@@ -171,27 +171,44 @@ pub fn verify_optimal(
     }
 
     let x_inf = norm_inf(&certificate.primal);
-    let b_inf = norm_inf(&problem.b);
-    let a_inf = matrix_inf_norm(problem)?;
     // These are dimensionless backward/relative errors. Do not floor their
     // denominators at 1: doing so makes a uniformly tiny but inconsistent LP
     // appear feasible, which is precisely the failure mode this checker must
     // catch after solver scaling is mapped back to the original model.
-    let primal_scale = checked_sum(checked_product(a_inf, x_inf)?, b_inf)?;
-    let mut primal_residual_raw = 0.0_f64;
-    for (ax_i, b_i) in ax.iter().zip(problem.b.iter()) {
-        primal_residual_raw = primal_residual_raw.max((ax_i - b_i).abs());
+    // Use componentwise backward errors: a large row/column must not hide
+    // a violated small row/column in a badly scaled original model.
+    let mut primal_residual_inf = 0.0_f64;
+    for row in 0..problem.rows {
+        let mut row_scale = problem.b[row].abs();
+        for col in 0..problem.cols {
+            let product = problem.a[row * problem.cols + col] * certificate.primal[col];
+            if !product.is_finite() {
+                return Err(VerifyError::NonFiniteArithmetic);
+            }
+            row_scale = checked_sum(row_scale, product.abs())?;
+        }
+        let residual = (ax[row] - problem.b[row]).abs();
+        primal_residual_inf =
+            primal_residual_inf.max(normalized_ratio(residual, row_scale));
     }
-    let primal_residual_inf = normalized_ratio(primal_residual_raw, primal_scale);
 
     let primal_nonnegativity_violation =
         normalized_ratio(max_negative_part(&certificate.primal), x_inf);
 
-    let aty_inf = norm_inf(&aty);
-    let c_inf = norm_inf(&problem.c);
-    let dual_scale = checked_sum(c_inf, aty_inf)?;
-    let dual_nonnegativity_violation =
-        normalized_ratio(max_negative_part(&slack), dual_scale);
+    let mut dual_nonnegativity_violation = 0.0_f64;
+    for col in 0..problem.cols {
+        let mut column_scale = problem.c[col].abs();
+        for row in 0..problem.rows {
+            let product = problem.a[row * problem.cols + col] * certificate.dual[row];
+            if !product.is_finite() {
+                return Err(VerifyError::NonFiniteArithmetic);
+            }
+            column_scale = checked_sum(column_scale, product.abs())?;
+        }
+        let violation = (-slack[col]).max(0.0);
+        dual_nonnegativity_violation =
+            dual_nonnegativity_violation.max(normalized_ratio(violation, column_scale));
+    }
 
     let primal_objective = dot(&problem.c, &certificate.primal)?;
     let dual_objective = dot(&problem.b, &certificate.dual)?;
@@ -278,34 +295,33 @@ pub fn verify_infeasible(
     let normalized_y: Vec<f64> = certificate.y.iter().map(|value| value / y_inf).collect();
     let aty = transpose_mat_vec(problem, &normalized_y)?;
 
-    // Check each dual-cone component against its own column scale. A global
-    // matrix norm can hide a violation in a small column when another column
-    // has much larger coefficients.
+    // Check each dual-cone component against its actual absolute
+    // contributions. A small multiplier must not hide a violated cone
+    // component behind the unweighted norm of its matrix column.
     let mut dual_cone_violation = 0.0_f64;
     for col in 0..problem.cols {
         let mut column_scale = 0.0_f64;
         for row in 0..problem.rows {
-            column_scale += problem.a[row * problem.cols + col].abs();
-            if !column_scale.is_finite() {
+            let product = problem.a[row * problem.cols + col] * normalized_y[row];
+            if !product.is_finite() {
                 return Err(VerifyError::NonFiniteArithmetic);
             }
+            column_scale = checked_sum(column_scale, product.abs())?;
         }
-        let component_violation = if column_scale > 0.0 {
-            (-aty[col]).max(0.0) / column_scale
-        } else if aty[col] < 0.0 {
-            f64::INFINITY
-        } else {
-            0.0
-        };
-        dual_cone_violation = dual_cone_violation.max(component_violation);
+        dual_cone_violation = dual_cone_violation.max(normalized_ratio(
+            (-aty[col]).max(0.0),
+            column_scale,
+        ));
     }
 
     let b_transpose_y = dot(&problem.b, &normalized_y)?;
-    let b_inf = norm_inf(&problem.b);
-    let y_l1 = sum_abs(&normalized_y)?;
-    let contradiction_scale = b_inf * y_l1;
-    if !contradiction_scale.is_finite() {
-        return Err(VerifyError::NonFiniteArithmetic);
+    let mut contradiction_scale = 0.0_f64;
+    for row in 0..problem.rows {
+        let product = problem.b[row] * normalized_y[row];
+        if !product.is_finite() {
+            return Err(VerifyError::NonFiniteArithmetic);
+        }
+        contradiction_scale = checked_sum(contradiction_scale, product.abs())?;
     }
     let contradiction_margin = if contradiction_scale > 0.0 {
         -b_transpose_y / contradiction_scale
@@ -351,15 +367,22 @@ pub fn verify_unbounded(
     }
 
     let base_ax = mat_vec(problem, &certificate.feasible_point)?;
-    let a_inf = matrix_inf_norm(problem)?;
-    let b_inf = norm_inf(&problem.b);
     let x_inf = norm_inf(&certificate.feasible_point);
-    let base_scale = checked_sum(checked_product(a_inf, x_inf)?, b_inf)?;
-    let mut base_residual = 0.0_f64;
-    for (ax_i, b_i) in base_ax.iter().zip(problem.b.iter()) {
-        base_residual = base_residual.max((ax_i - b_i).abs());
+    let mut base_point_residual_inf = 0.0_f64;
+    for row in 0..problem.rows {
+        let mut row_scale = problem.b[row].abs();
+        for col in 0..problem.cols {
+            let product =
+                problem.a[row * problem.cols + col] * certificate.feasible_point[col];
+            if !product.is_finite() {
+                return Err(VerifyError::NonFiniteArithmetic);
+            }
+            row_scale = checked_sum(row_scale, product.abs())?;
+        }
+        let residual = (base_ax[row] - problem.b[row]).abs();
+        base_point_residual_inf =
+            base_point_residual_inf.max(normalized_ratio(residual, row_scale));
     }
-    let base_point_residual_inf = normalized_ratio(base_residual, base_scale);
 
     // An improving ray is homogeneous under positive scaling. Normalize it
     // before checking A*d = 0, d >= 0 and c^T*d < 0; otherwise a tiny copy of
@@ -374,30 +397,32 @@ pub fn verify_unbounded(
         .map(|value| value / d_inf)
         .collect();
     let ray_ad = mat_vec(problem, &normalized_ray)?;
-    let ray_residual_raw = norm_inf(&ray_ad);
-    let ray_residual_inf = if a_inf > 0.0 {
-        ray_residual_raw / a_inf
-    } else if ray_residual_raw == 0.0 {
-        0.0
-    } else {
-        f64::INFINITY
-    };
+    let mut ray_residual_inf = 0.0_f64;
+    for row in 0..problem.rows {
+        let mut row_scale = 0.0_f64;
+        for col in 0..problem.cols {
+            let product = problem.a[row * problem.cols + col] * normalized_ray[col];
+            if !product.is_finite() {
+                return Err(VerifyError::NonFiniteArithmetic);
+            }
+            row_scale = checked_sum(row_scale, product.abs())?;
+        }
+        ray_residual_inf =
+            ray_residual_inf.max(normalized_ratio(ray_ad[row].abs(), row_scale));
+    }
     let ray_nonnegativity_violation = max_negative_part(&normalized_ray);
 
-    // The reported slope uses the normalized ray too: its magnitude depends
-    // on arbitrary certificate scaling, but its sign and normalized margin do not.
+    // Normalize objective descent by the absolute contributions to c^T d.
     let objective_slope = dot(&problem.c, &normalized_ray)?;
-    let c_inf = norm_inf(&problem.c);
-    let d_l1 = sum_abs(&normalized_ray)?;
-    let slope_scale = c_inf * d_l1;
-    if !slope_scale.is_finite() {
-        return Err(VerifyError::NonFiniteArithmetic);
+    let mut slope_scale = 0.0_f64;
+    for col in 0..problem.cols {
+        let product = problem.c[col] * normalized_ray[col];
+        if !product.is_finite() {
+            return Err(VerifyError::NonFiniteArithmetic);
+        }
+        slope_scale = checked_sum(slope_scale, product.abs())?;
     }
-    let improving_margin = if slope_scale > 0.0 {
-        -objective_slope / slope_scale
-    } else {
-        0.0
-    };
+    let improving_margin = normalized_ratio(-objective_slope, slope_scale);
 
     if ![
         base_point_residual_inf,
@@ -492,21 +517,6 @@ fn dot(left: &[f64], right: &[f64]) -> Result<f64, VerifyError> {
     Ok(sum)
 }
 
-fn matrix_inf_norm(problem: &LpProblem) -> Result<f64, VerifyError> {
-    let mut maximum = 0.0_f64;
-    for row in 0..problem.rows {
-        let mut row_sum = 0.0;
-        for col in 0..problem.cols {
-            row_sum += problem.a[row * problem.cols + col].abs();
-            if !row_sum.is_finite() {
-                return Err(VerifyError::NonFiniteArithmetic);
-            }
-        }
-        maximum = maximum.max(row_sum);
-    }
-    Ok(maximum)
-}
-
 fn norm_inf(values: &[f64]) -> f64 {
     values.iter().fold(0.0_f64, |m, value| m.max(value.abs()))
 }
@@ -517,31 +527,12 @@ fn max_negative_part(values: &[f64]) -> f64 {
         .fold(0.0_f64, |m, value| m.max((-value).max(0.0)))
 }
 
-fn sum_abs(values: &[f64]) -> Result<f64, VerifyError> {
-    let mut sum = 0.0;
-    for value in values {
-        sum += value.abs();
-        if !sum.is_finite() {
-            return Err(VerifyError::NonFiniteArithmetic);
-        }
-    }
-    Ok(sum)
-}
-
 fn all_finite(values: &[f64]) -> bool {
     values.iter().all(|value| value.is_finite())
 }
 
 fn checked_sum(a: f64, b: f64) -> Result<f64, VerifyError> {
     let value = a + b;
-    if !value.is_finite() {
-        return Err(VerifyError::NonFiniteArithmetic);
-    }
-    Ok(value)
-}
-
-fn checked_product(a: f64, b: f64) -> Result<f64, VerifyError> {
-    let value = a * b;
     if !value.is_finite() {
         return Err(VerifyError::NonFiniteArithmetic);
     }
@@ -772,6 +763,98 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn rejects_infeasible_small_row_hidden_by_large_row() {
+        let problem = LpProblem {
+            rows: 2,
+            cols: 2,
+            a: vec![1.0e12, 0.0, 0.0, 0.0],
+            b: vec![1.0e12, 1.0],
+            c: vec![0.0, 0.0],
+        };
+        let certificate = OptimalCertificate {
+            primal: vec![1.0, 0.0],
+            dual: vec![0.0, 0.0],
+        };
+        assert_eq!(
+            verify_optimal(&problem, &certificate, tolerances()),
+            Err(VerifyError::PrimalInfeasible)
+        );
+    }
+
+    #[test]
+    fn rejects_dual_violation_in_small_column() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 2,
+            a: vec![1.0e12, 1.0e-12],
+            b: vec![1.0e12],
+            c: vec![1.0e12, -1.0e-12],
+        };
+        let certificate = OptimalCertificate {
+            primal: vec![1.0, 0.0],
+            dual: vec![0.0],
+        };
+        assert_eq!(
+            verify_optimal(&problem, &certificate, tolerances()),
+            Err(VerifyError::DualInfeasible)
+        );
+    }
+
+    #[test]
+    fn rejects_farkas_cone_violation_from_small_multiplier_component() {
+        let problem = LpProblem {
+            rows: 2,
+            cols: 2,
+            a: vec![1.0e12, 0.0, 0.0, -1.0],
+            b: vec![-1.0, 0.0],
+            c: vec![0.0, 0.0],
+        };
+        let certificate = FarkasCertificate { y: vec![1.0, 1.0e-12] };
+        assert_eq!(
+            verify_infeasible(&problem, &certificate, tolerances()),
+            Err(VerifyError::FarkasConeViolation)
+        );
+    }
+
+    #[test]
+    fn rejects_unbounded_ray_with_small_row_nullspace_violation() {
+        let problem = LpProblem {
+            rows: 2,
+            cols: 2,
+            a: vec![1.0e12, 0.0, 0.0, 1.0],
+            b: vec![0.0, 0.0],
+            c: vec![0.0, -1.0],
+        };
+        let certificate = UnboundedCertificate {
+            feasible_point: vec![0.0, 0.0],
+            improving_ray: vec![1.0e-12, 1.0],
+        };
+        assert_eq!(
+            verify_unbounded(&problem, &certificate, tolerances()),
+            Err(VerifyError::RayNotFeasible)
+        );
+    }
+
+    #[test]
+    fn rejects_unbounded_base_point_with_small_row_residual() {
+        let problem = LpProblem {
+            rows: 2,
+            cols: 2,
+            a: vec![1.0e12, 0.0, 0.0, 0.0],
+            b: vec![1.0e12, 1.0],
+            c: vec![0.0, -1.0],
+        };
+        let certificate = UnboundedCertificate {
+            feasible_point: vec![1.0, 0.0],
+            improving_ray: vec![0.0, 1.0],
+        };
+        assert_eq!(
+            verify_unbounded(&problem, &certificate, tolerances()),
+            Err(VerifyError::RayNotFeasible)
+        );
+    }
     #[test]
     fn rejects_infeasible_certificate_after_uniform_model_scaling() {
         // Scaling the whole LP by 1e-12 must not make x=0 satisfy Ax=b.
