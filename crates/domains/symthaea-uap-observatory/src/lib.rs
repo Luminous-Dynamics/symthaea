@@ -824,7 +824,7 @@ pub use budgeted_design::{
 pub mod correlated_design;
 
 pub use correlated_design::{
-    MAX_CORRELATED_DESIGN_OBSERVATIONS, CorrelatedDesignScenario, CorrelatedExperimentOption,
+    CorrelatedDesignScenario, CorrelatedExperimentOption, MAX_CORRELATED_DESIGN_OBSERVATIONS,
     exhaustive_correlated_budgeted_design, greedy_correlated_budgeted_design,
 };
 
