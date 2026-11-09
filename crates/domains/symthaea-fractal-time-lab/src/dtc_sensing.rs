@@ -975,6 +975,30 @@ mod tests {
     }
 
     #[test]
+    fn zero_frequency_nonzero_phase_exposes_amplitude_phase_confounding() {
+        let mut static_probe = config();
+        static_probe.probe_frequency_cycles_per_drive_period = 0.0;
+        static_probe.probe_initial_phase_rad = 0.4;
+        let report = evaluate_dtc_probe_sensing(&static_probe).unwrap();
+
+        assert_eq!(report.phase_time_offset_drive_periods_per_radian, None);
+        assert!(report.classical_joint_crlb_covariance_per_shot.is_none());
+        assert!(report.quantum_joint_crlb_covariance_per_shot.is_none());
+        assert!(
+            report
+                .classical_effective_amplitude_fisher_with_phase_nuisance
+                .unwrap()
+                <= 1.0e-7
+        );
+        assert!(
+            report
+                .quantum_effective_amplitude_fisher_with_phase_nuisance
+                .unwrap()
+                <= 1.0e-6
+        );
+    }
+
+    #[test]
     fn invalid_phase_derivative_step_fails_closed() {
         let mut invalid = config();
         invalid.phase_derivative_step_rad = f64::NAN;
