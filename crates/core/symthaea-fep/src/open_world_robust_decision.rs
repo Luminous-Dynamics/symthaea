@@ -90,14 +90,18 @@ pub enum ModelAdequacyError {
     InvalidThresholds,
     #[error("observation {observation_index} has no outcome categories")]
     EmptyOutcomeSet { observation_index: usize },
-    #[error("observation {observation_index} has an invalid probability at category {category_index}")]
+    #[error(
+        "observation {observation_index} has an invalid probability at category {category_index}"
+    )]
     InvalidProbability {
         observation_index: usize,
         category_index: usize,
     },
     #[error("observation {observation_index} probability mass sums to {sum}, expected 1")]
     ProbabilityMassNotNormalized { observation_index: usize, sum: f64 },
-    #[error("observation {observation_index} has outcome index {outcome_index} outside 0..{outcome_count}")]
+    #[error(
+        "observation {observation_index} has outcome index {outcome_index} outside 0..{outcome_count}"
+    )]
     OutcomeIndexOutOfRange {
         observation_index: usize,
         outcome_index: usize,
@@ -153,8 +157,9 @@ pub fn evaluate_prequential_model_adequacy(
 
         let observed_probability = probabilities[observation.observed_outcome_index];
         minimum_observed_probability = Some(
-            minimum_observed_probability
-                .map_or(observed_probability, |minimum| minimum.min(observed_probability)),
+            minimum_observed_probability.map_or(observed_probability, |minimum| {
+                minimum.min(observed_probability)
+            }),
         );
         if observed_probability == 0.0 {
             zero_support_count += 1;
@@ -310,13 +315,10 @@ pub fn evaluate_tv_robust_decision_diagnostics(
     decision_config: DecisionDiagnosticConfig,
     total_variation_radius: f64,
 ) -> Result<TvRobustDecisionEvaluation, TvRobustDecisionError> {
-    if !total_variation_radius.is_finite()
-        || !(0.0..=1.0).contains(&total_variation_radius)
-    {
+    if !total_variation_radius.is_finite() || !(0.0..=1.0).contains(&total_variation_radius) {
         return Err(TvRobustDecisionError::InvalidTotalVariationRadius);
     }
-    let nominal =
-        evaluate_decision_focused_diagnostics(hypotheses, actions, decision_config)?;
+    let nominal = evaluate_decision_focused_diagnostics(hypotheses, actions, decision_config)?;
     let maximum_declared_loss = hypotheses
         .iter()
         .flat_map(|hypothesis| hypothesis.loss_by_final_decision.iter().copied())
@@ -448,9 +450,7 @@ pub fn worst_case_distribution_within_tv(
     let mut recipient_index = 0;
     let mut remaining_budget = radius;
     while remaining_budget > PROBABILITY_TOLERANCE {
-        while donor_index < donors.len()
-            && worst_case[donors[donor_index]] <= PROBABILITY_TOLERANCE
-        {
+        while donor_index < donors.len() && worst_case[donors[donor_index]] <= PROBABILITY_TOLERANCE {
             donor_index += 1;
         }
         while recipient_index < recipients.len()
@@ -478,14 +478,15 @@ pub fn worst_case_distribution_within_tv(
     }
 
     let final_mass = worst_case.iter().sum::<f64>();
-    if worst_case.iter().any(|probability| !probability.is_finite())
+    if worst_case
+        .iter()
+        .any(|probability| !probability.is_finite())
         || (final_mass - 1.0).abs() > PROBABILITY_TOLERANCE
     {
         return Err(TvRobustDecisionError::NonFiniteRisk);
     }
     Ok(worst_case)
 }
-
 
 /// A preregistered alternative predictive model for sequential adequacy testing.
 ///
@@ -538,20 +539,26 @@ pub enum PrequentialEProcessError {
         expected: usize,
         actual: usize,
     },
-    #[error("alternative {alternative_index}, observation {observation_index} has {actual} categories; expected {expected}")]
+    #[error(
+        "alternative {alternative_index}, observation {observation_index} has {actual} categories; expected {expected}"
+    )]
     AlternativeCategoryCountMismatch {
         alternative_index: usize,
         observation_index: usize,
         expected: usize,
         actual: usize,
     },
-    #[error("alternative {alternative_index}, observation {observation_index}, category {category_index} has invalid probability")]
+    #[error(
+        "alternative {alternative_index}, observation {observation_index}, category {category_index} has invalid probability"
+    )]
     InvalidAlternativeProbability {
         alternative_index: usize,
         observation_index: usize,
         category_index: usize,
     },
-    #[error("alternative {alternative_index}, observation {observation_index} probability mass sums to {sum}, expected 1")]
+    #[error(
+        "alternative {alternative_index}, observation {observation_index} probability mass sums to {sum}, expected 1"
+    )]
     AlternativeProbabilityMassNotNormalized {
         alternative_index: usize,
         observation_index: usize,
@@ -559,14 +566,18 @@ pub enum PrequentialEProcessError {
     },
     #[error("null observation {observation_index} has no outcome categories")]
     EmptyNullOutcomeSet { observation_index: usize },
-    #[error("null observation {observation_index} has an invalid probability at category {category_index}")]
+    #[error(
+        "null observation {observation_index} has an invalid probability at category {category_index}"
+    )]
     InvalidNullProbability {
         observation_index: usize,
         category_index: usize,
     },
     #[error("null observation {observation_index} probability mass sums to {sum}, expected 1")]
     NullProbabilityMassNotNormalized { observation_index: usize, sum: f64 },
-    #[error("null observation {observation_index} has outcome index {outcome_index} outside 0..{outcome_count}")]
+    #[error(
+        "null observation {observation_index} has outcome index {outcome_index} outside 0..{outcome_count}"
+    )]
     NullOutcomeIndexOutOfRange {
         observation_index: usize,
         outcome_index: usize,
@@ -614,17 +625,17 @@ pub fn evaluate_prequential_e_process(
         }
         weight_sum += alternative.prior_weight;
         if alternative.predicted_outcome_probabilities.len() != null_observations.len() {
-            return Err(PrequentialEProcessError::AlternativeObservationCountMismatch {
-                alternative_index,
-                expected: null_observations.len(),
-                actual: alternative.predicted_outcome_probabilities.len(),
-            });
+            return Err(
+                PrequentialEProcessError::AlternativeObservationCountMismatch {
+                    alternative_index,
+                    expected: null_observations.len(),
+                    actual: alternative.predicted_outcome_probabilities.len(),
+                },
+            );
         }
     }
     if (weight_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(PrequentialEProcessError::AlternativeWeightsNotNormalized {
-            sum: weight_sum,
-        });
+        return Err(PrequentialEProcessError::AlternativeWeightsNotNormalized { sum: weight_sum });
     }
 
     let mut log_likelihood_ratios = vec![Some(0.0_f64); alternatives.len()];
@@ -637,19 +648,21 @@ pub fn evaluate_prequential_e_process(
         if null_probabilities.is_empty() {
             return Err(PrequentialEProcessError::EmptyNullOutcomeSet { observation_index });
         }
-        validate_categorical_distribution(null_probabilities).map_err(|(category_index, sum)| {
-            if let Some(category_index) = category_index {
-                PrequentialEProcessError::InvalidNullProbability {
-                    observation_index,
-                    category_index,
+        validate_categorical_distribution(null_probabilities).map_err(
+            |(category_index, sum)| {
+                if let Some(category_index) = category_index {
+                    PrequentialEProcessError::InvalidNullProbability {
+                        observation_index,
+                        category_index,
+                    }
+                } else {
+                    PrequentialEProcessError::NullProbabilityMassNotNormalized {
+                        observation_index,
+                        sum,
+                    }
                 }
-            } else {
-                PrequentialEProcessError::NullProbabilityMassNotNormalized {
-                    observation_index,
-                    sum,
-                }
-            }
-        })?;
+            },
+        )?;
         if null_observation.observed_outcome_index >= null_probabilities.len() {
             return Err(PrequentialEProcessError::NullOutcomeIndexOutOfRange {
                 observation_index,
@@ -683,11 +696,13 @@ pub fn evaluate_prequential_e_process(
                 }
             }
             if (sum - 1.0).abs() > PROBABILITY_TOLERANCE {
-                return Err(PrequentialEProcessError::AlternativeProbabilityMassNotNormalized {
-                    alternative_index,
-                    observation_index,
-                    sum,
-                });
+                return Err(
+                    PrequentialEProcessError::AlternativeProbabilityMassNotNormalized {
+                        alternative_index,
+                        observation_index,
+                        sum,
+                    },
+                );
             }
 
             if let Some(current_log_ratio) = log_likelihood_ratios[alternative_index] {
@@ -722,11 +737,13 @@ pub fn evaluate_prequential_e_process(
     let components = alternatives
         .iter()
         .zip(log_likelihood_ratios)
-        .map(|(alternative, log_likelihood_ratio)| AlternativeEProcessComponent {
-            id: alternative.id.clone(),
-            prior_weight: alternative.prior_weight / normalized_weight_sum,
-            log_likelihood_ratio,
-        })
+        .map(
+            |(alternative, log_likelihood_ratio)| AlternativeEProcessComponent {
+                id: alternative.id.clone(),
+                prior_weight: alternative.prior_weight / normalized_weight_sum,
+                log_likelihood_ratio,
+            },
+        )
         .collect();
     Ok(PrequentialEProcessReport {
         alpha,
@@ -754,10 +771,7 @@ fn mixture_log_e_value(
         })
         .collect::<Vec<_>>();
     let maximum = terms.iter().copied().reduce(f64::max)?;
-    let log_sum = terms
-        .iter()
-        .map(|term| (term - maximum).exp())
-        .sum::<f64>();
+    let log_sum = terms.iter().map(|term| (term - maximum).exp()).sum::<f64>();
     Some(maximum + log_sum.ln())
 }
 
@@ -849,8 +863,14 @@ mod tests {
             0.0,
         )
         .expect("zero-radius TV diagnostics");
-        assert_eq!(robust.nominal_selected_action_index, nominal.selected_action_index);
-        assert_eq!(robust.robust_selected_action_index, nominal.selected_action_index);
+        assert_eq!(
+            robust.nominal_selected_action_index,
+            nominal.selected_action_index
+        );
+        assert_eq!(
+            robust.robust_selected_action_index,
+            nominal.selected_action_index
+        );
         assert!(
             (robust.actions[0].nominal_expected_posterior_bayes_risk
                 - robust.actions[0].worst_case_expected_posterior_bayes_risk)
@@ -871,10 +891,7 @@ mod tests {
         .expect("robust diagnostics");
         assert_eq!(robust.nominal_selected_action_index, Some(0));
         assert_eq!(robust.robust_selected_action_index, None);
-        assert!(
-            robust.actions[0].worst_case_total_score.unwrap()
-                > robust.no_probe_bayes_risk
-        );
+        assert!(robust.actions[0].worst_case_total_score.unwrap() > robust.no_probe_bayes_risk);
     }
 
     #[test]
@@ -990,13 +1007,10 @@ mod tests {
             prior_weight: 1.0,
             predicted_outcome_probabilities: (0..8).map(|_| vec![0.9, 0.1]).collect(),
         };
-        let report =
-            evaluate_prequential_e_process(&observations, &[alternative], 0.05)
-                .expect("valid sequential e-process");
+        let report = evaluate_prequential_e_process(&observations, &[alternative], 0.05)
+            .expect("valid sequential e-process");
         assert_eq!(report.crossed_at_observation, Some(6));
-        assert!(
-            report.log_e_value.unwrap() >= report.log_e_threshold
-        );
+        assert!(report.log_e_value.unwrap() >= report.log_e_threshold);
     }
 
     #[test]
