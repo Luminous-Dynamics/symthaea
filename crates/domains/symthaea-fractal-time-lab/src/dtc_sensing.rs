@@ -522,7 +522,7 @@ mod tests {
         let nominal = [0.4, 0.6];
         let plus = [0.42, 0.58];
         let minus = [0.38, 0.62];
-        let derivative = 0.02 / 0.002;
+        let derivative = 0.04 / 0.002;
         let expected = derivative * derivative / 0.4 + derivative * derivative / 0.6;
         let observed =
             total_z_classical_fisher_information(&nominal, &plus, &minus, 0.001).unwrap();
