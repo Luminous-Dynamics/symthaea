@@ -1413,6 +1413,202 @@ fn is_lower_hex(value: &str, length: usize) -> bool {
 mod tests {
     use super::*;
 
+    // Deliberately separate test oracle: directly enumerates menu products and
+    // computes risks from raw tensors. It does not call production decoders,
+    // candidate comparators, static-risk, or rectangular-risk functions.
+    fn independent_reference(
+        problem: &StaticModelDiagnosticProblem,
+    ) -> (f64, f64, f64, u64) {
+        fn expand_menus(
+            menus: &[Vec<String>],
+            depth: usize,
+            prefix: &mut Vec<usize>,
+            output: &mut Vec<Vec<usize>>,
+        ) {
+            if depth == menus.len() {
+                output.push(prefix.clone());
+                return;
+            }
+            for index in 0..menus[depth].len() {
+                prefix.push(index);
+                expand_menus(menus, depth + 1, prefix, output);
+                prefix.pop();
+            }
+        }
+
+        fn rectangular_reference(
+            problem: &StaticModelDiagnosticProblem,
+            root_index: usize,
+            selected_actions: &[usize],
+            terminal_map: &[StaticDiagnosticDecision],
+        ) -> f64 {
+            let outcome_count = problem.second_stage_outcome_ids.len();
+            let root = &problem.model_vertices[root_index];
+            let mut total = 0.0;
+            for history_index in 0..problem.first_stage_history_ids.len() {
+                let mut joint_world = vec![0.0; problem.world_ids.len()];
+                for world_index in 0..problem.world_ids.len() {
+                    joint_world[world_index] = root.world_prior_probabilities[world_index]
+                        * root.stage_one_outcome_probabilities_by_world[world_index]
+                            [history_index];
+                }
+                let history_probability = joint_world.iter().sum::<f64>();
+                if history_probability == 0.0 {
+                    continue;
+                }
+                let posterior_world = joint_world
+                    .iter()
+                    .map(|mass| mass / history_probability)
+                    .collect::<Vec<_>>();
+                let action_index = selected_actions[history_index];
+                let mut adversarial_conditional = 0.0_f64;
+                for stage_vertex in &problem.model_vertices {
+                    let mut conditional = 0.0;
+                    for world_index in 0..problem.world_ids.len() {
+                        for outcome_index in 0..outcome_count {
+                            let decision =
+                                terminal_map[history_index * outcome_count + outcome_index];
+                            let says_true = decision == StaticDiagnosticDecision::Support;
+                            let actually_true = problem.world_is_query_true[world_index];
+                            let loss = if says_true == actually_true { 0.0 } else { 1.0 };
+                            conditional += posterior_world[world_index]
+                                * stage_vertex.stage_two_outcome_probabilities[history_index]
+                                    [action_index][world_index][outcome_index]
+                                * loss;
+                        }
+                    }
+                    adversarial_conditional = adversarial_conditional.max(conditional);
+                }
+                total += history_probability * adversarial_conditional;
+            }
+            total
+        }
+
+        let mut menu_products = Vec::new();
+        expand_menus(
+            &problem.second_stage_action_ids_by_history,
+            0,
+            &mut Vec::new(),
+            &mut menu_products,
+        );
+        let outcome_count = problem.second_stage_outcome_ids.len();
+        let decision_count = problem.first_stage_history_ids.len() * outcome_count;
+        let mut best_static = f64::INFINITY;
+        let mut best_rectangular = f64::INFINITY;
+        let mut best_static_actions = Vec::new();
+        let mut best_static_decisions = Vec::new();
+        let mut feasible_policy_count = 0_u64;
+
+        for selected_actions in menu_products {
+            let branch_cost = problem.root_action_cost
+                + selected_actions
+                    .iter()
+                    .enumerate()
+                    .map(|(history, action)| {
+                        problem.second_stage_action_costs_by_history[history][*action]
+                    })
+                    .fold(0.0_f64, f64::max);
+            if branch_cost > problem.maximum_worst_branch_cost + 1e-10 {
+                continue;
+            }
+            for mask in 0..(1_u64 << decision_count) {
+                feasible_policy_count += 1;
+                let terminal_map = (0..decision_count)
+                    .map(|index| {
+                        if mask & (1_u64 << index) == 0 {
+                            StaticDiagnosticDecision::Support
+                        } else {
+                            StaticDiagnosticDecision::Refute
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut worst_static = 0.0_f64;
+                for vertex in &problem.model_vertices {
+                    let mut vertex_risk = 0.0;
+                    for world_index in 0..problem.world_ids.len() {
+                        for history_index in 0..problem.first_stage_history_ids.len() {
+                            let p_history =
+                                vertex.stage_one_outcome_probabilities_by_world[world_index]
+                                    [history_index];
+                            let action_index = selected_actions[history_index];
+                            for outcome_index in 0..outcome_count {
+                                let decision = terminal_map[history_index * outcome_count + outcome_index];
+                                let says_true = decision == StaticDiagnosticDecision::Support;
+                                let actually_true = problem.world_is_query_true[world_index];
+                                let loss = if says_true == actually_true { 0.0 } else { 1.0 };
+                                vertex_risk += vertex.world_prior_probabilities[world_index]
+                                    * p_history
+                                    * vertex.stage_two_outcome_probabilities[history_index]
+                                        [action_index][world_index][outcome_index]
+                                    * loss;
+                            }
+                        }
+                    }
+                    worst_static = worst_static.max(vertex_risk);
+                }
+
+                let mut worst_rectangular = 0.0_f64;
+                for root_index in 0..problem.model_vertices.len() {
+                    worst_rectangular = worst_rectangular.max(rectangular_reference(
+                        problem,
+                        root_index,
+                        &selected_actions,
+                        &terminal_map,
+                    ));
+                }
+
+                if worst_static + 1e-10 < best_static {
+                    best_static = worst_static;
+                    best_static_actions = selected_actions.clone();
+                    best_static_decisions = terminal_map.clone();
+                }
+                if worst_rectangular + 1e-10 < best_rectangular {
+                    best_rectangular = worst_rectangular;
+                }
+            }
+        }
+
+        let mut rectangular_risk_of_static = 0.0_f64;
+        for root_index in 0..problem.model_vertices.len() {
+            rectangular_risk_of_static = rectangular_risk_of_static.max(rectangular_reference(
+                problem,
+                root_index,
+                &best_static_actions,
+                &best_static_decisions,
+            ));
+        }
+        (
+            best_static,
+            best_rectangular,
+            rectangular_risk_of_static,
+            feasible_policy_count,
+        )
+    }
+
+    #[test]
+    fn independent_policy_tree_oracle_matches_solver() {
+        let problem = symmetric_calibration_fixture();
+        let result = evaluate_static_model_diagnostic_problem(
+            &problem,
+            StaticModelDiagnosticConfig::default(),
+            &"a".repeat(40),
+        )
+        .expect("static-model oracle");
+        let (reference_static, reference_rectangular, reference_static_rectangular, feasible) =
+            independent_reference(&problem);
+
+        assert_eq!(feasible, 256);
+        assert_eq!(reference_static, result.report.static_robust_risk);
+        assert!(
+            (reference_rectangular - result.report.rectangular_minimax_risk).abs() < 1e-12
+        );
+        assert!(
+            (reference_static_rectangular - result.report.rectangular_risk_of_static_policy).abs()
+                < 1e-12
+        );
+    }
+
     #[test]
     fn known_answer_separates_static_and_rectangular_risk() {
         let problem = symmetric_calibration_fixture();
