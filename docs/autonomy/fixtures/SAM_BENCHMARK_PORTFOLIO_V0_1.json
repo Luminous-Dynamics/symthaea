@@ -1733,6 +1733,60 @@
         "authored_rust_test_count": 17,
         "exact_head": "7eb335423e6cee74d0293d50bfca1125ed83cfa1"
       }
+    },
+    {
+      "id": "sam-world-model-decision-utility-gate-v0.1",
+      "name": "SAM World-Model Decision-Utility Promotion Gate v0.1",
+      "category": "world_model_promotion_and_downstream_utility",
+      "source_status": "specification_only",
+      "rights_status": "benchmark_specific_rights_review_required",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9010",
+      "artifacts": [
+        "docs/autonomy/SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.md",
+        "docs/autonomy/fixtures/SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.json"
+      ],
+      "comparison_arms": [
+        "direct_reactive",
+        "direct_plus_same_memory",
+        "model_assisted",
+        "shuffled_dynamics_control",
+        "stale_model_control",
+        "qualified_oracle_evaluator_only",
+        "distilled_student"
+      ],
+      "evaluation_layers": [
+        "scene_fidelity",
+        "trajectory_prediction_coverage_and_residuals",
+        "counterfactual_decision_lift",
+        "interactive_closed_loop_outcomes",
+        "compute_and_resource_cost"
+      ],
+      "promotion_requirements": [
+        "matched_budget_decision_lift_or_regret_reduction",
+        "prediction_set_coverage_and_sharpness_qualified",
+        "horizon_residual_and_model_exploitation_audit",
+        "qualified_reference_disagreement_retained",
+        "held_out_interaction_family_improvement",
+        "no_worst_family_hard_constraint_regression",
+        "latency_memory_energy_and_deadline_profile",
+        "no_evaluator_or_teacher_privilege_leakage"
+      ],
+      "validation_result": null,
+      "caveats": [
+        "Specification only; no controller or model has passed this promotion gate.",
+        "DrivingGen measures visual/scene fidelity and trajectory controllability, not downstream closed-loop task success.",
+        "World-In-World is a non-driving embodied benchmark and is used as methodological context, not an AV score.",
+        "WOD-E2E, NAVSIM v2, ReactSim-Bench, nuPlan-R and Symtropy reciprocal policy loop are distinct protocol classes and must not be pooled.",
+        "A passing synthetic or benchmark promotion report is not physical vehicle safety or public-road qualification."
+      ],
+      "sources": [
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html",
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html",
+        "https://github.com/autonomousvision/navsim/blob/main/README.md",
+        "https://arxiv.org/abs/2606.14058",
+        "https://arxiv.org/abs/2511.10403",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/9010"
+      ]
     }
   ],
   "world_model_benchmark_landscape_snapshot": {
