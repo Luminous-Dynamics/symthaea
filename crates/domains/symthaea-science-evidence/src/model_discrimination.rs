@@ -694,7 +694,6 @@ pub fn rank_detection_aware_model_discriminating_experiments(
     for (index, candidate) in experiments.iter().enumerate() {
         let experiment = &candidate.experiment;
         validate_experiment(experiment, hypotheses, index, &mut experiment_ids)?;
-        let detection_by_model = validate_detection_probabilities(candidate, hypotheses)?;
 
         // Reuse all of the existing measurement comparability gates. The
         // wrapped score's old uninformative-missingness EIG is not used here.
@@ -718,6 +717,7 @@ pub fn rank_detection_aware_model_discriminating_experiments(
             continue;
         }
 
+        let detection_by_model = validate_detection_probabilities(candidate, hypotheses)?;
         let measurement_sigma = experiment.measurement_sigma.expect("comparability gate");
         // Prediction rows are keyed by model ID, not by caller-supplied vector
         // position. Canonicalize to the hypothesis order before pairing them
@@ -2093,6 +2093,36 @@ mod tests {
             assert!((left.total_eig_given_execution_nats - right.total_eig_given_execution_nats).abs() < 1.0e-10);
             assert!((left.availability_adjusted_total_eig_nats - right.availability_adjusted_total_eig_nats).abs() < 1.0e-10);
         }
+    }
+
+    #[test]
+    fn non_comparable_prediction_remains_typed_even_when_detection_rows_are_incomplete() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = detection_candidate(
+            "partial-model",
+            1.0,
+            vec![
+                prediction("model-a", Some(-1.0), Some(0.1)),
+                GaussianModelPrediction {
+                    model_id: "model-b".to_string(),
+                    disposition: PredictionDisposition::NotDerived,
+                    predictive_mean: None,
+                    predictive_sigma: None,
+                    derivation_reference: None,
+                },
+            ],
+            vec![detection_prediction("model-a", 0.5)],
+        );
+        let report = rank_detection_aware_model_discriminating_experiments(
+            &hypotheses,
+            &[candidate],
+            &config(vec![equal_prior()], 128),
+        )
+        .unwrap();
+        assert!(matches!(
+            report.experiments[0].status,
+            ExperimentDiscriminationStatus::NotComparable { .. }
+        ));
     }
 
     #[test]
