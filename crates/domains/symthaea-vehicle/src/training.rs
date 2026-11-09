@@ -1128,6 +1128,15 @@ mod tests {
 
         let summary = std::fs::read_to_string(format!("{}/summary.csv", dir)).unwrap();
         assert!(summary.starts_with("episode,task,"));
+        let summary_header = summary.lines().next().unwrap();
+        assert!(summary_header.contains("follow_oracle_available_steps"));
+        assert!(summary_header.contains("follow_oracle_unavailable_steps"));
+
+        let step_csv = std::fs::read_to_string(format!("{}/episode_0000.csv", dir)).unwrap();
+        let step_header = step_csv.lines().next().unwrap();
+        assert!(step_header.contains("follow_oracle_available"));
+        assert!(step_header.contains("follow_oracle_actor_id"));
+        assert!(step_header.contains("follow_oracle_snapshot_age_s"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
