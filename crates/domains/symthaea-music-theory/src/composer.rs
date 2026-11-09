@@ -4120,6 +4120,36 @@ fn realize_harmony_measures(
     cadential_split: bool,
     seventh_chords: bool,
 ) {
+    realize_harmony_measures_for_part(
+        score,
+        PartId::UNASSIGNED,
+        measure_degrees,
+        key,
+        meter_beats,
+        intent,
+        prev_upper,
+        start_measure,
+        section_intensity,
+        pattern,
+        cadential_split,
+        seventh_chords,
+    );
+}
+
+fn realize_harmony_measures_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    measure_degrees: &[i32],
+    key: Key,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    prev_upper: &mut Vec<Pitch>,
+    start_measure: i64,
+    section_intensity: f32,
+    pattern: crate::accompaniment::Accompaniment,
+    cadential_split: bool,
+    seventh_chords: bool,
+) {
     let harmony_octave = 3;
     // Accompaniment level: loud enough that real sampled instruments keep
     // their presence (low velocity ALSO selects the softest recorded layer —
@@ -4194,8 +4224,9 @@ fn realize_harmony_measures(
             let half = bar.scale(1, 2);
             let (first, second) = (key.diatonic_triad(deg), key.diatonic_seventh(deg));
             let voiced1 = crate::voicing::lead_upper(prev_upper, first, harmony_octave);
-            pattern.realize_measure(
+            pattern.realize_measure_for_part(
                 score,
+                part_id,
                 &voiced1,
                 onset,
                 meter_beats / 2.0,
@@ -4204,8 +4235,9 @@ fn realize_harmony_measures(
             );
             *prev_upper = voiced1;
             let voiced2 = crate::voicing::lead_upper(prev_upper, second, harmony_octave);
-            pattern.realize_measure(
+            pattern.realize_measure_for_part(
                 score,
+                part_id,
                 &voiced2,
                 onset + half,
                 meter_beats / 2.0,
@@ -4233,7 +4265,7 @@ fn realize_harmony_measures(
         // (block pad, arpeggio, Alberti, oom-pah, comp stabs); WHICH tones
         // exist is decided above by the voice leading and is identical for
         // every pattern — see `accompaniment.rs`'s containment tests.
-        pattern.realize_measure(score, &voiced, onset, meter_beats, vel, section_intensity);
+        pattern.realize_measure_for_part(score, part_id, &voiced, onset, meter_beats, vel, section_intensity);
         *prev_upper = voiced;
     }
 }
@@ -4247,8 +4279,36 @@ fn realize_harmony_measures(
 /// (voice-leading a real-time phrase transition exactly like a section
 /// boundary); `compose()` passes a fresh, empty `Vec`.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn realize_harmony(
     score: &mut Score,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    prev_upper: &mut Vec<Pitch>,
+    pattern: crate::accompaniment::Accompaniment,
+    thin_departure: bool,
+    cadential_split: bool,
+    seventh_chords: bool,
+) {
+    realize_harmony_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        meter_beats,
+        intent,
+        prev_upper,
+        pattern,
+        thin_departure,
+        cadential_split,
+        seventh_chords,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn realize_harmony_for_part(
+    score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -4275,8 +4335,9 @@ pub(crate) fn realize_harmony(
         } else {
             (&degrees[..], measure)
         };
-        realize_harmony_measures(
+        realize_harmony_measures_for_part(
             score,
+            part_id,
             realized,
             section.key,
             meter_beats,
@@ -4401,8 +4462,41 @@ pub(crate) fn realize_counter_melody(
 /// opening measure, to establish a new key clearly, and the piece's very
 /// final measure).
 #[allow(clippy::too_many_arguments)] // each parameter is a distinct, irreducible piece of realization state; bundling them into a struct for one internal call site wouldn't add clarity.
+#[allow(clippy::too_many_arguments)]
 fn realize_bass_measures(
     score: &mut Score,
+    measure_degrees: &[i32],
+    key: Key,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    prev_bass: &mut Option<Pitch>,
+    start_measure: i64,
+    force_root_at: impl Fn(usize) -> bool,
+    section_intensity: f32,
+    pattern: crate::accompaniment::Accompaniment,
+    cadential_split: bool,
+    melody_aware: bool,
+) {
+    realize_bass_measures_for_part(
+        score,
+        PartId::UNASSIGNED,
+        measure_degrees,
+        key,
+        meter_beats,
+        intent,
+        prev_bass,
+        start_measure,
+        force_root_at,
+        section_intensity,
+        pattern,
+        cadential_split,
+        melody_aware,
+    );
+}
+
+fn realize_bass_measures_for_part(
+    score: &mut Score,
+    part_id: PartId,
     measure_degrees: &[i32],
     key: Key,
     meter_beats: f64,
@@ -4518,7 +4612,7 @@ fn realize_bass_measures(
             let quarter = Duration::quarter();
             let hold = bar.saturating_sub(quarter);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: bass,
                 onset: bar_onset,
                 duration: if meter_beats > 1.0 { hold } else { bar },
@@ -4533,7 +4627,7 @@ fn realize_bass_measures(
                 // lesson: cross-bar sustain risks colliding with the next
                 // bar's own freshly-voiced chord).
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch: bass,
                     onset: bar_onset + hold,
                     duration: quarter,
@@ -4556,7 +4650,7 @@ fn realize_bass_measures(
                 bar
             };
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: bass,
                 onset: bar_onset,
                 duration: anchor_dur,
@@ -4591,7 +4685,7 @@ fn realize_bass_measures(
                     continue;
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch: if is_fifth { fifth } else { bass },
                     onset: bar_onset + Duration::new((beat * 2.0).round() as i64, 2),
                     duration: eighth,
@@ -4607,7 +4701,7 @@ fn realize_bass_measures(
         if approaches_dominant {
             let third = chord.voice(bass_octave)[1];
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: bass,
                 onset: bar_onset,
                 duration: half_bar,
@@ -4617,7 +4711,7 @@ fn realize_bass_measures(
                 section_intensity,
             });
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: third,
                 onset: bar_onset + half_bar,
                 duration: half_bar,
@@ -4631,7 +4725,7 @@ fn realize_bass_measures(
         }
 
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: part_id,
             pitch: bass,
             onset: bar_onset,
             duration: if five_gait {
@@ -4655,7 +4749,7 @@ fn realize_bass_measures(
         if walking {
             let fifth = chord.voice(bass_octave)[2];
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: fifth,
                 onset: bar_onset + half_bar,
                 duration: half_bar,
@@ -4668,7 +4762,7 @@ fn realize_bass_measures(
         } else if five_gait {
             // The TWO group's anchor: the root again at beat 3, two beats.
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: bass,
                 onset: bar_onset + Duration::new(3, 1),
                 duration: Duration::new(2, 1),
@@ -4691,8 +4785,34 @@ fn realize_bass_measures(
 /// `prev_bass` is caller-owned so [`crate::live::LiveComposer`] can carry it
 /// between incremental calls; `compose()` passes a fresh `None`.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn realize_bass(
     score: &mut Score,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    prev_bass: &mut Option<Pitch>,
+    pattern: crate::accompaniment::Accompaniment,
+    cadential_split: bool,
+    refits_melody_in_bc: bool,
+) {
+    realize_bass_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        meter_beats,
+        intent,
+        prev_bass,
+        pattern,
+        cadential_split,
+        refits_melody_in_bc,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn realize_bass_for_part(
+    score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -4723,8 +4843,9 @@ pub(crate) fn realize_bass(
                 section.role,
                 crate::form::SectionRole::B | crate::form::SectionRole::C
             ));
-        realize_bass_measures(
+        realize_bass_measures_for_part(
             score,
+            part_id,
             &degrees,
             section.key,
             meter_beats,
