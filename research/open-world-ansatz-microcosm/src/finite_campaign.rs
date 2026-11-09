@@ -660,7 +660,7 @@ pub fn run_exhaustive_finite_policy_campaign(
     let paired_contrasts = paired_arm_contrasts(&pair_records);
 
     Ok(FinitePolicyCampaignReport {
-        report_version: "symthaea-open-world-finite-policy-campaign-v1".to_owned(),
+        report_version: "symthaea-open-world-finite-policy-campaign-v2".to_owned(),
         campaign_kind: "exhaustive_generating_model_census".to_owned(),
         policy_kind: "StrategyEnumeratorBaseline (exact finite inference; not learned)".to_owned(),
         initial_observation_count: 0,
