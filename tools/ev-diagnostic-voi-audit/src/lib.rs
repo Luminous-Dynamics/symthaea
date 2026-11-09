@@ -955,9 +955,9 @@ mod tests {
     #[test]
     fn frozen_corpus_selects_one_test_abstains_once_and_rejects_two_controls() {
         let report = audit_corpus(SCHEMA, CORPUS).expect("frozen decision corpus");
-        assert_eq!(report.payload.scenario_count, 4);
+        assert_eq!(report.payload.scenario_count, 5);
         assert_eq!(report.payload.selected_test_count, 1);
-        assert_eq!(report.payload.no_test_count, 2);
+        assert_eq!(report.payload.no_test_count, 3);
         assert_eq!(report.payload.abstain_count, 1);
     }
 
@@ -1014,6 +1014,44 @@ mod tests {
         }
         let permuted: Scenario = serde_json::from_value(permuted_value).expect("permuted scenario");
         assert_eq!(original_decision, evaluate_scenario(&permuted));
+    }
+
+    #[test]
+    fn mismatched_pack_configuration_excludes_a_test() {
+        let report = audit_corpus(SCHEMA, CORPUS).expect("frozen decision corpus");
+        let case = report
+            .payload
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "synthetic-wrong-pack-configuration-test-excluded")
+            .expect("wrong-configuration case");
+        assert_eq!(case.recommendation_status, "no_test");
+        let test = case.tests.first().expect("candidate test");
+        assert!(!test.eligible);
+        assert!(test
+            .ineligibility_reasons
+            .contains(&"vehicle_or_pack_configuration_mismatch".to_owned()));
+    }
+
+    #[test]
+    fn scenario_report_preserves_asset_and_evidence_identity() {
+        let report = audit_corpus(SCHEMA, CORPUS).expect("frozen decision corpus");
+        let case = report
+            .payload
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "synthetic-diagnostic-positive-evsi")
+            .expect("positive EVSI case");
+        assert_eq!(case.vehicle_ref, "vehicle-synthetic-ev-01");
+        assert_eq!(case.pack_ref, "pack-synthetic-ev-01");
+        assert_eq!(
+            case.observation_batch_ref,
+            "synthetic-observation-batch-v0.1"
+        );
+        assert_eq!(
+            case.pack_capability_profile_ref,
+            "synthetic-pack-capability-profile-v0.1"
+        );
     }
 
     #[test]
