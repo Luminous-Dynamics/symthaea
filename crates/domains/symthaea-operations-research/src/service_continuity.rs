@@ -754,6 +754,7 @@ mod tests {
     fn failed_post_test_rejects_release_even_if_a_release_is_attempted() {
         let events=vec![
             event("failure",1800,EventKind::ComponentFailure,0.0),
+            task_event("repair_start",2700,EventKind::RepairStarted,0.0),
             task_event("repair",3600,EventKind::RepairCompleted,0.0),
             task_event("test_fail",5400,EventKind::PostTestFailed,0.0),
             task_event("config",6000,EventKind::ConfigurationUpdated,0.0),
@@ -769,6 +770,7 @@ mod tests {
     fn wrong_revision_spare_is_rejected() {
         let events=vec![
             event("failure",1800,EventKind::ComponentFailure,0.0),
+            task_event("repair_start",2700,EventKind::RepairStarted,0.0),
             task_event("repair",3600,EventKind::RepairCompleted,0.0),
             task_event("test",5400,EventKind::PostTestPassed,0.0),
             task_event("config",6000,EventKind::ConfigurationUpdated,0.0),
@@ -1041,6 +1043,24 @@ mod tests {
         assert_eq!(episode.disposition, RestorationEpisodeDisposition::Open);
         assert_eq!(episode.accepted_restoration_seconds, None);
         assert_eq!(episode.tasr_seconds, None);
+    }
+
+    #[test]
+    fn compatible_spare_arriving_before_first_repair_start_can_qualify() {
+        let events = vec![
+            event("failure", 10, EventKind::ComponentFailure, 0.0),
+            task_event("spare_arrived", 15, EventKind::SpareArrived, 0.0),
+            task_event("repair_start", 20, EventKind::RepairStarted, 0.0),
+            task_event("repair", 30, EventKind::RepairCompleted, 0.0),
+            task_event("test", 40, EventKind::PostTestPassed, 0.0),
+            task_event("config", 45, EventKind::ConfigurationUpdated, 0.0),
+            task_event("release", 50, EventKind::AuthorizedRelease, 80.0),
+        ];
+        let mut maintenance = task();
+        maintenance.spare_state = SpareState::CompatibleArrivesLater;
+        let out = evaluate_service_continuity(&case(events, vec![maintenance], 60)).unwrap();
+        assert_eq!(out.services[0].accepted_restoration_seconds, Some(50));
+        assert_eq!(out.services[0].restoration_episodes[0].disposition, RestorationEpisodeDisposition::Restored);
     }
 
     #[test]
