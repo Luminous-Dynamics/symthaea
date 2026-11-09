@@ -769,7 +769,10 @@ mod tests {
         };
         aggregate.record(&correct);
 
-        assert_eq!(aggregate.claimed_singleton_model_cases, 2);
+        // The claimed parameterized-model set has two members in all
+        // three fixtures. Structural singleton claims are scored separately.
+        assert_eq!(aggregate.claimed_singleton_model_cases, 0);
+        assert_eq!(aggregate.oracle_singleton_model_cases, 0);
         assert_eq!(aggregate.oracle_identified_structure_cases, 2);
         assert_eq!(aggregate.claimed_identified_structure_cases, 2);
         assert_eq!(aggregate.correct_identified_structure_cases, 1);
