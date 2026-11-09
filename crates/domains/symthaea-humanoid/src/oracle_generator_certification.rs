@@ -75,6 +75,8 @@ pub struct IndependentOracleGenerationCertificate {
     pub dataset_id: String,
     pub generator_id: Option<String>,
     pub generator_build_id: Option<String>,
+    /// SHA-256 from the frozen dataset manifest, checked against the configured worker.
+    pub generator_executable_sha256: Option<String>,
     pub engine_id: Option<String>,
     pub total_requests: usize,
     pub valid_cases: usize,
@@ -100,11 +102,22 @@ pub fn generate_independent_oracle_dataset(
     requests: &[MujocoOracleWorkerRequest],
     criteria: IndependentOracleGenerationCriteria,
 ) -> IndependentOracleGenerationResult {
+    let worker_digest_matches_manifest = generator.expected_executable_sha256()
+        == Some(manifest.generator_executable_sha256.as_str());
     let mut builder = DynamicsOracleDatasetBuilder::new(manifest.clone());
     let mut cases = Vec::new();
     for request in requests {
+        let request_identity_matches = request.validate()
+            && request.generator_id == manifest.generator_id
+            && request.generator_build_id == manifest.generator_build_id
+            && request.engine_id == manifest.engine_id
+            && request.candidate_build_id == candidate_build_id;
         let start = Instant::now();
-        let response = generator.generate(request);
+        let response = if worker_digest_matches_manifest && request_identity_matches {
+            generator.generate(request)
+        } else {
+            None
+        };
         let elapsed_micros = start.elapsed().as_micros().max(1) as u64;
         let mut evidence = IndependentOracleGenerationCase {
             request_id: request.request_id,
@@ -125,6 +138,8 @@ pub fn generate_independent_oracle_dataset(
             || request.candidate_build_id != candidate_build_id
         {
             Some("oracle request identity differs from the dataset manifest".to_string())
+        } else if !worker_digest_matches_manifest {
+            Some("oracle executable digest differs from the frozen dataset manifest".to_string())
         } else if let Some(response) = response {
             if let Some(oracle) = response.oracle {
                 evidence.model_id = Some(oracle.model_id.clone());
@@ -170,6 +185,68 @@ pub fn generate_independent_oracle_dataset(
     }
 }
 
+/// Recompute an oracle-generation receipt against its exact stored dataset.
+/// The dataset must contain exactly the admitted receipt rows, with matching
+/// request-derived case IDs, state fingerprints, model IDs, manifest identity,
+/// and the independently pinned model/worker artifacts.
+pub fn recompute_independent_oracle_generation_certificate(
+    supplied: &IndependentOracleGenerationCertificate,
+    dataset: &DynamicsOracleDataset,
+    candidate_build_id: &str,
+    expected_model_artifact_sha256: &str,
+) -> IndependentOracleGenerationCertificate {
+    let manifest = &dataset.manifest;
+    let dataset_valid = supplied.schema_version == 2
+        && dataset.validate_for_candidate(candidate_build_id)
+        && is_lower_hex_sha256(expected_model_artifact_sha256)
+        && manifest.model_artifact_sha256 == expected_model_artifact_sha256
+        && manifest.dataset_id == supplied.dataset_id
+        && supplied.generator_executable_sha256.as_deref()
+            == Some(manifest.generator_executable_sha256.as_str())
+        && generation_receipt_matches_dataset(&supplied.cases, dataset);
+    certify_generation_cases(
+        manifest,
+        candidate_build_id,
+        supplied.total_requests,
+        supplied.cases.clone(),
+        IndependentOracleGenerationCriteria::default(),
+        dataset_valid,
+    )
+}
+
+fn generation_receipt_matches_dataset(
+    cases: &[IndependentOracleGenerationCase],
+    dataset: &DynamicsOracleDataset,
+) -> bool {
+    if cases.iter().map(|case| case.request_id).collect::<BTreeSet<_>>().len() != cases.len()
+        || cases
+            .iter()
+            .map(|case| case.state_fingerprint)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != cases.len()
+        || dataset.cases.len() != cases.iter().filter(|case| case.admitted).count()
+    {
+        return false;
+    }
+    cases.iter().all(|case| {
+        let expected_case_id = format!("oracle-{}", case.request_id);
+        let matching_case = dataset.cases.iter().find(|dataset_case| {
+            dataset_case.case_id == expected_case_id
+                || dataset_case.state_fingerprint == case.state_fingerprint
+        });
+        if case.admitted {
+            matching_case.is_some_and(|dataset_case| {
+                dataset_case.case_id == expected_case_id
+                    && dataset_case.state_fingerprint == case.state_fingerprint
+                    && case.model_id.as_deref() == Some(dataset_case.oracle.model_id.as_str())
+            })
+        } else {
+            matching_case.is_none()
+        }
+    })
+}
+
 fn certify_generation_cases(
     manifest: &DynamicsOracleDatasetManifest,
     candidate_build_id: &str,
@@ -198,6 +275,11 @@ fn certify_generation_cases(
     let generator_build_id = exactly_one(&generator_build_ids);
     let engine_id = exactly_one(&engine_ids);
     let admitted_cases = valid.iter().filter(|case| case.admitted).count();
+    let distinct_request_ids = valid
+        .iter()
+        .map(|case| case.request_id)
+        .collect::<BTreeSet<_>>()
+        .len();
     let distinct_states = valid
         .iter()
         .map(|case| case.state_fingerprint)
@@ -221,11 +303,27 @@ fn certify_generation_cases(
     if !manifest.validate_for_candidate(candidate_build_id) {
         failures.push("oracle manifest is invalid or self-generated".to_string());
     }
+    if generator_build_id.is_some()
+        && !is_lower_hex_sha256(&manifest.generator_executable_sha256)
+    {
+        failures.push("oracle manifest omitted a canonical worker executable digest".to_string());
+    }
     if generator_id.as_deref() != Some(manifest.generator_id.as_str())
         || generator_build_id.as_deref() != Some(manifest.generator_build_id.as_str())
         || engine_id.as_deref() != Some(manifest.engine_id.as_str())
     {
         failures.push("oracle cases do not preserve one manifest identity".to_string());
+    }
+    if total_requests != cases.len() || valid.len() != cases.len() {
+        failures.push("oracle receipt omitted requests or included invalid case records".to_string());
+    }
+    if distinct_request_ids != valid.len() {
+        failures.push("oracle receipt contains duplicate request IDs".to_string());
+    }
+    if valid.iter().map(|case| case.state_fingerprint).collect::<BTreeSet<_>>().len()
+        != valid.len()
+    {
+        failures.push("oracle receipt contains duplicate state fingerprints".to_string());
     }
     if valid.len() < criteria.minimum_cases {
         failures.push(format!(
@@ -257,10 +355,12 @@ fn certify_generation_cases(
     }
 
     IndependentOracleGenerationCertificate {
-        schema_version: 1,
+        schema_version: 2,
         dataset_id: manifest.dataset_id.clone(),
         generator_id,
         generator_build_id,
+        generator_executable_sha256: is_lower_hex_sha256(&manifest.generator_executable_sha256)
+            .then(|| manifest.generator_executable_sha256.clone()),
         engine_id,
         total_requests,
         valid_cases: valid.len(),
@@ -274,6 +374,13 @@ fn certify_generation_cases(
     }
 }
 
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn exactly_one(values: &BTreeSet<&str>) -> Option<String> {
     (values.len() == 1)
         .then(|| values.first().map(|value| (*value).to_string()))
@@ -284,13 +391,150 @@ fn exactly_one(values: &BTreeSet<&str>) -> Option<String> {
 mod tests {
     use super::*;
 
+    fn oracle_snapshot() -> crate::floating_base::FloatingBaseDynamicsSnapshot {
+        use crate::floating_base::{FLOATING_BASE_DOF, FloatingBaseDynamicsSnapshot};
+        use crate::full_dynamics::{DynamicsProvenance, SpatialContactJacobian};
+        use crate::morphology::HumanoidMorphology;
+
+        let morphology = HumanoidMorphology::Dmc21;
+        let nv = FLOATING_BASE_DOF + morphology.num_actuators();
+        let mut mass_matrix = vec![0.0; nv * nv];
+        for index in 0..nv {
+            mass_matrix[index * nv + index] = 1.0 + index as f64 * 0.1;
+        }
+        FloatingBaseDynamicsSnapshot {
+            morphology,
+            sampled_at_s: 1.0,
+            total_mass_kg: 70.0,
+            gravity_world_mps2: [0.0, 0.0, -9.81],
+            generalized_velocity_count: nv,
+            mass_matrix,
+            bias_force: vec![0.25; nv],
+            actuator_velocity_indices: (FLOATING_BASE_DOF..nv).collect(),
+            torque_limits_nm: vec![100.0; morphology.num_actuators()],
+            centroidal_momentum_matrix: vec![0.5; 6 * nv],
+            contacts: vec![SpatialContactJacobian {
+                site_id: "r_foot_site".to_string(),
+                rows: std::array::from_fn(|row| vec![row as f64 * 0.01; nv]),
+                confidence: 1.0,
+            }],
+            provenance: DynamicsProvenance::mujoco_solver_with_morphology_limits(),
+            model_id: "oracle-model".to_string(),
+        }
+    }
+
+    fn dataset_manifest() -> DynamicsOracleDatasetManifest {
+        let morphology = crate::morphology::HumanoidMorphology::Dmc21;
+        DynamicsOracleDatasetManifest {
+            schema_version: 2,
+            dataset_id: "release-dataset".to_string(),
+            generator_id: "independent-generator".to_string(),
+            generator_build_id: "generator-build".to_string(),
+            generator_executable_sha256: "e".repeat(64),
+            engine_id: "mujoco".to_string(),
+            model_artifact_sha256: "a".repeat(64),
+            generalized_coordinate_order: (0..6 + morphology.num_actuators())
+                .map(|index| format!("v{index}"))
+                .collect(),
+            morphology,
+            contact_site_order: vec!["r_foot_site".to_string()],
+            generated_unix_millis: 1,
+        }
+    }
+
+    #[test]
+    fn release_receipt_must_match_exact_dataset_rows_and_hashes() {
+        use crate::oracle_dataset::DynamicsOracleDatasetBuilder;
+
+        let manifest = dataset_manifest();
+        let mut builder = DynamicsOracleDatasetBuilder::new(manifest.clone()).unwrap();
+        let nv = 6 + manifest.morphology.num_actuators();
+        let actuators = manifest.morphology.num_actuators();
+        for index in 0..64 {
+            assert!(builder.push_case(
+                format!("oracle-{}", index + 1),
+                vec![index as f64 + 1.0; nv + 1],
+                vec![index as f64 * 0.01; nv],
+                vec![0.1; actuators],
+                oracle_snapshot(),
+            ));
+        }
+        let dataset = builder.finish("candidate-build").unwrap();
+        let receipt_cases = dataset
+            .cases
+            .iter()
+            .enumerate()
+            .map(|(index, case)| IndependentOracleGenerationCase {
+                request_id: index as u64 + 1,
+                state_fingerprint: case.state_fingerprint,
+                generator_id: manifest.generator_id.clone(),
+                generator_build_id: manifest.generator_build_id.clone(),
+                engine_id: manifest.engine_id.clone(),
+                model_id: Some(case.oracle.model_id.clone()),
+                admitted: true,
+                elapsed_micros: 100,
+                failure: None,
+            })
+            .collect::<Vec<_>>();
+        let certificate = certify_generation_cases(
+            &manifest,
+            "candidate-build",
+            receipt_cases.len(),
+            receipt_cases,
+            IndependentOracleGenerationCriteria::default(),
+            true,
+        );
+        assert!(certificate.passed, "{:?}", certificate.failures);
+
+        let recomputed = recompute_independent_oracle_generation_certificate(
+            &certificate,
+            &dataset,
+            "candidate-build",
+            &manifest.model_artifact_sha256,
+        );
+        assert!(recomputed.passed, "{:?}", recomputed.failures);
+        assert_eq!(
+            serde_json::to_vec(&certificate).unwrap(),
+            serde_json::to_vec(&recomputed).unwrap(),
+        );
+
+        let mut altered_receipt = certificate.clone();
+        altered_receipt.cases[0].state_fingerprint ^= 1;
+        let rejected = recompute_independent_oracle_generation_certificate(
+            &altered_receipt,
+            &dataset,
+            "candidate-build",
+            &manifest.model_artifact_sha256,
+        );
+        assert!(!rejected.passed);
+
+        let mut truncated_dataset = dataset.clone();
+        truncated_dataset.cases.pop();
+        let rejected = recompute_independent_oracle_generation_certificate(
+            &certificate,
+            &truncated_dataset,
+            "candidate-build",
+            &manifest.model_artifact_sha256,
+        );
+        assert!(!rejected.passed);
+
+        let rejected = recompute_independent_oracle_generation_certificate(
+            &certificate,
+            &dataset,
+            "candidate-build",
+            &"b".repeat(64),
+        );
+        assert!(!rejected.passed);
+    }
+
     #[test]
     fn empty_generation_never_certifies() {
         let manifest = DynamicsOracleDatasetManifest {
-            schema_version: 1,
+            schema_version: 2,
             dataset_id: "dataset".to_string(),
             generator_id: "generator".to_string(),
             generator_build_id: "generator-build".to_string(),
+            generator_executable_sha256: "e".repeat(64),
             engine_id: "mujoco".to_string(),
             model_artifact_sha256: "a".repeat(64),
             morphology: crate::morphology::HumanoidMorphology::Dmc21,

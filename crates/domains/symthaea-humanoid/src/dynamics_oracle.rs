@@ -235,6 +235,16 @@ impl DynamicsOracleCase {
     }
 }
 
+/// Raw candidate/oracle snapshots from which release verification recomputes
+/// numerical comparison reports. No submitted report or pass bit is trusted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DynamicsOracleInputCase {
+    pub case_id: String,
+    pub sampled_state_fingerprint: u64,
+    pub candidate_snapshot: FloatingBaseDynamicsSnapshot,
+    pub oracle_snapshot: FloatingBaseDynamicsSnapshot,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DynamicsOracleCertificationCriteria {
     pub minimum_cases: usize,
@@ -260,6 +270,26 @@ pub struct DynamicsOracleCertificate {
     pub distinct_state_fingerprints: usize,
     pub passed: bool,
     pub failures: Vec<String>,
+}
+
+/// Recompute oracle comparison reports from raw snapshots under pinned default
+/// numerical tolerances and release coverage criteria.
+pub fn certify_dynamics_oracle_snapshots(
+    inputs: &[DynamicsOracleInputCase],
+) -> DynamicsOracleCertificate {
+    let cases = inputs
+        .iter()
+        .map(|input| DynamicsOracleCase {
+            case_id: input.case_id.clone(),
+            sampled_state_fingerprint: input.sampled_state_fingerprint,
+            report: compare_floating_base_dynamics(
+                &input.candidate_snapshot,
+                &input.oracle_snapshot,
+                DynamicsOracleTolerances::default(),
+            ),
+        })
+        .collect::<Vec<_>>();
+    certify_dynamics_oracle_cases(&cases, DynamicsOracleCertificationCriteria::default())
 }
 
 pub fn certify_dynamics_oracle_cases(
@@ -386,6 +416,28 @@ mod tests {
             provenance: DynamicsProvenance::mujoco_solver_with_morphology_limits(),
             model_id: model_id.to_string(),
         }
+    }
+
+    #[test]
+    fn release_snapshot_recomputation_ignores_supplied_report_claims() {
+        let inputs = (0..16)
+            .map(|index| DynamicsOracleInputCase {
+                case_id: format!("case-{index}"),
+                sampled_state_fingerprint: index + 1,
+                candidate_snapshot: snapshot("candidate"),
+                oracle_snapshot: snapshot("oracle"),
+            })
+            .collect::<Vec<_>>();
+        let certificate = certify_dynamics_oracle_snapshots(&inputs);
+        assert!(certificate.passed, "{:?}", certificate.failures);
+        assert_eq!(certificate.total_cases, 16);
+        assert_eq!(certificate.valid_cases, 16);
+
+        let mut altered = inputs.clone();
+        altered[0].candidate_snapshot.mass_matrix[0] *= 1.1;
+        let rejected = certify_dynamics_oracle_snapshots(&altered);
+        assert!(!rejected.passed);
+        assert_eq!(rejected.passing_cases, 15);
     }
 
     #[test]

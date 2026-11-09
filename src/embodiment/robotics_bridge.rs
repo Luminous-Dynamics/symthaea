@@ -71,12 +71,11 @@ impl RoboticAgent {
             thought_hv.clone()
         };
 
-        // 4. Safety Gating
-        let safety = self.bridge.safety_level();
-        let gain = safety.motor_gain();
-
-        // 5. Actuation
+        // 4. Actuation and platform safety enforcement.
+        // Each embodiment applies its current safety tier at its controller/actuator
+        // boundary. Read the returned tier afterward so telemetry cannot lag one step.
         let result = self.bridge.step(&modulated_hv, dt, phi);
+        let gain = result.safety_level.motor_gain();
 
         RoboticStepResult {
             embodiment: result,
@@ -104,61 +103,93 @@ pub struct RoboticStepResult {
     pub embodiment: EmbodimentResult,
     pub free_energy: f64,
     pub surprise: f64,
+    /// Multiplier for ordinary controller-commanded output at this step's safety tier.
+    ///
+    /// At Red, a platform may run an active safe fallback at full authority.
+    /// Therefore, zero here does not mean that the platform emitted zero actuator
+    /// command; inspect platform-specific fallback telemetry for that distinction.
     pub motor_gain: f32,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_core::genesis::GenesisSeed;
+    struct MockBridge {
+        reported_safety: MotorSafetyLevel,
+        step_safety: MotorSafetyLevel,
+    }
 
-    #[test]
-    fn test_robotic_agent_construction() {
-        struct MockBridge;
-        impl EmbodimentBridge for MockBridge {
-            fn step(&mut self, _hv: &ContinuousHV, _dt: f32, _phi: f64) -> EmbodimentResult {
-                EmbodimentResult {
-                    num_actuators: 1,
-                    control_effort: 0.0,
-                    success: true,
-                    prediction_error: 0.0,
-                    safety_level: MotorSafetyLevel::Green,
-                    epistemic_grounding: 0,
-                    observation_confidence: 1.0,
-                }
-            }
-            fn encode_perception(&mut self) -> ContinuousHV {
-                ContinuousHV::zero(16384)
-            }
-            fn reset(&mut self) {}
-            fn safety_level(&self) -> MotorSafetyLevel {
-                MotorSafetyLevel::Green
-            }
-            fn set_safety_override(&mut self, _level: MotorSafetyLevel) {}
-            fn clear_safety_override(&mut self) {}
-            fn platform(&self) -> crate::symthaea_core::embodiment::EmbodimentPlatform {
-                crate::symthaea_core::embodiment::EmbodimentPlatform::None
-            }
-            fn num_actuators(&self) -> usize {
-                1
-            }
-            fn total_steps(&self) -> usize {
-                0
-            }
-            fn telemetry(&self) -> crate::symthaea_core::embodiment::EmbodimentTelemetry {
-                Default::default()
-            }
-            fn apply_moral_gate(
-                &mut self,
-                _gate: crate::symthaea_core::embodiment::MoralGateInput,
-            ) {
-            }
-            fn platform_telemetry_bytes(&self) -> Vec<u8> {
-                Vec::new()
+    impl EmbodimentBridge for MockBridge {
+        fn step(&mut self, _hv: &ContinuousHV, _dt: f32, _phi: f64) -> EmbodimentResult {
+            EmbodimentResult {
+                num_actuators: 1,
+                control_effort: 0.0,
+                success: true,
+                prediction_error: 0.0,
+                safety_level: self.step_safety,
+                epistemic_grounding: 0,
+                observation_confidence: 1.0,
             }
         }
 
-        let agent = RoboticAgent::new(Box::new(MockBridge));
+        fn encode_perception(&mut self) -> ContinuousHV {
+            ContinuousHV::zero(16384)
+        }
+
+        fn reset(&mut self) {}
+
+        fn safety_level(&self) -> MotorSafetyLevel {
+            self.reported_safety
+        }
+
+        fn set_safety_override(&mut self, _level: MotorSafetyLevel) {}
+        fn clear_safety_override(&mut self) {}
+
+        fn platform(&self) -> crate::symthaea_core::embodiment::EmbodimentPlatform {
+            crate::symthaea_core::embodiment::EmbodimentPlatform::None
+        }
+
+        fn num_actuators(&self) -> usize {
+            1
+        }
+
+        fn total_steps(&self) -> usize {
+            0
+        }
+
+        fn telemetry(&self) -> crate::symthaea_core::embodiment::EmbodimentTelemetry {
+            Default::default()
+        }
+
+        fn apply_moral_gate(
+            &mut self,
+            _gate: crate::symthaea_core::embodiment::MoralGateInput,
+        ) {
+        }
+
+        fn platform_telemetry_bytes(&self) -> Vec<u8> {
+            Vec::new()
+        }
+    }
+
+    #[test]
+    fn motor_gain_telemetry_uses_safety_tier_returned_by_current_step() {
+        let mut agent = RoboticAgent::new(Box::new(MockBridge {
+            reported_safety: MotorSafetyLevel::Green,
+            step_safety: MotorSafetyLevel::Red,
+        }));
+        let thought = ContinuousHV::zero(16384);
+        let result = agent.step(&thought, 0.01, 0.05);
+        assert_eq!(result.embodiment.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(result.motor_gain, 0.0);
+    }
+
+    #[test]
+    fn test_robotic_agent_construction() {
+        let agent = RoboticAgent::new(Box::new(MockBridge {
+            reported_safety: MotorSafetyLevel::Green,
+            step_safety: MotorSafetyLevel::Green,
+        }));
         assert_eq!(agent.bridge().num_actuators(), 1);
     }
 }
