@@ -365,7 +365,8 @@ fn run() -> Result<(), String> {
     let mut last_group_plan = None;
     let mut last_hierarchical_plan = None;
 
-    for _ in 0..cfg.repeats {
+    for iteration in 0..(cfg.repeats + 3) {
+        let measure = iteration >= 3;
         let group_start = Instant::now();
         let group_plan = select_group_refinement_set_with_partition_receipt(
             &group_records,
@@ -374,7 +375,9 @@ fn run() -> Result<(), String> {
             &partition_receipt,
         )
         .map_err(|error| format!("group selection failed: {error}"))?;
-        group_select_samples.push(group_start.elapsed().as_nanos());
+        if measure {
+            group_select_samples.push(group_start.elapsed().as_nanos());
+        }
 
         let selected_identities: BTreeSet<[u8; 32]> = group_plan
             .refinement_groups
@@ -414,7 +417,9 @@ fn run() -> Result<(), String> {
                 );
             }
         }
-        member_interval_samples.push(member_start.elapsed().as_nanos());
+        if measure {
+            member_interval_samples.push(member_start.elapsed().as_nanos());
+        }
 
         let hierarchy_start = Instant::now();
         let plan = select_hierarchical_refinement_set_with_partition_receipt(
@@ -425,7 +430,9 @@ fn run() -> Result<(), String> {
             &partition_receipt,
         )
         .map_err(|error| format!("hierarchical selection failed: {error}"))?;
-        hierarchy_samples.push(hierarchy_start.elapsed().as_nanos());
+        if measure {
+            hierarchy_samples.push(hierarchy_start.elapsed().as_nanos());
+        }
 
         let exact_start = Instant::now();
         let mut exact_scores = Vec::with_capacity(plan.member_plan.refinement_ids.len());
@@ -440,7 +447,9 @@ fn run() -> Result<(), String> {
         }
         let actual_top_k = stable_exact_top_k(&exact_scores, cfg.top_k)
             .map_err(|error| format!("refined exact rerank failed: {error}"))?;
-        exact_rerank_samples.push(exact_start.elapsed().as_nanos());
+        if measure {
+            exact_rerank_samples.push(exact_start.elapsed().as_nanos());
+        }
         if actual_top_k != expected_top_k {
             return Err(format!(
                 "exact top-k mismatch: expected {expected_top_k:?}, received {actual_top_k:?}"
@@ -473,6 +482,7 @@ fn run() -> Result<(), String> {
     println!("groups={group_count}");
     println!("top_k={}", cfg.top_k);
     println!("repeats={}", cfg.repeats);
+    println!("warmup_iterations=3");
     println!("exact_top_k_agreement=true");
     println!("expected_top_k={:?}", expected_top_k);
     println!("refinement_groups={}", group_plan.refinement_groups.len());
