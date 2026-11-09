@@ -32,10 +32,34 @@ struct Scenario {
     scenario_version: String,
     scenario_id: String,
     oracle_evidence_class: String,
+    asset: AssetBinding,
+    evidence: EvidenceBinding,
     context: Context,
     states: Vec<State>,
     actions: Vec<Action>,
     tests: Vec<DiagnosticTest>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AssetBinding {
+    vehicle_ref: String,
+    vehicle_configuration_digest: String,
+    pack_ref: String,
+    pack_configuration_digest: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EvidenceBinding {
+    observation_batch_ref: String,
+    observation_batch_digest: String,
+    pack_capability_profile_ref: String,
+    pack_capability_profile_digest: String,
+    prior_model_ref: String,
+    prior_model_digest: String,
+    decision_loss_model_ref: String,
+    decision_loss_model_digest: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +96,9 @@ struct StateLoss {
 #[serde(deny_unknown_fields)]
 struct DiagnosticTest {
     test_id: String,
+    vehicle_configuration_digest: String,
+    pack_configuration_digest: String,
+    calibration_ref: String,
     protocol_ref: String,
     equipment_ref: String,
     protocol_digest: String,
@@ -92,6 +119,7 @@ struct TestCost {
     cost_unit_ref: String,
     evidence_class: String,
     evidence_digest: String,
+    source_ref: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -153,6 +181,18 @@ pub struct TestEvaluation {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ScenarioDecision {
     pub scenario_id: String,
+    pub vehicle_ref: String,
+    pub vehicle_configuration_digest: String,
+    pub pack_ref: String,
+    pub pack_configuration_digest: String,
+    pub observation_batch_ref: String,
+    pub observation_batch_digest: String,
+    pub pack_capability_profile_ref: String,
+    pub pack_capability_profile_digest: String,
+    pub prior_model_ref: String,
+    pub prior_model_digest: String,
+    pub decision_loss_model_ref: String,
+    pub decision_loss_model_digest: String,
     pub recommendation_status: String,
     pub current_best_action: Option<String>,
     pub prior_expected_loss: Option<f64>,
@@ -244,6 +284,24 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
     ) {
         errors.push("unknown oracle evidence class".to_owned());
     }
+    if !nonempty(&scenario.asset.vehicle_ref)
+        || !nonempty(&scenario.asset.pack_ref)
+        || !is_digest(&scenario.asset.vehicle_configuration_digest)
+        || !is_digest(&scenario.asset.pack_configuration_digest)
+    {
+        errors.push("asset configuration identity or digest is invalid".to_owned());
+    }
+    if !nonempty(&scenario.evidence.observation_batch_ref)
+        || !is_digest(&scenario.evidence.observation_batch_digest)
+        || !nonempty(&scenario.evidence.pack_capability_profile_ref)
+        || !is_digest(&scenario.evidence.pack_capability_profile_digest)
+        || !nonempty(&scenario.evidence.prior_model_ref)
+        || !is_digest(&scenario.evidence.prior_model_digest)
+        || !nonempty(&scenario.evidence.decision_loss_model_ref)
+        || !is_digest(&scenario.evidence.decision_loss_model_digest)
+    {
+        errors.push("observation, capability, prior or decision-loss evidence binding is invalid".to_owned());
+    }
     if !nonempty(&scenario.context.chemistry)
         || !scenario.context.temperature_c.is_finite()
         || !scenario.context.soc_fraction.is_finite()
@@ -330,7 +388,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
                 test.test_id
             ));
         }
-        if !nonempty(&test.protocol_ref)
+        if !is_digest(&test.vehicle_configuration_digest)
+            || !is_digest(&test.pack_configuration_digest)
+            || !nonempty(&test.calibration_ref)
+            || !nonempty(&test.protocol_ref)
             || !nonempty(&test.equipment_ref)
             || !is_digest(&test.protocol_digest)
             || !is_digest(&test.equipment_digest)
@@ -360,6 +421,7 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
                 "declared_synthetic_cost" | "reference_quote" | "measured_cost"
             )
             || !is_digest(&test.cost.evidence_digest)
+            || !nonempty(&test.cost.source_ref)
         {
             errors.push(format!(
                 "test {} has invalid or untraceable cost",
@@ -552,8 +614,14 @@ fn precondition_reasons(test: &DiagnosticTest) -> Vec<String> {
     reasons
 }
 
-fn eligibility_reasons(test: &DiagnosticTest, context: &Context) -> Vec<String> {
+fn eligibility_reasons(test: &DiagnosticTest, scenario: &Scenario) -> Vec<String> {
     let mut reasons = precondition_reasons(test);
+    if test.vehicle_configuration_digest != scenario.asset.vehicle_configuration_digest
+        || test.pack_configuration_digest != scenario.asset.pack_configuration_digest
+    {
+        reasons.push("vehicle_or_pack_configuration_mismatch".to_owned());
+    }
+    let context = &scenario.context;
     if !test
         .applicability
         .supported_chemistries
@@ -582,7 +650,7 @@ fn evaluate_test(
     prior: &BTreeMap<String, f64>,
     prior_expected_loss: f64,
 ) -> TestEvaluation {
-    let reasons = eligibility_reasons(test, &scenario.context);
+    let reasons = eligibility_reasons(test, scenario);
     let eligible = reasons.is_empty();
     let prior_entropy = entropy(prior.values().copied());
     let mut outcomes = Vec::new();
@@ -736,6 +804,18 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioDecision {
 
     ScenarioDecision {
         scenario_id: scenario.scenario_id.clone(),
+        vehicle_ref: scenario.asset.vehicle_ref.clone(),
+        vehicle_configuration_digest: scenario.asset.vehicle_configuration_digest.clone(),
+        pack_ref: scenario.asset.pack_ref.clone(),
+        pack_configuration_digest: scenario.asset.pack_configuration_digest.clone(),
+        observation_batch_ref: scenario.evidence.observation_batch_ref.clone(),
+        observation_batch_digest: scenario.evidence.observation_batch_digest.clone(),
+        pack_capability_profile_ref: scenario.evidence.pack_capability_profile_ref.clone(),
+        pack_capability_profile_digest: scenario.evidence.pack_capability_profile_digest.clone(),
+        prior_model_ref: scenario.evidence.prior_model_ref.clone(),
+        prior_model_digest: scenario.evidence.prior_model_digest.clone(),
+        decision_loss_model_ref: scenario.evidence.decision_loss_model_ref.clone(),
+        decision_loss_model_digest: scenario.evidence.decision_loss_model_digest.clone(),
         recommendation_status: status.to_owned(),
         current_best_action: current.as_ref().map(|(action, _)| action.clone()),
         prior_expected_loss: prior_loss,
