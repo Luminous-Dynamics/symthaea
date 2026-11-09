@@ -495,6 +495,17 @@ EOF
           ];
         };
 
+        nixwardWorkspaceSrc = mkCargoWorkspaceSource {
+          name = "symthaea-nixward-workspace";
+          members = [
+            "crates/core/symthaea-core"
+            "crates/core/serde-core-shim"
+            "crates/core/nixward"
+          ];
+          extraCopies = [
+            "vendor/cudarc-0.13.9-cuda129"
+          ];
+        };
         gpuWorkspaceSrc = mkCargoWorkspaceSource {
           name = "symthaea-gpu-workspace";
           members = [
@@ -1093,6 +1104,17 @@ EOF
         };
 
         checks = {
+          nixward-evaluation-diagnostics = mkRustCheck {
+            name = "nixward-evaluation-diagnostics";
+            src = nixwardWorkspaceSrc;
+            buildInputs = rustBuildInputs;
+            inherit nativeBuildInputs;
+            buildPhase = ''
+              cargo test --manifest-path crates/core/nixward/Cargo.toml --lib parser::eval_diagnostics -- --nocapture
+            '';
+            installText = "Nixward evaluation diagnostic tests passed";
+          };
+
           installer-iso-security = import ./nix/tests/installer-iso-security.nix { inherit pkgs; };
           eval-api-security = import ./nix/tests/eval-api-security.nix { inherit pkgs; };
           eval-service-module = import ./nix/tests/eval-service-module.nix { inherit pkgs; };
