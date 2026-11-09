@@ -28,7 +28,7 @@ NotYetEffectiveAtTarget; it must not be described as a realized current fact.
 The implementation rejects future-known evidence, identity mismatches, impossible retrieval
 ordering, wrong rights profiles, denied rights and malformed revision ancestry. It retains
 older versions while identifying which admitted version supersedes them at the chosen
-frontier. It counts unique provenance families rather than documents.
+frontier. It counts unique provenance-family identifiers rather than documents; that count is not proof that the underlying sources are actually independent.
 
 ## Trust boundary
 
