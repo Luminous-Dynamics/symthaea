@@ -157,6 +157,7 @@ pub fn normalize_piper_english(
     let mut punctuation = Vec::new();
     let mut pending_stress: Option<(usize, StressKind, Option<ProsodyInfo>)> = None;
     let mut raw_position = 0usize;
+    let mut last_was_word_separator = false;
 
     let flush_word = |words: &mut Vec<RawWordHypothesis>,
                       current_tokens: &mut Vec<String>,
@@ -195,6 +196,7 @@ pub fn normalize_piper_english(
                     &mut stress_evidence,
                 );
                 raw_position = 0;
+                last_was_word_separator = true;
             }
             "ˈ" | "ˌ" => {
                 if pending_stress.is_some() {
@@ -220,6 +222,7 @@ pub fn normalize_piper_english(
                 pending_stress = Some((raw_token_index, kind, info));
             }
             _ if is_punctuation_token(token) => {
+                last_was_word_separator = false;
                 if pending_stress.is_some() {
                     return Err(format!(
                         "stress marker at Piper token {} is not followed by an IPA character before punctuation",
@@ -234,6 +237,7 @@ pub fn normalize_piper_english(
                 });
             }
             _ => {
+                last_was_word_separator = false;
                 if let Some((marker_index, kind, marker_info)) = pending_stress.take() {
                     let character_index = raw_position;
                     let following_info = prosody[raw_token_index];
@@ -265,12 +269,14 @@ pub fn normalize_piper_english(
             "Piper stress marker at raw token {marker_index} has no following IPA character"
         ));
     }
-    flush_word(
-        &mut words,
-        &mut current_tokens,
-        &mut current_prosody,
-        &mut stress_evidence,
-    );
+    if !last_was_word_separator || words.is_empty() {
+        flush_word(
+            &mut words,
+            &mut current_tokens,
+            &mut current_prosody,
+            &mut stress_evidence,
+        );
+    }
     if words.is_empty() {
         return Err("Piper returned no lexical word hypotheses".into());
     }
@@ -456,6 +462,15 @@ mod tests {
         assert_eq!(normalized.punctuation.len(), 1);
         assert_eq!(normalized.punctuation[0].word_index, 0);
         assert_eq!(normalized.punctuation[0].after_ipa_character_index, 4);
+    }
+
+    #[test]
+    fn trailing_word_separator_does_not_invent_a_trailing_word_slot() {
+        let tokens = vec!["h".into(), "ə".into(), " ".into()];
+        let prosody = vec![info(0, 1), info(0, 1), None];
+        let normalized = normalize_piper_english(&tokens, &prosody).unwrap();
+        assert_eq!(normalized.words.len(), 1);
+        assert_eq!(normalized.words[0].raw_ipa, "hə");
     }
 
     #[test]
