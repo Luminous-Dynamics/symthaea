@@ -1729,33 +1729,49 @@ mod tests {
     #[test]
     fn rejects_remote_cooperative_claim_as_follow_target() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
-            Value::String("deployment".into());
-        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
-            Value::String("cooperative-v2x-claim-01".into());
-        fixture["snapshot"]["follow_target_context"]["coordinate_frame_id"] =
-            Value::String("remote-peer-frame-01".into());
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("cooperative-v2x-claim-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
     #[test]
-    fn accepts_current_local_sensor_follow_target_for_deployment_profile() {
+    fn accepts_synthetic_local_perception_follow_target_linked_to_track() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
-            Value::String("deployment".into());
-        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
-            Value::String("local-lidar-track-fixture-01".into());
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
         validate_values(&schema, &fixture)
-            .expect("current local sensor evidence should satisfy the declared input contract");
+            .expect("synthetic sensor observations may test the local perception adapter path");
+    }
+
+    #[test]
+    fn rejects_synthetic_local_perception_evidence_for_deployment() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("deployment".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
+        assert!(validate_values(&schema, &fixture).is_err());
     }
 
     #[test]
     fn rejects_stale_local_sensor_follow_target() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["follow_target_context"]["consumer_profile"] =
-            Value::String("deployment".into());
-        fixture["snapshot"]["follow_target_context"]["evidence_source_ref"] =
-            Value::String("local-lidar-track-fixture-01".into());
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
         fixture["snapshot"]["sources"][4]["currentness"] = Value::String("stale".into());
         assert!(validate_values(&schema, &fixture).is_err());
     }
@@ -1765,6 +1781,58 @@ mod tests {
         let (schema, mut fixture) = load_fixture();
         fixture["snapshot"]["follow_target_context"]["coordinate_frame_id"] =
             Value::String("front-camera-image-01".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_with_unlinked_object_hypothesis() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("missing-hypothesis".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_gap_scalar_not_supported_by_scene_geometry() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["gap_m"] = Value::from(99.0);
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_relative_speed_not_supported_by_scene_geometry() {
+        let (schema, mut fixture) = load_fixture();
+        fixture["snapshot"]["follow_target_context"]["relative_speed_mps"] =
+            Value::from(25.0);
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_follow_target_actor_id_that_does_not_match_linked_track() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("wrong-track".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_non_actor_sensor_modality_as_local_follow_evidence() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
+        fixture["snapshot"]["sources"][4]["modality"] = Value::String("imu".into());
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
@@ -1793,6 +1861,8 @@ mod tests {
             "gap_m",
             "relative_speed_mps",
             "distance_uncertainty_m",
+            "target_reference_kind",
+            "target_reference_id",
         ] {
             fixture["snapshot"]["follow_target_context"][key] = Value::Null;
         }
