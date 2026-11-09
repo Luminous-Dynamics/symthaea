@@ -1290,11 +1290,7 @@ mod tests {
         };
         let report = rank_model_discriminating_experiments(
             &hypotheses,
-            &[
-                make("always", 1.0),
-                make("half", 0.5),
-                make("never", 0.0),
-            ],
+            &[make("always", 1.0), make("half", 0.5), make("never", 0.0)],
             &config(vec![equal_prior()], 256),
         )
         .unwrap();
@@ -1324,13 +1320,14 @@ mod tests {
             (never
                 .availability_adjusted_worst_case_model_identity_eig_nats
                 .unwrap())
-                .abs()
+            .abs()
                 < 1.0e-12
         );
         let half_scenario = &half.prior_scenario_scores[0];
         assert!(
             (half_scenario.expected_posterior_entropy_nats
-                - (half_scenario.prior_entropy_nats - half_scenario.availability_adjusted_eig_nats))
+                - (half_scenario.prior_entropy_nats
+                    - half_scenario.availability_adjusted_eig_nats))
                 .abs()
                 < 1.0e-12
         );
@@ -1341,8 +1338,7 @@ mod tests {
                 < 1.0e-12
         );
         assert_eq!(
-            report.experiments[0].experiment_id,
-            "always",
+            report.experiments[0].experiment_id, "always",
             "availability-adjusted EIG per cost should rank the fully available candidate first"
         );
     }
