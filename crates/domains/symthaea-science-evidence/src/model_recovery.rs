@@ -58,6 +58,12 @@ pub struct ModelRecoveryReport {
     /// These are counted as abstentions, not discarded from the denominator.
     pub unavailable_observations_by_generator: Vec<u64>,
     pub abstention_threshold: f64,
+    /// Optional maximum absolute standardized residual required for at least
+    /// one named model to remain eligible. Frozen from independent calibration.
+    pub predictive_adequacy_threshold: Option<f64>,
+    /// Trials rejected because every named model exceeded the adequacy gate.
+    /// These are included in the confusion-matrix abstention column.
+    pub predictive_adequacy_abstentions_by_generator: Vec<u64>,
     /// Fraction correctly recovered across named generating models, with
     /// equal sampling per named model.
     pub named_model_accuracy: f64,
@@ -85,6 +91,8 @@ pub enum ModelRecoveryError {
     TooManyTrials,
     #[error("model-recovery abstention threshold must be finite and in (0, 1]")]
     InvalidAbstentionThreshold,
+    #[error("predictive-adequacy standardized-residual threshold must be finite and positive")]
+    InvalidPredictiveAdequacyThreshold,
     #[error("prior scenario has {actual} probabilities; expected {expected}")]
     PriorProbabilityCount { expected: usize, actual: usize },
     #[error("prior scenario ID must not be empty")]
@@ -132,6 +140,7 @@ struct GaussianInferenceModel {
 /// equal-weight named-model accuracy, prior-weighted accuracy, coverage,
 /// selective accuracy, and M-open false-confident assignment rate. It does not
 /// assign any likelihood to OTHER_UNRESOLVED.
+/// Evaluate the original posterior-only MAP/abstention rule.
 pub fn evaluate_model_recovery(
     hypotheses: &[DiscriminationHypothesis],
     experiment: &CandidateExperiment,
@@ -140,6 +149,47 @@ pub fn evaluate_model_recovery(
     samples_per_generator: usize,
     seed: u64,
     minimum_posterior_probability: f64,
+) -> Result<ModelRecoveryReport, ModelRecoveryError> {
+    evaluate_model_recovery_internal(
+        hypotheses, experiment, prior, generators, samples_per_generator, seed,
+        minimum_posterior_probability, None,
+    )
+}
+
+/// Evaluate model recovery with an independent predictive-adequacy gate.
+///
+/// Before choosing among named models, at least one candidate must have an
+/// absolute standardized residual no greater than the supplied threshold.
+/// The threshold must be fixed by an independent calibration protocol before
+/// evaluating M-open challenge worlds. It is not learned from the challenge.
+pub fn evaluate_model_recovery_with_predictive_adequacy(
+    hypotheses: &[DiscriminationHypothesis],
+    experiment: &CandidateExperiment,
+    prior: &ModelPriorScenario,
+    generators: &[RecoveryGenerator],
+    samples_per_generator: usize,
+    seed: u64,
+    minimum_posterior_probability: f64,
+    maximum_standardized_residual: f64,
+) -> Result<ModelRecoveryReport, ModelRecoveryError> {
+    if !maximum_standardized_residual.is_finite() || maximum_standardized_residual <= 0.0 {
+        return Err(ModelRecoveryError::InvalidPredictiveAdequacyThreshold);
+    }
+    evaluate_model_recovery_internal(
+        hypotheses, experiment, prior, generators, samples_per_generator, seed,
+        minimum_posterior_probability, Some(maximum_standardized_residual),
+    )
+}
+
+fn evaluate_model_recovery_internal(
+    hypotheses: &[DiscriminationHypothesis],
+    experiment: &CandidateExperiment,
+    prior: &ModelPriorScenario,
+    generators: &[RecoveryGenerator],
+    samples_per_generator: usize,
+    seed: u64,
+    minimum_posterior_probability: f64,
+    predictive_adequacy_threshold: Option<f64>,
 ) -> Result<ModelRecoveryReport, ModelRecoveryError> {
     if samples_per_generator == 0 {
         return Err(ModelRecoveryError::InvalidSampleCount);
@@ -399,6 +449,7 @@ pub fn evaluate_model_recovery(
     let abstain_column = model_ids.len();
     let mut confusion_counts = vec![vec![0_u64; model_ids.len() + 1]; generators.len()];
     let mut unavailable_observations_by_generator = vec![0_u64; generators.len()];
+    let mut predictive_adequacy_abstentions_by_generator = vec![0_u64; generators.len()];
     let mut named_correct = 0_u64;
     let mut named_assigned = 0_u64;
     let mut named_abstained = 0_u64;
@@ -424,6 +475,24 @@ pub fn evaluate_model_recovery(
             if !observation.is_finite() {
                 return Err(ModelRecoveryError::NonFiniteSyntheticCalculation);
             }
+
+            // A high relative posterior is not evidence that any candidate
+            // adequately predicts the observation. Reject before normalizing
+            // a closed-set posterior when every candidate is an implausible fit.
+            if let Some(maximum_residual) = predictive_adequacy_threshold {
+                let any_model_adequate = inference_models.iter().any(|model| {
+                    ((observation - model.mean) / model.sigma).abs() <= maximum_residual
+                });
+                if !any_model_adequate {
+                    confusion_counts[generator_index][abstain_column] += 1;
+                    predictive_adequacy_abstentions_by_generator[generator_index] += 1;
+                    if generator.generator_id != OTHER_UNRESOLVED_MODEL_ID {
+                        named_abstained += 1;
+                    }
+                    continue;
+                }
+            }
+
             let mut log_joint = Vec::with_capacity(inference_models.len());
             for model in &inference_models {
                 let value = if model.prior > 0.0 {
@@ -501,6 +570,8 @@ pub fn evaluate_model_recovery(
         availability_probability: experiment.availability_probability,
         unavailable_observations_by_generator,
         abstention_threshold: minimum_posterior_probability,
+        predictive_adequacy_threshold,
+        predictive_adequacy_abstentions_by_generator,
         named_model_accuracy,
         prior_weighted_named_model_accuracy: prior_weighted_accuracy,
         named_model_coverage,
@@ -893,6 +964,82 @@ mod tests {
         );
         assert!(report.open_world_false_confident_assignment_rate.is_some());
         assert!(report.open_world_abstention_rate.is_some());
+    }
+
+    #[test]
+    fn predictive_adequacy_gate_rejects_unseen_process_far_from_all_named_models() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = experiment(vec![
+            prediction("model-a", 0.0, 0.1),
+            prediction("model-b", 1.0, 0.1),
+        ]);
+        let prior = ModelPriorScenario {
+            scenario_id: "equal".to_string(),
+            scenario_weight: 1.0,
+            probabilities: vec![0.5, 0.5],
+        };
+        let generators = vec![
+            RecoveryGenerator {
+                generator_id: "model-a".to_string(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "model-b".to_string(),
+                predictive_mean: 1.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: OTHER_UNRESOLVED_MODEL_ID.to_string(),
+                predictive_mean: 10.0,
+                predictive_sigma: 0.1,
+            },
+        ];
+
+        let closed_set = evaluate_model_recovery(
+            &hypotheses, &candidate, &prior, &generators, 128, 0xA11CE, 0.70,
+        ).unwrap();
+        assert_eq!(closed_set.open_world_false_confident_assignment_rate, Some(1.0));
+
+        let open_world = evaluate_model_recovery_with_predictive_adequacy(
+            &hypotheses, &candidate, &prior, &generators, 128, 0xA11CE, 0.70, 3.0,
+        ).unwrap();
+        assert_eq!(open_world.predictive_adequacy_threshold, Some(3.0));
+        assert_eq!(open_world.open_world_false_confident_assignment_rate, Some(0.0));
+        assert_eq!(open_world.open_world_abstention_rate, Some(1.0));
+        assert_eq!(open_world.predictive_adequacy_abstentions_by_generator[2], 128);
+    }
+
+    #[test]
+    fn invalid_predictive_adequacy_threshold_fails_closed() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let candidate = experiment(vec![
+            prediction("model-a", 0.0, 0.1),
+            prediction("model-b", 1.0, 0.1),
+        ]);
+        let prior = ModelPriorScenario {
+            scenario_id: "equal".to_string(),
+            scenario_weight: 1.0,
+            probabilities: vec![0.5, 0.5],
+        };
+        let generators = vec![
+            RecoveryGenerator {
+                generator_id: "model-a".to_string(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.1,
+            },
+            RecoveryGenerator {
+                generator_id: "model-b".to_string(),
+                predictive_mean: 1.0,
+                predictive_sigma: 0.1,
+            },
+        ];
+        assert_eq!(
+            evaluate_model_recovery_with_predictive_adequacy(
+                &hypotheses, &candidate, &prior, &generators, 8, 42, 0.7, f64::NAN,
+            ),
+            Err(ModelRecoveryError::InvalidPredictiveAdequacyThreshold)
+        );
     }
 
     #[test]
