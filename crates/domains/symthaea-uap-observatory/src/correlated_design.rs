@@ -208,8 +208,8 @@ pub fn exhaustive_correlated_budgeted_design(
             .collect();
         ids.sort();
 
-        let replace = gain > best_gain + 1.0e-12
-            || ((gain - best_gain).abs() <= 1.0e-12 && ids < best_ids);
+        let replace =
+            gain > best_gain + 1.0e-12 || ((gain - best_gain).abs() <= 1.0e-12 && ids < best_ids);
         if replace {
             best_selection = selected;
             best_cost = cost;
@@ -397,7 +397,9 @@ fn validate_correlated_inputs(
     let mut option_ids = BTreeSet::new();
     for (option_index, option) in options.iter().enumerate() {
         if option.option_id.trim().is_empty() {
-            return Err(BudgetedDesignError::InvalidOptionId { index: option_index });
+            return Err(BudgetedDesignError::InvalidOptionId {
+                index: option_index,
+            });
         }
         if !option_ids.insert(option.option_id.as_str()) {
             return Err(BudgetedDesignError::DuplicateOptionId(
@@ -425,13 +427,8 @@ fn validate_correlated_inputs(
                 actual: option.observation_indices_by_scenario.len(),
             });
         }
-        for (scenario_index, indices) in option
-            .observation_indices_by_scenario
-            .iter()
-            .enumerate()
-        {
-            let measurement_count =
-                scenarios[scenario_index].measurement_jacobian_rows.len();
+        for (scenario_index, indices) in option.observation_indices_by_scenario.iter().enumerate() {
+            let measurement_count = scenarios[scenario_index].measurement_jacobian_rows.len();
             let mut seen = BTreeSet::new();
             for index in indices.iter().copied() {
                 if index >= measurement_count {
@@ -453,7 +450,10 @@ fn validate_correlated_inputs(
         }
     }
 
-    let total_weight = scenarios.iter().map(|scenario| scenario.weight).sum::<f64>();
+    let total_weight = scenarios
+        .iter()
+        .map(|scenario| scenario.weight)
+        .sum::<f64>();
     if !total_weight.is_finite() || total_weight <= 0.0 {
         return Err(BudgetedDesignError::NumericalOverflow);
     }
@@ -531,12 +531,8 @@ fn evaluate_correlated_selection(
             let mut selected_covariance = vec![vec![0.0; count]; count];
             let mut selected_jacobian = Vec::with_capacity(count);
             for (local_row, source_row) in selected_indices.iter().copied().enumerate() {
-                selected_jacobian.push(
-                    scenario.measurement_jacobian_rows[source_row].clone(),
-                );
-                for (local_column, source_column) in
-                    selected_indices.iter().copied().enumerate()
-                {
+                selected_jacobian.push(scenario.measurement_jacobian_rows[source_row].clone());
+                for (local_column, source_column) in selected_indices.iter().copied().enumerate() {
                     selected_covariance[local_row][local_column] =
                         scenario.measurement_covariance[source_row][source_column];
                 }
@@ -563,11 +559,12 @@ fn evaluate_correlated_selection(
 
         let posterior_joint_logdet = cholesky_log_determinant(&information)
             .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
-        let prior_joint_logdet = cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
-            BudgetedDesignError::PriorNotPositiveDefinite {
-                scenario_id: scenario.scenario_id.clone(),
-            }
-        })?;
+        let prior_joint_logdet =
+            cholesky_log_determinant(&scenario.prior_precision).map_err(|_| {
+                BudgetedDesignError::PriorNotPositiveDefinite {
+                    scenario_id: scenario.scenario_id.clone(),
+                }
+            })?;
         let posterior_target_logdet =
             marginal_target_log_determinant(&information, scenario.target_parameter_count)
                 .map_err(|_| BudgetedDesignError::CholeskyFailure)?;
@@ -640,7 +637,10 @@ fn forward_whiten_jacobian(
 }
 
 fn normalized_weights(scenarios: &[CorrelatedDesignScenario]) -> Vec<f64> {
-    let total = scenarios.iter().map(|scenario| scenario.weight).sum::<f64>();
+    let total = scenarios
+        .iter()
+        .map(|scenario| scenario.weight)
+        .sum::<f64>();
     scenarios
         .iter()
         .map(|scenario| scenario.weight / total)
@@ -739,7 +739,10 @@ mod tests {
             vec![vec![1.0, 0.0], vec![0.0, 4.0]],
             vec![vec![1.0], vec![1.0]],
         )];
-        let correlated_options = vec![option("sensor-a", 1.0, vec![0]), option("sensor-b", 1.0, vec![1])];
+        let correlated_options = vec![
+            option("sensor-a", 1.0, vec![0]),
+            option("sensor-b", 1.0, vec![1]),
+        ];
         let correlated = greedy_correlated_budgeted_design(
             &correlated_scenarios,
             &correlated_options,
@@ -774,7 +777,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(correlated.selected_option_ids, independent.selected_option_ids);
+        assert_eq!(
+            correlated.selected_option_ids,
+            independent.selected_option_ids
+        );
         assert!(
             (correlated.expected_information_gain_nats
                 - independent.expected_information_gain_nats)
@@ -797,18 +803,12 @@ mod tests {
             vec![vec![1.0], vec![1.0]],
         )];
         let options = vec![option("two-correlated-sensors", 1.0, vec![0, 1])];
-        let report = greedy_correlated_budgeted_design(
-            &scenarios,
-            &options,
-            &config(1.0, 1),
-        )
-        .unwrap();
+        let report =
+            greedy_correlated_budgeted_design(&scenarios, &options, &config(1.0, 1)).unwrap();
         let expected_information = (1.0 + 2.0 / (1.0 + rho)).ln();
         let independent_assumption_information = 3.0_f64.ln();
 
-        assert!(
-            (report.expected_information_gain_nats - expected_information).abs() < 1.0e-12
-        );
+        assert!((report.expected_information_gain_nats - expected_information).abs() < 1.0e-12);
         assert!(report.expected_information_gain_nats < independent_assumption_information);
     }
 
@@ -818,13 +818,12 @@ mod tests {
             vec![vec![1.0, 0.8], vec![0.8, 1.0]],
             vec![vec![1.0], vec![1.0]],
         )];
-        let options = vec![option("sensor-a", 1.0, vec![0]), option("sensor-b", 1.0, vec![1])];
-        let report = greedy_correlated_budgeted_design(
-            &scenarios,
-            &options,
-            &config(1.0, 1),
-        )
-        .unwrap();
+        let options = vec![
+            option("sensor-a", 1.0, vec![0]),
+            option("sensor-b", 1.0, vec![1]),
+        ];
+        let report =
+            greedy_correlated_budgeted_design(&scenarios, &options, &config(1.0, 1)).unwrap();
 
         // Either one-observation option has information log(1 + 1/1).
         assert!((report.expected_information_gain_nats - 2.0_f64.ln()).abs() < 1.0e-12);
@@ -851,18 +850,12 @@ mod tests {
         };
         let first_options = vec![option("both", 1.0, vec![0, 1])];
         let second_options = vec![option("both", 1.0, vec![1, 0])];
-        let first = greedy_correlated_budgeted_design(
-            &[first_scenario],
-            &first_options,
-            &config(1.0, 2),
-        )
-        .unwrap();
-        let second = greedy_correlated_budgeted_design(
-            &[second_scenario],
-            &second_options,
-            &config(1.0, 2),
-        )
-        .unwrap();
+        let first =
+            greedy_correlated_budgeted_design(&[first_scenario], &first_options, &config(1.0, 2))
+                .unwrap();
+        let second =
+            greedy_correlated_budgeted_design(&[second_scenario], &second_options, &config(1.0, 2))
+                .unwrap();
 
         assert!(
             (first.expected_information_gain_nats - second.expected_information_gain_nats).abs()
