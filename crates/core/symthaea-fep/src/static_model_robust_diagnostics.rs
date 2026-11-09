@@ -147,6 +147,38 @@ pub fn rectangular_model_policy_risk(policy: &TwoStageDiagnosticPolicy) -> f64 {
     worst_root_risk
 }
 
+/// Optimal terminal risk when the model vertex is revealed before the
+/// second-stage action. The hidden TRUE/FALSE state remains unknown.
+fn clairvoyant_risk_for_vertex(model_vertex: ObservationModelVertex) -> f64 {
+    let mut best_risk = f64::INFINITY;
+    for action_index in 0..ACTION_COUNT {
+        let action = ObservationModelVertex::from_index(action_index);
+        for decision_mask in 0..(1_u8 << BINARY_OUTCOME_COUNT) {
+            let mut risk = 0.0;
+            for hidden_truth in [false, true] {
+                let response_is_positive = if action == model_vertex {
+                    hidden_truth
+                } else {
+                    !hidden_truth
+                };
+                let response_category = if response_is_positive { 1 } else { 0 };
+                let decision = (decision_mask & (1 << response_category)) != 0;
+                if decision != hidden_truth {
+                    risk += 0.5;
+                }
+            }
+            best_risk = best_risk.min(risk);
+        }
+    }
+    best_risk
+}
+
+/// Worst revealed-vertex optimal risk, used only as a clairvoyant lower bound.
+fn clairvoyant_lower_bound() -> f64 {
+    clairvoyant_risk_for_vertex(ObservationModelVertex::ModelA)
+        .max(clairvoyant_risk_for_vertex(ObservationModelVertex::ModelB))
+}
+
 /// Exhaustively enumerate every deterministic non-anticipative policy.
 ///
 /// There are two choices for the action after CAL-A, two choices after CAL-B,
@@ -213,9 +245,7 @@ pub fn solve_two_stage_static_model_fixture() -> StaticModelRobustFixtureResult 
         policies_evaluated,
         static_robust_risk: best_static_risk,
         rectangular_robust_risk: best_rectangular_risk,
-        // Once the vertex is revealed, choose the matching action and decode
-        // its truthful response. Both observation-model vertices are noiseless.
-        clairvoyant_lower_bound: 0.0,
+        clairvoyant_lower_bound: clairvoyant_lower_bound(),
         calibrated_policy_rectangular_risk: rectangular_model_policy_risk(&static_optimal_policy),
         static_optimal_risk_by_vertex,
         static_optimal_policy,
