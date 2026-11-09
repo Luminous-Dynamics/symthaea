@@ -24,6 +24,10 @@ The validator applies full JSON Schema Draft 2020-12 validation plus SAM semanti
 - exact parameter digest invariance in Arm C;
 - explicit recurrent-state evolution consistency;
 - evaluator truth strictly after action commitment and never policy-visible;
-- specification-only reports contain no trials.
+- specification-only reports contain no trials;
+- paired interventions bind identical episode, scenario, actor, controller and tick context;
+- masked oracle-sidecar mutations preserve Arm B policy-input and student-action digests;
+- V2X claim mutations preserve the local Follow-target record on Arm E;
+- post-commit shadow-teacher interventions preserve the Arm C executed-action digest.
 
 A passing check establishes only structural and declared information-flow semantics for the supplied report. It does not establish perception quality, statistical validity, physical safety or deployment authority.
