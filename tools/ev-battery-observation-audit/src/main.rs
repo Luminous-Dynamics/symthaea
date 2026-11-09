@@ -36,18 +36,16 @@ fn main() -> ExitCode {
         }
     };
     match audit_corpus(&schema, &corpus) {
-        Ok(summary) => {
-            match serde_json::to_string_pretty(&summary) {
-                Ok(report) => {
-                    println!("{report}");
-                    ExitCode::SUCCESS
-                }
-                Err(error) => {
-                    eprintln!("cannot serialize report: {error}");
-                    ExitCode::FAILURE
-                }
+        Ok(summary) => match serde_json::to_string_pretty(&summary) {
+            Ok(report) => {
+                println!("{report}");
+                ExitCode::SUCCESS
             }
-        }
+            Err(error) => {
+                eprintln!("cannot serialize report: {error}");
+                ExitCode::FAILURE
+            }
+        },
         Err(error) => {
             eprintln!("EV battery observation audit failed: {error}");
             ExitCode::FAILURE
