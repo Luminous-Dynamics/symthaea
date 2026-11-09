@@ -116,6 +116,26 @@ Capture an append-only, content-addressed event path:
 
 A corrected file after consumption does not retroactively repair the evidence path. A matching conclusion reached through corrupted or unconsumed evidence is still an integrity failure.
 
+### 1.9 Separate law validity, predictive fit and candidate selection
+
+A strong held-out fit is not enough to certify a scientific law. Add three distinct stages:
+- **candidate generation:** did the researcher produce a viable family of hypotheses?
+- **candidate selection:** did it submit the best scientifically valid candidate it had actually generated?
+- **scientific validity:** does the candidate satisfy source-grounded constraints and survive independent interventions, not just fit observed data?
+
+SciLaws-Bench gives a concrete reason. Its Real setting scores held-out numeric fit and scientific validity separately; its Parallel setting scores recovery of new hidden structural terms. The authors report fit–validity agreement in only 53.6% of unequal-fit model pairs, a task-level GPT-6 fit/structure correlation of only r=0.06, and a measurable gap between the best generated candidate and the one submitted. Its five-candidate selector chooses a Pareto-dominated winner in 60% of the reported groups. Discovery and selection must therefore be separate benchmark tracks. <https://yiyihum.github.io/SciLaws-Bench/>
+
+For Symthaea, record the complete candidate pool, candidate provenance, frozen pre-submission predictions, independent score for every candidate and the final selected candidate. Report best-generated candidate score, submitted candidate score, selection regret/Pareto domination, generation cost and selection cost separately. The oracle best-of-N score is an upper bound, not a feasible agent result. A model that generates a brilliant law but submits a weaker one has not completed discovery reliably.
+
+### 1.10 Test whether conclusions follow the evidence
+
+Correct answers can come from memorized priors or elimination strategies rather than supplied observations. Introduce paired evidence interventions:
+- **intact:** original evidence;
+- **withdrawn:** remove the evidence needed to support the claimed conclusion;
+- **reversed:** alter the evidence in a pre-registered, independently checked way that should change the conclusion.
+
+Score whether the conclusion follows the evidence, whether uncertainty increases when evidence is withdrawn, and whether the conclusion changes appropriately when evidence reverses. Keep irrelevant-metadata invariance as a separate control. A 2026 evidence-grounding study found a large gap between answer accuracy and evidence-grounded accuracy on its small BAISBench single-cell slice, showing that answer-key correctness alone does not establish data use. This motivates a controlled counterfactual track, not a universal quantitative claim about all science agents. <https://arxiv.org/abs/2610.04915>
+
 ### 1.8 Predictive success is necessary but not sufficient
 
 Use both:
@@ -130,6 +150,7 @@ Scores below belong to their own protocols. Do not combine them into one leaderb
 
 | Comparator | What it measures | Reported evidence / caveat | Symthaea use |
 |---|---|---|---|
+| SciLaws-Bench (2026-09-02) | Real-data law proposal and active discovery of newly synthesized structural variants | 118 problems / six disciplines / 381 papers / 291 candidate laws / ~8M data points; separates numeric fit (S_N), scientific validity (S_V) and hidden-structure recovery (S_S). Authors report 53.6% fit–validity concordance across unequal-fit pairs; candidate-selection regret is a separate failure. | Closest complementary benchmark for law validity, structural novelty, cross-group transfer and best-generated-vs-submitted selection. Adapt Real and Parallel separately; do not pool with Unsatz or DiscoverPhysics percentages. |
 | Unsatz (2026-10-31) | Ansatz-free program construction across ODEs, delays, PDEs, discrete, causal, static and stochastic systems; active experiments; held-out interventions and long horizons | 80 worlds / 20 domains; nine language models report 21–60% solved. The paper's 44-world classical subset finds a large difference between supplied-structure fitting and discovering structure. | Primary external structure-discovery comparator. Match DSL, splits, budgets and scoring before claiming reproduction. |
 | Active Causal Discovery Benchmark (2026-09-16) | Linear-Gaussian SCM graph recovery under a budgeted observe/intervene/submit API | Reported best non-oracle PC + greedy active orientation baseline: directed F1 42.7%, SHD 4.79. A structure-blind random-DAG baseline reaches 23.6% directed F1 on its dense v0; a density probe reduces that to 16.9%. | Causal-topology / intervention-efficiency comparator. Keep graph metrics separate from equation and hidden-state recovery. |
 | WorldTest / AutumnBench (ICML 2026) | Whether a learned world model supports environment-level queries rather than only observed-rollout prediction | 43 interactive worlds, 129 tasks across masked-frame prediction, change detection and planning; 517 human participants and five frontier models. The study reports humans substantially outperforming tested models. | Add global queries: reachability, interventions, change detection, counterfactual consequences and planning. |
@@ -195,6 +216,19 @@ A0 must pass first. If the supplied-structure arm fails, do not attribute the pa
 - Partial-transfer identification.
 - Calibration after a transferred model is challenged.
 - Explicit rejection / quarantine of harmful source mechanisms.
+
+### I. A6 model misspecification and candidate selection
+- F0 closed-grammar exact version-space recovery.
+- F1 parameter-support extrapolation; F2 structural support shift; F3 measurement-process shift; F4 regime shift; F5 stochastic/discrepancy shift.
+- OOD detection precision/recall and false-rejection rate on in-grammar controls.
+- Best-generated versus submitted-candidate performance and selection regret.
+- Scientific-validity rubric, held-out predictive fit and structure recovery are independent scores.
+
+### J. A7 evidence-grounded reasoning
+- Intact / withdrawn / reversed evidence perturbations.
+- Evidence-grounded accuracy, selective coverage and calibrated abstention.
+- Counterfactual responsiveness to decision-relevant observations.
+- Invariance to irrelevant context and metadata.
 
 ### G. Research judgment and efficiency
 - Success-versus-total-cost curve.
@@ -361,7 +395,7 @@ The external landscape is broader than the initial comparator set. These benchma
 
 ASI-Bench's B1–B4 ladder measures something the microcosm's A0/A2 treatment does not. A0/A2 changes whether the generating structural family is disclosed while holding the task data and budget; B1–B4 holds the research task fixed while progressively withdrawing human methodological guidance (B1 full procedure, B2 intended method/constraints, B3 objective/data/constraints/output only, B4 B3 plus non-essential context). Do not call B1 "A0" or B3 "A2". Keep the constructs independent and cross them only on task families whose contracts genuinely support both manipulations.
 
-For a matched B1–B4 track, report the per-level score and artifact validity, the B1→B3 autonomy gap, the B3→B4 distractor effect, and inclusive cost. A prospective Symthaea objective is to improve B3/B4 relative to a frozen incumbent while preserving B1 performance; B4 should remain within a preregistered tolerance of B3 when the added context is explicitly non-essential. The published aggregate 50.91 (B1) → 26.62 (B3) is a suite-level reference, not a target copied as if task distributions were identical.
+For a matched B1–B4 track, report the per-level score and artifact validity, the B1→B3 autonomy gap, the B3→B4 distractor effect, and inclusive cost. A prospective Symthaea objective is to improve B3/B4 relative to a frozen incumbent while preserving B1 performance; B4 should remain within a preregistered tolerance of B3 when the added context is explicitly non-essential. The paper's original 18-configuration aggregate reports B1 50.91, B2 29.10 and B3 26.62. The newer supplied board snapshot lists 25 Agent×Model rows and reports cross-row means B1 54.92, B2 33.11, B3 30.58 and B4 30.74; its leading row is GPT-5.6 Sol/Codex Ultra at 55.84 overall. These are different snapshots and must not be mixed. Both show the sharpest average drop from B1 to B2.
 
 ### Immediate benchmark consequence
 
@@ -373,6 +407,9 @@ Before any leaderboard comparison, preregister matched tasks, action semantics, 
 
 - Unsatz: https://arxiv.org/abs/2611.03713
 - Active Causal Discovery Benchmark: https://arxiv.org/abs/2609.31675
+- SciLaws-Bench: https://yiyihum.github.io/SciLaws-Bench/ ; paper https://arxiv.org/abs/2609.01552
+- Evidence-grounded scientific evaluation: https://arxiv.org/abs/2610.04915
+- K-Bench real scientific requests: https://arxiv.org/abs/2608.21601
 - WorldTest / AutumnBench: https://proceedings.mlr.press/v306/warrier26a.html
 - Scientist World: https://arxiv.org/abs/2611.08478
 - FrontierPhysics: https://arxiv.org/abs/2611.06910
