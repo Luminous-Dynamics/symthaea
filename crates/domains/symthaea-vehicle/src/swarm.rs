@@ -115,7 +115,21 @@ pub struct SwarmSimulator {
 
 impl SwarmSimulator {
     /// Create a new swarm with peers staggered along the road ahead of the origin.
+    /// The default absolute simulation time origin is zero.
     pub fn new(config: SwarmConfig) -> Self {
+        Self::new_at_time(config, 0.0)
+    }
+
+    /// Create a new swarm aligned to an existing ego simulation clock.
+    ///
+    /// Use this when the ego simulator has already been primed before the swarm
+    /// is constructed. Peer state timestamps, broadcast-history keys and the
+    /// swarm clock all begin at the same absolute time.
+    pub fn new_at_time(config: SwarmConfig, start_time_s: f64) -> Self {
+        assert!(
+            start_time_s.is_finite() && start_time_s >= 0.0,
+            "swarm time origin must be finite and non-negative"
+        );
         let mut peers = Vec::with_capacity(config.num_peers);
 
         for i in 0..config.num_peers {
@@ -124,11 +138,12 @@ impl SwarmSimulator {
             let s = (i as f64 + 1.0) * config.initial_spacing;
             let (x, y, heading) = config.road.position_at(s);
             sim.set_position(x, y, heading);
-            // Seed the broadcast history with the initial state so the
-            // mesh is never empty at t=0.
+            sim.set_simulation_time(start_time_s);
+
+            // Seed history using the same absolute time as the peer and swarm clocks.
             let initial = sim.state().clone();
             let mut history = VecDeque::new();
-            history.push_back((0.0, initial));
+            history.push_back((start_time_s, initial));
             peers.push(PeerVehicle {
                 sim,
                 id: i as u64 + 1,
@@ -140,7 +155,7 @@ impl SwarmSimulator {
         Self {
             config,
             peers,
-            sim_time: 0.0,
+            sim_time: start_time_s,
         }
     }
 
