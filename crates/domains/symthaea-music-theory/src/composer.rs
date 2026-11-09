@@ -4136,6 +4136,7 @@ fn realize_harmony_measures(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn realize_harmony_measures_for_part(
     score: &mut Score,
     part_id: PartId,
@@ -4278,7 +4279,6 @@ fn realize_harmony_measures_for_part(
 /// [`crate::live::LiveComposer`] can carry it between incremental calls
 /// (voice-leading a real-time phrase transition exactly like a section
 /// boundary); `compose()` passes a fresh, empty `Vec`.
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn realize_harmony(
     score: &mut Score,
@@ -4494,6 +4494,7 @@ fn realize_bass_measures(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn realize_bass_measures_for_part(
     score: &mut Score,
     part_id: PartId,
@@ -4784,7 +4785,6 @@ fn realize_bass_measures_for_part(
 /// walking root-then-fifth idiom added on beat 3 at higher arousal.
 /// `prev_bass` is caller-owned so [`crate::live::LiveComposer`] can carry it
 /// between incremental calls; `compose()` passes a fresh `None`.
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn realize_bass(
     score: &mut Score,
