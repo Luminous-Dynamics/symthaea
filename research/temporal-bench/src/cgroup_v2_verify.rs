@@ -133,9 +133,13 @@ fn safe_control_group_path(value: &str) -> bool {
     if segments.next() != Some("") {
         return false;
     }
-    segments.all(|segment| {
-        !segment.is_empty() && segment != "." && segment != ".."
-    })
+    let segments: Vec<&str> = segments.collect();
+    if segments.is_empty() || segments.iter().any(|segment| {
+        segment.is_empty() || *segment == "." || *segment == ".."
+    }) {
+        return false;
+    }
+    segments.last().is_some_and(|name| name.ends_with(".scope"))
 }
 
 fn decode_mountinfo_path(value: &str) -> Result<String, CgroupV2Error> {
@@ -659,6 +663,39 @@ mod tests {
                 Err(CgroupV2Error::InvalidControlGroupPath)
             );
         }
+    }
+
+    #[test]
+    fn only_exact_systemd_scope_paths_are_accepted() {
+        for invalid in [
+            "/user.slice/ceb-candidate.service",
+            "/user.slice/ceb-candidate.scope/child",
+        ] {
+            let mut observed = snapshot();
+            observed.control_group = invalid.into();
+            let mut policy = expected();
+            policy.control_group = invalid.into();
+            assert_eq!(
+                verify_cgroup_v2_snapshot(&policy, &observed),
+                Err(CgroupV2Error::InvalidControlGroupPath)
+            );
+        }
+    }
+
+    #[test]
+    fn oversized_control_file_is_rejected_before_full_read() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-cgroup-control-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::write(&path, vec![b'x'; (MAX_CGROUP_CONTROL_FILE_BYTES + 1) as usize]).unwrap();
+        let result = read_control_file(&path);
+        let _ = fs::remove_file(&path);
+        assert!(matches!(result, Err(CgroupV2Error::ControlFileTooLarge { .. })));
     }
 
     #[test]
