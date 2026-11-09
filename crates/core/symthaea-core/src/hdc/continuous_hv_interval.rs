@@ -1266,9 +1266,8 @@ impl ContinuousHV {
     /// supplied by a deterministic, allocation-free indexed callback.
     ///
     /// This supports compact outward-quantized synopsis formats. The callback
-    /// is invoked during validation and again during accumulation, so it must
-    /// return the same pair for each index on every invocation. Returned lower
-    /// and upper values must enclose the true component range.
+    /// is invoked exactly once per component in ascending index order. Returned
+    /// lower and upper values must enclose the true component range.
     ///
     /// The implementation uses the same group-of-eight and ordered-tail
     /// reduction contract as the slice-based component-bound kernel. It does
@@ -1281,20 +1280,6 @@ impl ContinuousHV {
         F: FnMut(usize) -> (f32, f32),
     {
         self.validate_full_resolution_profile("query")?;
-        for index in 0..self.values.len() {
-            let (lower, upper) = component_bounds(index);
-            if !lower.is_finite()
-                || !upper.is_finite()
-                || !(-1.0..=1.0).contains(&lower)
-                || !(-1.0..=1.0).contains(&upper)
-                || lower > upper
-            {
-                return Err(
-                    ContinuousHVIntervalError::InvalidCandidateComponentBounds { index },
-                );
-            }
-        }
-
         let query_norm_sq = canonical_norm_squared(&self.values);
         if !query_norm_sq.is_finite() {
             return Ok(ContinuousHVScoreInterval::uninformative());
@@ -1308,10 +1293,23 @@ impl ContinuousHV {
         let mut query_chunks = self.values.chunks_exact(8);
         let mut offset = 0usize;
         for query_chunk in query_chunks.by_ref() {
+            let mut invalid_index = None;
             let candidate_chunk: [F32Interval; 8] = std::array::from_fn(|index| {
-                let (lower, upper) = component_bounds(offset + index);
+                let component_index = offset + index;
+                let (lower, upper) = component_bounds(component_index);
+                if !lower.is_finite()
+                    || !upper.is_finite()
+                    || !(-1.0..=1.0).contains(&lower)
+                    || !(-1.0..=1.0).contains(&upper)
+                    || lower > upper
+                {
+                    invalid_index = Some(component_index);
+                }
                 F32Interval { lo: lower, hi: upper }
             });
+            if let Some(index) = invalid_index {
+                return Err(ContinuousHVIntervalError::InvalidCandidateComponentBounds { index });
+            }
             let dot_group = match product_group(query_chunk, &candidate_chunk) {
                 Some(value) => value,
                 None => return Ok(ContinuousHVScoreInterval::uninformative()),
@@ -1333,6 +1331,16 @@ impl ContinuousHV {
 
         for &query_value in query_chunks.remainder() {
             let (lower, upper) = component_bounds(offset);
+            if !lower.is_finite()
+                || !upper.is_finite()
+                || !(-1.0..=1.0).contains(&lower)
+                || !(-1.0..=1.0).contains(&upper)
+                || lower > upper
+            {
+                return Err(ContinuousHVIntervalError::InvalidCandidateComponentBounds {
+                    index: offset,
+                });
+            }
             let candidate_value = F32Interval { lo: lower, hi: upper };
             let product = match F32Interval::point(query_value).mul(candidate_value) {
                 Some(value) => value,
