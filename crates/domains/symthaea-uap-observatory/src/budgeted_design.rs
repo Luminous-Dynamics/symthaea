@@ -1281,6 +1281,55 @@ mod tests {
     }
 
     #[test]
+    fn greedy_selector_chooses_calibration_when_it_improves_target_marginal_eig() {
+        let scenarios = vec![DesignScenario {
+            scenario_id: "target-clock-coupled".to_string(),
+            target_parameter_count: 1,
+            weight: 1.0,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        }];
+        let options = vec![
+            option(
+                "bearing-mixed-target-and-clock",
+                1.0,
+                None,
+                vec![vec![vec![1.0, 1.0]]],
+            ),
+            option("clock-calibration", 1.0, None, vec![vec![vec![0.0, 1.0]]]),
+        ];
+
+        let greedy = greedy_budgeted_design(
+            &scenarios,
+            &options,
+            &BudgetedDesignConfig {
+                budget: 2.0,
+                parameter_scales: vec![1.0, 1.0],
+            },
+        )
+        .unwrap();
+        let exact = exhaustive_budgeted_design(
+            &scenarios,
+            &options,
+            &BudgetedDesignConfig {
+                budget: 2.0,
+                parameter_scales: vec![1.0, 1.0],
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            greedy.selected_option_ids,
+            vec!["bearing-mixed-target-and-clock", "clock-calibration"]
+        );
+        assert_eq!(greedy.selected_option_ids, exact.selected_option_ids);
+        assert!(
+            (greedy.expected_information_gain_nats - (5.0_f64 / 3.0).ln()).abs()
+                < 1.0e-12
+        );
+        assert!(greedy.expected_joint_information_gain_nats > greedy.expected_information_gain_nats);
+    }
+
+    #[test]
     fn nuisance_only_measurement_can_improve_target_when_prior_couples_them() {
         let scenarios = vec![DesignScenario {
             scenario_id: "correlated-target-clock-prior".to_string(),
