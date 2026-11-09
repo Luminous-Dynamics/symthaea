@@ -143,7 +143,7 @@ fn cue_sequence(include_response: bool) -> EnsembleCueSequenceV1 {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let valid_interlock = analyze_ensemble_groove(&cross_cycle_fixture([10, 26]))?;
+    let valid_interlock = analyze_ensemble_groove(&cross_cycle_fixture([10, 26])).map_err(|issues| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{issues:?}")))?;
     assert_eq!(valid_interlock.supercycle_ticks, 96);
     assert!(valid_interlock.all_constraints_passed);
     assert_eq!(valid_interlock.pair_analyses[0].coincident_attack_pairs, 0);
@@ -152,16 +152,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(2)
     );
 
-    let collision_control = analyze_ensemble_groove(&cross_cycle_fixture([8, 24]))?;
+    let collision_control = analyze_ensemble_groove(&cross_cycle_fixture([8, 24])).map_err(|issues| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{issues:?}")))?;
     assert_eq!(
         collision_control.pair_analyses[0].coincident_attack_pairs,
         2
     );
     assert!(!collision_control.all_constraints_passed);
 
-    let sparse_space = analyze_groove_space(&one_layer(&[0, 48]), 24)?;
+    let sparse_space = analyze_groove_space(&one_layer(&[0, 48]), 24).map_err(|issues| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{issues:?}")))?;
     let dense_space =
-        analyze_groove_space(&one_layer(&[0, 12, 24, 36, 48, 60, 72, 84]), 24)?;
+        analyze_groove_space(&one_layer(&[0, 12, 24, 36, 48, 60, 72, 84]), 24).map_err(|issues| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{issues:?}")))?;
     assert_eq!(
         sparse_space.layers[0].long_gap_span_basis_points,
         10_000
@@ -179,8 +179,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         96
     );
 
-    let cue_success = verify_ensemble_cues(&cue_graph(), &cue_sequence(true))?;
-    let cue_missing_response = verify_ensemble_cues(&cue_graph(), &cue_sequence(false))?;
+    let cue_success = verify_ensemble_cues(&cue_graph(), &cue_sequence(true)).map_err(|issues| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{issues:?}")))?;
+    let cue_missing_response = verify_ensemble_cues(&cue_graph(), &cue_sequence(false)).map_err(|issues| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{issues:?}")))?;
     assert!(cue_success.all_transitions_passed);
     assert!(!cue_missing_response.all_transitions_passed);
     assert_eq!(cue_success.final_state, "soft");
