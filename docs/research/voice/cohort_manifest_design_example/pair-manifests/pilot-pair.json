@@ -1,0 +1,12 @@
+{
+  "pair_id": "pilot-pair",
+  "baseline_trial_id": "pilot-a",
+  "variant_trial_id": "pilot-b",
+  "intervention_kind": "TEXT_NUISANCE",
+  "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "variant_condition_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "changed_dimensions": [
+    "CONTEXT_TEXT"
+  ]
+}
