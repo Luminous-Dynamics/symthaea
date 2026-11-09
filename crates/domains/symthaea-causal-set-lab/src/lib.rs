@@ -36,6 +36,7 @@ pub use bayesian_dimension::{
     MIN_DIMENSION_CALIBRATION_REPLICATES, calibrate_minkowski_ordering_fraction,
     estimate_finite_size_dimension_posterior,
 };
+pub use causal_set_nd::{CausalSetNd, CausalSetNdError, EventNd};
 pub use curved_frw_1p1::{ConformalFrw1p1, CurvedFrwError};
 pub use curved_order_statistics::{
     CurvedOrderFractionReference, CurvedOrderStatisticsError, DimensionlessCurvatureEstimate,
