@@ -557,8 +557,9 @@ impl GroupPartitionCoverageReceipt {
 
     /// Verify a query's compact group records against this build-time receipt.
     ///
-    /// Cost is O(number of groups), not O(number of members): member roster
-    /// disjointness was established by from_group_envelopes().
+    /// Cost is O(G log G) group-level work: member roster disjointness and
+    /// eligible population membership were established by from_group_envelopes().
+    /// No member-ID roster is walked on this query path.
     fn verify_group_records(
         &self,
         groups: &[GroupScoreIntervalRecord],
@@ -1369,8 +1370,8 @@ pub fn select_group_refinement_set(
 ///
 /// The receipt proves group membership disjointness and completeness for one
 /// manifest/eligibility generation. Query-time validation is O(number of
-/// groups): it checks group identities, counts, query digests and snapshot
-/// fields, without walking each member ID. A persisted receipt must be
+/// groups log groups): it checks group identities, counts, query digests and
+/// snapshot fields, without walking each member ID. A persisted receipt must be
 /// authenticated against the immutable segment manifest by #10917 after reopen.
 pub fn select_group_refinement_set_with_partition_receipt(
     groups: &[GroupScoreIntervalRecord],
