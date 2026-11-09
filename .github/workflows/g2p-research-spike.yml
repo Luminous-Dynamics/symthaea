@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/g2p-spike/**"
+      - "tools/g2p-eval/**"
       - "crates/domains/symthaea-muse/src/singing_bridge.rs"
       - ".github/workflows/g2p-research-spike.yml"
   workflow_dispatch:
