@@ -15,7 +15,8 @@ use symthaea::voice::diffsinger::DiffSingerEngine;
 use symthaea::voice::formant_singing_engine::FormantSingingEngine;
 use symthaea::voice::kokoro_singing::KokoroSingingEngine;
 use symthaea::voice::singing_engine::{
-    SingingBackendCapabilities, SingingVoiceEngine, VocalPerformance, VocalStem,
+    ControlCapability, SingingBackendCapabilities, SingingControl, SingingRenderPolicy,
+    SingingVoiceEngine, VocalPerformance, VocalStem,
 };
 use symthaea::voice::singing_quality::{VocalQualityMetrics, analyze_vocal_stem};
 use symthaea_muse::{MusicalIntent, MusicalState, Style};
@@ -102,6 +103,7 @@ struct KeyEntry {
     performance_blake3: Option<String>,
     audio_blake3: String,
     capability_manifest_blake3: Option<String>,
+    render_policy_blake3: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -144,6 +146,10 @@ struct ObjectiveEntry {
     capability_manifest: SingingBackendCapabilities,
     capability_manifest_canonical_json: String,
     capability_manifest_blake3: String,
+    render_policy: SingingRenderPolicy,
+    render_policy_canonical_json: String,
+    render_policy_blake3: String,
+    accepted_control_dispositions: Vec<ControlCapability>,
 }
 
 #[derive(Deserialize)]
@@ -320,6 +326,22 @@ fn render_one(
         .to_hex()
         .to_string();
     let policy = SingingRenderPolicy::score_conditioned_comparison();
+    let policy_canonical_json = serde_json::to_string(&policy)?;
+    let policy_blake3 = blake3::hash(policy_canonical_json.as_bytes())
+        .to_hex()
+        .to_string();
+    let accepted_control_dispositions = policy
+        .required_controls
+        .iter()
+        .map(|control| {
+            capabilities
+                .controls
+                .iter()
+                .find(|entry| entry.control == *control)
+                .cloned()
+                .with_context(|| format!("missing declared disposition for {control:?}"))
+        })
+        .collect::<Result<Vec<_>>>()?;
     let stem = engine.render_with_policy(performance, &policy)?;
     let id = blind_id(salt, &stem.backend, case_id);
     let filename = format!("{id}.wav");
@@ -345,6 +367,7 @@ fn render_one(
         performance_blake3: Some(performance_blake3),
         audio_blake3,
         capability_manifest_blake3: Some(capability_manifest_blake3.clone()),
+        render_policy_blake3: Some(policy_blake3.clone()),
     });
     objective.push(ObjectiveEntry {
         clip_id: id,
@@ -354,6 +377,10 @@ fn render_one(
         capability_manifest: capabilities,
         capability_manifest_canonical_json,
         capability_manifest_blake3,
+        render_policy: policy,
+        render_policy_canonical_json: policy_canonical_json,
+        render_policy_blake3: policy_blake3,
+        accepted_control_dispositions,
     });
     Ok(())
 }
@@ -414,6 +441,7 @@ fn import_references(
             performance_blake3: None,
             audio_blake3: audio_blake3.clone(),
             capability_manifest_blake3: None,
+            render_policy_blake3: None,
         });
         receipts.push(HumanReferenceReceipt {
             case_id: reference.case_id,
