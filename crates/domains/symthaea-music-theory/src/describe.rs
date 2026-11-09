@@ -713,6 +713,17 @@ fn accompaniment_sentence(pattern: crate::accompaniment::Accompaniment) -> Optio
 
 fn texture_sentences(t: &crate::spec::TextureSpec) -> Vec<String> {
     let mut out = Vec::new();
+    for (role, accompaniment) in &t.section_accompaniment_overrides {
+        let section_name = match role {
+            crate::form::SectionRole::A => "opening A",
+            crate::form::SectionRole::B => "contrasting middle B",
+            crate::form::SectionRole::ReturnA => "da-capo return A",
+            crate::form::SectionRole::C => "C episode",
+        };
+        out.push(format!(
+            "The {section_name} section uses a section-specific {accompaniment:?} accompaniment pattern."
+        ));
+    }
     if t.full_drone {
         out.push(
             "The harmony never changes — a single sustained chord underlies the entire piece."
@@ -783,6 +794,15 @@ mod tests {
             seed,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn identity_description_discloses_section_specific_accompaniment() {
+        let spec = Style::MinuetAndTrio.spec();
+        let description = texture_sentences(&spec.texture).join(" ");
+        assert!(description.contains("contrasting middle B"), "{description}");
+        assert!(description.contains("Arpeggio"), "{description}");
+        assert!(description.contains("section-specific"), "{description}");
     }
 
     #[test]
