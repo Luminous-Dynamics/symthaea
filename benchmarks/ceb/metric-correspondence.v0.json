@@ -2,7 +2,7 @@
   "schema_version": 0,
   "crosswalk_id": "CEB-METRIC-CORRESPONDENCE-V0",
   "status": "design_only_no_matched_comparisons",
-  "snapshot_date": "2026-11-05",
+  "snapshot_date": "2026-11-07",
   "policy": {
     "purpose": "Map every CEB primary metric to external observations without confusing metric resemblance with protocol equivalence.",
     "classes": "exact_semantics means operational metric meaning aligns; close_semantics means same broad construct with specific definitional differences; related_but_distinct means useful contextual relation but not the same metric; not_comparable means no defensible numeric correspondence is registered.",
@@ -446,9 +446,10 @@
       "comparison_use": "replication_candidate",
       "external_observation_ids": [
         "crbug-opus-recall5",
-        "codereviewbench-deepseek-v4-pro-recall"
+        "codereviewbench-deepseek-v4-pro-recall",
+        "reviewbench-intent-agent-grounded-recall"
       ],
-      "rationale": "CRBugBench is the closest existing top-five comment comparator. ReviewBench grounded recall, SecPRBench target-mechanism recall, CR-Bench-v2 KDDR and CodeReviewBench human-flagged bug recall are all useful context but have different output cutoffs, defect populations, judges and denominators; do not label them exact CEB Recall@5 equivalents.",
+      "rationale": "CRBugBench is the closest existing top-five comment comparator. ReviewBench grounded recall, SecPRBench target-mechanism recall, CR-Bench-v2 KDDR and CodeReviewBench human-flagged bug recall are all useful context but have different output cutoffs, defect populations, judges and denominators; do not label them exact CEB Recall@5 equivalents. The November 7 20:14 SAST live capture adds intent-review-agent at 74.4% grounded recall on the same 219-PR high-severity board; retain this as contextual grounded recall because it is still not top-five constrained.",
       "blockers": [
         "review comment ranking differs from CEB finding ranking",
         "repository/task sets differ",
@@ -457,7 +458,8 @@
         "CR-Bench-v2 KDDR is one known target per task and not top-five constrained",
         "CodeReviewBench recovers pre-existing human review findings and cannot credit bugs humans never found",
         "CodeReviewBench is 30 PRs / 95 bugs, one Kodus harness and Claude Haiku 4.5 judge; CEB uses a different task and finding contract",
-        "ReviewBench and SecPRBench are not top-five constrained; CR-Bench-v2 KDDR uses a single labeled target per PR"
+        "ReviewBench and SecPRBench are not top-five constrained; CR-Bench-v2 KDDR uses a single labeled target per PR",
+        "the 2026-11-07 20:14 SAST leader capture is a mutable high-severity grounded-recall snapshot, not a top-five score"
       ],
       "normalization_requirements": [
         "same changes and adjudicated defects",

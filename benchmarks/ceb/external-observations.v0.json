@@ -2,7 +2,7 @@
   "schema_version": 0,
   "registry_id": "CEB-EXTERNAL-OBSERVATIONS-V0",
   "status": "design_only_external_reference_snapshot",
-  "snapshot_date": "2026-11-07",
+  "snapshot_date": "2026-11-08",
   "policy": {
     "unit_of_observation": "One row represents one metric from one benchmark split and one named system configuration. Never combine metrics from different configurations into a synthetic system.",
     "comparison_ceiling": "All included external scores are contextual or historical references unless a separately preregistered matched comparison is recorded; no direct CEB superiority claim is supported by this registry.",
@@ -353,6 +353,260 @@
       "published_on": "2026-09-29",
       "supports": [
         "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "sdr-ca-paper",
+      "source_url": "https://doi.org/10.1016/j.jss.2026.112931",
+      "title": "SDRCA: causal-graph software defect root-cause analysis",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "unival-paper",
+      "source_url": "https://arxiv.org/abs/2102.06292",
+      "title": "UniVal: predicate- and value-based causal fault localization",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "aacr-bench-paper",
+      "source_url": "https://arxiv.org/abs/2601.19494",
+      "title": "AACR-Bench: annotated AI code review benchmark with repository context",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW",
+        "CEB-REPO"
+      ]
+    },
+    {
+      "source_id": "cbfl-softrex-paper",
+      "source_url": "https://arxiv.org/abs/2611.01292",
+      "title": "Causality-Based Fault Localization / SoftReX",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-10-31",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "causalrepair-paper",
+      "source_url": "https://arxiv.org/abs/2608.10613",
+      "title": "CausalRepair dual-slicing automated program repair",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-06-25",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "poscm-uai2026-paper",
+      "source_url": "https://proceedings.mlr.press/v337/orujlu26a.html",
+      "title": "Partially Observed Structural Causal Models",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "cgarf-paper",
+      "source_url": "https://doi.org/10.1007/s10664-026-10940-1",
+      "title": "CGARF: a causality-guided framework for reliable automated program repair",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-08-22",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "secrepobench-leaderboard",
+      "source_url": "https://secrepobench.github.io/",
+      "title": "SecRepoBench secure repository-level code completion benchmark and leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-SECURE"
+      ]
+    },
+    {
+      "source_id": "llm-overcorrection-review-paper",
+      "source_url": "https://doi.org/10.1007/s10515-026-00638-5",
+      "title": "Are LLMs reliable code reviewers? systematic overcorrection in requirement conformance judgement",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-06-26",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "reviewgrounder-acl2026-paper",
+      "source_url": "https://aclanthology.org/2026.acl-long.1477/",
+      "title": "ReviewGrounder: Improving Review Substantiveness with Rubric-Guided, Tool-Integrated Agents",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-07-01",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "scope-selective-judge-summary",
+      "source_url": "https://hypermatrix.cs.dal.ca/selective-prediction/",
+      "title": "Uncertainty-Guarded Selective Prediction for Large Language Models — SCOPE research summary",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-08-20",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "ase-ipa-2025-paper",
+      "source_url": "https://doi.org/10.1109/ase63991.2025.00194",
+      "title": "Incremental Program Analysis in the Wild: An Empirical Study on Real-World Program Changes",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2025-11-19",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "diffci-open-evidence-study",
+      "source_url": "https://diffci.com/research/diffci-open-evidence-2026",
+      "title": "DiffCI Open Evidence Study 2026: Change-Aware Test Selection",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-09-03",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "agent-evidence-tracing-survey-2026",
+      "source_url": "https://arxiv.org/abs/2606.04990",
+      "title": "From Agent Traces to Trust: Evidence Tracing and Execution Provenance in LLM Agents",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-06-03",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "llm-se-empirical-guidelines-2026",
+      "source_url": "https://link.springer.com/article/10.1007/s10664-026-10922-3",
+      "title": "Guidelines for empirical studies in software engineering involving large language models",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-11-03",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "pr-change-impact-analysis-2025",
+      "source_url": "https://doi.org/10.1007/s10664-024-10600-2",
+      "title": "Enhanced code reviews using pull request based change impact analysis",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2025-02-12",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "microservice-evolution-verification-slr-2026",
+      "source_url": "https://www.mdpi.com/2674-113x/5/3/32",
+      "title": "Formal Verification Under Evolution in Microservice-Based Systems: A Systematic Literature Review",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-07-15",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "swe-ci-maintenance-paper-2026",
+      "source_url": "https://arxiv.org/abs/2603.03823",
+      "title": "SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-03-04",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "conflictbench-merge-tools-2024",
+      "source_url": "https://doi.org/10.1016/j.jss.2024.112084",
+      "title": "ConflictBench: A benchmark to evaluate software merge tools",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-08",
+      "published_on": null,
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "history-change-propagation-channels",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0164121223003072",
+      "title": "Revealing code change propagation channels by evolution history mining",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": null,
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "verifierbench-arxiv-2610-28679",
+      "source_url": "https://arxiv.org/abs/2610.28679",
+      "title": "VerifierBench: Benchmarking the Generation of Executable Verifiers for LLM Agents",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-10-19",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "verifierbench-project",
+      "source_url": "https://verifierbench.github.io/",
+      "title": "VerifierBench project page and benchmark population details",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-08",
+      "published_on": null,
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "unearned-pass-maintenance-arxiv-2609-34262",
+      "source_url": "https://arxiv.org/abs/2609.34262",
+      "title": "Maintaining Benchmarks Against Increasingly Capable Agents: Detection and Remediation of Unearned Passes",
+      "source_type": "paper",
+      "accessed_on": "2026-11-08",
+      "published_on": "2026-09-28",
+      "supports": [
+        "CEB-EVAL"
       ]
     }
   ],
@@ -1073,6 +1327,548 @@
         "Claude Opus 5 xhigh reaches 67.7% Pass@1, the highest table result; Fable 5 high reports 65.3%; GPT-5.6 Sol max 61.2%.",
         "This is greenfield whole-repository generation from implementation-independent specifications, not maintenance of an existing repository or PR review.",
         "The authors perform static specification/test alignment and rollout-guided task auditing; 59.4% of a separate 138-task SWE-Bench Verified audit is not a result on E2E-SWE."
+      ]
+    },
+    {
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "ReviewBench",
+      "benchmark_version": "live high-severity grounded leaderboard; rechecked 2026-11-07 20:14 SAST",
+      "split": "High-severity grounded-F1 leaderboard; 20:14 SAST capture",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 219,
+        "unit": "pull_requests"
+      },
+      "source_id": "reviewbench-leaderboard",
+      "supporting_source_ids": [
+        "reviewbench-methodology"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Later same-day capture than the earlier OhMyBug observation; preserve both as separate dated leaderboard observations rather than replacing the earlier record.",
+        "Top row in this capture: intent-review-agent, run dated 2026-10-20, at 82.2 grounded F1 / 92.0 precision / 74.4 recall.",
+        "219 PRs / 187 repositories / 19 languages describe the benchmark dataset; the exact high-severity true-positive denominator is not separately exposed in the live row.",
+        "Grounded F1/precision/recall are not equivalent to CEB Recall@5 or blinded actionable precision.",
+        "Mutable live leaderboard; recapture filter, row, model run date and time before any matched comparison."
+      ]
+    },
+    {
+      "comparator_id": "sdr-ca-runtime-root-cause",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "SDRCA",
+      "benchmark_version": "Journal of Systems and Software, 2026, DOI 10.1016/j.jss.2026.112931",
+      "split": "Runtime root-cause analysis across PetShop, RE1 and RE3",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "benchmark_instances; exact task denominator not recorded here"
+      },
+      "source_id": "sdr-ca-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Runtime root-cause localization over monitored signals, not source-only pre-merge PR review.",
+        "Uses causal graphs, in-distribution counterfactual interventions and Shapley-style contribution allocation; contribution allocation alone is not causal identification.",
+        "Reports Recall@1/Recall@3 in its own runtime RCA setting; these are not CEB Recall@5 or ReviewBench grounded F1.",
+        "Task denominator, exact system configurations and uncertainty must be taken from the paper before any quantitative replication."
+      ]
+    },
+    {
+      "comparator_id": "unival-causal-fault-localization",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "UniVal",
+      "benchmark_version": "ICSE 2021 Distinguished Paper",
+      "split": "Defects4J real-fault program versions",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 835,
+        "unit": "program_versions"
+      },
+      "source_id": "unival-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Uses execution profiles combining predicate outcomes and variable values for causal statistical fault localization.",
+        "The published 835 program-version population is a fault-localization dataset denominator, not PR review tasks.",
+        "Execution-profile evidence is not equivalent to source-only counterfactual predictions or human-adjudicated review comments.",
+        "Do not compare its fault-localization rank directly with CEB defect Recall@5."
+      ]
+    },
+    {
+      "comparator_id": "aacr-bench-repository-context",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "AACR-Bench",
+      "benchmark_version": "2026 paper; public benchmark context snapshot accessed 2026-11-07",
+      "split": "200 PRs from 50 active projects across 10 languages",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 200,
+        "unit": "pull_requests"
+      },
+      "source_id": "aacr-bench-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Provides full repository context and expert-verified annotation; relevant to cross-file and multilingual review context.",
+        "The reported 285% increase is annotation defect-coverage expansion against a prior comparison baseline, not model performance improvement.",
+        "Does not directly establish P/I/F/N/M/IRR counterfactual diagnosis, causal topology correctness or residual-path detection.",
+        "Map its annotation and review metrics to CEB only after task-unit, denominator, judge and rubric harmonization."
+      ]
+    },
+    {
+      "comparator_id": "cbfl-softrex-defects4j",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "Causality-Based Fault Localization / SoftReX",
+      "benchmark_version": "arXiv:2611.01292; 2026-10-31",
+      "split": "Defects4J experiment 1; 17 Java projects; 27 OOM/timeout cases excluded",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 827,
+        "unit": "bugs"
+      },
+      "source_id": "cbfl-softrex-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Actual-causality / responsibility formulation with mutation interventions; evaluated as execution-grounded fault localization.",
+        "The 827-bug denominator is after 27 OOM/timeout exclusions from the source evaluation population.",
+        "Top-1/Top-10 are source-location ranking metrics, not CEB defect Recall@5 over review findings.",
+        "The same paper's guided mutation-generation experiment uses a different matched subset; do not combine its mutant counts with the 827-bug denominator.",
+        "Defects4J Java test/oracle population is not pre-merge multi-language PR review."
+      ]
+    },
+    {
+      "comparator_id": "causalrepair-defects4j",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "CausalRepair",
+      "benchmark_version": "PACMSE / ISSTA 2026; arXiv:2608.10613",
+      "split": "Defects4J V1.2 + V2.0 combined",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 829,
+        "unit": "bugs"
+      },
+      "source_id": "causalrepair-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Dual-slicing combines test-semantic static slicing and runtime execution-trace dynamic slicing to form minimal causal context for automated repair.",
+        "Defects4J V1.2 contributes 391 bugs and V2.0 contributes 438; the combined population is 829.",
+        "Reported correct-patch count is a repair outcome, not CEB causal-diagnosis accuracy or code-review precision.",
+        "Uses DeepSeek-V3 for the principal comparison; the paper also reports a GPT-4o configuration.",
+        "Correctness assessment includes two independent Java researchers and a third reviewer for disagreements; retain this specific adjudication contract."
+      ]
+    },
+    {
+      "comparator_id": "causalrepair-defects4j-trans",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "CausalRepair",
+      "benchmark_version": "PACMSE / ISSTA 2026; arXiv:2608.10613",
+      "split": "Defects4J-Trans",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 483,
+        "unit": "transformed_bugs"
+      },
+      "source_id": "causalrepair-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Defects4J-Trans contains 483 semantically transformed single-function bugs and is used as a contamination-reduced evaluation.",
+        "Reported CausalRepair correct-patch count is not a source-only review or causal-identifiability score.",
+        "This transformed benchmark population is distinct from original Defects4J V1.2/V2.0 and must retain its own denominator.",
+        "Uses executable test/trace context; it does not test how to state non-identifiability when traces are missing."
+      ]
+    },
+    {
+      "comparator_id": "poscm-uai2026",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "Partially Observed Structural Causal Models",
+      "benchmark_version": "UAI 2026; PMLR volume 337",
+      "split": "Two external simulator validation settings",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 2,
+        "unit": "external_simulators"
+      },
+      "source_id": "poscm-uai2026-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Formal causal-modeling research on latent context that co-determines graph structure and downstream mechanisms.",
+        "Provides node- and edge-level intervention hierarchy and identifiability theory; empirical validation uses two external simulators.",
+        "The two-simulator count is experimental scope, not a model-performance metric.",
+        "This is not a software-engineering benchmark or code-review evaluation."
+      ]
+    },
+    {
+      "comparator_id": "cgarf-swebench-repair",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "CGARF",
+      "benchmark_version": "Empirical Software Engineering; published 2026-08-22; DOI 10.1007/s10664-026-10940-1",
+      "split": "SWE-bench Lite and SWE-bench Verified; 12 configurations (3 localization methods × 4 models)",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task counts per split not reported in retrieved result summary"
+      },
+      "source_id": "cgarf-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Causal Graph-Augmented Multi-Agent Debate ranks candidate root-cause locations; Self-Reflection Consistency Distillation stabilizes patch generation; Two-Stage Patch Filtering combines functional tests, causal matching and group similarity.",
+        "Evaluates automated repair using three localization methods and four models across 12 configurations on SWE-bench Lite and Verified.",
+        "Reports repair success improvements of 2–4 percentage points and about 3 percentage points average patch applicability gain; these are cross-configuration effect summaries, not CEB review metrics.",
+        "Exact task denominators, uncertainty intervals and per-configuration values must be taken from the full paper before quantitative replication.",
+        "Causal graphs in a repair pipeline do not by themselves establish reviewer causal-claim identifiability or incident attribution."
+      ]
+    },
+    {
+      "comparator_id": "secrepobench-secure-completion",
+      "lane_id": "CEB-SECURE",
+      "benchmark_name": "SecRepoBench",
+      "benchmark_version": "Public benchmark/leaderboard snapshot accessed 2026-11-07",
+      "split": "318 secure code completion tasks from 27 C/C++ repositories across 15 CWEs",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 318,
+        "unit": "code_completion_tasks"
+      },
+      "source_id": "secrepobench-leaderboard",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Secure code completion on partially implemented functions with full repository context; not code review or vulnerability-introducing PR diagnosis.",
+        "Correctness uses developer-written tests and security uses OSS-Fuzz-derived proof-of-concept inputs.",
+        "Leaderboard rows are setup-specific; do not treat a single setup as a universal industry ceiling.",
+        "Security completion metrics are not CEB-SECURE joint secure-functional pass unless the exact task, denominator, oracle and execution policy are matched."
+      ]
+    },
+    {
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Requirement-conformance over-correction / Fix-guided Verification Filter",
+      "benchmark_version": "Automated Software Engineering 33, article 90 (2026)",
+      "split": "Paired canonical/buggy HumanEval, MBPP and QuixBugs instances; five models; Direct / Direct+Explain / Full prompts",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "paper reports over 700 tasks and over 1,400 paired instances; exact per-benchmark denominators not copied here"
+      },
+      "source_id": "llm-overcorrection-review-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Task is natural-language requirement conformance on paired canonical and buggy implementations, not PR review and not CEB-REVIEW finding adjudication.",
+        "False-negative rate here measures rejection of a canonical correct implementation (over-correction); false-positive rate measures acceptance of a buggy implementation. Do not equate FNR with CEB defect recall or actionable precision.",
+        "Fix-guided Verification Filter uses the model-proposed patch with benchmark and specification-constrained tests; generated tests and benchmark oracles can be incomplete.",
+        "Average FNR reductions are reported across five models under Full prompting. Exact per-model/per-task raw denominators and uncertainty intervals are not represented in these summary observations.",
+        "Authors report small FPR increases in some settings; retain the two-sided error trade-off."
+      ]
+    },
+    {
+      "comparator_id": "reviewgrounder-academic-peer-review",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "ReviewGrounder / ReviewBench",
+      "benchmark_version": "ACL 2026",
+      "split": "Academic-paper peer review; eight rubric dimensions; draft then evidence-grounding pipeline",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task denominator not stated in the retrieved paper summary"
+      },
+      "source_id": "reviewgrounder-acl2026-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "This is academic-paper review, not source-code pull-request review.",
+        "The framework separates a Phi-4-14B drafter from GPT-OSS-120B evidence grounding and reports improved human-judgment alignment/rubric review quality versus larger backbones.",
+        "The eight rubric dimensions describe evaluation scope, not eight CEB primary metrics.",
+        "Methodological reference only; no direct CEB score or industry ranking is implied."
+      ]
+    },
+    {
+      "comparator_id": "scope-selective-pairwise-judging",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "SCOPE — Selective Conformal Optimized Pairwise LLM Judging",
+      "benchmark_version": "ACL 2026; HyperMatrix research summary snapshot 2026-08-20",
+      "split": "Pairwise LLM judging across general judging benchmarks; acceptance calibrated under exchangeability",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task count not stated in the retrieved summary"
+      },
+      "source_id": "scope-selective-judge-summary",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "This is pairwise LLM judging, not software code review or causal diagnosis.",
+        "The reported empirical FDR range is under a target alpha of 0.10 and the stated calibration protocol; it is not an unconditional guarantee for CEB.",
+        "Reported acceptance multiplier is up to 2.4x versus vanilla baselines, not 2.4x accuracy.",
+        "CEB adaptation requires disjoint calibration material and evaluation of exchangeability/shift by repository, defect family, severity and claim type."
+      ]
+    },
+    {
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "Incremental Program Analysis in the Wild",
+      "benchmark_version": "ASE 2025 empirical study",
+      "split": "4,084 real-world Java program changes from 20 open-source projects; two IPA tools evaluated",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 4084,
+        "unit": "program_change_commits"
+      },
+      "source_id": "ase-ipa-2025-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "This is incremental program analysis, not CEB evidence-disposition or engineering-claim continuity.",
+        "The corpus contains 4,084 commits from 20 Java projects; two representative Java IPA tools were evaluated.",
+        "The paper reports efficiency gains versus exhaustive analysis but also inconsistencies and markedly higher peak memory in evaluated tools.",
+        "Do not translate static-analysis recomputation results into continuity disposition accuracy or stale-evidence safety.",
+        "The Java-only population does not establish transfer to Rust, multi-language workspaces or security-authority changes."
+      ]
+    },
+    {
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "DiffCI Open Evidence Study 2026",
+      "benchmark_version": "diffci-oes-2026-v1; published 2026-09-03 / updated 2026-09-25",
+      "split": "2,000 historical commit deltas across 20 repositories; graph test selection compared with path-rule selection",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 2000,
+        "unit": "historical_commit_deltas"
+      },
+      "source_id": "diffci-open-evidence-study",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Self-published open evidence study; use as a transparent contextual comparator, not an independently replicated industry ceiling.",
+        "Only 29.8% of deltas offered a selective-test opportunity; reported whole-corpus test reduction against a path rule was 4.2%.",
+        "Reports job-level recall of 280 historical CI failures at 96.4% for DiffCI versus 70.7% for a path rule; this is change-aware test selection, not claim-disposition recall.",
+        "The 95% repository-clustered interval for the aggregate reduction crosses zero (-4.8% to +47.9%); the study says the sample cannot rule out a null population effect.",
+        "The 32/32 measurable mutation detections are explicitly not a reliability estimate; the report states no production CI runs were skipped, cancelled or blocked.",
+        "Only 3 of 7 attempted repositories passed its canonical suite-green qualification, and its own research page discloses limited repository reach."
+      ]
+    },
+    {
+      "comparator_id": "agent-evidence-tracing-provenance-survey",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Evidence tracing and execution provenance in LLM agents",
+      "benchmark_version": "arXiv:2606.04990; survey published 2026-06-03",
+      "split": "Conceptual survey of agent provenance: six taxonomy dimensions and six open challenge categories",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "surveyed studies/tasks denominator not represented in abstract summary"
+      },
+      "source_id": "agent-evidence-tracing-survey-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Survey/taxonomy, not a software code-review benchmark or empirical CEB performance result.",
+        "Connects retrieval, tool outputs, memory, environment observations, intermediate claims, actions and final answers through provenance relations.",
+        "Six open challenges are conceptual categories, not measured failure rates or performance values.",
+        "Use it as a design reference for traceable evidence/action/claim relationships; do not expose or score private chain-of-thought."
+      ]
+    },
+    {
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Guidelines for empirical LLM studies in software engineering",
+      "benchmark_version": "Empirical Software Engineering; published 2026-11-03",
+      "split": "Seven study types and eight reporting guidelines co-developed by 22 researchers",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "guideline study; not a benchmark task population"
+      },
+      "source_id": "llm-se-empirical-guidelines-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Empirical-method guidance, not a code-review system or benchmark score.",
+        "Twenty-two contributing researchers, seven study types and eight reporting guidelines are source descriptors.",
+        "The guidelines call for model/tool versions and configurations, system/prompt/harness description, interaction/runtime traces, suitable baselines/metrics, open-model baseline, human validation and limitations.",
+        "Use as a reporting checklist; do not interpret the counts as performance metrics."
+      ]
+    },
+    {
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "PR-based change impact analysis using call graphs and repository history",
+      "benchmark_version": "Empirical Software Engineering; published 2025-02-12",
+      "split": "Call-graph and history-mining impact detector; feasibility on three open-source projects plus two focus groups",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "three OSS feasibility projects; focus-group participant denominator not stated in abstract summary"
+      },
+      "source_id": "pr-change-impact-analysis-2025",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Change-impact analysis context, not a large-scale code-review accuracy benchmark.",
+        "Combines call graph dependencies and software history; file metrics and a PR-level risk score highlight possibly affected code.",
+        "Three-project feasibility study reports 7.4–22.43 seconds analysis time; focus-group scores are perception/construct ratings, not defect detection accuracy.",
+        "Call-graph reachability is not proof of semantic claim-support completeness; the method does not by itself cover policy, trust-root, evaluator and authority dependencies."
+      ]
+    },
+    {
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "Formal verification under microservice evolution — systematic literature review",
+      "benchmark_version": "Software 5(3), article 32; published 2026-07-15",
+      "split": "1,187 records screened; 18 included studies (13 primary, 5 background)",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 18,
+        "unit": "included studies"
+      },
+      "source_id": "microservice-evolution-verification-slr-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Systematic literature review, not a software-agent benchmark or CEB metric result.",
+        "The synthesis identifies actor-based model checking, TLA+ control-plane verification, static analysis, continuous certification and runtime/self-adaptive testing as complementary clusters.",
+        "The authors report small academic case studies, few shared datasets and limited end-to-end CI/CD integration in the included literature.",
+        "Use as a research-gap map for verification under evolution; do not equate study counts with technique effectiveness."
+      ]
+    },
+    {
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "SWE-CI",
+      "benchmark_version": "arXiv:2603.03823; March 4, 2026",
+      "split": "100 repository-maintenance tasks; average evolution history 233 days and 71 consecutive commits",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 100,
+        "unit": "repository_maintenance_tasks"
+      },
+      "source_id": "swe-ci-maintenance-paper-2026",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Repository-maintenance benchmark built around repeated CI loops and long-term requirement/feature evolution, not code-review claim-support adjudication.",
+        "100 tasks; average history spans 233 days and 71 consecutive commits.",
+        "Long-horizon maintenance success is adjacent to CEB-CONTINUITY but is not evidence-disposition macro-F1, stale-evidence use or proof of selective claim retention.",
+        "Do not rank SWE-CI and CEB scores together without matched tasks, harness, budgets and outcome definitions."
+      ]
+    },
+    {
+      "comparator_id": "conflictbench-java-merge-tools",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "ConflictBench",
+      "benchmark_version": "Journal of Systems and Software 214 (August 2024), article 112084",
+      "split": "Java merge-conflict dataset; five software merge tools compared",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "Java merge-conflict cases; exact abstract denominator not reported"
+      },
+      "source_id": "conflictbench-merge-tools-2024",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Evaluates software merge tools, not engineering agents or claim/evidence validity.",
+        "Java-specific merge-conflict population; transfer to Rust and multi-language repository histories is unestablished.",
+        "Useful for designing merge-resolution controls; no numerical score is comparable with CEB."
+      ]
+    },
+    {
+      "comparator_id": "history-mined-change-propagation",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "Change propagation channels mined from software evolution history",
+      "benchmark_version": "Journal of Systems and Software; 2023 publication record",
+      "split": "Five maintained projects; 5,032 project versions; 40 mined propagation-channel types",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "task denominator not reported; project-version count is a separate dataset descriptor"
+      },
+      "source_id": "history-change-propagation-channels",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "History-mined propagation channels are empirical dependency candidates, not proof of causal impact or claim invalidation.",
+        "The reported population is five projects and 5,032 versions; it is not an agent benchmark.",
+        "Co-change/history relationships cannot alone establish branch-scoped claim validity, authorization scope or evidence completeness."
+      ]
+    },
+    {
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "VerifierBench",
+      "benchmark_version": "arXiv:2610.28679; paper and project page accessed 2026-11-08",
+      "split": "222 tasks from six source benchmarks; 4,993 hidden cases; 19 models in the paper's common-harness experiment. The project page separately lists 36 model–harness configurations and 45 exclusions for source defects.",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 222,
+        "unit": "tasks"
+      },
+      "source_id": "verifierbench-arxiv-2610-28679",
+      "supporting_source_ids": [
+        "verifierbench-project"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Measures generation of executable task verifiers, not a PR-review finding-recall benchmark, causal diagnosis, or CEB review precision.",
+        "The paper reports normalized balanced accuracy from 10.6 to 62.1 across 19 models in a common harness; this is a range, not a score for one named model or a CEB metric.",
+        "The project page's 36 model–harness configurations is a separate project-level count and must not replace the paper's 19-model common-harness denominator.",
+        "The 4,993 hidden cases include valid alternatives and attacks; the project page identifies 798 attack cases. Positive acceptance and negative rejection must be audited separately.",
+        "The paper reports that generated verifiers reject invalid solutions more reliably than they accept all valid alternatives; many false rejections arose from verifiers accepting no tested solution.",
+        "Verifier4Verifier's six checks qualify source verifiers and suites for this benchmark; they do not establish CEB's own evaluator independence, runner isolation, or signer trust.",
+        "The project page labels the submission under review and displayed no released code/data links when accessed on 2026-11-08; treat these as a paper/project snapshot, not an independent replication.",
+        "The benchmark reports 1,566 positive and 3,427 negative labels; the 1,344 Alt. cases are cosmetic changes plus valid alternatives (a subset of positives), not 1,344 additional tasks.",
+        "The 1,410 task–operator configurations are mutation-testing coverage for the source reference material, not 1,410 independent tasks or generated-verifier model runs."
+      ]
+    },
+    {
+      "comparator_id": "benchmark-maintenance-pass-audit",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "Unearned-pass benchmark maintenance audit",
+      "benchmark_version": "arXiv:2609.34262; published 2026-09-28",
+      "split": "3,810 passing trajectories across 29 model–benchmark cohorts; process-verification audit of passes and post-repair replay.",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 3810,
+        "unit": "passing trajectories"
+      },
+      "source_id": "unearned-pass-maintenance-arxiv-2609-34262",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Audits whether benchmark passes demonstrate the intended capability; it is a benchmark-integrity methodology, not a code-review performance benchmark.",
+        "The paper's reported 3,810 count is passing trajectories across 29 cohorts; these are cohort-clustered observations, not independent tasks or independent model observations.",
+        "Unearned-pass rates are cohort-specific and descriptive; do not infer a monotonic model-generation effect or a universal rate.",
+        "Reported exploit surfaces include unintended reference-solution access through Git history and alternate access paths; a patch must be followed by exploit replay and fresh-agent evaluation.",
+        "The paper's model/cohort configurations are not normalized to CEB budgets, tasks, source snapshots, or adjudication; no direct score comparison is supported."
+      ]
+    },
+    {
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "Unearned-pass rates on SWE-Bench Pro V1 cohorts",
+      "benchmark_version": "arXiv:2609.34262; published 2026-09-28",
+      "split": "Descriptive model/cohort rates reported for the SWE-Bench Pro V1 maintenance audit; exact per-cohort denominators are not stated in the abstract.",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "per-cohort passing-trajectory/task denominator not reported in the abstract"
+      },
+      "source_id": "unearned-pass-maintenance-arxiv-2609-34262",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Rates are reported for named model/cohort snapshots and are descriptive; they are not normalized across model generations and do not support a universal ranking.",
+        "The 24% versus 73% comparison is described on matched tasks for Opus 4.7 and Fable 5; exact per-cohort sample counts are not stated in the abstract.",
+        "The later 11% and 0% cohort observations should not be interpreted as a monotonic trend or as general model reliability.",
+        "Unearned-pass rate is not false-positive rate, benchmark solve rate, or PR-review defect recall.",
+        "Use these rates to motivate post-patch exploit replay and fresh-agent re-evaluation, not as CEB performance targets."
       ]
     }
   ],
@@ -4401,6 +5197,2783 @@
         }
       },
       "notes": []
+    },
+    {
+      "observation_id": "reviewbench-intent-agent-grounded-f1",
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard; capture 2026-11-07 20:14 SAST; intent-review-agent row (run dated 2026-10-20)",
+      "system": {
+        "system_id": "reviewbench-intent-review-agent",
+        "model": "not_reported_on_leaderboard",
+        "harness": "intent-review-agent submission",
+        "configuration": "High-severity grounded leaderboard; model run dated 2026-10-20; live row captured 2026-11-07 20:14 SAST"
+      },
+      "metric": {
+        "metric_id": "grounded_f1",
+        "label": "Grounded F1",
+        "definition": "Harmonic mean of grounded precision and grounded recall against the fixed human-reviewed gold set.",
+        "value": 82.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "82.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by leaderboard",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "grounded_f1",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
+        "High-severity only. Not a CEB result or a matched comparison."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-intent-agent-grounded-precision",
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard; capture 2026-11-07 20:14 SAST; intent-review-agent row (run dated 2026-10-20)",
+      "system": {
+        "system_id": "reviewbench-intent-review-agent",
+        "model": "not_reported_on_leaderboard",
+        "harness": "intent-review-agent submission",
+        "configuration": "High-severity grounded leaderboard; model run dated 2026-10-20; live row captured 2026-11-07 20:14 SAST"
+      },
+      "metric": {
+        "metric_id": "grounded_precision",
+        "label": "Grounded precision",
+        "definition": "Fraction of candidate findings matched to fixed-gold actionable findings under the ReviewBench matcher.",
+        "value": 92,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "92.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by leaderboard",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "grounded_precision",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
+        "High-severity only. Not a CEB result or a matched comparison."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-intent-agent-grounded-recall",
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard; capture 2026-11-07 20:14 SAST; intent-review-agent row (run dated 2026-10-20)",
+      "system": {
+        "system_id": "reviewbench-intent-review-agent",
+        "model": "not_reported_on_leaderboard",
+        "harness": "intent-review-agent submission",
+        "configuration": "High-severity grounded leaderboard; model run dated 2026-10-20; live row captured 2026-11-07 20:14 SAST"
+      },
+      "metric": {
+        "metric_id": "grounded_recall",
+        "label": "Grounded recall",
+        "definition": "Fraction of fixed-gold true-positive findings identified by the candidate.",
+        "value": 74.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "74.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by leaderboard",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "grounded_recall",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
+        "High-severity only. Not a CEB result or a matched comparison."
+      ]
+    },
+    {
+      "observation_id": "sdr-ca-public-dataset-count",
+      "comparator_id": "sdr-ca-runtime-root-cause",
+      "source_locator": "SDRCA abstract; datasets named PetShop, RE1 and RE3",
+      "system": {
+        "system_id": "sdr-ca-framework",
+        "model": "SDRCA",
+        "harness": "runtime root-cause analysis framework",
+        "configuration": "causal graphs, in-distribution counterfactual interventions and Shapley-style multi-cause attribution"
+      },
+      "metric": {
+        "metric_id": "evaluation_dataset_count",
+        "label": "Named evaluation datasets",
+        "definition": "Count of distinct public benchmark datasets named in the paper abstract.",
+        "value": 3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "datasets",
+        "direction": "not_applicable",
+        "raw_display": "3 datasets",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "evaluation_dataset_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Descriptive evaluation-scope count only; not an accuracy or recall score.",
+        "Exact task denominator and numerical Recall@1/Recall@3 results are not encoded in this observation."
+      ]
+    },
+    {
+      "observation_id": "unival-defects4j-program-versions",
+      "comparator_id": "unival-causal-fault-localization",
+      "source_locator": "UniVal ICSE 2021 paper and published evaluation description; Defects4J corpus",
+      "system": {
+        "system_id": "unival-causal-fault-localization",
+        "model": "UniVal",
+        "harness": "predicate-outcome and variable-value causal statistical fault localization",
+        "configuration": "Defects4J real-fault program-version evaluation"
+      },
+      "metric": {
+        "metric_id": "evaluated_program_versions",
+        "label": "Evaluated program versions",
+        "definition": "Number of Defects4J program versions in the reported evaluation population.",
+        "value": 835,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "program_versions",
+        "direction": "not_applicable",
+        "raw_display": "835 program versions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "evaluated_program_versions",
+          "applies_to_task_count": 835
+        }
+      },
+      "notes": [
+        "Population descriptor, not a model accuracy result.",
+        "Execution-profile fault localization; not source-only PR review or CEB Recall@5."
+      ]
+    },
+    {
+      "observation_id": "aacr-bench-annotation-coverage-increase",
+      "comparator_id": "aacr-bench-repository-context",
+      "source_locator": "AACR-Bench arXiv:2601.19494 abstract; annotation pipeline result",
+      "system": {
+        "system_id": "aacr-bench-annotation-pipeline",
+        "model": "AI-assisted annotation with expert verification",
+        "harness": "AACR-Bench three-stage comment augmentation/review completion/expert verification",
+        "configuration": "200 selected PRs; full repository context; 50 projects; 10 languages"
+      },
+      "metric": {
+        "metric_id": "annotation_coverage_increase",
+        "label": "Annotation defect-coverage increase",
+        "definition": "Reported increase in annotated issue/defect coverage compared with using original PR review comments alone.",
+        "value": 285,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent_increase",
+        "direction": "not_applicable",
+        "raw_display": "285% increase",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "annotation_coverage_increase",
+          "applies_to_task_count": 200
+        }
+      },
+      "notes": [
+        "This is expansion in dataset annotation coverage, not model performance improvement or recall.",
+        "Paper reports 1,505 final annotated review comments; do not reinterpret this as a 285% model-score gain.",
+        "Annotation construction uses LLM-generated candidates followed by expert verification; preserve provenance and judge dependence caveats."
+      ]
+    },
+    {
+      "observation_id": "cbfl-softrex-top1",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "softrex-cbfl",
+        "model": "SoftReX",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_1_localizations",
+        "label": "Top-1 correct localizations",
+        "definition": "Number of buggy program versions whose true fault is ranked first.",
+        "value": 103,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "103",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_1_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-softrex-top10",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "softrex-cbfl",
+        "model": "SoftReX",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_10_localizations",
+        "label": "Top-10 correct localizations",
+        "definition": "Number of buggy program versions whose true fault appears within the top ten ranked locations.",
+        "value": 301,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "301",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_10_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-softrex-mrr",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "softrex-cbfl",
+        "model": "SoftReX",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "mean_reciprocal_rank",
+        "label": "Mean reciprocal rank",
+        "definition": "Mean reciprocal rank of the true faulty program element in the evaluated test set.",
+        "value": 0.349,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "MRR",
+        "direction": "maximize",
+        "raw_display": "0.349",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_reciprocal_rank",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-blmu-top1",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "blmu-cbfl",
+        "model": "BLMu",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_1_localizations",
+        "label": "Top-1 correct localizations",
+        "definition": "Number of buggy program versions whose true fault is ranked first.",
+        "value": 89,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "89",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_1_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-blmu-top10",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "blmu-cbfl",
+        "model": "BLMu",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_10_localizations",
+        "label": "Top-10 correct localizations",
+        "definition": "Number of buggy program versions whose true fault appears within the top ten ranked locations.",
+        "value": 270,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "270",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_10_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-blmu-mrr",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "blmu-cbfl",
+        "model": "BLMu",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "mean_reciprocal_rank",
+        "label": "Mean reciprocal rank",
+        "definition": "Mean reciprocal rank of the true faulty program element in the evaluated test set.",
+        "value": 0.301,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "MRR",
+        "direction": "maximize",
+        "raw_display": "0.301",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_reciprocal_rank",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "causalrepair-d4j-correct-fixes",
+      "comparator_id": "causalrepair-defects4j",
+      "source_locator": "CausalRepair arXiv:2608.10613, Defects4J V1.2 + V2.0, principal DeepSeek-V3 configuration",
+      "system": {
+        "system_id": "causalrepair-deepseek-v3",
+        "model": "CausalRepair",
+        "harness": "dual-slicing LLM repair harness",
+        "configuration": "DeepSeek-V3; V1.2 + V2.0 combined; 829 bugs"
+      },
+      "metric": {
+        "metric_id": "correct_patches",
+        "label": "Correct patches",
+        "definition": "Number of Defects4J bugs for which the generated patch was judged semantically correct.",
+        "value": 313,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "313 correct patches",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "correct_patches",
+          "applies_to_task_count": 829
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "reinfix-d4j-correct-fixes",
+      "comparator_id": "causalrepair-defects4j",
+      "source_locator": "CausalRepair arXiv:2608.10613, same Defects4J V1.2 + V2.0 comparison setting",
+      "system": {
+        "system_id": "reinfix-deepseek-v3",
+        "model": "ReinFix",
+        "harness": "unified LLM-based repair comparison",
+        "configuration": "DeepSeek-V3; V1.2 + V2.0 combined; 829 bugs"
+      },
+      "metric": {
+        "metric_id": "correct_patches",
+        "label": "Correct patches",
+        "definition": "Number of Defects4J bugs for which the generated patch was judged semantically correct.",
+        "value": 236,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "236 correct patches",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "correct_patches",
+          "applies_to_task_count": 829
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "causalrepair-d4j-trans-correct-fixes",
+      "comparator_id": "causalrepair-defects4j-trans",
+      "source_locator": "CausalRepair arXiv:2608.10613, Defects4J-Trans transformed-bug experiment",
+      "system": {
+        "system_id": "causalrepair-deepseek-v3-trans",
+        "model": "CausalRepair",
+        "harness": "dual-slicing LLM repair harness",
+        "configuration": "DeepSeek-V3; Defects4J-Trans; 483 transformed bugs"
+      },
+      "metric": {
+        "metric_id": "correct_patches",
+        "label": "Correct patches",
+        "definition": "Number of Defects4J-Trans bugs for which the generated patch was judged semantically correct.",
+        "value": 289,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "289 correct patches",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "correct_patches",
+          "applies_to_task_count": 483
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "poscm-uai26-simulators",
+      "comparator_id": "poscm-uai2026",
+      "source_locator": "PMLR 337:5111-5137, Partially Observed Structural Causal Models, empirical validation description",
+      "system": {
+        "system_id": "poscm-uai2026-authors",
+        "model": "POSCM",
+        "harness": "structural causal model / simulator validation",
+        "configuration": "Two external simulators: virtual retina and gene-regulatory analogue"
+      },
+      "metric": {
+        "metric_id": "external_simulator_count",
+        "label": "External simulator count",
+        "definition": "Number of distinct external simulators named for empirical validation; not a model-performance metric.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "simulators",
+        "direction": "not_applicable",
+        "raw_display": "2 simulators",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "external_simulator_count",
+          "applies_to_task_count": 2
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cgarf-repair-success-gain-lower",
+      "comparator_id": "cgarf-swebench-repair",
+      "source_locator": "CGARF, Empirical Software Engineering, DOI 10.1007/s10664-026-10940-1, abstract/result summary",
+      "system": {
+        "system_id": "cgarf-twelve-configurations",
+        "model": "CGARF",
+        "harness": "CGARF repair pipeline",
+        "configuration": "Aggregate reported range across 12 configurations on SWE-bench Lite/Verified"
+      },
+      "metric": {
+        "metric_id": "repair_success_gain_lower_bound",
+        "label": "Repair success gain range bound",
+        "definition": "Lower bound of the reported 2–4 percentage-point repair success improvement over the corresponding baseline configurations.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points",
+        "direction": "maximize",
+        "raw_display": "+2 pp (lower bound of reported range)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "repair_success_gain_lower_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Range bound, not an exact average or a CEB review score.",
+        "Per-configuration task denominators and confidence intervals are not encoded in this registry row."
+      ]
+    },
+    {
+      "observation_id": "cgarf-repair-success-gain-upper",
+      "comparator_id": "cgarf-swebench-repair",
+      "source_locator": "CGARF, Empirical Software Engineering, DOI 10.1007/s10664-026-10940-1, abstract/result summary",
+      "system": {
+        "system_id": "cgarf-twelve-configurations",
+        "model": "CGARF",
+        "harness": "CGARF repair pipeline",
+        "configuration": "Aggregate reported range across 12 configurations on SWE-bench Lite/Verified"
+      },
+      "metric": {
+        "metric_id": "repair_success_gain_upper_bound",
+        "label": "Repair success gain range bound",
+        "definition": "Upper bound of the reported 2–4 percentage-point repair success improvement over the corresponding baseline configurations.",
+        "value": 4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points",
+        "direction": "maximize",
+        "raw_display": "+4 pp (upper bound of reported range)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "repair_success_gain_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Range bound, not an exact average or a CEB review score.",
+        "Per-configuration task denominators and confidence intervals are not encoded in this registry row."
+      ]
+    },
+    {
+      "observation_id": "cgarf-patch-applicability-gain",
+      "comparator_id": "cgarf-swebench-repair",
+      "source_locator": "CGARF, Empirical Software Engineering, DOI 10.1007/s10664-026-10940-1, abstract/result summary",
+      "system": {
+        "system_id": "cgarf-twelve-configurations",
+        "model": "CGARF",
+        "harness": "CGARF repair pipeline",
+        "configuration": "Average reported gain across 12 configurations on SWE-bench Lite/Verified"
+      },
+      "metric": {
+        "metric_id": "patch_applicability_gain",
+        "label": "Patch applicability gain",
+        "definition": "Approximate average increase in patch applicability reported by the authors across the evaluated configurations.",
+        "value": 3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points_approximate",
+        "direction": "maximize",
+        "raw_display": "about +3 percentage points",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "patch_applicability_gain",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Approximate average from the paper summary; uncertainty and per-split denominators not reported here.",
+        "Patch applicability is not reviewer actionable precision or repair correctness."
+      ]
+    },
+    {
+      "observation_id": "secrepobench-top-setup-secure-pass-at-1",
+      "comparator_id": "secrepobench-secure-completion",
+      "source_locator": "SecRepoBench live benchmark website/leaderboard, top visible setup row captured 2026-11-07",
+      "system": {
+        "system_id": "secrepobench-imagecodex-gpt51-review",
+        "model": "ImageGPT-5.1-Codex-Max",
+        "harness": "ImageCodex review setup",
+        "configuration": "Top visible leaderboard row; repository code completion"
+      },
+      "metric": {
+        "metric_id": "secure_pass_at_1",
+        "label": "Secure pass@1",
+        "definition": "Fraction of secure code completion tasks passing the combined functional and security acceptance checks under this setup.",
+        "value": 60.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "60.1%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "secure_pass_at_1",
+          "applies_to_task_count": 318
+        }
+      },
+      "notes": [
+        "Top visible setup row; benchmark includes 318 tasks, 27 repositories and 15 CWEs.",
+        "Secure code completion, not PR review or CEB-REVIEW causal diagnosis."
+      ]
+    },
+    {
+      "observation_id": "secrepobench-top-setup-pass-at-1",
+      "comparator_id": "secrepobench-secure-completion",
+      "source_locator": "SecRepoBench live benchmark website/leaderboard, top visible setup row captured 2026-11-07",
+      "system": {
+        "system_id": "secrepobench-imagecodex-gpt51-review",
+        "model": "ImageGPT-5.1-Codex-Max",
+        "harness": "ImageCodex review setup",
+        "configuration": "Top visible leaderboard row; repository code completion"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Functional pass@1",
+        "definition": "Fraction of completion tasks passing the functional test acceptance criteria under this setup.",
+        "value": 76.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "76.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 318
+        }
+      },
+      "notes": [
+        "Top visible setup row; benchmark includes 318 tasks, 27 repositories and 15 CWEs.",
+        "Functional pass@1 is not the joint CEB secure-functional pass metric."
+      ]
+    },
+    {
+      "observation_id": "overcorr-humaneval-full-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-humaneval",
+        "model": "Five-model average",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_humaneval_full",
+        "label": "False-negative rate — HumanEval — Full prompt",
+        "definition": "Share of canonical implementations incorrectly rejected under Full prompting; reported average across five models.",
+        "value": 54.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "54.8%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_humaneval_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Canonical-code rejection / over-correction measure; not CEB review recall."
+      ]
+    },
+    {
+      "observation_id": "overcorr-humaneval-filter-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-filter-humaneval",
+        "model": "Five-model average",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_humaneval_full_filter",
+        "label": "False-negative rate — HumanEval — Full + filter",
+        "definition": "Share of canonical implementations incorrectly rejected after original/proposed-patch executable comparison; reported average across five models.",
+        "value": 16.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "16.3%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_humaneval_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Filter uses benchmark and spec-constrained tests; retain oracle-coverage caveat."
+      ]
+    },
+    {
+      "observation_id": "overcorr-mbpp-full-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-mbpp",
+        "model": "Five-model average",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_mbpp_full",
+        "label": "False-negative rate — MBPP — Full prompt",
+        "definition": "Share of canonical implementations incorrectly rejected under Full prompting; reported average across five models.",
+        "value": 69,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "69.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_mbpp_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Canonical-code rejection / over-correction measure; not CEB review recall."
+      ]
+    },
+    {
+      "observation_id": "overcorr-mbpp-filter-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-filter-mbpp",
+        "model": "Five-model average",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_mbpp_full_filter",
+        "label": "False-negative rate — MBPP — Full + filter",
+        "definition": "Share of canonical implementations incorrectly rejected after original/proposed-patch executable comparison; reported average across five models.",
+        "value": 28.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "28.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_mbpp_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Filter uses benchmark and spec-constrained tests; retain oracle-coverage caveat."
+      ]
+    },
+    {
+      "observation_id": "overcorr-quixbugs-full-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-quixbugs",
+        "model": "Five-model average",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_quixbugs_full",
+        "label": "False-negative rate — QuixBugs — Full prompt",
+        "definition": "Share of canonical implementations incorrectly rejected under Full prompting; reported average across five models.",
+        "value": 51,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "51.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_quixbugs_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Canonical-code rejection / over-correction measure; not CEB review recall."
+      ]
+    },
+    {
+      "observation_id": "overcorr-quixbugs-filter-fnr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "five-model-average-full-filter-quixbugs",
+        "model": "Five-model average",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; canonical implementation slice"
+      },
+      "metric": {
+        "metric_id": "false_negative_rate_quixbugs_full_filter",
+        "label": "False-negative rate — QuixBugs — Full + filter",
+        "definition": "Share of canonical implementations incorrectly rejected after original/proposed-patch executable comparison; reported average across five models.",
+        "value": 24,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "24.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_negative_rate_quixbugs_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Filter uses benchmark and spec-constrained tests; retain oracle-coverage caveat."
+      ]
+    },
+    {
+      "observation_id": "overcorr-gpt4o-humaneval-full-fpr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "gpt4o-full-humaneval",
+        "model": "GPT-4o",
+        "harness": "Requirement-conformance judge",
+        "configuration": "Full prompt; HumanEval buggy slice"
+      },
+      "metric": {
+        "metric_id": "false_positive_rate_gpt4o_humaneval_full",
+        "label": "False-positive rate — GPT-4o — HumanEval — Full",
+        "definition": "Share of buggy implementations incorrectly accepted under Full prompting.",
+        "value": 0,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "0.00%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_positive_rate_gpt4o_humaneval_full",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Model- and benchmark-specific example."
+      ]
+    },
+    {
+      "observation_id": "overcorr-gpt4o-humaneval-filter-fpr",
+      "comparator_id": "llm-overcorrection-paired-conformance",
+      "source_locator": "Jin and Chen, Automated Software Engineering 33, article 90, Tables 2/4; source summary accessed 2026-11-08",
+      "system": {
+        "system_id": "gpt4o-full-filter-humaneval",
+        "model": "GPT-4o",
+        "harness": "Fix-guided Verification Filter",
+        "configuration": "Full prompt + filter; HumanEval buggy slice"
+      },
+      "metric": {
+        "metric_id": "false_positive_rate_gpt4o_humaneval_full_filter",
+        "label": "False-positive rate — GPT-4o — HumanEval — Full + filter",
+        "definition": "Share of buggy implementations incorrectly accepted after filtering.",
+        "value": 1.83,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "1.83%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "false_positive_rate_gpt4o_humaneval_full_filter",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Small false-positive increase in this example; do not hide FNR/FPR trade-off."
+      ]
+    },
+    {
+      "observation_id": "reviewgrounder-rubric-dimensions",
+      "comparator_id": "reviewgrounder-academic-peer-review",
+      "source_locator": "ACL 2026 paper abstract/metadata, section describing ReviewBench rubric",
+      "system": {
+        "system_id": "reviewgrounder-eight-dimensions",
+        "model": "Phi-4-14B drafter + GPT-OSS-120B grounder",
+        "harness": "ReviewGrounder",
+        "configuration": "Academic-paper peer-review benchmark"
+      },
+      "metric": {
+        "metric_id": "rubric_dimension_count",
+        "label": "Rubric dimension count",
+        "definition": "Number of paper-specific review rubric dimensions reported for the ReviewGrounder evaluation.",
+        "value": 8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "dimensions",
+        "direction": "not_applicable",
+        "raw_display": "8 dimensions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "rubric_dimension_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Evaluation-scope descriptor, not a performance score or software code-review metric."
+      ]
+    },
+    {
+      "observation_id": "scope-fdr-lower-bound",
+      "comparator_id": "scope-selective-pairwise-judging",
+      "source_locator": "HyperMatrix Research Lab SCOPE research summary; ACL 2026 result synopsis",
+      "system": {
+        "system_id": "scope-alpha-010-fdr-lower",
+        "model": "SCOPE",
+        "harness": "Selective conformal pairwise judge",
+        "configuration": "Target alpha=0.10; pairwise judging"
+      },
+      "metric": {
+        "metric_id": "accepted_judgement_fdr_lower_bound",
+        "label": "Accepted-judgment FDR lower bound",
+        "definition": "Lower bound of the reported empirical FDR range among accepted judgments at target alpha 0.10.",
+        "value": 0.097,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "fraction",
+        "direction": "minimize",
+        "raw_display": "approximately 0.097",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "accepted_judgement_fdr_lower_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Methodological result under the source calibration/exchangeability setup; not a CEB target guarantee."
+      ]
+    },
+    {
+      "observation_id": "scope-fdr-upper-bound",
+      "comparator_id": "scope-selective-pairwise-judging",
+      "source_locator": "HyperMatrix Research Lab SCOPE research summary; ACL 2026 result synopsis",
+      "system": {
+        "system_id": "scope-alpha-010-fdr-upper",
+        "model": "SCOPE",
+        "harness": "Selective conformal pairwise judge",
+        "configuration": "Target alpha=0.10; pairwise judging"
+      },
+      "metric": {
+        "metric_id": "accepted_judgement_fdr_upper_bound",
+        "label": "Accepted-judgment FDR upper bound",
+        "definition": "Upper bound of the reported empirical FDR range among accepted judgments at target alpha 0.10.",
+        "value": 0.099,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "fraction",
+        "direction": "minimize",
+        "raw_display": "approximately 0.099",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "accepted_judgement_fdr_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Methodological result under the source calibration/exchangeability setup; not a CEB target guarantee."
+      ]
+    },
+    {
+      "observation_id": "scope-acceptance-multiplier",
+      "comparator_id": "scope-selective-pairwise-judging",
+      "source_locator": "HyperMatrix Research Lab SCOPE research summary; ACL 2026 result synopsis",
+      "system": {
+        "system_id": "scope-vanilla-coverage-multiplier",
+        "model": "SCOPE",
+        "harness": "Selective conformal pairwise judge",
+        "configuration": "Compared with vanilla pairwise judging under same risk constraint"
+      },
+      "metric": {
+        "metric_id": "accepted_judgement_coverage_multiplier_upper_bound",
+        "label": "Accepted-judgment multiplier upper bound",
+        "definition": "Maximum reported multiplicative increase in accepted judgments compared with vanilla baselines under the same risk constraint.",
+        "value": 2.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "multipliers",
+        "direction": "maximize",
+        "raw_display": "up to 2.4x",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by source summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in retrieved source summary",
+          "applies_to_metric_id": "accepted_judgement_coverage_multiplier_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Acceptance/coverage multiplier, not accuracy improvement."
+      ]
+    },
+    {
+      "observation_id": "ase-ipa-real-change-commit-count",
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "source_locator": "Wang et al., ASE 2025, DOI 10.1109/ase63991.2025.00194, abstract and conference presentation",
+      "system": {
+        "system_id": "ase-ipa-2025-corpus",
+        "model": "Two Java incremental program analysis tools",
+        "harness": "Empirical incremental-analysis study",
+        "configuration": "4,084 historical real-world changes across 20 Java repositories"
+      },
+      "metric": {
+        "metric_id": "program_change_count",
+        "label": "Real-world program change count",
+        "definition": "Number of real-world program changes/commits in the curated incremental program-analysis corpus.",
+        "value": 4084,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "commits",
+        "direction": "not_applicable",
+        "raw_display": "4,084 commits",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "program_change_count",
+          "applies_to_task_count": 4084
+        }
+      },
+      "notes": [
+        "Population descriptor, not a CEB task count or success score."
+      ]
+    },
+    {
+      "observation_id": "ase-ipa-project-count",
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "source_locator": "Wang et al., ASE 2025, DOI 10.1109/ase63991.2025.00194, abstract and conference presentation",
+      "system": {
+        "system_id": "ase-ipa-2025-corpus",
+        "model": "Two Java incremental program analysis tools",
+        "harness": "Empirical incremental-analysis study",
+        "configuration": "Open-source Java project population"
+      },
+      "metric": {
+        "metric_id": "project_count",
+        "label": "Open-source project count",
+        "definition": "Number of Java open-source projects represented in the curated program-change corpus.",
+        "value": 20,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "projects",
+        "direction": "not_applicable",
+        "raw_display": "20 projects",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "project_count",
+          "applies_to_task_count": 4084
+        }
+      },
+      "notes": [
+        "Population descriptor; Java-only scope."
+      ]
+    },
+    {
+      "observation_id": "ase-ipa-tool-count",
+      "comparator_id": "incremental-program-analysis-ase2025",
+      "source_locator": "Wang et al., ASE 2025, DOI 10.1109/ase63991.2025.00194, abstract and conference presentation",
+      "system": {
+        "system_id": "ase-ipa-2025-evaluated-tools",
+        "model": "Two representative Java IPA tools",
+        "harness": "Empirical incremental-analysis study",
+        "configuration": "Tool comparison scope"
+      },
+      "metric": {
+        "metric_id": "evaluated_tool_count",
+        "label": "Evaluated incremental-analysis tool count",
+        "definition": "Number of representative Java incremental program analysis tools evaluated in the study.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tools",
+        "direction": "not_applicable",
+        "raw_display": "two representative tools",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "evaluated_tool_count",
+          "applies_to_task_count": 4084
+        }
+      },
+      "notes": [
+        "Tool count, not a performance score."
+      ]
+    },
+    {
+      "observation_id": "diffci-historical-delta-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-open-study",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "20 repositories; historical commit-delta replay"
+      },
+      "metric": {
+        "metric_id": "historical_commit_delta_count",
+        "label": "Historical commit-delta count",
+        "definition": "Number of historical commit deltas replayed in the study.",
+        "value": 2000,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "commit_deltas",
+        "direction": "not_applicable",
+        "raw_display": "2,000 deltas",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_commit_delta_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Population descriptor. Study is self-published; repository selection and evidence limitations are disclosed."
+      ]
+    },
+    {
+      "observation_id": "diffci-repository-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-open-study",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Repository sample frame"
+      },
+      "metric": {
+        "metric_id": "repository_count",
+        "label": "Repository count",
+        "definition": "Number of repositories represented in the historical replay corpus.",
+        "value": 20,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "repositories",
+        "direction": "not_applicable",
+        "raw_display": "20 repositories",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "repository_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Population descriptor."
+      ]
+    },
+    {
+      "observation_id": "diffci-selective-opportunity-rate",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-graph-selector",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Deltas with a genuine selective-test opportunity"
+      },
+      "metric": {
+        "metric_id": "selective_test_opportunity_rate",
+        "label": "Selective-test opportunity rate",
+        "definition": "Share of all historical deltas classified as offering a genuine opportunity for selective test selection.",
+        "value": 29.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "29.8%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "selective_test_opportunity_rate",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Not a CEB claim-impact or evidence-invalidation recall metric."
+      ]
+    },
+    {
+      "observation_id": "diffci-whole-corpus-test-reduction",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-vs-path-rule",
+        "model": "DiffCI versus changed-path baseline",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Weighted whole-corpus comparison against path-rule selection"
+      },
+      "metric": {
+        "metric_id": "whole_corpus_test_reduction_vs_path_rule",
+        "label": "Whole-corpus test reduction versus path rule",
+        "definition": "Reported weighted test-count reduction across the whole corpus relative to path-rule selection.",
+        "value": 4.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "4.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "whole_corpus_test_reduction_vs_path_rule",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Repository-clustered 95% interval reported as -4.8% to +47.9%, crossing zero; do not claim a certain population gain."
+      ]
+    },
+    {
+      "observation_id": "diffci-job-recall",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-graph-selector",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Historical CI failure jobs; 280 failures"
+      },
+      "metric": {
+        "metric_id": "historical_ci_failure_job_recall",
+        "label": "Historical CI-failure job recall",
+        "definition": "Job-level recall of historical CI failure jobs under the DiffCI selection policy.",
+        "value": 96.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "96.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_ci_failure_job_recall",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "The denominator is 280 historical CI failures, recorded in comparator caveats; this is test-selection recall, not CEB evidence-disposition recall."
+      ]
+    },
+    {
+      "observation_id": "diffci-path-rule-job-recall",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "changed-path-baseline",
+        "model": "Changed-path selection baseline",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Historical CI failure jobs; 280 failures"
+      },
+      "metric": {
+        "metric_id": "historical_ci_failure_job_recall",
+        "label": "Historical CI-failure job recall — path rule",
+        "definition": "Job-level recall of historical CI failure jobs under the changed-path baseline.",
+        "value": 70.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "70.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_ci_failure_job_recall",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Matched baseline to the DiffCI study; not a CEB score."
+      ]
+    },
+    {
+      "observation_id": "diffci-historical-failure-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-historical-ci-failure-sample",
+        "model": "DiffCI and path-rule policies",
+        "harness": "DiffCI open historical replay study",
+        "configuration": "Historical CI-failure job set"
+      },
+      "metric": {
+        "metric_id": "historical_ci_failure_count",
+        "label": "Historical CI failure count",
+        "definition": "Number of historical CI failure jobs used in the recall comparison.",
+        "value": 280,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "failure_jobs",
+        "direction": "not_applicable",
+        "raw_display": "280 historical CI failure jobs",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "historical_ci_failure_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "Denominator descriptor for the separate job-level recall metric."
+      ]
+    },
+    {
+      "observation_id": "diffci-measurable-mutation-count",
+      "comparator_id": "diffci-change-aware-test-selection-2026",
+      "source_locator": "DiffCI Open Evidence Study 2026, diffci-oes-2026-v1, published 2026-09-03 / updated 2026-09-25",
+      "system": {
+        "system_id": "diffci-measurable-mutation-sample",
+        "model": "DiffCI graph-based selector",
+        "harness": "DiffCI open mutation-safety replay",
+        "configuration": "Five corpora; all measurable mutations"
+      },
+      "metric": {
+        "metric_id": "measurable_mutation_count",
+        "label": "Measurable mutation count",
+        "definition": "Number of mutation cases for which detection was measurable in the study's safety evidence.",
+        "value": 32,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "mutations",
+        "direction": "not_applicable",
+        "raw_display": "32 measurable mutations",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this summary observation",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "measurable_mutation_count",
+          "applies_to_task_count": 2000
+        }
+      },
+      "notes": [
+        "The report says 32/32 were detected but explicitly warns this is not a reliability estimate; preserve that caveat."
+      ]
+    },
+    {
+      "observation_id": "agent-trace-provenance-taxonomy-dimensions",
+      "comparator_id": "agent-evidence-tracing-provenance-survey",
+      "source_locator": "Wang et al., arXiv:2606.04990, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "agent-trace-provenance-survey-2026",
+        "model": "Survey synthesis",
+        "harness": "Evidence-tracing survey",
+        "configuration": "Trace sources, evidence/execution units, provenance relations, granularity/timing, representations, trust functions"
+      },
+      "metric": {
+        "metric_id": "provenance_taxonomy_dimension_count",
+        "label": "Provenance taxonomy dimension count",
+        "definition": "Number of dimensions explicitly named in the survey's provenance taxonomy.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "dimensions",
+        "direction": "not_applicable",
+        "raw_display": "six dimensions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "provenance_taxonomy_dimension_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Conceptual taxonomy descriptor; not accuracy or reliability."
+      ]
+    },
+    {
+      "observation_id": "agent-trace-open-challenge-categories",
+      "comparator_id": "agent-evidence-tracing-provenance-survey",
+      "source_locator": "Wang et al., arXiv:2606.04990, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "agent-trace-open-challenges-2026",
+        "model": "Survey synthesis",
+        "harness": "Evidence-tracing survey",
+        "configuration": "Unified schema, semantic provenance, safety, trace benchmark, recovery, privacy"
+      },
+      "metric": {
+        "metric_id": "open_challenge_category_count",
+        "label": "Open challenge category count",
+        "definition": "Number of open challenge categories listed in the survey abstract.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "categories",
+        "direction": "not_applicable",
+        "raw_display": "six challenge categories",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "open_challenge_category_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Research-gap descriptor; not a performance measure."
+      ]
+    },
+    {
+      "observation_id": "llm-se-guidelines-contributor-count",
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "source_locator": "Baltes et al., Empirical Software Engineering, author list and abstract, DOI 10.1007/s10664-026-10922-3; accessed 2026-11-08",
+      "system": {
+        "system_id": "llm-se-guidelines-22-authors",
+        "model": "22 researchers",
+        "harness": "Empirical study guideline collaboration",
+        "configuration": "Community-developed authorship"
+      },
+      "metric": {
+        "metric_id": "contributor_count",
+        "label": "Contributing researcher count",
+        "definition": "Number of researchers contributing to the LLM software-engineering empirical-study guidelines.",
+        "value": 22,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "researchers",
+        "direction": "not_applicable",
+        "raw_display": "22 researchers",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "contributor_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Source descriptor, not study sample size or performance."
+      ]
+    },
+    {
+      "observation_id": "llm-se-guidelines-study-type-count",
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "source_locator": "Baltes et al., Empirical Software Engineering, DOI 10.1007/s10664-026-10922-3, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "llm-se-guidelines-seven-types",
+        "model": "22-researcher collaboration",
+        "harness": "Empirical study guideline paper",
+        "configuration": "Seven study types"
+      },
+      "metric": {
+        "metric_id": "study_type_taxonomy_count",
+        "label": "Study-type taxonomy count",
+        "definition": "Number of LLM-in-SE empirical study types organized by the guideline paper.",
+        "value": 7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "study_types",
+        "direction": "not_applicable",
+        "raw_display": "seven study types",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "study_type_taxonomy_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Taxonomy descriptor."
+      ]
+    },
+    {
+      "observation_id": "llm-se-guidelines-recommendation-count",
+      "comparator_id": "llm-se-empirical-reproducibility-guidelines",
+      "source_locator": "Baltes et al., Empirical Software Engineering, DOI 10.1007/s10664-026-10922-3, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "llm-se-guidelines-eight-guidelines",
+        "model": "22-researcher collaboration",
+        "harness": "Empirical study guideline paper",
+        "configuration": "Eight reporting guidelines"
+      },
+      "metric": {
+        "metric_id": "reporting_guideline_count",
+        "label": "Reporting guideline count",
+        "definition": "Number of empirical study reporting guidelines proposed by the paper.",
+        "value": 8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "guidelines",
+        "direction": "not_applicable",
+        "raw_display": "eight guidelines",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "reporting_guideline_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Guideline count, not benchmark result."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-analysis-time-min",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-analysis-time-range",
+        "model": "Change Impact Detector",
+        "harness": "Call-graph + history analysis",
+        "configuration": "Three open-source project feasibility experiments; lower reported runtime bound"
+      },
+      "metric": {
+        "metric_id": "analysis_time_lower_bound",
+        "label": "PR impact analysis time lower bound",
+        "definition": "Lower endpoint of reported code-impact analysis time range.",
+        "value": 7.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "seconds",
+        "direction": "minimize",
+        "raw_display": "7.4 seconds",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "analysis_time_lower_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Observed analysis runtime, not review latency or defect-detection effectiveness."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-analysis-time-max",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-analysis-time-range",
+        "model": "Change Impact Detector",
+        "harness": "Call-graph + history analysis",
+        "configuration": "Three open-source project feasibility experiments; upper reported runtime bound"
+      },
+      "metric": {
+        "metric_id": "analysis_time_upper_bound",
+        "label": "PR impact analysis time upper bound",
+        "definition": "Upper endpoint of reported code-impact analysis time range.",
+        "value": 22.43,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "seconds",
+        "direction": "minimize",
+        "raw_display": "22.43 seconds",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "analysis_time_upper_bound",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Observed analysis runtime, not review latency or defect-detection effectiveness."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-focus-group-enhancement-rating",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-focus-group-review-enhancement",
+        "model": "Change Impact Detector",
+        "harness": "Focus group survey",
+        "configuration": "User-perceived enhancement of PR review across five aspects"
+      },
+      "metric": {
+        "metric_id": "review_enhancement_rating",
+        "label": "Review enhancement rating",
+        "definition": "Average focus-group rating for whether change-impact analysis enhanced the review experience.",
+        "value": 3.66,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "rating_out_of_5",
+        "direction": "maximize",
+        "raw_display": "3.66/5",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "review_enhancement_rating",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "User perception rating; not defect detection or causal claim accuracy."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-risk-score-perceived-accuracy",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-focus-group-risk-score",
+        "model": "Change Impact Detector",
+        "harness": "Focus group survey",
+        "configuration": "Perceived accuracy of the PR risk score"
+      },
+      "metric": {
+        "metric_id": "risk_score_perceived_accuracy_rating",
+        "label": "Risk-score perceived-accuracy rating",
+        "definition": "Average focus-group rating for how accurately the risk score represented change impact.",
+        "value": 3.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "rating_out_of_5",
+        "direction": "maximize",
+        "raw_display": "3.2/5",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "risk_score_perceived_accuracy_rating",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Construct/perception rating, not objective accuracy."
+      ]
+    },
+    {
+      "observation_id": "pr-impact-metric-agreement",
+      "comparator_id": "pr-change-impact-callgraph-history",
+      "source_locator": "Göçmen, Cezayir and Tüzün, Empirical Software Engineering, DOI 10.1007/s10664-024-10600-2, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "pr-impact-selected-metrics-agreement",
+        "model": "Change Impact Detector",
+        "harness": "Focus group survey",
+        "configuration": "Agreement on selected risk-score metrics"
+      },
+      "metric": {
+        "metric_id": "selected_metric_agreement",
+        "label": "Selected metric agreement",
+        "definition": "Reported participant agreement on the selected metrics.",
+        "value": 71,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "71%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "selected_metric_agreement",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Agreement on metric selection, not accuracy of the impact detector."
+      ]
+    },
+    {
+      "observation_id": "microservice-evolution-initial-records-screened",
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "source_locator": "Gómez et al., Software 5(3), 32, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "microservice-evolution-screening-pipeline",
+        "model": "Systematic review",
+        "harness": "Literature screening",
+        "configuration": "Initial search yield before screening"
+      },
+      "metric": {
+        "metric_id": "records_screened",
+        "label": "Records screened",
+        "definition": "Initial records retrieved by the systematic literature search before selection.",
+        "value": 1187,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "records",
+        "direction": "not_applicable",
+        "raw_display": "1,187 records",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "records_screened",
+          "applies_to_task_count": 18
+        }
+      },
+      "notes": [
+        "The comparator denominator is 18 included studies; 1,187 is the initial search yield, not the final included sample."
+      ]
+    },
+    {
+      "observation_id": "microservice-evolution-primary-studies",
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "source_locator": "Gómez et al., Software 5(3), 32, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "microservice-evolution-included-primary-studies",
+        "model": "Systematic review",
+        "harness": "Literature synthesis",
+        "configuration": "Included primary studies"
+      },
+      "metric": {
+        "metric_id": "primary_study_count",
+        "label": "Included primary study count",
+        "definition": "Number of included studies that contribute primary evidence.",
+        "value": 13,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "studies",
+        "direction": "not_applicable",
+        "raw_display": "13 primary studies",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "primary_study_count",
+          "applies_to_task_count": 18
+        }
+      },
+      "notes": [
+        "Review-method descriptor."
+      ]
+    },
+    {
+      "observation_id": "microservice-evolution-total-included-studies",
+      "comparator_id": "microservice-evolution-formal-verification-slr",
+      "source_locator": "Gómez et al., Software 5(3), 32, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "microservice-evolution-included-studies",
+        "model": "Systematic review",
+        "harness": "Literature synthesis",
+        "configuration": "Total included primary and background studies"
+      },
+      "metric": {
+        "metric_id": "included_study_count",
+        "label": "Included study count",
+        "definition": "Number of studies retained in the systematic review.",
+        "value": 18,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "studies",
+        "direction": "not_applicable",
+        "raw_display": "18 studies",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in source/abstract summary",
+          "applies_to_metric_id": "included_study_count",
+          "applies_to_task_count": 18
+        }
+      },
+      "notes": [
+        "Review-method descriptor."
+      ]
+    },
+    {
+      "observation_id": "sweci-maintenance-task-count",
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "source_locator": "Chen et al., arXiv:2603.03823, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "sweci-paper-benchmark-population",
+        "model": "Benchmark population",
+        "harness": "Continuous Integration maintenance loop",
+        "configuration": "Repository-maintenance task set"
+      },
+      "metric": {
+        "metric_id": "repository_maintenance_task_count",
+        "label": "Repository-maintenance task count",
+        "definition": "Number of repository-maintenance tasks in the SWE-CI benchmark.",
+        "value": 100,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "100 tasks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported in abstract summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in abstract summary",
+          "applies_to_metric_id": "repository_maintenance_task_count",
+          "applies_to_task_count": 100
+        }
+      },
+      "notes": [
+        "Task population descriptor, not a model performance score."
+      ]
+    },
+    {
+      "observation_id": "sweci-average-history-days",
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "source_locator": "Chen et al., arXiv:2603.03823, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "sweci-paper-benchmark-history",
+        "model": "Benchmark population",
+        "harness": "Continuous Integration maintenance loop",
+        "configuration": "Mean repository history per task"
+      },
+      "metric": {
+        "metric_id": "average_history_duration",
+        "label": "Average history duration",
+        "definition": "Average evolution-history duration represented by each SWE-CI maintenance task.",
+        "value": 233,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "days",
+        "direction": "not_applicable",
+        "raw_display": "233 days",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported in abstract summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in abstract summary",
+          "applies_to_metric_id": "average_history_duration",
+          "applies_to_task_count": 100
+        }
+      },
+      "notes": [
+        "Average task history duration; not wall-clock agent runtime."
+      ]
+    },
+    {
+      "observation_id": "sweci-average-commit-count",
+      "comparator_id": "swe-ci-long-horizon-maintenance",
+      "source_locator": "Chen et al., arXiv:2603.03823, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "sweci-paper-benchmark-history",
+        "model": "Benchmark population",
+        "harness": "Continuous Integration maintenance loop",
+        "configuration": "Mean consecutive commit history per task"
+      },
+      "metric": {
+        "metric_id": "average_consecutive_commit_count",
+        "label": "Average consecutive commits",
+        "definition": "Average number of consecutive repository commits represented in each SWE-CI task history.",
+        "value": 71,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "commits",
+        "direction": "not_applicable",
+        "raw_display": "71 consecutive commits",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported in abstract summary",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported in abstract summary",
+          "applies_to_metric_id": "average_consecutive_commit_count",
+          "applies_to_task_count": 100
+        }
+      },
+      "notes": [
+        "History-length descriptor; not agent action or turn count."
+      ]
+    },
+    {
+      "observation_id": "conflictbench-merge-tool-count",
+      "comparator_id": "conflictbench-java-merge-tools",
+      "source_locator": "ConflictBench abstract and article metadata; DOI 10.1016/j.jss.2024.112084",
+      "system": {
+        "system_id": "conflictbench-five-tools",
+        "model": "Five software merge tools",
+        "harness": "ConflictBench",
+        "configuration": "Java merge-conflict dataset"
+      },
+      "metric": {
+        "metric_id": "merge_tool_count",
+        "label": "Merge tools compared",
+        "definition": "Number of software merge tools compared in the ConflictBench study.",
+        "value": 5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tools",
+        "direction": "not_applicable",
+        "raw_display": "Five software merge tools",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "reported as a study descriptor",
+          "applies_to_metric_id": "merge_tool_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Benchmark-population descriptor, not merge correctness or agent performance."
+      ]
+    },
+    {
+      "observation_id": "history-propagation-version-count",
+      "comparator_id": "history-mined-change-propagation",
+      "source_locator": "Article abstract; ScienceDirect PII S0164121223003072",
+      "system": {
+        "system_id": "history-propagation-five-projects",
+        "model": "History-mining study",
+        "harness": "Change propagation channel mining",
+        "configuration": "Five maintained software projects"
+      },
+      "metric": {
+        "metric_id": "project_version_count",
+        "label": "Project versions analyzed",
+        "definition": "Number of project versions represented in the mined evolution-history dataset.",
+        "value": 5032,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "versions",
+        "direction": "not_applicable",
+        "raw_display": "5,032 versions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "reported as dataset descriptor",
+          "applies_to_metric_id": "project_version_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Dataset population descriptor; not a model evaluation."
+      ]
+    },
+    {
+      "observation_id": "history-propagation-channel-type-count",
+      "comparator_id": "history-mined-change-propagation",
+      "source_locator": "Article abstract; ScienceDirect PII S0164121223003072",
+      "system": {
+        "system_id": "history-propagation-channel-types",
+        "model": "History-mining study",
+        "harness": "Change propagation channel mining",
+        "configuration": "Mined change-propagation relationship taxonomy"
+      },
+      "metric": {
+        "metric_id": "propagation_channel_type_count",
+        "label": "Propagation channel types",
+        "definition": "Number of distinct change-propagation channel types identified by the study.",
+        "value": 40,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "channel types",
+        "direction": "not_applicable",
+        "raw_display": "40 types",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "reported as taxonomy descriptor",
+          "applies_to_metric_id": "propagation_channel_type_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Taxonomy descriptor; channel membership does not prove semantic causation."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-task-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-paper-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench",
+        "configuration": "Paper task denominator"
+      },
+      "metric": {
+        "metric_id": "task_count",
+        "label": "Benchmark task count",
+        "definition": "Number of retained verifier-generation tasks in VerifierBench.",
+        "value": 222,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "222 tasks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "task_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The task population spans six source agent benchmarks."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-hidden-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-hidden-cases",
+        "model": "Hidden test population",
+        "harness": "VerifierBench",
+        "configuration": "All hidden verifier cases"
+      },
+      "metric": {
+        "metric_id": "hidden_case_count",
+        "label": "Hidden verifier-case count",
+        "definition": "Number of hidden positive and negative cases used to evaluate generated task verifiers.",
+        "value": 4993,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "4,993 hidden cases",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "hidden_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The cases include gold solutions, cosmetic changes, valid alternatives, near misses, regressions, and attacks."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-source-benchmark-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-source-benchmarks",
+        "model": "Benchmark population",
+        "harness": "VerifierBench",
+        "configuration": "Number of source benchmark families"
+      },
+      "metric": {
+        "metric_id": "source_benchmark_count",
+        "label": "Source benchmark count",
+        "definition": "Number of source benchmarks from which VerifierBench tasks were drawn.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "benchmarks",
+        "direction": "not_applicable",
+        "raw_display": "Six source benchmarks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "source_benchmark_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "verifierbench-paper-common-harness-model-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract; common-harness experiment",
+      "system": {
+        "system_id": "verifierbench-common-harness-models",
+        "model": "Evaluated models",
+        "harness": "VerifierBench",
+        "configuration": "Paper's common agent harness"
+      },
+      "metric": {
+        "metric_id": "common_harness_model_count",
+        "label": "Common-harness model count",
+        "definition": "Number of models evaluated under the paper's common agent harness.",
+        "value": 19,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "models",
+        "direction": "not_applicable",
+        "raw_display": "19 models",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "common_harness_model_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "Keep separate from the project page's 36 model–harness configurations."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-project-model-harness-config-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, benchmark overview",
+      "system": {
+        "system_id": "verifierbench-project-configurations",
+        "model": "Project overview",
+        "harness": "VerifierBench",
+        "configuration": "Project page"
+      },
+      "metric": {
+        "metric_id": "model_harness_configuration_count",
+        "label": "Model–harness configuration count",
+        "definition": "Number of model–harness configurations listed on the VerifierBench project page.",
+        "value": 36,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "configurations",
+        "direction": "not_applicable",
+        "raw_display": "36 model–harness configurations",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "model_harness_configuration_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This project-page configuration count is not the paper's 19-model common-harness experiment."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-project-source-defect-exclusions",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, task inclusion summary",
+      "system": {
+        "system_id": "verifierbench-excluded-source-tasks",
+        "model": "Source curation",
+        "harness": "VerifierBench",
+        "configuration": "Project page"
+      },
+      "metric": {
+        "metric_id": "source_defect_exclusion_count",
+        "label": "Source-defect task exclusions",
+        "definition": "Number of source tasks excluded after confirmed defects were found in source materials.",
+        "value": 45,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "not_applicable",
+        "raw_display": "45 tasks excluded",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "source_defect_exclusion_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "Source-quality exclusions are not model errors or benchmark failures."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-attack-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, hidden-case composition",
+      "system": {
+        "system_id": "verifierbench-attack-cases",
+        "model": "Hidden negative cases",
+        "harness": "VerifierBench",
+        "configuration": "Project page"
+      },
+      "metric": {
+        "metric_id": "attack_case_count",
+        "label": "Attack-case count",
+        "definition": "Number of adversarial attack cases included among VerifierBench hidden negative cases.",
+        "value": 798,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "798 attack cases",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "attack_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The 798 attacks are a subset of the 4,993 hidden cases, not additional cases."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-v4v-check-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract and project page, accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-v4v-audit",
+        "model": "Verifier4Verifier",
+        "harness": "VerifierBench",
+        "configuration": "Six-check source-verifier audit"
+      },
+      "metric": {
+        "metric_id": "v4v_check_count",
+        "label": "Verifier4Verifier check count",
+        "definition": "Number of checks in the Verifier4Verifier source-verifier and test-suite audit.",
+        "value": 6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "checks",
+        "direction": "not_applicable",
+        "raw_display": "Six V4V checks",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "v4v_check_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This is the benchmark paper's source-verifier audit; it is not evidence that CEB's own V4V or regrade gate is qualified."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-validity-asymmetry",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench paper abstract; normalized balanced accuracy and false-rejection analysis",
+      "system": {
+        "system_id": "verifierbench-19-model-range",
+        "model": "19 evaluated models",
+        "harness": "Common agent harness",
+        "configuration": "Paper-reported aggregate range and qualitative error asymmetry"
+      },
+      "metric": {
+        "metric_id": "verifier_lifecycle_policy",
+        "label": "Verifier acceptance/rejection asymmetry",
+        "definition": "Qualitative report of generated verifiers' ability to reject invalid solutions while accepting all valid alternatives.",
+        "value": null,
+        "value_status": "qualitative",
+        "operator": "reported_qualitative",
+        "unit": "qualitative finding",
+        "direction": "not_applicable",
+        "raw_display": "Normalized balanced accuracy is 10.6–62.1 across 19 pi-harness models; TPR is 21.1–70.2% versus TNR 79.2–96.3%, with TPR below TNR for every model.",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "verifier_lifecycle_policy",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The 10.6–62.1 range is across 19 pi-harness models, not a single model score; all 36 project-listed model–harness configurations are reported below the TPR=TNR line.",
+        "For nine models with archived task-level records, verifiers that reject every case in a task account for 87.9–96.0% of false rejections; a high negative-rejection rate can therefore hide zero acceptance of valid solutions."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-audited-trajectory-count",
+      "comparator_id": "benchmark-maintenance-pass-audit",
+      "source_locator": "Luo et al., arXiv:2609.34262, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "benchmark-maintenance-audit-population",
+        "model": "Benchmark audit population",
+        "harness": "Process-verification framework",
+        "configuration": "Aggregate passing trajectories audited across 29 cohorts"
+      },
+      "metric": {
+        "metric_id": "passing_trajectory_count",
+        "label": "Passing trajectories audited",
+        "definition": "Number of passing agent trajectories audited for unearned passes across the study's model–benchmark cohorts.",
+        "value": 3810,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "trajectories",
+        "direction": "not_applicable",
+        "raw_display": "3,810 passing trajectories",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "passing_trajectory_count",
+          "applies_to_task_count": 3810
+        }
+      },
+      "notes": [
+        "Trajectories are not independent tasks or independent model observations."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-cohort-count",
+      "comparator_id": "benchmark-maintenance-pass-audit",
+      "source_locator": "Luo et al., arXiv:2609.34262, abstract; accessed 2026-11-08",
+      "system": {
+        "system_id": "benchmark-maintenance-cohort-population",
+        "model": "Benchmark audit population",
+        "harness": "Process-verification framework",
+        "configuration": "Model–benchmark cohorts included in the audit"
+      },
+      "metric": {
+        "metric_id": "model_benchmark_cohort_count",
+        "label": "Model–benchmark cohort count",
+        "definition": "Number of distinct model–benchmark cohorts represented in the audited passing trajectories.",
+        "value": 29,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cohorts",
+        "direction": "not_applicable",
+        "raw_display": "29 model–benchmark cohorts",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "model_benchmark_cohort_count",
+          "applies_to_task_count": 3810
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "benchmark-maintenance-opus47-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "opus47-swebenchpro-v1",
+        "model": "Opus 4.7",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 24,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "24%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "The paper describes the Opus 4.7 and Fable 5 comparison as matched tasks; exact cohort denominators are not stated in the abstract."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-fable5-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "fable5-swebenchpro-v1",
+        "model": "Fable 5",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 73,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "73%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "The paper describes the Opus 4.7 and Fable 5 comparison as matched tasks; exact cohort denominators are not stated in the abstract."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-fable51-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "fable51-swebenchpro-v1",
+        "model": "Fable 5.1",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 11,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "11%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Descriptive later cohort observation; do not infer a monotonic trend or generalize to other tasks and harnesses."
+      ]
+    },
+    {
+      "observation_id": "benchmark-maintenance-gpt6astra-unearned-pass-rate",
+      "comparator_id": "benchmark-maintenance-unearned-pass-rates",
+      "source_locator": "SWE-Bench Pro V1 cohort-rate observations in the paper abstract",
+      "system": {
+        "system_id": "gpt6-astra-swebenchpro-v1",
+        "model": "GPT-6 Astra",
+        "harness": "SWE-Bench Pro V1 cohort (paper report)",
+        "configuration": "Reported descriptive unearned-pass cohort rate"
+      },
+      "metric": {
+        "metric_id": "confirmed_unearned_pass_rate",
+        "label": "Confirmed unearned-pass rate",
+        "definition": "Fraction of the audited passing cohort classified as a confirmed unearned pass by the paper's process-verification audit.",
+        "value": 0,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for this observation",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_reported in the cited paper or project summary",
+          "applies_to_metric_id": "confirmed_unearned_pass_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Descriptive later cohort observation; do not infer a monotonic trend or generalize to other tasks and harnesses."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-positive-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-case-label-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Aggregate PASS labels"
+      },
+      "metric": {
+        "metric_id": "positive_case_count",
+        "label": "Positive reference cases",
+        "definition": "Number of hidden cases labeled PASS by the reference task requirements.",
+        "value": 1566,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "1,566 PASS",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "positive_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "Positive cases include gold, cosmetic variants and valid alternative solutions."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-negative-case-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-case-label-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Aggregate FAIL labels"
+      },
+      "metric": {
+        "metric_id": "negative_case_count",
+        "label": "Negative reference cases",
+        "definition": "Number of hidden cases labeled FAIL by the reference task requirements.",
+        "value": 3427,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "3,427 FAIL",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "negative_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "The 798 attack cases are a subset of FAIL, not additional cases."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-alternative-positive-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-alternative-case-population",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Positive variation subset"
+      },
+      "metric": {
+        "metric_id": "alternate_positive_case_count",
+        "label": "Alternative positive cases",
+        "definition": "Number of Alt. cases, combining cosmetic variations and valid alternative solutions, which remain PASS.",
+        "value": 1344,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "cases",
+        "direction": "not_applicable",
+        "raw_display": "1,344 Alt. (cosmetic + valid alternatives)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "alternate_positive_case_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This is a subset of the 1,566 PASS cases; it is not a separate denominator or a count of only semantic alternatives."
+      ]
+    },
+    {
+      "observation_id": "verifierbench-reference-mutation-configuration-count",
+      "comparator_id": "verifierbench-executable-verifier-generation",
+      "source_locator": "VerifierBench project page, revision 670 main table and Reference Validation section; accessed 2026-11-08",
+      "system": {
+        "system_id": "verifierbench-reference-mutation-coverage",
+        "model": "Benchmark population",
+        "harness": "VerifierBench reference validation",
+        "configuration": "Reference-verifier mutation testing"
+      },
+      "metric": {
+        "metric_id": "mutation_test_configuration_count",
+        "label": "Reference mutation-test configurations",
+        "definition": "Number of task–operator configurations used to test whether weakening a source verifier check changes at least one valid decision.",
+        "value": 1410,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "task–operator configurations",
+        "direction": "not_applicable",
+        "raw_display": "1,410 task–operator configurations",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "reported as benchmark population descriptor",
+          "applies_to_metric_id": "mutation_test_configuration_count",
+          "applies_to_task_count": 222
+        }
+      },
+      "notes": [
+        "This is mutation coverage for the source reference material, not a model run count or independent task denominator."
+      ]
     }
   ]
 }
