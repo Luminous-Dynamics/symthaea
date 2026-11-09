@@ -208,6 +208,9 @@ This is one finite-system synthetic setting, not a universal ratio, experiment r
 
 Acceptance requires independent analytic QFIM/CFI oracles, PSD checks, finite-difference convergence, phase-origin invariance, both zero-frequency nominal-phase and nonzero-phase confounding controls, and a matched known-phase versus unknown-phase comparison. The full experiment budget still needs preparation, readout, reset, dead time, time jitter, calibration drift and a conventional Ramsey/lock-in baseline before any sensitivity comparison.
 
+
+The 2x2 joint covariance inversion now has an explicit maximum condition-number gate of `1e10`. Matrices that are mathematically positive but numerically too ill-conditioned are reported without a joint CRLB covariance; they are not inverted into a misleading finite precision. The zero-frequency, nonzero-phase test specifically checks the static-kick amplitude/phase confounding. The clock-offset conversion is a parameter mapping, not evidence that the simulator has an independent clock state.
+
 ## Claim ceiling
 
 A numerical pass validates only a declared model and estimator. It does not reproduce the diamond experiment, show that Symthaea has achieved a physical DTC sensor, exceed current experimental sensitivity, or connect temporal order to UAP propulsion. A valid negative result is that no information advantage survives matched resources and noise.
