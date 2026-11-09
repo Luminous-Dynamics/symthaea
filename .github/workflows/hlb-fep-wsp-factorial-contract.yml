@@ -19,6 +19,8 @@ on:
       - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
       - "crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs"
       - "crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/src/static_model_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs"
       - "crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs"
       - "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs"
       - "crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs"
@@ -55,6 +57,8 @@ on:
       - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
       - "crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs"
       - "crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/src/static_model_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs"
       - "crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs"
       - "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs"
       - "crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs"
@@ -138,6 +142,8 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/open_world_robust_decision.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/static_model_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
@@ -182,6 +188,8 @@ jobs:
           cargo test --locked --release -p symthaea-fep --lib open_world_robust_decision::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_planning::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_benchmark::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib static_model_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_static_model_diagnostic -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib decision_diagnostic_benchmark::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark -- --nocapture
           cargo test --locked --release -p symthaea-fep --example hlb_open_world_robustness_benchmark -- --nocapture
@@ -243,6 +251,26 @@ jobs:
           ' research-results/hlb-open-world-robustness.json >/dev/null
           cat research-results/hlb-open-world-robustness.json
 
+      - name: Run static-versus-rectangular diagnostic policy oracle
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_static_model_diagnostic > research-results/hlb-static-model-diagnostic.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .receipt.source_git_sha == $source_sha and
+            .report.static_robust_risk == 0 and
+            .report.clairvoyant_lower_bound_risk == 0 and
+            (.report.rectangular_minimax_risk == 0.5) and
+            (.report.rectangular_risk_of_static_policy == 1) and
+            (.report.one_shot.best_worst_case_risk == 0.5) and
+            (.report.static_policy.worst_branch_cost == 2) and
+            .report.static_robust_certificate and
+            ( .report.rectangular_robust_certificate | not )
+          ' research-results/hlb-static-model-diagnostic.json >/dev/null
+          cat research-results/hlb-static-model-diagnostic.json
+
       - name: Run packed BinaryHV bundle-capacity pilot
         run: |
           set -euo pipefail
@@ -264,7 +292,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/open_world_robust_decision.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs research-results/hlb-open-world-robustness.json research-results/hlb-decision-diagnostic.json crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/open_world_robust_decision.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs crates/core/symthaea-fep/src/static_model_diagnostic.rs crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs research-results/hlb-open-world-robustness.json research-results/hlb-decision-diagnostic.json research-results/hlb-static-model-diagnostic.json crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
