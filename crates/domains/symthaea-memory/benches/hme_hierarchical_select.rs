@@ -7,7 +7,7 @@
 //   cargo bench -p symthaea-memory --bench hme_hierarchical_select
 // Optional environment:
 //   HME_BENCH_RECORDS=4096 HME_BENCH_DIM=16384 HME_BENCH_GROUP_SIZE=64
-//   HME_BENCH_TOP_K=10 HME_BENCH_REPEATS=21
+//   HME_BENCH_TOP_K=10 HME_BENCH_REPEATS=21 HME_BENCH_MODE=box|ball
 //
 // This harness measures CPU/algorithm behavior and logical candidate payload
 // reads. It cannot establish physical disk I/O, page faults, cache residency,
@@ -36,6 +36,7 @@ struct Config {
     group_size: usize,
     top_k: usize,
     repeats: usize,
+    mode: GroupEnvelopeMode,
 }
 
 fn env_usize(name: &str, default: usize) -> Result<usize, String> {
@@ -48,6 +49,18 @@ fn env_usize(name: &str, default: usize) -> Result<usize, String> {
     }
 }
 
+fn env_mode() -> Result<GroupEnvelopeMode, String> {
+    let value = env::var("HME_BENCH_MODE").unwrap_or_else(|_| "box".to_owned());
+    match value.to_ascii_lowercase().as_str() {
+        "box" | "box_and_ball" => Ok(GroupEnvelopeMode::BoxAndBall),
+        "ball" | "ball_only" => Ok(GroupEnvelopeMode::BallOnly),
+        "quantized" | "quantized_box_and_ball" => Err(
+            "QuantizedBoxAndBall remains selector-gated pending #11243; benchmark box or ball".to_owned(),
+        ),
+        _ => Err(format!("HME_BENCH_MODE must be 'box' or 'ball', got {value:?}")),
+    }
+}
+
 fn config() -> Result<Config, String> {
     let cfg = Config {
         records: env_usize("HME_BENCH_RECORDS", 512)?,
@@ -55,6 +68,7 @@ fn config() -> Result<Config, String> {
         group_size: env_usize("HME_BENCH_GROUP_SIZE", 32)?,
         top_k: env_usize("HME_BENCH_TOP_K", 10)?,
         repeats: env_usize("HME_BENCH_REPEATS", 21)?,
+        mode: env_mode()?,
     };
     if cfg.records == 0 || cfg.dimension == 0 || cfg.group_size == 0 || cfg.top_k == 0 || cfg.repeats == 0 {
         return Err("all HME_BENCH_* values must be positive".to_owned());
@@ -219,10 +233,11 @@ fn run() -> Result<(), String> {
     let mut envelopes = Vec::with_capacity(group_count);
     for members in &groups {
         envelopes.push(
-            ContinuousHVGroupEnvelope::from_original_members(
+            ContinuousHVGroupEnvelope::from_original_members_with_mode(
                 1,
                 1,
                 members,
+                cfg.mode,
             )
             .map_err(|error| format!("group envelope build failed: {error}"))?,
         );
@@ -279,7 +294,7 @@ fn run() -> Result<(), String> {
         cfg.records,
         cfg.group_size,
         24,
-        GroupEnvelopeMode::BoxAndBall,
+        cfg.mode,
     )
     .map_err(|error| format!("metadata estimate failed: {error}"))?;
 
@@ -479,6 +494,7 @@ fn run() -> Result<(), String> {
     println!("records={}", cfg.records);
     println!("dimension={}", cfg.dimension);
     println!("group_size={}", cfg.group_size);
+    println!("envelope_mode={:?}", cfg.mode);
     println!("groups={group_count}");
     println!("top_k={}", cfg.top_k);
     println!("repeats={}", cfg.repeats);
