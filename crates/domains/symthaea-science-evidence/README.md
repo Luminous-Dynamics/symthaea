@@ -88,6 +88,51 @@ gain, a Bayes factor, model posterior probability, or a claim that one theory
 is true. The generic EIG/EVSI/Fisher design utilities remain separate and
 should consume full calibrated likelihoods only after those are available.
 
+## Model-identity EIG and measurement availability
+
+The `model_discrimination` module computes conditional expected information
+gain about a finite set of named model hypotheses from calibrated Gaussian
+predictive distributions. It preserves:
+- each prior scenario's conditional EIG;
+- availability-adjusted EIG;
+- expected posterior entropy;
+- coarse/refined quadrature error and convergence status;
+- worst-case and weighted-mean EIG across prior scenarios.
+
+A candidate carries `availability_probability` in [0, 1]. Under the current
+explicit assumption that an unavailable measurement is uninformative,
+
+```
+expected EIG = availability_probability * conditional EIG
+expected posterior entropy = prior entropy - expected EIG
+```
+
+The cost-normalized ranking uses availability-adjusted EIG per cost. It does
+not overwrite the conditional EIG. A candidate with zero availability remains
+visible with its conditional discrimination score but contributes zero
+expected information.
+
+The scalar availability factor is not a general missing-data model. In real
+instruments, non-detection, occlusion, visibility, instrument health or radar
+cross-section may themselves carry information. Such outcomes must be included
+in an explicit likelihood in a future model rather than treated as
+uninformative dropout.
+
+The model-recovery reference now applies the same availability probability:
+unavailable trials enter the confusion matrix as abstentions, remain in the
+accuracy/coverage denominator, and are counted separately per generator.
+The recovery report therefore distinguishes performance conditional on
+obtaining a measurement from end-to-end performance under the declared
+availability model.
+
+Run the synthetic model-identity EIG / predictive-KL reference with:
+
+    cargo run --locked -p symthaea-science-evidence --example model_discrimination_reference
+
+This is a synthetic decision-rule fixture. It is not a physical theory
+validation, an empirical sensor-availability estimate, or proof that a named
+model is true.
+
 The synthetic known-answer fixture is designed to make two failure modes
 visible:
 
