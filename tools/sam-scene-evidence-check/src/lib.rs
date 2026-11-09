@@ -1306,92 +1306,92 @@ fn validate_follow_target_context(
         .and_then(|state| state.get("velocity_mps"))
         .and_then(Value::as_array);
 
-    let (target_position, target_velocity, target_frame, target_scenario, target_tick) =
-        if profile == "simulation_benchmark" {
-            let actor = snapshot
-                .get("simulator_truth_actor_states")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .find(|actor| {
-                    actor.get("actor_id").and_then(Value::as_str) == Some(reference_id)
-                });
-            if let Some(actor) = actor {
-                let actor_source = actor.get("source_ref").and_then(Value::as_str);
-                if actor_source != Some(source_id) {
-                    errors.push(
-                        "follow_target_context: simulator actor and evidence_source_ref must share the exact oracle source"
-                            .into(),
-                    );
-                }
-                (
-                    actor.get("position_m").and_then(Value::as_array),
-                    actor.get("velocity_mps").and_then(Value::as_array),
-                    actor.get("reference_frame_id").and_then(Value::as_str),
-                    actor.get("scenario_id").and_then(Value::as_str),
-                    actor.get("acquisition_tick_ns").and_then(Value::as_u64),
-                )
-            } else {
-                errors.push(format!(
-                    "follow_target_context: unknown simulator truth actor {reference_id}"
-                ));
-                (None, None, None, None, None)
+    let (target_position, target_velocity, target_frame, target_scenario, target_tick) = if profile
+        == "simulation_benchmark"
+    {
+        let actor = snapshot
+            .get("simulator_truth_actor_states")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .find(|actor| actor.get("actor_id").and_then(Value::as_str) == Some(reference_id));
+        if let Some(actor) = actor {
+            let actor_source = actor.get("source_ref").and_then(Value::as_str);
+            if actor_source != Some(source_id) {
+                errors.push(
+                    "follow_target_context: simulator actor and evidence_source_ref must share the exact oracle source"
+                        .into(),
+                );
             }
+            (
+                actor.get("position_m").and_then(Value::as_array),
+                actor.get("velocity_mps").and_then(Value::as_array),
+                actor.get("reference_frame_id").and_then(Value::as_str),
+                actor.get("scenario_id").and_then(Value::as_str),
+                actor.get("acquisition_tick_ns").and_then(Value::as_u64),
+            )
         } else {
-            let object = snapshot
-                .get("object_hypotheses")
+            errors.push(format!(
+                "follow_target_context: unknown simulator truth actor {reference_id}"
+            ));
+            (None, None, None, None, None)
+        }
+    } else {
+        let object = snapshot
+            .get("object_hypotheses")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .find(|object| {
+                object.get("hypothesis_id").and_then(Value::as_str) == Some(reference_id)
+            });
+        if let Some(object) = object {
+            if object.get("track_lineage_id").and_then(Value::as_str)
+                != context.get("actor_id").and_then(Value::as_str)
+            {
+                errors.push(
+                    "follow_target_context: actor_id must match the linked track_lineage_id"
+                        .into(),
+                );
+            }
+            let refs: BTreeSet<&str> = object
+                .get("source_refs")
                 .and_then(Value::as_array)
                 .into_iter()
                 .flatten()
-                .find(|object| {
-                    object.get("hypothesis_id").and_then(Value::as_str) == Some(reference_id)
-                });
-            if let Some(object) = object {
-                if object.get("track_lineage_id").and_then(Value::as_str)
-                    != context.get("actor_id").and_then(Value::as_str)
-                {
-                    errors.push(
-                        "follow_target_context: actor_id must match the linked track_lineage_id"
-                            .into(),
-                    );
-                }
-                let refs: BTreeSet<&str> = object
-                    .get("source_refs")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Value::as_str)
-                    .collect();
-                if !refs.contains(source_id) {
-                    errors.push(
-                        "follow_target_context: evidence_source_ref must be attached to the linked object hypothesis"
-                            .into(),
-                    );
-                }
-                if !matches!(
-                    object.get("epistemic_state").and_then(Value::as_str),
-                    Some("observed" | "estimated")
-                ) {
-                    errors.push(
-                        "follow_target_context: stale, unknown, occluded, predicted or contradicted object cannot be a current Follow target"
-                            .into(),
-                    );
-                }
-                (
-                    object.get("position_m").and_then(Value::as_array),
-                    object.get("velocity_mps").and_then(Value::as_array),
-                    object.get("reference_frame_id").and_then(Value::as_str),
-                    snapshot_scenario,
-                    object.get("measurement_time_tick_ns").and_then(Value::as_u64),
-                )
-            } else {
-                errors.push(format!(
-                    "follow_target_context: unknown tracked object hypothesis {reference_id}"
-                ));
-                (None, None, None, None, None)
+                .filter_map(Value::as_str)
+                .collect();
+            if !refs.contains(source_id) {
+                errors.push(
+                    "follow_target_context: evidence_source_ref must be attached to the linked object hypothesis"
+                        .into(),
+                );
             }
-        };
-
+            if !matches!(
+                object.get("epistemic_state").and_then(Value::as_str),
+                Some("observed" | "estimated")
+            ) {
+                errors.push(
+                    "follow_target_context: stale, unknown, occluded, predicted or contradicted object cannot be a current Follow target"
+                        .into(),
+                );
+            }
+            (
+                object.get("position_m").and_then(Value::as_array),
+                object.get("velocity_mps").and_then(Value::as_array),
+                object.get("reference_frame_id").and_then(Value::as_str),
+                snapshot_scenario,
+                object
+                    .get("measurement_time_tick_ns")
+                    .and_then(Value::as_u64),
+            )
+        } else {
+            errors.push(format!(
+                "follow_target_context: unknown tracked object hypothesis {reference_id}"
+            ));
+            (None, None, None, None, None)
+        }
+    };
     if target_frame != context_frame || target_frame != ego_frame {
         errors.push(
             "follow_target_context: ego, target and requested Follow frame must match exactly"
