@@ -233,8 +233,7 @@ pub fn score_alignment(
 
     let mut covered_melismas = 0usize;
     for span in melismas {
-        if let Some(predicted_index) =
-            identity_prediction_for_reference[span.reference_phone_index]
+        if let Some(predicted_index) = identity_prediction_for_reference[span.reference_phone_index]
         {
             let phone = &predicted[predicted_index];
             if phone.is_vowel
