@@ -283,6 +283,18 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run joint interval-profile and longest-chain signature reference
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example joint_signature_reference | tee joint-causal-set-signature.txt
+          grep -q 'claim_boundary=feature_extraction_only_joint_likelihood_requires_whole_sprinkling_calibration' joint-causal-set-signature.txt
+          {
+            echo '## Joint causal-set signature reference'
+            cat joint-causal-set-signature.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
