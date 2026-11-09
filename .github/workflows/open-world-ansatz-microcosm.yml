@@ -57,9 +57,11 @@ jobs:
             .a0.agent.executable_sha256 == .a2.agent.executable_sha256 and
             .a0.agent.executable_sha256 == .out_of_catalogue.agent.executable_sha256 and
             .a0.agent.executable_sha256 == .equivalent_out_of_catalogue.agent.executable_sha256 and
+            .a0.agent.executable_sha256 == .structural_out_of_catalogue.agent.executable_sha256 and
             .a0.agent.arguments == .a2.agent.arguments and
             .a0.agent.arguments == .out_of_catalogue.agent.arguments and
             .a0.agent.arguments == .equivalent_out_of_catalogue.agent.arguments and
+            .a0.agent.arguments == .structural_out_of_catalogue.agent.arguments and
             .a0.agent.environment_inherited == false and
             .a2.agent.environment_inherited == false and
             .a0.agent.max_input_frame_bytes <= 16777216 and
@@ -94,13 +96,28 @@ jobs:
             .equivalent_out_of_catalogue.evaluator_score.decision_correct == true and
             .equivalent_out_of_catalogue.evaluator_score.evidence_references_valid == true and
             .equivalent_out_of_catalogue.evaluator_score.probe_count <= 6 and
+            .structural_out_of_catalogue.evaluator_score.generating_model_in_version_space == false and
+            .structural_out_of_catalogue.evaluator_score.generating_truth_behaviorally_represented == false and
+            .structural_out_of_catalogue.evaluator_score.set_score.oracle_model_count == 0 and
+            .structural_out_of_catalogue.evaluator_score.set_score.claimed_model_count == 0 and
+            .structural_out_of_catalogue.evaluator_score.set_score.exact_version_space_match == true and
+            .structural_out_of_catalogue.evaluator_score.decision_correct == true and
+            .structural_out_of_catalogue.evaluator_score.evidence_references_valid == true and
+            .structural_out_of_catalogue.evaluator_score.probe_count <= 6 and
+            .structural_out_of_catalogue.agent.environment_inherited == false and
+            .structural_out_of_catalogue.agent.max_input_frame_bytes <= 16777216 and
+            .structural_out_of_catalogue.agent.max_output_frame_bytes <= 16777216 and
+            .structural_out_of_catalogue.process_exit_code == 0 and
             .equivalent_out_of_catalogue.agent.environment_inherited == false and
             .equivalent_out_of_catalogue.agent.max_input_frame_bytes <= 16777216 and
             .equivalent_out_of_catalogue.agent.max_output_frame_bytes <= 16777216 and
             .equivalent_out_of_catalogue.process_exit_code == 0 and
             (.equivalent_out_of_catalogue.action_records | length) == (.equivalent_out_of_catalogue.observation_count + 1) and
+            (.structural_out_of_catalogue.action_records | length) == (.structural_out_of_catalogue.observation_count + 1) and
             .equivalent_out_of_catalogue.action_records[-1].resulting_status == "submitted" and
             (.equivalent_out_of_catalogue.action_records[-1].action.action == "submit") and
+            .structural_out_of_catalogue.action_records[-1].resulting_status == "submitted" and
+            (.structural_out_of_catalogue.action_records[-1].action.action == "submit") and
             (.out_of_catalogue.action_records | length) == (.out_of_catalogue.observation_count + 1) and
             .out_of_catalogue.action_records[-1].resulting_status == "submitted" and
             (.out_of_catalogue.action_records[-1].action.action == "submit") and
@@ -114,12 +131,15 @@ jobs:
             .out_of_catalogue.final_evidence_prefix == .out_of_catalogue.action_records[-1].evidence_prefix_after and
             .equivalent_out_of_catalogue.initial_evidence_prefix == .equivalent_out_of_catalogue.action_records[0].evidence_prefix_before and
             .equivalent_out_of_catalogue.final_evidence_prefix == .equivalent_out_of_catalogue.action_records[-1].evidence_prefix_after and
+            .structural_out_of_catalogue.initial_evidence_prefix == .structural_out_of_catalogue.action_records[0].evidence_prefix_before and
+            .structural_out_of_catalogue.final_evidence_prefix == .structural_out_of_catalogue.action_records[-1].evidence_prefix_after and
             .a0.action_records[-1].resulting_status == "submitted" and
             .a2.action_records[-1].resulting_status == "submitted" and
             all(.a0.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
             all(.a2.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
             all(.out_of_catalogue.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
-            all(.equivalent_out_of_catalogue.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$")))
+            all(.equivalent_out_of_catalogue.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$"))) and
+            all(.structural_out_of_catalogue.action_records[]; (.evidence_prefix_before | test("^sha256:[0-9a-f]{64}$")) and (.evidence_prefix_after | test("^sha256:[0-9a-f]{64}$")) and (.agent_view_frame_sha256 | test("^sha256:[0-9a-f]{64}$")) and (.agent_action_frame_sha256 | test("^sha256:[0-9a-f]{64}$")))
           ' "$report"
           printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/open-world-process-pair-smoke.source-sha"
           sha256sum "$report" | tee "$report.sha256"
