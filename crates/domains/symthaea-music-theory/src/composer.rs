@@ -1239,13 +1239,13 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         let total = n.duration.beats();
         let lean_beats = (total / 2.0).min(1.0);
         let lean_480 = (lean_beats * 480.0).round() as i64;
-        let (onset, velocity, si) = (n.onset, n.velocity, n.section_intensity);
+        let (onset, velocity, si, part) = (n.onset, n.velocity, n.section_intensity, n.part);
         let note = &mut score.notes[i];
         note.onset = onset + Duration::new(lean_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1315,7 +1315,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1413,7 +1413,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: n.part,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -4749,6 +4749,73 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    fn ornament_source_note(part: PartId, duration: Duration, emphasis: Emphasis) -> ScoreNote {
+        ScoreNote {
+            part,
+            pitch: Pitch::new(crate::pitch::PitchClass::C, 4),
+            onset: Duration::zero(),
+            duration,
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis,
+            section_intensity: 1.0,
+        }
+    }
+
+    #[test]
+    fn appoggiatura_inherits_the_exact_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ornament_source_note(
+            PartId(42),
+            Duration::new(2, 1),
+            Emphasis::Cadential,
+        ));
+        let dna = crate::spec::MelodicDna {
+            appoggiatura_rate: 1.0,
+            ..Default::default()
+        };
+        apply_appoggiaturas(&mut score, key, &dna, 7);
+        assert!(score.notes.len() >= 2);
+        assert!(score.notes.iter().all(|note| note.part == PartId(42)));
+    }
+
+    #[test]
+    fn grace_ornament_inherits_the_exact_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ornament_source_note(
+            PartId(43),
+            Duration::new(1, 1),
+            Emphasis::Normal,
+        ));
+        let dna = crate::spec::MelodicDna {
+            ornament_rate: 1.0,
+            ..Default::default()
+        };
+        apply_grace_ornaments(&mut score, key, &dna, 11);
+        assert!(score.notes.len() >= 2);
+        assert!(score.notes.iter().all(|note| note.part == PartId(43)));
+    }
+
+    #[test]
+    fn roll_chain_inherits_the_exact_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ornament_source_note(
+            PartId(44),
+            Duration::new(2, 1),
+            Emphasis::Normal,
+        ));
+        let dna = crate::spec::MelodicDna {
+            ornament_rate: 1.0,
+            ..Default::default()
+        };
+        apply_roll_ornaments(&mut score, key, &dna, 13);
+        assert_eq!(score.notes.len(), 5);
+        assert!(score.notes.iter().all(|note| note.part == PartId(44)));
+    }
 
     /// Regression test for the counter-melody overlap bugs fixed in
     /// `apply_counter_hook_echoes` and `DamageDevice::CounterShift`: a
