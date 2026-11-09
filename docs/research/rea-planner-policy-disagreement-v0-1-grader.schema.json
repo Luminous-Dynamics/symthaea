@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-planner-policy-disagreement-grader-v0-1.schema.json",
+  "title": "REA planner policy disagreement grader view v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "status",
+    "source_policy",
+    "not_human_adjudicated",
+    "oracle_policy",
+    "obligations",
+    "candidate_effects",
+    "expected_policy_rankings",
+    "golden_values"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "const": "REA-PLAN-POLICY-001"
+    },
+    "status": {
+      "const": "design_fixture_only"
+    },
+    "source_policy": {
+      "const": "original_synthetic_text_only"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "oracle_policy": {
+      "const": "grader_only_not_for_agent_input"
+    },
+    "obligations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/obligation"
+      }
+    },
+    "candidate_effects": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/candidateEffects"
+      }
+    },
+    "expected_policy_rankings": {
+      "$ref": "#/$defs/rankings"
+    },
+    "golden_values": {
+      "$ref": "#/$defs/golden"
+    }
+  },
+  "$defs": {
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "required",
+        "initial_status",
+        "admissible_evidence_classes"
+      ],
+      "properties": {
+        "obligation_id": {
+          "enum": [
+            "deployment_binding",
+            "vulnerability_behavior"
+          ]
+        },
+        "required": {
+          "const": true
+        },
+        "initial_status": {
+          "const": "unknown"
+        },
+        "admissible_evidence_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "obligation_id",
+        "resulting_status",
+        "evidence_class",
+        "source_family_id"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "obligation_id": {
+          "enum": [
+            "deployment_binding",
+            "vulnerability_behavior"
+          ]
+        },
+        "resulting_status": {
+          "enum": [
+            "satisfied",
+            "contradicted",
+            "conflicted",
+            "unknown"
+          ]
+        },
+        "evidence_class": {
+          "type": "string",
+          "minLength": 3
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 3
+        }
+      }
+    },
+    "candidateEffects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "effects"
+      ],
+      "properties": {
+        "experiment_id": {
+          "enum": [
+            "static_function_probe",
+            "verify_deployment_manifest",
+            "controlled_reproduction"
+          ]
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "experiment_id": {
+                "const": "static_function_probe"
+              }
+            },
+            "required": [
+              "experiment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effects": {
+                "items": {
+                  "properties": {
+                    "outcome": {
+                      "enum": [
+                        "feature_present",
+                        "feature_absent"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "experiment_id": {
+                "const": "verify_deployment_manifest"
+              }
+            },
+            "required": [
+              "experiment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effects": {
+                "items": {
+                  "properties": {
+                    "outcome": {
+                      "enum": [
+                        "digest_match",
+                        "digest_mismatch"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "experiment_id": {
+                "const": "controlled_reproduction"
+              }
+            },
+            "required": [
+              "experiment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effects": {
+                "items": {
+                  "properties": {
+                    "outcome": {
+                      "enum": [
+                        "reproduced",
+                        "not_reproduced"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "rankings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point_eig_best",
+        "expected_scenario_eig_best",
+        "lower_tail_cvar_eig_best",
+        "expected_evsi_best",
+        "obligation_closure_per_second_best",
+        "combined_gated_sequence"
+      ],
+      "properties": {
+        "point_eig_best": {
+          "const": "static_function_probe"
+        },
+        "expected_scenario_eig_best": {
+          "const": "static_function_probe"
+        },
+        "lower_tail_cvar_eig_best": {
+          "const": "controlled_reproduction"
+        },
+        "expected_evsi_best": {
+          "const": "static_function_probe"
+        },
+        "obligation_closure_per_second_best": {
+          "const": "verify_deployment_manifest"
+        },
+        "combined_gated_sequence": {
+          "type": "array",
+          "const": [
+            "verify_deployment_manifest",
+            "controlled_reproduction"
+          ]
+        }
+      }
+    },
+    "golden": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "static_probe_nominal_eig_bits",
+        "static_probe_conservative_eig_bits",
+        "static_probe_expected_eig_bits",
+        "static_probe_lower_tail_eig_bits",
+        "manifest_eig_bits",
+        "reproduction_nominal_eig_bits",
+        "reproduction_conservative_eig_bits",
+        "reproduction_expected_eig_bits",
+        "reproduction_lower_tail_eig_bits",
+        "static_probe_expected_evsi_units",
+        "manifest_expected_evsi_units",
+        "reproduction_expected_evsi_units",
+        "static_probe_normalized_cost",
+        "manifest_normalized_cost",
+        "reproduction_normalized_cost",
+        "static_probe_point_planner_utility",
+        "reproduction_point_planner_utility",
+        "static_probe_robust_lower_tail_utility",
+        "reproduction_robust_lower_tail_utility"
+      ],
+      "properties": {
+        "static_probe_nominal_eig_bits": {
+          "const": 0.5310044064107189
+        },
+        "static_probe_conservative_eig_bits": {
+          "const": 0.00028855824719009604
+        },
+        "static_probe_expected_eig_bits": {
+          "const": 0.2656464823289545
+        },
+        "static_probe_lower_tail_eig_bits": {
+          "const": 0.00028855824719009604
+        },
+        "manifest_eig_bits": {
+          "const": 0
+        },
+        "reproduction_nominal_eig_bits": {
+          "const": 0.2780719051126377
+        },
+        "reproduction_conservative_eig_bits": {
+          "const": 0.18872187554086717
+        },
+        "reproduction_expected_eig_bits": {
+          "const": 0.23339689032675243
+        },
+        "reproduction_lower_tail_eig_bits": {
+          "const": 0.18872187554086717
+        },
+        "static_probe_expected_evsi_units": {
+          "const": 0.775
+        },
+        "manifest_expected_evsi_units": {
+          "const": 0
+        },
+        "reproduction_expected_evsi_units": {
+          "const": 0.05
+        },
+        "static_probe_normalized_cost": {
+          "const": 0.3833333333333333
+        },
+        "manifest_normalized_cost": {
+          "const": 0.10333333333333335
+        },
+        "reproduction_normalized_cost": {
+          "const": 0.7333333333333334
+        },
+        "static_probe_point_planner_utility": {
+          "const": 1.385228886288832
+        },
+        "reproduction_point_planner_utility": {
+          "const": 0.3791889615172332
+        },
+        "static_probe_robust_lower_tail_utility": {
+          "const": 0.0007527606448437289
+        },
+        "reproduction_robust_lower_tail_utility": {
+          "const": 0.25734801210118247
+        }
+      }
+    }
+  }
+}

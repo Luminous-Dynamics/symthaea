@@ -1,0 +1,102 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "REA-PLAN-POLICY-001",
+  "status": "design_fixture_only",
+  "source_policy": "original_synthetic_text_only",
+  "not_human_adjudicated": true,
+  "oracle_policy": "grader_only_not_for_agent_input",
+  "obligations": [
+    {
+      "obligation_id": "deployment_binding",
+      "required": true,
+      "initial_status": "unknown",
+      "admissible_evidence_classes": [
+        "deployment_manifest"
+      ]
+    },
+    {
+      "obligation_id": "vulnerability_behavior",
+      "required": true,
+      "initial_status": "unknown",
+      "admissible_evidence_classes": [
+        "controlled_reproduction"
+      ]
+    }
+  ],
+  "candidate_effects": [
+    {
+      "experiment_id": "static_function_probe",
+      "effects": []
+    },
+    {
+      "experiment_id": "verify_deployment_manifest",
+      "effects": [
+        {
+          "outcome": "digest_match",
+          "obligation_id": "deployment_binding",
+          "resulting_status": "satisfied",
+          "evidence_class": "deployment_manifest",
+          "source_family_id": "synthetic:deployment-ledger-policy-001"
+        },
+        {
+          "outcome": "digest_mismatch",
+          "obligation_id": "deployment_binding",
+          "resulting_status": "contradicted",
+          "evidence_class": "deployment_manifest",
+          "source_family_id": "synthetic:deployment-ledger-policy-001"
+        }
+      ]
+    },
+    {
+      "experiment_id": "controlled_reproduction",
+      "effects": [
+        {
+          "outcome": "reproduced",
+          "obligation_id": "vulnerability_behavior",
+          "resulting_status": "satisfied",
+          "evidence_class": "controlled_reproduction",
+          "source_family_id": "synthetic:reproduction-policy-001"
+        },
+        {
+          "outcome": "not_reproduced",
+          "obligation_id": "vulnerability_behavior",
+          "resulting_status": "contradicted",
+          "evidence_class": "controlled_reproduction",
+          "source_family_id": "synthetic:reproduction-policy-001"
+        }
+      ]
+    }
+  ],
+  "expected_policy_rankings": {
+    "point_eig_best": "static_function_probe",
+    "expected_scenario_eig_best": "static_function_probe",
+    "lower_tail_cvar_eig_best": "controlled_reproduction",
+    "expected_evsi_best": "static_function_probe",
+    "obligation_closure_per_second_best": "verify_deployment_manifest",
+    "combined_gated_sequence": [
+      "verify_deployment_manifest",
+      "controlled_reproduction"
+    ]
+  },
+  "golden_values": {
+    "static_probe_nominal_eig_bits": 0.5310044064107189,
+    "static_probe_conservative_eig_bits": 0.00028855824719009604,
+    "static_probe_expected_eig_bits": 0.2656464823289545,
+    "static_probe_lower_tail_eig_bits": 0.00028855824719009604,
+    "manifest_eig_bits": 0,
+    "reproduction_nominal_eig_bits": 0.2780719051126377,
+    "reproduction_conservative_eig_bits": 0.18872187554086717,
+    "reproduction_expected_eig_bits": 0.23339689032675243,
+    "reproduction_lower_tail_eig_bits": 0.18872187554086717,
+    "static_probe_expected_evsi_units": 0.775,
+    "manifest_expected_evsi_units": 0,
+    "reproduction_expected_evsi_units": 0.05,
+    "static_probe_normalized_cost": 0.3833333333333333,
+    "manifest_normalized_cost": 0.10333333333333335,
+    "reproduction_normalized_cost": 0.7333333333333334,
+    "static_probe_point_planner_utility": 1.385228886288832,
+    "reproduction_point_planner_utility": 0.3791889615172332,
+    "static_probe_robust_lower_tail_utility": 0.0007527606448437289,
+    "reproduction_robust_lower_tail_utility": 0.25734801210118247
+  }
+}

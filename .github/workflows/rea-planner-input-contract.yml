@@ -6,6 +6,10 @@ on:
       - "docs/research/REA_PLANNER_INPUT_CONTRACT_V0_1_2026Q4.md"
       - "docs/research/rea-planner-input-contract-v0-1.schema.json"
       - "docs/research/rea-planner-input-contract-v0-1-example-math-only.json"
+      - "docs/research/rea-planner-policy-disagreement-v0-1-agent-input.json"
+      - "docs/research/rea-planner-policy-disagreement-v0-1-grader.json"
+      - "docs/research/rea-planner-policy-disagreement-v0-1-grader.schema.json"
+      - "docs/research/REA_PLANNER_POLICY_DISAGREEMENT_V0_1_2026Q4.md"
       - "tools/rea-planner-input-contract-check/**"
       - ".github/workflows/rea-planner-input-contract.yml"
   workflow_dispatch:
@@ -48,8 +52,18 @@ jobs:
           cargo --version
           sha256sum tools/rea-planner-input-contract-check/Cargo.lock
 
-      - name: Rust formatting
-        run: cargo fmt --manifest-path tools/rea-planner-input-contract-check/Cargo.toml -- --check
+      - name: Apply rustfmt and verify formatting
+        run: |
+          cargo fmt --manifest-path tools/rea-planner-input-contract-check/Cargo.toml
+          cargo fmt --manifest-path tools/rea-planner-input-contract-check/Cargo.toml -- --check
+
+      - name: Archive rustfmt-normalized checker source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-planner-policy-disagreement-rustfmt-source
+          path: tools/rea-planner-input-contract-check/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Schema, probability and utility contract tests
         run: cargo test --manifest-path tools/rea-planner-input-contract-check/Cargo.toml --locked
