@@ -1,0 +1,40 @@
+name: Financial V2 Schema Validation
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/financial-agent-v1/evidence-v2.schema.json"
+      - "benchmarks/financial-agent-v1/evidence-manifest-v2.schema.json"
+      - "benchmarks/financial-agent-v1/dev-example.evidence-v2.json"
+      - "benchmarks/quant-strategy-v1/observation-manifest-v2.schema.json"
+      - "benchmarks/quant-strategy-v1/dev-example.observations-v2.json"
+      - "tools/financial-v2-schema-validator/**"
+      - ".github/workflows/financial-v2-schema-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "benchmarks/financial-agent-v1/evidence-v2.schema.json"
+      - "benchmarks/financial-agent-v1/evidence-manifest-v2.schema.json"
+      - "benchmarks/financial-agent-v1/dev-example.evidence-v2.json"
+      - "benchmarks/quant-strategy-v1/observation-manifest-v2.schema.json"
+      - "benchmarks/quant-strategy-v1/dev-example.observations-v2.json"
+      - "tools/financial-v2-schema-validator/**"
+      - ".github/workflows/financial-v2-schema-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Validate schemas, references, examples and fail-closed semantics offline
+        working-directory: tools/financial-v2-schema-validator
+        run: |
+          cargo fmt -- --check
+          cargo test --locked
+          cargo run --locked
