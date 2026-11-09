@@ -1028,7 +1028,8 @@
             "number",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "description": "For local_perception/deployment, a conservative upper bound on the standard deviation of longitudinal gap: at least sigma_ego_x + sigma_target_x when only marginal diagonal variances are available. This avoids assuming independent ego/target state errors. For exact simulator truth, zero may be used. This is a model uncertainty measure, not a hard physical error bound."
         },
         "target_reference_kind": {
           "enum": [
