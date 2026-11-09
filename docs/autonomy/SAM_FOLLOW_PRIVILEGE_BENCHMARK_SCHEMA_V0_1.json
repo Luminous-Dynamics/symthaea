@@ -1,0 +1,520 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json",
+  "title": "SAM Follow Privilege-Separation Benchmark v0.1",
+  "description": "Schema for privilege-aware Follow evaluation reports. Structural conformance does not establish perception validity, causal identification, vehicle safety or real-world performance.",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "schema_version",
+    "benchmark_status",
+    "claim_ceiling",
+    "benchmark",
+    "trials"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "luminous.sam.follow-privilege-benchmark"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_status": {
+      "enum": [
+        "specification_only",
+        "synthetic_fixture_only",
+        "campaign_incomplete",
+        "campaign_complete"
+      ]
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark": {
+      "$ref": "#/$defs/benchmark"
+    },
+    "trials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/trial"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "arm": {
+      "type": "object",
+      "required": [
+        "arm_id",
+        "name",
+        "observation_profile",
+        "teacher_blending",
+        "teacher_supervision",
+        "learning_updates",
+        "evaluator_truth",
+        "eligibility",
+        "description"
+      ],
+      "properties": {
+        "arm_id": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E"
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/id"
+        },
+        "observation_profile": {
+          "enum": [
+            "simulation_20d_with_sim_peer_channels",
+            "simulation_20d_peer_channels_masked",
+            "local_sensor_only",
+            "local_sensor_plus_remote_advisory",
+            "custom_declared"
+          ]
+        },
+        "teacher_blending": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "factorial"
+          ]
+        },
+        "teacher_supervision": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "factorial"
+          ]
+        },
+        "learning_updates": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "factorial"
+          ]
+        },
+        "evaluator_truth": {
+          "enum": [
+            "available",
+            "post_commit_only",
+            "unavailable"
+          ]
+        },
+        "eligibility": {
+          "enum": [
+            "eligible_simulation",
+            "blocked_until_scene_admission",
+            "non_authoritative_only"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "benchmark": {
+      "type": "object",
+      "required": [
+        "benchmark_id",
+        "title",
+        "tracking_issue",
+        "arms",
+        "metrics",
+        "negative_controls"
+      ],
+      "properties": {
+        "benchmark_id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/id"
+        },
+        "tracking_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "arms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/arm"
+          },
+          "minItems": 3
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1
+        },
+        "negative_controls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "source_role",
+        "policy_visible",
+        "observed_tick",
+        "received_tick",
+        "evidence_ref"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_role": {
+          "enum": [
+            "local_sensor_observation",
+            "simulator_oracle",
+            "remote_cooperative_claim",
+            "map_prior",
+            "derived_estimate",
+            "unknown"
+          ]
+        },
+        "policy_visible": {
+          "type": "boolean"
+        },
+        "observed_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "received_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "failure_domain_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "teacher": {
+      "type": "object",
+      "required": [
+        "action_computed",
+        "action_digest",
+        "blended",
+        "blend_coefficient",
+        "supervised",
+        "evaluation_only",
+        "reference_only"
+      ],
+      "properties": {
+        "action_computed": {
+          "type": "boolean"
+        },
+        "action_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "blended": {
+          "type": "boolean"
+        },
+        "blend_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "supervised": {
+          "type": "boolean"
+        },
+        "evaluation_only": {
+          "type": "boolean"
+        },
+        "reference_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    "learning": {
+      "type": "object",
+      "required": [
+        "optimizer_update",
+        "replay_inserted",
+        "replay_sampled",
+        "exploration_applied",
+        "parameter_digest_before",
+        "parameter_digest_after",
+        "weights_changed"
+      ],
+      "properties": {
+        "optimizer_update": {
+          "type": "boolean"
+        },
+        "replay_inserted": {
+          "type": "boolean"
+        },
+        "replay_sampled": {
+          "type": "boolean"
+        },
+        "exploration_applied": {
+          "type": "boolean"
+        },
+        "parameter_digest_before": {
+          "$ref": "#/$defs/digest"
+        },
+        "parameter_digest_after": {
+          "$ref": "#/$defs/digest"
+        },
+        "weights_changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "inference_state": {
+      "type": "object",
+      "required": [
+        "recurrent_evolved",
+        "recurrent_digest_before",
+        "recurrent_digest_after",
+        "normalization_evolved",
+        "fep_tau_evolved"
+      ],
+      "properties": {
+        "recurrent_evolved": {
+          "type": "boolean"
+        },
+        "recurrent_digest_before": {
+          "$ref": "#/$defs/digest"
+        },
+        "recurrent_digest_after": {
+          "$ref": "#/$defs/digest"
+        },
+        "normalization_evolved": {
+          "type": "boolean"
+        },
+        "fep_tau_evolved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "actions": {
+      "type": "object",
+      "required": [
+        "student_raw_action_digest",
+        "post_blend_action_digest",
+        "executed_action_digest"
+      ],
+      "properties": {
+        "student_raw_action_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "post_blend_action_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "executed_action_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "evaluator_truth": {
+      "type": "object",
+      "required": [
+        "available",
+        "delivered_tick",
+        "source_ids",
+        "policy_visible"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "delivered_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "policy_visible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "follow_target": {
+      "type": "object",
+      "required": [
+        "available",
+        "source_role",
+        "target_id",
+        "age_ms",
+        "frame_id",
+        "status"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "source_role": {
+          "enum": [
+            "local_sensor_observation",
+            "simulator_oracle",
+            "remote_cooperative_claim",
+            "unknown"
+          ]
+        },
+        "target_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "age_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "frame_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "current",
+            "stale",
+            "missing",
+            "rejected",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "trial": {
+      "type": "object",
+      "required": [
+        "trial_id",
+        "episode_id",
+        "scenario_id",
+        "actor_policy_id",
+        "arm_id",
+        "action_observation_tick",
+        "action_commit_tick",
+        "observation",
+        "teacher",
+        "learning",
+        "inference_state",
+        "actions",
+        "evaluator_truth",
+        "follow_target"
+      ],
+      "properties": {
+        "trial_id": {
+          "$ref": "#/$defs/id"
+        },
+        "episode_id": {
+          "$ref": "#/$defs/id"
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/id"
+        },
+        "actor_policy_id": {
+          "$ref": "#/$defs/id"
+        },
+        "arm_id": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E"
+          ]
+        },
+        "action_observation_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "action_commit_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observation": {
+          "type": "object",
+          "required": [
+            "profile_id",
+            "policy_input_digest",
+            "sources"
+          ],
+          "properties": {
+            "profile_id": {
+              "enum": [
+                "simulation_20d_with_sim_peer_channels",
+                "simulation_20d_peer_channels_masked",
+                "local_sensor_only",
+                "local_sensor_plus_remote_advisory",
+                "custom_declared"
+              ]
+            },
+            "policy_input_digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/source"
+              }
+            }
+          }
+        },
+        "teacher": {
+          "$ref": "#/$defs/teacher"
+        },
+        "learning": {
+          "$ref": "#/$defs/learning"
+        },
+        "inference_state": {
+          "$ref": "#/$defs/inference_state"
+        },
+        "actions": {
+          "$ref": "#/$defs/actions"
+        },
+        "evaluator_truth": {
+          "$ref": "#/$defs/evaluator_truth"
+        },
+        "follow_target": {
+          "$ref": "#/$defs/follow_target"
+        }
+      }
+    }
+  }
+}
