@@ -86,13 +86,7 @@ pub fn score_intervention(
     let target_range = ranges
         .get(&spec.target_metric)
         .ok_or_else(|| format!("missing range for target metric {:?}", spec.target_metric))?;
-    let target = delta(
-        &spec.target_metric,
-        target_range,
-        baseline,
-        treatment,
-        None,
-    )?;
+    let target = delta(&spec.target_metric, target_range, baseline, treatment, None)?;
 
     let direction_correct = match spec.direction {
         Direction::Increase => target.range_fraction > 0.0,
@@ -220,12 +214,16 @@ fn delta(
         .copied()
         .ok_or_else(|| format!("treatment is missing metric {metric:?}"))?;
     if !baseline_value.is_finite() || !treatment_value.is_finite() {
-        return Err(format!("metric {metric:?} contains a non-finite observation"));
+        return Err(format!(
+            "metric {metric:?} contains a non-finite observation"
+        ));
     }
     if !(range.minimum..=range.maximum).contains(&baseline_value)
         || !(range.minimum..=range.maximum).contains(&treatment_value)
     {
-        return Err(format!("metric {metric:?} observation lies outside its frozen range"));
+        return Err(format!(
+            "metric {metric:?} observation lies outside its frozen range"
+        ));
     }
     let range_fraction = (treatment_value - baseline_value) / (range.maximum - range.minimum);
     Ok(MetricDelta {
@@ -243,10 +241,34 @@ mod tests {
 
     fn ranges() -> RangeMap {
         BTreeMap::from([
-            ("breathiness".into(), MetricRange { minimum: 0.0, maximum: 1.0 }),
-            ("vibrato_rate_hz".into(), MetricRange { minimum: 3.0, maximum: 8.0 }),
-            ("pitch_median_cents".into(), MetricRange { minimum: -100.0, maximum: 100.0 }),
-            ("loudness_lufs".into(), MetricRange { minimum: -30.0, maximum: 0.0 }),
+            (
+                "breathiness".into(),
+                MetricRange {
+                    minimum: 0.0,
+                    maximum: 1.0,
+                },
+            ),
+            (
+                "vibrato_rate_hz".into(),
+                MetricRange {
+                    minimum: 3.0,
+                    maximum: 8.0,
+                },
+            ),
+            (
+                "pitch_median_cents".into(),
+                MetricRange {
+                    minimum: -100.0,
+                    maximum: 100.0,
+                },
+            ),
+            (
+                "loudness_lufs".into(),
+                MetricRange {
+                    minimum: -30.0,
+                    maximum: 0.0,
+                },
+            ),
         ])
     }
 
@@ -257,9 +279,18 @@ mod tests {
             direction: Direction::Increase,
             minimum_effect_range_fraction: 0.15,
             collateral_guards: vec![
-                CollateralGuard { metric: "vibrato_rate_hz".into(), maximum_range_fraction: 0.05 },
-                CollateralGuard { metric: "pitch_median_cents".into(), maximum_range_fraction: 0.05 },
-                CollateralGuard { metric: "loudness_lufs".into(), maximum_range_fraction: 0.08 },
+                CollateralGuard {
+                    metric: "vibrato_rate_hz".into(),
+                    maximum_range_fraction: 0.05,
+                },
+                CollateralGuard {
+                    metric: "pitch_median_cents".into(),
+                    maximum_range_fraction: 0.05,
+                },
+                CollateralGuard {
+                    metric: "loudness_lufs".into(),
+                    maximum_range_fraction: 0.08,
+                },
             ],
         }
     }
@@ -281,7 +312,8 @@ mod tests {
             ("pitch_median_cents".into(), 5.0),
             ("loudness_lufs".into(), -17.0),
         ]);
-        let result = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
+        let result =
+            score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
         assert!(result.direction_correct);
         assert!(result.target_effect_sufficient);
         assert!(result.collateral_guards_pass);
@@ -303,7 +335,8 @@ mod tests {
     fn insufficient_target_change_fails() {
         let mut treatment = baseline();
         treatment.insert("breathiness".into(), 0.25);
-        let result = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
+        let result =
+            score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
         assert!(!result.target_effect_sufficient);
         assert!(!result.passed);
     }
@@ -313,7 +346,8 @@ mod tests {
         let mut treatment = baseline();
         treatment.insert("breathiness".into(), 0.6);
         treatment.insert("pitch_median_cents".into(), 40.0);
-        let result = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
+        let result =
+            score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
         assert!(result.direction_correct);
         assert!(result.target_effect_sufficient);
         assert!(!result.collateral_guards_pass);
@@ -324,7 +358,8 @@ mod tests {
     fn missing_metric_fails_closed() {
         let mut treatment = baseline();
         treatment.remove("vibrato_rate_hz");
-        let error = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap_err();
+        let error = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment)
+            .unwrap_err();
         assert!(error.contains("missing metric"));
     }
 
@@ -332,7 +367,9 @@ mod tests {
     fn non_finite_and_out_of_range_observations_are_rejected() {
         let mut treatment = baseline();
         treatment.insert("breathiness".into(), f64::NAN);
-        assert!(score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).is_err());
+        assert!(
+            score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).is_err()
+        );
 
         treatment.insert("breathiness".into(), 1.1);
         assert!(score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).is_err());
@@ -356,11 +393,13 @@ mod tests {
     fn batch_summary_reports_control_success_and_worst_spillover_separately() {
         let mut treatment = baseline();
         treatment.insert("breathiness".into(), 0.5);
-        let pass = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
+        let pass =
+            score_intervention(&breathiness_spec(), &ranges(), &baseline(), &treatment).unwrap();
 
         let mut bad_treatment = treatment.clone();
         bad_treatment.insert("pitch_median_cents".into(), 50.0);
-        let fail = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &bad_treatment).unwrap();
+        let fail = score_intervention(&breathiness_spec(), &ranges(), &baseline(), &bad_treatment)
+            .unwrap();
 
         let summary = summarize_batch(&[pass, fail]).unwrap();
         assert_eq!(summary.case_count, 2);
