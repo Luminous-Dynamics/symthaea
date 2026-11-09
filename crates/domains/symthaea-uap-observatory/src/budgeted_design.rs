@@ -36,6 +36,37 @@ pub struct DesignScenario {
     pub prior_precision: Vec<Vec<f64>>,
 }
 
+/// Scenario for selected-set correlated residual covariance design.
+///
+/// The Jacobian rows and covariance use one immutable observation ordering.
+/// Candidate options select indices into that common pool. The covariance is
+/// sliced and jointly whitened only after a candidate set has been selected.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CorrelatedDesignScenario {
+    pub scenario_id: String,
+    pub target_parameter_count: usize,
+    pub weight: f64,
+    pub prior_precision: Vec<Vec<f64>>,
+    /// One raw (not pre-whitened) residual-Jacobian row per candidate observation.
+    pub measurement_jacobian_rows: Vec<Vec<f64>>,
+    /// Full covariance of the candidate observation pool in the same ordering.
+    pub measurement_covariance: Vec<Vec<f64>>,
+}
+
+/// Candidate action selecting one or more rows from a correlated observation pool.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CorrelatedExperimentOption {
+    pub option_id: String,
+    pub cost: f64,
+    pub exclusive_group: Option<String>,
+    /// Observation indices selected by this action in each scenario.
+    /// Empty indices mean that the action is unavailable in that scenario.
+    pub observation_indices_by_scenario: Vec<Vec<usize>>,
+}
+
+/// Maximum observation-pool size accepted by the small dense covariance reference.
+pub const MAX_CORRELATED_DESIGN_OBSERVATIONS: usize = 512;
+
 /// One optional measurement action or sensor-fidelity choice.
 ///
 /// `jacobian_rows_by_scenario[s]` contains the candidate's whitened
@@ -174,6 +205,46 @@ pub enum BudgetedDesignError {
         count: usize,
         maximum: usize,
     },
+    TooManyMeasurements {
+        scenario_id: String,
+        count: usize,
+        maximum: usize,
+    },
+    MeasurementJacobianShape {
+        scenario_id: String,
+        row_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidMeasurementCovarianceShape {
+        scenario_id: String,
+    },
+    InvalidMeasurementCovarianceSymmetry {
+        scenario_id: String,
+    },
+    MeasurementCovarianceNotPositiveDefinite {
+        scenario_id: String,
+    },
+    MeasurementIndexScenarioCountMismatch {
+        option_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    MeasurementIndexOutOfRange {
+        option_id: String,
+        scenario_index: usize,
+        index: usize,
+        measurement_count: usize,
+    },
+    DuplicateMeasurementIndexInOption {
+        option_id: String,
+        scenario_index: usize,
+        index: usize,
+    },
+    DuplicateSelectedMeasurement {
+        scenario_id: String,
+        index: usize,
+    },
     NumericalOverflow,
     CholeskyFailure,
     Observability(ObservabilityError),
@@ -276,6 +347,67 @@ impl fmt::Display for BudgetedDesignError {
             Self::TooManyOptionsForExhaustive { count, maximum } => write!(
                 f,
                 "exhaustive design has {count} options; maximum supported is {maximum}"
+            ),
+            Self::TooManyMeasurements {
+                scenario_id,
+                count,
+                maximum,
+            } => write!(
+                f,
+                "scenario {scenario_id} has {count} candidate measurements; maximum supported is {maximum}"
+            ),
+            Self::MeasurementJacobianShape {
+                scenario_id,
+                row_index,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "scenario {scenario_id} measurement Jacobian row {row_index} has {actual} columns; expected {expected}"
+            ),
+            Self::InvalidMeasurementCovarianceShape { scenario_id } => write!(
+                f,
+                "measurement covariance for scenario {scenario_id} is not square or does not match the observation pool"
+            ),
+            Self::InvalidMeasurementCovarianceSymmetry { scenario_id } => write!(
+                f,
+                "measurement covariance for scenario {scenario_id} is not symmetric"
+            ),
+            Self::MeasurementCovarianceNotPositiveDefinite { scenario_id } => write!(
+                f,
+                "measurement covariance for scenario {scenario_id} is not positive definite"
+            ),
+            Self::MeasurementIndexScenarioCountMismatch {
+                option_id,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "option {option_id} has {actual} scenario observation-index sets; expected {expected}"
+            ),
+            Self::MeasurementIndexOutOfRange {
+                option_id,
+                scenario_index,
+                index,
+                measurement_count,
+            } => write!(
+                f,
+                "option {option_id}, scenario {scenario_index} selects measurement {index}; pool size is {measurement_count}"
+            ),
+            Self::DuplicateMeasurementIndexInOption {
+                option_id,
+                scenario_index,
+                index,
+            } => write!(
+                f,
+                "option {option_id}, scenario {scenario_index} selects measurement {index} more than once"
+            ),
+            Self::DuplicateSelectedMeasurement {
+                scenario_id,
+                index,
+            } => write!(
+                f,
+                "selected actions duplicate measurement {index} in scenario {scenario_id}"
             ),
             Self::NumericalOverflow => write!(f, "information accumulation overflowed"),
             Self::CholeskyFailure => write!(f, "posterior precision Cholesky factorization failed"),
