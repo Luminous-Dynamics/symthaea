@@ -13,13 +13,13 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::sequential_weight_verification::{
+    SequentialWeightVerificationError, SequentialWeightVerificationReport,
+    validate_qualified_report,
+};
 use crate::weight_space_program::{
     ValidatedWeightCandidate, WeightModelSnapshot, WeightProgram, WeightProgramError,
     WeightProgramOperation,
-};
-use crate::sequential_weight_verification::{
-    validate_qualified_report, SequentialWeightVerificationError,
-    SequentialWeightVerificationReport,
 };
 
 /// Reusable edit program and its cumulative session budgets.
@@ -816,12 +816,8 @@ mod tests {
                 break;
             }
         }
-        bind_sequential_verification_evidence(
-            session,
-            candidate_native_model_digest,
-            &report,
-        )
-        .expect("statistical report bound to sequential edit candidate")
+        bind_sequential_verification_evidence(session, candidate_native_model_digest, &report)
+            .expect("statistical report bound to sequential edit candidate")
     }
 
     fn signed_attestation(
@@ -1193,7 +1189,9 @@ mod tests {
         ));
 
         let mut wrong_statistical_report = correctly_bound.clone();
-        wrong_statistical_report.claims.statistical_verification_report_digest = digest('4');
+        wrong_statistical_report
+            .claims
+            .statistical_verification_report_digest = digest('4');
         let message = sequential_verifier_attestation_message(&wrong_statistical_report.claims)
             .expect("message for re-signed mismatched statistical report");
         wrong_statistical_report.signature = signing_key.sign(&message).to_bytes().to_vec();
