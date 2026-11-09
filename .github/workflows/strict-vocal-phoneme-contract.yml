@@ -6,6 +6,7 @@ on:
       - "src/voice/mod.rs"
       - "src/voice/formant_singing_engine.rs"
       - "src/voice/resolved_singing_engine.rs"
+      - "docs/research/RESOLVED_VOCAL_RENDERER_CONTRACT_V1.md"
       - "src/voice/singing_engine.rs"
       - "src/voice/kokoro_singing.rs"
       - "src/voice/diffsinger.rs"
