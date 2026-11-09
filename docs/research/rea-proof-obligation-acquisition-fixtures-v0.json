@@ -1110,19 +1110,19 @@
           ]
         },
         {
-          "experiment_id": "claim_absence_from_no_event",
+          "experiment_id": "repeat_same_bounded_session",
           "authorization": "authorized",
           "reversible": true,
           "destructive": false,
           "target_impact": "read_only",
           "cost_units": 0.25,
-          "description": "Promote no observed event to a universal absence claim",
+          "description": "Repeat the same bounded session without expanding observation coverage",
           "outcomes": [
-            "none_seen"
+            "no_network_event"
           ],
           "effects": [
             {
-              "outcome": "none_seen",
+              "outcome": "no_network_event",
               "obligation_id": "complete_network_observation",
               "resulting_status": "unknown",
               "evidence_class": "bounded_session_observation",
