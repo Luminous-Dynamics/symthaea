@@ -42,36 +42,87 @@ impl Default for SynQbfArtifactBudget {
 /// Fail-closed format, structure and semantic-verification errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SynQbfArtifactError {
-    ArtifactByteBudgetExceeded { required: usize, limit: usize },
-    EncodingByteBudgetExceeded { required: usize, limit: usize },
+    ArtifactByteBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    EncodingByteBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     BadMagic,
-    UnsupportedVersion { version: u16 },
-    TruncatedArtifact { offset: usize, required: usize },
-    TrailingBytes { remaining: usize },
+    UnsupportedVersion {
+        version: u16,
+    },
+    TruncatedArtifact {
+        offset: usize,
+        required: usize,
+    },
+    TrailingBytes {
+        remaining: usize,
+    },
     ResourceAccountingOverflow,
-    IntegerOutOfRange { field: &'static str, value: u64 },
-    VariableBudgetExceeded { required: usize, limit: usize },
-    PrefixCountMismatch { expected: usize, actual: usize },
-    InvalidBooleanTag { offset: usize, tag: u8 },
-    InvalidQuantifierTag { offset: usize, tag: u8 },
+    IntegerOutOfRange {
+        field: &'static str,
+        value: u64,
+    },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    PrefixCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidBooleanTag {
+        offset: usize,
+        tag: u8,
+    },
+    InvalidQuantifierTag {
+        offset: usize,
+        tag: u8,
+    },
     PrefixVariableOutOfRange {
         position: usize,
         variable: usize,
         variable_count: usize,
     },
-    DuplicatePrefixVariable { variable: usize },
-    DependencyCountMismatch { expected: usize, actual: usize },
-    AigDependencyBudgetExceeded { required: usize, limit: usize },
+    DuplicatePrefixVariable {
+        variable: usize,
+    },
+    DependencyCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    AigDependencyBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     DependencyOrderMismatch {
         position: usize,
         expected: usize,
         actual: usize,
     },
-    DecompositionOrderCountMismatch { expected: usize, actual: usize },
-    AigNodeBudgetExceeded { required: usize, limit: usize },
-    AigAndNodeBudgetExceeded { required: usize, limit: usize },
-    UnknownAigNodeTag { offset: usize, tag: u8 },
-    UnknownAigLiteralTag { offset: usize, tag: u8 },
+    DecompositionOrderCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    AigNodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    AigAndNodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    UnknownAigNodeTag {
+        offset: usize,
+        tag: u8,
+    },
+    UnknownAigLiteralTag {
+        offset: usize,
+        tag: u8,
+    },
     CircuitValidation(super::strategy_aig::StrategyAigError),
     SemanticVerification(SynQbfError),
 }
@@ -121,15 +172,13 @@ impl<'a> Reader<'a> {
     fn u64(&mut self) -> Result<u64, SynQbfArtifactError> {
         let bytes = self.take(8)?;
         Ok(u64::from_le_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]))
     }
 
     fn usize(&mut self, field: &'static str) -> Result<usize, SynQbfArtifactError> {
         let value = self.u64()?;
-        usize::try_from(value)
-            .map_err(|_| SynQbfArtifactError::IntegerOutOfRange { field, value })
+        usize::try_from(value).map_err(|_| SynQbfArtifactError::IntegerOutOfRange { field, value })
     }
 
     fn remaining(&self) -> usize {
@@ -177,8 +226,8 @@ fn push_u64(
     value: usize,
     budget: SynQbfArtifactBudget,
 ) -> Result<(), SynQbfArtifactError> {
-    let value = u64::try_from(value)
-        .map_err(|_| SynQbfArtifactError::ResourceAccountingOverflow)?;
+    let value =
+        u64::try_from(value).map_err(|_| SynQbfArtifactError::ResourceAccountingOverflow)?;
     append(output, &value.to_le_bytes(), budget)
 }
 
@@ -190,11 +239,17 @@ fn encode_literal(
     match literal {
         AigLiteral::Constant(false) => push_u8(output, 0, budget),
         AigLiteral::Constant(true) => push_u8(output, 1, budget),
-        AigLiteral::Node { index, inverted: false } => {
+        AigLiteral::Node {
+            index,
+            inverted: false,
+        } => {
             push_u8(output, 2, budget)?;
             push_u64(output, index, budget)
         }
-        AigLiteral::Node { index, inverted: true } => {
+        AigLiteral::Node {
+            index,
+            inverted: true,
+        } => {
             push_u8(output, 3, budget)?;
             push_u64(output, index, budget)
         }
@@ -280,9 +335,7 @@ fn validate_proof_structure(
         .map_err(SynQbfArtifactError::CircuitValidation)
 }
 
-fn decode_quantifier(
-    reader: &mut Reader<'_>,
-) -> Result<Quantifier, SynQbfArtifactError> {
+fn decode_quantifier(reader: &mut Reader<'_>) -> Result<Quantifier, SynQbfArtifactError> {
     let offset = reader.offset;
     match reader.u8()? {
         0 => Ok(Quantifier::ForAll),
@@ -391,10 +444,12 @@ pub fn decode_synqbf_proof(
     let claimed_truth_value = match reader.u8()? {
         0 => false,
         1 => true,
-        tag => return Err(SynQbfArtifactError::InvalidBooleanTag {
-            offset: truth_tag_offset,
-            tag,
-        }),
+        tag => {
+            return Err(SynQbfArtifactError::InvalidBooleanTag {
+                offset: truth_tag_offset,
+                tag,
+            });
+        }
     };
 
     let prefix_count = reader.usize("prefix count")?;
@@ -560,12 +615,11 @@ mod tests {
     use super::super::quantified_game_dag::{QbfGameDagBudget, build_qbf_game_proof_dag};
     use super::super::quantified_game_values::extract_game_value_profile_from_dag;
     use super::super::quantified_scope::QuantifierBlock;
-    use super::super::synqbf_construction::{
-        SynQbfConstructionBudget,
-        construct_synqbf_from_game_value_profile,
-    };
-    use super::super::strategy_aig::{StrategyAigBudget, compile_strategy_function_to_aig};
     use super::super::quantified_strategy::BooleanStrategyFunction;
+    use super::super::strategy_aig::{StrategyAigBudget, compile_strategy_function_to_aig};
+    use super::super::synqbf_construction::{
+        SynQbfConstructionBudget, construct_synqbf_from_game_value_profile,
+    };
     use super::*;
 
     fn proof_and_source(
@@ -645,21 +699,13 @@ mod tests {
                 verified.verification.source_equivalence_assignments_checked,
                 2
             );
-            assert_eq!(
-                verified.verification.representability_conditions_checked,
-                1
-            );
+            assert_eq!(verified.verification.representability_conditions_checked, 1);
         }
     }
 
     #[test]
     fn qdimacs_game_dag_synqbf_and_portable_artifact_form_one_vertical_slice() {
-        let source = concat!(
-            "c exists x: x\n",
-            "p cnf 1 1\n",
-            "e 1 0\n",
-            "1 0\n"
-        );
+        let source = concat!("c exists x: x\n", "p cnf 1 1\n", "e 1 0\n", "1 0\n");
         let parsed = parse_qdimacs(source, QdimacsParseBudget::default()).unwrap();
         let dag_budget = QbfGameDagBudget::default();
         let (dag, _) =
@@ -695,10 +741,7 @@ mod tests {
             verified.verification.source_equivalence_assignments_checked,
             2
         );
-        assert_eq!(
-            verified.verification.representability_conditions_checked,
-            1
-        );
+        assert_eq!(verified.verification.representability_conditions_checked, 1);
         assert_eq!(parsed.stats.declared_variables, 1);
     }
 
@@ -833,6 +876,8 @@ mod tests {
                 SynQbfError::SourceEquivalenceCounterexample { .. }
             ))
         ));
-        assert!(verify_synqbf_artifact(&problem, &prefix, &bytes, budget(), budget().proof).is_ok());
+        assert!(
+            verify_synqbf_artifact(&problem, &prefix, &bytes, budget(), budget().proof).is_ok()
+        );
     }
 }
