@@ -377,11 +377,14 @@ fn run() -> Result<(), String> {
     let mut member_interval_samples = Vec::with_capacity(cfg.repeats);
     let mut hierarchy_samples = Vec::with_capacity(cfg.repeats);
     let mut exact_rerank_samples = Vec::with_capacity(cfg.repeats);
+    let mut full_scan_samples = Vec::with_capacity(cfg.repeats);
+    let mut end_to_end_samples = Vec::with_capacity(cfg.repeats);
     let mut last_group_plan = None;
     let mut last_hierarchical_plan = None;
 
     for iteration in 0..(cfg.repeats + 3) {
         let measure = iteration >= 3;
+        let end_to_end_start = Instant::now();
         let group_start = Instant::now();
         let group_plan = select_group_refinement_set_with_partition_receipt(
             &group_records,
@@ -470,6 +473,25 @@ fn run() -> Result<(), String> {
                 "exact top-k mismatch: expected {expected_top_k:?}, received {actual_top_k:?}"
             ));
         }
+
+        let full_scan_start = Instant::now();
+        let full_scan_scores: Vec<ExactScoreRecord<String>> = originals_by_id
+            .iter()
+            .map(|(id, original)| ExactScoreRecord {
+                id: id.clone(),
+                score: query.similarity_full_resolution(black_box(original)),
+            })
+            .collect();
+        let full_scan_top_k = stable_exact_top_k(&full_scan_scores, cfg.top_k)
+            .map_err(|error| format!("timed full scan failed: {error}"))?;
+        if full_scan_top_k != expected_top_k {
+            return Err("full-scan timing oracle disagreed with frozen exact top-k".to_owned());
+        }
+        if measure {
+            full_scan_samples.push(full_scan_start.elapsed().as_nanos());
+            end_to_end_samples.push(end_to_end_start.elapsed().as_nanos());
+        }
+
         last_group_plan = Some(group_plan);
         last_hierarchical_plan = Some(plan);
     }
@@ -530,6 +552,12 @@ fn run() -> Result<(), String> {
     println!("exact_rerank_p50_ns={}", percentile_ns(&exact_rerank_samples, 50));
     println!("exact_rerank_p95_ns={}", percentile_ns(&exact_rerank_samples, 95));
     println!("exact_rerank_p99_ns={}", percentile_ns(&exact_rerank_samples, 99));
+    println!("two_stage_end_to_end_p50_ns={}", percentile_ns(&end_to_end_samples, 50));
+    println!("two_stage_end_to_end_p95_ns={}", percentile_ns(&end_to_end_samples, 95));
+    println!("two_stage_end_to_end_p99_ns={}", percentile_ns(&end_to_end_samples, 99));
+    println!("full_scan_p50_ns={}", percentile_ns(&full_scan_samples, 50));
+    println!("full_scan_p95_ns={}", percentile_ns(&full_scan_samples, 95));
+    println!("full_scan_p99_ns={}", percentile_ns(&full_scan_samples, 99));
     println!("dataset_generation_ns={dataset_build_ns}");
     println!("group_envelope_build_ns={envelope_build_ns}");
     println!("partition_receipt_build_ns={partition_receipt_build_ns}");
