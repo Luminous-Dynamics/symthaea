@@ -152,6 +152,7 @@ pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod hierarchical_information_gain;
 pub mod open_world_robust_decision;
+pub mod static_model_robust_diagnostics;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
