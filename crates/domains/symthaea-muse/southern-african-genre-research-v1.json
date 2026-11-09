@@ -1,0 +1,522 @@
+{
+  "schema": "melothaea-southern-african-genre-research-v1",
+  "status": "research_only_not_runtime_evidence",
+  "catalog": {
+    "proposal_branch": "muse/style-genre-profile-v1",
+    "path": "crates/domains/symthaea-muse-protocol/src/catalog.rs",
+    "source_blob_sha": "8f77be9d1989975ffad298aefc1df8c390604605",
+    "ids": [
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160
+    ],
+    "all_require_expert_review": true,
+    "all_composer_style_null": true
+  },
+  "policy": {
+    "purpose": "Source-bound research hypotheses for taxonomy refinement and later musician-reviewed style profiles.",
+    "not_evidence_of": [
+      "composer route implementation",
+      "audio renderer availability",
+      "perceptual style distinction",
+      "cultural authenticity",
+      "expert approval",
+      "permission to ingest or train on linked recordings, scores, or corpora"
+    ],
+    "evidence_labels": [
+      "grounded_observation",
+      "candidate_discriminator",
+      "open_question",
+      "not_inferred"
+    ],
+    "promotion_gates": [
+      "identity_and_scope_review",
+      "tradition_specific_anatomy",
+      "nearest_neighbour_counterexamples",
+      "production_composer_target_sensitivity_and_non_target_invariance",
+      "renderer_capability_disclosure",
+      "rights_cleared_blind_listening_and_practitioner_review"
+    ]
+  },
+  "sources": [
+    {
+      "id": "ballantine_1991",
+      "title": "Concert and Dance: the foundations of black jazz in South Africa between the twenties and the early forties",
+      "type": "peer_reviewed_article",
+      "year": 1991,
+      "url": "https://doi.org/10.1017/S0261143000004475",
+      "supports": [
+        "marabi",
+        "township_jazz"
+      ],
+      "limits": "Historical analysis of early urban Black jazz and performance culture; does not define all later township jazz."
+    },
+    {
+      "id": "allen_1993",
+      "title": "Pennywhistle Kwela: A Musical, Historical and Socio-Political Analysis",
+      "type": "university_masters_thesis",
+      "year": 1993,
+      "url": "https://hdl.handle.net/10413/9106",
+      "full_text_url": "https://researchspace.ukzn.ac.za/bitstreams/58dd0dba-5a1e-4328-9854-fa7a35155695/download",
+      "supports": [
+        "kwela",
+        "marabi",
+        "township_jazz",
+        "mbaqanga"
+      ],
+      "limits": "A historically bounded thesis and corpus; not a universal rulebook for every later performance."
+    },
+    {
+      "id": "ntombela_2017",
+      "title": "Maskandi: a critical general inductive analysis of Zulu maskandi songs",
+      "type": "peer_reviewed_article",
+      "year": 2017,
+      "url": "https://doi.org/10.25159/1016-8427/1465",
+      "supports": [
+        "maskandi"
+      ],
+      "limits": "Focuses particularly on introductory techniques; not an exhaustive account of all regional or contemporary variants."
+    },
+    {
+      "id": "olsen_2014",
+      "title": "Music and Social Change in South Africa: Maskanda Past and Present",
+      "type": "ethnomusicology_monograph",
+      "year": 2014,
+      "url": "https://www.jstor.org/stable/j.ctt14btb8n",
+      "supports": [
+        "maskandi"
+      ],
+      "limits": "Historical, lyrical, and musical account; access and excerpt availability may be restricted."
+    },
+    {
+      "id": "juluka_maskanda_2022",
+      "title": "Something else is possible: transcultural collaboration as anti-apartheid activism in the music of Juluka",
+      "type": "peer_reviewed_article",
+      "year": 2022,
+      "url": "https://doi.org/10.1017/S026114302100043X",
+      "supports": [
+        "maskandi"
+      ],
+      "limits": "Discusses Maskanda in context of Juluka and related performance; not every Maskandi ensemble follows the described model."
+    },
+    {
+      "id": "ndlovu_1996",
+      "title": "Religion, tradition and custom in a Zulu male vocal idiom",
+      "type": "university_doctoral_thesis",
+      "year": 1996,
+      "url": "https://hdl.handle.net/20.500.14915/10338",
+      "supports": [
+        "isicathamiya"
+      ],
+      "limits": "Strong context for one Zulu male vocal tradition and its performance culture; does not represent every contemporary choir."
+    },
+    {
+      "id": "erlmann_nightsong",
+      "title": "Nightsong: Performance, Power, and Practice in South Africa",
+      "type": "ethnomusicology_monograph",
+      "url": "https://press.uchicago.edu/ucp/books/book/chicago/N/bo3632138.html",
+      "supports": [
+        "isicathamiya"
+      ],
+      "limits": "Comprehensive performance and cultural study; source does not itself provide a machine-executable composition grammar."
+    },
+    {
+      "id": "meintjes_2003",
+      "title": "Sound of Africa! Making Music Zulu in a South African Studio",
+      "type": "ethnomusicology_monograph",
+      "year": 2003,
+      "url": "https://www.dukeupress.edu/sound-of-africa",
+      "supports": [
+        "mbaqanga"
+      ],
+      "limits": "Focused studio ethnography of a Mbaqanga album and production process; avoid treating one production as exhaustive."
+    },
+    {
+      "id": "mbaqanga_exchange_2011",
+      "title": "Dancing to the beat of the diaspora: musical exchanges between Africa and its diasporas",
+      "type": "scholarly_article",
+      "year": 2011,
+      "url": "https://doi.org/10.1080/17528631.2010.481976",
+      "supports": [
+        "mbaqanga"
+      ],
+      "limits": "Historical/style comparison; the cited account addresses particular phases and examples."
+    },
+    {
+      "id": "eaby_lomas_2023",
+      "title": "Kwaito as history: Complicating contemporary historiographies",
+      "type": "peer_reviewed_article",
+      "year": 2023,
+      "url": "https://doi.org/10.21504/amj.v12i1.2529",
+      "supports": [
+        "kwaito",
+        "mbaqanga",
+        "bubblegum"
+      ],
+      "limits": "A historical argument about a changing, multivocal lineage; does not establish a universal production recipe."
+    },
+    {
+      "id": "steingo_2016",
+      "title": "Kwaito's Promise: Music and the Aesthetics of Freedom in South Africa",
+      "type": "ethnomusicology_monograph",
+      "year": 2016,
+      "url": "https://doi.org/10.7208/chicago/9780226362687.001.0001",
+      "supports": [
+        "kwaito"
+      ],
+      "limits": "Ethnographic and aesthetic study; avoid collapsing the genre into a single tempo, lyric, or political stance."
+    },
+    {
+      "id": "durbach_2015",
+      "title": "A study of the linkages between popular music and politics in South Africa under Apartheid in the 1980s",
+      "type": "university_dissertation",
+      "year": 2015,
+      "url": "https://hdl.handle.net/10500/18725",
+      "supports": [
+        "bubblegum"
+      ],
+      "limits": "Political and industry history of 1980s popular music; not a complete musical feature inventory."
+    },
+    {
+      "id": "saho_kwaito",
+      "title": "A history of Kwaito music",
+      "type": "public_history",
+      "url": "https://sahistory.org.za/article/history-kwaito-music",
+      "supports": [
+        "kwaito"
+      ],
+      "limits": "Useful historical context and influence map; not a compositional specification."
+    },
+    {
+      "id": "saho_resistance",
+      "title": "Music and culture as forms of resistance",
+      "type": "public_history",
+      "url": "https://sahistory.org.za/article/music-and-culture-forms-resistance",
+      "supports": [
+        "marabi",
+        "township_jazz"
+      ],
+      "limits": "Public-history synthesis; not a substitute for primary or peer-reviewed analysis."
+    }
+  ],
+  "profiles": [
+    {
+      "catalog_id": 153,
+      "id": "kwaito",
+      "canonical_name": "Kwaito",
+      "aliases": [],
+      "scope": "Black South African electronic/popular dance music emerging in the 1990s; profile period and scene must be declared.",
+      "grounded_observations": [
+        "A post-apartheid electronic/popular form with local and international influences, including house and earlier South African popular music.",
+        "Its histories are multivocal and non-linear; no single uncontested origin should be encoded.",
+        "Early vocal delivery includes a range from rhythmic speech to song; do not choose a single vocal mode."
+      ],
+      "candidate_discriminators": [
+        "Period-conditioned house-adjacent loop and groove treatment.",
+        "Vocal continuum across speech, chant, sung refrain and response.",
+        "Local production, language and scene attributes alongside rather than replaced by international influence."
+      ],
+      "not_inferred": [
+        "No universal BPM, drum pattern, key, language, lyric topic or political stance.",
+        "Not synonymous with South African house, gqom or amapiano."
+      ],
+      "nearest_neighbours": [
+        "South African house",
+        "hip-hop",
+        "bubblegum",
+        "gqom",
+        "amapiano"
+      ],
+      "required_review": [
+        "Early/mid-1990s vs later subprofiles",
+        "DJ/producer/vocalist and listener review",
+        "Rights-cleared audio comparison"
+      ],
+      "sources": [
+        "steingo_2016",
+        "eaby_lomas_2023",
+        "saho_kwaito"
+      ]
+    },
+    {
+      "catalog_id": 154,
+      "id": "maskandi",
+      "canonical_name": "Maskandi",
+      "aliases": [
+        "Maskanda",
+        "Zulu Maskandi (source-scoped)"
+      ],
+      "scope": "Zulu Maskandi/Maskanda song traditions, preserving solo, ensemble, regional and contemporary variants.",
+      "grounded_observations": [
+        "The isihlabo instrumental introduction is predominant and important, while introductions can also involve concertina, bass guitar, voices and lead/group interplay.",
+        "Some documented ensemble practice uses an unmetered guitar introduction that lays out harmonic material, followed by a rhythmic/melodic guitar pattern and overlapping vocal/guitar response.",
+        "Fast guitar picking and blues-inflected vocal intonation are described in ethnomusicological work."
+      ],
+      "candidate_discriminators": [
+        "Free/unmetered introductory guitar statement and its transition into the song groove.",
+        "Guitar as melodic, rhythmic and response voice rather than chordal backing only.",
+        "Picked ornament, multi-line guitar behavior and overlapping call-response."
+      ],
+      "not_inferred": [
+        "No universal tuning, tempo, scale, lyric subject, or fixed ensemble.",
+        "Do not make the introductory passage a generic metronomic four-bar loop."
+      ],
+      "nearest_neighbours": [
+        "Zulu folk song",
+        "other acoustic guitar song practices",
+        "Mbaqanga"
+      ],
+      "required_review": [
+        "Solo and ensemble variants",
+        "Tuning and guitar technique",
+        "Regional/current practice review by Maskandi musicians"
+      ],
+      "sources": [
+        "ntombela_2017",
+        "olsen_2014",
+        "juluka_maskanda_2022"
+      ]
+    },
+    {
+      "catalog_id": 155,
+      "id": "isicathamiya",
+      "canonical_name": "Isicathamiya",
+      "aliases": [
+        "Isicathamiya choral tradition"
+      ],
+      "scope": "Zulu a cappella choral and performance practice, including historically important male-voice ensembles and competition contexts.",
+      "grounded_observations": [
+        "A cappella male-voice choral tradition associated with migrant workers and all-night competitions.",
+        "Close/cyclic harmony, a bass foundation, lead/group response and choreography are described in the sources.",
+        "Social, competitive, symbolic and movement practices form part of the performance context."
+      ],
+      "candidate_discriminators": [
+        "Multi-part voice-leading and bass/upper-voice relationships.",
+        "Lead/choir timing, close-harmony movement, phrase releases and vocal attack.",
+        "Performance sequence and choreography represented independently from note sequence."
+      ],
+      "not_inferred": [
+        "Not generic SATB chorale, barbershop or hymn arrangement.",
+        "Do not encode male-only as a universal present-day constraint.",
+        "Do not reduce the tradition to timbre alone."
+      ],
+      "nearest_neighbours": [
+        "Zulu hymnody",
+        "other Zulu choral practices",
+        "barbershop",
+        "Western SATB choral music"
+      ],
+      "required_review": [
+        "Choir leaders and singers review",
+        "Separate musical, vocal production, competition and movement schemas",
+        "Blind listening focused on ensemble phrasing"
+      ],
+      "sources": [
+        "ndlovu_1996",
+        "erlmann_nightsong"
+      ]
+    },
+    {
+      "catalog_id": 156,
+      "id": "mbaqanga",
+      "canonical_name": "Mbaqanga",
+      "aliases": [
+        "Mbaqanga / Mbaqanga-jive (period-scoped)"
+      ],
+      "scope": "Black South African urban popular/dance music; profile must identify historical period and specific use of the term.",
+      "grounded_observations": [
+        "Documented later Mbaqanga combines driving dance pulse, cyclical harmony, short repeated/varied melody, independent bass/lead-guitar lines and vocal response.",
+        "A prominent studio ensemble profile has bass solo voice, soaring female-frontline harmony, electric guitar, bass, keyboard and drums.",
+        "Some educational and scholarly descriptions note close four-part vocal harmony, heavy bass, indlamu-derived drum impulse and layered/polyrhythmic activity."
+      ],
+      "candidate_discriminators": [
+        "Bass/drum drive, rhythmic layering and independent melodic bass/guitar lines.",
+        "Short phrase units over a cyclic harmonic frame.",
+        "Period- and ensemble-specific lead/backing vocal architecture."
+      ],
+      "not_inferred": [
+        "No single four-chord loop is universal.",
+        "Do not collapse 1940s African Jazz naming with later Mbaqanga studio/dance idioms."
+      ],
+      "nearest_neighbours": [
+        "African Jazz",
+        "Kwela",
+        "Marabi",
+        "bubblegum"
+      ],
+      "required_review": [
+        "Period-specific subprofiles",
+        "Bass/guitar independence tests",
+        "Mbaqanga practitioner/historian review"
+      ],
+      "sources": [
+        "meintjes_2003",
+        "mbaqanga_exchange_2011",
+        "eaby_lomas_2023"
+      ]
+    },
+    {
+      "catalog_id": 157,
+      "id": "kwela",
+      "canonical_name": "Kwela",
+      "aliases": [
+        "Pennywhistle Kwela"
+      ],
+      "scope": "South African pennywhistle-led popular music, especially 1950s–early 1960s recorded and street-performance practices.",
+      "grounded_observations": [
+        "Detailed analysis covers form, harmony, melody, rhythm, guitar, banjo, bass, drums, pennywhistle and saxophone.",
+        "Both swung and straight-beat repertoires are documented; their subdivision and historical relationships differ.",
+        "Lead melodic improvisation and secondary melodic/rhythmic lines are documented."
+      ],
+      "candidate_discriminators": [
+        "Pennywhistle-led melodic improvisation and ornamentation, with historically scoped saxophone variants.",
+        "Explicit straight vs swung subdivision choice.",
+        "Interlocking banjo/guitar, bass and percussion roles."
+      ],
+      "not_inferred": [
+        "Do not force every composition into swing or one fixed pennywhistle ensemble.",
+        "A pennywhistle instrument alone does not establish Kwela identity."
+      ],
+      "nearest_neighbours": [
+        "Mbaqanga",
+        "African Jazz",
+        "jive",
+        "other pennywhistle music"
+      ],
+      "required_review": [
+        "Separate straight/swing variants",
+        "Front-line instrumentation variants",
+        "Listening validation against period-labelled examples"
+      ],
+      "sources": [
+        "allen_1993"
+      ]
+    },
+    {
+      "catalog_id": 158,
+      "id": "marabi",
+      "canonical_name": "Marabi",
+      "aliases": [
+        "Early urban Marabi (scope-qualified)"
+      ],
+      "scope": "Early urban Black South African dance music associated with Johannesburg slumyard/shebeen culture in the 1920s–1930s; later uses require separate scope.",
+      "grounded_observations": [
+        "Keyboard/organ/piano, banjo and guitar styles built around repeated multi-bar harmonic cycles are described.",
+        "The basic four-measure I–IV–I6/4–V cycle is documented as a common pattern, with improvisatory melodic material over repetition.",
+        "Dance and extended social performance settings are central to public-history accounts."
+      ],
+      "candidate_discriminators": [
+        "Repeating harmonic cycle with variable melodic improvisation.",
+        "Keyboard-led texture and guitar/banjo variants.",
+        "Extended dance form based on repetition, variation and performer interaction rather than verse/chorus."
+      ],
+      "not_inferred": [
+        "A single progression is not universal.",
+        "No generic African scale, drum pattern or contemporary production palette should be inferred."
+      ],
+      "nearest_neighbours": [
+        "African Jazz",
+        "Kwela",
+        "Mbaqanga",
+        "other cyclic dance music"
+      ],
+      "required_review": [
+        "Historical recordings/transcriptions and source triangulation",
+        "Period boundary and later revival treatment",
+        "Improvisation/accompaniment interaction"
+      ],
+      "sources": [
+        "ballantine_1991",
+        "allen_1993",
+        "saho_resistance"
+      ]
+    },
+    {
+      "catalog_id": 159,
+      "id": "township_jazz",
+      "canonical_name": "Township Jazz",
+      "aliases": [
+        "Candidate: Sophiatown African Jazz",
+        "Candidate: African Jazz (historical, scoped)"
+      ],
+      "scope": "Ambiguous umbrella label; currently researched primarily through early/mid-20th-century urban Black South African jazz and Sophiatown/African Jazz histories.",
+      "grounded_observations": [
+        "Early Black South African urban jazz-band and vaudeville traditions involved interaction among American jazz, local musical practices, venues and social histories.",
+        "Sophiatown-era bands performed swing-influenced music and contributed to new local idioms.",
+        "The literature distinguishes 1940s swing-influenced African Jazz from later Kwela and Mbaqanga developments."
+      ],
+      "candidate_discriminators": [
+        "Period-specific band configuration and front-line/voice arrangement.",
+        "Swing-derived ensemble practice interacting with local melodic/rhythmic materials.",
+        "Sectional improvisation and ensemble riff behavior to be studied against actual repertoire."
+      ],
+      "not_inferred": [
+        "Do not equate with all jazz made in townships, all South African jazz or contemporary township scenes.",
+        "Do not assign one big-band orchestration or one generic jazz grammar."
+      ],
+      "nearest_neighbours": [
+        "African Jazz",
+        "Sophiatown swing",
+        "Mbaqanga",
+        "Kwela",
+        "contemporary South African jazz"
+      ],
+      "required_review": [
+        "Naming and period review by South African jazz historians/performers",
+        "Decide rename, split, or umbrella/child hierarchy",
+        "Define representative repertory and arrangement scope"
+      ],
+      "naming_review_required": true,
+      "sources": [
+        "ballantine_1991",
+        "allen_1993",
+        "saho_resistance"
+      ]
+    },
+    {
+      "catalog_id": 160,
+      "id": "south_african_bubblegum_pop",
+      "canonical_name": "South African Bubblegum Pop",
+      "aliases": [
+        "South African Bubblegum",
+        "Township Pop (source-scoped)"
+      ],
+      "scope": "Locally developed Black South African dance-pop discussed as bubblegum/township pop, especially in the 1980s; distinct from international Euro-American bubblegum.",
+      "grounded_observations": [
+        "Energetic dance beats and township contexts are described.",
+        "Local bubblegum emerged through interaction of Mbaqanga histories and international pop/disco/house influences.",
+        "Programmed/sequenced synthetic timbres and vocal effects such as reverb, chorus and echo are described."
+      ],
+      "candidate_discriminators": [
+        "Dance-oriented beat and hook/song form.",
+        "Studio/electronic production as part of identity, not merely an acoustic ensemble.",
+        "Local language and township-life materials alongside international pop influence."
+      ],
+      "not_inferred": [
+        "Not generic international bubblegum, synthpop, disco or all 1980s South African popular music.",
+        "No fixed lyric language or political stance."
+      ],
+      "nearest_neighbours": [
+        "Mbaqanga",
+        "Kwaito",
+        "Synthpop",
+        "disco",
+        "crossover pop"
+      ],
+      "required_review": [
+        "Artist/producer/period-specific source and recording analysis",
+        "Separate local/international usage of bubblegum label",
+        "Rights-cleared audio and production review"
+      ],
+      "sources": [
+        "eaby_lomas_2023",
+        "durbach_2015"
+      ]
+    }
+  ]
+}
