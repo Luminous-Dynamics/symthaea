@@ -950,51 +950,72 @@ fn validate_simulator_truth_actor_states(
             }
         }
         if actor_scenario != scenario_id {
-            errors.push(format!("{prefix}: scenario_id must match the containing scene"));
+            errors.push(format!(
+                "{prefix}: scenario_id must match the containing scene"
+            ));
         }
         if frame_id.is_none_or(|frame| !frame_ids.contains(frame)) {
-            errors.push(format!("{prefix}: reference_frame_id must resolve in the scene"));
+            errors.push(format!(
+                "{prefix}: reference_frame_id must resolve in the scene"
+            ));
         }
         let Some(source_ref) = source_ref else {
             errors.push(format!("{prefix}: source_ref is required"));
             continue;
         };
         if !truth_refs.contains(source_ref) {
-            errors.push(format!("{prefix}: source_ref must also appear in simulator_truth_refs"));
+            errors.push(format!(
+                "{prefix}: source_ref must also appear in simulator_truth_refs"
+            ));
         }
         let Some(source) = source_records.get(source_ref) else {
-            errors.push(format!("{prefix}: unknown simulator-oracle source {source_ref}"));
+            errors.push(format!(
+                    "{prefix}: unknown simulator-oracle source {source_ref}"
+                ));
             continue;
         };
         if source.get("source_role").and_then(Value::as_str) != Some("simulator_oracle") {
-            errors.push(format!("{prefix}: source_ref must have simulator_oracle role"));
+            errors.push(format!(
+                "{prefix}: source_ref must have simulator_oracle role"
+            ));
         }
         if source.get("modality").and_then(Value::as_str) != Some("synthetic")
-            || source.get("evidence_kind").and_then(Value::as_str)
-                != Some("synthetic_observation")
+            || source.get("evidence_kind").and_then(Value::as_str) != Some("synthetic_observation")
         {
-            errors.push(format!("{prefix}: source must be a synthetic oracle observation"));
+            errors.push(format!(
+                "{prefix}: source must be a synthetic oracle observation"
+            ));
         }
-        if source.get("currentness").and_then(Value::as_str)
+        if source
+            .get("currentness")
+            .and_then(Value::as_str)
             .is_none_or(|value| !matches!(value, "current" | "current_for_fixture"))
         {
-            errors.push(format!("{prefix}: stale or unknown oracle source cannot define truth state"));
+            errors.push(format!(
+                "{prefix}: stale or unknown oracle source cannot define truth state"
+            ));
         }
         if source.get("reference_frame_id").and_then(Value::as_str) != frame_id {
-            errors.push(format!("{prefix}: actor and oracle source frames must match"));
+            errors.push(format!(
+                "{prefix}: actor and oracle source frames must match"
+            ));
         }
         if source.get("acquisition_tick_ns").and_then(Value::as_u64) != acquisition_tick {
-            errors.push(format!("{prefix}: actor acquisition tick must match oracle source"));
+            errors.push(format!(
+                "{prefix}: actor acquisition tick must match oracle source"
+            ));
         }
         for field in ["position_m", "velocity_mps"] {
             let values = actor.get(field).and_then(Value::as_array);
             if values.is_none_or(|values| {
                 values.len() != 3
-                    || values.iter().any(|value| {
-                        value.as_f64().is_none_or(|number| !number.is_finite())
-                    })
+                    || values
+                        .iter()
+                        .any(|value| value.as_f64().is_none_or(|number| !number.is_finite()))
             }) {
-                errors.push(format!("{prefix}.{field}: expected a finite metric 3-vector"));
+                errors.push(format!(
+                    "{prefix}.{field}: expected a finite metric 3-vector"
+                ));
             }
         }
     }
@@ -1096,7 +1117,10 @@ fn validate_follow_target_context(
     let expected_role = match profile {
         "simulation_benchmark" => "simulator_oracle",
         "local_perception" => {
-            if !matches!(role, "local_sensor_observation" | "synthetic_sensor_observation") {
+            if !matches!(
+                role,
+                "local_sensor_observation" | "synthetic_sensor_observation"
+            ) {
                 errors.push(format!(
                     "follow_target_context: local_perception requires a local sensor observation, not {role}"
                 ));
@@ -1148,7 +1172,13 @@ fn validate_follow_target_context(
                         .into(),
                 );
             }
-            if reference_kind != "simulator_truth_actor" || reference_id != context.get("actor_id").and_then(Value::as_str).unwrap_or("") {
+            if reference_kind != "simulator_truth_actor"
+                || reference_id
+                    != context
+                        .get("actor_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+            {
                 errors.push(
                     "follow_target_context: simulation benchmark must link to the exact simulator truth actor"
                         .into(),
@@ -1163,7 +1193,9 @@ fn validate_follow_target_context(
                 );
             }
             let admissible = match role {
-                "local_sensor_observation" => evidence_kind == "measurement" && currentness == "current",
+                "local_sensor_observation" => {
+                    evidence_kind == "measurement" && currentness == "current"
+                }
                 "synthetic_sensor_observation" => {
                     evidence_kind == "synthetic_observation" && currentness == "current_for_fixture"
                 }
@@ -1183,7 +1215,8 @@ fn validate_follow_target_context(
             }
         }
         "deployment" => {
-            if !actor_sensor_modality || evidence_kind != "measurement" || currentness != "current" {
+            if !actor_sensor_modality || evidence_kind != "measurement" || currentness != "current"
+            {
                 errors.push(
                     "follow_target_context: deployment Follow requires a current camera/LiDAR/radar/ultrasonic local sensor measurement"
                         .into(),
@@ -1394,10 +1427,9 @@ fn validate_follow_target_context(
         (ego_position, target_position, gap)
     {
         if ego_position.len() == 3 && target_position.len() == 3 {
-            if let (Some(ego_x), Some(target_x)) = (
-                ego_position[0].as_f64(),
-                target_position[0].as_f64(),
-            ) {
+            if let (Some(ego_x), Some(target_x)) =
+                (ego_position[0].as_f64(), target_position[0].as_f64())
+            {
                 let expected_gap = target_x - ego_x;
                 if (gap - expected_gap).abs() > 1e-6 || expected_gap <= 0.0 {
                     errors.push(
@@ -1412,10 +1444,9 @@ fn validate_follow_target_context(
         (ego_velocity, target_velocity, relative_speed)
     {
         if ego_velocity.len() == 3 && target_velocity.len() == 3 {
-            if let (Some(ego_vx), Some(target_vx)) = (
-                ego_velocity[0].as_f64(),
-                target_velocity[0].as_f64(),
-            ) {
+            if let (Some(ego_vx), Some(target_vx)) =
+                (ego_velocity[0].as_f64(), target_velocity[0].as_f64())
+            {
                 let expected_relative_speed = target_vx - ego_vx;
                 if (relative_speed - expected_relative_speed).abs() > 1e-6 {
                     errors.push(
@@ -1837,8 +1868,7 @@ mod tests {
     #[test]
     fn rejects_follow_target_relative_speed_not_supported_by_scene_geometry() {
         let (schema, mut fixture) = load_fixture();
-        fixture["snapshot"]["follow_target_context"]["relative_speed_mps"] =
-            Value::from(25.0);
+        fixture["snapshot"]["follow_target_context"]["relative_speed_mps"] = Value::from(25.0);
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
@@ -1872,11 +1902,9 @@ mod tests {
         let (schema, mut fixture) = load_fixture();
         let stale_tick = Value::from(11_000_000_000u64);
         fixture["snapshot"]["follow_target_context"]["max_age_ns"] = Value::from(1u64);
-        fixture["snapshot"]["follow_target_context"]["observation_tick_ns"] =
-            stale_tick.clone();
+        fixture["snapshot"]["follow_target_context"]["observation_tick_ns"] = stale_tick.clone();
         fixture["snapshot"]["sources"][3]["acquisition_tick_ns"] = stale_tick.clone();
-        fixture["snapshot"]["simulator_truth_actor_states"][0]["acquisition_tick_ns"] =
-            stale_tick;
+        fixture["snapshot"]["simulator_truth_actor_states"][0]["acquisition_tick_ns"] = stale_tick;
         assert!(validate_values(&schema, &fixture).is_err());
     }
 
