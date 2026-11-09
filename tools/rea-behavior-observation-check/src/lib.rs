@@ -16,6 +16,7 @@ const FIXTURE: &str =
     include_str!("../../../docs/research/rea-behavior-observation-profile-v0.synthetic.json");
 const MAX_PROFILE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_PROFILE_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservationError(pub String);
@@ -182,10 +183,6 @@ fn validate_observation(value: &Value) -> Result<(), ObservationError> {
             "{id} must remain exact-invocation scoped"
         )));
     }
-    if get_str(value, "evidence_binding", "evidence_binding")? == "" {
-        return Err(ObservationError("empty evidence binding".to_owned()));
-    }
-
     let binding = value.get("evidence_binding").ok_or_else(|| {
         ObservationError(format!("{id}.evidence_binding missing"))
     })?;
@@ -302,7 +299,7 @@ fn validate_observation(value: &Value) -> Result<(), ObservationError> {
             return Err(ObservationError(format!("{id} {termination_kind} termination requires a reason and no exit/signal")));
         }
         "exit" | "signal" | "timeout" | "launch_error" => {}
-        other => return Err(ObservationError(format!("{id} unsupported termination kind {other}")),
+        other => return Err(ObservationError(format!("{id} unsupported termination kind {other}"))),
     }
 
     validate_byte_capture(result.get("stdout").ok_or_else(|| ObservationError(format!("{id} stdout missing")))?, &format!("{id}.stdout"), false)?;
@@ -319,24 +316,189 @@ fn validate_observation(value: &Value) -> Result<(), ObservationError> {
         let predicate = get_str(assertion, "predicate", id)?;
         let capture_ref = get_str(assertion, "capture_ref", id)?;
         match (predicate, capture_ref) {
-            ("stdout_sha256", "stdout") => validate_byte_capture(&result["stdout"], &format!("{id}.stdout assertion"), true)?,
-            ("stderr_sha256", "stderr") => validate_byte_capture(&result["stderr"], &format!("{id}.stderr assertion"), true)?,
-            ("exit_code", "termination") if termination_kind == "exit" => {}
-            ("signal", "termination") if termination_kind == "signal" => {}
+            ("stdout_sha256", "stdout") => {
+                validate_byte_capture(&result["stdout"], &format!("{id}.stdout assertion"), true)?;
+                if assertion["observed_value"].as_str() != result["stdout"]["sha256"].as_str() {
+                    return Err(ObservationError(format!("{id} stdout assertion does not match captured digest")));
+                }
+            }
+            ("stderr_sha256", "stderr") => {
+                validate_byte_capture(&result["stderr"], &format!("{id}.stderr assertion"), true)?;
+                if assertion["observed_value"].as_str() != result["stderr"]["sha256"].as_str() {
+                    return Err(ObservationError(format!("{id} stderr assertion does not match captured digest")));
+                }
+            }
+            ("exit_code", "termination") if termination_kind == "exit" => {
+                if assertion["observed_value"].as_i64() != termination["exit_code"].as_i64() {
+                    return Err(ObservationError(format!("{id} exit-code assertion does not match termination")));
+                }
+            }
+            ("signal", "termination") if termination_kind == "signal" => {
+                if assertion["observed_value"].as_u64() != termination["signal"].as_u64() {
+                    return Err(ObservationError(format!("{id} signal assertion does not match termination")));
+                }
+            }
             ("filesystem_diff_empty", "filesystem") => {
-                if get_str(&result["filesystem"], "state", id)? != "complete" {
+                let filesystem = &result["filesystem"];
+                if get_str(filesystem, "state", id)? != "complete" {
                     return Err(ObservationError(format!("{id} filesystem assertion requires a complete diff")));
+                }
+                let empty = filesystem["entries"].as_array().is_some_and(Vec::is_empty);
+                if assertion["observed_value"].as_bool() != Some(empty) {
+                    return Err(ObservationError(format!("{id} filesystem-empty assertion does not match captured diff")));
                 }
             }
             ("filesystem_path_present", "filesystem") => {
-                if get_str(&result["filesystem"], "state", id)? != "complete" {
+                let filesystem = &result["filesystem"];
+                if get_str(filesystem, "state", id)? != "complete" {
                     return Err(ObservationError(format!("{id} filesystem path assertion requires a complete diff")));
+                }
+                let path = assertion["observed_value"].as_str().ok_or_else(|| {
+                    ObservationError(format!("{id} filesystem_path_present observed_value must be a path string"))
+                })?;
+                let found = filesystem["entries"].as_array().is_some_and(|entries| {
+                    entries.iter().any(|entry| entry["path"].as_str() == Some(path))
+                });
+                if !found {
+                    return Err(ObservationError(format!("{id} asserted filesystem path is absent from captured diff")));
                 }
             }
             _ => return Err(ObservationError(format!("{id} assertion predicate/capture reference is incompatible or incomplete"))),
         }
     }
     Ok(())
+}
+
+/// Parse JSON while rejecting duplicate object keys at every nesting level.
+pub fn parse_unique_json(bytes: &[u8]) -> Result<Value, ObservationError> {
+    use serde::de::{self, Deserialize, MapAccess, SeqAccess, Visitor};
+    use serde_json::{Map, Number};
+    use std::collections::HashSet;
+    use std::fmt;
+
+    struct UniqueValue(Value);
+    struct UniqueVisitor;
+
+    impl<'de> Deserialize<'de> for UniqueValue {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(UniqueVisitor)
+        }
+    }
+
+    impl<'de> Visitor<'de> for UniqueVisitor {
+        type Value = UniqueValue;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("JSON with unique object keys")
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::Bool(value)))
+        }
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::Number(Number::from(value))))
+        }
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::Number(Number::from(value))))
+        }
+        fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Number::from_f64(value)
+                .map(|number| UniqueValue(Value::Number(number)))
+                .ok_or_else(|| E::custom("JSON number must be finite"))
+        }
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::String(value.to_owned())))
+        }
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::String(value)))
+        }
+        fn visit_unit<E>(self) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::Null))
+        }
+        fn visit_none<E>(self) -> Result<Self::Value, E> {
+            Ok(UniqueValue(Value::Null))
+        }
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            UniqueValue::deserialize(deserializer)
+        }
+        fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut values = Vec::new();
+            while let Some(item) = sequence.next_element::<UniqueValue>()? {
+                values.push(item.0);
+            }
+            Ok(UniqueValue(Value::Array(values)))
+        }
+        fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            let mut values = Map::new();
+            let mut seen = HashSet::new();
+            while let Some((key, item)) = object.next_entry::<String, UniqueValue>()? {
+                if !seen.insert(key.clone()) {
+                    return Err(de::Error::custom(format!("duplicate JSON object key '{key}'")));
+                }
+                values.insert(key, item.0);
+            }
+            Ok(UniqueValue(Value::Object(values)))
+        }
+    }
+
+    if bytes.len() > MAX_PROFILE_BYTES {
+        return Err(ObservationError(format!(
+            "profile exceeds {MAX_PROFILE_BYTES} bytes"
+        )));
+    }
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let parsed = UniqueValue::deserialize(&mut deserializer)
+        .map_err(|error| ObservationError(format!("profile JSON rejected: {error}")))?;
+    deserializer
+        .end()
+        .map_err(|error| ObservationError(format!("profile has trailing data: {error}")))?;
+    Ok(parsed.0)
+}
+
+/// Validate a caller-supplied raw profile against the embedded schema and v0 semantics.
+pub fn validate_profile_bytes(bytes: &[u8]) -> Result<Value, ObservationError> {
+    let schema: Value = serde_json::from_str(SCHEMA)
+        .map_err(|error| ObservationError(format!("schema JSON parse failed: {error}")))?;
+    draft202012::meta::validate(&schema)
+        .map_err(|error| ObservationError(format!("Draft 2020-12 schema invalid: {error}")))?;
+    let profile = parse_unique_json(bytes)?;
+    let validator = draft202012::options()
+        .build(&schema)
+        .map_err(|error| ObservationError(format!("schema compilation failed: {error}")))?;
+    let errors: Vec<String> = validator
+        .iter_errors(&profile)
+        .map(|error| error.to_string())
+        .collect();
+    if !errors.is_empty() {
+        return Err(ObservationError(format!(
+            "profile fails Draft 2020-12: {}",
+            errors.join("; ")
+        )));
+    }
+    validate_profile(&profile)?;
+    let count = profile["observations"].as_array().map_or(0, Vec::len);
+    Ok(serde_json::json!({
+        "schema":"luminous.rea.behavior-observation-validation-report.v0",
+        "status":"capture_valid_evidence_admission_unverified",
+        "observation_count":count,
+        "evidence_admission":"unverified_reference",
+        "claim_ceiling":"Captured byte integrity and sidecar consistency only; referenced REA Evidence, producer, runner and real execution are not authenticated."
+    }))
 }
 
 pub fn validate_profile(value: &Value) -> Result<(), ObservationError> {
@@ -503,4 +665,34 @@ mod tests {
         ]);
         assert!(validate_profile(&value).is_ok());
     }
+    #[test]
+    fn assertion_value_must_match_the_captured_observation() {
+        let mut value = fixture();
+        value["observations"][0]["assertions"][0]["observed_value"] =
+            Value::String("0".repeat(64));
+        assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn filesystem_empty_assertion_must_match_complete_diff() {
+        let mut value = fixture();
+        value["observations"][0]["assertions"][2]["observed_value"] = Value::Bool(false);
+        assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn duplicate_json_keys_and_trailing_data_are_rejected() {
+        assert!(parse_unique_json(br#"{"x":1,"x":2}"#).is_err());
+        assert!(parse_unique_json(br#"{"x":1} {}"#).is_err());
+    }
+
+    #[test]
+    fn partial_and_unavailable_streams_remain_non_assertable() {
+        let mut value = fixture();
+        value["observations"][2]["assertions"] = serde_json::json!([
+            {"assertion_id":"stdout_exact","predicate":"stdout_sha256","capture_ref":"stdout","observed_value":"2725aea2d2dea736fbe38e41ecb518f6098cb68ac77362c5e34faafb356567c5"}
+        ]);
+        assert!(validate_profile(&value).is_err());
+    }
+
 }
