@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     report.norm_error,
                 ),
                 Err(error) => println!(
-                    "{coupling:.6},{frequency:.6},unavailable,unavailable,unavailable,unavailable,unavailable,unavailable,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,error={error}"
+                    "{coupling:.6},{frequency:.6},unavailable,unavailable,unavailable,unavailable,unavailable,unavailable,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,error={error}"
                 ),
             }
         }
