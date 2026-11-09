@@ -751,3 +751,24 @@ The first external goal is reproducible parity with strong baselines under froze
 - Recast (2026-11-02): https://arxiv.org/abs/2611.02765
 - QBAT (PVLDB 2026): https://research.google/pubs/qbat-model-based-query-budget-autotuner-for-clustering-based-approximate-nearest-neighbor-search/
 - VectorDBBench 2026 VIBE dataset support: https://github.com/zilliztech/VectorDBBench/blob/main/docs/release/2026-09-hugging-face-datasets.md
+
+
+## 20. No-allocation quantized decode and selector promotion gate (2026-11-09)
+
+The first quantized implementation decoded every group's u16 extrema into two temporary D-element f32 vectors. At 256K dimensions that would allocate approximately 2 MiB per group evaluation, potentially overwhelming the saved resident bytes when many groups are scanned.
+
+The HDC core now exposes an allocation-free indexed callback kernel, similarity_interval_full_resolution_for_component_bounds_with. It uses the same group-of-eight and ordered-tail f32 interval reduction as the slice-based component-box kernel, but requests each conservative (lower, upper) pair from a deterministic callback and consumes it immediately. On a valid profile, the callback is evaluated exactly once per coordinate in ascending order. Invalid component bounds fail closed.
+
+HME's quantized group path now decodes the outward u16 endpoints within that callback. It does not construct temporary dimension-sized vectors. The callback kernel has authored tests comparing its interval exactly to the slice-based kernel, checking the group-of-eight/tail behavior, invalid bounds and callback count. Those Rust tests have not been executed.
+
+Most importantly, QuantizedBoxAndBall is now explicitly selector-gated:
+- the public score_interval_for_snapshot API returns UnqualifiedSynopsisMode for this profile;
+- GroupScoreIntervalRecord::from_group_envelope calls that public API and therefore cannot admit a quantized group into the exact selector;
+- a private cfg(test) helper exists only to test enclosure behavior;
+- BoxAndBall and BallOnly remain on the existing public conservative score path.
+
+This keeps the quantized codec available for numerical research and future benchmarking without allowing it to silently authorize an exact prune. Promotion requires #11243's complete endpoint, canonical-score, compiler/target, and runtime measurement gates, followed by an explicit source change removing the gate.
+
+An independent JavaScript IEEE-754 model tested 296,608 coordinates: every quantizer boundary and its adjacent f32 values, plus 100,000 deterministic random values. It observed zero endpoint escapes; maximum decoded interval width in that sample was about 3.06e-5. This is useful arithmetic cross-checking only. It is not Rust execution, formal proof, target/compiler qualification, or permission to prune.
+
+The next measurements must count actual metadata bytes, allocations, group survival, member intervals scanned and physical original-payload bytes. The theoretical 4/8/12-byte-per-dimension profiles are only the first line in a cost model, not performance outcomes.
