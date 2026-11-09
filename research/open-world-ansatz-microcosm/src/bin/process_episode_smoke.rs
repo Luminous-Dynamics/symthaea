@@ -310,6 +310,10 @@ fn run() -> Result<(), String> {
     .all(|identity| {
         identity.executable_sha256 == a0.agent.executable_sha256
             && identity.arguments == a0.agent.arguments
+            && identity.working_directory == a0.agent.working_directory
+            && identity.max_input_frame_bytes == a0.agent.max_input_frame_bytes
+            && identity.max_output_frame_bytes == a0.agent.max_output_frame_bytes
+            && identity.environment_inherited == a0.agent.environment_inherited
     });
     if !same_process_artifact {
         return Err(
