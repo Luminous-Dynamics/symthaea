@@ -40,6 +40,8 @@ pub mod contrapuntal_foundry;
 pub mod counterpoint;
 pub mod describe;
 pub mod diversity_plan;
+pub mod ensemble_cues;
+pub mod groove_space;
 pub mod ensemble_groove;
 pub mod explorer;
 pub mod fingerprint;
