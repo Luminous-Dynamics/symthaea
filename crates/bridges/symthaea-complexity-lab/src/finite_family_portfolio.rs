@@ -3359,6 +3359,19 @@ mod tests {
         }
     }
 
+    fn portfolio_search_budget() -> ExactPolicyPortfolioSearchBudget {
+        ExactPolicyPortfolioSearchBudget {
+            per_cluster: cluster_search_budget(),
+            max_outer_search_nodes: 10_000,
+            max_total_inner_dp_multiply_adds: 10_000_000,
+            max_frontier_nodes: 10_000,
+            max_frontier_memory_bytes: 10_000_000,
+            max_cached_cluster_solutions: 10_000,
+            max_cached_cluster_bytes: 10_000_000,
+            max_total_memory_bytes: 20_000_000,
+        }
+    }
+
     #[test]
     fn exact_action_mask_bound_is_zero_for_full_mask_and_exact_at_leaf() {
         let family = FiniteUmdpModelFamily::new(vec![
@@ -3776,6 +3789,150 @@ mod tests {
             solve_exact_cluster_policy_bnb(&family, &[0,1], q(1,2), frontier_tight),
             Err(PolicyPortfolioError::BudgetExceeded {
                 resource: "cluster B&B frontier masks",
+                required: 2,
+                limit: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn outer_partition_bnb_finds_zero_regret_two_policy_specialist_portfolio() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let result = solve_exact_finite_family_policy_portfolio_bnb(
+            &family, q(1,2), 2, portfolio_search_budget(),
+        ).unwrap();
+        assert_eq!(result.partition, vec![vec![0], vec![1]]);
+        assert_eq!(result.cluster_solutions.iter().map(|solution| solution.policy_actions.clone()).collect::<Vec<_>>(), vec![vec![0], vec![1]]);
+        assert_eq!(result.model_optimal_values, vec![q(1,1), q(1,1)]);
+        assert_eq!(result.model_policy_values, vec![vec![q(1,1), q(0,1)], vec![q(0,1), q(1,1)]]);
+        assert_eq!(result.model_portfolio_values, vec![q(1,1), q(1,1)]);
+        assert_eq!(result.model_regrets, vec![q(0,1), q(0,1)]);
+        assert_eq!(result.worst_case_model_indices, vec![0,1]);
+        assert_eq!(result.minimax_regret, q(0,1));
+        assert_eq!(result.global_lower_bound, q(0,1));
+        assert_eq!(result.global_upper_bound, q(0,1));
+        assert!(result.optimality_proven);
+        assert_eq!(result.outer_search_nodes, 4);
+        assert_eq!(result.complete_partitions_evaluated, 2);
+        assert_eq!(result.cached_cluster_solutions, 3);
+
+        let reference = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 2, budget(2,3),
+        ).unwrap();
+        assert_eq!(result.minimax_regret, reference.minimax_regret);
+        verify_exact_finite_family_policy_portfolio_bnb(
+            &family, portfolio_search_budget(), &result,
+        ).unwrap();
+
+        let mut mutated = result.clone();
+        mutated.model_regrets[0] = q(1,1);
+        assert_eq!(
+            verify_exact_finite_family_policy_portfolio_bnb(
+                &family, portfolio_search_budget(), &mutated,
+            ),
+            Err(PolicyPortfolioError::PortfolioCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn outer_partition_bnb_k_one_matches_single_cluster_exact_solver() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        let result = solve_exact_finite_family_policy_portfolio_bnb(
+            &family, q(1,2), 1, portfolio_search_budget(),
+        ).unwrap();
+        assert_eq!(result.partition, vec![vec![0,1]]);
+        assert_eq!(result.minimax_regret, q(1,1));
+        assert_eq!(result.global_lower_bound, result.global_upper_bound);
+        assert_eq!(result.outer_search_nodes, 2);
+        assert_eq!(result.complete_partitions_evaluated, 1);
+        let cluster = solve_exact_cluster_policy_bnb(
+            &family, &[0,1], q(1,2), cluster_search_budget(),
+        ).unwrap();
+        assert_eq!(result.cluster_solutions[0], cluster);
+    }
+
+    #[test]
+    fn outer_partition_bnb_three_models_matches_exhaustive_policy_portfolio() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[2, 0]),
+            one_state_model(&[0, 2]),
+            one_state_model(&[1, 1]),
+        ]).unwrap();
+        let result = solve_exact_finite_family_policy_portfolio_bnb(
+            &family, q(1,2), 2, portfolio_search_budget(),
+        ).unwrap();
+        let reference = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 2, budget(2,3),
+        ).unwrap();
+        assert_eq!(result.minimax_regret, q(0,1));
+        assert_eq!(result.minimax_regret, reference.minimax_regret);
+        assert_eq!(result.partition.len(), 2);
+        let covered = result.partition.iter().flatten().copied().collect::<Vec<_>>();
+        assert_eq!(covered, vec![0,1,2]);
+        verify_exact_finite_family_policy_portfolio_bnb(
+            &family, portfolio_search_budget(), &result,
+        ).unwrap();
+    }
+
+    #[test]
+    fn outer_partition_bnb_budget_limits_and_invalid_k_fail_closed() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1, 0]),
+            one_state_model(&[0, 1]),
+        ]).unwrap();
+        assert!(matches!(
+            solve_exact_finite_family_policy_portfolio_bnb(
+                &family, q(1,2), 0, portfolio_search_budget(),
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer portfolio size (must be in 1..=model_count)",
+                ..
+            })
+        ));
+        assert!(matches!(
+            solve_exact_finite_family_policy_portfolio_bnb(
+                &family, q(1,2), 3, portfolio_search_budget(),
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer portfolio size (must be in 1..=model_count)",
+                ..
+            })
+        ));
+
+        let mut nodes_tight = portfolio_search_budget();
+        nodes_tight.max_outer_search_nodes = 1;
+        assert_eq!(
+            solve_exact_finite_family_policy_portfolio_bnb(&family, q(1,2), 2, nodes_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer partition search nodes",
+                required: 2,
+                limit: 1,
+            })
+        );
+
+        let mut frontier_tight = portfolio_search_budget();
+        frontier_tight.max_frontier_nodes = 1;
+        assert_eq!(
+            solve_exact_finite_family_policy_portfolio_bnb(&family, q(1,2), 2, frontier_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer partition frontier nodes",
+                required: 2,
+                limit: 1,
+            })
+        );
+
+        let mut cache_tight = portfolio_search_budget();
+        cache_tight.max_cached_cluster_solutions = 1;
+        assert_eq!(
+            solve_exact_finite_family_policy_portfolio_bnb(&family, q(1,2), 2, cache_tight),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer cached cluster solutions",
                 required: 2,
                 limit: 1,
             })
