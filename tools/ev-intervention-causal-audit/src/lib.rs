@@ -484,7 +484,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
                 let error = (actual - expected).abs();
                 if !error.is_finite() || error > tolerance {
                     return Err(format!(
-                        "case {} effect mismatch: actual {actual}, expected {expected}, error {error}",
+                        "case {} effect mismatch ({actual} vs {expected}; error {error})",
                         case.case_id
                     ));
                 }
