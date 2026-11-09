@@ -1758,8 +1758,10 @@ mod tests {
                 && row.teacher_target_throttle.is_some()
                 && row.teacher_target_brake.is_some()
                 && row.student_teacher_action_delta_l1.is_some()
+                && row.training_enabled
                 && row.teacher_action_used_for_blend
                 && (row.pd_teacher_blend_weight - 0.8).abs() < 1e-6
+                && row.follow_oracle_used_for_policy == row.follow_oracle_available
                 && row.student_proposal_steering.is_finite()
                 && row.student_proposal_throttle.is_finite()
                 && row.student_proposal_brake.is_finite()
@@ -1791,6 +1793,81 @@ mod tests {
                 .iter()
                 .any(|row| !row.teacher_action_used_for_supervision),
             "Teacher blending and BPTT supervision must remain distinct events"
+        );
+    }
+
+    #[test]
+    fn test_follow_phase_four_can_have_zero_blend_but_teacher_supervision() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 100,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let mut trainer = VehicleTrainer::new(config).with_swarm(SwarmConfig::convoy_straight(1));
+        let metrics = trainer.train();
+        let telemetry = &metrics[99].telemetry;
+
+        assert!(telemetry.iter().all(|row| !row.teacher_action_used_for_blend));
+        assert!(telemetry.iter().all(|row| row.pd_teacher_blend_weight == 0.0));
+        assert!(
+            telemetry.iter().any(|row| {
+                row.teacher_action_used_for_supervision
+                    && row.teacher_target_steering.is_some()
+                    && row.follow_oracle_available
+                    && row.follow_oracle_used_for_policy
+            }),
+            "Zero action blending must not be misreported as zero teacher supervision"
+        );
+    }
+
+    #[test]
+    fn test_follow_frozen_evaluation_disables_teacher_and_keeps_weights_fixed() {
+        use crate::swarm::SwarmConfig;
+
+        let config = VehicleConfig {
+            num_episodes: 1,
+            steps_per_episode: 5,
+            early_termination: false,
+            collect_telemetry: true,
+            task: VehicleTask::Follow { target_gap: 30.0 },
+            ..VehicleConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let mut trainer = VehicleTrainer::new(config.clone()).with_swarm(SwarmConfig::convoy_straight(1));
+        let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = VehicleController::new(&genesis, &config);
+        let mut fep_agent =
+            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::Follow { target_gap: 30.0 });
+        let original_projection = controller.output_projection();
+
+        let metrics =
+            trainer.run_evaluation_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        let telemetry = &metrics.telemetry;
+
+        assert_eq!(telemetry.len(), 5);
+        assert_eq!(controller.output_projection(), original_projection);
+        assert!(telemetry.iter().all(|row| {
+            !row.training_enabled
+                && !row.teacher_action_used_for_blend
+                && !row.teacher_action_used_for_supervision
+                && !row.follow_oracle_used_for_policy
+                && row.pd_teacher_blend_weight == 0.0
+                && row.teacher_target_steering.is_none()
+                && row.teacher_target_throttle.is_none()
+                && row.teacher_target_brake.is_none()
+                && row.student_teacher_action_delta_l1.is_none()
+                && (row.executed_action_steering - row.blended_action_steering).abs() < 1e-6
+                && (row.executed_action_throttle - row.blended_action_throttle).abs() < 1e-6
+                && (row.executed_action_brake - row.blended_action_brake).abs() < 1e-6
+        }));
+        assert!(
+            telemetry.iter().any(|row| row.follow_oracle_available),
+            "Simulator truth may remain available to score the evaluation episode"
         );
     }
 
