@@ -47,6 +47,8 @@ The checker enforces:
 - `deployment` rejects synthetic sources and requires a current camera/LiDAR/radar/ultrasonic local sensor measurement linked to a tracked object hypothesis.
 - `remote_cooperative_claim` is never a Follow-target source. A signature or V2X claim does not become a local lead track.
 - Actor/track ID, source ID, frame, scenario and observation tick must resolve and agree.
+- In the declared local-road x-forward frame, gap and relative speed are recomputed from ego and target states; they are not accepted as free-floating scalars.
+- For local-perception/deployment profiles, reported gap uncertainty must be at least the sum of ego and target longitudinal standard deviations from their diagonal covariances. This is a conservative standard-deviation upper bound under unknown cross-correlation, not a hard physical error bound. The exact simulator-truth path remains separate.
 - The v0.1 Follow calculation is restricted to a local-road frame with x forward. The checker recomputes gap and relative speed from the linked target and ego states; mismatched free-floating scalars reject.
 - Observation time must match the source acquisition time under the exact scene clock and clock-transform identity; age is bounded by the declared maximum.
 - `unknown` / `rejected` status carries no source, actor reference or numeric fallback. Missing local tracks do not silently fall back to oracle or remote peer distance.
