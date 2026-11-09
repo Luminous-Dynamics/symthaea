@@ -424,6 +424,68 @@ mod tests {
     }
 
     #[test]
+    fn test_follow_oracle_selects_nearest_same_road_actor() {
+        let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(2));
+        let ego = VehicleState::cruising(13.4);
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("same-road lead should be available from simulator truth");
+
+        assert_eq!(target.actor_id, 1);
+        assert!((target.gap_m - 30.0).abs() < 1e-6);
+        assert!((target.relative_speed_mps).abs() < 1e-6);
+        assert_eq!(target.snapshot_time_s, ego.timestamp);
+        assert!(target.is_current_at(ego.timestamp));
+    }
+
+    #[test]
+    fn test_follow_oracle_never_uses_future_peer_snapshot() {
+        let mut swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        swarm.step(0.005);
+        let ego = VehicleState::cruising(13.4); // observation remains at t=0
+
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("initial simulator snapshot should remain available");
+        assert_eq!(target.snapshot_time_s, 0.0);
+        assert!(target.snapshot_time_s <= ego.timestamp);
+    }
+
+    #[test]
+    fn test_follow_oracle_rejects_off_lane_peer() {
+        let mut swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        swarm.peers[0].history[0].1.position_y = 3.0;
+        let ego = VehicleState::cruising(13.4);
+        assert!(swarm.nearest_simulator_truth_follow_target(&ego).is_none());
+    }
+
+    #[test]
+    fn test_follow_oracle_rejects_stale_peer_snapshot() {
+        let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        let mut ego = VehicleState::cruising(13.4);
+        ego.timestamp = 1.0;
+        assert!(swarm.nearest_simulator_truth_follow_target(&ego).is_none());
+    }
+
+    #[test]
+    fn test_follow_oracle_projects_relative_speed() {
+        let mut swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(1));
+        swarm.peers[0].history[0].1.speed = 10.0;
+        let ego = VehicleState::cruising(13.4);
+        let target = swarm
+            .nearest_simulator_truth_follow_target(&ego)
+            .expect("lead actor should be available");
+        assert!((target.relative_speed_mps - (10.0 - 13.4)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_follow_oracle_returns_none_without_peers() {
+        let swarm = SwarmSimulator::new(SwarmConfig::convoy_straight(0));
+        let ego = VehicleState::cruising(13.4);
+        assert!(swarm.nearest_simulator_truth_follow_target(&ego).is_none());
+    }
+
+    #[test]
     fn test_brake_density() {
         let config = SwarmConfig::convoy_straight(4);
         let mut swarm = SwarmSimulator::new(config);
