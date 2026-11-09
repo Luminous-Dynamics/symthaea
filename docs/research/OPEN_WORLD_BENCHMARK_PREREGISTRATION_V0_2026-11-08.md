@@ -76,6 +76,39 @@ Prospective Symthaea gates for an exact B1–B4 adapter:
 
 Terminal-Bench Science is an adjacent execution/reliability track, not a scientific-law score. The vendor's Nov 5, 2026 table lists 70 tasks, an eight-hour cap, 62.86% for GPT-6 Astra, 52.86% for GPT-6.1 Sol and 47.14% for Claude Opus 5.5, with costs from $3.44 to $20.80 per task among these leading rows. Treat these as a changing vendor snapshot. A Symthaea comparison requires the same task/verifier revision, harness, task access, timeout, attempt count and cost accounting.
 
+## 3B. Law validity, candidate selection and evidence grounding
+
+Add a complementary SciLaws-Bench adapter with two distinct task settings:
+
+- **Real:** fixed scientific data; submit a closed-form law and score held-out numeric fit (S_N) separately from source-grounded scientific validity (S_V).
+- **Parallel:** active queries to a residual-calibrated simulator whose hidden law is a newly synthesized structural variant; score hidden structural recovery (S_S) separately from numeric fit.
+
+The upstream corpus reports 118 scientific problems from 381 papers across six disciplines, 291 candidate laws and roughly 8M data points. It contains 66 single-group and 52 multi-group problems; the latter test one shared functional form with per-group parameters and held-out group transfer. These are strong external task assets, but the official Python task packages and judging protocol must be pinned and licensing/runtime compatibility reviewed before an adapter claim.
+
+SciLaws-Bench reports that numeric fit and validity agree in only 53.6% of unequal-fit candidate pairs, and that final candidate selection can discard a better generated candidate. Therefore require a three-part acceptance vector:
+1. **Predictive fit:** held-out interpolation, range extrapolation, temporal transfer and group transfer as applicable.
+2. **Scientific validity:** frozen, source-grounded rubric with anti-hacking checks and independent reviewer sampling.
+3. **Structural recovery:** complete hidden added-term recovery in Parallel, not merely recovery of the published base equation.
+
+Also preserve candidate selection:
+- record every generated candidate and its exact model/provenance digest;
+- freeze every candidate before selection, with pre-submission predictions and resource costs;
+- independently score the best generated candidate and the submitted candidate;
+- report generation-to-submission selection regret, candidate-pool coverage and Pareto domination;
+- report the exhaustive best-of-N oracle only as an upper bound, never as an agent score.
+
+### Evidence-grounding perturbation
+
+On a subset of Real tasks and on synthetic controls, create paired versions of the same task:
+- intact evidence;
+- evidence withdrawn (the target-supporting rows/columns/statistic removed);
+- evidence reversed (a pre-registered, independently verified transformation that reverses the relevant statistic or causal contrast);
+- irrelevant metadata changed while the evidence remains fixed.
+
+The claim should receive credit as *evidence-grounded* only when it is supported on the intact version, appropriately weakens or abstains when the decisive evidence is withdrawn, and changes consistently with the evidence when reversed. The irrelevant-metadata arm should leave the decision invariant. Preserve the original answer score separately. This tests whether the system uses the current evidence rather than recalling or inferring the answer from prior knowledge. It is inspired by evidence-grounded scientific evaluation on a limited single-cell task slice; this preregistration is not a claim of direct reproduction.
+
+Prospective Symthaea target: reduce the best-generated-to-submitted gap under matched candidate-generation budget, without trading away scientific validity or structural recovery. Evidence-grounded accuracy must improve against a frozen incumbent while intact-task accuracy does not regress. Set margins only after a development pilot and freeze them before confirmation.
+
 ## 4. Matched experimental arms
 
 ### 4.1 Structure-access treatment
@@ -135,6 +168,16 @@ Information gain is not decision value. For each decision-focused probe, pre-reg
 The exact tiny-world oracle may enumerate future branches only for its declared utility and action set. It is not a general theorem or evidence of physical truth.
 
 ## 6. Primary outcomes — report as a vector
+
+### Law quality, model selection and evidence use
+
+- S_N / held-out prediction score, by task and split type.
+- S_V / scientific validity score and each rubric item, with anti-hacking failures.
+- S_S / complete hidden structural-term recovery.
+- Best-generated versus submitted-candidate score, selection regret and Pareto domination.
+- Evidence-grounded accuracy on intact / withdrawn / reversed variants.
+- Withdrawn-evidence uncertainty/abstention response and reversed-evidence action/conclusion response.
+- Irrelevant-metadata invariance and prior-knowledge-only accuracy.
 
 ### Structure and model
 - structural-family precision / recall / exact set match;
@@ -258,5 +301,8 @@ This lane owns the matched benchmark experiment and thin adapter only. It does n
 - SciAgentArena: https://www.microsoft.com/en-us/research/publication/benchmarking-ai-agents-for-addressing-scientific-challenges-across-scales/
 - ScienceAgentBench: https://hal.cs.princeton.edu/scienceagentbench
 - AstaBench: https://allenai.org/asta/bench
+- SciLaws-Bench: https://yiyihum.github.io/SciLaws-Bench/ ; paper https://arxiv.org/abs/2609.01552
+- Evidence-grounded scientific evaluation: https://arxiv.org/abs/2610.04915
+- Semantic Calibration for long-form scientific QA: https://aclanthology.org/2026.uncertainlp-main.11/
 - ASI-Bench: https://arxiv.org/abs/2608.17271 ; leaderboard: https://asibench.apexin.ai/leaderboard/ ; prompt guidance FAQ: https://asibench.apexin.ai/faq/
 - Terminal-Bench Science: https://vals-ai.com/benchmarks/terminal-bench-science
