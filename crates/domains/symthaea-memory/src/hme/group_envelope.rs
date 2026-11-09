@@ -402,6 +402,16 @@ impl ContinuousHVGroupEnvelope {
         })
     }
 
+    /// Manifest generation bound into this immutable envelope.
+    pub fn manifest_generation(&self) -> u64 {
+        self.manifest_generation
+    }
+
+    /// Eligibility generation bound into this immutable envelope.
+    pub fn eligibility_generation(&self) -> u64 {
+        self.eligibility_generation
+    }
+
     /// Stable IDs covered by the envelope, sorted ascending.
     pub fn member_ids(&self) -> &[String] {
         &self.member_ids
