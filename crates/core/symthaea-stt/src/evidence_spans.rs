@@ -39,7 +39,7 @@ pub struct ReferenceClaimEvidence {
 /// One model-emitted citation bound to the exact source audio.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceCitation {
-    pub source_audio_sha256: String,
+    pub evaluation_audio_sha256: String,
     pub interval: SampleInterval,
 }
 
@@ -57,7 +57,7 @@ pub struct PredictedClaimEvidence {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceSpanTrial {
     pub trial_id: String,
-    pub source_audio_sha256: String,
+    pub evaluation_audio_sha256: String,
     pub sample_rate_hz: u32,
     pub sample_count: u64,
     pub reference_claims: Vec<ReferenceClaimEvidence>,
@@ -90,7 +90,7 @@ impl EvidenceRate {
 pub struct EvidenceSpanResult {
     /// Exact trial and audio coordinate identity used by this result.
     pub trial_id: String,
-    pub source_audio_sha256: String,
+    pub evaluation_audio_sha256: String,
     pub sample_rate_hz: u32,
     pub sample_count: u64,
     pub total_reference_claims: usize,
@@ -126,7 +126,7 @@ pub struct EvidenceSpanResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvidenceSpanError {
     EmptyTrialId,
-    InvalidSourceAudioDigest,
+    InvalidEvaluationAudioDigest,
     InvalidSampleRate,
     EmptyAudio,
     EmptyReferenceClaims,
@@ -140,7 +140,7 @@ pub enum EvidenceSpanError {
         end_sample: u64,
         sample_count: u64,
     },
-    CitationSourceDigestMismatch {
+    CitationEvaluationDigestMismatch {
         claim_id: String,
         expected: String,
         actual: String,
@@ -171,8 +171,8 @@ pub fn score_evidence_spans(
     if trial.trial_id.trim().is_empty() {
         return Err(EvidenceSpanError::EmptyTrialId);
     }
-    if !is_sha256(&trial.source_audio_sha256) {
-        return Err(EvidenceSpanError::InvalidSourceAudioDigest);
+    if !is_sha256(&trial.evaluation_audio_sha256) {
+        return Err(EvidenceSpanError::InvalidEvaluationAudioDigest);
     }
     if trial.sample_rate_hz == 0 {
         return Err(EvidenceSpanError::InvalidSampleRate);
@@ -222,11 +222,11 @@ pub fn score_evidence_spans(
 
         let mut intervals = Vec::with_capacity(claim.citations.len());
         for citation in &claim.citations {
-            if !citation.source_audio_sha256.eq_ignore_ascii_case(&trial.source_audio_sha256) {
-                return Err(EvidenceSpanError::CitationSourceDigestMismatch {
+            if !citation.evaluation_audio_sha256.eq_ignore_ascii_case(&trial.evaluation_audio_sha256) {
+                return Err(EvidenceSpanError::CitationEvaluationDigestMismatch {
                     claim_id: claim.claim_id.clone(),
-                    expected: trial.source_audio_sha256.clone(),
-                    actual: citation.source_audio_sha256.clone(),
+                    expected: trial.evaluation_audio_sha256.clone(),
+                    actual: citation.evaluation_audio_sha256.clone(),
                 });
             }
             validate_intervals(
@@ -279,7 +279,7 @@ pub fn score_evidence_spans(
 
     Ok(EvidenceSpanResult {
         trial_id: trial.trial_id.clone(),
-        source_audio_sha256: trial.source_audio_sha256.clone(),
+        evaluation_audio_sha256: trial.evaluation_audio_sha256.clone(),
         sample_rate_hz: trial.sample_rate_hz,
         sample_count: trial.sample_count,
         total_reference_claims: trial.reference_claims.len(),
@@ -418,7 +418,7 @@ mod tests {
             citations: spans
                 .into_iter()
                 .map(|interval| EvidenceCitation {
-                    source_audio_sha256: AUDIO.into(),
+                    evaluation_audio_sha256: AUDIO.into(),
                     interval,
                 })
                 .collect(),
@@ -431,7 +431,7 @@ mod tests {
     ) -> EvidenceSpanTrial {
         EvidenceSpanTrial {
             trial_id: "trial-1".into(),
-            source_audio_sha256: AUDIO.into(),
+            evaluation_audio_sha256: AUDIO.into(),
             sample_rate_hz: 16_000,
             sample_count: 100,
             reference_claims,
@@ -559,13 +559,13 @@ mod tests {
     #[test]
     fn rejects_citation_bound_to_different_audio_digest() {
         let mut bad = prediction("answer", vec![interval(10, 20)]);
-        bad.citations[0].source_audio_sha256 = OTHER_AUDIO.into();
+        bad.citations[0].evaluation_audio_sha256 = OTHER_AUDIO.into();
         assert!(matches!(
             score_evidence_spans(&trial(
                 vec![reference("answer", vec![interval(10, 20)])],
                 vec![bad],
             )),
-            Err(EvidenceSpanError::CitationSourceDigestMismatch { .. })
+            Err(EvidenceSpanError::CitationEvaluationDigestMismatch { .. })
         ));
     }
 
@@ -650,8 +650,8 @@ mod tests {
         bad.sample_count = 0;
         assert_eq!(score_evidence_spans(&bad), Err(EvidenceSpanError::EmptyAudio));
         bad.sample_count = 100;
-        bad.source_audio_sha256 = "not-a-digest".into();
-        assert_eq!(score_evidence_spans(&bad), Err(EvidenceSpanError::InvalidSourceAudioDigest));
+        bad.evaluation_audio_sha256 = "not-a-digest".into();
+        assert_eq!(score_evidence_spans(&bad), Err(EvidenceSpanError::InvalidEvaluationAudioDigest));
     }
 
     #[test]
