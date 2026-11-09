@@ -1279,6 +1279,18 @@
     {
       "id": "clairvoyant_model_vertex_policy_lower_bound",
       "scope": "Diagnostic lower bound with the hidden model vertex revealed to the policy; never a deployable policy."
+    },
+    {
+      "id": "hlb_static_model_robust_policy_tree_oracle",
+      "scope": "Exact exhaustive finite-horizon policy-tree oracle minimizing worst-case terminal risk over one hidden observation-model vertex fixed for the episode."
+    },
+    {
+      "id": "hlb_rectangular_stagewise_robust_relaxation",
+      "scope": "Rectangular adversary may select a different model vertex after each observable history; used as a conservative comparator, not as a persistent physical model."
+    },
+    {
+      "id": "hlb_clairvoyant_model_vertex_lower_bound",
+      "scope": "Diagnostic lower bound in which the hidden observation-model vertex is revealed to the policy; not a deployable policy."
     }
   ],
   "seeds": {
@@ -1685,7 +1697,12 @@
     "The anytime e-process significance parameter must satisfy the strict open interval 0 < alpha < 1; zero, one, out-of-range, NaN, and infinite values fail closed.",
     "A calibrated TV ambiguity radius must be computed from an independent IID calibration sample using a declared confidence parameter and explicit finite-sample bound; calibration observations may not be reused as evaluation outcomes.",
     "The categorical Hoeffding/union-bound radius must report category count, sample count, empirical distribution, per-coordinate bound, alpha, confidence level, and derived TV radius; it must not be described as valid under temporal dependence or calibration/deployment shift.",
-    "Sequential e-process thresholds and categorical TV calibration bounds must be calculated in the log domain so valid subnormal alpha values cannot cause reciprocal overflow; strict alpha bounds remain 0 < alpha < 1."
+    "Sequential e-process thresholds and categorical TV calibration bounds must be calculated in the log domain so valid subnormal alpha values cannot cause reciprocal overflow; strict alpha bounds remain 0 < alpha < 1.",
+    "Static-model robust evaluation must use one latent observation-model vertex for every stage of an episode; policy branches may depend only on public observations.",
+    "The rectangular comparator must identify every stage/history at which the adversary may switch vertices; its hybrid paths must not be reported as trajectories from one static model.",
+    "The two-stage noiseless fixture must enumerate exactly 64 deterministic non-anticipative policies and yield static robust risk 0, rectangular robust risk 0.5, and clairvoyant lower bound 0.",
+    "The static-optimal calibrated policy must have zero terminal risk under both persistent model vertices and risk 1 under the designated rectangular switching adversary.",
+    "The exact finite oracle is a small-instance reference only; no scalable non-rectangular robust-MDP solver or general POMDP claim is permitted."
   ],
   "research_references": [
     {

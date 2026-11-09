@@ -1,0 +1,86 @@
+name: HLB Static-Model Robust Sequential Contract
+
+on:
+  pull_request:
+    branches: [research/hlb-fep-wsp-factorial-v2]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/hlb-static-model-robust-seq-contract.yml"
+      - "crates/core/symthaea-fep/src/static_model_robust_diagnostics.rs"
+      - "crates/core/symthaea-fep/examples/hlb_static_model_robust_diagnostics.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "Cargo.lock"
+  push:
+    branches: [research/hlb-static-model-robust-seq-v1]
+    paths:
+      - ".github/workflows/hlb-static-model-robust-seq-contract.yml"
+      - "crates/core/symthaea-fep/src/static_model_robust_diagnostics.rs"
+      - "crates/core/symthaea-fep/examples/hlb_static_model_robust_diagnostics.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-static-model-robust-seq-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  exact-policy-oracle:
+    name: Static vs rectangular policy-tree oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/static_model_robust_diagnostics.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_static_model_robust_diagnostics.rs
+
+      - name: Run exhaustive policy-oracle tests
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+          cargo test --locked --release -p symthaea-fep --lib static_model_robust_diagnostics::tests -- --nocapture
+
+      - name: Emit exact-head known-answer receipt
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_static_model_robust_diagnostics | tee research-results/hlb-static-model-robust-seq.txt
+          grep -Fx "source_sha=$SYMTHAEA_SOURCE_SHA" research-results/hlb-static-model-robust-seq.txt
+          grep -Fx "policies_evaluated=64" research-results/hlb-static-model-robust-seq.txt
+          grep -Fx "static_robust_risk=0" research-results/hlb-static-model-robust-seq.txt
+          grep -Fx "rectangular_robust_risk=0.5" research-results/hlb-static-model-robust-seq.txt
+          grep -Fx "clairvoyant_lower_bound=0" research-results/hlb-static-model-robust-seq.txt
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json crates/core/symthaea-fep/src/static_model_robust_diagnostics.rs crates/core/symthaea-fep/examples/hlb_static_model_robust_diagnostics.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-static-model-robust-seq.txt > research-results/SHA256SUMS
+
+      - name: Upload exact-head receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hlb-static-model-robust-seq-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30
