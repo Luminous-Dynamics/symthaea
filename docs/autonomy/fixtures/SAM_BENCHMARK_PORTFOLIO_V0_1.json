@@ -1466,7 +1466,7 @@
     },
     {
       "id": "sam-follow-oracle-observation-separation-v0.1",
-      "name": "SAM Follow Oracle / Student-Teacher Privilege Separation v0.2",
+      "name": "SAM Follow Oracle / Student-Teacher Privilege Separation v0.3",
       "category": "synthetic_training_information_privilege",
       "capability_target": [
         "simulator_truth_source_separation",
@@ -1477,7 +1477,8 @@
         "teacher_blend_vs_supervision_separation",
         "student_teacher_action_gap_measurement",
         "frozen_policy_teacher_free_evaluation",
-        "evaluator_only_shadow_teacher"
+        "evaluator_only_shadow_teacher",
+        "teacher_reference_only_classification"
       ],
       "protocol": {
         "kind": "synthetic_action_teacher_and_target_admission",
@@ -1509,7 +1510,8 @@
             "teacher_action_used_for_blend",
             "teacher_action_used_for_supervision",
             "teacher_action_evaluation_only",
-            "follow_oracle_used_for_policy"
+            "follow_oracle_used_for_policy",
+            "teacher_action_reference_only"
           ]
         },
         "action_trace": [
@@ -1529,7 +1531,7 @@
           "replay_buffer_updates": false,
           "exploration_noise": false,
           "controller_output_projection_must_remain_unchanged": true,
-          "shadow_teacher": "optional telemetry-only reference; teacher_action_evaluation_only=true; never blended or supervised",
+          "shadow_teacher": "optional telemetry-only reference; teacher_action_evaluation_only=true and teacher_action_reference_only=true; never blended or supervised",
           "simulator_oracle": "may be retained for outcome/reward scoring; must not influence the policy"
         }
       },
@@ -1555,7 +1557,8 @@
         "teacher_free_eval_replay_update_count_zero",
         "teacher_free_eval_controller_weight_delta_zero",
         "teacher_free_eval_executed_vs_blended_command_delta",
-        "telemetry_csv_column_arity"
+        "telemetry_csv_column_arity",
+        "teacher_action_reference_only_steps"
       ],
       "source_status": "implementation_in_review_not_yet_executed",
       "rights_status": "synthetic_simulator_only",
@@ -1563,9 +1566,9 @@
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
         "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
         "source_branch": "research/sam-follow-oracle-evidence-v0-1",
-        "latest_inspected_commit": "a0958fa4f78228b8b6cbcf71c6189f9191d83764",
-        "csv_header_columns": 36,
-        "csv_format_placeholders": 36,
+        "latest_inspected_commit": "c0610c3363239851a12a586643c41467750917a3",
+        "csv_header_columns": 37,
+        "csv_format_placeholders": 37,
         "structural_source_check": "passed_during_authoring",
         "rust_tests_status": "authored_not_yet_confirmed_by_current_exact_head_ci"
       },
@@ -1576,7 +1579,8 @@
         "Simulator truth may remain available to score outcomes, but the student policy must not consume the explicit Follow oracle target.",
         "The evaluation path still uses the bicycle-model simulator and existing simulated state vector; it does not establish a camera/LiDAR/radar-only perception result.",
         "Exact-head CI and tests for the latest implementation are not yet confirmed; authored tests and source audit are not counted as passes.",
-        "This internal synthetic training/evaluation crucible is not an external leaderboard result or road-safety measure."
+        "This internal synthetic training/evaluation crucible is not an external leaderboard result or road-safety measure.",
+        "Episode CSV currently has 37 named columns; a regression checks every emitted row has the same width as its header. This is an authored test and source-authoring check, not yet an executed Rust pass."
       ],
       "sources": [
         "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
