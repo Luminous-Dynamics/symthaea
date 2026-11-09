@@ -18,6 +18,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use std::sync::Arc;
 
 use super::group_envelope::{
     ContinuousHVGroupEnvelope, GroupEnvelopeError, continuous_hv_member_payload_digest,
