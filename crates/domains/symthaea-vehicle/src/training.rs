@@ -524,12 +524,12 @@ impl VehicleTrainer {
                         0
                     },
                     follow_oracle_available: follow_oracle_target.is_some(),
-                    follow_oracle_actor_id: follow_oracle_target.map(|target| target.actor_id),
-                    follow_oracle_gap_m: follow_oracle_target.map(|target| target.gap_m),
+                    follow_oracle_actor_id: follow_oracle_target.map(|target| target.actor_id()),
+                    follow_oracle_gap_m: follow_oracle_target.map(|target| target.gap_m()),
                     follow_oracle_relative_speed_mps: follow_oracle_target
-                        .map(|target| target.relative_speed_mps),
+                        .map(|target| target.relative_speed_mps()),
                     follow_oracle_snapshot_age_s: follow_oracle_target
-                        .map(|target| (state.timestamp - target.snapshot_time_s).max(0.0)),
+                        .map(|target| (state.timestamp - target.snapshot_time_s()).max(0.0)),
                 });
             }
 
