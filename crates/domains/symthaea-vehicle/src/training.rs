@@ -50,6 +50,10 @@ pub struct EpisodeMetrics {
     pub avg_control_effort: f64,
     /// Number of exploration bursts triggered.
     pub exploration_count: usize,
+    /// Follow steps with a current simulator-oracle lead target.
+    pub follow_oracle_available_steps: usize,
+    /// Follow steps with no admissible simulator-oracle target.
+    pub follow_oracle_unavailable_steps: usize,
     /// Final subterranean navigation sigma when subterranean context is active.
     pub subterranean_navigation_sigma_m: Option<f64>,
     /// Number of subterranean navigation updates applied.
@@ -277,6 +281,8 @@ impl VehicleTrainer {
         let mut total_heading_error = 0.0;
         let mut total_control_effort = 0.0;
         let mut exploration_count = 0usize;
+        let mut follow_oracle_available_steps = 0usize;
+        let mut follow_oracle_unavailable_steps = 0usize;
         let mut fe_samples = 0usize;
         let mut steps_completed = 0usize;
         let mut current_tau_factor = fep_result.tau_factor;
@@ -379,9 +385,20 @@ impl VehicleTrainer {
             // Separate simulator-truth Follow target from delayed mesh aggregates.
             // The oracle selector only returns a same-road actor snapshot at or
             // before this exact ego observation timestamp.
-            let follow_oracle_target = swarm
-                .as_ref()
-                .and_then(|sw| sw.nearest_simulator_truth_follow_target(&state));
+            let follow_oracle_target = if matches!(task, VehicleTask::Follow { .. }) {
+                swarm
+                    .as_ref()
+                    .and_then(|sw| sw.nearest_simulator_truth_follow_target(&state))
+            } else {
+                None
+            };
+            if matches!(task, VehicleTask::Follow { .. }) {
+                if follow_oracle_target.is_some() {
+                    follow_oracle_available_steps += 1;
+                } else {
+                    follow_oracle_unavailable_steps += 1;
+                }
+            }
 
             if let (Some(context), Some(bridge), Some(navigator)) = (
                 self.subterranean_context.as_ref(),
@@ -505,6 +522,14 @@ impl VehicleTrainer {
                     } else {
                         0
                     },
+                    follow_oracle_available: follow_oracle_target.is_some(),
+                    follow_oracle_actor_id: follow_oracle_target.map(|target| target.actor_id),
+                    follow_oracle_gap_m: follow_oracle_target.map(|target| target.gap_m),
+                    follow_oracle_relative_speed_mps: follow_oracle_target
+                        .map(|target| target.relative_speed_mps),
+                    follow_oracle_snapshot_age_s: follow_oracle_target.map(|target| {
+                        (state.timestamp - target.snapshot_time_s).max(0.0)
+                    }),
                 });
             }
 
@@ -603,6 +628,8 @@ impl VehicleTrainer {
             avg_heading_error: total_heading_error / n,
             avg_control_effort: total_control_effort / n,
             exploration_count,
+            follow_oracle_available_steps,
+            follow_oracle_unavailable_steps,
             subterranean_navigation_sigma_m,
             subterranean_navigation_updates,
             subterranean_buffered_relays,
