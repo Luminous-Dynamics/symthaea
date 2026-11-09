@@ -32,6 +32,22 @@ pub struct StressEvidence {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RawProsodyInfo {
+    pub a1: i32,
+    pub a2: i32,
+    pub a3: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PunctuationEvidence {
+    /// Position in the original Piper token array.
+    pub raw_token_index: usize,
+    /// Number of lexical words completed before this punctuation token.
+    pub after_word_count: usize,
+    pub token: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct RawWordHypothesis {
     pub word_index: usize,
     /// Concatenated IPA character stream; not yet segmented into phones.
@@ -42,6 +58,10 @@ pub struct RawWordHypothesis {
     pub ipa_character_tokens: Vec<String>,
     /// Stress marker evidence only. No syllable boundaries are asserted.
     pub stress_evidence: Vec<StressEvidence>,
+    /// A1/A2/A3 metadata for each IPA character token, in the same order as
+    /// ipa_character_tokens. This is preserved exactly, not interpreted as
+    /// a phoneme or syllable label.
+    pub character_prosody: Vec<Option<RawProsodyInfo>>,
     /// Null means no independently validated syllabification was supplied.
     pub syllable_boundaries: Option<Vec<usize>>,
     /// The backend does not expose an independently calibrated OOV decision.
@@ -55,7 +75,33 @@ pub struct RawPronunciationHypothesis {
     pub language: &'static str,
     pub provider: &'static str,
     pub provider_version: &'static str,
+    /// Exact provider token stream, including stress markers, separators and
+    /// punctuation. The normalized word view below never replaces this source.
+    pub raw_tokens: Vec<String>,
+    /// Full A1/A2/A3 stream, index-aligned with raw_tokens.
+    pub raw_prosody: Vec<Option<RawProsodyInfo>>,
+    /// Punctuation is retained separately and never folded into IPA words.
+    pub punctuation: Vec<PunctuationEvidence>,
     pub words: Vec<RawWordHypothesis>,
+}
+
+fn is_punctuation_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.chars().all(|character| {
+            character.is_ascii_punctuation()
+                || matches!(
+                    character,
+                    '“' | '”' | '‘' | '’' | '—' | '–' | '…' | '«' | '»' | '¿' | '¡'
+                )
+        })
+}
+
+fn raw_prosody_info(info: Option<ProsodyInfo>) -> Option<RawProsodyInfo> {
+    info.map(|value| RawProsodyInfo {
+        a1: value.a1,
+        a2: value.a2,
+        a3: value.a3,
+    })
 }
 
 fn validate_prosody_alignment(
@@ -100,12 +146,15 @@ pub fn normalize_piper_english(
 
     let mut words = Vec::new();
     let mut current_tokens: Vec<String> = Vec::new();
+    let mut current_prosody: Vec<Option<RawProsodyInfo>> = Vec::new();
     let mut stress_evidence = Vec::new();
+    let mut punctuation = Vec::new();
     let mut pending_stress: Option<(usize, StressKind, Option<ProsodyInfo>)> = None;
     let mut raw_position = 0usize;
 
     let flush_word = |words: &mut Vec<RawWordHypothesis>,
                       current_tokens: &mut Vec<String>,
+                      current_prosody: &mut Vec<Option<RawProsodyInfo>>,
                       stress_evidence: &mut Vec<StressEvidence>| {
         if current_tokens.is_empty() {
             return;
@@ -116,6 +165,7 @@ pub fn normalize_piper_english(
             raw_ipa,
             ipa_character_tokens: std::mem::take(current_tokens),
             stress_evidence: std::mem::take(stress_evidence),
+            character_prosody: std::mem::take(current_prosody),
             syllable_boundaries: None,
             oov_status: "not_assessed",
             resolution_status: "needs_review",
@@ -131,7 +181,12 @@ pub fn normalize_piper_english(
                         pending_stress.as_ref().unwrap().0
                     ));
                 }
-                flush_word(&mut words, &mut current_tokens, &mut stress_evidence);
+                flush_word(
+                    &mut words,
+                    &mut current_tokens,
+                    &mut current_prosody,
+                    &mut stress_evidence,
+                );
                 raw_position = 0;
             }
             "ˈ" | "ˌ" => {
@@ -157,6 +212,26 @@ pub fn normalize_piper_english(
                 }
                 pending_stress = Some((raw_token_index, kind, info));
             }
+            _ if is_punctuation_token(token) => {
+                if pending_stress.is_some() {
+                    return Err(format!(
+                        "stress marker at Piper token {} is not followed by an IPA character before punctuation",
+                        pending_stress.as_ref().unwrap().0
+                    ));
+                }
+                flush_word(
+                    &mut words,
+                    &mut current_tokens,
+                    &mut current_prosody,
+                    &mut stress_evidence,
+                );
+                punctuation.push(PunctuationEvidence {
+                    raw_token_index,
+                    after_word_count: words.len(),
+                    token: token.clone(),
+                });
+                raw_position = 0;
+            }
             _ => {
                 if let Some((marker_index, kind, marker_info)) = pending_stress.take() {
                     let character_index = raw_position;
@@ -178,6 +253,7 @@ pub fn normalize_piper_english(
                     });
                 }
                 current_tokens.push(token.clone());
+                current_prosody.push(raw_prosody_info(prosody[raw_token_index]));
                 raw_position += token.chars().count();
             }
         }
@@ -188,7 +264,12 @@ pub fn normalize_piper_english(
             "Piper stress marker at raw token {marker_index} has no following IPA character"
         ));
     }
-    flush_word(&mut words, &mut current_tokens, &mut stress_evidence);
+    flush_word(
+        &mut words,
+        &mut current_tokens,
+        &mut current_prosody,
+        &mut stress_evidence,
+    );
     if words.is_empty() {
         return Err("Piper returned no lexical word hypotheses".into());
     }
@@ -197,6 +278,9 @@ pub fn normalize_piper_english(
         language: "en",
         provider: "piper-plus-g2p",
         provider_version: "0.5.3",
+        raw_tokens: tokens.to_vec(),
+        raw_prosody: prosody.iter().copied().map(raw_prosody_info).collect(),
+        punctuation,
         words,
     })
 }
@@ -254,6 +338,77 @@ mod tests {
         assert_eq!(normalized.words[0].syllable_boundaries, None);
         assert_eq!(normalized.words[0].oov_status, "not_assessed");
         assert_eq!(normalized.words[0].resolution_status, "needs_review");
+    }
+
+    #[test]
+    fn punctuation_is_separated_from_words_but_preserved_with_raw_provenance() {
+        let tokens = vec![
+            "“".into(),
+            "h".into(),
+            "ə".into(),
+            "l".into(),
+            "ˈ".into(),
+            "o".into(),
+            "ʊ".into(),
+            ",".into(),
+            " ".into(),
+            "w".into(),
+            "ˈ".into(),
+            "ɜ".into(),
+            "ː".into(),
+            "l".into(),
+            "d".into(),
+            "!".into(),
+            "”".into(),
+        ];
+        let prosody = vec![
+            None,
+            info(0, 5),
+            info(0, 5),
+            info(0, 5),
+            info(2, 5),
+            info(2, 5),
+            info(2, 5),
+            None,
+            None,
+            info(0, 6),
+            info(2, 6),
+            info(2, 6),
+            info(2, 6),
+            info(2, 6),
+            info(2, 6),
+            None,
+            None,
+        ];
+        let normalized = normalize_piper_english(&tokens, &prosody).unwrap();
+        assert_eq!(normalized.words.len(), 2);
+        assert_eq!(normalized.words[0].raw_ipa, "həloʊ");
+        assert_eq!(normalized.words[1].raw_ipa, "wɜːld");
+        assert_eq!(normalized.punctuation.len(), 4);
+        assert_eq!(
+            normalized
+                .punctuation
+                .iter()
+                .map(|item| item.token.as_str())
+                .collect::<Vec<_>>(),
+            vec!["“", ",", "!", "”"]
+        );
+        assert_eq!(normalized.raw_tokens, tokens);
+        assert_eq!(normalized.raw_prosody.len(), tokens.len());
+        assert_eq!(
+            normalized.words[0].character_prosody.len(),
+            normalized.words[0].ipa_character_tokens.len()
+        );
+        assert_eq!(normalized.words[0].character_prosody[0], raw_prosody_info(prosody[1]));
+    }
+
+    #[test]
+    fn punctuation_cannot_consume_a_pending_stress_marker() {
+        let tokens = vec!["ˈ".into(), ",".into(), "a".into()];
+        let prosody = vec![info(2, 0), None, info(2, 0)];
+        assert!(normalize_piper_english(&tokens, &prosody)
+            .unwrap_err()
+            .contains("before punctuation"));
     }
 
     #[test]
