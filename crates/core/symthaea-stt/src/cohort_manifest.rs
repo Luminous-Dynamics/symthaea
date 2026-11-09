@@ -979,6 +979,26 @@ mod tests {
     }
 
     #[test]
+    fn rejects_extra_record_claiming_existing_pair_without_membership() {
+        let mut manifest = fixture();
+        manifest.records.push(record(
+            "pilot-extra",
+            "pilot-pair",
+            "source-pilot",
+            "speaker-pilot",
+            "session-pilot",
+            "utterance-pilot",
+            CohortSplit::Pilot,
+            A,
+            A,
+        ));
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::OrphanPairRecord(_))
+        ));
+    }
+
+    #[test]
     fn rejects_duplicate_pair_ids_across_uses() {
         let mut manifest = fixture();
         manifest.pairs[1].pair_id = manifest.pairs[0].pair_id.clone();
