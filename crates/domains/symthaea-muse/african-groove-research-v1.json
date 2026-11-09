@@ -1,0 +1,432 @@
+{
+  "schema": "melothaea-african-groove-research-v1",
+  "status": "research_only_no_composer_routes",
+  "parent_catalog": {
+    "branch": "main",
+    "catalog_path": "crates/domains/symthaea-muse-protocol/src/catalog.rs",
+    "scope_note": "The six named identities are research entries in the 152-entry main-branch taxonomy. This file does not assign or alter catalog IDs."
+  },
+  "implementation_reference": {
+    "schema": "ensemble-groove-v1",
+    "module_path": "crates/domains/symthaea-music-theory/src/ensemble_groove.rs",
+    "status": "symbolic_interaction_analyzer_only"
+  },
+  "claim_limits": [
+    "No genre-specific composer route is implemented by this manifest.",
+    "Candidate features are research hypotheses and must be scoped by period, region, scene and repertoire.",
+    "No exact rhythmic pattern is asserted as canonical for any tradition.",
+    "The synthetic analyzer fixtures are not musical reference data and are not evidence of cultural authenticity.",
+    "Publicly accessible recordings, transcriptions and scores are not presumed licensed for ingestion, training or commercial use."
+  ],
+  "shared_research_principles": [
+    "Represent independent role layers and their full joint cycle rather than flattening all events into one bar.",
+    "Treat intentional collisions and intentional rests as valid musical possibilities; only enforce explicitly sourced constraints.",
+    "Distinguish a stable reference/ostinato layer from variable lead or improvisatory layers.",
+    "Preserve provenance, period boundaries, variants, annotation uncertainty and practitioner disagreement.",
+    "Keep identity, structural grammar, performance interpretation, sound rendering and cultural review as separate evidence dimensions."
+  ],
+  "sources": [
+    {
+      "id": "anku_2000",
+      "title": "Circles and Time: A Theory of Structural Organization of Rhythm in African Music",
+      "kind": "peer_reviewed_music_theory_article",
+      "year": 2000,
+      "url": "https://doi.org/10.30535/mto.6.1.2",
+      "supports": [
+        "afrobeat",
+        "highlife",
+        "juju"
+      ],
+      "scope": "A theory of cyclical rhythmic sets, ostinato frameworks and lead variation; use as an analytical lens, not as a universal description of African music."
+    },
+    {
+      "id": "agawu_2016",
+      "title": "The Rhythmic Imagination",
+      "kind": "ethnomusicology_monograph_chapter",
+      "year": 2016,
+      "url": "https://doi.org/10.1093/acprof:oso/9780190263201.003.0005",
+      "supports": [
+        "afrobeat",
+        "highlife",
+        "juju"
+      ],
+      "scope": "Discusses time-lines, polyrhythm and lead drumming. The concepts must be applied to the specific tradition and evidence."
+    },
+    {
+      "id": "arom_rhythmics",
+      "title": "African rhythmics",
+      "kind": "ethnomusicology_monograph_chapter",
+      "url": "https://www.cambridge.org/core/books/abs/african-polyphony-and-polyrhythm/african-rhythmics/F675DEAFE6569381B013C9982B3C5762",
+      "supports": [
+        "afrobeat",
+        "highlife",
+        "juju"
+      ],
+      "scope": "Describes interwoven cyclical figures and cross-rhythm; not a template for every style or every African region."
+    },
+    {
+      "id": "afrobeat_after_dereification",
+      "title": "Gigging on the World Stage: Bossa Nova and Afrobeat after De-reification",
+      "kind": "scholarly_article",
+      "url": "https://www.scielo.br/j/cint/a/3TTy5RCKtKQDJLghWzb833b/?format=html&lang=en",
+      "supports": [
+        "afrobeat"
+      ],
+      "scope": "Discusses interlocked repetitive guitar parts and the distinction between foundational patterns and improvising lines in Fela-era Afrobeat; scoped to the discussed historical examples."
+    },
+    {
+      "id": "coffie_highlife_2020",
+      "title": "Redefining Ghanaian Highlife Music in Modern Times",
+      "kind": "scholarly_article",
+      "year": 2020,
+      "url": "https://www.uew.edu.gh/index.php/dme/staff/mmcoffie/publications/29265/detail",
+      "supports": [
+        "highlife"
+      ],
+      "scope": "Highlights instrument structure and named Ghanaian guitar patterns, while warning that timeline and drum pattern alone can be misleading."
+    },
+    {
+      "id": "highlife_keyboard_2021",
+      "title": "Ghanaian Highlife Keyboard Accompanying Patterns: A Performance Considerations",
+      "kind": "scholarly_article",
+      "year": 2021,
+      "url": "https://doi.org/10.20431/2349-0381.0812002",
+      "supports": [
+        "highlife"
+      ],
+      "scope": "Examines keyboard patterns and their relationship to indigenous drum and guitar patterns; does not imply one universal keyboard arrangement."
+    },
+    {
+      "id": "doe_palmwine_2025",
+      "title": "Palmwine music styles in Ghana",
+      "kind": "peer_reviewed_musicology_article",
+      "year": 2025,
+      "url": "https://doi.org/10.21504/amj.v14i1.3039",
+      "supports": [
+        "highlife"
+      ],
+      "scope": "Distinguishes palmwine guitar practices from guitar-band highlife; useful for nearest-neighbour controls and local guitar pattern vocabulary."
+    },
+    {
+      "id": "juju_change_2008",
+      "title": "A diachronic study of change in juju music",
+      "kind": "peer_reviewed_musicology_article",
+      "year": 2008,
+      "url": "https://www.cambridge.org/core/journals/popular-music/article/abs/diachronic-study-of-change-in-juju-music/6C359B104E11472083E09727E7958672",
+      "supports": [
+        "juju"
+      ],
+      "scope": "Documents Juju as a changing Nigerian popular style; rejects a timeless, fixed recipe."
+    },
+    {
+      "id": "juju_directing",
+      "title": "Origin and development of Directing in juju music performance",
+      "kind": "research_article",
+      "url": "https://academicjournals.org/journal/JMD/article-full-text/777EB6547545",
+      "supports": [
+        "juju"
+      ],
+      "scope": "Describes instrumental, verbal and non-verbal performance direction, including lead guitar, talking drum and ensemble cues."
+    },
+    {
+      "id": "zaire_urban_music",
+      "title": "The Genesis of Urban Music in Zaïre",
+      "kind": "musicology_article",
+      "url": "https://journal.ru.ac.za/index.php/africanmusic/article/download/1945/1020/1027",
+      "supports": [
+        "soukous"
+      ],
+      "scope": "Describes a historical Congolese rumba lineage, guitar/bass/percussion roles, section structure and improvisatory sebene practice."
+    },
+    {
+      "id": "gqom_history_2021",
+      "title": "Historicising gqom as a post-kwaito phenomenon",
+      "kind": "peer_reviewed_musicology_article",
+      "year": 2021,
+      "url": "https://doi.org/10.2989/18121004.2021.2020964",
+      "supports": [
+        "gqom"
+      ],
+      "scope": "Describes Durban Gqom history and distinguishes its rhythmic emphasis, darker/raw production and slow-burn structure from Kwaito; later variants need separate treatment."
+    },
+    {
+      "id": "amapiano_sonics_2026",
+      "title": "Ase trap tse ke pina tsa ko kasi: Sonics After the Struggle: Mapping Amapiano and Black Aesthetics in Post-Apartheid South Africa",
+      "kind": "scholarly_article",
+      "year": 2026,
+      "url": "https://doi.org/10.1080/13696815.2026.2634896",
+      "supports": [
+        "amapiano"
+      ],
+      "scope": "Explores Amapiano's post-apartheid cultural and production history and the log drum's role; it is not a complete rhythm transcription or universal production recipe."
+    }
+  ],
+  "profiles": [
+    {
+      "id": "afrobeat",
+      "canonical_name": "Afrobeat",
+      "region": "West Africa; especially Nigeria",
+      "period_scope": "The profile must distinguish the Fela-era 1970s/1980s ensemble tradition from later revivals and stylistic descendants.",
+      "route_status": "research_only_no_composer_route",
+      "candidate_discriminators": [
+        "Several repetitive/interlocking guitar parts can form a stable rhythmic fabric rather than one strummed chord layer.",
+        "Foundational ostinato parts may be structurally distinct from more variable or improvising horn and vocal parts.",
+        "Long-form vamps and sectional development should be modelled independently from one-bar drum patterns."
+      ],
+      "role_hypotheses": [
+        "rhythm_guitar_layer",
+        "second_guitar_layer",
+        "bass_ostinato",
+        "percussion_reference",
+        "horn_or_lead_layer",
+        "vocal_layer"
+      ],
+      "research_questions": [
+        "Which guitar interlocks are shared across the selected repertoire and which are arrangement-specific?",
+        "How should horn improvisation and vocal phrases interact with invariant guitar/bass layers?",
+        "Which section transitions are stable enough to become obligations rather than inferred from one song?"
+      ],
+      "nearest_neighbours": [
+        "Afrobeats",
+        "Highlife",
+        "Funk",
+        "Afro-Cuban-influenced popular music"
+      ],
+      "not_inferred": [
+        "Do not equate Afrobeat with contemporary Afrobeats.",
+        "Do not prescribe one canonical BPM, clave, chord loop, guitar count or horn lineup.",
+        "Do not assume every part must avoid coincident attacks."
+      ],
+      "sources": [
+        "afrobeat_after_dereification",
+        "anku_2000",
+        "agawu_2016",
+        "arom_rhythmics"
+      ]
+    },
+    {
+      "id": "highlife",
+      "canonical_name": "Ghanaian Highlife",
+      "region": "Ghana; related and evolving West African scenes",
+      "period_scope": "Separate early palmwine-linked guitar forms, guitar-band highlife, dance-band highlife and contemporary variants.",
+      "route_status": "research_only_no_composer_route",
+      "candidate_discriminators": [
+        "Named guitar-pattern idioms and their harmonic compatibility are more diagnostic than a generic backbeat or percussion-only signature.",
+        "Guitar-band and dance-band arrangements require different ensemble and orchestration profiles.",
+        "Keyboard patterns can function as an auxiliary rhythmic/harmonic layer shaped by guitar and indigenous drum patterns."
+      ],
+      "role_hypotheses": [
+        "mainline_or_named_guitar_pattern",
+        "bass",
+        "percussion_or_time_line",
+        "keyboard_support",
+        "vocal_or_brass_frontline"
+      ],
+      "research_questions": [
+        "Which named guitar patterns can be documented with exact, rights-cleared score/audio examples?",
+        "How do guitar-pattern variants correlate with chord progressions and melodic phrasing?",
+        "Which characteristics distinguish palmwine from guitar-band highlife in held-out recordings?"
+      ],
+      "nearest_neighbours": [
+        "Palmwine music",
+        "Juju",
+        "Afrobeat",
+        "other Ghanaian dance-band forms"
+      ],
+      "not_inferred": [
+        "Do not treat Highlife as one immutable beat or guitar pattern.",
+        "Do not assume a keyboard is always present or primary.",
+        "Do not infer contemporary identity from timeline or drum pattern alone."
+      ],
+      "sources": [
+        "coffie_highlife_2020",
+        "highlife_keyboard_2021",
+        "doe_palmwine_2025",
+        "anku_2000"
+      ]
+    },
+    {
+      "id": "juju",
+      "canonical_name": "Juju",
+      "region": "Nigeria; Yoruba and Lagos-associated popular music histories",
+      "period_scope": "Must declare historical period, band/artist context and ensemble configuration; Juju is a changing practice.",
+      "route_status": "research_only_no_composer_route",
+      "candidate_discriminators": [
+        "Ensemble coordination may use instrumental, verbal and non-verbal cues, not only pre-written repeated note patterns.",
+        "Lead instruments may direct other parts into dynamics changes, pickups, fills, interludes and endings.",
+        "Role relationships and cue-response transitions may be more diagnostic than a static cycle alone."
+      ],
+      "role_hypotheses": [
+        "lead_guitar_or_lead_instrument",
+        "talking_drum_or_lead_percussion",
+        "supporting_percussion",
+        "bass",
+        "harmony_or_guitar_support",
+        "vocal_and_response"
+      ],
+      "research_questions": [
+        "Can cue types be represented as a finite, observable transition vocabulary?",
+        "Which direction signals are instrument-specific and which are verbal/non-verbal?",
+        "How do band size and production era alter the ensemble interaction contract?"
+      ],
+      "nearest_neighbours": [
+        "Highlife",
+        "Fuji",
+        "Apala",
+        "contemporary Nigerian popular music"
+      ],
+      "not_inferred": [
+        "Do not make talking drum the sole leader in every arrangement.",
+        "Do not reduce directing to a fixed percussion pattern.",
+        "Do not create a timeless Juju recipe from one period or artist."
+      ],
+      "sources": [
+        "juju_change_2008",
+        "juju_directing",
+        "anku_2000",
+        "agawu_2016"
+      ]
+    },
+    {
+      "id": "soukous",
+      "canonical_name": "Soukous / Congolese Rumba lineage",
+      "region": "Democratic Republic of the Congo and wider Central/East African circulation",
+      "period_scope": "Declare historical era and relationship to Congolese rumba, soukous, cavacha and later dance variants.",
+      "route_status": "research_only_no_composer_route",
+      "candidate_discriminators": [
+        "Rhythm guitar and bass can establish the accompaniment fabric while lead guitar supplies interludes and improvisation.",
+        "Sebene can act as a structurally meaningful instrumental section with increased lead-guitar freedom.",
+        "Guitar role separation, bass motion and sectional transition should be modelled together."
+      ],
+      "role_hypotheses": [
+        "rhythm_guitar",
+        "second_or_supporting_guitar",
+        "lead_guitar",
+        "bass",
+        "percussion",
+        "vocal_frontline"
+      ],
+      "research_questions": [
+        "How does the rhythm-guitar pattern change between verse/refrain and sebene?",
+        "Which bass/rhythm-guitar relationships persist across historical substyles?",
+        "How should lead improvisation vary while the dance foundation remains legible?"
+      ],
+      "nearest_neighbours": [
+        "Congolese rumba",
+        "Cavacha",
+        "Tanzanian rumba",
+        "Highlife"
+      ],
+      "not_inferred": [
+        "Do not collapse Congolese rumba and all soukous variants into a single pattern.",
+        "Do not assume fixed guitar counts or one sebene duration.",
+        "Do not use fast tempo as a sufficient identity criterion."
+      ],
+      "sources": [
+        "zaire_urban_music",
+        "anku_2000",
+        "arom_rhythmics"
+      ]
+    },
+    {
+      "id": "amapiano",
+      "canonical_name": "Amapiano",
+      "region": "South Africa; originated in Gauteng and expanded nationally/internationally",
+      "period_scope": "Period and production-scene metadata required; distinguish early forms, log-drum-forward developments, vocal/instrumental and contemporary variants.",
+      "route_status": "research_only_no_composer_route",
+      "candidate_discriminators": [
+        "Log drum can function as a pitched, melodic-rhythmic bass voice with phrase identity, not merely as a kick substitute.",
+        "The log-drum line should be evaluated in relation to kick, percussion, keys, vocals and section changes.",
+        "Production and low-frequency design form part of the sound, but cannot replace groove/form analysis."
+      ],
+      "role_hypotheses": [
+        "log_drum_bass_voice",
+        "kick_or_low_percussion",
+        "shaker_or_high_percussion",
+        "keyboard_harmony",
+        "vocal_or_hook",
+        "atmospheric_texture"
+      ],
+      "research_questions": [
+        "What phrase and pitch contours characterize log-drum roles across scoped substyles?",
+        "How do log-drum phrases answer, overlap or avoid other bass/kick events?",
+        "Which production traits are stable musical identity and which are renderer-specific timbre?"
+      ],
+      "nearest_neighbours": [
+        "South African house",
+        "Kwaito",
+        "Gqom",
+        "Bacardi/Sgija (scope requires practitioner clarification)"
+      ],
+      "not_inferred": [
+        "Do not equate Amapiano with presence of a log-drum sample.",
+        "Do not assume a universal kick placement, BPM, chord progression or vocal language.",
+        "Do not conflate a sound-design profile with a composition grammar."
+      ],
+      "sources": [
+        "amapiano_sonics_2026",
+        "gqom_history_2021"
+      ]
+    },
+    {
+      "id": "gqom",
+      "canonical_name": "Gqom",
+      "region": "Durban, South Africa; later scenes and adaptations require separate scope",
+      "period_scope": "Distinguish original Durban contexts from later substyles and geographically translated forms such as Afrikaans Gqom.",
+      "route_status": "research_only_no_composer_route",
+      "candidate_discriminators": [
+        "The rhythmic beat can be foregrounded while harmony and melody remain subordinate.",
+        "Sparse arrangements and deliberate negative space may be central; density maximization can destroy identity.",
+        "Long-range slow-burn structure and evolving production are relevant alongside local rhythmic repetition."
+      ],
+      "role_hypotheses": [
+        "kick_or_primary_rhythm",
+        "secondary_percussion",
+        "sub_bass",
+        "texture_or_synth",
+        "vocal_or_chant"
+      ],
+      "research_questions": [
+        "Which negative-space and repetition properties distinguish Gqom from generic techno and Kwaito?",
+        "How do slow-burn section transitions work in the selected period/repertoire?",
+        "How do Cape/Kaaps and other geographically translated variants preserve, transform or reject earlier features?"
+      ],
+      "nearest_neighbours": [
+        "Kwaito",
+        "Techno",
+        "South African house",
+        "Afrikaans Gqom"
+      ],
+      "not_inferred": [
+        "Do not define Gqom as generic techno at one BPM.",
+        "Do not infer that harmony/melody are absent in every recording.",
+        "Do not treat Durban-origin traits as the only valid contemporary form."
+      ],
+      "sources": [
+        "gqom_history_2021",
+        "afrombeat_after_dereification",
+        "amapiano_sonics_2026"
+      ]
+    }
+  ],
+  "future_extensions": [
+    {
+      "id": "afrobeats",
+      "relationship": "distinct_from_afrobeat",
+      "state": "proposal_only",
+      "note": "Research independently; do not use as an alias for Afrobeat."
+    },
+    {
+      "id": "fuji",
+      "relationship": "possible_juju_neighbour_not_equivalent",
+      "state": "proposal_only",
+      "note": "Needs tradition-specific rhythmic/vocal research."
+    },
+    {
+      "id": "afro_house",
+      "relationship": "possible_electronic_dance_family",
+      "state": "proposal_only",
+      "note": "Needs local scene and practitioner evidence."
+    }
+  ]
+}
