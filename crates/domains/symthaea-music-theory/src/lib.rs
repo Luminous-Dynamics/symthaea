@@ -66,6 +66,7 @@ pub mod motif_foundry;
 pub mod motif_return;
 pub mod obligation;
 pub mod opera;
+pub mod orchestration;
 pub mod passacaglia;
 pub mod phrase;
 pub mod pitch;
