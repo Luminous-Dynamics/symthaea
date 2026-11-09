@@ -117,7 +117,7 @@ Use paired comparisons, bootstrap confidence intervals or other pre-registered u
 
 ## 8b. Source timestamp precision
 
-The v0.1 shared temporal kernel (#11241 / PR #11253) accepts only exact, offset-aware availability instants. Date-only filing dates and macro vintage dates must not be converted to midnight and treated as exact intraday availability. Preserve source precision; use an explicit interval or return INDETERMINATE when the possible availability interval straddles the decision frontier. The interval-censored extension is tracked in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256). A date can identify a vintage without proving its release hour.
+The v0.1 shared temporal kernel (#11241 / PR #11253) accepts only exact, offset-aware availability instants. Date-only filing dates and macro vintage dates must not be converted to midnight and treated as exact intraday availability. Preserve source precision; use an explicit interval or return INDETERMINATE when the possible availability interval straddles the decision frontier. The interval-censored extension is tracked in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256). A date can identify a vintage without proving its release hour. The shared temporal programme also tracks [unresolved revision forks #11300](https://github.com/Luminous-Dynamics/symthaea/issues/11300): two admissible successors of the same source version remain contested until an explicit resolution, not “latest timestamp wins.”
 
 ## 8a. Evaluator, rubric and reference metrology
 
