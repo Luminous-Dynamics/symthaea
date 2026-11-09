@@ -231,6 +231,9 @@ jobs:
             .source_sha == $source_sha and
             .decision_problem.nominal_selected_action_index == 0 and
             .decision_problem.robust_selected_action_index == 1 and
+            .decision_problem.calibrated_robust_selected_action_index == 1 and
+            .decision_problem.calibrated_tv_radius.sample_count == 50 and
+            .decision_problem.calibrated_tv_radius.confidence_level == 0.95 and
             (.decision_problem.robust_actual_expected_score < .decision_problem.nominal_actual_expected_score) and
             .prequential_adequacy.no_shift_report.status == "NoDetectedInadequacy" and
             .prequential_adequacy.shifted_aggregate_score_report.status == "NoDetectedInadequacy" and
