@@ -646,6 +646,218 @@ pub fn validate_embedded_profile() -> Result<(), ObservationError> {
     validate_profile(&fixture)
 }
 
+
+fn not_comparable_report(
+    comparison_kind: &str,
+    reference: &Value,
+    candidate: &Value,
+    reasons: Vec<String>,
+) -> Value {
+    serde_json::json!({
+        "schema":"luminous.rea.behavior-differential-report.v0",
+        "comparison_status":"not_comparable",
+        "comparison_kind":comparison_kind,
+        "reference_observation_id":reference["observation_id"],
+        "candidate_observation_id":candidate["observation_id"],
+        "reasons":reasons,
+        "evidence_admission":"unverified_reference",
+        "authenticated_observation":false,
+        "scope":"exact_invocation_and_environment_only"
+    })
+}
+
+/// Compare one original-target observation against one reconstruction observation.
+///
+/// A positive result is only an exact-invocation match over complete, supplied
+/// sidecar captures. It is not proof that either observation was authentic or
+/// that the programs are equivalent for untested inputs.
+pub fn compare_observations(
+    reference: &Value,
+    candidate: &Value,
+) -> Result<Value, ObservationError> {
+    validate_observation(reference)?;
+    validate_observation(candidate)?;
+
+    let reference_role = get_str(&reference["target"], "execution_role", "reference")?;
+    let candidate_role = get_str(&candidate["target"], "execution_role", "candidate")?;
+    if reference_role != "original_reference" || candidate_role != "reconstruction_candidate" {
+        return Err(ObservationError(
+            "comparison requires original_reference and reconstruction_candidate roles".to_owned(),
+        ));
+    }
+
+    let reference_id = get_str(reference, "observation_id", "reference")?;
+    let candidate_id = get_str(candidate, "observation_id", "candidate")?;
+    let reference_executable = get_str(&reference["target"], "executable_sha256", reference_id)?;
+    let candidate_executable = get_str(&candidate["target"], "executable_sha256", candidate_id)?;
+    let comparison_kind = if reference_executable == candidate_executable {
+        "same_binary_replay_control"
+    } else {
+        "reconstruction_vs_reference"
+    };
+
+    let mut scope_reasons = Vec::new();
+    for key in ["subject_sha256", "platform", "architecture"] {
+        if reference["target"][key] != candidate["target"][key] {
+            scope_reasons.push(format!("target.{key} differs"));
+        }
+    }
+    for key in [
+        "profile_sha256",
+        "os_release",
+        "architecture",
+        "locale",
+        "timezone",
+        "isolation",
+        "network",
+    ] {
+        if reference["runner"][key] != candidate["runner"][key] {
+            scope_reasons.push(format!("runner.{key} differs"));
+        }
+    }
+
+    let reference_invocation = &reference["invocation"];
+    let candidate_invocation = &candidate["invocation"];
+    if reference_invocation["argv"] != candidate_invocation["argv"] {
+        scope_reasons.push("argv byte sequence differs".to_owned());
+    }
+    if reference_invocation["working_directory"] != candidate_invocation["working_directory"] {
+        scope_reasons.push("working_directory differs".to_owned());
+    }
+    if reference_invocation["timeout_ms"] != candidate_invocation["timeout_ms"] {
+        scope_reasons.push("timeout budget differs".to_owned());
+    }
+
+    let reference_stdin_state = get_str(&reference_invocation["stdin"], "state", reference_id)?;
+    let candidate_stdin_state = get_str(&candidate_invocation["stdin"], "state", candidate_id)?;
+    if !matches!(reference_stdin_state, "complete" | "not_applicable")
+        || !matches!(candidate_stdin_state, "complete" | "not_applicable")
+    {
+        scope_reasons.push("stdin capture is incomplete or unavailable".to_owned());
+    } else if reference_invocation["stdin"] != candidate_invocation["stdin"] {
+        scope_reasons.push("stdin bytes or applicability differ".to_owned());
+    }
+
+    let reference_env = reference_invocation["environment"]
+        .as_array()
+        .ok_or_else(|| ObservationError(format!("{reference_id} environment must be an array")))?;
+    let candidate_env = candidate_invocation["environment"]
+        .as_array()
+        .ok_or_else(|| ObservationError(format!("{candidate_id} environment must be an array")))?;
+    let has_redacted_env = reference_env
+        .iter()
+        .chain(candidate_env.iter())
+        .any(|item| item["state"].as_str() == Some("redacted"));
+    if has_redacted_env {
+        scope_reasons.push("one or more environment values are redacted".to_owned());
+    } else {
+        let by_name = |items: &[Value]| {
+            let mut map = std::collections::BTreeMap::new();
+            for item in items {
+                if let Some(name) = item["name"].as_str() {
+                    map.insert(name.to_owned(), item.clone());
+                }
+            }
+            map
+        };
+        if by_name(reference_env) != by_name(candidate_env) {
+            scope_reasons.push("captured or absent environment variables differ".to_owned());
+        }
+    }
+
+    if !scope_reasons.is_empty() {
+        return Ok(not_comparable_report(
+            comparison_kind,
+            reference,
+            candidate,
+            scope_reasons,
+        ));
+    }
+
+    let reference_result = &reference["result"];
+    let candidate_result = &candidate["result"];
+    for channel in ["stdout", "stderr"] {
+        if reference_result[channel]["state"].as_str() != Some("complete")
+            || candidate_result[channel]["state"].as_str() != Some("complete")
+        {
+            return Ok(not_comparable_report(
+                comparison_kind,
+                reference,
+                candidate,
+                vec![format!("{channel} is not completely captured on both executions")],
+            ));
+        }
+    }
+    if reference_result["filesystem"]["state"].as_str() != Some("complete")
+        || candidate_result["filesystem"]["state"].as_str() != Some("complete")
+    {
+        return Ok(not_comparable_report(
+            comparison_kind,
+            reference,
+            candidate,
+            vec!["filesystem diff is not complete on both executions".to_owned()],
+        ));
+    }
+
+    let mut mismatches = Vec::new();
+    for (field, label) in [
+        ("kind", "termination kind"),
+        ("exit_code", "exit code"),
+        ("signal", "signal"),
+    ] {
+        if reference_result["termination"][field] != candidate_result["termination"][field] {
+            mismatches.push(format!("{label} differs"));
+        }
+    }
+    for channel in ["stdout", "stderr"] {
+        if reference_result[channel]["bytes_base64"]
+            != candidate_result[channel]["bytes_base64"]
+        {
+            mismatches.push(format!("{channel} bytes differ"));
+        }
+    }
+
+    let entries_by_path = |filesystem: &Value| {
+        let mut entries: Vec<Value> = filesystem["entries"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        entries.sort_by(|left, right| {
+            left["path"]
+                .as_str()
+                .unwrap_or_default()
+                .cmp(right["path"].as_str().unwrap_or_default())
+        });
+        entries
+    };
+    if entries_by_path(&reference_result["filesystem"])
+        != entries_by_path(&candidate_result["filesystem"])
+    {
+        mismatches.push("sandbox filesystem diff differs".to_owned());
+    }
+
+    let status = if mismatches.is_empty() {
+        "within_scope_match"
+    } else {
+        "mismatch"
+    };
+    Ok(serde_json::json!({
+        "schema":"luminous.rea.behavior-differential-report.v0",
+        "comparison_status":status,
+        "comparison_kind":comparison_kind,
+        "reference_observation_id":reference_id,
+        "candidate_observation_id":candidate_id,
+        "reference_executable_sha256":reference_executable,
+        "candidate_executable_sha256":candidate_executable,
+        "compared_fields":["argv","stdin","working_directory","environment","runner","termination","stdout","stderr","sandbox_filesystem_diff"],
+        "mismatches":mismatches,
+        "evidence_admission":"unverified_reference",
+        "authenticated_observation":false,
+        "scope":"exact_invocation_and_environment_only",
+        "claim_ceiling":"An exact-scope byte/result match only. This is not proof of semantic equivalence for untested inputs or authenticated execution."
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -835,6 +1047,84 @@ mod tests {
         value["behavioral_spec"]["clauses"][1]["clause_id"] =
             value["behavioral_spec"]["clauses"][0]["clause_id"].clone();
         assert!(validate_profile(&value).is_err());
+    }
+
+    #[test]
+    fn identical_reference_and_reconstruction_observations_match_exact_scope() {
+        let value = fixture();
+        let report = compare_observations(&value["observations"][0], &value["observations"][3]).unwrap();
+        assert_eq!(report["comparison_status"], "within_scope_match");
+        assert_eq!(report["comparison_kind"], "reconstruction_vs_reference");
+        assert_eq!(report["authenticated_observation"], false);
+    }
+
+    #[test]
+    fn output_difference_is_a_mismatch_not_a_scope_error() {
+        let value = fixture();
+        let reference = &value["observations"][0];
+        let mut candidate = value["observations"][3].clone();
+        candidate["result"]["stdout"]["bytes_base64"] = Value::String("d29ybGQ=".into());
+        candidate["result"]["stdout"]["sha256"] =
+            Value::String("486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7".into());
+        assert_eq!(candidate["result"]["stdout"]["byte_length"], 5);
+        let report = compare_observations(reference, &candidate).unwrap();
+        assert_eq!(report["comparison_status"], "mismatch");
+        assert_eq!(report["mismatches"][0], "stdout bytes differ");
+    }
+
+    #[test]
+    fn different_argv_is_not_comparable() {
+        let value = fixture();
+        let reference = &value["observations"][0];
+        let mut candidate = value["observations"][3].clone();
+        candidate["invocation"]["argv"][2]["bytes_base64"] = Value::String("d29ybGQ=".into());
+        candidate["invocation"]["argv"][2]["sha256"] =
+            Value::String("486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7".into());
+        let report = compare_observations(reference, &candidate).unwrap();
+        assert_eq!(report["comparison_status"], "not_comparable");
+        assert!(report["reasons"][0].as_str().unwrap().contains("argv"));
+    }
+
+    #[test]
+    fn partial_output_never_counts_as_a_differential_pass() {
+        let value = fixture();
+        let reference = &value["observations"][0];
+        let mut candidate = value["observations"][3].clone();
+        candidate["result"]["stdout"]["state"] = Value::String("partial".into());
+        candidate["result"]["stdout"]["reason"] = Value::String("truncated".into());
+        let report = compare_observations(reference, &candidate).unwrap();
+        assert_eq!(report["comparison_status"], "not_comparable");
+    }
+
+    #[test]
+    fn reference_and_candidate_roles_are_mandatory() {
+        let value = fixture();
+        let mut wrong_reference = value["observations"][3].clone();
+        let candidate = value["observations"][0].clone();
+        assert!(compare_observations(&wrong_reference, &candidate).is_err());
+        wrong_reference["target"]["execution_role"] = Value::String("original_reference".into());
+    }
+
+    #[test]
+    fn different_runner_context_is_not_comparable() {
+        let value = fixture();
+        let reference = &value["observations"][0];
+        let mut candidate = value["observations"][3].clone();
+        candidate["runner"]["locale"] = Value::String("en_US.UTF-8".into());
+        let report = compare_observations(reference, &candidate).unwrap();
+        assert_eq!(report["comparison_status"], "not_comparable");
+    }
+
+    #[test]
+    fn redacted_environment_prevents_replay_comparison() {
+        let value = fixture();
+        let reference = &value["observations"][0];
+        let mut candidate = value["observations"][3].clone();
+        candidate["invocation"]["environment"] = serde_json::json!([
+            {"name":"TOKEN","state":"redacted","value_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reason":"secret omitted"}
+        ]);
+        let report = compare_observations(reference, &candidate).unwrap();
+        assert_eq!(report["comparison_status"], "not_comparable");
     }
 
 }
