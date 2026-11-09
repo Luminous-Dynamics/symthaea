@@ -5,10 +5,13 @@ use std::path::{Path, PathBuf};
 
 use jsonschema::{Retrieve, Uri};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 type AnyError = Box<dyn Error + Send + Sync>;
 
 const EVIDENCE_SCHEMA_PATH: &str = "benchmarks/financial-agent-v1/evidence-v2.schema.json";
+const PROOF_BINDING_SCHEMA_PATH: &str =
+    "benchmarks/financial-agent-v1/evidence-proof-binding-v1.schema.json";
 const RESEARCH_MANIFEST_SCHEMA_PATH: &str =
     "benchmarks/financial-agent-v1/evidence-manifest-v2.schema.json";
 const QUANT_MANIFEST_SCHEMA_PATH: &str =
@@ -133,6 +136,112 @@ fn validate_proof_state(
     }
 }
 
+
+fn validate_binding_value_subset(value: &Value) -> Result<(), String> {
+    match value {
+        Value::Null => Ok(()),
+        Value::String(value) if value.is_ascii() => Ok(()),
+        Value::String(_) => Err("proof-binding strings must be ASCII in v1".to_owned()),
+        Value::Object(object) => {
+            for (key, child) in object {
+                if !key.is_ascii() {
+                    return Err("proof-binding property names must be ASCII in v1".to_owned());
+                }
+                validate_binding_value_subset(child)?;
+            }
+            Ok(())
+        }
+        Value::Array(_) => Err("arrays are not allowed in proof-binding preimages v1".to_owned()),
+        Value::Bool(_) | Value::Number(_) => {
+            Err("proof-binding preimages v1 permit only strings, objects and null".to_owned())
+        }
+    }
+}
+
+fn proof_binding_sha256(binding: &Value) -> Result<String, String> {
+    validate_binding_value_subset(binding)?;
+    // serde_json::Map is BTreeMap-backed here (preserve_order is not enabled), so ASCII
+    // property names are emitted in lexicographic order. V1 binding values intentionally
+    // exclude numbers, arrays and non-ASCII strings. In this constrained subset, compact
+    // serde_json serialization is the RFC 8785 JCS representation.
+    let canonical = serde_json::to_vec(binding)
+        .map_err(|error| format!("cannot serialize proof-binding preimage: {error}"))?;
+    let digest = Sha256::digest(canonical);
+    Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn require_binding_fields(
+    binding: &Value,
+    expected: &[(&str, Value)],
+    label: &str,
+) -> Result<(), String> {
+    for (field, expected_value) in expected {
+        if binding.get(*field) != Some(expected_value) {
+            return Err(format!("{label} binding field {field} does not match the enclosing evidence"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_attestation_binding(
+    attestation: &Value,
+    evidence: &Value,
+    principal_id: &str,
+    rights_profile_id: &str,
+    binding_type: &str,
+) -> Result<(), String> {
+    let binding = attestation
+        .get("binding")
+        .ok_or_else(|| format!("{binding_type} attestation is missing its binding preimage"))?;
+    let source_domain = match binding_type {
+        "availability" => "luminous.financial.availability-proof-binding.v1",
+        "rights" => "luminous.financial.rights-proof-binding.v1",
+        other => return Err(format!("unsupported proof binding type {other}")),
+    };
+    let common = vec![
+        ("binding_type", Value::String(binding_type.to_owned())),
+        ("domain", Value::String(source_domain.to_owned())),
+        ("binding_version", Value::String("1".to_owned())),
+        ("evidence_id", evidence["evidence_id"].clone()),
+        ("source_id", evidence["source_id"].clone()),
+        ("source_record_id", evidence["source_record_id"].clone()),
+        ("source_version_id", evidence["source_version_id"].clone()),
+        ("content_sha256", evidence["content_sha256"].clone()),
+        ("principal_id", Value::String(principal_id.to_owned())),
+        ("rights_profile_id", Value::String(rights_profile_id.to_owned())),
+    ];
+    require_binding_fields(binding, &common, binding_type)?;
+
+    if binding_type == "availability" {
+        let expected = [
+            ("precision", evidence["availability"]["precision"].clone()),
+            ("known_at", evidence["availability"]["known_at"].clone()),
+            ("interval", evidence["availability"]["interval"].clone()),
+            ("retrieved_at", evidence["retrieved_at"].clone()),
+        ];
+        require_binding_fields(binding, &expected, "availability")?;
+    } else {
+        let expected = [
+            ("disposition", evidence["rights_authorization"]["disposition"].clone()),
+            ("valid_from", evidence["rights_authorization"]["valid_from"].clone()),
+            ("valid_until", evidence["rights_authorization"]["valid_until"].clone()),
+        ];
+        require_binding_fields(binding, &expected, "rights")?;
+    }
+
+    let state = required_string(attestation, "/state")?;
+    if matches!(state, "verified" | "synthetic_fixture_only") {
+        let declared = required_string(attestation, "/binding_sha256")?;
+        let computed = proof_binding_sha256(binding)?;
+        if declared != computed {
+            return Err(format!(
+                "{binding_type} binding_sha256 mismatch: expected {computed}, received {declared}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_evidence_semantics(
     evidence: &Value,
     principal_id: &str,
@@ -200,6 +309,20 @@ fn validate_evidence_semantics(
 
     validate_proof_state(availability_proof, qualification, "availability proof")?;
     validate_proof_state(rights_proof, qualification, "rights proof")?;
+    validate_attestation_binding(
+        availability_proof,
+        evidence,
+        principal_id,
+        rights_profile_id,
+        "availability",
+    )?;
+    validate_attestation_binding(
+        rights_proof,
+        evidence,
+        principal_id,
+        rights_profile_id,
+        "rights",
+    )?;
 
     let precision = required_string(availability, "/precision")?;
     let known_at = availability.get("known_at");
@@ -401,6 +524,7 @@ fn validate_quant_manifest(
 
 fn run(root: &Path) -> Result<(), String> {
     let evidence_schema = load_json(root, EVIDENCE_SCHEMA_PATH)?;
+    let proof_binding_schema = load_json(root, PROOF_BINDING_SCHEMA_PATH)?;
     let research_schema = load_json(root, RESEARCH_MANIFEST_SCHEMA_PATH)?;
     let quant_schema = load_json(root, QUANT_MANIFEST_SCHEMA_PATH)?;
     let research_example = load_json(root, RESEARCH_EXAMPLE_PATH)?;
@@ -408,6 +532,7 @@ fn run(root: &Path) -> Result<(), String> {
 
     for (schema, path) in [
         (&evidence_schema, EVIDENCE_SCHEMA_PATH),
+        (&proof_binding_schema, PROOF_BINDING_SCHEMA_PATH),
         (&research_schema, RESEARCH_MANIFEST_SCHEMA_PATH),
         (&quant_schema, QUANT_MANIFEST_SCHEMA_PATH),
     ] {
@@ -416,6 +541,7 @@ fn run(root: &Path) -> Result<(), String> {
 
     let mut resources = LocalSchemaResources::default();
     resources.insert(&evidence_schema)?;
+    resources.insert(&proof_binding_schema)?;
     resources.insert(&research_schema)?;
     resources.insert(&quant_schema)?;
 
@@ -426,6 +552,7 @@ fn run(root: &Path) -> Result<(), String> {
 
     println!("Draft 2020-12 schema and semantic checks passed for:");
     println!("  {EVIDENCE_SCHEMA_PATH}");
+    println!("  {PROOF_BINDING_SCHEMA_PATH}");
     println!("  {RESEARCH_MANIFEST_SCHEMA_PATH}");
     println!("  {QUANT_MANIFEST_SCHEMA_PATH}");
     println!("  {RESEARCH_EXAMPLE_PATH}");
