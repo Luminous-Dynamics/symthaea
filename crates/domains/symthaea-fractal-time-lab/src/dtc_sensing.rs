@@ -939,6 +939,40 @@ mod tests {
     }
 
     #[test]
+    fn joint_fisher_matrices_converge_under_derivative_step_refinement() {
+        let coarse = evaluate_dtc_probe_sensing(&config()).unwrap();
+        let mut refined_config = config();
+        refined_config.amplitude_derivative_step = 5.0e-4;
+        refined_config.phase_derivative_step_rad = 5.0e-4;
+        let refined = evaluate_dtc_probe_sensing(&refined_config).unwrap();
+
+        for row in 0..2 {
+            for column in 0..2 {
+                let cfi_scale = refined.classical_fisher_matrix_per_shot[row][column]
+                    .abs()
+                    .max(1.0e-10);
+                let qfi_scale = refined.quantum_fisher_matrix_per_shot[row][column]
+                    .abs()
+                    .max(1.0e-10);
+                assert!(
+                    (coarse.classical_fisher_matrix_per_shot[row][column]
+                        - refined.classical_fisher_matrix_per_shot[row][column])
+                        .abs()
+                        / cfi_scale
+                        < 1.0e-3
+                );
+                assert!(
+                    (coarse.quantum_fisher_matrix_per_shot[row][column]
+                        - refined.quantum_fisher_matrix_per_shot[row][column])
+                        .abs()
+                        / qfi_scale
+                        < 1.0e-3
+                );
+            }
+        }
+    }
+
+    #[test]
     fn invalid_phase_derivative_step_fails_closed() {
         let mut invalid = config();
         invalid.phase_derivative_step_rad = f64::NAN;
