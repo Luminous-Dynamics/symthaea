@@ -101,6 +101,9 @@ jobs:
         run: |
           set -euo pipefail
           cargo run --locked -p symthaea-uap-observatory --example budgeted_experiment_design | tee budgeted-experiment-design.csv
+          grep -q 'greedy_expected_target_eig_nats=' budgeted-experiment-design.csv
+          grep -q 'greedy_expected_joint_eig_nats=' budgeted-experiment-design.csv
+          grep -q 'exact_expected_target_eig_nats=' budgeted-experiment-design.csv
           {
             echo "## Budgeted multifidelity experimental design"
             echo "- Greedy expected-EIG/cost selection compared with exhaustive subset oracle"
