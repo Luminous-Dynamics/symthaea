@@ -55,6 +55,10 @@ For historical replay, later retrieval is admissible only when the exact vintage
 
 Use deterministic reference oracles for cash, positions, returns, costs, fills and risk metrics wherever exact ground truth is available. For human- or LLM-judged research workflows, qualify references and judges under #11254; do not let an LLM judge replace accounting arithmetic or execution reconciliation.
 
+### Source timestamp precision
+
+Do not coerce date-only vintage metadata (including macro-series vintage dates or filingDate) to midnight for intraday backtests. The shared v0.1 kernel (#11241 / PR #11253) requires exact offset-aware availability instants; coarse or ambiguous timestamps remain indeterminate until the interval-censored extension in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256) proves the entire possible-availability interval is before the frontier.
+
 ## 4. Cohorts and split design
 
 Keep result cohorts separate:
