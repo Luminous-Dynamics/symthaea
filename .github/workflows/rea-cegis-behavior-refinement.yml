@@ -59,8 +59,8 @@ jobs:
           cargo test --manifest-path tools/rea-cegis-behavior-refinement/Cargo.toml --locked --lib -- --list > /tmp/rea-cegis-tests.txt
           discovered_count="$(awk '/: test$/ { count++ } END { print count + 0 }' /tmp/rea-cegis-tests.txt)"
           echo "Discovered ${discovered_count} REA CEGIS tests"
-          test "${discovered_count}" -ge 11 || {
-            echo "ERROR: expected at least 11 finite-kernel tests"
+          test "${discovered_count}" -ge 14 || {
+            echo "ERROR: expected at least 14 finite-kernel tests"
             exit 1
           }
 
