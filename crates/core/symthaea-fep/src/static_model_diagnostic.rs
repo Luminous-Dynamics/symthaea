@@ -580,7 +580,7 @@ pub fn symmetric_calibration_fixture() -> StaticModelDiagnosticProblem {
         root_action_cost: 1.0,
         first_stage_history_ids: histories,
         second_stage_action_ids_by_history: actions_by_history,
-        second_stage_action_costs_by_history: vec![vec![0.0, 1.0, 1.0], vec![0.0, 1.0, 1.0]],
+        second_stage_action_costs_by_history: vec![vec![0.0, 1.0, 3.0], vec![0.0, 3.0, 1.0]],
         second_stage_outcome_ids: outcomes,
         one_shot_action_ids: vec!["ACTION-A".to_owned(), "ACTION-B".to_owned()],
         one_shot_action_costs: vec![1.0, 1.0],
@@ -1325,6 +1325,16 @@ mod tests {
         }));
         assert!(result.report.static_policy.second_stage_action_by_history.iter().any(|x| {
             x.first_stage_history_id == "CAL-B" && x.action_id == "ACTION-B"
+        }));
+        assert!(result.report.static_policy.terminal_decision_by_history_and_outcome.iter().any(|x| {
+            x.first_stage_history_id == "CAL-A"
+                && x.second_stage_outcome_id == "POSITIVE"
+                && x.decision == StaticDiagnosticDecision::Support
+        }));
+        assert!(result.report.static_policy.terminal_decision_by_history_and_outcome.iter().any(|x| {
+            x.first_stage_history_id == "CAL-B"
+                && x.second_stage_outcome_id == "NEGATIVE"
+                && x.decision == StaticDiagnosticDecision::Refute
         }));
         assert_eq!(result.report.cross_stage_switching_stress_risk, 1.0);
         assert!(is_lower_hex(&result.receipt.input_sha256, 64));
