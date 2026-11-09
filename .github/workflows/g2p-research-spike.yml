@@ -1,0 +1,68 @@
+name: G2P research spike
+
+on:
+  pull_request:
+    paths:
+      - "tools/g2p-spike/**"
+      - "crates/domains/symthaea-muse/src/singing_bridge.rs"
+      - ".github/workflows/g2p-research-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  piper-plus-g2p-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "G2P_SPIKE_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Install pinned Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test reference scorer and syntax-check G2P tools
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/g2p-spike/score_reference.py tools/g2p-spike/test_score_reference.py
+          python3 -m unittest discover -s tools/g2p-spike -p 'test_*.py' -v
+
+      - name: Compile and test isolated G2P spike
+        run: cargo +1.96.0 test --manifest-path tools/g2p-spike/Cargo.toml
+
+      - name: Capture candidate IPA outputs
+        run: cargo +1.96.0 run --manifest-path tools/g2p-spike/Cargo.toml > piper-plus-g2p-spike.tsv
+
+      - name: Record source revision
+        run: printf '%s\n' "$G2P_SPIKE_REVISION" > piper-plus-g2p-spike.revision
+
+      - name: Upload diagnostic output
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-g2p-spike-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            piper-plus-g2p-spike.tsv
+            piper-plus-g2p-spike.revision
+            tools/g2p-spike/references.template.csv
+            tools/g2p-spike/score_reference.py
+            tools/g2p-spike/README.md
+            tools/g2p-spike/THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
