@@ -154,14 +154,16 @@
       "baseline_record_id": "pilot-a",
       "variant_record_id": "pilot-b",
       "split": "PILOT",
-      "purpose": "PILOT_EVALUATION"
+      "purpose": "PILOT_EVALUATION",
+      "counterfactual_pair_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     },
     {
       "pair_id": "pref-pair",
       "baseline_record_id": "pref-a",
       "variant_record_id": "pref-b",
       "split": "PREFERENCE_TRAINING",
-      "purpose": "PREFERENCE_TRAINING"
+      "purpose": "PREFERENCE_TRAINING",
+      "counterfactual_pair_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     }
   ]
 }
