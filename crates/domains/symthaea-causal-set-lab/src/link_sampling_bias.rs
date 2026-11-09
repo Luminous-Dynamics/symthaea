@@ -48,14 +48,16 @@ pub enum LinkSamplingBiasError {
 impl fmt::Display for LinkSamplingBiasError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedSpatialDimension { dimension } => write!(
-                f,
-                "spatial dimension must be in 1..=3, got {dimension}"
-            ),
+            Self::UnsupportedSpatialDimension { dimension } => {
+                write!(f, "spatial dimension must be in 1..=3, got {dimension}")
+            }
             Self::InvalidDensity => write!(f, "sprinkling density must be finite and positive"),
             Self::InvalidTimeExtent => write!(f, "time extent must be finite and positive"),
             Self::InvalidDimensionlessTime => {
-                write!(f, "dimensionless proper time must be finite and non-negative")
+                write!(
+                    f,
+                    "dimensionless proper time must be finite and non-negative"
+                )
             }
             Self::InvalidRapidity => write!(f, "rapidity must be finite and non-negative"),
             Self::InvalidWindowFraction => {
@@ -167,15 +169,11 @@ pub fn log_hyperbolic_ball_volume(
             // sinh(chi)cosh(chi)-chi =
             // 2/3 chi^3 + 2/15 chi^5 + 4/315 chi^7 + O(chi^9).
             let chi2 = rapidity * rapidity;
-            let series = (2.0 / 3.0)
-                * chi2
-                * rapidity
-                * (1.0 + chi2 / 5.0 + 2.0 * chi2 * chi2 / 105.0);
+            let series =
+                (2.0 / 3.0) * chi2 * rapidity * (1.0 + chi2 / 5.0 + 2.0 * chi2 * chi2 / 105.0);
             (2.0 * PI * series).ln()
         }
-        3 if rapidity < 20.0 => {
-            (2.0 * PI * (rapidity.sinh() * rapidity.cosh() - rapidity)).ln()
-        }
+        3 if rapidity < 20.0 => (2.0 * PI * (rapidity.sinh() * rapidity.cosh() - rapidity)).ln(),
         3 => {
             // sinh(chi)cosh(chi)-chi =
             // exp(2 chi)/4 * (1-exp(-4chi)-4chi exp(-2chi)).
@@ -222,22 +220,16 @@ impl FiniteConeLinkProfile {
         }
 
         let upper = dimensionless_time_extent.min(MAX_DIMENSIONLESS_TIME_FOR_QUADRATURE);
-        let log_unnormalized = |x: f64| {
-            finite_cone_log_weight(spatial_dimension, dimensionless_time_extent, x)
-        };
-        let log_normalization =
-            log_simpson_integral(upper, SIMPSON_PANELS, &log_unnormalized)?;
-        let log_first_moment = log_simpson_integral(
-            upper,
-            SIMPSON_PANELS,
-            &|x| {
-                if x <= 0.0 {
-                    f64::NEG_INFINITY
-                } else {
-                    log_unnormalized(x) + x.ln()
-                }
-            },
-        )?;
+        let log_unnormalized =
+            |x: f64| finite_cone_log_weight(spatial_dimension, dimensionless_time_extent, x);
+        let log_normalization = log_simpson_integral(upper, SIMPSON_PANELS, &log_unnormalized)?;
+        let log_first_moment = log_simpson_integral(upper, SIMPSON_PANELS, &|x| {
+            if x <= 0.0 {
+                f64::NEG_INFINITY
+            } else {
+                log_unnormalized(x) + x.ln()
+            }
+        })?;
         let mean = (log_first_moment - log_normalization).exp();
         if !mean.is_finite() {
             return Err(LinkSamplingBiasError::NumericalOverflow);
@@ -263,10 +255,7 @@ impl FiniteConeLinkProfile {
         self.mean_dimensionless_proper_time
     }
 
-    pub fn density(
-        &self,
-        dimensionless_proper_time: f64,
-    ) -> Result<f64, LinkSamplingBiasError> {
+    pub fn density(&self, dimensionless_proper_time: f64) -> Result<f64, LinkSamplingBiasError> {
         validate_dimensionless_time(dimensionless_proper_time)?;
         if dimensionless_proper_time == 0.0
             || dimensionless_proper_time >= self.dimensionless_time_extent
@@ -304,8 +293,7 @@ impl ProductWindowLinkProfile {
         dimensionless_proper_time_cutoff: f64,
     ) -> Result<Self, LinkSamplingBiasError> {
         validate_dimension(spatial_dimension)?;
-        if !dimensionless_proper_time_cutoff.is_finite()
-            || dimensionless_proper_time_cutoff <= 0.0
+        if !dimensionless_proper_time_cutoff.is_finite() || dimensionless_proper_time_cutoff <= 0.0
         {
             return Err(LinkSamplingBiasError::InvalidDimensionlessTime);
         }
@@ -320,10 +308,7 @@ impl ProductWindowLinkProfile {
     }
 
     /// Normalized density in dimensionless proper time, truncated at x_c.
-    pub fn density(
-        &self,
-        dimensionless_proper_time: f64,
-    ) -> Result<f64, LinkSamplingBiasError> {
+    pub fn density(&self, dimensionless_proper_time: f64) -> Result<f64, LinkSamplingBiasError> {
         validate_dimensionless_time(dimensionless_proper_time)?;
         let cutoff = self.dimensionless_proper_time_cutoff;
         if dimensionless_proper_time == 0.0 || dimensionless_proper_time >= cutoff {
@@ -346,23 +331,18 @@ impl ProductWindowLinkProfile {
     }
 
     pub fn mean_dimensionless_proper_time(&self) -> Result<f64, LinkSamplingBiasError> {
-        let cutoff = self.dimensionless_proper_time_cutoff
+        let cutoff = self
+            .dimensionless_proper_time_cutoff
             .min(MAX_DIMENSIONLESS_TIME_FOR_QUADRATURE);
         let d = self.spatial_dimension;
-        let log_first_moment = log_simpson_integral(
-            cutoff,
-            SIMPSON_PANELS,
-            &|x| {
-                if x <= 0.0 {
-                    f64::NEG_INFINITY
-                } else {
-                    (d + 1) as f64 + (d + 1) as f64 * x.ln() - x.powi((d + 1) as i32)
-                }
-            },
-        )?;
-        let tail_exponent = self
-            .dimensionless_proper_time_cutoff
-            .powi((d + 1) as i32);
+        let log_first_moment = log_simpson_integral(cutoff, SIMPSON_PANELS, &|x| {
+            if x <= 0.0 {
+                f64::NEG_INFINITY
+            } else {
+                (d + 1) as f64 + (d + 1) as f64 * x.ln() - x.powi((d + 1) as i32)
+            }
+        })?;
+        let tail_exponent = self.dimensionless_proper_time_cutoff.powi((d + 1) as i32);
         let log_normalization = if tail_exponent > 745.0 {
             0.0
         } else {
@@ -476,9 +456,7 @@ fn finite_cone_log_weight(
     dimensionless_time_extent: f64,
     dimensionless_proper_time: f64,
 ) -> Result<f64, LinkSamplingBiasError> {
-    if dimensionless_proper_time <= 0.0
-        || dimensionless_proper_time >= dimensionless_time_extent
-    {
+    if dimensionless_proper_time <= 0.0 || dimensionless_proper_time >= dimensionless_time_extent {
         return Ok(f64::NEG_INFINITY);
     }
     let rapidity = (dimensionless_time_extent / dimensionless_proper_time).acosh();
@@ -567,14 +545,11 @@ mod tests {
         let chi: f64 = 1.2;
         assert!((hyperbolic_ball_volume(1, chi).unwrap() - 2.0 * chi).abs() < 1.0e-14);
         assert!(
-            (hyperbolic_ball_volume(2, chi).unwrap()
-                - 2.0 * PI * (chi.cosh() - 1.0))
-                .abs()
+            (hyperbolic_ball_volume(2, chi).unwrap() - 2.0 * PI * (chi.cosh() - 1.0)).abs()
                 < 1.0e-13
         );
         assert!(
-            (hyperbolic_ball_volume(3, chi).unwrap()
-                - 2.0 * PI * (chi.sinh() * chi.cosh() - chi))
+            (hyperbolic_ball_volume(3, chi).unwrap() - 2.0 * PI * (chi.sinh() * chi.cosh() - chi))
                 .abs()
                 < 1.0e-12
         );
@@ -587,14 +562,16 @@ mod tests {
                 MAX_DIMENSIONLESS_TIME_FOR_QUADRATURE,
                 SIMPSON_PANELS,
                 &|x| {
-                    (dimension + 1) as f64
-                        + (dimension + 1) as f64 * x.ln()
+                    (dimension + 1) as f64 + (dimension + 1) as f64 * x.ln()
                         - x.powi((dimension + 1) as i32)
                 },
             )
             .unwrap()
             .exp();
-            assert!((integral - 1.0).abs() < 1.0e-10, "d={dimension}: {integral}");
+            assert!(
+                (integral - 1.0).abs() < 1.0e-10,
+                "d={dimension}: {integral}"
+            );
         }
     }
 
@@ -668,8 +645,7 @@ mod tests {
 
     #[test]
     fn double_scaling_cutoffs_match_the_declared_formula() {
-        let window =
-            double_scaling_product_window(3, 128_000.0, 1.0, 1.0, 0.6, 0.9).unwrap();
+        let window = double_scaling_product_window(3, 128_000.0, 1.0, 1.0, 0.6, 0.9).unwrap();
         let expected_rapidity = 0.6 / 4.0 * (128_000.0_f64).ln();
         assert!((window.rapidity_cutoff - expected_rapidity).abs() < 1.0e-14);
         assert!(window.proper_time_cutoff > 0.0);
@@ -679,8 +655,7 @@ mod tests {
 
     #[test]
     fn boundary_near_roots_fail_the_asymptotic_admissibility_gate() {
-        let interior =
-            double_scaling_product_window(3, 128_000.0, 1.0, 1.0, 0.6, 0.9).unwrap();
+        let interior = double_scaling_product_window(3, 128_000.0, 1.0, 1.0, 0.6, 0.9).unwrap();
         let boundary_near =
             double_scaling_product_window(3, 128_000.0, 1.0, 1.0e-4, 0.6, 0.9).unwrap();
         assert!(interior.asymptotically_admissible);
