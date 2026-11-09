@@ -3859,8 +3859,27 @@ mod tests {
         assert_eq!(result.global_upper_bound, q(0,1));
         assert!(result.optimality_proven);
         assert_eq!(result.outer_search_nodes, 4);
+        assert_eq!(result.outer_pruned_nodes, 0);
         assert_eq!(result.complete_partitions_evaluated, 2);
         assert_eq!(result.cached_cluster_solutions, 3);
+        assert_eq!(result.total_cluster_search_nodes, 7);
+        assert_eq!(result.total_dp_multiply_adds, 104);
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.cluster_solutions[0].certificate_sha256),
+            "bdfca086755479f1cff8fe09303fabdbeabb12182e50789c12f2628d365cb5c7"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.cluster_solutions[1].certificate_sha256),
+            "551f6f315468270f5a5b3a74f04665ba3e5a9894cc8ae41312cd1bbb5cdaa222"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.partition_transcript_sha256),
+            "c69c11ded97c6634b743ba30e1f5bfcaadd5cd0de6c3db65cca867c8a3d38eaa"
+        );
+        assert_eq!(
+            policy_portfolio_sha256_hex(result.certificate_sha256),
+            "f75dc2c13a38445ffb22df19526d0d4628d533b864dcec8265c2c65d03eb6d17"
+        );
 
         let reference = solve_finite_family_policy_portfolio(
             &family, q(1,2), 2, budget(2,3),
