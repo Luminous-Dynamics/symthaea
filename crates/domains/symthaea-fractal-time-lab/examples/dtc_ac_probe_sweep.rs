@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cost_metric=Fisher_information_per_simulated_Floquet_period_not_full_experiment_cost"
     );
     println!(
-        "coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_AA,CFI_Aphi,CFI_phiphi,QFI_AA,QFI_Aphi,QFI_phiphi,CFI_A_given_phase,QFI_A_given_phase,phase_time_offset_drive_periods_per_radian,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,norm_error"
+        "coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_AA,CFI_Aphi,CFI_phiphi,QFI_AA,QFI_Aphi,QFI_phiphi,CFI_A_given_phase,QFI_A_given_phase,phase_time_offset_drive_periods_per_radian,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,joint_CFI_matrix_within_QFIM,norm_error"
     );
 
     for coupling in couplings {
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match evaluate_dtc_probe_sensing(&config) {
                 Ok(report) => println!(
-                    "{coupling:.6},{frequency:.6},{:.9},{:.9},{:.9},{:.9},{},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{},{},{},{:.12e},{:.12e},{},{},{:.3e}",
+                    "{coupling:.6},{frequency:.6},{:.9},{:.9},{:.9},{:.9},{},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{},{},{},{:.12e},{:.12e},{},{},{},{:.3e}",
                     report.baseline_subharmonic_response.mean_demodulated_order,
                     report.probed_subharmonic_response.mean_demodulated_order,
                     report.baseline_subharmonic_response.sign_coherence,
@@ -98,10 +98,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .map(|value| format!("{value:.9}"))
                         .unwrap_or_else(|| "undefined".to_string()),
                     report.classical_fisher_within_quantum_bound,
+                    report.joint_classical_fisher_within_quantum_bound,
                     report.norm_error,
                 ),
                 Err(error) => println!(
-                    "{coupling:.6},{frequency:.6},unavailable,unavailable,unavailable,unavailable,unavailable,unavailable,undefined,undefined,undefined,error={error}"
+                    "{coupling:.6},{frequency:.6},unavailable,unavailable,unavailable,unavailable,unavailable,unavailable,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,error={error}"
                 ),
             }
         }
