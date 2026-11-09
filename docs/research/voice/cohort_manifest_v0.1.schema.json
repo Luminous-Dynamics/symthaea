@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/cohort_manifest_v0.1.schema.json",
+  "title": "Speech evaluation cohort admission manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "cohort_id",
+    "records",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "cohort_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "records": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "split": {
+      "enum": [
+        "TRAINING",
+        "DEVELOPMENT",
+        "PILOT",
+        "CONFIRMATORY",
+        "PREFERENCE_TRAINING"
+      ]
+    },
+    "record": {
+      "type": "object",
+      "required": [
+        "record_id",
+        "pair_id",
+        "source_family_id",
+        "speaker_cluster_id",
+        "session_cluster_id",
+        "utterance_family_id",
+        "split",
+        "language_varieties",
+        "source_audio_sha256",
+        "evaluation_audio_sha256",
+        "source_manifest_sha256",
+        "annotation_manifest_sha256",
+        "derivation_manifest_sha256",
+        "reviewer_ids",
+        "adjudication_manifest_sha256",
+        "phonological_profile_id",
+        "phonological_profile_revision",
+        "phonological_profile_qualified",
+        "native_review_manifest_sha256",
+        "rights"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "speaker_cluster_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "session_cluster_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "utterance_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "language_varieties": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evaluation_audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "annotation_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "derivation_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reviewer_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "adjudication_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phonological_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "phonological_profile_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "phonological_profile_qualified": {
+          "type": "boolean"
+        },
+        "native_review_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rights": {
+          "$ref": "#/$defs/rights"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rights": {
+      "type": "object",
+      "required": [
+        "license_id",
+        "authorized_purpose",
+        "benchmark_evaluation_authorized",
+        "derivative_processing_authorized",
+        "external_processing_authorized",
+        "consent_status",
+        "redistribution"
+      ],
+      "properties": {
+        "license_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorized_purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_evaluation_authorized": {
+          "type": "boolean"
+        },
+        "derivative_processing_authorized": {
+          "type": "boolean"
+        },
+        "external_processing_authorized": {
+          "type": "boolean"
+        },
+        "consent_status": {
+          "enum": [
+            "CONFIRMED",
+            "DOCUMENTED_NOT_REQUIRED",
+            "UNVERIFIED",
+            "WITHDRAWN"
+          ]
+        },
+        "redistribution": {
+          "enum": [
+            "PROHIBITED",
+            "CONTROLLED_ACCESS",
+            "PUBLIC"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "pair": {
+      "type": "object",
+      "required": [
+        "pair_id",
+        "baseline_record_id",
+        "variant_record_id",
+        "split",
+        "purpose"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "purpose": {
+          "enum": [
+            "PREFERENCE_TRAINING",
+            "DEVELOPMENT_EVALUATION",
+            "PILOT_EVALUATION",
+            "CONFIRMATORY_EVALUATION"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
