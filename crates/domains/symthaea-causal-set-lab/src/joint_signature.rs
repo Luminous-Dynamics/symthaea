@@ -14,8 +14,8 @@
 //! preserving the dependence among pair intervals.
 
 use crate::causal_set_nd::{CausalSetNd, CausalSetNdError};
-use crate::{CausalSet2D, CausalSetError};
 use crate::interval_profile::{IntervalAbundanceProfile, IntervalProfileError};
+use crate::{CausalSet2D, CausalSetError};
 use std::error::Error;
 use std::fmt;
 
@@ -27,15 +27,10 @@ pub const MAX_SIGNATURE_SPACETIME_DIMENSION: usize = 4;
 #[derive(Clone, Debug, PartialEq)]
 pub enum JointSignatureError {
     InvalidProfileBinCount,
-    InvalidProfileLength {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidProfileLength { expected: usize, actual: usize },
     InvalidProfileValues,
     InsufficientEvents,
-    InvalidSpacetimeDimension {
-        dimension: usize,
-    },
+    InvalidSpacetimeDimension { dimension: usize },
     NonFiniteScaledChain,
     IntervalProfile(IntervalProfileError),
     CausalSet1p1(CausalSetError),
@@ -46,13 +41,22 @@ impl fmt::Display for JointSignatureError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidProfileBinCount => {
-                write!(f, "joint signature requires a positive interval-profile bin count")
+                write!(
+                    f,
+                    "joint signature requires a positive interval-profile bin count"
+                )
             }
             Self::InvalidProfileLength { expected, actual } => {
-                write!(f, "interval profile has {actual} values; expected {expected}")
+                write!(
+                    f,
+                    "interval profile has {actual} values; expected {expected}"
+                )
             }
             Self::InvalidProfileValues => {
-                write!(f, "interval profile must be a finite normalized composition")
+                write!(
+                    f,
+                    "interval profile must be a finite normalized composition"
+                )
             }
             Self::InsufficientEvents => {
                 write!(f, "joint signature requires at least two events")
@@ -62,7 +66,10 @@ impl fmt::Display for JointSignatureError {
                 "spacetime dimension {dimension} is outside {MIN_SIGNATURE_SPACETIME_DIMENSION}..={MAX_SIGNATURE_SPACETIME_DIMENSION}"
             ),
             Self::NonFiniteScaledChain => {
-                write!(f, "dimension-normalized longest-chain statistic is not finite")
+                write!(
+                    f,
+                    "dimension-normalized longest-chain statistic is not finite"
+                )
             }
             Self::IntervalProfile(error) => write!(f, "interval profile failed: {error}"),
             Self::CausalSet1p1(error) => write!(f, "1+1D causal set failed: {error}"),
@@ -295,7 +302,10 @@ mod tests {
         assert_eq!(signature.event_count, 256);
         assert_eq!(signature.profile_bin_count, 8);
         assert_eq!(signature.normalized_interval_profile.len(), 9);
-        assert_eq!(signature.longest_chain_length, causet.longest_chain_length());
+        assert_eq!(
+            signature.longest_chain_length,
+            causet.longest_chain_length()
+        );
 
         let profile_sum: f64 = signature.normalized_interval_profile.iter().sum();
         assert!((profile_sum - 1.0).abs() < 1.0e-12);
@@ -312,7 +322,10 @@ mod tests {
         let signature = JointCausalSetSignature::from_causal_set_nd(&causet, 6).unwrap();
 
         assert_eq!(signature.normalized_interval_profile.len(), 7);
-        assert_eq!(signature.longest_chain_length, causet.longest_chain_length());
+        assert_eq!(
+            signature.longest_chain_length,
+            causet.longest_chain_length()
+        );
 
         let d3 = signature.features_for_dimension(3).unwrap();
         let d4 = signature.features_for_dimension(4).unwrap();
