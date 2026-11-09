@@ -33,6 +33,8 @@ jobs:
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
 
       - name: Install pinned Python
         uses: actions/setup-python@v5
@@ -45,11 +47,29 @@ jobs:
           python3 -m py_compile tools/g2p-spike/score_reference.py tools/g2p-spike/test_score_reference.py
           python3 -m unittest discover -s tools/g2p-spike -p 'test_*.py' -v
 
-      - name: Compile and test isolated G2P spike
-        run: cargo +1.96.0 test --manifest-path tools/g2p-spike/Cargo.toml
+      - name: Format-check isolated G2P tools
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --check --manifest-path tools/g2p-spike/Cargo.toml
+          cargo +1.96.0 fmt --check --manifest-path tools/g2p-eval/Cargo.toml
 
-      - name: Capture candidate IPA outputs
-        run: cargo +1.96.0 run --manifest-path tools/g2p-spike/Cargo.toml > piper-plus-g2p-spike.tsv
+      - name: Freeze standalone G2P dependency graphs for this run
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 generate-lockfile --manifest-path tools/g2p-spike/Cargo.toml
+          cargo +1.96.0 generate-lockfile --manifest-path tools/g2p-eval/Cargo.toml
+
+      - name: Compile and test isolated G2P spike and reference evaluator
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 test --locked --manifest-path tools/g2p-spike/Cargo.toml
+          cargo +1.96.0 test --locked --manifest-path tools/g2p-eval/Cargo.toml
+
+      - name: Capture candidate IPA outputs from Piper Plus and Muse
+        run: cargo +1.96.0 run --locked --manifest-path tools/g2p-spike/Cargo.toml > piper-plus-g2p-spike.tsv
+
+      - name: Exercise canonical reference evaluator on synthetic contract fixtures
+        run: cargo +1.96.0 run --locked --manifest-path tools/g2p-eval/Cargo.toml -- --references tools/g2p-eval/fixtures/references.jsonl --predictions tools/g2p-eval/fixtures/candidate.jsonl --output g2p-eval-synthetic-report.json
 
       - name: Record source revision
         run: printf '%s\n' "$G2P_SPIKE_REVISION" > piper-plus-g2p-spike.revision
@@ -61,8 +81,15 @@ jobs:
           path: |
             piper-plus-g2p-spike.tsv
             piper-plus-g2p-spike.revision
+            g2p-eval-synthetic-report.json
+            tools/g2p-spike/Cargo.lock
+            tools/g2p-eval/Cargo.lock
             tools/g2p-spike/references.template.csv
             tools/g2p-spike/score_reference.py
             tools/g2p-spike/README.md
             tools/g2p-spike/THIRD_PARTY_NOTICES.md
+            tools/g2p-spike/src/normalize.rs
+            tools/g2p-eval/README.md
+            tools/g2p-eval/fixtures/candidate.jsonl
+            tools/g2p-eval/fixtures/references.jsonl
           if-no-files-found: error
