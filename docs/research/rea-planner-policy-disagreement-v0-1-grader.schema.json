@@ -152,7 +152,93 @@
             "$ref": "#/$defs/effect"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "experiment_id": {
+                "const": "static_function_probe"
+              }
+            },
+            "required": [
+              "experiment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effects": {
+                "items": {
+                  "properties": {
+                    "outcome": {
+                      "enum": [
+                        "feature_present",
+                        "feature_absent"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "experiment_id": {
+                "const": "verify_deployment_manifest"
+              }
+            },
+            "required": [
+              "experiment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effects": {
+                "items": {
+                  "properties": {
+                    "outcome": {
+                      "enum": [
+                        "digest_match",
+                        "digest_mismatch"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "experiment_id": {
+                "const": "controlled_reproduction"
+              }
+            },
+            "required": [
+              "experiment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effects": {
+                "items": {
+                  "properties": {
+                    "outcome": {
+                      "enum": [
+                        "reproduced",
+                        "not_reproduced"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "rankings": {
       "type": "object",
