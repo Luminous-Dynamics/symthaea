@@ -1,6 +1,12 @@
 name: REA CEGIS Behavioral Refinement
 
 on:
+  push:
+    branches:
+      - "research/rea-cegis-behavior-refinement-v0.1"
+    paths:
+      - ".github/workflows/rea-cegis-behavior-refinement.yml"
+      - "tools/rea-cegis-behavior-refinement/**"
   pull_request:
     paths:
       - ".github/workflows/rea-cegis-behavior-refinement.yml"
