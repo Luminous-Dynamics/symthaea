@@ -1,0 +1,74 @@
+name: FEP Hierarchical Information Gain Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/fep-hierarchical-information-gain.yml"
+      - "crates/core/symthaea-fep/Cargo.toml"
+      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fep-hierarchical-information-gain-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  hierarchical-information-gain:
+    name: Compile and qualify hierarchical information gain
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Verify exact revision and toolchain
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          rustc --version --verbose
+          cargo --version
+
+      - name: Validate workspace metadata
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Check hierarchical source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/lib.rs
+
+      - name: Assert hierarchical test discovery
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --list > /tmp/hierarchical-information-gain-tests.txt
+          discovered_count="$(awk '/hierarchical_information_gain::tests::.*: test$/ { count++ } END { print count + 0 }' /tmp/hierarchical-information-gain-tests.txt)"
+          echo "Discovered ${discovered_count} hierarchical information-gain tests"
+          test "${discovered_count}" -ge 7 || {
+            echo "ERROR: expected at least 7 hierarchical information-gain tests"
+            exit 1
+          }
+
+      - name: Execute hierarchical information-gain tests
+        run: cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
+
+      - name: Warnings-denied Clippy
+        run: cargo clippy --locked --release -p symthaea-fep --all-targets -- -D warnings
