@@ -586,8 +586,7 @@ mod tests {
         let view = episode.view().unwrap();
         let scored = score_available_probes(&view).unwrap();
         let (_, work) =
-            choose_probe_with_work(&view, ProbeStrategy::MaximumStructureInformationGain)
-                .unwrap();
+            choose_probe_with_work(&view, ProbeStrategy::MaximumStructureInformationGain).unwrap();
 
         assert_eq!(work.legal_actions_scored as usize, scored.len());
         assert_eq!(
