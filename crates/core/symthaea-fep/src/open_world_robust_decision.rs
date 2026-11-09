@@ -557,6 +557,21 @@ pub enum PrequentialEProcessError {
         observation_index: usize,
         sum: f64,
     },
+    #[error("null observation {observation_index} has no outcome categories")]
+    EmptyNullOutcomeSet { observation_index: usize },
+    #[error("null observation {observation_index} has an invalid probability at category {category_index}")]
+    InvalidNullProbability {
+        observation_index: usize,
+        category_index: usize,
+    },
+    #[error("null observation {observation_index} probability mass sums to {sum}, expected 1")]
+    NullProbabilityMassNotNormalized { observation_index: usize, sum: f64 },
+    #[error("null observation {observation_index} has outcome index {outcome_index} outside 0..{outcome_count}")]
+    NullOutcomeIndexOutOfRange {
+        observation_index: usize,
+        outcome_index: usize,
+        outcome_count: usize,
+    },
     #[error("null observation {observation_index} has zero probability under the declared null")]
     NullSupportViolation { observation_index: usize },
     #[error("sequential log-likelihood ratio became non-finite")]
@@ -619,15 +634,28 @@ pub fn evaluate_prequential_e_process(
 
     for (observation_index, null_observation) in null_observations.iter().enumerate() {
         let null_probabilities = &null_observation.predicted_outcome_probabilities;
+        if null_probabilities.is_empty() {
+            return Err(PrequentialEProcessError::EmptyNullOutcomeSet { observation_index });
+        }
         validate_categorical_distribution(null_probabilities).map_err(|(category_index, sum)| {
             if let Some(category_index) = category_index {
-                PrequentialEProcessError::NullSupportViolation { observation_index }
+                PrequentialEProcessError::InvalidNullProbability {
+                    observation_index,
+                    category_index,
+                }
             } else {
-                PrequentialEProcessError::NullSupportViolation { observation_index }
+                PrequentialEProcessError::NullProbabilityMassNotNormalized {
+                    observation_index,
+                    sum,
+                }
             }
         })?;
         if null_observation.observed_outcome_index >= null_probabilities.len() {
-            return Err(PrequentialEProcessError::NullSupportViolation { observation_index });
+            return Err(PrequentialEProcessError::NullOutcomeIndexOutOfRange {
+                observation_index,
+                outcome_index: null_observation.observed_outcome_index,
+                outcome_count: null_probabilities.len(),
+            });
         }
         let null_probability = null_probabilities[null_observation.observed_outcome_index];
         if null_probability == 0.0 {
