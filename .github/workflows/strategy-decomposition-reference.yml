@@ -48,6 +48,7 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf_artifact.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf_construction.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf_pipeline.rs
 
       - name: Compile the pure-std crate test harness
         run: rustc --edition 2024 --test crates/domains/symthaea-operations-research/src/lib.rs -o /tmp/symthaea-operations-research-tests
