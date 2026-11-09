@@ -782,8 +782,8 @@ mod tests {
         candidate_native_model_digest: &str,
     ) -> SequentialVerifierEvidenceBinding {
         use crate::sequential_weight_verification::{
-            PairedLossObservation, SequentialWeightVerificationCampaign,
-            SequentialWeightVerificationConfig,
+            ConfirmatoryEpisodeManifest, PairedLossObservation,
+            SequentialWeightVerificationCampaign, SequentialWeightVerificationConfig,
         };
         let mut campaign = SequentialWeightVerificationCampaign::new(
             SequentialWeightVerificationConfig {
@@ -795,11 +795,18 @@ mod tests {
             digest('8'),
         )
         .expect("valid statistical campaign");
+        let confirmatory_episode_manifest = ConfirmatoryEpisodeManifest::new(
+            (0..600)
+                .map(|index| format!("confirmatory-{index}"))
+                .collect(),
+        )
+        .expect("valid confirmatory episode manifest");
         let mut verifier = campaign
             .start_candidate(
                 session.latest_candidate_model_digest.clone(),
                 candidate_native_model_digest.to_owned(),
                 digest('6'),
+                confirmatory_episode_manifest,
                 digest('5'),
             )
             .expect("fresh statistical candidate");
