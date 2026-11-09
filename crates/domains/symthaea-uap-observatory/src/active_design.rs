@@ -596,6 +596,19 @@ mod tests {
     }
 
     #[test]
+    fn widely_separated_model_means_remain_numerically_resolved() {
+        let report = rank_experiments(
+            &priors(),
+            &[candidate("wide", -1.0e6, 1.0e6, 1.0, 0.0, 1.0, 1.0)],
+            10.0,
+            0.0,
+        )
+        .unwrap();
+
+        assert!((report.ranked_candidates[0].conditional_eig_nats - 2.0_f64.ln()).abs() < 1.0e-7);
+    }
+
+    #[test]
     fn information_gain_does_not_increase_with_measurement_or_calibration_noise() {
         let low_noise = rank_experiments(
             &priors(),
