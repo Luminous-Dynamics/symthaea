@@ -8,8 +8,8 @@ pub mod finite_campaign;
 pub mod interaction;
 pub mod numeric;
 pub mod policy;
-pub mod protocol;
 pub mod process;
+pub mod protocol;
 pub mod strategies;
 
 use serde::{Deserialize, Serialize};
