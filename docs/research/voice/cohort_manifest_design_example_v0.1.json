@@ -1,0 +1,171 @@
+{
+  "schema_version": "0.1.0",
+  "cohort_id": "synthetic-cohort-design-example-v0",
+  "evidence_state": "SYNTHETIC_ONLY",
+  "records": [
+    {
+      "record_id": "pilot-a",
+      "pair_id": "pilot-pair",
+      "source_family_id": "source-pilot",
+      "speaker_cluster_id": "speaker-pilot",
+      "session_cluster_id": "session-pilot",
+      "utterance_family_id": "utterance-pilot",
+      "split": "PILOT",
+      "language_varieties": [
+        "zu-ZA",
+        "en-ZA"
+      ],
+      "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "annotation_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "derivation_manifest_sha256": null,
+      "reviewer_ids": [
+        "reviewer-a",
+        "reviewer-b"
+      ],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null,
+      "rights": {
+        "license_id": "SYNTHETIC-ORIGINAL",
+        "authorized_purpose": "synthetic conformance only",
+        "benchmark_evaluation_authorized": true,
+        "derivative_processing_authorized": true,
+        "external_processing_authorized": false,
+        "consent_status": "DOCUMENTED_NOT_REQUIRED",
+        "redistribution": "PUBLIC"
+      }
+    },
+    {
+      "record_id": "pilot-b",
+      "pair_id": "pilot-pair",
+      "source_family_id": "source-pilot",
+      "speaker_cluster_id": "speaker-pilot",
+      "session_cluster_id": "session-pilot",
+      "utterance_family_id": "utterance-pilot",
+      "split": "PILOT",
+      "language_varieties": [
+        "zu-ZA",
+        "en-ZA"
+      ],
+      "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "annotation_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "derivation_manifest_sha256": null,
+      "reviewer_ids": [
+        "reviewer-a",
+        "reviewer-b"
+      ],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null,
+      "rights": {
+        "license_id": "SYNTHETIC-ORIGINAL",
+        "authorized_purpose": "synthetic conformance only",
+        "benchmark_evaluation_authorized": true,
+        "derivative_processing_authorized": true,
+        "external_processing_authorized": false,
+        "consent_status": "DOCUMENTED_NOT_REQUIRED",
+        "redistribution": "PUBLIC"
+      }
+    },
+    {
+      "record_id": "pref-a",
+      "pair_id": "pref-pair",
+      "source_family_id": "source-pref",
+      "speaker_cluster_id": "speaker-pref",
+      "session_cluster_id": "session-pref",
+      "utterance_family_id": "utterance-pref",
+      "split": "PREFERENCE_TRAINING",
+      "language_varieties": [
+        "zu-ZA",
+        "en-ZA"
+      ],
+      "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "annotation_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "derivation_manifest_sha256": null,
+      "reviewer_ids": [
+        "reviewer-a",
+        "reviewer-b"
+      ],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null,
+      "rights": {
+        "license_id": "SYNTHETIC-ORIGINAL",
+        "authorized_purpose": "synthetic conformance only",
+        "benchmark_evaluation_authorized": true,
+        "derivative_processing_authorized": true,
+        "external_processing_authorized": false,
+        "consent_status": "DOCUMENTED_NOT_REQUIRED",
+        "redistribution": "PUBLIC"
+      }
+    },
+    {
+      "record_id": "pref-b",
+      "pair_id": "pref-pair",
+      "source_family_id": "source-pref",
+      "speaker_cluster_id": "speaker-pref",
+      "session_cluster_id": "session-pref",
+      "utterance_family_id": "utterance-pref",
+      "split": "PREFERENCE_TRAINING",
+      "language_varieties": [
+        "zu-ZA",
+        "en-ZA"
+      ],
+      "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "annotation_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "derivation_manifest_sha256": null,
+      "reviewer_ids": [
+        "reviewer-a",
+        "reviewer-b"
+      ],
+      "adjudication_manifest_sha256": null,
+      "phonological_profile_id": null,
+      "phonological_profile_revision": null,
+      "phonological_profile_qualified": false,
+      "native_review_manifest_sha256": null,
+      "rights": {
+        "license_id": "SYNTHETIC-ORIGINAL",
+        "authorized_purpose": "synthetic conformance only",
+        "benchmark_evaluation_authorized": true,
+        "derivative_processing_authorized": true,
+        "external_processing_authorized": false,
+        "consent_status": "DOCUMENTED_NOT_REQUIRED",
+        "redistribution": "PUBLIC"
+      }
+    }
+  ],
+  "pairs": [
+    {
+      "pair_id": "pilot-pair",
+      "baseline_record_id": "pilot-a",
+      "variant_record_id": "pilot-b",
+      "split": "PILOT",
+      "purpose": "PILOT_EVALUATION",
+      "counterfactual_pair_manifest_sha256": "7d7be3c9bf5dcad123e2e7199d2705d590752284aabd58b50d10aaaf4ad2a01f",
+      "counterfactual_pair_manifest_path": "cohort_manifest_design_example/pair-manifests/pilot-pair.json"
+    },
+    {
+      "pair_id": "pref-pair",
+      "baseline_record_id": "pref-a",
+      "variant_record_id": "pref-b",
+      "split": "PREFERENCE_TRAINING",
+      "purpose": "PREFERENCE_TRAINING",
+      "counterfactual_pair_manifest_sha256": "95245f9c0e8df1569baac2d63dd9f215e4b127385eeea0af315114d0e376276b",
+      "counterfactual_pair_manifest_path": "cohort_manifest_design_example/pair-manifests/pref-pair.json"
+    }
+  ]
+}

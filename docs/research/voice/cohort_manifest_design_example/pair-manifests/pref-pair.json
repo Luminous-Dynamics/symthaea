@@ -1,0 +1,12 @@
+{
+  "pair_id": "pref-pair",
+  "baseline_trial_id": "pref-a",
+  "variant_trial_id": "pref-b",
+  "intervention_kind": "TEXT_NUISANCE",
+  "baseline_condition_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "variant_condition_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "intervention_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "changed_dimensions": [
+    "PROMPT_TEXT"
+  ]
+}
