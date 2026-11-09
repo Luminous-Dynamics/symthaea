@@ -231,7 +231,7 @@ pub(crate) fn realize_renaissance(
     // Alto: suspension prepared in bar 7 (deg 7 held through the bar
     // line), resolves to deg 6 at the top of bar 8.
     score.push(ScoreNote {
-        part: PartId::UNASSIGNED,
+        part: ALTUS,
         pitch: scale.degree_pitch(7, 4),
         onset: bar(7),
         duration: full_bar + half_bar,
@@ -241,7 +241,7 @@ pub(crate) fn realize_renaissance(
         section_intensity: CADENCE,
     });
     score.push(ScoreNote {
-        part: PartId::UNASSIGNED,
+        part: ALTUS,
         pitch: scale.degree_pitch(6, 4),
         onset: bar(7) + full_bar + half_bar,
         duration: half_bar,
@@ -378,6 +378,31 @@ mod tests {
         assert!(
             resolution.pitch.midi() < suspension.pitch.midi(),
             "resolution must be below the suspension"
+        );
+    }
+
+    #[test]
+    fn all_cadence_events_retain_their_generator_authored_voice_identity() {
+        let key = Key::modal(PitchClass::D, crate::scale::Mode::Dorian).unwrap();
+        let score = realize_renaissance(key, 92.0, 4, &point(), 7);
+
+        assert!(
+            score.has_part_identity(),
+            "all three voices, including the alto suspension and resolution, must retain PartId"
+        );
+        let parts: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        assert_eq!(parts, [SUPERIUS.0, ALTUS.0, BASSUS.0].into_iter().collect());
+
+        let alto_cadence: Vec<&ScoreNote> = score
+            .notes
+            .iter()
+            .filter(|note| note.role == VoiceRole::CounterMelody && note.onset.beats() >= 28.0)
+            .collect();
+        assert_eq!(alto_cadence.len(), 2);
+        assert!(
+            alto_cadence.iter().all(|note| note.part == ALTUS),
+            "cadence notes must remain on the persistent alto part"
         );
     }
 
