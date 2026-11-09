@@ -1827,6 +1827,7 @@ mod tests {
             member_ids: Arc::from(member_ids),
             member_payload_digests: Arc::from(member_payload_digests),
             query_digest: [0x51u8; 32],
+            scope_binding: test_scope_binding(),
             member_count,
             interval: ContinuousHVScoreInterval { lower, upper },
         }
@@ -1891,6 +1892,7 @@ mod tests {
             4,
             envelope.member_set_digest(),
             envelope.content_digest(),
+            test_scope_binding(),
         )
         .unwrap();
 
@@ -1908,6 +1910,7 @@ mod tests {
             4,
             envelope.member_set_digest(),
             envelope.content_digest(),
+            test_scope_binding(),
         );
         assert!(matches!(
             stale,
@@ -1935,6 +1938,7 @@ mod tests {
             envelope.eligibility_generation(),
             envelope.member_set_digest(),
             envelope.content_digest(),
+            test_scope_binding(),
         )
         .unwrap()
     }
@@ -2592,6 +2596,24 @@ mod tests {
                 member_id,
                 ..
             }) if member_id == "shared"
+        ));
+    }
+
+    #[test]
+    fn group_selector_rejects_group_interval_built_under_different_eligibility_scope() {
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let envelope = ContinuousHVGroupEnvelope::from_original_members(
+            62,
+            10,
+            &[("scoped-memory".to_owned(), ContinuousHV::from_vec(vec![0.8; 8]))],
+        )
+        .unwrap();
+        let mut group = build_group_record(&envelope, &query);
+        group.scope_binding.policy_generation += 1;
+        let groups = vec![group];
+        assert!(matches!(
+            select_group_refinement_set(&groups, 1, complete_group_coverage(&groups)),
+            Err(GroupIntervalSelectionError::EligibilityScopeMismatch { group_index: 0 })
         ));
     }
 
