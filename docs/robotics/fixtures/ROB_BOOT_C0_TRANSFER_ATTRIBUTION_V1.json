@@ -1,0 +1,145 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-transfer-attribution-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "purpose": "synthetic known answers for ROB-BOOT-000D nominal/as-built/physical attribution; not physical evidence",
+  "comparison_layers": [
+    "nominal_prediction",
+    "asbuilt_conditioned_prediction",
+    "physical_outcome"
+  ],
+  "cases": [
+    {
+      "name": "clean_nominal_transfer",
+      "realization_conforms": true,
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": true,
+      "asbuilt_prediction_agrees": true,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "PhysicalImprovementAndNominalTransferSupported",
+        "NominalPredictionAccurate",
+        "AsBuiltConditionedPredictionAccurate"
+      ]
+    },
+    {
+      "name": "article_win_but_length_trimmed_outside_profile",
+      "realization_conforms": false,
+      "realization_failure_reason": "total_article_length_outside_frozen_acceptance",
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": false,
+      "asbuilt_prediction_agrees": true,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "RealizedArticleImprovedButDesignTransferIndeterminate",
+        "RealizationConformityInsufficientForDesignTransfer"
+      ]
+    },
+    {
+      "name": "fabrication_deviation_explains_nominal_miss",
+      "realization_conforms": true,
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": false,
+      "asbuilt_prediction_agrees": true,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "NominalPredictionPoor",
+        "AsBuiltConditionedPredictionAccurate",
+        "FabricationDeviationExplainsMaterialPartOfNominalMiss"
+      ]
+    },
+    {
+      "name": "model_or_fixture_discrepancy_remains_after_asbuilt_conditioning",
+      "realization_conforms": true,
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": false,
+      "asbuilt_prediction_agrees": false,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "NominalPredictionPoor",
+        "AsBuiltConditionedPredictionPoor",
+        "PhysicalImprovementButPredictionPoor"
+      ]
+    },
+    {
+      "name": "uncertain_realization_spans_acceptance_boundary",
+      "realization_conforms": null,
+      "realization_uncertainty_spans_boundary": true,
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": true,
+      "asbuilt_prediction_agrees": true,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "RealizationConformityInsufficientForDesignTransfer"
+      ]
+    },
+    {
+      "name": "outcome_dependent_rework_after_proxy_or_outcome_exposure",
+      "realization_conforms": true,
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": true,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": true,
+      "asbuilt_prediction_agrees": true,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "ConfirmatoryProtocolContaminated"
+      ]
+    },
+    {
+      "name": "measurement_invalidates_attribution_even_with_apparent_win",
+      "realization_conforms": true,
+      "analytical_applicability_preserved": true,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": false,
+      "nominal_prediction_agrees": true,
+      "asbuilt_prediction_agrees": true,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "MeasurementSystemDominatesEffect"
+      ]
+    },
+    {
+      "name": "asbuilt_geometry_outside_analytical_applicability",
+      "realization_conforms": true,
+      "analytical_applicability_preserved": false,
+      "outcome_dependent_rework": false,
+      "measurement_capability_supported": true,
+      "nominal_prediction_agrees": true,
+      "asbuilt_prediction_agrees": null,
+      "physical_improvement_supported": true,
+      "expected_dispositions": [
+        "AnalyticalApplicabilityFailed",
+        "RealizedArticleImprovedButDesignTransferIndeterminate"
+      ]
+    }
+  ],
+  "required_reference_checks": [
+    "physical_win_does_not_imply_nominal_design_transfer",
+    "nominal_prediction_miss_can_be_partly_explained_by_realization",
+    "asbuilt_conditioned_miss_preserves_model_fixture_material_discrepancy",
+    "uncertain_realization_boundary_is_indeterminate_not_favorable",
+    "outcome_dependent_rework_contaminates_generation",
+    "measurement_failure_blocks_clean_attribution",
+    "asbuilt_applicability_failure_blocks_simple_model_transfer_claim",
+    "original_nominal_prediction_is_immutable"
+  ],
+  "nonclaims": [
+    "causal_mechanism",
+    "material_truth",
+    "fixture_ideality",
+    "physical_safety",
+    "process_population_improvement",
+    "r2_success"
+  ]
+}
