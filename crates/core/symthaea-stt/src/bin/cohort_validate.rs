@@ -6,10 +6,11 @@
 use clap::Parser;
 use std::error::Error;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use symthaea_stt::cohort_manifest::{
-    CohortManifest, canonical_cohort_manifest_digest, require_external_processing_authorization,
-    validate_cohort_manifest,
+    CohortManifest, canonical_cohort_manifest_digest,
+    require_external_processing_authorization, validate_cohort_manifest,
+    verify_counterfactual_pair_manifest_artifacts,
 };
 
 #[derive(Debug, Parser)]
@@ -39,6 +40,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(&args.manifest)?;
     let manifest: CohortManifest = serde_json::from_slice(&bytes)?;
     let summary = validate_cohort_manifest(&manifest)?;
+    let manifest_directory = args.manifest.parent().unwrap_or_else(|| Path::new("."));
+    let verified_pair_artifacts =
+        verify_counterfactual_pair_manifest_artifacts(&manifest, manifest_directory)?;
 
     if args.require_external_processing {
         for record in &manifest.records {
@@ -53,6 +57,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     println!("manifest_blake3={digest}");
     println!("records={}", summary.record_count);
     println!("pairs={}", summary.pair_count);
+    println!("pair_manifest_artifacts_verified={verified_pair_artifacts}");
     println!("preference_pairs={}", summary.preference_pair_count);
     println!("development_pairs={}", summary.development_pair_count);
     println!("pilot_pairs={}", summary.pilot_pair_count);
