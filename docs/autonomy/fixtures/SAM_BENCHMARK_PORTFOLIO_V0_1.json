@@ -1599,6 +1599,112 @@
         "https://github.com/Luminous-Dynamics/symthaea/issues/11109",
         "https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0"
       ]
+    },
+    {
+      "id": "sam-follow-privilege-separation-v0.1",
+      "name": "SAM Follow Privilege-Separation Benchmark v0.1",
+      "category": "privilege_aware_internal_evaluation",
+      "source_status": "specification_only",
+      "rights_status": "synthetic_no_external_dataset_required_for_initial_arms",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+      "implementation_refs": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11186",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11213"
+      ],
+      "capability_target": [
+        "policy_observation_privilege_separation",
+        "teacher_action_blending_measurement",
+        "teacher_supervision_measurement",
+        "evaluator_truth_noninterference",
+        "frozen_weight_invariance",
+        "inference_state_evolution_reporting",
+        "source_age_and_availability"
+      ],
+      "comparison_arms": [
+        {
+          "id": "A",
+          "name": "legacy_privileged",
+          "status": "initial_simulation_arm"
+        },
+        {
+          "id": "B",
+          "name": "masked_observation_teacher",
+          "status": "initial_simulation_arm"
+        },
+        {
+          "id": "C",
+          "name": "no_teacher_frozen",
+          "status": "initial_simulation_arm"
+        },
+        {
+          "id": "D",
+          "name": "local_perception_follow",
+          "status": "blocked_until_scene_admission_qualified"
+        },
+        {
+          "id": "E",
+          "name": "cooperative_v2x_advisory",
+          "status": "non_authoritative_remote_claim"
+        }
+      ],
+      "metrics": [
+        "oracle_observation_leakage_rate",
+        "teacher_blend_rate",
+        "teacher_supervision_rate",
+        "evaluator_to_policy_contamination_rate",
+        "frozen_parameter_digest_invariance",
+        "recurrent_state_evolution_rate",
+        "follow_target_availability_rate",
+        "stale_target_rate",
+        "missing_target_rate",
+        "gap_error_median",
+        "gap_error_p95",
+        "gap_error_worst_family",
+        "minimum_separation",
+        "minimum_ttc",
+        "contact_count",
+        "avoidability_classification",
+        "route_progress",
+        "intervention_rate",
+        "no_admissible_target_rate",
+        "false_intervention_rate",
+        "runtime_p50_ms",
+        "runtime_p95_ms",
+        "runtime_p99_ms",
+        "deadline_miss_rate"
+      ],
+      "negative_controls": [
+        "oracle_sidecar_mutation_invariant_under_local_only_profile",
+        "v2x_mutation_does_not_change_local_track",
+        "post_commit_shadow_teacher_cannot_change_committed_action",
+        "zero_blend_with_bptt_remains_supervised",
+        "unused_teacher_is_reference_only",
+        "frozen_weights_distinct_from_recurrent_state_evolution",
+        "disabled_teacher_update_replay_exploration_preserve_digests",
+        "missing_or_stale_target_has_no_peer_fallback",
+        "wrong_frame_scenario_future_or_stale_oracle_rejected",
+        "csv_header_row_width_integrity"
+      ],
+      "prospective_targets": {
+        "negative_control_pass_rate": 1,
+        "evaluator_to_policy_leakage_rate": 0,
+        "undeclared_teacher_use_in_arm_c": 0,
+        "arm_c_parameter_digest_change": 0
+      },
+      "validation_result": null,
+      "caveats": [
+        "Specification only. No Follow campaign result, test pass or performance result is claimed.",
+        "Arms A–C are simulation-only; Arm D is ineligible until local metric tracks satisfy SAM scene admission.",
+        "A no-teacher/no-gradient-update run may still evolve recurrent/FEP state and must report these dynamics.",
+        "A student may still observe simulator-derived peer channels even when teacher actions are not used.",
+        "This is an internal SAM experiment, not an external leaderboard or a vehicle safety demonstration."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11186",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11109"
+      ]
     }
   ],
   "world_model_benchmark_landscape_snapshot": {
