@@ -112,6 +112,14 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+    if profile != arm.get("observation_profile").and_then(Value::as_str) {
+        errors.push(format!("{prefix}.observation: profile does not match declared benchmark arm"));
+    }
+    let observation_tick = trial.get("action_observation_tick").and_then(Value::as_u64);
+    let commit_tick = trial.get("action_commit_tick").and_then(Value::as_u64);
+    if !observation_tick.zip(commit_tick).is_some_and(|(observed, committed)| observed <= committed) {
+        errors.push(format!("{prefix}: action observation tick must not exceed action commit tick"));
+    }
     let mut source_roles = BTreeMap::new();
     for (index, source) in sources.iter().enumerate() {
         let source_id = source.get("source_id").and_then(Value::as_str);
@@ -131,6 +139,13 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
             }
             if visible && role == "unknown" {
                 errors.push(format!("{prefix}.observation.sources[{index}]: unknown-role source cannot be policy-visible"));
+            }
+            if visible
+                && !observation_tick.is_some_and(|tick| {
+                    source.get("received_tick").and_then(Value::as_u64).is_some_and(|received| received <= tick)
+                })
+            {
+                errors.push(format!("{prefix}.observation.sources[{index}]: policy-visible source was received after the action observation tick"));
             }
         }
     }
@@ -212,6 +227,13 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
 
     let truth = trial.get("evaluator_truth");
     let truth_available = truth.and_then(|x| x.get("available")).and_then(Value::as_bool) == Some(true);
+    if !truth_available {
+        if truth.and_then(|x| x.get("delivered_tick")).is_some_and(|tick| !tick.is_null())
+            || truth.and_then(|x| x.get("source_ids")).and_then(Value::as_array).is_some_and(|ids| !ids.is_empty())
+        {
+            errors.push(format!("{prefix}.evaluator_truth: unavailable truth must not carry a delivery tick or source IDs"));
+        }
+    }
     if truth_available {
         let commit = trial.get("action_commit_tick").and_then(Value::as_u64);
         let delivered = truth.and_then(|x| x.get("delivered_tick")).and_then(Value::as_u64);
@@ -263,8 +285,16 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
         if !source_exists {
             errors.push(format!("{prefix}.follow_target: target source must resolve in observation sources"));
         }
-    } else if !matches!(target_status, "missing" | "stale" | "rejected" | "unknown") {
-        errors.push(format!("{prefix}.follow_target: unavailable target must state missing/stale/rejected/unknown"));
+    } else {
+        if !matches!(target_status, "missing" | "stale" | "rejected" | "unknown") {
+            errors.push(format!("{prefix}.follow_target: unavailable target must state missing/stale/rejected/unknown"));
+        }
+        if target.and_then(|x| x.get("target_id")).is_some_and(|id| !id.is_null())
+            || target.and_then(|x| x.get("age_ms")).is_some_and(|age| !age.is_null())
+            || target.and_then(|x| x.get("frame_id")).is_some_and(|frame| !frame.is_null())
+        {
+            errors.push(format!("{prefix}.follow_target: unavailable target must not carry target ID, age or frame"));
+        }
     }
 }
 
@@ -278,7 +308,7 @@ mod tests {
     }
 
     fn fixture() -> Value {
-        serde_json::from_str(include_str!("../../../../docs/autonomy/fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json"))
+        serde_json::from_str(include_str!("../../../docs/autonomy/fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json"))
             .expect("fixture JSON")
     }
 
@@ -287,7 +317,7 @@ mod tests {
     }
 
     fn valid_arm_c_trial() -> Value {
-        let mut t = serde_json::json!({
+        let t = serde_json::json!({
             "trial_id":"trial-c-001",
             "episode_id":"episode-001",
             "scenario_id":"scenario-crossing-001",
