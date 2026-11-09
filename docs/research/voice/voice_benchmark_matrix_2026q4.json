@@ -363,7 +363,10 @@
         10,
         20,
         50,
-        100
+        100,
+        150,
+        300,
+        400
       ],
       "selection_arms": [
         "random",
@@ -380,7 +383,7 @@
         "worst_group_quality",
         "prior_language_retention"
       ],
-      "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds.",
+      "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds. Include 150/300/400-hour arms when admitted language data supports them, reflecting Paza's published scaling range; this is a test grid, not a universal saturation claim.",
       "candidate_sources": [
         {
           "id": "yecs_yoruba_english",
@@ -454,7 +457,8 @@
         "uniform_LoRA",
         "DAMA_depth_aware",
         "HDC_language_conditioned_projection",
-        "hybrid_depth_adapter_HDC"
+        "hybrid_depth_adapter_HDC",
+        "PUMA_Universal_Language_Projection"
       ],
       "metrics": [
         "target_WER_CER_PIER",
@@ -478,7 +482,7 @@
         50,
         100
       ],
-      "note": "DAMA (Findings ACL 2026) reports depth-aware adaptation, 80% fewer trainable parameters and 29% error reduction in its own setting. Reproduce on matched South African data/compute; published gains are not assumed to transfer."
+      "note": "DAMA (Findings ACL 2026) reports depth-aware adaptation, 80% fewer trainable parameters and 29% error reduction in its own setting. Reproduce on matched South African data/compute; published gains are not assumed to transfer. Add PUMA's Universal Language Projection as a mandatory matched-compute comparator against HDC-conditioned projection; paper gains are not assumed to transfer. Paper: https://aclanthology.org/2026.findings-acl.17/."
     },
     {
       "id": "metric_vector_conformance",
@@ -810,6 +814,12 @@
           "status": "RESEARCH_BASELINE_REPRODUCTION_REQUIRED",
           "paper_url": "https://aclanthology.org/2026.findings-acl.2147/",
           "note": "Uses AudioRatio, AudioConsistency, AudioEntropy and TextEntropy attention-derived features with lightweight classifiers. Model-dependent and task-specific; requires attention access and should not be treated as universal confidence."
+        },
+        {
+          "id": "paraspeechrag_speech_semantic_robustness",
+          "status": "ADJACENT_PAPER_COMPARATOR_TASK_TRANSFER_NOT_ESTABLISHED",
+          "paper_url": "https://aclanthology.org/2026.emnlp-main.2581/",
+          "note": "ParaSpeechRAG (EMNLP 2026) studies semantic stability under speaker, emotion/prosody, noise, speaking-rate and codec perturbations. It is a speech-retrieval robustness comparator, not an ASR benchmark reproduction. Treat speaker identity as nuisance for transcript semantics but as task evidence for diarization/speaker attribution."
         }
       ],
       "metrics": [
@@ -901,6 +911,12 @@
           "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
           "paper_url": "https://aclanthology.org/2026.findings-aacl.165/",
           "note": "DEAF varies textual influence over acoustic conflicts. The paired scorer extends this idea with explicit text-nuisance invariance and waveform-relevant sensitivity; do not treat this as an official DEAF reproduction."
+        },
+        {
+          "id": "paraspeechrag_acoustic_nuisance_robustness",
+          "status": "ADJACENT_PAPER_COMPARATOR_TASK_TRANSFER_NOT_ESTABLISHED",
+          "paper_url": "https://aclanthology.org/2026.emnlp-main.2581/",
+          "note": "ParaSpeechRAG (EMNLP 2026) studies semantic stability under speaker, emotion/prosody, noise, speaking-rate and codec perturbations. It is a speech-retrieval robustness comparator, not an ASR benchmark reproduction. Treat speaker identity as nuisance for transcript semantics but as task evidence for diarization/speaker attribution."
         }
       ],
       "metrics": [
@@ -913,7 +929,13 @@
         "audio_nuisance_semantic_stability",
         "audio_nuisance_joint_correct_rate",
         "audio_nuisance_differential_abstention_rate",
-        "pair_coverage"
+        "pair_coverage",
+        "text_nuisance_joint_answer_coverage",
+        "text_joint_correct_given_answered",
+        "audio_relevant_joint_answer_coverage",
+        "audio_relevant_joint_sensitivity_given_answered",
+        "audio_nuisance_joint_claim_coverage",
+        "audio_nuisance_joint_correct_given_answered"
       ],
       "system_arms": [
         "trial_level_acoustic_faithfulness_only",
@@ -937,7 +959,13 @@
         "held_out_evaluation_pair_manifest_sha256",
         "training_evaluation_disjointness_audit_sha256",
         "training_evaluation_overlap_count",
-        "training_evaluation_disjointness_status"
+        "training_evaluation_disjointness_status",
+        "text_nuisance_joint_answer_coverage_numerator_denominator",
+        "text_joint_correct_given_answered_numerator_denominator",
+        "audio_relevant_joint_answer_coverage_numerator_denominator",
+        "audio_relevant_joint_sensitivity_given_answered_numerator_denominator",
+        "audio_nuisance_joint_claim_coverage_numerator_denominator",
+        "audio_nuisance_joint_correct_given_answered_numerator_denominator"
       ],
       "required_controls": [
         "same_audio_same_truth_text_context_changed",
@@ -946,7 +974,8 @@
         "same_wrong_answer_is_not_joint_correct",
         "both_abstain_is_not_evidence_sensitivity",
         "differential_abstention_under_acoustic_nuisance",
-        "pair_id_trial_reuse_and_manifest_digest_rejection"
+        "pair_id_trial_reuse_and_manifest_digest_rejection",
+        "speaker_identity_task_role_declared_per_target_task"
       ],
       "prospective_gates": [
         "100_percent_frozen_pair_relation_validation",
