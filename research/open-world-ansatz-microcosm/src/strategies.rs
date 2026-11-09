@@ -569,6 +569,39 @@ mod tests {
     }
 
     #[test]
+    fn probe_scoring_work_counts_every_candidate_prediction_for_every_legal_action() {
+        let episode = BlindEpisode::new_numeric(
+            "strategy-work-count-01",
+            numeric::ModelHypothesis {
+                mechanism: numeric::Mechanism::DirectResponse,
+                gain: 2,
+                decay: None,
+                initial_state: None,
+                sensor: numeric::SensorMap::Identity,
+            },
+            StructureAccess::NumericWithheld,
+            4,
+        )
+        .unwrap();
+        let view = episode.view().unwrap();
+        let scored = score_available_probes(&view).unwrap();
+        let (_, work) =
+            choose_probe_with_work(&view, ProbeStrategy::MaximumStructureInformationGain)
+                .unwrap();
+
+        assert_eq!(work.legal_actions_scored as usize, scored.len());
+        assert_eq!(
+            work.model_prediction_evaluations,
+            scored
+                .iter()
+                .map(|metric| metric.expected_remaining_denominator as u64)
+                .sum::<u64>()
+        );
+        assert_eq!(work.legal_actions_scored, 3);
+        assert_eq!(work.model_prediction_evaluations, 360);
+    }
+
+    #[test]
     fn interaction_strategy_never_recommends_an_already_observed_design_point() {
         let mut episode = BlindEpisode::new_interaction(
             "strategy-no-repeat-01",
