@@ -1813,6 +1813,16 @@ mod tests {
         }
     }
 
+    fn test_scope_binding() -> HmeEligibilityScopeBinding {
+        HmeEligibilityScopeBinding {
+            principal_scope_digest: [0x11u8; 32],
+            policy_digest: [0x22u8; 32],
+            policy_generation: 6,
+            source_ledger_generation: 91,
+            bitemporal_query_digest: [0x33u8; 32],
+        }
+    }
+
     fn complete_group_coverage(
         groups: &[GroupScoreIntervalRecord],
     ) -> GroupIntervalCoverageCounts {
@@ -1825,6 +1835,7 @@ mod tests {
             expected_manifest_generation: first.identity.manifest_generation,
             expected_eligibility_generation: first.identity.eligibility_generation,
             query_digest: first.query_digest,
+            scope_binding: test_scope_binding(),
             unbounded_unopened_groups: 0,
         }
     }
@@ -1841,6 +1852,7 @@ mod tests {
             envelopes,
             all_ids.len(),
             authoritative_digest,
+            test_scope_binding(),
         )
         .unwrap()
     }
@@ -2437,7 +2449,12 @@ mod tests {
             ContinuousHVGroupEnvelope::from_original_members(88, 12, &second_members).unwrap(),
         ];
         assert!(matches!(
-            GroupPartitionCoverageReceipt::from_group_envelopes(&overlapping, 4, [0u8; 32]),
+            GroupPartitionCoverageReceipt::from_group_envelopes(
+                &overlapping,
+                4,
+                [0u8; 32],
+                test_scope_binding(),
+            ),
             Err(GroupPartitionReceiptError::DuplicateMember {
                 member_id,
                 ..
@@ -2467,6 +2484,7 @@ mod tests {
                 &disjoint,
                 all_ids.len() + 1,
                 authoritative_digest,
+                test_scope_binding(),
             ),
             Err(GroupPartitionReceiptError::EligiblePopulationCountMismatch {
                 expected,
@@ -2478,6 +2496,7 @@ mod tests {
                 &disjoint,
                 all_ids.len(),
                 [0xFFu8; 32],
+                test_scope_binding(),
             ),
             Err(GroupPartitionReceiptError::EligibleMemberSetDigestMismatch)
         ));
@@ -2493,6 +2512,19 @@ mod tests {
             &receipt,
         )
         .unwrap();
+        let mut wrong_scope = coverage;
+        wrong_scope.scope_binding.policy_generation += 1;
+        assert!(matches!(
+            select_group_refinement_set_with_partition_receipt(
+                &groups,
+                1,
+                wrong_scope,
+                &receipt,
+            ),
+            Err(GroupIntervalSelectionError::PartitionReceipt(
+                GroupPartitionReceiptError::EligibilityScopeMismatch
+            ))
+        ));
         let defensive = select_group_refinement_set(&groups, 1, coverage).unwrap();
         assert_eq!(fast, defensive);
         assert_eq!(receipt.group_count(), 2);
