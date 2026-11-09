@@ -167,8 +167,14 @@ pub struct ExperimentDiscriminationScore {
     pub availability_probability: f64,
     pub status: ExperimentDiscriminationStatus,
     pub prior_scenario_scores: Vec<PriorScenarioEIG>,
+    /// Conditional EIG assuming a usable observation is obtained.
     pub worst_case_model_identity_eig_nats: Option<f64>,
+    /// Conditional EIG assuming a usable observation is obtained.
     pub weighted_mean_model_identity_eig_nats: Option<f64>,
+    /// Worst-case EIG after accounting for the probability of a usable observation.
+    pub availability_adjusted_worst_case_model_identity_eig_nats: Option<f64>,
+    /// Weighted-mean EIG after accounting for the probability of a usable observation.
+    pub availability_adjusted_weighted_mean_model_identity_eig_nats: Option<f64>,
     /// Availability-adjusted worst-case EIG per cost.
     pub worst_case_eig_per_cost: Option<f64>,
     /// Availability-adjusted weighted-mean EIG per cost.
@@ -723,6 +729,8 @@ fn score_experiment(
             prior_scenario_scores: Vec::new(),
             worst_case_model_identity_eig_nats: None,
             weighted_mean_model_identity_eig_nats: None,
+            availability_adjusted_worst_case_model_identity_eig_nats: None,
+            availability_adjusted_weighted_mean_model_identity_eig_nats: None,
             worst_case_eig_per_cost: None,
             weighted_mean_eig_per_cost: None,
             open_world_unresolved_excluded,
@@ -841,6 +849,12 @@ fn score_experiment(
         prior_scenario_scores,
         worst_case_model_identity_eig_nats: Some(worst_case),
         weighted_mean_model_identity_eig_nats: Some(weighted_mean),
+        availability_adjusted_worst_case_model_identity_eig_nats: Some(
+            availability_adjusted_worst_case,
+        ),
+        availability_adjusted_weighted_mean_model_identity_eig_nats: Some(
+            availability_adjusted_weighted_mean,
+        ),
         worst_case_eig_per_cost: Some(availability_adjusted_worst_case / experiment.cost),
         weighted_mean_eig_per_cost: Some(availability_adjusted_weighted_mean / experiment.cost),
         open_world_unresolved_excluded,
@@ -1021,6 +1035,7 @@ mod tests {
             measurement_sigma,
             noise_calibration: NoiseCalibrationStatus::SyntheticKnownAnswer,
             calibration_reference: Some("synthetic-noise-fixture-v1".to_string()),
+            availability_probability: 1.0,
             cost,
             exclusive_group: None,
             predictions,
