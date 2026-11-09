@@ -36,9 +36,16 @@ impl LocalSchemaResources {
 
 impl Retrieve for LocalSchemaResources {
     fn retrieve(&self, uri: &Uri<String>) -> Result<Value, AnyError> {
-        self.resources.get(uri.as_str()).cloned().ok_or_else(|| {
-            format!("schema reference is not present in the offline registry: {uri}").into()
-        })
+        self.resources
+            .get(uri.as_str())
+            .cloned()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("schema reference is not present in the offline registry: {uri}"),
+                )
+                .into()
+            })
     }
 }
 
