@@ -257,14 +257,22 @@ pub enum StaticModelDiagnosticError {
     #[error("no policy satisfies the branch-cost bound")]
     NoFeasiblePolicy,
     #[error("rectangular risk {rectangular_risk} is below static risk {static_risk}")]
-    RectangularityInvariant { static_risk: f64, rectangular_risk: f64 },
-    #[error("rectangular evaluation of the static policy {rectangular_risk} is below its static risk {static_risk}")]
+    RectangularityInvariant {
+        static_risk: f64,
+        rectangular_risk: f64,
+    },
+    #[error(
+        "rectangular evaluation of the static policy {rectangular_risk} is below its static risk {static_risk}"
+    )]
     StaticPolicyRectangularityInvariant {
         static_risk: f64,
         rectangular_risk: f64,
     },
     #[error("clairvoyant lower bound {clairvoyant_risk} exceeds static robust risk {static_risk}")]
-    ClairvoyanceInvariant { clairvoyant_risk: f64, static_risk: f64 },
+    ClairvoyanceInvariant {
+        clairvoyant_risk: f64,
+        static_risk: f64,
+    },
     #[error("public observation history is unknown or has zero predictive probability")]
     ImpossiblePublicHistory,
     #[error("source Git SHA must be 40 lowercase hexadecimal characters")]
@@ -337,7 +345,10 @@ pub fn evaluate_static_model_diagnostic_problem(
                 .iter()
                 .map(|vertex| static_policy_risk(problem, vertex, &action_indices, &decisions))
                 .collect::<Vec<_>>();
-            let static_robust_risk = static_per_model_risks.iter().copied().fold(0.0_f64, f64::max);
+            let static_robust_risk = static_per_model_risks
+                .iter()
+                .copied()
+                .fold(0.0_f64, f64::max);
             let rectangular_per_root_model_risks = problem
                 .model_vertices
                 .iter()
@@ -369,7 +380,10 @@ pub fn evaluate_static_model_diagnostic_problem(
                 rectangular_robust_risk,
                 worst_branch_cost,
             };
-            if best_static.as_ref().is_none_or(|best| candidate_precedes(&candidate, best, true)) {
+            if best_static
+                .as_ref()
+                .is_none_or(|best| candidate_precedes(&candidate, best, true))
+            {
                 best_static = Some(candidate.clone());
             }
             if best_rectangular
@@ -416,16 +430,15 @@ pub fn evaluate_static_model_diagnostic_problem(
         })
         .fold(0.0_f64, f64::max);
     if rectangular_risk_of_static_policy + RISK_TOL < best_static.static_robust_risk {
-        return Err(StaticModelDiagnosticError::StaticPolicyRectangularityInvariant {
-            static_risk: best_static.static_robust_risk,
-            rectangular_risk: rectangular_risk_of_static_policy,
-        });
+        return Err(
+            StaticModelDiagnosticError::StaticPolicyRectangularityInvariant {
+                static_risk: best_static.static_robust_risk,
+                rectangular_risk: rectangular_risk_of_static_policy,
+            },
+        );
     }
-    let cross_stage_switching_stress_risk = cross_stage_switching_risk(
-        problem,
-        &best_static.action_indices,
-        &best_static.decisions,
-    );
+    let cross_stage_switching_stress_risk =
+        cross_stage_switching_risk(problem, &best_static.action_indices, &best_static.decisions);
 
     let report = StaticModelDiagnosticReport {
         scenario_id: problem.scenario_id.clone(),
@@ -551,8 +564,16 @@ pub fn symmetric_calibration_fixture() -> StaticModelDiagnosticProblem {
     let world_ids = vec!["QUERY_TRUE".to_owned(), "QUERY_FALSE".to_owned()];
     let histories = vec!["CAL-A".to_owned(), "CAL-B".to_owned()];
     let actions_by_history = vec![
-        vec![STOP_ACTION_ID.to_owned(), "ACTION-A".to_owned(), "ACTION-B".to_owned()],
-        vec![STOP_ACTION_ID.to_owned(), "ACTION-A".to_owned(), "ACTION-B".to_owned()],
+        vec![
+            STOP_ACTION_ID.to_owned(),
+            "ACTION-A".to_owned(),
+            "ACTION-B".to_owned(),
+        ],
+        vec![
+            STOP_ACTION_ID.to_owned(),
+            "ACTION-A".to_owned(),
+            "ACTION-B".to_owned(),
+        ],
     ];
     let outcomes = vec![
         STOP_ACTION_ID.to_owned(),
@@ -569,8 +590,7 @@ pub fn symmetric_calibration_fixture() -> StaticModelDiagnosticProblem {
             } else {
                 vec![0.0, 1.0]
             };
-            let stage_one_outcome_probabilities_by_world =
-                vec![calibration.clone(), calibration];
+            let stage_one_outcome_probabilities_by_world = vec![calibration.clone(), calibration];
             let stage_two_outcome_probabilities = (0..histories.len())
                 .map(|_| {
                     actions_by_history[0]
@@ -581,7 +601,8 @@ pub fn symmetric_calibration_fixture() -> StaticModelDiagnosticProblem {
                                     if action_id == STOP_ACTION_ID {
                                         vec![1.0, 0.0, 0.0]
                                     } else {
-                                        let truthful = (*action_id == "ACTION-A") == (model_index == 0);
+                                        let truthful =
+                                            (*action_id == "ACTION-A") == (model_index == 0);
                                         let world_true = world_index == 0;
                                         if truthful == world_true {
                                             vec![0.0, 0.0, 1.0]
@@ -726,7 +747,8 @@ fn validate_problem(
         || problem.one_shot_action_ids.len() > 4
         || problem.world_is_query_true.len() != problem.world_ids.len()
         || problem.second_stage_action_ids_by_history.len() != problem.first_stage_history_ids.len()
-        || problem.second_stage_action_costs_by_history.len() != problem.first_stage_history_ids.len()
+        || problem.second_stage_action_costs_by_history.len()
+            != problem.first_stage_history_ids.len()
         || problem.one_shot_action_costs.len() != problem.one_shot_action_ids.len()
     {
         return Err(StaticModelDiagnosticError::InvalidActionMenu(
@@ -853,7 +875,9 @@ fn validate_problem(
             &vertex.world_prior_probabilities,
             format!("{} world prior", vertex.model_vertex_id),
         )
-        .map_err(|_| StaticModelDiagnosticError::InvalidWorldPrior(vertex.model_vertex_id.clone()))?;
+        .map_err(|_| {
+            StaticModelDiagnosticError::InvalidWorldPrior(vertex.model_vertex_id.clone())
+        })?;
 
         if vertex.stage_one_outcome_probabilities_by_world.len() != problem.world_ids.len()
             || vertex
@@ -865,8 +889,10 @@ fn validate_problem(
                 vertex.model_vertex_id.clone(),
             ));
         }
-        for (world_index, distribution) in
-            vertex.stage_one_outcome_probabilities_by_world.iter().enumerate()
+        for (world_index, distribution) in vertex
+            .stage_one_outcome_probabilities_by_world
+            .iter()
+            .enumerate()
         {
             validate_distribution(
                 distribution,
@@ -916,9 +942,10 @@ fn validate_problem(
                     )?;
                     if action_index == stop_action_index
                         && (distribution[stop_outcome_index] != 1.0
-                            || distribution.iter().enumerate().any(|(index, value)| {
-                                index != stop_outcome_index && *value != 0.0
-                            }))
+                            || distribution
+                                .iter()
+                                .enumerate()
+                                .any(|(index, value)| index != stop_outcome_index && *value != 0.0))
                     {
                         return Err(StaticModelDiagnosticError::InvalidStopContract);
                     }
@@ -926,7 +953,8 @@ fn validate_problem(
             }
         }
 
-        if vertex.one_shot_outcome_probabilities_by_action.len() != problem.one_shot_action_ids.len()
+        if vertex.one_shot_outcome_probabilities_by_action.len()
+            != problem.one_shot_action_ids.len()
             || vertex
                 .one_shot_outcome_probabilities_by_action
                 .iter()
@@ -941,8 +969,10 @@ fn validate_problem(
                 vertex.model_vertex_id.clone(),
             ));
         }
-        for (action_index, worlds) in
-            vertex.one_shot_outcome_probabilities_by_action.iter().enumerate()
+        for (action_index, worlds) in vertex
+            .one_shot_outcome_probabilities_by_action
+            .iter()
+            .enumerate()
         {
             for (world_index, distribution) in worlds.iter().enumerate() {
                 validate_distribution(
@@ -997,7 +1027,8 @@ fn required_policy_evaluations(
     problem: &StaticModelDiagnosticProblem,
 ) -> Result<u64, StaticModelDiagnosticError> {
     let actions = action_combination_count(problem)?;
-    let decisions = 1_u64 << (problem.first_stage_history_ids.len() * problem.second_stage_outcome_ids.len());
+    let decisions =
+        1_u64 << (problem.first_stage_history_ids.len() * problem.second_stage_outcome_ids.len());
     let one_shot_masks = 1_u64 << problem.one_shot_outcome_ids.len();
     actions
         .checked_mul(decisions)
@@ -1017,12 +1048,12 @@ fn action_combination_count(
         .second_stage_action_ids_by_history
         .iter()
         .try_fold(1_u64, |count, actions| {
-            count
-                .checked_mul(actions.len() as u64)
-                .ok_or(StaticModelDiagnosticError::SearchBudgetExceeded {
+            count.checked_mul(actions.len() as u64).ok_or(
+                StaticModelDiagnosticError::SearchBudgetExceeded {
                     required: u64::MAX,
                     budget: 0,
-                })
+                },
+            )
         })
 }
 
@@ -1067,7 +1098,11 @@ fn policy_worst_branch_cost(
             .fold(0.0_f64, f64::max)
 }
 
-fn candidate_precedes(candidate: &CandidatePolicy, best: &CandidatePolicy, static_mode: bool) -> bool {
+fn candidate_precedes(
+    candidate: &CandidatePolicy,
+    best: &CandidatePolicy,
+    static_mode: bool,
+) -> bool {
     let candidate_risk = if static_mode {
         candidate.static_robust_risk
     } else {
@@ -1116,8 +1151,8 @@ fn static_policy_risk(
                 vertex.stage_one_outcome_probabilities_by_world[world_index][history_index];
             let action_index = action_indices[history_index];
             for outcome_index in 0..outcome_count {
-                let p_outcome = vertex.stage_two_outcome_probabilities[history_index]
-                    [action_index][world_index][outcome_index];
+                let p_outcome = vertex.stage_two_outcome_probabilities[history_index][action_index]
+                    [world_index][outcome_index];
                 let decision = decisions[history_index * outcome_count + outcome_index];
                 risk += vertex.world_prior_probabilities[world_index]
                     * p_history
@@ -1144,7 +1179,8 @@ fn rectangular_policy_risk(
         let joint_world_mass = (0..problem.world_ids.len())
             .map(|world_index| {
                 root_vertex.world_prior_probabilities[world_index]
-                    * root_vertex.stage_one_outcome_probabilities_by_world[world_index][history_index]
+                    * root_vertex.stage_one_outcome_probabilities_by_world[world_index]
+                        [history_index]
             })
             .collect::<Vec<_>>();
         let p_history = joint_world_mass.iter().sum::<f64>();
@@ -1195,8 +1231,8 @@ fn cross_stage_switching_risk(
             let mut risk = 0.0;
             for world_index in 0..problem.world_ids.len() {
                 for history_index in 0..problem.first_stage_history_ids.len() {
-                    let p_history =
-                        root_vertex.stage_one_outcome_probabilities_by_world[world_index][history_index];
+                    let p_history = root_vertex.stage_one_outcome_probabilities_by_world
+                        [world_index][history_index];
                     let action_index = action_indices[history_index];
                     for outcome_index in 0..outcome_count {
                         let decision = decisions[history_index * outcome_count + outcome_index];
@@ -1233,8 +1269,8 @@ fn materialize_policy(
             terminal.push(StaticDiagnosticTerminalDecision {
                 first_stage_history_id: history_id.clone(),
                 second_stage_outcome_id: outcome_id.clone(),
-                decision: decisions[history_index * problem.second_stage_outcome_ids.len()
-                    + outcome_index],
+                decision: decisions
+                    [history_index * problem.second_stage_outcome_ids.len() + outcome_index],
             });
         }
     }
@@ -1262,25 +1298,26 @@ fn materialize_risks(
 }
 
 fn no_probe_risk(problem: &StaticModelDiagnosticProblem) -> f64 {
-    [StaticDiagnosticDecision::Support, StaticDiagnosticDecision::Refute]
-        .into_iter()
-        .map(|decision| {
-            problem
-                .model_vertices
-                .iter()
-                .map(|vertex| {
-                    vertex
-                        .world_prior_probabilities
-                        .iter()
-                        .zip(&problem.world_is_query_true)
-                        .map(|(probability, is_true)| {
-                            probability * is_wrong(decision, *is_true)
-                        })
-                        .sum::<f64>()
-                })
-                .fold(0.0_f64, f64::max)
-        })
-        .fold(f64::INFINITY, f64::min)
+    [
+        StaticDiagnosticDecision::Support,
+        StaticDiagnosticDecision::Refute,
+    ]
+    .into_iter()
+    .map(|decision| {
+        problem
+            .model_vertices
+            .iter()
+            .map(|vertex| {
+                vertex
+                    .world_prior_probabilities
+                    .iter()
+                    .zip(&problem.world_is_query_true)
+                    .map(|(probability, is_true)| probability * is_wrong(decision, *is_true))
+                    .sum::<f64>()
+            })
+            .fold(0.0_f64, f64::max)
+    })
+    .fold(f64::INFINITY, f64::min)
 }
 
 fn evaluate_one_shot(
@@ -1310,7 +1347,10 @@ fn evaluate_one_shot(
                             risk += vertex.world_prior_probabilities[world_index]
                                 * vertex.one_shot_outcome_probabilities_by_action[action_index]
                                     [world_index][outcome_index]
-                                * is_wrong(decisions[outcome_index], problem.world_is_query_true[world_index]);
+                                * is_wrong(
+                                    decisions[outcome_index],
+                                    problem.world_is_query_true[world_index],
+                                );
                         }
                     }
                     risk
@@ -1416,9 +1456,7 @@ mod tests {
     // Deliberately separate test oracle: directly enumerates menu products and
     // computes risks from raw tensors. It does not call production decoders,
     // candidate comparators, static-risk, or rectangular-risk functions.
-    fn independent_reference(
-        problem: &StaticModelDiagnosticProblem,
-    ) -> (f64, f64, f64, u64) {
+    fn independent_reference(problem: &StaticModelDiagnosticProblem) -> (f64, f64, f64, u64) {
         fn expand_menus(
             menus: &[Vec<String>],
             depth: usize,
@@ -1449,8 +1487,7 @@ mod tests {
                 let mut joint_world = vec![0.0; problem.world_ids.len()];
                 for world_index in 0..problem.world_ids.len() {
                     joint_world[world_index] = root.world_prior_probabilities[world_index]
-                        * root.stage_one_outcome_probabilities_by_world[world_index]
-                            [history_index];
+                        * root.stage_one_outcome_probabilities_by_world[world_index][history_index];
                 }
                 let history_probability = joint_world.iter().sum::<f64>();
                 if history_probability == 0.0 {
@@ -1528,12 +1565,12 @@ mod tests {
                     let mut vertex_risk = 0.0;
                     for world_index in 0..problem.world_ids.len() {
                         for history_index in 0..problem.first_stage_history_ids.len() {
-                            let p_history =
-                                vertex.stage_one_outcome_probabilities_by_world[world_index]
-                                    [history_index];
+                            let p_history = vertex.stage_one_outcome_probabilities_by_world
+                                [world_index][history_index];
                             let action_index = selected_actions[history_index];
                             for outcome_index in 0..outcome_count {
-                                let decision = terminal_map[history_index * outcome_count + outcome_index];
+                                let decision =
+                                    terminal_map[history_index * outcome_count + outcome_index];
                                 let says_true = decision == StaticDiagnosticDecision::Support;
                                 let actually_true = problem.world_is_query_true[world_index];
                                 let loss = if says_true == actually_true { 0.0 } else { 1.0 };
@@ -1600,9 +1637,7 @@ mod tests {
 
         assert_eq!(feasible, 256);
         assert_eq!(reference_static, result.report.static_robust_risk);
-        assert!(
-            (reference_rectangular - result.report.rectangular_minimax_risk).abs() < 1e-12
-        );
+        assert!((reference_rectangular - result.report.rectangular_minimax_risk).abs() < 1e-12);
         assert!(
             (reference_static_rectangular - result.report.rectangular_risk_of_static_policy).abs()
                 < 1e-12
@@ -1631,22 +1666,46 @@ mod tests {
         assert_eq!(result.report.static_policy.worst_branch_cost, 2.0);
         assert_eq!(result.report.policy_evaluations, 264);
         assert_eq!(result.report.static_policy.root_action_id, "CALIBRATE");
-        assert!(result.report.static_policy.second_stage_action_by_history.iter().any(|x| {
-            x.first_stage_history_id == "CAL-A" && x.action_id == "ACTION-A"
-        }));
-        assert!(result.report.static_policy.second_stage_action_by_history.iter().any(|x| {
-            x.first_stage_history_id == "CAL-B" && x.action_id == "ACTION-B"
-        }));
-        assert!(result.report.static_policy.terminal_decision_by_history_and_outcome.iter().any(|x| {
-            x.first_stage_history_id == "CAL-A"
-                && x.second_stage_outcome_id == "POSITIVE"
-                && x.decision == StaticDiagnosticDecision::Support
-        }));
-        assert!(result.report.static_policy.terminal_decision_by_history_and_outcome.iter().any(|x| {
-            x.first_stage_history_id == "CAL-B"
-                && x.second_stage_outcome_id == "NEGATIVE"
-                && x.decision == StaticDiagnosticDecision::Refute
-        }));
+        assert!(
+            result
+                .report
+                .static_policy
+                .second_stage_action_by_history
+                .iter()
+                .any(|x| { x.first_stage_history_id == "CAL-A" && x.action_id == "ACTION-A" })
+        );
+        assert!(
+            result
+                .report
+                .static_policy
+                .second_stage_action_by_history
+                .iter()
+                .any(|x| { x.first_stage_history_id == "CAL-B" && x.action_id == "ACTION-B" })
+        );
+        assert!(
+            result
+                .report
+                .static_policy
+                .terminal_decision_by_history_and_outcome
+                .iter()
+                .any(|x| {
+                    x.first_stage_history_id == "CAL-A"
+                        && x.second_stage_outcome_id == "POSITIVE"
+                        && x.decision == StaticDiagnosticDecision::Support
+                })
+        );
+        assert!(
+            result
+                .report
+                .static_policy
+                .terminal_decision_by_history_and_outcome
+                .iter()
+                .any(|x| {
+                    x.first_stage_history_id == "CAL-B"
+                        && x.second_stage_outcome_id == "NEGATIVE"
+                        && x.decision == StaticDiagnosticDecision::Refute
+                })
+        );
         assert_eq!(result.report.cross_stage_switching_stress_risk, 1.0);
         assert!(is_lower_hex(&result.receipt.input_sha256, 64));
     }
@@ -1687,8 +1746,8 @@ mod tests {
     #[test]
     fn posterior_updates_from_public_observations_only() {
         let problem = symmetric_calibration_fixture();
-        let calibrated = posterior_after_public_history(&problem, "CAL-A", None)
-            .expect("calibration outcome");
+        let calibrated =
+            posterior_after_public_history(&problem, "CAL-A", None).expect("calibration outcome");
         assert_eq!(
             calibrated.world_probabilities,
             vec![
@@ -1698,17 +1757,11 @@ mod tests {
         );
         assert_eq!(
             calibrated.model_probabilities,
-            vec![
-                ("MODEL-A".to_owned(), 1.0),
-                ("MODEL-B".to_owned(), 0.0)
-            ]
+            vec![("MODEL-A".to_owned(), 1.0), ("MODEL-B".to_owned(), 0.0)]
         );
-        let classified = posterior_after_public_history(
-            &problem,
-            "CAL-A",
-            Some(("ACTION-A", "POSITIVE")),
-        )
-        .expect("terminal observation");
+        let classified =
+            posterior_after_public_history(&problem, "CAL-A", Some(("ACTION-A", "POSITIVE")))
+                .expect("terminal observation");
         assert_eq!(
             classified.world_probabilities,
             vec![
