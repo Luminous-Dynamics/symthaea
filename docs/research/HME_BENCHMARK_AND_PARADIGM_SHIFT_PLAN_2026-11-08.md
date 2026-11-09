@@ -812,7 +812,7 @@ The harness:
 - performs hierarchical selection and exact-reranks the final payload set;
 - checks every run against the full canonical score/top-k oracle;
 - separately times the full-scan baseline and the end-to-end two-stage path;
-- reports p50/p95/p99 for full scan, end-to-end hierarchy, each selector/materialization stage, build costs, logical exact-payload reads and metadata estimates. The two-stage latency timer stops before the full-scan baseline begins. It also emits explicit work counters: defensive member-roster IDs walked, receipt-backed member-roster IDs walked (expected zero before stage one), group-directory records visited, and member interval records consumed in stage two.
+- reports p50/p95/p99 for full scan, end-to-end hierarchy, each selector/materialization stage, build costs, logical exact-payload reads and metadata estimates. The two-stage latency timer stops before the full-scan baseline begins. It also reports the full-scan-to-two-stage CPU p50 ratio, explicitly limited to the in-memory synthetic harness (not a disk speedup), and emits explicit work counters: defensive member-roster IDs walked, receipt-backed member-roster IDs walked (expected zero before stage one), group-directory linear-pass entries, and member interval records consumed in stage two.
 
 The reconstruction remains an unpacked f32 grid simulation. This is not a production compression format, not a physical disk-I/O benchmark, and not a substitute for #10917 segment/page telemetry. It emits physical_io_measured=false by design. The benchmark has been authored and registered but was not executed in this environment because cargo/rustc are unavailable.
 
