@@ -2864,6 +2864,9 @@ pub fn verify_policy_regret_profile_frontier(
 /// Resource limits for the exact threshold-feasibility / set-cover solver.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PolicyThresholdCoverBudget {
+    /// Independently replay the exhaustive finite-family source table before
+    /// using its policy values or regret profiles.
+    pub source_verification_budget: PolicyPortfolioBudget,
     pub profile_budget: PolicyRegretProfileBudget,
     pub max_threshold_candidates: usize,
     /// Coverage-matrix construction plus MRV/branch profile checks.
@@ -2920,7 +2923,7 @@ fn threshold_cover_dfs(
     budget: PolicyThresholdCoverBudget,
     solution: &mut Option<Vec<usize>>,
 ) -> Result<bool, PolicyPortfolioError> {
-    *nodes_this_threshold = nodes_this_threshold.checked_add(1)
+    *nodes_this_threshold = (*nodes_this_threshold).checked_add(1)
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     if *nodes_this_threshold > budget.max_search_nodes_per_threshold {
         return Err(PolicyPortfolioError::BudgetExceeded {
@@ -2929,7 +2932,7 @@ fn threshold_cover_dfs(
             limit: budget.max_search_nodes_per_threshold,
         });
     }
-    *total_search_nodes = total_search_nodes.checked_add(1)
+    *total_search_nodes = (*total_search_nodes).checked_add(1)
         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
     if *total_search_nodes > budget.max_total_search_nodes {
         return Err(PolicyPortfolioError::BudgetExceeded {
@@ -2955,7 +2958,7 @@ fn threshold_cover_dfs(
         return Ok(true);
     }
     if selected_rows.len() >= max_portfolio_size {
-        *dead_ends = dead_ends.checked_add(1)
+        *dead_ends = (*dead_ends).checked_add(1)
             .ok_or(PolicyPortfolioError::DimensionOverflow)?;
         return Ok(false);
     }
@@ -2977,7 +2980,7 @@ fn threshold_cover_dfs(
         }
         let mut available = 0usize;
         for row in 0..coverage.len() {
-            *profile_coverage_checks = profile_coverage_checks.checked_add(1)
+            *profile_coverage_checks = (*profile_coverage_checks).checked_add(1)
                 .ok_or(PolicyPortfolioError::DimensionOverflow)?;
             if *profile_coverage_checks > budget.max_profile_coverage_checks {
                 return Err(PolicyPortfolioError::BudgetExceeded {
@@ -3011,7 +3014,7 @@ fn threshold_cover_dfs(
     // Ascending row order is canonical. After each branch, forbid the policy
     // just explored so all later branches require it to be absent.
     for row in 0..coverage.len() {
-        *profile_coverage_checks = profile_coverage_checks.checked_add(1)
+        *profile_coverage_checks = (*profile_coverage_checks).checked_add(1)
             .ok_or(PolicyPortfolioError::DimensionOverflow)?;
         if *profile_coverage_checks > budget.max_profile_coverage_checks {
             return Err(PolicyPortfolioError::BudgetExceeded {
@@ -3153,6 +3156,14 @@ pub fn solve_exact_policy_regret_threshold_cover(
     max_portfolio_size: usize,
     budget: PolicyThresholdCoverBudget,
 ) -> Result<VerifiedPolicyRegretThresholdCover, PolicyPortfolioError> {
+    // The profile hash binds a table, but a caller could forge both the
+    // table and its digest. Replay the finite-family source solver before
+    // allowing its values to participate in an optimality claim.
+    verify_finite_family_policy_portfolio_result(
+        family,
+        budget.source_verification_budget,
+        source,
+    )?;
     verify_policy_regret_profile_frontier(
         family,
         source,
@@ -3527,7 +3538,7 @@ pub fn solve_exact_policy_regret_threshold_cover(
         family.sha256(),
         profile_frontier.policy_manifest_sha256,
         profile_frontier.policy_values_sha256,
-        profile_frontier_certificate_sha256_placeholder,
+        profile_frontier.certificate_sha256,
         source.discount,
         max_portfolio_size,
         optimal_threshold,
@@ -3547,7 +3558,7 @@ pub fn solve_exact_policy_regret_threshold_cover(
         model_family_sha256: family.sha256(),
         policy_manifest_sha256: profile_frontier.policy_manifest_sha256,
         policy_values_sha256: profile_frontier.policy_values_sha256,
-        profile_frontier_sha256: profile_frontier_certificate_sha256_placeholder,
+        profile_frontier_sha256: profile_frontier.certificate_sha256,
         discount: source.discount,
         max_portfolio_size,
         optimal_threshold,
