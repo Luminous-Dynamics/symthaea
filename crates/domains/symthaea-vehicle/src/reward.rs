@@ -293,12 +293,16 @@ mod tests {
     fn test_follow_reward_does_not_use_legacy_mesh_distance() {
         let mut state = VehicleState::cruising(13.4);
         state.nearest_peer_distance = 30.0;
-        assert_eq!(episode_reward_with_follow_target(
+        let reward = episode_reward_with_follow_target(
             &state,
             &VehicleTask::Follow { target_gap: 30.0 },
             13.4,
             0.0,
             None,
-        ), 0.25 * safety_reward(&state) + 0.30 * speed_reward(&state,13.4) + 0.25 * 0.0 + 0.10 * lane_reward(&state) + 0.10 * smoothness_reward(&state));
+        );
+        assert!(
+            (reward - 0.75).abs() < 1e-6,
+            "Missing oracle evidence must not award a mesh-derived gap reward: {reward}"
+        );
     }
 }
