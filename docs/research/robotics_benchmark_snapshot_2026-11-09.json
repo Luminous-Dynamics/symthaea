@@ -310,6 +310,63 @@
         "use": "map Luminous physical tests to applicable published NIST/ASTM methods; preserve native metrics"
       },
       "claim_ceiling": "method reference; not a Luminous test result or certification"
+    },
+    {
+      "id": "rmmb-2026-10-04-preprint-current-project-page",
+      "name": "RMMBench — continuous-space mobile manipulation",
+      "paper_source": "https://arxiv.org/abs/2610.05414",
+      "project_source": "https://mxxq-stack.github.io/rmmbench-project/",
+      "code_source": "https://github.com/mxxq-stack/RMMBench",
+      "source_date": "2026-10-04",
+      "evidence_class": "research_preprint_and_public_benchmark_artifact",
+      "protocol_scope": {
+        "task_count_preprint_abstract": 70,
+        "task_count_current_project_page": 90,
+        "count_discrepancy": "Unreconciled between arXiv abstract (70) and current project page (90); freeze exact code commit, asset pack and task manifest.",
+        "task_type": "language-instructed continuous-space navigation plus manipulation, from localized skills to long-horizon composite tasks",
+        "described_inputs": [
+          "head camera",
+          "wrist camera",
+          "optional bird's-eye view"
+        ],
+        "described_navigation": "Hanan grid dynamically bounded by workspace geometry",
+        "described_manipulation": "GraspNet candidates plus human-verified fallback candidate",
+        "public_runtime_requirements": [
+          "Python 3.10",
+          "dm_control/MuJoCo",
+          "GraspNet baseline and checkpoint",
+          "configurable VLM server endpoint"
+        ],
+        "claim_ceiling": "mobile navigation/manipulation evaluation under the exact disclosed skill library, aids, modalities, VLM endpoint and simulator; not automatically pure end-to-end autonomy or physical qualification"
+      },
+      "luminous_use": "Use as a separate spatial/mobile benchmark; report navigation, manipulation, modality, task progress, intervention and recovery metrics independently."
+    },
+    {
+      "id": "manipulation-benchmark-validity-audit-2026-06",
+      "name": "What Are We Actually Benchmarking in Robot Manipulation?",
+      "source": "https://arxiv.org/abs/2606.04233",
+      "artifacts": "https://ripl.github.io/manipulation_benchmark_audit/",
+      "code": "https://github.com/ripl/ManipulationBenchmarkAudit",
+      "source_date": "2026-06-02",
+      "evidence_class": "peer_reviewed_benchmark_audit_and_reference_diagnostics",
+      "diagnostics": [
+        "shortcut_solvability",
+        "statistical_significance",
+        "creeping_overfitting",
+        "data_source_dependence"
+      ],
+      "paper_reported_provably_significant_sota_claim_share_pct": {
+        "LIBERO": 19.8,
+        "SimplerEnv": 19.7,
+        "RoboCasa": 53.3,
+        "RoboTwin 2.0": 73.7
+      },
+      "paper_reported_examples": {
+        "shortcut_probe": "A 0.09B probe without a language encoder approached reported LIBERO SOTA.",
+        "within_training_distribution_perturbation": "CALVIN average tasks completed fell from 4.17 to 3.14 after block-pose resampling within the training range."
+      },
+      "luminous_acceptance_rule": "Every comparative benchmark claim must include shortcut probes, statistical comparison with raw denominators and confidence intervals, within-distribution perturbations and held-out instances/scenes, and training-data proximity/overlap disclosure. Failure of a diagnostic reduces claim ceiling; it does not make the benchmark unusable for debugging.",
+      "claim_ceiling": "paper-reported audit of the named benchmarks/protocols; do not generalize its percentages to all tasks, releases or later leaderboard snapshots"
     }
   ],
   "proposed_luminous_targets": {
@@ -333,6 +390,8 @@
     "No Luminous benchmark has been executed by recording this source snapshot.",
     "No SOTA superiority, physical qualification, safety certification or production readiness is implied.",
     "A credential signature or content digest does not prove the physical event or measurement is true.",
-    "MOST's paper-reported memory-ablation results are not reproduced or independently verified by Luminous."
+    "MOST's paper-reported memory-ablation results are not reproduced or independently verified by Luminous.",
+    "RMMBench's public project page currently states 90 scenarios while its arXiv abstract states 70; Luminous has not reconciled or executed either exact protocol.",
+    "The benchmark-validity audit metrics are the paper's audit results, not Luminous-run diagnostics."
   ]
 }
