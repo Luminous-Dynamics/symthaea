@@ -138,7 +138,64 @@ SciLaws-Bench gives a concrete reason. Its Real setting scores held-out numeric 
 
 For Symthaea, record the complete candidate pool, candidate provenance, frozen pre-submission predictions, independent score for every candidate and the final selected candidate. Report best-generated candidate score, submitted candidate score, selection regret/Pareto domination, generation cost and selection cost separately. The oracle best-of-N score is an upper bound, not a feasible agent result. A model that generates a brilliant law but submits a weaker one has not completed discovery reliably.
 
-### 1.10 Test whether conclusions follow the evidence
+### 1.11 From one-shot researcher to discover–compile–transfer
+
+A promising hybrid architecture is to treat a confirmed scientific result as a **versioned executable knowledge object**, not a paragraph in long-term memory. The pipeline is:
+
+`explore → propose typed model → design discriminating experiment → independently qualify → compile a bounded executable capsule → transfer-test → promote or quarantine`.
+
+The canonical source must remain #6879/#6880 ScientificModel / PhysicsIR. A compiled capsule is a derived artifact, never a second equation AST or physical ontology. Bind the canonical model digest, assumptions, units, domain of validity, measurement model, parameter ranges, solver/runtime profile, test corpus, counterexamples, uncertainty contract, codegen version and qualification receipt. Keep the code generator deterministic and restricted to a tested expression subset; unsupported features must fail closed rather than silently approximate.
+
+This is a third evaluation arm alongside cold-start generalist and precompiled specialist:
+
+1. **Cold-start generalist:** method and model construction begins only after the task is presented.
+2. **Compiled specialist:** task-specific executable knowledge is prepared before task presentation; publish all human and automated setup costs and data access.
+3. **Discover–compile–transfer hybrid:** the system discovers a method on a source task, compiles it only after independent qualification, then receives fresh related and unrelated tasks without seeing their answer keys. It must decide whether to reuse, adapt, or reject the capsule.
+
+Measure first-use and amortized performance separately. For (K) tasks, report total setup cost (C_{setup}), total discovery cost, per-task execution cost (c_i), verification cost and human intervention. A simple break-even diagnostic is (K^* = C_{setup}/(c_{baseline}-c_{compiled})) when compiled execution is cheaper and quality remains non-inferior. It is not enough to show a low runtime after excluding solver construction.
+
+Promotion gates:
+- deterministic compiler/codegen and model/artifact digests;
+- independent differential tests against the canonical model on known and boundary inputs;
+- units, domain, singularity, stability and unsupported-operation checks;
+- exact behavior on source confirmation tests and declared uncertainty coverage;
+- successful positive transfer to held-out related parameterizations/coordinate systems;
+- explicit rejection or safe abstention on unrelated, shifted or out-of-domain tasks;
+- no support for a model claim merely because the compiled program fits the observed points.
+
+Preserve failed hypotheses, null results, counterexamples and failed transfers in the knowledge capsule's ancestry. A library containing only successful programs creates severe survivorship bias. Track retrieval/selection regret and the false-reuse rate, not just the number of reusable programs.
+
+This is where Symthaea can plausibly differentiate: the research policy discovers and validates; the existing typed physics representation carries semantics; a deterministic compiler turns validated knowledge into bounded reusable execution; and the blind evaluator tests transfer. None of these stages may certify itself.
+
+### 1.11 From one-shot researcher to discover–compile–transfer
+
+A promising hybrid architecture is to treat a confirmed scientific result as a **versioned executable knowledge object**, not a paragraph in long-term memory. The pipeline is:
+
+`explore → propose typed model → design discriminating experiment → independently qualify → compile a bounded executable capsule → transfer-test → promote or quarantine`.
+
+The canonical source must remain #6879/#6880 ScientificModel / PhysicsIR. A compiled capsule is a derived artifact, never a second equation AST or physical ontology. Bind the canonical model digest, assumptions, units, domain of validity, measurement model, parameter ranges, solver/runtime profile, test corpus, counterexamples, uncertainty contract, codegen version and qualification receipt. Keep the code generator deterministic and restricted to a tested expression subset; unsupported features must fail closed rather than silently approximate.
+
+This is a third evaluation arm alongside cold-start generalist and precompiled specialist:
+
+1. **Cold-start generalist:** method and model construction begins only after the task is presented.
+2. **Compiled specialist:** task-specific executable knowledge is prepared before task presentation; publish all human and automated setup costs and data access.
+3. **Discover–compile–transfer hybrid:** the system discovers a method on a source task, compiles it only after independent qualification, then receives fresh related and unrelated tasks without seeing their answer keys. It must decide whether to reuse, adapt, or reject the capsule.
+
+Measure first-use and amortized performance separately. For (K) tasks, report total setup cost (C_{setup}), total discovery cost, per-task execution cost (c_i), verification cost and human intervention. A simple break-even diagnostic is (K^* = C_{setup}/(c_{baseline}-c_{compiled})) when compiled execution is cheaper and quality remains non-inferior. It is not enough to show a low runtime after excluding solver construction.
+
+Promotion gates:
+- deterministic compiler/codegen and model/artifact digests;
+- independent differential tests against the canonical model on known and boundary inputs;
+- units, domain, singularity, stability and unsupported-operation checks;
+- exact behavior on source confirmation tests and declared uncertainty coverage;
+- successful positive transfer to held-out related parameterizations/coordinate systems;
+- explicit rejection or safe abstention on unrelated, shifted or out-of-domain tasks;
+- no support for a model claim merely because the compiled program fits the observed points.
+
+Preserve failed hypotheses, null results, counterexamples and failed transfers in the knowledge capsule's ancestry. A library containing only successful programs creates severe survivorship bias. Track retrieval/selection regret and the false-reuse rate, not just the number of reusable programs.
+
+This is where Symthaea can plausibly differentiate: the research policy discovers and validates; the existing typed physics representation carries semantics; a deterministic compiler turns validated knowledge into bounded reusable execution; and the blind evaluator tests transfer. None of these stages may certify itself.
+
 
 Correct answers can come from memorized priors or elimination strategies rather than supplied observations. Introduce paired evidence interventions:
 - **intact:** original evidence;
@@ -374,6 +431,18 @@ Prospective stretch hypotheses after exact parity:
 - **Terminal-Bench Science:** compare only on an identical task/verifier/harness/time cap and report cost separately. A pass-rate gain purchased with materially more compute or human intervention is a trade-off, not unconditional superiority.
 
 These targets are hypotheses, not current Symthaea results and not transferable between benchmarks. If no method beats a simple baseline or the confidence interval overlaps no effect, keep the simpler policy and preserve the null result.
+
+### Specialist and hybrid-system comparison
+
+Report three distinct capabilities rather than one pooled "research agent" score:
+
+| Track | What is frozen before task release | What counts toward inclusive cost | Primary question |
+|---|---|---|---|
+| Cold-start researcher | General policy, base knowledge and tools; no task-specific solver | Policy development amortization reported separately; inference, retrieval, tools, tests, retries and human review per task | Can it discover a method without seeing the answer? |
+| Compiled specialist | Task-specific solver may be prebuilt | Human/code engineering, data curation, tuning, compilation, validation and artifact maintenance, plus runtime | Can prepared domain knowledge execute accurately and cheaply? |
+| Discover–compile–transfer | Source-task discovery and independently qualified capsule are frozen before fresh tasks | Full source discovery + compilation + qualification + retrieval/adaptation + target execution + human review | Can a researcher turn a discovery into reusable knowledge and know when it does not transfer? |
+
+Report first-task quality/cost, amortized cost at K = 1, 5, 20, 100 projects, break-even K, positive-transfer gain, negative-transfer rate, false reuse, and reuse-selection regret. These are proposed experimental slices, not a claim that the Unizen local ASI-Bench report or any other compiled system has demonstrated transfer.
 
 ## 6. Near-term target policy
 
