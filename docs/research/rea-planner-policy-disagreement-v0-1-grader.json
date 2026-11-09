@@ -95,8 +95,8 @@
     "manifest_normalized_cost": 0.10333333333333335,
     "reproduction_normalized_cost": 0.7333333333333334,
     "static_probe_point_planner_utility": 1.385228886288832,
-    "reproduction_point_planner_utility": 0.3791889615344692,
+    "reproduction_point_planner_utility": 0.3791889615172332,
     "static_probe_robust_lower_tail_utility": 0.0007527606448437289,
-    "reproduction_robust_lower_tail_utility": 0.25734801211288016
+    "reproduction_robust_lower_tail_utility": 0.25734801210118247
   }
 }
